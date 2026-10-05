@@ -31,6 +31,12 @@ describe('findDeckSentences', () => {
   it('does not mistake nouns containing contraction prefixes for completion grammar', () => {
     expect(findDeckSentences([{ id: 'noun', word: '', sentence: 'おもちゃとじゃがいも。' }], 'てしまう')).toEqual([]);
   });
+  it.each(['食べちゃいけない。', '飲んじゃいけない。', 'お茶をちゃわんに入れる。'])(
+    'does not list "must not" or 茶碗 under てしまう: %s',
+    (sentence) => {
+      expect(findDeckSentences([{ id: 'x', word: '', sentence }], 'てしまう')).toEqual([]);
+    },
+  );
   it('honours the limit', () => {
     expect(findDeckSentences(cards, '水を', 2)).toHaveLength(2);
     expect(findDeckSentences(cards, '水を', 1)).toHaveLength(1);

@@ -26,9 +26,11 @@ function needleVariants(needle: string): string[] {
   if (needle === 'てしまう' || needle === 'でしまう') {
     // Include voiced te-forms and casual contractions, but not bare ちゃ/じゃ:
     // those would also match unrelated words such as おもちゃ and じゃがいも.
+    // The endings are long enough to stay out of 〜ちゃいけない ("must not", from
+    // てはいけない) and 茶碗 (ちゃわん), which a bare い or わ matched.
     return ['てしまう', 'でしまう', 'てしま', 'でしま',
       ...['ちゃ', 'じゃ'].flatMap((stem) =>
-        ['う', 'った', 'って', 'わ', 'い', 'え', 'お'].map((ending) => stem + ending)),
+        ['う', 'った', 'って', 'わない', 'いま', 'え', 'おう'].map((ending) => stem + ending)),
     ];
   }
   const stem = needle.slice(0, -1);
