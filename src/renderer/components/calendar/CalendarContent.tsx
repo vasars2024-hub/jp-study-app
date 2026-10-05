@@ -39,7 +39,7 @@ import {
 } from '../../calendar';
 import { loadDesktopPrefs, onDesktopPrefsChanged } from '../../desktopPrefs';
 import { useT } from '../../i18n';
-import { getStreakRestDates } from '../../stats';
+import { getStreakRestDates, onStatsChanged } from '../../stats';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 
 export type ViewMode = 'month' | 'week' | 'day' | 'agenda';
@@ -593,7 +593,10 @@ function MonthGrid({ state }: { state: CalendarState }) {
   const keys = useMemo(() => monthCells.map(toKey), [monthCells]);
   // One week's dates, used only to name the seven weekday columns.
   const headerWeek = monthCells.slice(0, 7);
-  const restDates = useMemo(() => getStreakRestDates(), [monthCells]);
+  // Re-read when study is recorded or the rest-day switch flips in Stats, Blanc or Files.
+  const [statsVersion, setStatsVersion] = useState(0);
+  useEffect(() => onStatsChanged(() => setStatsVersion((v) => v + 1)), []);
+  const restDates = useMemo(() => getStreakRestDates(), [monthCells, statsVersion]);
   // The cursor's own day when it is on screen, else the first cell: a grid whose
   // active descendant is a day from the month you navigated away from reads as
   // broken, and `aria-activedescendant` pointing at a missing id announces nothing.
