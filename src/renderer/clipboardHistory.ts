@@ -149,10 +149,16 @@ export function onClipboardSettingsChanged(cb: () => void): () => void {
   return () => window.removeEventListener(SETTINGS_EVENT, h);
 }
 
-function applyCap(list: ClipboardEntry[], maxSize = loadClipboardSettings().maxSize): ClipboardEntry[] {
+function applyCap(
+  list: ClipboardEntry[],
+  maxSize = loadClipboardSettings().maxSize,
+  keepId?: string,
+): ClipboardEntry[] {
   const pinned = list.filter((e) => e.pinned);
   let remaining = Math.max(0, maxSize - pinned.length);
-  return list.filter((e) => e.pinned || remaining-- > 0);
+  // `keepId` always survives and spends a slot first, so older copies make way for it.
+  if (keepId && list.some((e) => e.id === keepId && !e.pinned)) remaining -= 1;
+  return list.filter((e) => e.pinned || e.id === keepId || remaining-- > 0);
 }
 
 export interface RecordClipboardOptions {
@@ -197,8 +203,10 @@ export function recordReaderCopy(
 
 export function togglePin(id: string): ClipboardEntry[] {
   // Pins can exceed the cap. Once unpinned, an entry uses the same retention
-  // budget as other copies, without waiting for another clipboard change.
-  const list = applyCap(readList().map((e) => (e.id === id ? { ...e, pinned: !e.pinned } : e)));
+  // budget as other copies, without waiting for another clipboard change — but the
+  // entry just unpinned is never the one dropped: with more pins than the limit
+  // there is no room at all, and unpinning would silently delete what was clicked.
+  const list = applyCap(readList().map((e) => (e.id === id ? { ...e, pinned: !e.pinned } : e)), undefined, id);
   writeList(list);
   return list;
 }

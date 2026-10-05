@@ -107,7 +107,7 @@ describe('consecutive clipboard copies with pinned entries', () => {
 });
 
 describe('reducing the clipboard history limit', () => {
-  it('reapplies the limit when excess pins are unpinned and keeps all remaining pins', () => {
+  it('never deletes the entry being unpinned, even with more pins than the limit', () => {
     const ids = Array.from({ length: 12 }, (_, index) => {
       const entry = recordClipboardEntry(`saved word ${index}`)!;
       togglePin(entry.id);
@@ -115,13 +115,18 @@ describe('reducing the clipboard history limit', () => {
     });
     saveClipboardSettings({ maxSize: 10 });
 
+    // 11 pins still exceed the limit, but the copy just unpinned stays visible.
     const afterFirst = togglePin(ids[0]);
-    expect(afterFirst).toHaveLength(11);
-    expect(afterFirst.every((entry) => entry.pinned)).toBe(true);
-    expect(afterFirst.some((entry) => entry.id === ids[0])).toBe(false);
+    expect(afterFirst).toHaveLength(12);
+    expect(afterFirst.find((entry) => entry.id === ids[0])?.pinned).toBe(false);
+    expect(afterFirst.filter((entry) => entry.pinned)).toHaveLength(11);
     expect(loadClipboardHistory()).toEqual(afterFirst);
 
-    expect(togglePin(ids[1])).toHaveLength(10);
+    // The next unpin keeps its own entry; the older unpinned copy makes way.
+    const afterSecond = togglePin(ids[1]);
+    expect(afterSecond).toHaveLength(11);
+    expect(afterSecond.some((entry) => entry.id === ids[1])).toBe(true);
+    expect(afterSecond.some((entry) => entry.id === ids[0])).toBe(false);
     // With room available, unpinning retains the copy in history.
     const withinLimit = togglePin(ids[2]);
     expect(withinLimit).toHaveLength(10);
