@@ -45,9 +45,12 @@ function entriesOf(file: string): Array<[string, number]> {
 }
 
 describe.each(BASELINES)('$file describes the tree it gates', ({ file, prefix }) => {
-  it('is a non-empty map of path to count', () => {
+  it('is a map of path to count', () => {
     const entries = entriesOf(file);
-    expect(entries.length, `${file} carries no path entries`).toBeGreaterThan(0);
+    const raw = JSON.parse(readFileSync(resolve(REPO, file), 'utf8')) as Record<string, unknown>;
+    // `{}` is a paid-off debt (the locale-arg ratchet reached zero); what must never
+    // happen is a file whose entries are not counts, which every gate would read as clean.
+    expect(entries.length, `${file} has entries that are not path counts`).toBe(Object.keys(raw).length);
     for (const [path, count] of entries) {
       expect(count, `${file}: ${path} has a negative count`).toBeGreaterThanOrEqual(0);
     }

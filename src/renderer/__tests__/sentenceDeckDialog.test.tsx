@@ -246,7 +246,7 @@ describe('SentenceDeckDialog', () => {
   it('says the Whisper model downloads first, with its size, only when it is not here yet', async () => {
     sources = { ok: true, videoPath: VIDEO, title: 'x', tracks: [] };
     await open();
-    expect(q('[data-sd-model-download]').textContent).toMatch(/downloads first.*\d+(\.\d)? MB/);
+    expect(q('[data-sd-model-download]').textContent).toMatch(/downloads first.*\d+(\.\d)? [MG]B/);
     await act(async () => { root.unmount(); });
     host.remove();
     // The study language's default tier, downloaded for the backend in use.
