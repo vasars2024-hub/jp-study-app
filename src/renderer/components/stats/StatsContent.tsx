@@ -81,10 +81,6 @@ import {
  * per-language layout. In English it returns exactly the S M T W T F S the
  * hardcoded array used to. Ambiguity (two S in English, two В in Russian) is
  * inherent to a one-letter axis and is what the tooltip's full date is for.
- *
- * Not `dayLabel`: shared/reviewForecast exports a different function under that
- * name (offset days → "Today"/"Tomorrow"/short weekday), and the collision made
- * it possible to import the wrong one.
  */
 export function weekdayInitial(isoDate: string, lang: UiLang = 'en'): string {
   const d = new Date(`${isoDate}T00:00:00`);

@@ -642,10 +642,7 @@ const WK_LEVEL_KEYS = [
   'blanc.native.forecast.level.known',
 ];
 
-/**
- * Localised twin of `shared/reviewForecast.ts`'s `dayLabel`, which returns
- * English 'Today'/'Tomorrow' and a host-locale weekday.
- */
+/** Forecast day label: Today, Tomorrow, then the weekday, all in the UI language. */
 function forecastDayLabel(t: TFn, lang: UiLang, offsetDays: number): string {
   if (offsetDays === 0) return t('blanc.native.forecast.today');
   if (offsetDays === 1) return t('blanc.native.forecast.tomorrow');

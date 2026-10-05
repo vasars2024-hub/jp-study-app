@@ -243,21 +243,3 @@ export function localDueForecast(
   }
   return { overdue, days: buckets, beyond, total: cards.length };
 }
-
-/**
- * Day label for an offset: Today, Tomorrow, then the weekday name.
- *
- * KNOWN ISSUE — this renders in the OS locale, and the first two labels are
- * hardcoded English besides. Its only consumer is `BlancStudyNativePanels.tsx`,
- * and Blanc is deferred and out of scope for the C1 run that found this; the
- * fix also needs catalog keys, which `shared/` cannot reach through `useT()`.
- * Recorded in docs/KNOWN_ISSUES.md rather than half-fixed here.
- */
-export function dayLabel(offsetDays: number, from: Date = new Date()): string {
-  if (offsetDays === 0) return 'Today';
-  if (offsetDays === 1) return 'Tomorrow';
-  const d = new Date(from);
-  d.setDate(d.getDate() + offsetDays);
-  // i18n-locale-arg-ignore: Blanc-only consumer, deferred — see doc comment above.
-  return d.toLocaleDateString(undefined, { weekday: 'short' });
-}

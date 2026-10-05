@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import {
   FORECAST_DAYS,
-  dayLabel,
   emptyForecast,
   isDueForecast,
   localBacklog,
@@ -147,28 +146,6 @@ describe('localBacklog', () => {
 
   it('handles an empty deck', () => {
     expect(localBacklog([])).toEqual({ total: 0, known: 0, unknown: 0, groups: [] });
-  });
-});
-
-describe('dayLabel', () => {
-  it('names the first two days relatively', () => {
-    expect(dayLabel(0)).toBe('Today');
-    expect(dayLabel(1)).toBe('Tomorrow');
-  });
-
-  it('uses the weekday for later days', () => {
-    // A fixed Monday, so the label is deterministic regardless of when tests run.
-    const monday = new Date(2026, 6, 20);
-    expect(dayLabel(2, monday)).toBe(
-      new Date(2026, 6, 22).toLocaleDateString(undefined, { weekday: 'short' }),
-    );
-  });
-
-  it('rolls over a month boundary', () => {
-    const endOfMonth = new Date(2026, 6, 30);
-    expect(dayLabel(3, endOfMonth)).toBe(
-      new Date(2026, 7, 2).toLocaleDateString(undefined, { weekday: 'short' }),
-    );
   });
 });
 
