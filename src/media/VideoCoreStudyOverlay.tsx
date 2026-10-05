@@ -39,6 +39,7 @@ import { shiftCues, shiftCuesMs } from '../shared/subtitleSync';
 import {
   effectiveKeys,
   formatKeysDisplay,
+  isImeCompositionEvent,
   registerCommandHandler,
 } from '../renderer/keyboardShortcuts';
 import { t as translateUi, useT } from '../renderer/i18n';
@@ -2950,7 +2951,11 @@ export default function VideoCoreStudyOverlay({
           value={dictationInput}
           onChange={(event) => setDictationInput(event.currentTarget.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') checkDictation();
+            // The Enter that confirms an IME conversion is not "check": scoring it
+            // filed half-typed answers in the missed-lines list. Neither is an empty box,
+            // which the Check button already refuses.
+            if (event.key !== 'Enter' || isImeCompositionEvent(event.nativeEvent)) return;
+            if (dictationInput.trim()) checkDictation();
           }}
           placeholder={t('mediaWorkspace.study.typeWhatYouHear')}
           aria-label={t('mediaWorkspace.study.dictationAnswer')}
