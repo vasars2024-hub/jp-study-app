@@ -15,7 +15,7 @@ import {
   SOUNDSCAPE_STORAGE_KEY,
   applyMix,
   clamp01,
-  isSilent,
+  isMixSilent,
   matchingSceneId,
   mixOf,
   normalizeSoundscapeState,
@@ -115,7 +115,7 @@ function clearTimer(): void {
 }
 
 function start(): void {
-  if (playing || isSilent(state)) return;
+  if (playing || isMixSilent(state)) return;
   hookMedia();
   pushToEngine();
   soundscapeEngine.play();
@@ -131,7 +131,7 @@ function stop(fadeSeconds = 0.4): void {
 
 /** Start when a change makes something audible; stop when it leaves nothing to hear. */
 function followMix(): void {
-  if (isSilent(state)) stop();
+  if (isMixSilent(state)) stop();
   else start();
 }
 
@@ -199,7 +199,7 @@ export function clearSoundscape(): void {
 /** Keep the current mix under `name`. Returns false when there is nothing to keep. */
 export function saveSoundscapeMix(name: string): boolean {
   const trimmed = name.trim().slice(0, 60);
-  if (!trimmed || isSilent(state) || state.saved.length >= MAX_SAVED_MIXES) return false;
+  if (!trimmed || isMixSilent(state) || state.saved.length >= MAX_SAVED_MIXES) return false;
   const id = `mix-${Date.now().toString(36)}`;
   commit({ ...state, saved: [...state.saved, { id, name: trimmed, ...mixOf(state) }] });
   return true;

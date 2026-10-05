@@ -11,7 +11,7 @@ import {
   SOUND_LAYERS,
   SOUND_LAYER_GROUPS,
   isMusicStyleId,
-  isSilent,
+  isMixSilent,
 } from '../soundscape/soundscapeModel';
 import {
   applySoundscapeScene,
@@ -56,7 +56,7 @@ export function SoundscapeWidget() {
   }, [timerRunning]);
 
   const { state, playing, sceneId, timerEndsAt } = snap;
-  const silent = isSilent(state);
+  const silent = isMixSilent(state);
   const savedSelected = state.saved.some((mix) => mix.id === sceneId);
   const minutesLeft = timerEndsAt === null ? 0 : Math.max(1, Math.ceil((timerEndsAt - Date.now()) / 60_000));
 

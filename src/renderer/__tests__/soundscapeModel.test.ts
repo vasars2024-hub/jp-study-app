@@ -19,7 +19,7 @@ import {
   createMotif,
   createRng,
   defaultSoundscapeState,
-  isSilent,
+  isMixSilent,
   keyNotes,
   matchingSceneId,
   midiToHz,
@@ -83,7 +83,7 @@ describe('the soundscape catalog', () => {
 describe('soundscape state', () => {
   it('starts silent with every layer at a usable level', () => {
     const state = defaultSoundscapeState();
-    expect(isSilent(state)).toBe(true);
+    expect(isMixSilent(state)).toBe(true);
     for (const layer of SOUND_LAYERS) expect(state.levels[layer.id]).toBeGreaterThan(0);
   });
 
@@ -125,7 +125,7 @@ describe('soundscape state', () => {
     const state = applyMix(defaultSoundscapeState(), scene.mix);
     expect(mixOf(state)).toEqual(scene.mix);
     expect(matchingSceneId(state)).toBe(scene.id);
-    expect(isSilent(state)).toBe(false);
+    expect(isMixSilent(state)).toBe(false);
 
     const [first] = state.active;
     const nudged = { ...state, levels: { ...state.levels, [first]: state.levels[first] + 0.1 } };

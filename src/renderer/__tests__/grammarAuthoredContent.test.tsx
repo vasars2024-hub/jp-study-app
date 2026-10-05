@@ -202,7 +202,7 @@ describe('GrammarDetail', () => {
     vi.spyOn(flashcardDeck, 'loadDeck').mockReturnValue([
       { id: 'source-card', word: '食べる', sentence: '食べちゃった。' } as flashcardDeck.DeckFlashcard,
     ]);
-    const open = vi.spyOn(openIntents, 'requestFlashcardsFocus').mockImplementation(() => {});
+    const open = vi.spyOn(openIntents, 'requestFlashcardsFocus').mockImplementation(() => undefined);
     const el = render({
       id: 'completion', lang: 'ja', level: 'N4', title: '〜てしまう', meaning: 'completion',
       structure: 'てしまう', explanation: 'completion', examples: [],

@@ -132,10 +132,10 @@ describe('Calendar month navigation', () => {
     localStorage.setItem(LS_KEYS.calendarEvents, JSON.stringify(events));
     try {
       let state: CalendarState;
-      function Harness() {
+      const Harness = () => {
         state = useCalendar();
         return null;
-      }
+      };
       host = document.createElement('div');
       document.body.appendChild(host);
       root = createRoot(host);

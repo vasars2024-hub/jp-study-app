@@ -584,6 +584,8 @@ function MonthGrid({ state }: { state: CalendarState }) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
   const keys = useMemo(() => monthCells.map(toKey), [monthCells]);
+  // One week's dates, used only to name the seven weekday columns.
+  const headerWeek = monthCells.slice(0, 7);
   const restDates = useMemo(() => getStreakRestDates(), [monthCells]);
   // The cursor's own day when it is on screen, else the first cell: a grid whose
   // active descendant is a day from the month you navigated away from reads as
@@ -634,7 +636,7 @@ function MonthGrid({ state }: { state: CalendarState }) {
         one column — checked live, not assumed.
       */}
       <div role="row" className="cal-month-row">
-        {monthCells.slice(0, 7).map((d, i) => (
+        {headerWeek.map((d, i) => (
           // The locale's own narrow weekday, in the order the grid actually runs —
           // this was a hard-coded English `S M T W T F S` that also assumed Sunday.
           <div

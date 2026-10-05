@@ -293,7 +293,7 @@ export function matchingSceneId(state: SoundscapeState): string | null {
 }
 
 /** Nothing would be heard: no layer in the mix and no music. */
-export function isSilent(state: SoundscapeState): boolean {
+export function isMixSilent(state: SoundscapeState): boolean {
   return state.active.length === 0 && state.music === 'off';
 }
 

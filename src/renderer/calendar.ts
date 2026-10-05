@@ -156,7 +156,7 @@ export interface EventOccurrence extends CalendarEvent {
 }
 
 /** Custom repeats use whole calendar days, including when loading older events. */
-export function normalizeRecurrenceInterval(value: number = 1): number {
+export function normalizeRecurrenceInterval(value = 1): number {
   return Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1;
 }
 
