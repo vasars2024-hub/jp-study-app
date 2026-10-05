@@ -167,6 +167,22 @@ describe('catalog hygiene', () => {
   });
 
   /**
+   * A catalog written through a non-UTF-8 codepage keeps its quotes and braces and turns
+   * every Japanese, Chinese or Cyrillic character into `?`. The result is a perfectly good
+   * non-empty string, so the missing-key gates pass it; a1d3d91e6 shipped six of them.
+   */
+  it('has no translation mangled into question marks', () => {
+    const offenders: string[] = [];
+    for (const lang of UI_LANGS) {
+      for (const [key, value] of Object.entries(CATALOGS[lang])) {
+        const texts = typeof value === 'string' ? [value] : Object.values(value ?? {});
+        if (texts.some((t) => typeof t === 'string' && /\?{3,}/.test(t))) offenders.push(`${lang}:${key}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  /**
    * Plurals must be the OBJECT form, never a raw ICU string.
    *
    * `isPluralForms` (core.ts) only recognises an object carrying `other`. A string entry falls

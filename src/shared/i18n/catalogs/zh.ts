@@ -7561,8 +7561,8 @@ export const zh: Catalog = {
   'flash.search.leeches': '难记卡片：{n}',
   'flash.search.leechesTitle': '显示遗忘至少{n}次的卡片',
   'flash.leechNotice': '难记卡片：“{word}”已遗忘{n}次。建议编辑它或添加记忆窍门。',
-  'flash.leechEditMeaning': '????',
-  'flash.leechEditMeaningPrompt': '???{word}????????????',
+  'flash.leechEditMeaning': '编辑释义',
+  'flash.leechEditMeaningPrompt': '修改“{word}”的释义，或添加记忆窍门。',
   'flash.leechNoticeDismiss': '关闭',
   'flash.search.noMatches': '没有匹配“{query}”的卡片。',
   'flash.search.matchCount': {
