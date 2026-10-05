@@ -2,7 +2,7 @@
   "name": "jp-study-app",
   "productName": "jp-study-app",
   "version": "1.0.1",
-  "description": "My Electron application description",
+  "description": "Gum: a desktop you study Japanese inside. Dictionary, grammar, reader, flashcards, video, games and stats on one offline-first desktop.",
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
