@@ -4,7 +4,7 @@
  * `whisperModelForCpu` substitutes `Xenova/whisper-base` for kotoba-whisper and
  * whisper-large-v3-turbo on the WASM path, because their fp32 encoders carry
  * external ONNX data the browser runtime cannot mount. That substitution is
- * correct — the alternative is a 320 MB download that then fails to transcribe.
+ * correct — the alternative is a 2.5 GB fp32 download that then fails to transcribe.
  * What was wrong is that it was SILENT: `whisperWorker.ts` posts a
  * `model-fallback` status and, measured 2026-09-01, nothing in `src/` listened
  * to it. A machine without a usable WebGPU adapter therefore produced

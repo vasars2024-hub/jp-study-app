@@ -22,7 +22,11 @@ export function whisperModelForCpu(requestedModel: string): string {
     : requestedModel;
 }
 
+// fp16 throughout. The q4 decoder this used to load turned clear Japanese speech
+// into fragments like 「て。」 on WebGPU while the same audio transcribed correctly
+// on CPU, and it bought nothing: for every tier the q4 decoder is no smaller than
+// the fp16 one, and fp16 is the GPU's native precision.
 export const WHISPER_GPU_PIPELINE_OPTIONS = {
   device: 'webgpu',
-  dtype: { encoder_model: 'fp16', decoder_model_merged: 'q4' },
+  dtype: { encoder_model: 'fp16', decoder_model_merged: 'fp16' },
 } as const;

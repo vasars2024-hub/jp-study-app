@@ -14,7 +14,11 @@ export interface WhisperModelSpec {
   id: WhisperModelTier;
   /** Hugging Face model id for @huggingface/transformers */
   hfId: string;
-  /** Approx download size for UI copy (bytes). */
+  /**
+   * Approx download size for UI copy (bytes): the fp16 encoder plus the fp16
+   * merged decoder that the default WebGPU path fetches (measured from the HF
+   * file listings, 2026-10). The CPU path downloads fp32 weights instead.
+   */
   sizeBytes: number;
   langs: Array<'ja' | 'zh' | 'ru' | 'any'>;
   /** Prefer this tier when study language matches. */
@@ -25,13 +29,13 @@ export const WHISPER_MODEL_SPECS: WhisperModelSpec[] = [
   {
     id: 'whisper-base',
     hfId: 'Xenova/whisper-base',
-    sizeBytes: 75_000_000,
+    sizeBytes: 150_000_000,
     langs: ['any'],
   },
   {
     id: 'whisper-small',
     hfId: 'Xenova/whisper-small',
-    sizeBytes: 250_000_000,
+    sizeBytes: 490_000_000,
     langs: ['any'],
   },
   {
@@ -42,7 +46,7 @@ export const WHISPER_MODEL_SPECS: WhisperModelSpec[] = [
     // conversion and serves the full encoder/decoder set (fp16, q4, quantized).
     id: 'kotoba-whisper',
     hfId: 'onnx-community/kotoba-whisper-v2.2-ONNX',
-    sizeBytes: 320_000_000,
+    sizeBytes: 1_500_000_000,
     langs: ['ja'],
     preferFor: ['ja'],
   },

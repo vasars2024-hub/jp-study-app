@@ -81,7 +81,6 @@ async function load(model: string, prefer: 'auto' | 'cpu'): Promise<any> {
 
   try {
     transcriber = await pipeline('automatic-speech-recognition', model, {
-      // Quantised decoder is dramatically faster than fp32 on the GPU.
       ...WHISPER_GPU_PIPELINE_OPTIONS,
       progress_callback,
     });

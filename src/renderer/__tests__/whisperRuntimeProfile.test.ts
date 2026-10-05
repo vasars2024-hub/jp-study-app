@@ -16,10 +16,10 @@ describe('Whisper packaged runtime profiles', () => {
     expect(whisperModelForCpu('Xenova/whisper-small')).toBe('Xenova/whisper-small');
   });
 
-  it('keeps the faster mixed precision graph on WebGPU', () => {
+  it('loads fp16 weights on WebGPU, never the q4 decoder that garbled Japanese', () => {
     expect(WHISPER_GPU_PIPELINE_OPTIONS).toEqual({
       device: 'webgpu',
-      dtype: { encoder_model: 'fp16', decoder_model_merged: 'q4' },
+      dtype: { encoder_model: 'fp16', decoder_model_merged: 'fp16' },
     });
   });
 });

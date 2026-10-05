@@ -6,7 +6,7 @@
 // stores them in the browser Cache Storage (`transformers-cache`). We record a
 // tier as downloaded once its pipeline has loaded successfully at least once.
 //
-// The record is per *variant*, not just per tier: the GPU path downloads fp16/q4
+// The record is per *variant*, not just per tier: the GPU path downloads fp16
 // weights and the CPU path downloads fp32 ones, so a model downloaded on GPU is
 // genuinely not present for CPU. Tracking only the tier made the "downloaded"
 // tick lie after a GPU/CPU switch. Follows the get/set/subscribe shape of
