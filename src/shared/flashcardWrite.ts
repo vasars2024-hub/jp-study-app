@@ -43,6 +43,8 @@ export interface WriteQuestion {
   hint: string;
   /** Characters in the canonical answer, so a host can offer a shape hint. */
   answerLength: number;
+  /** The card's reading when it differs from the answer (meaning → Japanese only). */
+  reading?: string;
 }
 
 export interface WriteRound {
@@ -168,6 +170,25 @@ export function writeMeaningText(card: WriteSourceCard): string {
   return (card.meaning || '').trim();
 }
 
+const KANJI_OR_KATAKANA = /[\p{Script=Han}\p{Script=Katakana}々〆ヵヶ]/u;
+
+/**
+ * The written forms a word field lists. `/` and `;` always separate variants.
+ * `、` and `,` only do when every piece looks like a written word, so 「私、僕」
+ * offers either, while a set phrase such as 「はい、そうです」 or an amount such as
+ * 「1,000円」 stays one answer — splitting those graded 「はい」 or 「1」 correct.
+ */
+function japaneseVariants(word: string): string[] {
+  const pieces = (text: string, sep: RegExp) => text.split(sep).map((p) => p.trim()).filter(Boolean);
+  const out: string[] = [];
+  for (const part of pieces(word, /[/／;；]/)) {
+    const listed = pieces(part, /[、,，]/);
+    const isList = listed.length > 1 && listed.every((p) => KANJI_OR_KATAKANA.test(p) && !/[0-9０-９]/.test(p));
+    out.push(...(isList ? listed : [part]));
+  }
+  return out.length > 1 ? out : [];
+}
+
 /**
  * One question from one card, or `null` when the card cannot ask anything.
  *
@@ -189,7 +210,7 @@ export function buildWriteQuestion(
     // types かんじ knows the word, and still ought to be shown 漢字.
     // A word field listing variants ("私、僕") accepts any one of them; a
     // sentence fallback is never split, its commas are just punctuation.
-    const variants = card.word?.trim() ? glossSenses(japanese) : [];
+    const variants = card.word?.trim() ? japaneseVariants(japanese) : [];
     const accepted = [
       ...new Set([japanese, ...variants, ...(reading && reading !== japanese ? [reading] : [])]),
     ];
@@ -202,6 +223,7 @@ export function buildWriteQuestion(
       // The reading IS an accepted answer, so it cannot also be the hint.
       hint: '',
       answerLength: [...japanese].length,
+      ...(reading && reading !== japanese ? { reading } : {}),
     };
   }
 
@@ -297,7 +319,7 @@ export function gradeWrittenAnswer(typed: string, question: WriteQuestion): Writ
       return {
         verdict: 'correct',
         matched: candidate,
-        viaReading: !english && candidate !== question.answer,
+        viaReading: !english && !!question.reading && candidate === question.reading,
       };
     }
   }

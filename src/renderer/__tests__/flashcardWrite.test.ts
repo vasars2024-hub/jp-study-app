@@ -44,6 +44,22 @@ describe('variant words', () => {
     const q = question('meaning-to-jp', card({ id: 's', sentence: 'はい、そうです', meaning: 'yes, it is' }));
     expect(gradeWrittenAnswer('はい', q).verdict).not.toBe('correct');
   });
+
+  it.each([
+    ['はい、そうです', 'はい'],
+    ['いいえ、けっこうです', 'いいえ'],
+    ['1,000円', '1'],
+  ])('keeps the word field %s whole, so %s alone is not correct', (word, part) => {
+    const q = question('meaning-to-jp', card({ id: 'p', word, meaning: 'phrase' }));
+    expect(gradeWrittenAnswer(part, q).verdict).not.toBe('correct');
+    expect(gradeWrittenAnswer(word, q).verdict).toBe('correct');
+  });
+
+  it('does not call a typed variant "via reading"; only the reading is', () => {
+    const q = question('meaning-to-jp', watashi);
+    expect(gradeWrittenAnswer('僕', q).viaReading).toBe(false);
+    expect(gradeWrittenAnswer('わたし', q).viaReading).toBe(true);
+  });
 });
 
 describe('buildWriteRound', () => {
