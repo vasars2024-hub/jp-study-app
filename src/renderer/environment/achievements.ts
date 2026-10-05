@@ -5,11 +5,19 @@ import { getSummary, READING_RECORDED_EVENT, REVIEW_RECORDED_EVENT } from '../st
 import { emitCompanionEvent } from './companionEvents';
 import { STREAK_MILESTONES, unlockTrinketsForStreak } from './companionTrinkets';
 import { t } from '../i18n';
+import { getStudyLang, type StudyLang } from '../studyEnvironment';
 
 const KEY = 'jp-os-achievements-v1';
 
 interface AchState {
+  /** Pre-language value; still the starting point for a language with no entry yet. */
   lastStreakCelebrated: number;
+  /**
+   * Streaks are counted per study language, so the milestone already celebrated has to be
+   * too. With one shared number, switching from a 30-day Japanese streak to a 2-day Chinese
+   * one read as a broken streak, and switching back celebrated 30 days again.
+   */
+  streakCelebratedByLang?: Partial<Record<StudyLang, number>>;
   lastDailyCharsBucket: number;
   lastDailyReviewsBucket: number;
   dayKey: string;
@@ -52,24 +60,31 @@ export function checkAchievements(): void {
   if (state.dayKey !== today) {
     state = {
       lastStreakCelebrated: state.lastStreakCelebrated,
+      streakCelebratedByLang: state.streakCelebratedByLang,
       lastDailyCharsBucket: 0,
       lastDailyReviewsBucket: 0,
       dayKey: today,
     };
   }
 
+  const studyLang = getStudyLang();
+  const byLang = { ...state.streakCelebratedByLang };
+  let celebrated = byLang[studyLang] ?? state.lastStreakCelebrated;
+
   // A broken streak re-arms the milestones above it, so rebuilding to 7 days celebrates again.
-  if (summary.streak < state.lastStreakCelebrated) {
-    state.lastStreakCelebrated = STREAK_MILESTONES.filter((m) => m <= summary.streak).pop() ?? 0;
+  if (summary.streak < celebrated) {
+    celebrated = STREAK_MILESTONES.filter((m) => m <= summary.streak).pop() ?? 0;
   }
 
   // Celebrate the highest newly crossed streak milestone (not every step at once).
   let bestStreak = 0;
   for (const m of STREAK_MILESTONES) {
-    if (summary.streak >= m && state.lastStreakCelebrated < m) bestStreak = m;
+    if (summary.streak >= m && celebrated < m) bestStreak = m;
   }
+  if (bestStreak > 0) celebrated = bestStreak;
+  byLang[studyLang] = celebrated;
+  state.streakCelebratedByLang = byLang;
   if (bestStreak > 0) {
-    state.lastStreakCelebrated = bestStreak;
     emitCompanionEvent('streak', t('companion.achievement.streak', { count: bestStreak }));
     emitCompanionEvent('achievement', t('companion.achievement.studyStreak', { count: bestStreak }));
   }
