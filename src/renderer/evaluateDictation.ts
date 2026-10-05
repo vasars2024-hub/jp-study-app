@@ -7,6 +7,18 @@ function toReading(text: string): string {
     .join('');
 }
 
+const KANJI = /[\p{Script=Han}々]/gu;
+
+/**
+ * Whether every kanji the learner typed is one the line actually uses. Reading the
+ * answer aloud is only fair then: 機械がある and 機会がある are both きかいがある, and
+ * a wrong kanji must not score as an exact match.
+ */
+function kanjiAllFromExpected(answer: string, expected: string): boolean {
+  const allowed = new Set(expected.match(KANJI) ?? []);
+  return (answer.match(KANJI) ?? []).every((ch) => allowed.has(ch));
+}
+
 /** Accept kana transcriptions without requiring the learner to spell kanji. */
 export async function evaluateDictation(answer: string, expected: string) {
   const literal = evaluateJapaneseDictation(answer, expected);
@@ -18,7 +30,9 @@ export async function evaluateDictation(answer: string, expected: string) {
     // An IME converts some words and not others (今日はいいてんき), so the
     // answer is read aloud too: neither script alone matches a mixed answer.
     const kana = evaluateJapaneseDictation(answer, reading);
-    const spoken = evaluateJapaneseDictation(toReading(answer), reading);
+    const spoken = kanjiAllFromExpected(answer, expected)
+      ? evaluateJapaneseDictation(toReading(answer), reading)
+      : kana;
     const phonetic = spoken.score > kana.score ? spoken : kana;
     return phonetic.score > literal.score
       ? {
