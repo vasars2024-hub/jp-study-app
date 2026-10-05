@@ -34,12 +34,14 @@ and the interface is available in English, Japanese, Chinese and Russian.
 | **Mine and review** | One-click mining to Anki through AnkiConnect, `.apkg` import, a field-mapping editor, and a built-in flashcard deck with its own scheduling for when you do not use Anki. |
 | **Watch and listen** | Local video with study subtitles, sentence mining from a line, dictation practice, YouTube playlists and a music player with a visualizer. |
 | **Play** | Fifteen small games built on your own vocabulary: kana sprint, cloze blitz, particle panic, listening flash and more. |
-| **Track** | Statistics, streaks, a review forecast, a study calendar with reminders, and desktop widgets for all of it. |
+| **Track** | Statistics, streaks with an optional weekly rest day, a review forecast, reading speed, a study calendar with reminders, and desktop widgets for all of it. |
+| **Focus** | Soundscape: fourteen generated sounds (rain, thunder, waves, café, fireplace, noise and more), each with its own slider, under generated lofi, jazz or piano. Scenes, saved mixes and a sleep timer. Nothing is a recording, so nothing loops. |
 | **Make it yours** | Themes, wallpapers and rotation playlists, a companion that reacts to your study, over a hundred rebindable keyboard commands and a command palette. |
 
 <p align="center">
-  <img alt="Dictionary result for a word, with readings, senses and an Add to Anki button" src="docs/readme/dictionary.png" width="49%">
-  <img alt="Grammar explorer showing a grammar point with its structure and an example" src="docs/readme/grammar.png" width="38%">
+  <img alt="Dictionary result for a word, with readings, senses and an Add to Anki button" src="docs/readme/dictionary.png" width="44%">
+  <img alt="Grammar explorer showing a grammar point with its structure and an example" src="docs/readme/grammar.png" width="34%">
+  <img alt="Soundscape widget: a list of sounds with a volume slider each, a scene picker and a sleep timer" src="docs/readme/soundscape.png" width="18%">
 </p>
 
 ### What works, honestly
@@ -53,22 +55,21 @@ reproduces it. Read those two before relying on something.
 
 ## Install
 
-Windows x64 builds are on the [releases page](https://github.com/vasars2024-hub/jp-study-app/releases).
-The release is split in two because of GitHub's file size limit, and you need both:
+1. Download **`jp-study-app-win32-x64-<version>.zip`** from the
+   [latest release](https://github.com/vasars2024-hub/jp-study-app/releases/latest).
+2. Extract it anywhere, for example to `C:\Apps`.
+3. Run `jp-study-app.exe` inside the extracted `jp-study-app-win32-x64` folder.
+   There is no installer, and nothing is written outside the folder except your
+   own data under `%APPDATA%`.
 
-1. **`…-core.zip`** is the app itself. Extract it to a folder of your choice.
-2. **`…-public.zip`** holds the models, dictionaries and OCR assets. Extract it
-   into `resourcespublic` inside that same folder.
+Windows SmartScreen may warn that the app is unrecognised, because the build is
+not code-signed. Choose **More info → Run anyway**.
 
-```
-jp-study-app-win32-x64  jp-study-app.exe
-  resources    app    public    <- the public zip goes here
-```
-
-Then run `jp-study-app.exe`. There is no installer.
-
-Further assets (more OCR and speech models) can be downloaded from inside the app
-under **Settings → Storage**. Those downloads resume if interrupted.
+The Japanese tokenizer, OCR engine and Chinese dictionary ship inside the zip.
+The Japanese–English dictionary, pitch accent, example sentences and the larger
+OCR, speech and AI models are downloaded from inside the app under
+**Settings → Storage**, so you only fetch what you use. Downloads resume if
+interrupted.
 
 Optional, for mining to Anki: [Anki](https://apps.ankiweb.net/) with the
 [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on.
@@ -84,9 +85,12 @@ npm install
 npm start
 ```
 
-A source checkout does not include the runtime data (models, dictionaries, OCR
-assets). Put the contents of the release's `public` zip into `public/` before the
-first run, or the dictionary and OCR will have nothing to load.
+`npm install` stages the tokenizer, ONNX and OCR engine files into `public/`. Two
+things it cannot fetch: Tesseract's Japanese language data and the CC-CEDICT
+Chinese dictionary. Copy `resources\public\tesseract\lang\` and
+`resources\public\cedict\` from an extracted release into the same places under
+`public/`. `npm run package:win` refuses to build while any
+runtime file is missing and names the feature it would break.
 
 | Command | What it does |
 |---|---|
@@ -130,16 +134,8 @@ before the test suite passes; [`CLAUDE.md`](CLAUDE.md) describes the workflow.
 ## Branches
 
 - **`master`** is the public line and what releases are cut from.
-- **`relay/astra`** collects small bug fixes and quality-of-life changes that are
-  reviewed in batches before they land. It currently adds, among other things, a
-  reading-time estimate in the novel reader, a rest day for study streaks, a leech
-  filter for flashcards and a **Soundscape** widget: a mixer of generated rain,
-  noise, nature and café sounds under generated lofi, jazz or piano, for studying
-  to. The screenshots on this page were taken from that branch.
-
-<p align="center">
-  <img alt="Soundscape widget: a list of sounds with a volume slider each, a scene picker and a sleep timer" src="docs/readme/soundscape.png" width="272">
-</p>
+- **`relay/astra`** collects small bug fixes and quality-of-life changes, which
+  land on `master` in reviewed batches.
 
 ## Contributing
 
