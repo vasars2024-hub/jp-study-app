@@ -1089,7 +1089,7 @@ export function SiteRulesPage() {
         }
         setNotice(t('scraperMgmt.rule.validated', {
           status: response.status,
-          bytes: response.body.length.toLocaleString(),
+          bytes: response.body.length.toLocaleString(LANG_TAGS[lang]),
           rows: result.rows.length,
         }));
         patchRule({
@@ -1132,7 +1132,7 @@ export function SiteRulesPage() {
         <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.rules.tile.validated')}</span><span className="scr-tile-value">{validatedCount}</span></div>
         <div className="scr-tile">
           <span className="scr-tile-label">{t('scraperMgmt.rules.tile.lastMatch')}</span>
-          <span className="scr-tile-value">{(selected?.lastMatchCount ?? 0).toLocaleString()}</span>
+          <span className="scr-tile-value">{(selected?.lastMatchCount ?? 0).toLocaleString(LANG_TAGS[lang])}</span>
         </div>
       </div>
 

@@ -1082,7 +1082,7 @@ export function HistoryPage() {
                   </div>
                   <div role="gridcell" className="scr-td"><span className="scr-t-plain">{job.provider}</span></div>
                   <div role="gridcell" className="scr-td"><Pill tone="outline">{job.profile}</Pill></div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{job.found.toLocaleString()}</span></div>
+                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{sxNumber(job.found)}</span></div>
                   <div role="gridcell" className="scr-td">
                     <span className={`scr-t-num${job.failed ? ' scr-seed is-low' : ''}`}>{sxNumber(job.failed)}</span>
                   </div>

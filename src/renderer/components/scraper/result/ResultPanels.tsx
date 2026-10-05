@@ -91,15 +91,15 @@ export function DetailsPanel({
       <div className="scr-tile-row">
         <div className="scr-tile">
           <span className="scr-tile-label">{sx('result.detail.found')}</span>
-          <span className="scr-tile-value">{episodes.length.toLocaleString()}</span>
+          <span className="scr-tile-value">{sxNumber(episodes.length)}</span>
         </div>
         <div className={`scr-tile${gap > 0 ? ' is-warn' : ''}`}>
           <span className="scr-tile-label">{sx('result.detail.expected')}</span>
-          <span className="scr-tile-value">{metadata.episodeCount.toLocaleString()}</span>
+          <span className="scr-tile-value">{sxNumber(metadata.episodeCount)}</span>
         </div>
         <div className="scr-tile">
           <span className="scr-tile-label">{sx('result.detail.japaneseSubs')}</span>
-          <span className="scr-tile-value">{stats.withJa.toLocaleString()}</span>
+          <span className="scr-tile-value">{sxNumber(stats.withJa)}</span>
         </div>
         <div className={`scr-tile${stats.failed ? ' is-bad' : ''}`}>
           <span className="scr-tile-label">{sx('result.detail.failed')}</span>
