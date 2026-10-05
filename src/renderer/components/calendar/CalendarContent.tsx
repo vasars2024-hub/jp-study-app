@@ -354,8 +354,13 @@ export function useCalendar() {
   const [mode, setMode] = useState<ViewMode>('month');
   const [cursor, setCursor] = useState(() => new Date());
   const [jumpVal, setJumpVal] = useState(toKey(new Date()));
-  // Follow navigation, but leave an unfinished date alone until the cursor moves.
-  useEffect(() => setJumpVal(toKey(cursor)), [cursor]);
+  // Follow navigation, but leave the field alone when it already names the cursor's day:
+  // the date input fires on every keystroke of the year, and rewriting "0202" as
+  // toKey(cursor) mid-typing made the browser blank the field.
+  useEffect(
+    () => setJumpVal((v) => (v && toKey(fromKey(v)) === toKey(cursor) ? v : toKey(cursor))),
+    [cursor],
+  );
   const [modal, setModal] = useState<Partial<EventForm> | null>(null);
   const [weekStartPref, setWeekStartPref] = useState(() => loadDesktopPrefs().weekStart);
   useEffect(() => onDesktopPrefsChanged((prefs) => setWeekStartPref(prefs.weekStart)), []);
@@ -377,7 +382,9 @@ export function useCalendar() {
   };
   const goToday = () => setCursor(new Date());
   const jump = (key: string) => {
-    if (!key) return;
+    // A year still being typed ("0002", "0020") is not a destination; new Date() would
+    // read it as 1902 or 1920 and send the calendar there.
+    if (!key || Number(key.split('-')[0]) < 1000) return;
     setCursor(fromKey(key));
   };
 

@@ -171,6 +171,28 @@ describe('Calendar month navigation', () => {
     act(() => state.shift(direction));
     expect(toKey(state!.cursor)).toBe(expected);
   });
+
+  it('keeps a year being typed in the jump field instead of rewriting it', () => {
+    let state: CalendarState;
+    function Harness() {
+      state = useCalendar();
+      return null;
+    }
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => root!.render(createElement(Harness)));
+    act(() => state.jump('2026-10-04'));
+    // The date input fires once per year keystroke while typing "2026".
+    for (const typed of ['0002-10-04', '0020-10-04', '0202-10-04', '2026-10-04']) {
+      act(() => {
+        state.setJumpVal(typed);
+        state.jump(typed);
+      });
+      expect(state!.jumpVal).toBe(typed);
+    }
+    expect(toKey(state!.cursor)).toBe('2026-10-04');
+  });
 });
 
 describe('Calendar month grid — keyboard', () => {
