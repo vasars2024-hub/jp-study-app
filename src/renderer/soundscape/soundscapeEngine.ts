@@ -574,7 +574,15 @@ class Instruments {
     if (wow) {
       wow.connect(osc.detune);
       // A finished oscillator stays alive while a live node feeds its parameter.
-      osc.onended = () => wow.disconnect(osc.detune);
+      // After the rig is disposed `wow` is already disconnected from everything, and
+      // disconnect(param) throws InvalidAccessError for a connection that is gone.
+      osc.onended = () => {
+        try {
+          wow.disconnect(osc.detune);
+        } catch {
+          /* rig already disposed */
+        }
+      };
     }
     osc.start(t);
     osc.stop(stopAt);
