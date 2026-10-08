@@ -47,7 +47,14 @@ function agentMatches(line: string, userAgent: string): boolean {
   const token = line.trim().toLowerCase();
   if (token === '*') return true;
   if (!token) return false;
-  return userAgent.toLowerCase().includes(token);
+  // The product token is the agent's name: `StudyOS-Scraper/1.0` →
+  // `studyos-scraper`. Comparing against it, not searching the whole string,
+  // is what stops `User-agent: Safari` from claiming every Chrome UA (which
+  // carries "Safari/537.36" as a compatibility comment). A token naming the
+  // product's leading `-` segment (`StudyOS` for `StudyOS-Scraper`) also counts.
+  const product = (/^[^\s/]+/.exec(userAgent.trim())?.[0] ?? '').toLowerCase();
+  if (!product) return false;
+  return product === token || product.startsWith(`${token}-`);
 }
 
 /**
@@ -144,8 +151,11 @@ export function isPathAllowed(rules: RobotsRules, path: string): boolean {
   return allowed;
 }
 
-/** Rule sets already fetched, keyed `origin\nuserAgent`. */
-const cache = new Map<string, RobotsRules>();
+/** How long a fetched robots.txt is trusted before it is asked for again. */
+const ROBOTS_TTL_MS = 24 * 60 * 60 * 1_000;
+
+/** Rule sets already fetched, keyed `origin\nuserAgent`, with when they were fetched. */
+const cache = new Map<string, RobotsRules & { fetchedAt: number }>();
 /** In-flight fetches, so eight requests to one host fetch robots.txt once. */
 const inFlight = new Map<string, Promise<RobotsRules>>();
 
@@ -170,7 +180,10 @@ export async function robotsRulesFor(
   const key = `${origin}\n${userAgent}`;
 
   const cached = cache.get(key);
-  if (cached) return cached;
+  if (cached && Date.now() - cached.fetchedAt < ROBOTS_TTL_MS) {
+    return { rules: cached.rules, group: cached.group };
+  }
+  if (cached) cache.delete(key);
   const pending = inFlight.get(key);
   if (pending) return pending;
 
@@ -183,7 +196,7 @@ export async function robotsRulesFor(
       // Fail open — see the header. The log line below records which it was.
       rules = { rules: [], group: '' };
     }
-    cache.set(key, rules);
+    cache.set(key, { ...rules, fetchedAt: Date.now() });
     inFlight.delete(key);
     return rules;
   })();

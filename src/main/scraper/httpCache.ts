@@ -106,10 +106,23 @@ export function cachePolicyFrom(
   };
 }
 
-export function cacheKeyFor(method: string, url: string, body: string | undefined): string {
+/**
+ * `credentials` is the effective cookie and authorization the request carries.
+ * It is folded in as a hash, so two sessions (or a signed-in and a signed-out
+ * run) never read each other's pages, and no secret is stored in the key.
+ */
+export function cacheKeyFor(
+  method: string,
+  url: string,
+  body: string | undefined,
+  credentials = '',
+): string {
   const verb = method.toUpperCase();
-  if (!body) return `${verb} ${url}`;
-  return `${verb} ${url} #${createHash('sha1').update(body).digest('hex').slice(0, 16)}`;
+  const who = credentials
+    ? ` @${createHash('sha256').update(credentials).digest('hex').slice(0, 16)}`
+    : '';
+  if (!body) return `${verb} ${url}${who}`;
+  return `${verb} ${url} #${createHash('sha1').update(body).digest('hex').slice(0, 16)}${who}`;
 }
 
 export function isCacheableMethod(method: string, kind: ScraperCacheKind): boolean {

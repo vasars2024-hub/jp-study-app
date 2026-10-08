@@ -2,8 +2,13 @@
 /**
  * Reliable Windows packaging: patch Forge/Vite bug, clean caches, package,
  * prune, and (opt-in) zip.
- * Usage: node tools/package-app.cjs [--zip] [--no-prune]
+ * Usage: node tools/package-app.cjs [--zip] [--installer] [--no-prune]
  *
+ *   --installer also build the Squirrel.Windows installer (Gum-<v> Setup.exe,
+ *               RELEASES, *-full.nupkg) into out/make/squirrel.windows/x64/,
+ *               from the PRUNED app. GUM_PACKAGE_INSTALLER=1 does the same.
+ *               Needs roughly 3x the pruned app size free on C: (Squirrel
+ *               copies the app to %TEMP% and compresses it twice).
  *   --zip       also run `electron-forge make` and write out/make/…/*.zip.
  *               GUM_PACKAGE_ZIP=1 does the same. Off by default: the zip is a
  *               distribution artifact only (the desktop shortcut runs the
@@ -124,8 +129,33 @@ function fail(label, staging) {
   process.exit(1);
 }
 
+/**
+ * Squirrel's releasify shells out to `electron-winstaller/vendor/7z.exe`, which that
+ * package's postinstall copies from `7z-<arch>.exe`. On a machine that installs with
+ * `npm install --ignore-scripts` the copy never happens and releasify dies with a bare
+ * "The system cannot find the file specified" (measured 2026-10-08). Do it here.
+ */
+function ensureWinstaller7z() {
+  let vendor;
+  try {
+    vendor = path.join(path.dirname(require.resolve('electron-winstaller/package.json', { paths: [root] })), 'vendor');
+  } catch {
+    return false;
+  }
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  for (const ext of ['exe', 'dll']) {
+    const target = path.join(vendor, `7z.${ext}`);
+    if (!fs.existsSync(target)) fs.copyFileSync(path.join(vendor, `7z-${arch}.${ext}`), target);
+  }
+  return true;
+}
+
 function main(argv = process.argv.slice(2), env = process.env) {
   const wantZip = argv.includes('--zip') || !!env.GUM_PACKAGE_ZIP;
+  const wantInstaller = argv.includes('--installer') || !!env.GUM_PACKAGE_INSTALLER;
+  // Forge maker names (forge.config.ts): only the makers asked for run, so `--zip`
+  // never quietly also builds a ~1 GB installer, and vice versa.
+  const makeTargets = [...(wantInstaller ? ['squirrel'] : []), ...(wantZip ? ['zip'] : [])];
   const wantPrune = !argv.includes('--no-prune') && !env.GUM_NO_PRUNE;
   // FIRST, before the multi-minute Vite build: this path calls Forge directly
   // rather than through `npm run package`, so it does not inherit that script's
@@ -140,6 +170,7 @@ function main(argv = process.argv.slice(2), env = process.env) {
   for (const [label, script] of preflight) {
     if (!run(label, 'node', [path.join(__dirname, script)])) fail(label, null);
   }
+  if (wantInstaller && !ensureWinstaller7z()) fail('electron-winstaller is not installed', null);
 
   // Vite's intermediate output only — never out/, which holds the build the
   // desktop shortcut launches.
@@ -182,12 +213,13 @@ function main(argv = process.argv.slice(2), env = process.env) {
     console.log('[package-app] Prune skipped (--no-prune / GUM_NO_PRUNE).');
   }
 
-  if (wantZip) {
-    if (!forgeApi('electron-forge make (zip, staging)', 'make', { dir, outDir: staging, skipPackage: true, interactive: false })) {
+  if (makeTargets.length) {
+    const label = `electron-forge make (${makeTargets.join(' + ')}, staging)`;
+    if (!forgeApi(label, 'make', { dir, outDir: staging, skipPackage: true, interactive: false, overrideTargets: makeTargets })) {
       fail('electron-forge make', staging);
     }
   } else {
-    console.log('[package-app] No zip (pass --zip or set GUM_PACKAGE_ZIP=1 to write out/make).');
+    console.log('[package-app] No zip or installer (pass --zip / --installer to write out/make).');
   }
 
   const swapped = swapBuild(stagedApp);
@@ -195,7 +227,7 @@ function main(argv = process.argv.slice(2), env = process.env) {
     console.error(`[package-app] Could not swap the new build in (${swapped.error}). Is Gum running? Close it and try again.`);
     fail('swap', staging);
   }
-  if (wantZip) {
+  if (makeTargets.length) {
     try {
       swapMake(path.join(staging, 'make'));
     } catch (err) {
@@ -216,6 +248,14 @@ function main(argv = process.argv.slice(2), env = process.env) {
   if (fs.existsSync(zipDir)) {
     for (const f of fs.readdirSync(zipDir)) {
       if (f.endsWith('.zip')) console.log(`  Zip: out/make/zip/win32/x64/${f}`);
+    }
+  }
+  const squirrelDir = path.join(OUT, 'make', 'squirrel.windows', 'x64');
+  if (fs.existsSync(squirrelDir)) {
+    // All three go on the GitHub release: Setup.exe for new users, RELEASES and the
+    // -full.nupkg for installed copies to update themselves (squirrelUpdater.ts).
+    for (const f of fs.readdirSync(squirrelDir)) {
+      console.log(`  Installer: out/make/squirrel.windows/x64/${f}`);
     }
   }
 }

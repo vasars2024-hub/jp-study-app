@@ -8,7 +8,13 @@
  * were removed from the on-page panel).
  */
 const JP_SETTINGS_KEY = 'jpStudySettings';
-const JP_SETTINGS_VERSION = 2;
+/**
+ * 3: the hover scan became one batched request, so the old 140 ms default
+ * hover delay (stored verbatim by every v2 save) is lowered to 40 ms — only
+ * when it is still that untouched default; a delay the user chose is kept.
+ */
+const JP_SETTINGS_VERSION = 3;
+const JP_V2_DEFAULT_HOVER_DELAY = 140;
 
 /** Fixed wheel positions, clockwise from the top. */
 const JP_WHEEL_POSITIONS = ['top', 'upper-right', 'lower-right', 'bottom', 'lower-left', 'upper-left'];
@@ -60,16 +66,31 @@ const JP_DEFAULT_SETTINGS = {
   // Hover lookup
   hoverLookup: true,
   hoverKey: 'shift', // shift | alt | ctrl
-  hoverDelayMs: 140, // 0–1000
+  // 0–1000. The scan is one batched request now, so a short rest is enough to
+  // skip the words the pointer only crosses; 140 felt sluggish next to 10ten.
+  hoverDelayMs: 40,
   closeOnRelease: false, // popup closes when the key is released (unless pinned/hovered)
   clickLookup: true, // key+click also opens the popup
   scanLength: 12, // max characters in the hover scan window (4–24)
   lookupInEditable: false,
+  // Keep recent lookups on this machine so the popup still answers with Gum closed.
+  offlineCache: true,
+  // Word status: ruby furigana over new / learning words (mutates the page, so opt-in).
+  furigana: false,
+  // Also run in embedded frames (registered dynamically; the manifest stays top-frame only).
+  allFrames: false,
   // Reader popup
   popupWidth: 360, // 280–560
   popupFontSize: 14, // 12–18
   popupCompact: false,
   popupPinOnClick: true,
+  popupTheme: 'auto', // auto (follow the page, then the OS) | light | dark
+  popupAutoAudio: false, // play the word's audio when the popup opens
+  // Recording
+  recordMaxMinutes: 60, // 1–240; a recording stops itself after this
+  recordAutoCrop: true, // a tab recording on a page with a video records just the video
+  recordMicWithTab: false, // the microphone recording also takes the tab's sound
+  recordTranscribe: true, // ask Gum to transcribe a finished tab recording
   // Saving
   saveDestination: 'both', // 'app' (Gum only) | 'both' (Gum + Anki)
   folderLabel: 'Extension',
@@ -123,6 +144,9 @@ function jpMigrateSettings(raw) {
   if (src.version === JP_SETTINGS_VERSION) return src;
   const out = { ...src, version: JP_SETTINGS_VERSION };
 
+  // v2 → v3: the old default hover delay becomes the new one (see VERSION).
+  if (src.hoverDelayMs === JP_V2_DEFAULT_HOVER_DELAY) delete out.hoverDelayMs;
+
   // v1 → v2 renames
   if (src.localFolderLabel != null && out.folderLabel == null) {
     out.folderLabel = src.localFolderLabel;
@@ -166,16 +190,26 @@ function jpNormalizeSettings(raw) {
 
   s.hoverLookup = s.hoverLookup !== false;
   s.hoverKey = JP_HOVER_KEYS.includes(s.hoverKey) ? s.hoverKey : 'shift';
-  s.hoverDelayMs = jpClampInt(s.hoverDelayMs, 0, 1000, 140);
+  s.hoverDelayMs = jpClampInt(s.hoverDelayMs, 0, 1000, 40);
   s.closeOnRelease = !!s.closeOnRelease;
   s.clickLookup = s.clickLookup !== false;
   s.scanLength = jpClampInt(s.scanLength, 4, 24, 12);
   s.lookupInEditable = !!s.lookupInEditable;
+  s.offlineCache = s.offlineCache !== false;
+  s.furigana = s.furigana === true;
+  s.allFrames = s.allFrames === true;
 
   s.popupWidth = jpClampInt(s.popupWidth, 280, 560, 360);
   s.popupFontSize = jpClampInt(s.popupFontSize, 12, 18, 14);
   s.popupCompact = !!s.popupCompact;
   s.popupPinOnClick = s.popupPinOnClick !== false;
+  s.popupTheme = s.popupTheme === 'light' || s.popupTheme === 'dark' ? s.popupTheme : 'auto';
+  s.popupAutoAudio = s.popupAutoAudio === true;
+
+  s.recordMaxMinutes = jpClampInt(s.recordMaxMinutes, 1, 240, 60);
+  s.recordAutoCrop = s.recordAutoCrop !== false;
+  s.recordMicWithTab = s.recordMicWithTab === true;
+  s.recordTranscribe = s.recordTranscribe !== false;
 
   s.saveDestination = s.saveDestination === 'app' ? 'app' : 'both';
   s.folderLabel = String(s.folderLabel || 'Extension').slice(0, 40) || 'Extension';

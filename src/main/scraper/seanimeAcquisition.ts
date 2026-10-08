@@ -324,6 +324,24 @@ export async function runSeanimeAcquisitionAction(
           queuedItemId: item.id,
         },
       });
+      const queuedHash = infoHashFromMagnet(item.magnet);
+      if (added && queuedHash) {
+        // The queued item knows exactly who it is (AniList id and episode), and
+        // without a handoff its files arrived in the ingest as a bare guess.
+        const episode = Number.isSafeInteger(item.episode) && item.episode > 0 ? item.episode : undefined;
+        emitAcquisitionHandoff({
+          target: 'seanime-torrent-client',
+          rows: [{ id: `seanime-queued-${item.id}`, name: item.torrentName ?? '', infoHash: queuedHash }],
+          ingest: {
+            via: 'seanime-auto-downloader',
+            hint: {
+              provider: 'seanime',
+              ...(Number.isSafeInteger(item.mediaId) && item.mediaId > 0 ? { anilistId: item.mediaId } : {}),
+              ...(episode ? { episodes: [episode] } : {}),
+            },
+          },
+        });
+      }
       const result = actionResult(Boolean(added), added
         ? `Queued episode ${item.episode} sent to Seanime's torrent client.`
         : 'Seanime rejected the queued item.', added ? 1 : 0);

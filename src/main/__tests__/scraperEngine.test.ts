@@ -9,7 +9,7 @@ import type { ScrapeJobEvent, StreamRow, TorrentRow } from '../../shared/scraper
 import type { CatalogueEpisode, CatalogueWork } from '../scraper/catalogue';
 
 vi.mock('electron', () => ({
-  app: { getPath: () => process.cwd(), getAppMetrics: () => [] },
+  app: { getPath: () => `${process.env.TEMP ?? process.env.TMPDIR ?? '/tmp'}/gum-vitest-userdata`, getAppMetrics: () => [] },
   ipcMain: { handle: () => undefined },
   BrowserWindow: { getAllWindows: () => [] },
 }));
@@ -239,7 +239,8 @@ describe('buildEpisodeRows', () => {
   it('builds one row per catalogue episode', () => {
     const rows = buildEpisodeRows(work(), catalogue.episodes, settingsWith(), []);
     expect(rows).toHaveLength(3);
-    expect(rows[0].id).toBe('mal-52991-e1');
+    // P6: the id carries season and kind, so S2E1 and special 1 cannot collide with S1E1.
+    expect(rows[0].id).toBe('mal-52991-s1-e1');
     expect(rows[0].seriesId).toBe('mal-52991');
     expect(rows[0].sourceLabel).toBe('MyAnimeList (Jikan)');
     expect(rows[0].numberLabel).toBe('EP 01');
@@ -508,8 +509,8 @@ describe('a scrape run', () => {
 
   it('keeps provider-resolved playable streams on the shared result', async () => {
     seanime.rows = [{
-      id: 'seanime-provider-mal-52991-e1-main-0',
-      episodeId: 'mal-52991-e1',
+      id: 'seanime-provider-mal-52991-s1-e1-main-0',
+      episodeId: 'mal-52991-s1-e1',
       sourceId: 'seanime:provider',
       sourceLabel: 'Provider · main',
       resolution: '1080p',

@@ -11,6 +11,7 @@
 // and it is never logged: the log bus redacts credential patterns, and nothing
 // here builds a line containing one.
 
+import { createHash } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
 import type {
   QbitSendReport,
@@ -321,7 +322,83 @@ interface LoginResult {
   latencyMs: number;
 }
 
+/**
+ * The `SID=<value>` pair from a login's Set-Cookie headers, or `''`.
+ *
+ * The HTTP layer joins several Set-Cookie headers with `; `, so the name is
+ * anchored to the start of the string or a `;`/`,` separator: an unanchored
+ * `SID=` also matched the tail of `WEBUI_SID=` (or any `*_SID`) and the client
+ * then rode a cookie qBittorrent never issued.
+ */
+export function sidCookieOf(rawSetCookie: string): string {
+  const match = /(?:^|[;,]\s*)SID=([^;,\s]+)/.exec(rawSetCookie ?? '');
+  return match ? `SID=${match[1]}` : '';
+}
+
+/**
+ * Back-off after a refused password login, keyed by base URL and username.
+ *
+ * qBittorrent bans the client's IP after a handful of failed logins
+ * (`WebUI\MaxAuthenticationFailCount`, 5 by default), and every caller here —
+ * the poller, the Torrent Manager's refresh, a send — used to log in again on
+ * its own. After a refusal, further logins for the same base and username are
+ * answered locally until the window passes: 30 s, doubling to 10 min. A
+ * success, a different password or `resetQbitSessions` clears it.
+ */
+export const QBIT_LOGIN_BACKOFF_MIN_MS = 30_000;
+export const QBIT_LOGIN_BACKOFF_MAX_MS = 10 * 60_000;
+const loginRefusals = new Map<string, { until: number; failures: number; secret: string }>();
+
+function loginRefusalKey(config: ScraperQbittorrentSettings): string {
+  return `${qbitBaseUrl(config)}\n${config.username}`;
+}
+
+/** A digest, so the refused password itself is not kept around in the map. */
+function secretDigest(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
+}
+
+function loginBackoffActive(config: ScraperQbittorrentSettings, password: string): LoginResult | null {
+  const held = loginRefusals.get(loginRefusalKey(config));
+  if (!held) return null;
+  // A different password is a new attempt the user asked for, not a retry.
+  if (held.secret !== secretDigest(password)) {
+    loginRefusals.delete(loginRefusalKey(config));
+    return null;
+  }
+  const remaining = held.until - Date.now();
+  if (remaining <= 0) return null;
+  return {
+    ok: false,
+    cookie: '',
+    status: 'unauthorized',
+    message: `The username or password was rejected. Not retrying for ${Math.ceil(remaining / 1_000)} s, `
+      + 'so qBittorrent does not ban this machine.',
+    latencyMs: 0,
+  };
+}
+
+function noteLoginOutcome(config: ScraperQbittorrentSettings, password: string, result: LoginResult): void {
+  const key = loginRefusalKey(config);
+  if (result.ok) {
+    loginRefusals.delete(key);
+    return;
+  }
+  if (result.status !== 'unauthorized') return;
+  const failures = (loginRefusals.get(key)?.failures ?? 0) + 1;
+  const wait = Math.min(QBIT_LOGIN_BACKOFF_MAX_MS, QBIT_LOGIN_BACKOFF_MIN_MS * 2 ** (failures - 1));
+  loginRefusals.set(key, { until: Date.now() + wait, failures, secret: secretDigest(password) });
+}
+
 async function login(config: ScraperQbittorrentSettings, password: string): Promise<LoginResult> {
+  const held = loginBackoffActive(config, password);
+  if (held) return held;
+  const result = await attemptLogin(config, password);
+  noteLoginOutcome(config, password, result);
+  return result;
+}
+
+async function attemptLogin(config: ScraperQbittorrentSettings, password: string): Promise<LoginResult> {
   const base = qbitBaseUrl(config);
   const started = Date.now();
   try {
@@ -398,8 +475,7 @@ async function login(config: ScraperQbittorrentSettings, password: string): Prom
     // The cookie was redacted on the way through the HTTP layer, so it is read
     // from the raw header set here instead. `scraperRequest` keeps the SID out
     // of every log line — this is the one place it is needed.
-    const cookie = response.rawSetCookie ?? '';
-    const sid = /SID=([^;]+)/.exec(cookie)?.[0] ?? '';
+    const sid = sidCookieOf(response.rawSetCookie ?? '');
     if (!sid) {
       return {
         ok: false,
@@ -592,6 +668,9 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
   const started = Date.now();
   // A test must not pass on a session minted by the previous credential.
   sessions.delete(qbitBaseUrl(config));
+  // A press of Test is the user asking for one attempt now, so it is not held
+  // behind a background caller's login back-off; its outcome re-arms it.
+  loginRefusals.delete(loginRefusalKey(config));
 
   const version = await authed(input, '/api/v2/app/version');
   const latencyMs = Date.now() - started;
@@ -807,15 +886,29 @@ export function parseAddOutcome(body: string): QbitAddOutcome | null {
 }
 
 /**
+ * Whether a `200` from `torrents/add` that carried no 5.2 JSON result is a
+ * refusal.
+ *
+ * qBittorrent 4.x answers `200 Ok.` for an accepted add and **`200 Fails.`**
+ * when it refused every link (a bad magnet, a duplicate, an unwritable save
+ * path). Treating any 200 as delivered reported refused links as sent and
+ * handed them to the ingest ledger. Only `Ok.` and an empty body (some builds
+ * and proxies answer that way for a success) count; anything else is a refusal.
+ */
+export function isLegacyAddRefusal(body: string): boolean {
+  const text = (body ?? '').trim();
+  return text !== '' && text !== 'Ok.';
+}
+
+/**
  * The v1 infohash a magnet names, lowercased, or `''` when it cannot be read.
  *
- * Only hex is decoded — 40 hex characters for `btih`, 64 for a v2 `btmh`. A
- * base32 `btih` returns `''` and the caller falls back to a whole-batch verdict
- * rather than guessing which row the daemon refused.
+ * Hex (40 characters for `btih`, 64 for a v2 `btmh`) and 32-character base32
+ * `btih` both decode — to the lowercase hex qBittorrent reports — so a base32
+ * magnet matches `added_torrent_ids` the same way a hex one does.
  */
 export function magnetInfoHash(magnet: string): string {
-  const match = /\bxt=urn:bt(?:ih|mh):([0-9a-fA-F]{40}|[0-9a-fA-F]{64})\b/.exec(magnet ?? '');
-  return match ? match[1].toLowerCase() : '';
+  return infoHashFromMagnet(magnet ?? '');
 }
 
 /**
@@ -938,6 +1031,19 @@ async function sendToQbit(
       const reason = response.error.message;
       for (const row of groupRows) details.push({ name: row.name, outcome: 'failed', reason });
       scraperLog('error', 'qbit', `Send failed: ${reason}`);
+    } else if (response.status === 200 && !parseAddOutcome(response.body) && isLegacyAddRefusal(response.body)) {
+      // qBittorrent 4.x's `200 Fails.`: nothing in this request was added.
+      const already = await presentHashes(input).catch(() => new Set<string>());
+      const generic = addFailureReason(response.status, response.body);
+      for (const row of groupRows) {
+        const hash = magnetInfoHash(row.magnet);
+        details.push({
+          name: row.name,
+          outcome: 'failed',
+          reason: hash && already.has(hash) ? 'Already in qBittorrent.' : generic,
+        });
+      }
+      scraperLog('error', 'qbit', `Send failed: ${generic}`);
     } else if (response.status === 200) {
       const settled = settleAddedRows(groupRows, parseAddOutcome(response.body));
       details.push(...settled);
@@ -1013,6 +1119,7 @@ function addGroups(
 /** Test seam — drops every cached session. */
 export function resetQbitSessions(): void {
   sessions.clear();
+  loginRefusals.clear();
 }
 
 // ------------------------------------------------------ completion polling ---
@@ -1320,6 +1427,10 @@ export async function qbitAddStopped(
   });
   if ('error' in response || response.status !== 200) {
     return { ok: false, reason: failureReason(response, 'torrents/add') };
+  }
+  // 4.x refuses with `200 Fails.`; carrying on would wait on a torrent that does not exist.
+  if (!parseAddOutcome(response.body) && isLegacyAddRefusal(response.body)) {
+    return { ok: false, reason: addFailureReason(response.status, response.body) };
   }
   scraperLog('info', 'qbit', `Added a subtitle fetch stopped (${hash.slice(0, 8)}).`);
   return { ok: true, value: 'added' };

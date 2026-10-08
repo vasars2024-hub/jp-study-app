@@ -16,6 +16,7 @@
  */
 import './shared.js';
 import './settings.js';
+import './idb.js';
 
 const S = globalThis.jpStudyShared || {};
 /** A catalogue string (see shared.js jpMsg); the key if shared.js did not load. */
@@ -35,7 +36,12 @@ const QUEUE_KEY = 'jpStudyRetryQueue';
 const TOKEN_KEY = 'jpStudyToken';
 const PORT_KEY = 'jpStudyPort';
 const ACTIVITY_KEY = 'jpRecentActivity';
-const MAX_QUEUE = 40;
+/** Saves waiting for the app. Never evicted: past this a new save is refused out loud. */
+const MAX_QUEUE = 200;
+const IMMERSION_KEY = 'jpStudyImmersionQueue';
+const MAX_IMMERSION = 60;
+/** True while a recording is running: the badge reads REC instead of the queue. */
+let recordingBadge = false;
 const MAX_ACTIVITY = 6;
 const ALARM_FLUSH = 'jpStudyFlushQueue';
 
@@ -78,17 +84,25 @@ const APP_OUTDATED_MSG = t('bg_appOutdated');
  */
 const AUTH_FAILED_MSG = t('bg_authFailed');
 
+/** App error code → _locales key (shared.js; content.js uses the same map for 200 `{ok:false}` replies). */
+const SERVER_ERROR_KEYS = S.SERVER_ERROR_KEYS || {};
+function serverErrorCode(json, raw) {
+  return typeof S.serverErrorCode === 'function' ? S.serverErrorCode(json, raw) : '';
+}
+
 async function apiFetch(path, opts = {}) {
   const { token, port } = await getConfig();
   const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
   if (token) headers.Authorization = `Bearer ${token}`;
   let res;
   try {
-    res = await fetch(`${baseUrl(port)}${path}`, {
-      method: opts.method || 'GET',
-      headers,
-      body: opts.body,
-    });
+    const init = { method: opts.method || 'GET', headers, body: opts.body };
+    // opts.timeoutMs: abort a request the app never answers (the recorder's
+    // /finish and /status); a timed-out call is treated like an offline one.
+    res =
+      Number(opts.timeoutMs) > 0
+        ? await fetchWithTimeout(`${baseUrl(port)}${path}`, init, Number(opts.timeoutMs))
+        : await fetch(`${baseUrl(port)}${path}`, init);
   } catch (err) {
     const offline = new Error(t('bg_offline'));
     offline.status = 0;
@@ -117,7 +131,9 @@ async function apiFetch(path, opts = {}) {
     // handlers that report a message all read err.message, so this is the only
     // place the substitution can happen without touching every one of them.
     err.serverError = raw;
+    err.code = serverErrorCode(json, raw);
     if (err.auth) err.message = AUTH_FAILED_MSG;
+    else if (err.code && message === raw) err.message = t(SERVER_ERROR_KEYS[err.code]);
     err.payload = json;
     throw err;
   }
@@ -167,15 +183,41 @@ function shouldRetryQueued(err) {
 const MAX_QUEUE_ATTEMPTS = 10;
 const MAX_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-async function enqueue(kind, payload) {
+/**
+ * Every read-modify-write of the queue runs under this one promise lock.
+ *
+ * Without it a save landing while a flush was in flight was overwritten by the
+ * flush's write-back (lost), and two overlapping flushes posted the same items
+ * twice (duplicates in Anki). Items carry an `id`, and a flush removes exactly
+ * the ids it sent, so anything enqueued meanwhile survives.
+ */
+let queueLock = Promise.resolve();
+function withQueueLock(fn) {
+  const run = queueLock.then(fn, fn);
+  queueLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function newQueueId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function readQueue() {
   const data = await chrome.storage.local.get(QUEUE_KEY);
   const queue = Array.isArray(data[QUEUE_KEY]) ? data[QUEUE_KEY] : [];
-  queue.push({ kind, payload, at: Date.now(), attempts: 0 });
-  while (queue.length > MAX_QUEUE) queue.shift();
+  // Items an older build stored have no id; give them one so a flush can
+  // remove exactly what it sent.
+  for (const item of queue) if (item && !item.id) item.id = newQueueId();
+  return queue;
+}
+
+async function writeQueue(queue) {
   // chrome.storage.local is 10 MB and this manifest does not request
-  // unlimitedStorage. A queued audio save carries a base64 data URL, so the
-  // quota is reachable in normal use — and an unhandled rejection here loses
-  // the save silently, which is the one outcome the queue exists to prevent.
+  // unlimitedStorage. An unhandled rejection here loses the save silently,
+  // which is the one outcome the queue exists to prevent.
   try {
     await chrome.storage.local.set({ [QUEUE_KEY]: queue });
   } catch (err) {
@@ -184,8 +226,114 @@ async function enqueue(kind, payload) {
     quota.cause = err;
     throw quota;
   }
-  await updateBadge(queue.length);
+}
+
+async function enqueue(kind, payload) {
+  await withQueueLock(async () => {
+    const queue = await readQueue();
+    // A save is never evicted to make room for another: past the cap the new
+    // one is refused out loud instead of the oldest vanishing silently.
+    if (queue.length >= MAX_QUEUE) {
+      const full = new Error(t('bg_storageFull'));
+      full.quota = true;
+      throw full;
+    }
+    const id = newQueueId();
+    queue.push({ id, kind, payload: await stashLargeFields(id, payload), at: Date.now(), attempts: 0 });
+    await writeQueue(queue);
+    await updateBadge(queue.length);
+  });
   await ensureFlushAlarm();
+}
+
+/**
+ * Recording / screenshot data URLs go to IndexedDB, not storage.local: a few
+ * queued audio clips used to fill the 10 MB quota and make every later save
+ * fail. The queue item keeps a `{ __blob: key }` stand-in.
+ */
+const BLOB_FIELDS = ['dataUrl', 'audioDataUrl', 'imageDataUrl'];
+const BLOB_INLINE_MAX = 64 * 1024;
+
+async function stashLargeFields(id, payload) {
+  const store = globalThis.jpStudyIdb;
+  if (!store || store.kind !== 'indexeddb' || !payload || typeof payload !== 'object') return payload;
+  const out = { ...payload };
+  for (const field of BLOB_FIELDS) {
+    const value = out[field];
+    if (typeof value !== 'string' || value.length <= BLOB_INLINE_MAX) continue;
+    const key = `${id}:${field}`;
+    await store.putStrict('blobs', { key, data: value, at: Date.now() });
+    out[field] = { __blob: key };
+  }
+  return out;
+}
+
+async function restoreLargeFields(payload) {
+  const store = globalThis.jpStudyIdb;
+  if (!store || !payload || typeof payload !== 'object') return payload;
+  const out = { ...payload };
+  for (const field of BLOB_FIELDS) {
+    const ref = out[field];
+    if (!ref || typeof ref !== 'object' || typeof ref.__blob !== 'string') continue;
+    const row = await store.get('blobs', ref.__blob);
+    out[field] = row ? row.data : '';
+  }
+  return out;
+}
+
+async function dropLargeFields(item) {
+  const store = globalThis.jpStudyIdb;
+  if (!store || !item || !item.payload) return;
+  for (const field of BLOB_FIELDS) {
+    const ref = item.payload[field];
+    if (ref && typeof ref === 'object' && typeof ref.__blob === 'string') await store.delete('blobs', ref.__blob);
+  }
+}
+
+/**
+ * Reading time is not a save and never shares the save queue: one entry per
+ * page, merged, capped. It used to post a heartbeat per tab per minute into the
+ * same 40-item queue, so an afternoon with the app closed evicted real saves.
+ */
+async function queueImmersion(visit) {
+  await withQueueLock(async () => {
+    const data = await chrome.storage.local.get(IMMERSION_KEY);
+    const list = Array.isArray(data[IMMERSION_KEY]) ? data[IMMERSION_KEY] : [];
+    const hit = list.find((v) => v && v.url === visit.url);
+    if (hit) {
+      hit.seconds = (Number(hit.seconds) || 0) + (Number(visit.seconds) || 0);
+      hit.chars = Math.max(Number(hit.chars) || 0, Number(visit.chars) || 0);
+      hit.title = hit.title || visit.title;
+      hit.at = Date.now();
+    } else {
+      list.push({ ...visit, at: Date.now() });
+    }
+    while (list.length > MAX_IMMERSION) list.shift();
+    await chrome.storage.local.set({ [IMMERSION_KEY]: list });
+  });
+  await ensureFlushAlarm();
+}
+
+async function flushImmersion() {
+  const data = await chrome.storage.local.get(IMMERSION_KEY);
+  const list = Array.isArray(data[IMMERSION_KEY]) ? data[IMMERSION_KEY] : [];
+  if (!list.length) return;
+  const done = new Set();
+  for (const visit of list) {
+    try {
+      const { at: _at, ...body } = visit;
+      await apiFetch('/v1/immersion/visit', { method: 'POST', body: JSON.stringify(body) });
+      done.add(visit.url);
+    } catch (err) {
+      if (err.offline) break;
+      done.add(visit.url); // refused: retrying will not change the answer
+    }
+  }
+  await withQueueLock(async () => {
+    const now = await chrome.storage.local.get(IMMERSION_KEY);
+    const current = Array.isArray(now[IMMERSION_KEY]) ? now[IMMERSION_KEY] : [];
+    await chrome.storage.local.set({ [IMMERSION_KEY]: current.filter((v) => !done.has(v.url)) });
+  });
 }
 
 /**
@@ -201,6 +349,8 @@ async function enqueueIfRetryable(kind, payload, err) {
 }
 
 async function updateBadge(count) {
+  // A running recording owns the badge; the queue count returns when it stops.
+  if (recordingBadge) return;
   const text = count > 0 ? String(count) : '';
   await chrome.action.setBadgeText({ text });
   await chrome.action.setBadgeBackgroundColor({ color: '#946300' });
@@ -227,15 +377,28 @@ const QUEUE_ENDPOINTS = {
   immersion: '/v1/immersion/visit',
 };
 
-async function flushQueue() {
-  const data = await chrome.storage.local.get(QUEUE_KEY);
-  const queue = Array.isArray(data[QUEUE_KEY]) ? data[QUEUE_KEY] : [];
-  if (!queue.length) return { flushed: 0, left: 0, dropped: 0 };
-  const left = [];
+/** One flush at a time: a second caller gets the flush already running. */
+let flushInFlight = null;
+function flushQueue() {
+  if (flushInFlight) return flushInFlight;
+  flushInFlight = doFlushQueue().finally(() => {
+    flushInFlight = null;
+  });
+  return flushInFlight;
+}
+
+async function doFlushQueue() {
+  const snapshot = await withQueueLock(async () => {
+    const queue = await readQueue();
+    if (queue.length) await writeQueue(queue); // persist ids given to legacy items
+    return queue;
+  });
+  const sent = new Set();
   const dropped = [];
+  const updates = new Map();
   let flushed = 0;
   const now = Date.now();
-  for (const item of queue) {
+  for (const item of snapshot) {
     const endpoint = QUEUE_ENDPOINTS[item.kind];
     if (!endpoint) {
       // Unknown legacy kind — there is no endpoint left to replay it to. Counted
@@ -244,9 +407,8 @@ async function flushQueue() {
       dropped.push({ ...item, reason: 'unknown-kind' });
       continue;
     }
-    // `at` has been written on every item since the queue existed and read by
-    // nothing. An item older than the age bound is past the point where silently
-    // retrying it is doing the user any favours. Backfill it for the items an
+    // An item older than the age bound is past the point where silently
+    // retrying it is doing the user any favours. Backfill `at` for the items an
     // older build stored without one, so the bound covers those too.
     const at = typeof item.at === 'number' ? item.at : now;
     if (now - at > MAX_QUEUE_AGE_MS) {
@@ -254,8 +416,10 @@ async function flushQueue() {
       continue;
     }
     try {
-      await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(item.payload) });
+      await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(await restoreLargeFields(item.payload)) });
+      sent.add(item.id);
       flushed += 1;
+      await dropLargeFields(item);
     } catch (err) {
       // Only an answered failure counts against the attempt bound — see the
       // comment on MAX_QUEUE_ATTEMPTS.
@@ -269,19 +433,35 @@ async function flushQueue() {
         dropped.push({ ...item, attempts, reason: 'attempts' });
         continue;
       }
-      left.push({ ...item, at, attempts });
+      updates.set(item.id, { at, attempts });
     }
   }
-  await chrome.storage.local.set({ [QUEUE_KEY]: left });
+  const droppedIds = new Set(dropped.map((d) => d.id));
+  // Commit against the queue as it is NOW: remove exactly what was sent or
+  // dropped, keep whatever was enqueued while the requests were in flight.
+  const left = await withQueueLock(async () => {
+    const current = await readQueue();
+    const next = current
+      .filter((it) => !sent.has(it.id) && !droppedIds.has(it.id))
+      .map((it) => (updates.has(it.id) ? { ...it, ...updates.get(it.id) } : it));
+    await writeQueue(next);
+    return next;
+  });
   // A drop is the queue failing at its one job, so it goes in the activity list
   // the popup shows rather than vanishing into a console nobody has open.
   for (const item of dropped) {
+    await dropLargeFields(item);
     await recordActivity({ kind: item.kind, label: queueItemLabel(item), dropped: item.reason });
   }
+  // Always written, so a badge left stale by a crashed write is corrected here.
   await updateBadge(left.length);
+  try {
+    await flushImmersion();
+  } catch {
+    /* reading time is best effort */
+  }
   return { flushed, left: left.length, dropped: dropped.length };
 }
-
 /** Best-effort human label for a queued item, for the activity list. */
 function queueItemLabel(item) {
   const p = item && item.payload ? item.payload : {};
@@ -364,8 +544,11 @@ async function downloadCurrent(tab) {
     await recordActivity({ kind: 'download', label: tab.title || tab.url });
     return { ...out, kind, openTarget: 'youtube' };
   } catch (err) {
-    await enqueueIfRetryable('download', payload, err);
-    throw err;
+    // Queued means it WILL happen: answer that, not the offline error (the
+    // toast used to say "failed" for a download that then ran).
+    if (!(await enqueueIfRetryable('download', payload, err))) throw err;
+    await recordActivity({ kind: 'download', label: tab.title || tab.url, queued: true });
+    return { ok: true, queued: true, kind, openTarget: 'youtube' };
   }
 }
 
@@ -445,6 +628,10 @@ async function saveText(tab, text, mode, opts = {}) {
     category: S.detectContentCategory(pageUrl, { title: pageTitle }),
     preferAnki,
     forceAnki,
+    // What the popup knew: the sentence around the word, the entry the user
+    // picked (its reading and gloss), and the dictionary form. The app used to
+    // get the bare selection and Anki an empty back.
+    ...pickMineContext(opts),
     // The page's language for the selection, so the app glosses a Chinese
     // word from the Chinese dictionary (Han alone would follow the study language).
     ...(opts.lang === 'ja' || opts.lang === 'zh' || opts.lang === 'ru' ? { lang: opts.lang } : {}),
@@ -469,13 +656,34 @@ async function saveText(tab, text, mode, opts = {}) {
   }
 }
 
+/** The optional, length-capped card context a content script may send with a save. */
+function pickMineContext(opts) {
+  const out = {};
+  const str = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : '');
+  const sentence = str(opts.sentence, 2000);
+  const reading = str(opts.reading, 200);
+  const meaning = str(opts.meaning, 2000);
+  const lemma = str(opts.lemma, 80);
+  const surface = str(opts.surface, 80);
+  if (sentence) out.sentence = sentence;
+  if (reading) out.reading = reading;
+  if (meaning) out.meaning = meaning;
+  if (lemma) out.lemma = lemma;
+  if (surface) out.surface = surface;
+  if (Number.isInteger(opts.entryIndex) && opts.entryIndex >= 0) out.entryIndex = opts.entryIndex;
+  if (typeof opts.imageDataUrl === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(opts.imageDataUrl)) {
+    out.imageDataUrl = opts.imageDataUrl;
+  }
+  return out;
+}
+
 /** Selection text from the page: stashed reader-popup hit first, then live selection. */
 async function selectionFromTab(tab) {
   if (!tab?.id) throw new Error('No active tab');
   await ensureContentScript(tab.id);
   try {
     const stash = await chrome.tabs.sendMessage(tab.id, { type: 'jp-get-save-payload' });
-    if (stash?.text) return { text: String(stash.text).trim(), mode: stash.mode || 'auto' };
+    if (stash?.text) return { text: String(stash.text).trim(), mode: stash.mode || 'auto', context: stash.context || {} };
   } catch {
     /* fall through */
   }
@@ -487,7 +695,12 @@ async function selectionFromTab(tab) {
 
 async function saveSelection(tab, mode, opts = {}) {
   const sel = await selectionFromTab(tab);
-  return saveText(tab, sel.text, mode === 'auto' || !mode ? sel.mode : mode, opts);
+  const resolved = mode === 'auto' || !mode ? sel.mode : mode;
+  // The popup's context belongs to the word it shows; a sentence save keeps
+  // only the sentence-level fields.
+  const ctx = sel.context || {};
+  const context = resolved === 'sentence' ? { lang: ctx.lang } : ctx;
+  return saveText(tab, sel.text, resolved, { ...context, ...opts });
 }
 
 async function clipboardText(tab, text, entryType) {
@@ -510,6 +723,7 @@ async function saveAudioClipboard(tab) {
   if (!tab?.id) throw new Error('No active tab');
   await ensureContentScript(tab.id);
   const stash = await chrome.tabs.sendMessage(tab.id, { type: 'jp-get-audio-clipboard' });
+  if (stash?.recording) throw new Error(t('bg_stopRecordingFirst'));
   const dataUrl = stash?.dataUrl || '';
   if (!dataUrl) throw new Error(t('bg_noRecording'));
   const payload = {
@@ -518,12 +732,21 @@ async function saveAudioClipboard(tab) {
     url: tab.url || '',
     title: tab.title || '',
   };
+  let out;
   try {
-    return await apiFetch('/v1/audio/save', { method: 'POST', body: JSON.stringify(payload) });
+    out = await apiFetch('/v1/audio/save', { method: 'POST', body: JSON.stringify(payload) });
   } catch (err) {
-    await enqueueIfRetryable('audio-save', payload, err);
-    throw err;
+    if (!(await enqueueIfRetryable('audio-save', payload, err))) throw err;
+    out = { ok: true, queued: true };
   }
+  // Clear the clip once it is saved or queued: a second Save used to make a
+  // second card from the same recording.
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'jp-clear-audio-clipboard' });
+  } catch {
+    /* the tab may be gone */
+  }
+  return out;
 }
 
 /* ------------------------- long-strip manga import ------------------------ */
@@ -765,8 +988,9 @@ async function scanLongStrip(tab) {
       scanned: result.scanned,
     };
   } catch (err) {
-    await enqueueIfRetryable('manga-import', payload, err);
-    throw err;
+    if (!(await enqueueIfRetryable('manga-import', payload, err))) throw err;
+    await recordActivity({ kind: 'manga', label: result.title || result.url, queued: true });
+    return { ok: true, queued: true, isLongStrip: result.isLongStrip, imageCount: result.images.length };
   }
 }
 
@@ -1018,6 +1242,62 @@ async function runTabAction(tabId, action) {
 
 /* ------------------------- content script helper -------------------------- */
 
+/** The page scripts, in dependency order (popup-css.js styles the shadow-root popup). */
+const CONTENT_SCRIPT_FILES = ['shared.js', 'settings.js', 'popup-css.js', 'content.js'];
+const CONTENT_SCRIPT_ID = 'gum-content';
+const CONTENT_SCRIPT_MATCHES = ['http://*/*', 'https://*/*'];
+
+/**
+ * The page scripts are registered here rather than in the manifest, so that
+ * "Also work inside embedded frames" (settings.allFrames, default off) is one
+ * `allFrames` flag on one registration. A static manifest entry plus a second,
+ * all-frames registration would run shared.js twice in every top frame (its
+ * top-level `const`s throw on the second run). Idempotent; calls are chained so
+ * the startup call and onInstalled never race to register the same id.
+ */
+let contentScriptSync = Promise.resolve();
+function syncContentScriptRegistration() {
+  contentScriptSync = contentScriptSync.then(syncContentScriptRegistrationNow, syncContentScriptRegistrationNow);
+  return contentScriptSync;
+}
+
+async function syncContentScriptRegistrationNow() {
+  const api = chrome.scripting;
+  if (!api || typeof api.registerContentScripts !== 'function') return 'unsupported';
+  const settings = await getSettings();
+  const allFrames = settings && settings.allFrames === true;
+  const spec = {
+    id: CONTENT_SCRIPT_ID,
+    matches: CONTENT_SCRIPT_MATCHES,
+    js: CONTENT_SCRIPT_FILES,
+    css: ['content.css'],
+    runAt: 'document_idle',
+    allFrames,
+    persistAcrossSessions: true,
+  };
+  try {
+    const existing = await api.getRegisteredContentScripts({ ids: [CONTENT_SCRIPT_ID] });
+    const cur = Array.isArray(existing) ? existing[0] : null;
+    if (!cur) {
+      await api.registerContentScripts([spec]);
+      return 'registered';
+    }
+    const same =
+      !!cur.allFrames === allFrames &&
+      JSON.stringify(cur.js || []) === JSON.stringify(CONTENT_SCRIPT_FILES) &&
+      JSON.stringify(cur.css || []) === JSON.stringify(spec.css);
+    if (same) return 'unchanged';
+    await api.updateContentScripts([spec]);
+    return 'updated';
+  } catch (err) {
+    // Another worker instance registered it between our read and write: the
+    // one registration exists, which is all we want (never a second id).
+    if (/duplicate script id/i.test(String((err && err.message) || err))) return 'unchanged';
+    console.warn('[Gum] content script registration failed', err);
+    return 'failed';
+  }
+}
+
 async function ensureContentScript(tabId) {
   try {
     await chrome.tabs.sendMessage(tabId, { type: 'jp-ping' });
@@ -1025,9 +1305,35 @@ async function ensureContentScript(tabId) {
   } catch {
     /* inject */
   }
+  // Idempotency guard: the registered script may already have run (or be
+  // running) in this tab without answering the ping yet. Injecting again would
+  // re-run shared.js, whose top-level consts throw on a second evaluation.
+  if (await contentLoadedIn(tabId)) return;
+  if (injecting.has(tabId)) return injecting.get(tabId);
+  const run = injectContentScripts(tabId).finally(() => injecting.delete(tabId));
+  injecting.set(tabId, run);
+  return run;
+}
+
+const injecting = new Map();
+
+async function contentLoadedIn(tabId) {
+  try {
+    const [probe] = await chrome.scripting.executeScript({
+      target: { tabId },
+      // content.js sets this first thing; the manifest-order files run in one go.
+      func: () => globalThis.__jpStudyContentLoaded === true,
+    });
+    return !!(probe && probe.result);
+  } catch {
+    return false;
+  }
+}
+
+async function injectContentScripts(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId },
-    files: ['shared.js', 'settings.js', 'content.js'],
+    files: CONTENT_SCRIPT_FILES,
   });
   await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
 }
@@ -1042,6 +1348,766 @@ async function toastOnTab(tab, message, kind = 'err') {
   }
 }
 
+/* ------------------------------ hover scan --------------------------------- */
+
+const IDB = globalThis.jpStudyIdb || null;
+/** Offline lookup cache cap (IndexedDB rows), trimmed oldest-first. */
+const LOOKUP_CACHE_MAX = 20000;
+let lookupWrites = 0;
+
+/** Real matches only (dictService `via`); an older app sends no `via` at all. */
+function isRealMatch(entry) {
+  return !entry || !entry.via || entry.via === 'exact' || entry.via === 'deinflected' || entry.via === 'reading';
+}
+
+async function cacheScanResult(lang, res) {
+  if (!IDB || !res || !res.matched || !Array.isArray(res.entries) || !res.entries.length) return;
+  const value = { matched: res.matched, entries: res.entries, deinflection: res.deinflection, via: res.via };
+  await IDB.put('lookups', { key: `${lang}:${res.matched}`, value, at: Date.now() });
+  lookupWrites += 1;
+  if (lookupWrites % 200 === 0) await IDB.trim('lookups', LOOKUP_CACHE_MAX);
+}
+
+/** Longest cached prefix of the window, for when Gum is closed. */
+async function cachedScan(text, lang) {
+  if (!IDB) return null;
+  const chars = [...text];
+  for (let len = chars.length; len >= 1; len -= 1) {
+    const row = await IDB.get('lookups', `${lang}:${chars.slice(0, len).join('')}`);
+    if (row && row.value) return row.value;
+  }
+  return null;
+}
+
+/** Older Gum without /v1/scan: every prefix through /v1/lookup, in parallel. */
+async function legacyScan(text, lang) {
+  const chars = [...text].slice(0, 24);
+  const prefixes = [];
+  for (let len = chars.length; len >= 1; len -= 1) prefixes.push(chars.slice(0, len).join(''));
+  const answers = await Promise.all(
+    prefixes.map((q) =>
+      apiFetch('/v1/lookup', { method: 'POST', body: JSON.stringify({ query: q, lang }) }).catch(() => null),
+    ),
+  );
+  for (let i = 0; i < prefixes.length; i += 1) {
+    const res = answers[i];
+    const q = prefixes[i];
+    const entries = (res && Array.isArray(res.entries) ? res.entries : []).filter(isRealMatch);
+    if (!entries.length) continue;
+    // Without `via`, only a headword, reading or de-inflection source equal to
+    // the prefix proves it is a word rather than a near miss.
+    const exact =
+      (res.deinflection && res.deinflection.source === q) ||
+      entries.some((e) => e.word === q || e.reading === q || !!e.via);
+    if (!exact) continue;
+    return { ok: true, matched: q, entries, deinflection: res.deinflection, legacy: true };
+  }
+  return { ok: true, matched: '', entries: [], legacy: true };
+}
+
+/**
+ * One request per hover: the app looks every prefix up in one batched read.
+ * Offline, the last answers for this page's words come from IndexedDB.
+ */
+async function scanLookup(text, lang) {
+  const q = String(text || '').trim().slice(0, 64);
+  if (!q) return { ok: true, matched: '', entries: [] };
+  try {
+    const res = await apiFetch('/v1/scan', { method: 'POST', body: JSON.stringify({ text: q, lang }) });
+    if (res && res.ok) {
+      res.entries = (res.entries || []).filter(isRealMatch);
+      const settings = await getSettings();
+      if (settings.offlineCache !== false) void cacheScanResult(lang, res);
+    }
+    return res;
+  } catch (err) {
+    if (err.status === 404) {
+      try {
+        return await legacyScan(q, lang);
+      } catch {
+        /* fall through */
+      }
+    }
+    if (err.offline) {
+      const cached = await cachedScan(q, lang);
+      if (cached) return { ok: true, ...cached, fromCache: true, offline: true };
+    }
+    return { ok: false, matched: '', entries: [], offline: !!err.offline, error: String(err.message || err) };
+  }
+}
+
+/* ------------------------- word status (WP8) ------------------------------ */
+/*
+ * The app tokenizes visible page text (/v1/annotate). The known-word map
+ * (/v1/known-snapshot) is cached in IndexedDB and refreshed with `?since=`, so
+ * word status still paints, by longest known-word match, while Gum is closed.
+ */
+const KNOWN_SNAPSHOT_KEY = 'known-snapshot';
+const KNOWN_SNAPSHOT_TTL_MS = 60_000;
+let knownSnapshotMem = null;
+let knownSnapshotCheckedAt = 0;
+
+async function loadKnownSnapshot() {
+  if (knownSnapshotMem) return knownSnapshotMem;
+  if (!IDB) return null;
+  try {
+    const row = await IDB.get('meta', KNOWN_SNAPSHOT_KEY);
+    knownSnapshotMem = row && row.value && row.value.words ? row.value : null;
+  } catch {
+    knownSnapshotMem = null;
+  }
+  return knownSnapshotMem;
+}
+
+/** The cached snapshot, refreshed from the app at most once a minute. */
+async function knownSnapshot(force = false) {
+  const cached = await loadKnownSnapshot();
+  if (!force && cached && Date.now() - knownSnapshotCheckedAt < KNOWN_SNAPSHOT_TTL_MS) return cached;
+  knownSnapshotCheckedAt = Date.now();
+  try {
+    const since = cached && cached.version ? `?since=${encodeURIComponent(cached.version)}` : '';
+    const res = await apiFetch(`/v1/known-snapshot${since}`);
+    if (res && res.ok && res.unchanged && cached) return cached;
+    if (res && res.ok && res.words && typeof res.words === 'object') {
+      knownSnapshotMem = { version: String(res.version || ''), lang: res.lang || '', words: res.words };
+      if (IDB) await IDB.put('meta', { key: KNOWN_SNAPSHOT_KEY, value: knownSnapshotMem, at: Date.now() });
+    }
+  } catch {
+    /* offline: keep the cached map */
+  }
+  return knownSnapshotMem;
+}
+
+/** Offline fallback: greedy longest known-word match inside CJK runs. */
+function localAnnotate(texts, words) {
+  const MAXLEN = 8;
+  return texts.map((text) => {
+    const out = [];
+    const s = String(text || '');
+    let i = 0;
+    while (i < s.length) {
+      let hit = 0;
+      for (let len = Math.min(MAXLEN, s.length - i); len >= 1; len -= 1) {
+        const w = s.slice(i, i + len);
+        if (typeof words[w] === 'number' && (len > 1 || /[㐀-鿿]/.test(w))) {
+          out.push({ o: i, n: len, l: w, k: words[w] });
+          hit = len;
+          break;
+        }
+      }
+      i += hit || 1;
+    }
+    return out;
+  });
+}
+
+async function annotateTexts(texts, lang) {
+  const list = (Array.isArray(texts) ? texts : []).slice(0, 64).map((t) => String(t || '').slice(0, 2000));
+  if (!list.length) return { ok: true, results: [] };
+  try {
+    const res = await apiFetch('/v1/annotate', { method: 'POST', body: JSON.stringify({ texts: list, lang }) });
+    if (res && res.ok && Array.isArray(res.results)) return { ok: true, results: res.results };
+  } catch (err) {
+    if (!err.offline && err.status !== 504 && err.status !== 404) {
+      return { ok: false, results: [], code: err.code || '', error: String(err.message || err) };
+    }
+  }
+  const snap = await knownSnapshot();
+  if (!snap) return { ok: false, results: [], offline: true };
+  return { ok: true, results: localAnnotate(list, snap.words), fromCache: true };
+}
+
+/* ------------------------------ tab recorder ------------------------------- */
+/*
+ * Flow: a user gesture (toolbar popup, keyboard command, context menu, or the
+ * wheel the command opened) → chrome.tabCapture.getMediaStreamId for the tab →
+ * the offscreen document (reason USER_MEDIA) opens the stream, plays the tab's
+ * sound back (tab capture mutes it), and records webm in 2 s chunks into
+ * IndexedDB → this worker uploads each chunk to /v1/recordings and finishes the
+ * upload when the recording stops. Chunks stay in IndexedDB until the app has
+ * them, so a closed app or a worker restart loses nothing.
+ */
+
+async function listRecs() {
+  if (!IDB) return [];
+  const all = await IDB.getAll('recs');
+  return all.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+}
+
+async function activeRecs() {
+  return (await listRecs()).filter((r) => r.status === 'recording');
+}
+
+async function refreshBadge() {
+  recordingBadge = (await activeRecs()).length > 0;
+  if (recordingBadge) {
+    await chrome.action.setBadgeText({ text: 'REC' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#c62828' });
+    return;
+  }
+  const data = await chrome.storage.local.get(QUEUE_KEY);
+  await updateBadge(Array.isArray(data[QUEUE_KEY]) ? data[QUEUE_KEY].length : 0);
+}
+
+async function ensureOffscreen() {
+  if (!chrome.offscreen) throw new Error(t('bg_recUnsupported'));
+  try {
+    if (chrome.runtime.getContexts) {
+      const ctx = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
+      if (ctx && ctx.length) return;
+    }
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['USER_MEDIA', 'BLOBS'],
+      justification: 'Records the tab or microphone the user asked Gum to record, and hands a pending recording to Save to disk.',
+    });
+  } catch (err) {
+    if (!/single offscreen|only a single/i.test(String(err && err.message))) throw err;
+  }
+}
+
+async function closeOffscreenIfIdle() {
+  if ((await activeRecs()).length) return;
+  // A Save to disk in progress reads the offscreen document's Blob URL.
+  if (typeof diskSaves !== 'undefined' && diskSaves.size) return;
+  if (typeof micClipActive !== 'undefined' && micClipActive) return;
+  try {
+    if (chrome.offscreen && chrome.offscreen.closeDocument) await chrome.offscreen.closeDocument();
+  } catch {
+    /* already closed */
+  }
+}
+
+/** The largest visible video on the tab, as a crop region (auto-crop). */
+async function videoRegionOnTab(tab) {
+  try {
+    const res = await chrome.tabs.sendMessage(tab.id, { type: 'jp-video-rect' }, { frameId: 0 });
+    return res && res.region ? res.region : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tab (video or tab audio) or microphone recording. Both run in the offscreen
+ * document and share the chunked IndexedDB → /v1/recordings upload. The mic is
+ * opened by the offscreen document, so the permission belongs to the extension,
+ * not to whatever site is in the tab; an offscreen document cannot show the
+ * prompt, so a first mic recording opens the options page to grant it.
+ */
+async function startRecording(tab, opts = {}) {
+  if (!IDB) throw new Error(t('bg_recUnsupported'));
+  const source = opts.source === 'mic' ? 'mic' : 'tab';
+  if (source === 'tab' && (!tab?.id || !isScriptableUrl(tab.url || ''))) throw new Error(t('bg_tabRestricted'));
+  const running = await activeRecs();
+  if (running.length) return stopRecording(running[0].id, 'user');
+  const settings = await getSettings();
+  let streamId = null;
+  if (source === 'tab') {
+    try {
+      streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
+    } catch (err) {
+      const m = String((err && err.message) || err);
+      // Chrome only lets an invoked extension capture a tab.
+      throw new Error(/invoked|activeTab|permission/i.test(m) ? t('bg_recNeedsGesture') : m);
+    }
+  }
+  const video = source === 'tab' && opts.video !== false;
+  let crop = video ? opts.crop || null : null;
+  if (video && !crop && settings.recordAutoCrop) crop = await videoRegionOnTab(tab);
+  const rec = {
+    id: newQueueId(),
+    kind: source,
+    video,
+    tabId: tab && tab.id ? tab.id : null,
+    url: (tab && tab.url) || '',
+    title: (tab && tab.title) || '',
+    startedAt: Date.now(),
+    status: 'recording',
+    chunks: 0,
+    bytes: 0,
+    uploadedSeq: -1,
+    serverId: null,
+    crop,
+  };
+  await IDB.put('recs', rec);
+  await ensureOffscreen();
+  const res = await chrome.runtime.sendMessage({
+    target: 'offscreen',
+    type: 'offscreen-rec-start',
+    recId: rec.id,
+    source,
+    streamId,
+    video,
+    crop,
+    maxMs: settings.recordMaxMinutes * 60000,
+  });
+  if (!res || !res.ok) {
+    await IDB.delete('recs', rec.id);
+    await closeOffscreenIfIdle();
+    if (source === 'mic' && res && (res.name === 'NotAllowedError' || res.name === 'SecurityError')) {
+      // Grant once on an extension page that can show the prompt.
+      try {
+        await chrome.tabs.create({ url: chrome.runtime.getURL('options.html#mic') });
+      } catch {
+        /* the message below still says what to do */
+      }
+      const err = new Error(t('bg_micGrantNeeded'));
+      err.code = 'mic_permission';
+      throw err;
+    }
+    if (source === 'mic' && res && (res.name === 'NotFoundError' || res.name === 'NotReadableError')) {
+      throw new Error(t('content_micUnavailable'));
+    }
+    throw new Error((res && res.error) || t('bg_recFailed'));
+  }
+  rec.mimeType = res.mimeType || (video ? 'video/webm' : 'audio/webm');
+  rec.transcribe = settings.recordTranscribe !== false;
+  await IDB.put('recs', rec);
+  await refreshBadge();
+  void pumpUpload(rec.id);
+  return { ok: true, recording: true, id: rec.id, video, source };
+}
+
+async function stopRecording(recId, reason) {
+  try {
+    await chrome.runtime.sendMessage({ target: 'offscreen', type: 'offscreen-rec-stop', recId, reason });
+  } catch {
+    /* the offscreen document is gone: mark it stopped below */
+  }
+  // The offscreen document reports `rec-stopped` itself; this is the fallback
+  // for a document that died with the recording.
+  await updateRec(recId, (rec) => {
+    if (rec.status !== 'recording') return false;
+    rec.status = 'stopped';
+    rec.stoppedAt = Date.now();
+    return true;
+  });
+  await refreshBadge();
+  void pumpUpload(recId);
+  return { ok: true, recording: false, id: recId };
+}
+
+/*
+ * Every change to a `recs` row goes through this one chain: read the CURRENT
+ * row, mutate, write. The uploader used to hold a copy across awaits and write
+ * it back, so a stop that landed mid-upload was overwritten (the row stayed
+ * `recording`, the REC badge stuck, and /finish was never sent). The mutator
+ * returns false to skip the write.
+ */
+let recWrites = Promise.resolve();
+function updateRec(recId, mutate) {
+  const run = async () => {
+    if (!IDB || !recId) return null;
+    const rec = await IDB.get('recs', recId);
+    if (!rec) return null;
+    if (mutate(rec) === false) return rec;
+    await IDB.put('recs', rec);
+    return rec;
+  };
+  const next = recWrites.then(run, run);
+  recWrites = next.catch(() => undefined);
+  return next;
+}
+
+/*
+ * After a browser restart (or an offscreen document that died) rows can be
+ * left `recording` with nothing recording them: mark them stopped so the badge
+ * clears and what was captured is uploaded. A live offscreen document is asked
+ * which sessions it still runs; only the others are cleaned.
+ */
+async function cleanupStaleRecordings() {
+  if (!IDB) return 0;
+  const active = await activeRecs();
+  if (!active.length) return 0;
+  let live = [];
+  try {
+    const ctx = chrome.runtime.getContexts ? await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] }) : [];
+    if (ctx && ctx.length) {
+      const res = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'offscreen-rec-list' });
+      live = res && Array.isArray(res.ids) ? res.ids : [];
+    }
+  } catch {
+    live = [];
+  }
+  let cleaned = 0;
+  for (const rec of active) {
+    if (live.includes(rec.id)) continue;
+    const done = await updateRec(rec.id, (r) => {
+      if (r.status !== 'recording') return false;
+      r.status = r.chunks ? 'stopped' : 'failed';
+      r.stoppedAt = r.stoppedAt || Date.now();
+      r.durationMs = r.durationMs || Math.max(0, r.stoppedAt - (r.startedAt || r.stoppedAt));
+      r.error = r.chunks ? r.error : t('bg_recFailed');
+      return true;
+    });
+    if (done) {
+      cleaned += 1;
+      void pumpUpload(rec.id);
+    }
+  }
+  await refreshBadge();
+  return cleaned;
+}
+
+async function handleRecordMessage(msg, tab) {
+  try {
+    if (msg.type === 'record-status') {
+      const recs = await listRecs();
+      return {
+        ok: true,
+        active: recs.filter((r) => r.status === 'recording'),
+        pending: recs.filter((r) => r.status !== 'recording' && r.status !== 'finished').slice(0, 10),
+      };
+    }
+    if (msg.type === 'record-stop') {
+      const running = await activeRecs();
+      for (const rec of running) await stopRecording(rec.id, 'user');
+      return { ok: true, recording: false };
+    }
+    return await startRecording(tab, {
+      video: msg.video !== false,
+      crop: msg.crop || null,
+      source: msg.source === 'mic' ? 'mic' : 'tab',
+    });
+  } catch (err) {
+    return { ok: false, error: String((err && err.message) || err), ...(err && err.code ? { code: err.code } : {}) };
+  }
+}
+
+/** Events from the offscreen recorder. */
+async function handleRecorderEvent(msg) {
+  if (!IDB || !msg.recId) return { ok: false };
+  if (msg.type === 'rec-chunk') {
+    const rec = await updateRec(msg.recId, (r) => {
+      r.chunks = Math.max(r.chunks || 0, Number(msg.seq) + 1);
+      r.bytes = (r.bytes || 0) + (Number(msg.size) || 0);
+    });
+    if (!rec) return { ok: false };
+    void pumpUpload(rec.id);
+    return { ok: true };
+  }
+  if (msg.type === 'rec-stopped' || msg.type === 'rec-error') {
+    const rec = await updateRec(msg.recId, (r) => {
+      if (r.status === 'recording') r.status = msg.type === 'rec-error' && !r.chunks ? 'failed' : 'stopped';
+      r.stoppedAt = Date.now();
+      r.durationMs = Number(msg.durationMs) || Date.now() - r.startedAt;
+      if (msg.type === 'rec-error') r.error = String(msg.error || '');
+    });
+    if (!rec) return { ok: false };
+    await refreshBadge();
+    await closeOffscreenIfIdle();
+    const tab = await chrome.tabs.get(rec.tabId).catch(() => null);
+    if (tab) await toastOnTab(tab, msg.type === 'rec-error' ? rec.error || t('bg_recFailed') : t('bg_recStopped'), msg.type === 'rec-error' ? 'err' : 'ok');
+    void pumpUpload(rec.id);
+    return { ok: true };
+  }
+  return { ok: false };
+}
+
+const uploadChains = new Map();
+function pumpUpload(recId) {
+  const prev = uploadChains.get(recId) || Promise.resolve();
+  const next = prev.then(() => uploadStep(recId)).catch(() => undefined);
+  uploadChains.set(recId, next);
+  return next;
+}
+
+/** fetch with an abort timeout (an app that hangs must not wedge the upload chain). */
+async function fetchWithTimeout(url, init, ms) {
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), ms) : null;
+  try {
+    return await fetch(url, ctl ? { ...init, signal: ctl.signal } : init);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+const REC_CHUNK_TIMEOUT_MS = 60_000;
+const REC_FINISH_POLL_MS = 2000;
+const REC_FINISH_POLL_MAX = 900; // 30 min of conversion at most per pump
+
+/*
+ * The uploader. It never writes back a stale copy of the row (updateRec), and
+ * each chunk is deleted from IndexedDB as soon as the app acknowledged it: a
+ * one-hour recording used to keep ~1.1 GB in the browser until /finish.
+ */
+async function uploadStep(recId) {
+  let rec = await IDB.get('recs', recId);
+  if (!rec || rec.status === 'finished' || rec.status === 'failed') return;
+  const { token, port } = await getConfig();
+  const auth = token ? { Authorization: `Bearer ${token}` } : {};
+  if (rec.status === 'finishing' && rec.serverId) return pollFinish(recId);
+  if (!rec.serverId) {
+    try {
+      const created = await apiFetch('/v1/recordings', {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: rec.kind === 'mic' ? 'mic' : 'tab',
+          mimeType: rec.mimeType || (rec.kind === 'mic' ? 'audio/webm' : 'video/webm'),
+          title: rec.title,
+          url: rec.url,
+          purpose: 'recording',
+          crop: rec.crop || undefined,
+          startedAt: rec.startedAt,
+        }),
+      });
+      const serverId = created.id;
+      rec = await updateRec(recId, (r) => {
+        r.serverId = serverId;
+        r.uploadedSeq = -1;
+      });
+      if (!rec) return;
+    } catch {
+      return; // offline or busy: the flush alarm tries again
+    }
+  }
+  const serverId = rec.serverId;
+  const chunks = (await IDB.getAllByIndex('chunks', 'recId', recId)).sort((a, b) => a.seq - b.seq);
+  let uploadedSeq = rec.uploadedSeq;
+  for (const chunk of chunks) {
+    if (chunk.seq <= uploadedSeq) {
+      // Acknowledged earlier (the delete was interrupted): drop it now.
+      await IDB.delete('chunks', chunk.key);
+      continue;
+    }
+    let res;
+    try {
+      res = await fetchWithTimeout(
+        `${baseUrl(port)}/v1/recordings/${serverId}/chunks/${chunk.seq}`,
+        { method: 'PUT', headers: { ...auth, 'Content-Type': 'application/octet-stream' }, body: chunk.data },
+        REC_CHUNK_TIMEOUT_MS,
+      );
+    } catch {
+      return;
+    }
+    if (res.status === 404) {
+      // The app lost the session (restart past 24 h): start a new one next time.
+      await updateRec(recId, (r) => {
+        r.serverId = null;
+      });
+      return;
+    }
+    if (res.status === 409) {
+      const body = await res.json().catch(() => ({}));
+      if (typeof body.nextSeq === 'number') {
+        uploadedSeq = body.nextSeq - 1;
+        await updateRec(recId, (r) => {
+          r.uploadedSeq = uploadedSeq;
+        });
+        if (chunk.seq <= uploadedSeq) await IDB.delete('chunks', chunk.key);
+      }
+      if (body.error === 'gap') return pumpUpload(recId);
+      continue;
+    }
+    if (!res.ok) return;
+    uploadedSeq = chunk.seq;
+    await updateRec(recId, (r) => {
+      r.uploadedSeq = Math.max(r.uploadedSeq ?? -1, uploadedSeq);
+    });
+    await IDB.delete('chunks', chunk.key);
+  }
+  // Re-read: a stop may have landed while the chunks were going up.
+  rec = await IDB.get('recs', recId);
+  if (!rec || rec.status !== 'stopped' || rec.uploadedSeq < (rec.chunks || 0) - 1) return;
+  try {
+    // Async finish: the app answers 202 at once and converts in the background;
+    // an older app answers 200 with the result (still handled).
+    const result = await apiFetch(`/v1/recordings/${serverId}/finish`, {
+      method: 'POST',
+      body: JSON.stringify({ totalChunks: rec.chunks, durationMs: rec.durationMs, transcribe: rec.transcribe !== false, async: true }),
+      timeoutMs: 120_000,
+    });
+    if (result && result.pending) {
+      await updateRec(recId, (r) => {
+        r.status = 'finishing';
+      });
+      return pollFinish(recId);
+    }
+    await completeRecording(recId, result);
+  } catch {
+    /* retried by the flush alarm */
+  }
+}
+
+async function completeRecording(recId, result) {
+  const failed = result && result.ok === false;
+  const rec = await updateRec(recId, (r) => {
+    r.status = failed ? 'failed' : 'finished';
+    r.result = result;
+    if (failed) r.error = String(result.error || '');
+  });
+  await IDB.deleteByIndex('chunks', 'recId', recId);
+  if (!rec || failed) return;
+  await recordActivity({ kind: 'recording', label: rec.title || rec.url });
+  const tab = rec.tabId ? await chrome.tabs.get(rec.tabId).catch(() => null) : null;
+  if (tab) await toastOnTab(tab, t('bg_recSaved'), 'ok');
+}
+
+/** Poll /status until the app's conversion is done (the /finish request no longer waits for it). */
+async function pollFinish(recId) {
+  for (let i = 0; i < REC_FINISH_POLL_MAX; i += 1) {
+    const rec = await IDB.get('recs', recId);
+    if (!rec || rec.status !== 'finishing' || !rec.serverId) return;
+    let st;
+    try {
+      st = await apiFetch(`/v1/recordings/${rec.serverId}/status`, { timeoutMs: 15_000 });
+    } catch {
+      return; // offline: the flush alarm resumes polling
+    }
+    if (st && (st.state === 'finished' || st.state === 'failed')) {
+      await completeRecording(recId, st.result || { ok: st.state === 'finished', id: rec.serverId, error: st.error });
+      return;
+    }
+    await new Promise((r) => setTimeout(r, REC_FINISH_POLL_MS));
+  }
+}
+
+async function resumeRecordingUploads() {
+  for (const rec of await listRecs()) {
+    if (rec.status === 'stopped' || rec.status === 'finishing') void pumpUpload(rec.id);
+  }
+}
+
+async function discardRecording(recId) {
+  const rec = await IDB.get('recs', recId);
+  if (!rec) return { ok: true };
+  if (rec.status === 'recording') await stopRecording(recId, 'discard');
+  if (rec.serverId) {
+    try {
+      await apiFetch(`/v1/recordings/${rec.serverId}`, { method: 'DELETE' });
+    } catch {
+      /* the app cleans partials after 24 h anyway */
+    }
+  }
+  await IDB.deleteByIndex('chunks', 'recId', recId);
+  await IDB.delete('recs', recId);
+  await refreshBadge();
+  return { ok: true };
+}
+
+/*
+ * Save to disk: a pending recording's chunks, as one file, through
+ * chrome.downloads. `downloads` is an OPTIONAL permission: the toolbar popup
+ * requests it on the click (a user gesture), so the extension never holds it
+ * unasked. A service worker has no URL.createObjectURL, so the offscreen
+ * document (reason BLOBS) assembles the Blob and keeps its URL alive until
+ * the download completes.
+ */
+const diskSaves = new Map();
+let diskSaveListener = false;
+
+/*
+ * The page's "record audio" clip (attached to the next saved card), recorded by
+ * the offscreen document so the microphone permission is the extension's, not
+ * each site's. Same grant flow as a mic recording.
+ */
+let micClipActive = false;
+
+async function handleMicClip(action) {
+  if (action === 'stop') {
+    if (!micClipActive) return { ok: false, recording: false };
+    micClipActive = false;
+    let res = null;
+    try {
+      res = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'offscreen-clip-stop' });
+    } catch (err) {
+      res = { ok: false, error: String((err && err.message) || err) };
+    }
+    await closeOffscreenIfIdle();
+    return { ...(res || { ok: false }), recording: false };
+  }
+  await ensureOffscreen();
+  const res = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'offscreen-clip-start' });
+  if (res && res.ok) {
+    micClipActive = true;
+    return { ok: true, recording: true };
+  }
+  await closeOffscreenIfIdle();
+  if (res && (res.name === 'NotAllowedError' || res.name === 'SecurityError')) {
+    try {
+      await chrome.tabs.create({ url: chrome.runtime.getURL('options.html#mic') });
+    } catch {
+      /* the message still says what to do */
+    }
+    return { ok: false, code: 'mic_permission', error: t('bg_micGrantNeeded') };
+  }
+  if (res && (res.name === 'NotFoundError' || res.name === 'NotReadableError')) {
+    return { ok: false, code: 'mic_unavailable', error: t('content_micUnavailable') };
+  }
+  return { ok: false, error: (res && res.error) || t('content_micUnavailable') };
+}
+
+function recordingFilename(rec) {
+  const d = new Date(rec.startedAt || Date.now());
+  const p = (n) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  return `Gum ${rec.kind === 'mic' ? 'mic' : 'tab'} recording ${stamp}.webm`;
+}
+
+async function releaseDiskSave(downloadId) {
+  const url = diskSaves.get(downloadId);
+  if (!url) return;
+  diskSaves.delete(downloadId);
+  try {
+    await chrome.runtime.sendMessage({ target: 'offscreen', type: 'offscreen-revoke', url });
+  } catch {
+    /* the document is already gone */
+  }
+  await closeOffscreenIfIdle();
+}
+
+async function saveRecordingToDisk(recId) {
+  if (!chrome.downloads || typeof chrome.downloads.download !== 'function') {
+    return { ok: false, code: 'downloads_permission', error: t('bg_recSaveNeedsPermission') };
+  }
+  const rec = IDB ? await IDB.get('recs', recId) : null;
+  const chunks = rec ? await IDB.getAllByIndex('chunks', 'recId', recId) : [];
+  if (!rec || !chunks.length) return { ok: false, error: t('bg_recSaveMissing') };
+  // Chunks are dropped once the app has them; a partly uploaded recording is
+  // no longer a whole file here (it lives in Gum).
+  const seqs = chunks.map((c) => c.seq).sort((a, b) => a - b);
+  if (seqs[0] !== 0 || seqs.length < (rec.chunks || 0)) {
+    return { ok: false, code: 'rec_in_app', error: t('bg_recSaveInApp') };
+  }
+  if (!diskSaveListener && chrome.downloads.onChanged && chrome.downloads.onChanged.addListener) {
+    diskSaveListener = true;
+    chrome.downloads.onChanged.addListener((delta) => {
+      const state = delta && delta.state && delta.state.current;
+      if (state === 'complete' || state === 'interrupted') void releaseDiskSave(delta.id);
+    });
+  }
+  await ensureOffscreen();
+  const made = await chrome.runtime.sendMessage({
+    target: 'offscreen',
+    type: 'offscreen-blob-url',
+    recId,
+    mimeType: rec.mimeType || (rec.kind === 'mic' ? 'audio/webm' : 'video/webm'),
+  });
+  if (!made || !made.ok || !made.url) {
+    await closeOffscreenIfIdle();
+    return { ok: false, error: (made && made.error) || t('bg_recFailed') };
+  }
+  try {
+    const downloadId = await chrome.downloads.download({
+      url: made.url,
+      filename: recordingFilename(rec),
+      saveAs: true,
+      conflictAction: 'uniquify',
+    });
+    diskSaves.set(downloadId, made.url);
+    return { ok: true, downloadId };
+  } catch (err) {
+    try {
+      await chrome.runtime.sendMessage({ target: 'offscreen', type: 'offscreen-revoke', url: made.url });
+    } catch {
+      /* ignore */
+    }
+    await closeOffscreenIfIdle();
+    return { ok: false, error: String((err && err.message) || err) };
+  }
+}
 /* --------------------------- command dispatch ------------------------------
  * One entry point for every surface. Page-side commands are forwarded to the
  * content script; bridge commands run here.
@@ -1098,6 +2164,10 @@ async function runCommand(commandId, tab, opts = {}) {
       return transcribeCurrent(tab);
     case 'capture.audio.save':
       return saveAudioClipboard(tab);
+    case 'capture.video.record':
+      return startRecording(tab, { video: true });
+    case 'capture.audio.tab':
+      return startRecording(tab, { video: false });
     case 'clipboard.send': {
       const sel = await selectionFromTab(tab);
       return clipboardText(tab, sel.text, S.classifyMineSelection(sel.text));
@@ -1130,6 +2200,7 @@ const CONTEXT_MENU_ITEMS = [
   { id: 'sep-1', type: 'separator', contexts: ['page', 'selection'] },
   { id: 'capture.page', title: t('menu_savePage'), contexts: ['page'] },
   { id: 'capture.ocr', title: t('menu_ocr'), contexts: ['page', 'image'] },
+  { id: 'capture.video.record', title: t('menu_recordTab'), contexts: ['page', 'video'] },
   { id: 'app.open', title: t('menu_openApp'), contexts: ['page'] },
 ];
 
@@ -1146,7 +2217,27 @@ function rebuildContextMenus() {
   });
 }
 
+// Page scripts: registered dynamically (see syncContentScriptRegistration).
+void syncContentScriptRegistration();
+// Rows a browser restart (or a dead offscreen document) left `recording`.
+void cleanupStaleRecordings().catch(() => undefined);
+if (chrome.runtime.onStartup && chrome.runtime.onStartup.addListener) {
+  chrome.runtime.onStartup.addListener(() => {
+    void syncContentScriptRegistration();
+    void cleanupStaleRecordings().catch(() => undefined);
+  });
+}
+if (chrome.storage && chrome.storage.onChanged && chrome.storage.onChanged.addListener) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes || !changes.jpStudySettings) return;
+    const before = (changes.jpStudySettings.oldValue || {}).allFrames === true;
+    const after = (changes.jpStudySettings.newValue || {}).allFrames === true;
+    if (before !== after) void syncContentScriptRegistration();
+  });
+}
+
 chrome.runtime.onInstalled.addListener(() => {
+  void syncContentScriptRegistration();
   rebuildContextMenus();
   void ensureFlushAlarm();
   void queueCount().then((n) => updateBadge(n));
@@ -1155,8 +2246,20 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM_FLUSH) void flushQueue();
+  if (alarm.name !== ALARM_FLUSH) return;
+  void flushQueue();
+  void resumeRecordingUploads();
 });
+
+// A recording follows its tab: closing the tab ends it.
+if (chrome.tabs.onRemoved && chrome.tabs.onRemoved.addListener) {
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    void activeRecs().then((recs) => {
+      // A mic recording is not the tab's; only tab captures end with their tab.
+      for (const rec of recs) if (rec.tabId === tabId && rec.kind !== 'mic') void stopRecording(rec.id, 'tab-closed');
+    });
+  });
+}
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
@@ -1215,6 +2318,9 @@ chrome.commands.onCommand.addListener(async (command) => {
       if (!tab?.id) return;
       await ensureContentScript(tab.id);
       await chrome.tabs.sendMessage(tab.id, { type: 'jp-action-wheel' });
+    } else if (command === 'record-tab') {
+      const res = await startRecording(tab, { video: true });
+      await toastOnTab(tab, res.recording ? t('bg_recStarted') : t('bg_recStopped'), 'ok');
     } else if (command === 'bulk-tabs') {
       await openTabPicker();
     } else if (command === 'analyze-selection') {
@@ -1231,8 +2337,51 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 /* ------------------------------- messages --------------------------------- */
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+/**
+ * Who sent a message. Content scripts run inside web pages, so a compromised
+ * page renderer can speak with a content script's voice; extension pages
+ * (popup, options, reading list) are the extension's own origin.
+ */
+function senderKind(sender) {
+  if (!sender || (sender.id && chrome.runtime.id && sender.id !== chrome.runtime.id)) return 'foreign';
+  const base = chrome.runtime.getURL('');
+  const url = String(sender.url || '');
+  if (url.startsWith(base) && !sender.tab) return 'page';
+  if (sender.tab) return url.startsWith(base) ? 'page' : 'content';
+  return 'foreign';
+}
+
+/** Messages only the extension's own pages may send (they act on other tabs or the whole queue). */
+const PAGE_ONLY_MESSAGES = new Set([
+  'list-tabs',
+  'tab-action',
+  'open-tab-picker',
+  'flush',
+  'get-commands',
+  'ensure-content',
+  'save-selection',
+  'capture',
+  'scan-strip',
+  'status-summary',
+  'recent-activity',
+  'transcribe-status',
+  'playlist-status',
+]);
+
+/** The tab a message is about: the sending tab for a content script, else the active one. */
+async function messageTab(sender) {
+  if (sender && sender.tab && sender.tab.id != null) return sender.tab;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab;
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
+    const from = senderKind(sender);
+    if (from === 'foreign' || (from === 'content' && PAGE_ONLY_MESSAGES.has(msg?.type))) {
+      sendResponse({ ok: false, error: 'Forbidden' });
+      return;
+    }
     if (msg?.type === 'health') {
       try {
         const { port } = await getConfig();
@@ -1323,7 +2472,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return;
     }
     if (msg?.type === 'run-command') {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await messageTab(sender);
       try {
         sendResponse(await runCommand(msg.command, tab, msg.opts || {}));
       } catch (err) {
@@ -1370,19 +2519,35 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return;
     }
     if (msg?.type === 'save-text') {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      // The tab the save came from, not whichever tab is active by the time
+      // the message lands (a save from a background tab went to the wrong page).
+      const tab = await messageTab(sender);
       const text = String(msg.text || '').trim();
       if (!text) {
         sendResponse({ ok: false, error: 'No text' });
         return;
       }
+      let imageDataUrl = '';
+      if (msg.screenshotRegion && tab?.windowId != null) {
+        try {
+          const shot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+          imageDataUrl = await cropDataUrlToRegion(shot, msg.screenshotRegion);
+        } catch {
+          /* a protected page cannot be captured; the card goes without */
+        }
+      }
       sendResponse(
-        await saveText(tab, text, msg.mode || 'auto', { forceAnki: msg.forceAnki === true, lang: msg.lang }),
+        await saveText(tab, text, msg.mode || 'auto', {
+          ...pickMineContext(msg),
+          ...(imageDataUrl ? { imageDataUrl } : {}),
+          forceAnki: msg.forceAnki === true,
+          lang: msg.lang,
+        }),
       );
       return;
     }
     if (msg?.type === 'clipboard-text') {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await messageTab(sender);
       const text = String(msg.text || '').trim();
       if (!text) {
         sendResponse({ ok: false, error: 'No text' });
@@ -1406,7 +2571,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return;
     }
     if (msg?.type === 'ocr') {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await messageTab(sender);
       sendResponse(
         await ocrVisibleTab(tab, msg.region, {
           category: msg.category,
@@ -1728,17 +2893,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           }),
         );
       } catch (err) {
-        const queued = await enqueueIfRetryable(
-          'immersion',
-          {
+        if (err.offline) {
+          await queueImmersion({
             url: msg.url || '',
             title: msg.title || '',
-            seconds: msg.seconds,
-            chars: msg.chars,
-          },
-          err,
-        );
-        if (queued) {
+            seconds: Number(msg.seconds) || 0,
+            chars: Number(msg.chars) || 0,
+          });
           sendResponse({ ok: true, queued: true });
           return;
         }
@@ -1746,12 +2907,70 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       }
       return;
     }
-    if (msg?.type === 'api') {
+    // The old all-routes pi pass-through is gone: it let any content script
+    // call every bridge route with the pairing token attached.
+    if (msg?.type === 'scan') {
+      sendResponse(await scanLookup(String(msg.text || ''), String(msg.lang || '')));
+      return;
+    }
+    if (msg?.type === 'mic-clip') {
+      sendResponse(await handleMicClip(msg.action === 'stop' ? 'stop' : 'start'));
+      return;
+    }
+    if (msg?.type === 'annotate') {
+      sendResponse(await annotateTexts(msg.texts, String(msg.lang || '')));
+      return;
+    }
+    if (msg?.type === 'known-snapshot-refresh') {
+      const snap = await knownSnapshot(true);
+      sendResponse({ ok: !!snap, version: snap ? snap.version : '' });
+      return;
+    }
+    if (msg?.type === 'word-audio') {
       try {
-        sendResponse(await apiFetch(msg.path, { method: msg.method || 'GET', body: msg.body }));
+        sendResponse(
+          await apiFetch('/v1/word-audio', {
+            method: 'POST',
+            body: JSON.stringify({ term: msg.term || '', reading: msg.reading || '', lang: msg.lang || '' }),
+          }),
+        );
       } catch (err) {
-        sendResponse({ ok: false, error: String(err.message || err), payload: err.payload });
+        sendResponse({ ok: false, offline: !!err.offline, status: err.status === 404 ? 'unsupported' : 'offline' });
       }
+      return;
+    }
+    if (msg?.type === 'mine-check') {
+      try {
+        sendResponse(
+          await apiFetch('/v1/mine/check', {
+            method: 'POST',
+            body: JSON.stringify({ terms: Array.isArray(msg.terms) ? msg.terms.slice(0, 50) : [] }),
+          }),
+        );
+      } catch (err) {
+        sendResponse({ ok: false, duplicates: {}, offline: !!err.offline });
+      }
+      return;
+    }
+    if (msg?.type === 'record-start' || msg?.type === 'record-stop' || msg?.type === 'record-status') {
+      sendResponse(await handleRecordMessage(msg, await messageTab(sender)));
+      return;
+    }
+    if (from === 'page' && msg?.type === 'recording-upload') {
+      await pumpUpload(String(msg.id || ''));
+      sendResponse({ ok: true });
+      return;
+    }
+    if (from === 'page' && msg?.type === 'recording-discard') {
+      sendResponse(await discardRecording(String(msg.id || '')));
+      return;
+    }
+    if (from === 'page' && msg?.type === 'recording-save-disk') {
+      sendResponse(await saveRecordingToDisk(String(msg.id || '')));
+      return;
+    }
+    if (from === 'page' && typeof msg?.type === 'string' && msg.type.startsWith('rec-')) {
+      sendResponse(await handleRecorderEvent(msg));
       return;
     }
     sendResponse({ ok: false, error: 'Unknown message' });
@@ -1766,4 +2985,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true;
 });
 
+// Test hook: only a test sandbox sets this global; nothing a page or another
+// extension can reach defines it in the service worker.
+if (globalThis.__JP_STUDY_TEST__ === true) globalThis.__jpStudyBg = { apiFetch, flushQueue, scanLookup };
+
 void ensureFlushAlarm();
+// A worker woken after a restart repaints REC or the pending count.
+void refreshBadge();

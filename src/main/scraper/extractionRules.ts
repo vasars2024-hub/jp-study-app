@@ -14,6 +14,7 @@
 
 import type { EpisodeKind, EpisodeRow } from '../../shared/scraperResults';
 import type { ScraperExtractionSettings } from '../../shared/scraperSettings';
+import { foldReleaseWidth, parseKanjiNumeral } from '../../shared/releaseEpisodeNumber';
 
 /**
  * The entity references that actually turn up in episode titles.
@@ -93,7 +94,7 @@ export function cleanExtractedText(text: string): string {
  * "The Village at Episode 3" is a title, and only the anchor tells them apart.
  */
 const LEADING_MARKER =
-  /^\s*(?:(?:episode|episodio|ep\.?|e|#)\s*0*(\d+(?:\.\d+)?)|第\s*0*(\d+(?:\.\d+)?)\s*話)\s*(?:[-–—:.、｜|]\s*)?/i;
+  /^\s*(?:(?:episode|episodio|ep\.?|e|#)\s*0*(\d+(?:\.\d+)?)|第\s*0*(\d+(?:\.\d+)?|[〇一二三四五六七八九十百千]+)\s*[話回])\s*(?:[-–—:.、｜|]\s*)?/i;
 
 export interface NormalizedNumbering {
   number: number | null;
@@ -101,9 +102,12 @@ export interface NormalizedNumbering {
 }
 
 export function normalizeEpisodeNumbering(title: string): NormalizedNumbering {
-  const match = LEADING_MARKER.exec(title);
+  // Width-folded copy, same length as `title`, so `第３話` / `＃５` match and the
+  // slice below still lines up with the original.
+  const match = LEADING_MARKER.exec(foldReleaseWidth(title));
   if (!match) return { number: null, title };
-  const value = Number.parseFloat(match[1] ?? match[2] ?? '');
+  const kanji = match[2] && !/^\d/.test(match[2]) ? parseKanjiNumeral(match[2]) : null;
+  const value = kanji ?? Number.parseFloat(match[1] ?? match[2] ?? '');
   const rest = title.slice(match[0].length).trim();
   return {
     number: Number.isFinite(value) ? value : null,

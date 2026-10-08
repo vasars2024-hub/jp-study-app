@@ -31,17 +31,14 @@ import {
   BrowserWindow,
   desktopCapturer,
   ipcMain,
-  Menu,
-  nativeImage,
   screen,
-  session,
-  Tray,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
   type Rectangle,
 } from 'electron';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
-import { allowDisplayCapture } from './securityHardening';
+import { installDisplayMediaBroker, registerDisplayMediaRequester } from './displayMediaBroker';
+import { setRecordingIndicator } from './recordingIndicator';
 import { encodeWavToMp3 } from './captionAudioEncode';
 import { foregroundWindowTitle } from './foregroundWindow';
 import { getMainStudyLang } from './studyLanguage';
@@ -286,7 +283,7 @@ function createCaptureWindow(): BrowserWindow {
       autoplayPolicy: 'no-user-gesture-required',
     },
   });
-  releaseDisplayCapture = allowDisplayCapture(win.webContents.id);
+  releaseDisplayCapture = registerDisplayMediaRequester(win.webContents, decideCaptureStreams);
   deps?.attachNavGuards?.(win);
   if (deps?.isDevServer) deps.forwardConsole?.(win);
   win.on('closed', () => {
@@ -425,39 +422,18 @@ export async function setCaptureEnabled(on: boolean): Promise<CaptionsState> {
   return getCaptionsState();
 }
 
-function installDisplayMediaHandler(): void {
-  try {
-    session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-      const win = captureWin;
-      const frame = request.frame;
-      const fromCapture =
-        !!win
-        && !win.isDestroyed()
-        && !!frame
-        && frame.processId === win.webContents.mainFrame.processId
-        && frame.routingId === win.webContents.mainFrame.routingId;
-      if (!fromCapture || process.platform !== 'win32') {
-        // Nobody else in the app asks for the screen; refuse whoever does.
-        callback({});
-        return;
-      }
-      desktopCapturer
-        .getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })
-        .then((sources) => {
-          const primaryId = String(screen.getPrimaryDisplay().id);
-          const source = sources.find((s) => s.display_id === primaryId) ?? sources[0];
-          if (!source) {
-            callback({});
-            return;
-          }
-          // The video track is required by Chromium and stopped by the host on arrival.
-          callback({ video: source, audio: 'loopback' });
-        })
-        .catch(() => callback({}));
-    });
-  } catch {
-    /* an older runtime without the handler: capture reports stream failure */
-  }
+/**
+ * What the capture window is granted (through the app's one display-media
+ * handler, `displayMediaBroker.ts`, which has already checked that the request
+ * came from this window's main frame): the Windows loopback, with the primary
+ * screen's video track Chromium insists on — the host stops it on arrival.
+ */
+async function decideCaptureStreams(): Promise<Electron.Streams | null> {
+  if (process.platform !== 'win32') return null;
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
+  const primaryId = String(screen.getPrimaryDisplay().id);
+  const source = sources.find((s) => s.display_id === primaryId) ?? sources[0];
+  return source ? { video: source, audio: 'loopback' } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -989,53 +965,17 @@ function setBarBounds(bar: OverlayBounds): OverlayBounds {
 // ---------------------------------------------------------------------------
 // Tray: the on/off indicator while audio is being held
 
-let tray: Tray | null = null;
-
-/** A 16 px deep-red dot — "recording", in the app's accent. */
-function indicatorIcon(): Electron.NativeImage {
-  const size = 16;
-  const buf = Buffer.alloc(size * size * 4);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const d = Math.hypot(x - 7.5, y - 7.5);
-      const alpha = Math.max(0, Math.min(1, 6.5 - d));
-      const i = (y * size + x) * 4;
-      // BGRA
-      buf[i] = 0x2a;
-      buf[i + 1] = 0x1c;
-      buf[i + 2] = 0xb0;
-      buf[i + 3] = Math.round(alpha * 255);
-    }
-  }
-  return nativeImage.createFromBitmap(buf, { width: size, height: size });
-}
-
+// The red dot itself is shared with the Region Recorder (`recordingIndicator.ts`).
 function refreshTray(): void {
-  const on = capture === 'on';
-  if (!on) {
-    if (tray) {
-      try {
-        tray.destroy();
-      } catch {
-        /* already gone */
-      }
-      tray = null;
-    }
+  if (capture !== 'on') {
+    setRecordingIndicator('captions', null);
     return;
   }
-  if (!tray) {
-    try {
-      tray = new Tray(indicatorIcon());
-      tray.on('click', () => setOverlayOpen(true));
-    } catch {
-      tray = null;
-      return;
-    }
-  }
   const seconds = settings.captureSeconds;
-  tray.setToolTip(mt('captions.tray.tooltip', { seconds }));
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
+  setRecordingIndicator('captions', {
+    tooltip: mt('captions.tray.tooltip', { seconds }),
+    onClick: () => setOverlayOpen(true),
+    menu: [
       { label: mt('captions.tray.status', { seconds }), enabled: false },
       { type: 'separator' },
       { label: mt('captions.tray.mineRecent', { seconds: settings.mineSeconds }), click: () => void mineRecent() },
@@ -1049,8 +989,8 @@ function refreshTray(): void {
       },
       { type: 'separator' },
       { label: mt('captions.tray.stop'), click: () => stopCapture() },
-    ]),
-  );
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1062,7 +1002,7 @@ export function configureSystemAudioCapture(options: CaptureDeps): void {
 
 export function registerSystemAudioCaptureIpc(): void {
   loadSettings();
-  installDisplayMediaHandler();
+  installDisplayMediaBroker();
 
   // The captions commands join the shared global-command registry (main/globalCommands.ts);
   // the renderer's Shortcuts rows push the user's chords, these are the defaults.
@@ -1207,13 +1147,6 @@ export function registerSystemAudioCaptureIpc(): void {
       saveSettingsNow();
     }
     stopCapture();
-    if (tray) {
-      try {
-        tray.destroy();
-      } catch {
-        /* gone */
-      }
-      tray = null;
-    }
+    setRecordingIndicator('captions', null);
   });
 }

@@ -14,7 +14,7 @@ import {
   formatPct,
   installedToday,
   isFirstTimeToday,
-  localDayKey,
+  aeroDayKey,
   pickBalloonCard,
   planUpdates,
   screensaverShouldStart,
@@ -269,7 +269,7 @@ describe('screensaver gate', () => {
 
 describe('once-a-day gates and formatting', () => {
   it('keys a day by local date', () => {
-    expect(localDayKey(NOW)).toBe('2026-10-07');
+    expect(aeroDayKey(NOW)).toBe('2026-10-07');
     expect(isFirstTimeToday('2026-10-07', NOW)).toBe(false);
     expect(isFirstTimeToday('2026-10-06', NOW)).toBe(true);
     expect(isFirstTimeToday(null, NOW)).toBe(true);

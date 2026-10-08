@@ -22,13 +22,84 @@ export interface VideoClipRequest {
    * run-up: the decoder settles on the following keyframe.
    */
   padSec?: number;
+  /**
+   * Extra time after the cue when it should differ from `padSec`. Speech tails off
+   * past a subtitle's end time more often than it starts before it, so one-key mining
+   * pads the end a little more than the start.
+   */
+  padAfterSec?: number;
   /** Downscale ceiling. A card does not need source resolution, and Anki syncs the file. */
   maxHeight?: number;
+  /**
+   * Which audio stream to keep, as a 0-based index among the file's AUDIO streams
+   * (`0:a:<n>`): the track the user is listening to. A dual-audio release often puts
+   * the dub first, so "the first audio stream" can be the wrong language entirely.
+   */
+  audioStreamOrdinal?: number | null;
 }
 
 export interface VideoClipBounds {
   startSec: number;
   durationSec: number;
+}
+
+/** One-key mining's default lead-in before a cue (seconds). */
+export const MINE_AUDIO_PAD_BEFORE_SEC = 0.25;
+/** One-key mining's default tail after a cue (seconds). */
+export const MINE_AUDIO_PAD_AFTER_SEC = 0.35;
+
+/**
+ * The cue audio extraction request: the same range a clip uses, cut to speech-sized
+ * audio rather than video. Lives beside the clip request because both are mined from
+ * the same file with the same padding rules.
+ */
+export interface AudioClipRequest {
+  filePath: string;
+  startSec: number;
+  endSec: number;
+  padBeforeSec?: number;
+  padAfterSec?: number;
+  audioStreamOrdinal?: number | null;
+}
+
+/** One still from the file, for a cue that is not the frame on screen. */
+export interface VideoFrameRequest {
+  filePath: string;
+  atSec: number;
+  /** Width ceiling; the frame is never upscaled. */
+  maxWidth?: number;
+}
+
+/**
+ * Machine reasons a cut can fail. Main has no locale, so it reports one of these and
+ * the renderer turns it into a sentence (`studyLoop.mine.error.*`).
+ */
+export type VideoClipErrorCode =
+  | 'no-local-file'
+  | 'file-missing'
+  | 'ffmpeg-unavailable'
+  | 'timeout'
+  | 'too-large'
+  | 'ffmpeg-failed';
+
+export const VIDEO_CLIP_ERROR_KEY: Record<VideoClipErrorCode, string> = {
+  'no-local-file': 'studyLoop.mine.error.noLocalFile',
+  'file-missing': 'studyLoop.mine.error.fileMissing',
+  'ffmpeg-unavailable': 'studyLoop.mine.error.ffmpegUnavailable',
+  timeout: 'studyLoop.mine.error.timeout',
+  'too-large': 'studyLoop.mine.error.tooLarge',
+  'ffmpeg-failed': 'studyLoop.mine.error.ffmpegFailed',
+};
+
+/** The catalog key for a cut's error, or null for a reason this module did not author. */
+export function videoClipErrorKey(error: string | undefined): string | null {
+  return error && Object.prototype.hasOwnProperty.call(VIDEO_CLIP_ERROR_KEY, error)
+    ? VIDEO_CLIP_ERROR_KEY[error as VideoClipErrorCode]
+    : null;
+}
+
+function audioOrdinal(value: number | null | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 /**
@@ -41,14 +112,50 @@ export interface VideoClipBounds {
  */
 export function videoClipBounds(request: VideoClipRequest): VideoClipBounds {
   const pad = Math.max(0, request.padSec ?? 0.25);
+  const padAfter = Math.max(0, request.padAfterSec ?? pad);
   const rawStart = Math.min(request.startSec, request.endSec);
   const rawEnd = Math.max(request.startSec, request.endSec);
   const startSec = Math.max(0, rawStart - pad);
   const durationSec = Math.min(
     MAX_CLIP_SEC,
-    Math.max(MIN_CLIP_SEC, rawEnd + pad - startSec),
+    Math.max(MIN_CLIP_SEC, rawEnd + padAfter - startSec),
   );
   return { startSec, durationSec };
+}
+
+/** The padded, clamped window for cue audio (same rules as a clip). */
+export function audioClipBounds(request: AudioClipRequest): VideoClipBounds {
+  return videoClipBounds({
+    filePath: request.filePath,
+    startSec: request.startSec,
+    endSec: request.endSec,
+    padSec: request.padBeforeSec ?? MINE_AUDIO_PAD_BEFORE_SEC,
+    padAfterSec: request.padAfterSec ?? MINE_AUDIO_PAD_AFTER_SEC,
+  });
+}
+
+/**
+ * A still at `atSec` as a JPEG on stdout, at most `maxWidth` wide (never upscaled).
+ * `-ss` before `-i` for the same reason as the clip: an indexed seek, not a decode
+ * from zero.
+ */
+export function videoFrameFfmpegArgs(request: VideoFrameRequest): string[] {
+  const maxWidth = Math.max(160, Math.min(1920, Math.round(request.maxWidth ?? 1280)));
+  const atSec = Math.max(0, Number.isFinite(request.atSec) ? request.atSec : 0);
+  return [
+    '-hide_banner',
+    '-loglevel', 'error',
+    '-nostdin',
+    '-ss', atSec.toFixed(3),
+    '-i', request.filePath,
+    '-frames:v', '1',
+    '-map', '0:v:0',
+    '-vf', `scale='min(${maxWidth},iw)':-2`,
+    '-q:v', '3',
+    '-f', 'image2',
+    '-c:v', 'mjpeg',
+    'pipe:1',
+  ];
 }
 
 /**
@@ -69,10 +176,11 @@ export function videoClipFfmpegArgs(request: VideoClipRequest): string[] {
     '-ss', startSec.toFixed(3),
     '-t', durationSec.toFixed(3),
     '-i', request.filePath,
-    // Only the first video and first audio stream: episodes routinely carry
-    // several audio tracks, and without this every one of them lands in the card.
+    // One video and one audio stream — the one being listened to (default the
+    // first): episodes routinely carry several audio tracks, and without this
+    // every one of them lands in the card.
     '-map', '0:v:0',
-    '-map', '0:a:0?',
+    '-map', `0:a:${audioOrdinal(request.audioStreamOrdinal)}?`,
     '-vf', `scale=-2:'min(${maxHeight},ih)'`,
     '-c:v', 'libx264',
     '-preset', 'veryfast',

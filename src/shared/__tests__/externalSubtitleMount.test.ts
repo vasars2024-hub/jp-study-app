@@ -56,6 +56,29 @@ describe('decideExternalSubtitleMount', () => {
     }))).toBe('mount');
   });
 
+  it('lets the study-language sidecar in beside a container track in another language', () => {
+    // An English-only release used to hide the downloaded Japanese track entirely.
+    expect(decideExternalSubtitleMount(state({
+      trackNumbers: [3],
+      mountedTrackNumber: null,
+      mountedName: null,
+      resolvedName: 'ep01.ja.srt',
+      trackLanguages: { 3: 'en' },
+      studyLang: 'ja',
+    }))).toBe('mount');
+    // A container track in the study language — or one that does not say — still wins.
+    for (const lang of ['ja', '']) {
+      expect(decideExternalSubtitleMount(state({
+        trackNumbers: [3],
+        mountedTrackNumber: null,
+        mountedName: null,
+        resolvedName: 'ep01.ja.srt',
+        trackLanguages: { 3: lang },
+        studyLang: 'ja',
+      }))).toBe('container');
+    }
+  });
+
   it('still refuses when the container track arrives after ours', () => {
     // The negative control for the loosened guard: our track number is 1, and a track
     // the file itself brought has appeared alongside it. `length > 0` and

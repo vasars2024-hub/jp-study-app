@@ -69,6 +69,7 @@ import {
   consumePendingAeroBoot,
   consumePendingWiredBoot,
   markLockscreenUnlocked,
+  syncLockscreenToMain,
   AERO_ENTRY_LOCKED_EVENT,
 } from './lockscreenSettings';
 import { loadThemeId } from './theme/engine';
@@ -271,6 +272,27 @@ export default function App() {
     window.addEventListener(AERO_ENTRY_LOCKED_EVENT, onEntryLocked);
     return () => window.removeEventListener(AERO_ENTRY_LOCKED_EVENT, onEntryLocked);
   }, []);
+
+  // Main owns the lock (main/lockscreenPin.ts): mirror the settings to it (a
+  // profile from before main kept the PIN is adopted once), take on a lock main
+  // holds, and show the PIN pad when main brings this window forward locked.
+  useEffect(() => {
+    if (popout || secondary || detachedBlock || isMiniWidgetWindow() || isLockscreenWindow() || isCompanionHostWindow()) {
+      return;
+    }
+    syncLockscreenToMain(undefined, shouldShowLockscreen());
+    let alive = true;
+    void window.api.lockscreenIsLocked?.()
+      .then((mainLocked) => {
+        if (alive && mainLocked) setLocked(true);
+      })
+      .catch(() => undefined);
+    const off = window.api.onLockscreenLocked?.(() => setLocked(true));
+    return () => {
+      alive = false;
+      off?.();
+    };
+  }, [popout, secondary, detachedBlock]);
 
   // Main's study bridges — extension mining into the local deck, the Whisper
   // requests, transcript cards, and the extension's known-word / level /

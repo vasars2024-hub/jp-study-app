@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { planListenQueue, type ReviewOrder } from '../../../shared/flashcardReview';
 import { loadPracticeDeck, type DeckFlashcard, type DeckFolderFilter } from '../../flashcardDeck';
 import { cardAudio } from '../../cardAudioPlayback';
+import { cardAudioSource } from '../../cardAudioSource';
 import { useT } from '../../i18n';
 import { cardContentLang } from '../../studyEnvironment';
 import Icon from '../Icons';
@@ -28,18 +29,7 @@ function listenQueue(deck: DeckFolderFilter, order: ReviewOrder): ListenCard[] {
   );
 }
 
-async function clipSource(card: DeckFlashcard): Promise<string | null> {
-  if (card.audioDataUrl) return card.audioDataUrl;
-  if (!card.audioPath) return null;
-  try {
-    const managed = await window.api.flashcardReadAudio(card.audioPath);
-    if (managed.ok && managed.dataUrl) return managed.dataUrl;
-    const captured = await window.api.visualNovelReadCaptureAudio?.(card.audioPath);
-    return captured?.ok && captured.dataUrl ? captured.dataUrl : null;
-  } catch {
-    return null;
-  }
-}
+const clipSource = (card: DeckFlashcard): Promise<string | null> => cardAudioSource(card);
 
 export default function ListenMode({ onExit, deck = 'all' }: {
   onExit?: () => void;

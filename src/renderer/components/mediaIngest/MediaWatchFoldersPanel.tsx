@@ -91,6 +91,11 @@ export default function MediaWatchFoldersPanel() {
       {state.autoImport && qbitLine ? (
         <p className="mc-setting-note mi-qbit" role="status">{t(qbitLine)}</p>
       ) : null}
+      {state.autoImport && (state.qbit.unresolved ?? 0) > 0 ? (
+        <p className="mc-setting-note mi-qbit" role="status">
+          {t('scraperFix.qbit.unresolved', { count: state.qbit.unresolved ?? 0 })}
+        </p>
+      ) : null}
 
       <div className="mi-folders-head">
         <strong>{t('mediaIngest.folders')}</strong>

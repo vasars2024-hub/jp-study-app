@@ -256,6 +256,43 @@ export function guessSidecarLanguage(fileName: string, mediaStem: string): strin
   return null;
 }
 
+/**
+ * Whether `fileName` is a sidecar of the media file with stem `stem`: the stem
+ * itself, then a `.` (`Show - 01.ja.srt`, `Show - 01.srt`) or the `_` of the
+ * `Episode_ja_JP.vtt` convention. A bare prefix is not enough —
+ * `Show - 010.ja.srt` belongs to episode 010, not episode 01.
+ * Case-insensitive, like the file systems this runs on.
+ */
+export function sidecarNameMatchesStem(fileName: string, stem: string): boolean {
+  if (!stem) return false;
+  const name = fileName.toLowerCase();
+  const prefix = stem.toLowerCase();
+  if (name.length <= prefix.length || !name.startsWith(prefix)) return false;
+  const boundary = name[prefix.length];
+  return boundary === '.' || boundary === '_';
+}
+
+/**
+ * The flag tags a sidecar carries AFTER the media stem (`.sdh.`, `.hi.`, `.cc.`,
+ * `_forced`, `[SDH]`). The stem is never looked at, so a show called
+ * "Hi Score Girl" or "CC Lemon" is not read as a hearing-impaired track.
+ */
+export function sidecarFlagTags(fileName: string, stem: string): { forced: boolean; hearingImpaired: boolean } {
+  const dot = fileName.lastIndexOf('.');
+  const base = dot > 0 ? fileName.slice(0, dot) : fileName;
+  const suffix = sidecarNameMatchesStem(fileName, stem) ? base.slice(stem.length) : base;
+  const segments = new Set(
+    suffix
+      .toLowerCase()
+      .split(/[._\s()[\]{}]+/)
+      .filter(Boolean),
+  );
+  return {
+    forced: segments.has('forced'),
+    hearingImpaired: segments.has('sdh') || segments.has('hi') || segments.has('cc'),
+  };
+}
+
 /** Subtitle files sitting beside the media file that share its stem. */
 export function findSidecarSubtitles(mediaFile: string): SidecarSubtitle[] {
   const dir = path.dirname(mediaFile);
@@ -273,15 +310,14 @@ export function findSidecarSubtitles(mediaFile: string): SidecarSubtitle[] {
     if (!READABLE_EXTENSIONS.includes(extension)) continue;
     // Same stem only. A directory of many episodes must not attach episode 1's
     // subtitle to every one of them.
-    if (!name.toLowerCase().startsWith(stem.toLowerCase())) continue;
-    const lower = name.toLowerCase();
+    // The stem must end at a `.`: `Show - 010.ja.srt` is not `Show - 01.mkv`'s.
+    if (!sidecarNameMatchesStem(name, stem)) continue;
     out.push({
       path: path.join(dir, name),
       fileName: name,
       format: extension,
       language: guessSidecarLanguage(name, stem),
-      forced: /\bforced\b/.test(lower),
-      hearingImpaired: /\b(sdh|cc|hi)\b/.test(lower),
+      ...sidecarFlagTags(name, stem),
     });
   }
   return out;

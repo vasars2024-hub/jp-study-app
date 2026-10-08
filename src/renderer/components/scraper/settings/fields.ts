@@ -236,6 +236,7 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'safety.maxRequestsPerMinute', group: 'antibot', kind: 'number', label: 'Max Requests / Minute', min: 1, max: 600 },
   { path: 'safety.pauseAfterFailures', group: 'antibot', kind: 'number', label: 'Pause After Failures', min: 1, max: 100 },
   { path: 'safety.pauseDurationMs', group: 'antibot', kind: 'number', label: 'Pause Duration', min: 1_000, max: 3_600_000, step: 1_000, unit: 'ms' },
+  { path: 'safety.allowPrivateNetwork', group: 'antibot', kind: 'toggle', label: 'Allow Private Network', hint: 'Lets crawls, source probes and the HTTP Inspector reach localhost and LAN addresses. Off refuses them; qBittorrent and Seanime are never affected.' },
 
   // ---------------------------------------------------------- extraction ---
   { path: 'extraction.cssSelectors', group: 'extraction', kind: 'tags', label: 'CSS Selectors', hint: 'Tried in order; the first that matches wins.' },
@@ -312,6 +313,7 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'qbittorrent.uploadLimitKbps', group: 'qbittorrent', kind: 'number', label: 'Upload Limit', min: 0, max: 10_000_000, unit: 'KB/s', hint: '0 means unlimited.' },
   { path: 'qbittorrent.downloadLimitKbps', group: 'qbittorrent', kind: 'number', label: 'Download Limit', min: 0, max: 10_000_000, unit: 'KB/s' },
   { path: 'qbittorrent.renameTemplate', group: 'qbittorrent', kind: 'text', label: 'Rename Template', placeholder: '{series} - {episode}', advanced: true },
+  { path: 'qbittorrent.pathMappings', group: 'qbittorrent', kind: 'counted', label: 'Path Mappings', action: 'qbit-path-mappings', keywords: ['remote', 'docker', 'nas', 'path', 'mapping'], hint: 'For qBittorrent on another machine: the folder it reports, and the same folder as this computer sees it.' },
 
   // -------------------------------------------------------------- images ---
   { path: 'images.downloadThumbnails', group: 'images', kind: 'toggle', label: 'Download Thumbnails' },

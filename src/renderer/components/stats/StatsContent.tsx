@@ -20,12 +20,15 @@ import {
   formatNumber,
   getSummary,
   getRestDayEnabled,
+  getStudyDaysByKey,
   setRestDayEnabled,
   onStatsChanged,
   resetStats,
   type DayStat,
   type StatsSummary,
 } from '../../stats';
+import { buildStudyHeatmap, gameAnswersByDay } from '../../../shared/studyActivityHeatmap';
+import './statsActivity.css';
 import {
   mediaWorkspaceHostIsMounted,
   readContinueWatching,
@@ -178,7 +181,9 @@ export function useStats(): StatsState {
       || summary.totalChars > 0
       || summary.totalWatchSeconds > 0
       || summary.totalStudySeconds > 0
-      || summary.totalReviews > 0,
+      || summary.totalReviews > 0
+      || (summary.totalMediaMined ?? 0) > 0
+      || (summary.totalLinesStudied ?? 0) > 0,
     refresh,
     resetAllStats,
   };
@@ -391,6 +396,9 @@ export function StatsGrammar() {
  * review log (renderer/reviewLog.ts); the forecast reads each local card's own
  * due date, with today's new-card allowance applied to what is due now.
  */
+/** How far ahead the review forecast reads the deck's schedule. */
+export const REVIEW_FORECAST_DAYS = 30;
+
 export function StatsReviews() {
   const { t, lang } = useT();
   const [log, setLog] = useState<ReviewLogSummary | null>(null);
@@ -405,7 +413,7 @@ export function StatsReviews() {
     };
     const refreshDeck = (): void => {
       const deck = loadDeck();
-      setForecast({ dueNow: dueDeckCards(deck).length, days: localDueForecast(deck, 7) });
+      setForecast({ dueNow: dueDeckCards(deck).length, days: localDueForecast(deck, REVIEW_FORECAST_DAYS) });
     };
     refreshLog();
     refreshDeck();
@@ -456,7 +464,15 @@ export function StatsReviews() {
         </div>
       </div>
       {forecast && (
-        <div className="stats-forecast" role="list" aria-label={t('stats.reviews.forecast')}>
+        <p className="muted stats-forecast-caption">
+          {t('studyLoop2.stats.forecast30', {
+            total: formatNumber(forecast.days.days.reduce((sum, day) => sum + day.due, 0)),
+            beyond: formatNumber(forecast.days.beyond),
+          })}
+        </p>
+      )}
+      {forecast && (
+        <div className="stats-forecast stats-forecast-30" role="list" aria-label={t('stats.reviews.forecast')}>
           {forecast.days.days.map((day) => {
             const date = new Date();
             date.setDate(date.getDate() + day.offsetDays);
@@ -469,7 +485,12 @@ export function StatsReviews() {
                     <div className="stats-forecast-fill" style={{ height: `${(day.due / peak) * 100}%` }} />
                   )}
                 </div>
-                <span className="stats-bar-lbl">{weekdayInitial(iso, lang)}</span>
+                {/* Thirty one-glyph weekdays are a picket fence: the day of the month, weekly. */}
+                <span className="stats-bar-lbl">
+                  {day.offsetDays % 7 === 0
+                    ? new Intl.DateTimeFormat(LANG_TAGS[lang], { day: 'numeric' }).format(date)
+                    : ''}
+                </span>
               </div>
             );
           })}
@@ -662,8 +683,39 @@ export function StatsCards({ state, showRestDayToggle = false }: { state: StatsS
           </div>
         </>
       )}
+      {/* Video study mode: lines mined from the player and lines studied there. */}
+      {mediaStudyFigures(s).map((figure) => (
+        <div className="stats-card" key={figure.labelKey}>
+          <span className="stats-card-val">{formatNumber(figure.value)}</span>
+          <span className="stats-card-lbl">{t(figure.labelKey)}</span>
+        </div>
+      ))}
     </div>
   );
+}
+
+/**
+ * The video-study counters as label / value rows, for every Statistics host
+ * (cards here, the Aero summary list). A channel with nothing recorded yet is
+ * left out, the way watch and study time are.
+ */
+export function mediaStudyFigures(s: StatsSummary): Array<{ labelKey: string; value: number }> {
+  const out: Array<{ labelKey: string; value: number }> = [];
+  if ((s.totalMediaMined ?? 0) > 0) {
+    out.push(
+      { labelKey: 'studyLoop.stats.card.minedToday', value: s.todayMediaMined ?? 0 },
+      { labelKey: 'studyLoop.stats.card.minedWeek', value: s.weekMediaMined ?? 0 },
+      { labelKey: 'studyLoop.stats.card.minedTotal', value: s.totalMediaMined ?? 0 },
+    );
+  }
+  if ((s.totalLinesStudied ?? 0) > 0) {
+    out.push(
+      { labelKey: 'studyLoop.stats.card.linesToday', value: s.todayLinesStudied ?? 0 },
+      { labelKey: 'studyLoop.stats.card.linesWeek', value: s.weekLinesStudied ?? 0 },
+      { labelKey: 'studyLoop.stats.card.linesTotal', value: s.totalLinesStudied ?? 0 },
+    );
+  }
+  return out;
 }
 
 /**
@@ -677,6 +729,7 @@ export function StatsCards({ state, showRestDayToggle = false }: { state: StatsS
  */
 export function StatsChart({ state }: { state: StatsState }) {
   const { t, lang } = useT();
+  const games = useGameAnswersByDay();
   const anyWatch = state.summary.totalWatchSeconds > 0;
   /** One day's figures as a sentence — the same string the tooltip carries. */
   const dayLabel = (d: DayStat): string =>
@@ -742,7 +795,142 @@ export function StatsChart({ state }: { state: StatsState }) {
         </div>
       )}
       <ReadingSpeedChart recent={state.summary.recent} />
+      <ReviewsGamesChart recent={state.summary.recent} games={games} />
+      <StatsStudyHeatmap games={games} />
     </>
+  );
+}
+
+/** Game answers per local day from the review log, kept current. */
+function useGameAnswersByDay(): Record<string, number> {
+  const [games, setGames] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let alive = true;
+    const refresh = (): void => {
+      void loadReviewLog()
+        .then((entries) => {
+          if (alive) setGames(gameAnswersByDay(entries));
+        })
+        .catch(() => undefined);
+    };
+    refresh();
+    const off = onReviewLogChanged(refresh);
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+  return games;
+}
+
+/**
+ * The same fourteen days as the time chart, in counts: reviews and game answers, stacked.
+ * A count and a duration cannot share one axis honestly, so they get their own bars
+ * under the time chart rather than a second scale on it.
+ */
+function ReviewsGamesChart({ recent, games }: { recent: DayStat[]; games: Record<string, number> }) {
+  const { t, lang } = useT();
+  const days = recent.map((day) => ({ date: day.date, reviews: day.reviews, games: games[day.date] ?? 0 }));
+  if (days.every((day) => day.reviews === 0 && day.games === 0)) return null;
+  const peak = Math.max(1, ...days.map((day) => day.reviews + day.games));
+  return (
+    <section className="stats-reviews-games" aria-label={t('studyLoop2.stats.reviewsGamesTitle')}>
+      <h3>{t('studyLoop2.stats.reviewsGamesTitle')}</h3>
+      <div className="stats-chart">
+        {days.map((day) => {
+          const label = t('studyLoop2.stats.reviewsGamesDay', {
+            date: chartDayLabel(day.date, lang),
+            reviews: formatNumber(day.reviews),
+            games: formatNumber(day.games),
+          });
+          return (
+            <div className="stats-bar-col" key={day.date} role="img" aria-label={label} title={label}>
+              <div className="stats-bar-track">
+                <div className="stats-bar-stack">
+                  {day.games > 0 && (
+                    <div className="stats-bar-fill watch" style={{ height: `${(day.games / peak) * 100}%` }} />
+                  )}
+                  {day.reviews > 0 && (
+                    <div className="stats-bar-fill" style={{ height: `${(day.reviews / peak) * 100}%` }} />
+                  )}
+                </div>
+              </div>
+              <span className="stats-bar-lbl">{weekdayInitial(day.date, lang)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="stats-legend">
+        <span className="stats-legend-item">
+          <i className="stats-legend-dot" aria-hidden="true" />
+          {t('studyLoop2.stats.legendReviews')}
+        </span>
+        <span className="stats-legend-item">
+          <i className="stats-legend-dot watch" aria-hidden="true" />
+          {t('studyLoop2.stats.legendGames')}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * A year of study, one square per day: minutes (reading, watching, listening, focused
+ * study), reviews, game answers and mined cards, shaded against the busiest day
+ * (`shared/studyActivityHeatmap.ts`). The grid is one image with a spoken summary; each
+ * day's figures are on its tooltip, since 365 focus stops would be a trap, not a chart.
+ */
+export function StatsStudyHeatmap({ games }: { games: Record<string, number> }) {
+  const { t, lang } = useT();
+  const [version, setVersion] = useState(0);
+  useEffect(() => onStatsChanged(() => setVersion((v) => v + 1)), []);
+  const heatmap = useMemo(
+    () => buildStudyHeatmap(getStudyDaysByKey(), games, new Date(), 365),
+    // `version` is the change signal for the stats store.
+    [games, version],
+  );
+  if (heatmap.activeDays === 0) return null;
+  const summary = t('studyLoop2.stats.heatmapSummary', {
+    days: formatNumber(heatmap.activeDays),
+    minutes: formatNumber(heatmap.totals.minutes),
+    reviews: formatNumber(heatmap.totals.reviews),
+    games: formatNumber(heatmap.totals.games),
+    mined: formatNumber(heatmap.totals.mined),
+  });
+  return (
+    <section className="stats-heatmap" aria-label={t('studyLoop2.stats.heatmapTitle')}>
+      <h3>{t('studyLoop2.stats.heatmapTitle')}</h3>
+      <p className="muted">{summary}</p>
+      <div className="stats-heatmap-scroll">
+        <div className="stats-heatmap-grid" role="img" aria-label={summary}>
+          {Array.from({ length: heatmap.leadingBlanks }, (_, i) => (
+            <span key={`blank-${i}`} className="stats-heatmap-cell is-blank" aria-hidden="true" />
+          ))}
+          {heatmap.cells.map((cell) => (
+            <span
+              key={cell.date}
+              className="stats-heatmap-cell"
+              data-level={cell.level}
+              aria-hidden="true"
+              title={t('studyLoop2.stats.heatmapDay', {
+                date: chartDayLabel(cell.date, lang),
+                minutes: formatNumber(cell.minutes),
+                reviews: formatNumber(cell.reviews),
+                games: formatNumber(cell.games),
+                mined: formatNumber(cell.mined),
+              })}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="stats-heatmap-legend muted" aria-hidden="true">
+        <span>{t('studyLoop2.stats.less')}</span>
+        {[0, 1, 2, 3, 4].map((level) => (
+          <span key={level} className="stats-heatmap-cell" data-level={level} />
+        ))}
+        <span>{t('studyLoop2.stats.more')}</span>
+      </div>
+    </section>
   );
 }
 

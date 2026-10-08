@@ -133,6 +133,11 @@
         transition: background 0.12s ease;
       }
       .actions button:hover { background: var(--panel-2); }
+      .rec-row { display: flex; gap: 6px; margin: 8px 0 4px; }
+      .rec-row button { flex: 1; }
+      #rec-stop { background: #c62828; color: #fff; }
+      .rec-item { display: flex; gap: 6px; align-items: center; font-size: 12px; margin: 4px 0; }
+      .rec-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .mode-row {
         display: flex;
         align-items: center;
@@ -288,6 +293,17 @@
           <button type="button" role="radio" data-mode="ai" data-i18n="popup_modeAi">AI OCR</button>
         </div>
       </div>
+
+      <!-- Tab recorder. Started from here (a toolbar click is the gesture
+           chrome.tabCapture needs); recordings upload to Gum in chunks. -->
+      <div class="rec-row" id="rec-row">
+        <button type="button" id="rec-tab" data-i18n="popup_recTab">Record tab</button>
+        <button type="button" id="rec-area" data-i18n="popup_recArea">Record area</button>
+        <button type="button" id="rec-audio" data-i18n="popup_recAudio">Record tab audio</button>
+        <button type="button" id="rec-mic" data-i18n="popup_recMic">Record microphone</button>
+        <button type="button" id="rec-stop" hidden data-i18n="popup_recStop">Stop recording</button>
+      </div>
+      <div id="rec-pending" hidden></div>
 
       <div id="recent-wrap" hidden>
         <h2 data-i18n="popup_recent">Recent</h2>

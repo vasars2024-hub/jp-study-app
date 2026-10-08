@@ -70,7 +70,8 @@ beforeEach(() => {
 
 describe('jimakuSearchDetailed — down is set by who actually knows', () => {
   it('marks a rate-limited search as down and names the status', async () => {
-    replies = [{ status: 429, body: 'Too Many Requests' }];
+    // A 429 is retried twice (P4 pacing); one that persists is the outage.
+    replies = [429, 429, 429].map((status) => ({ status, body: 'Too Many Requests' }));
 
     const match = await jimakuSearchDetailed(undefined, 'Bakuman.', null);
     expect(match.down).toBe(true);
@@ -78,7 +79,8 @@ describe('jimakuSearchDetailed — down is set by who actually knows', () => {
     expect(match.candidates).toEqual([]);
     expect(match.entry).toBeNull();
     // It must not have gone on to ask for files against an entry it never got.
-    expect(urls).toHaveLength(1);
+    expect(urls).toHaveLength(3);
+    expect(new Set(urls).size).toBe(1);
   });
 
   it('does NOT mark a genuine empty catalogue as down', async () => {
@@ -98,11 +100,12 @@ describe('jimakuSearchDetailed — down is set by who actually knows', () => {
     // a matched title vouching for it.
     replies = [
       { status: 200, body: ENTRY },
-      { status: 429, body: 'Too Many Requests' },
+      // Retried twice before it counts as down.
+      ...[429, 429, 429].map((status) => ({ status, body: 'Too Many Requests' })),
     ];
 
     const match = await jimakuSearchDetailed(undefined, 'Bakuman.', null);
-    expect(urls).toHaveLength(2);
+    expect(urls).toHaveLength(4);
     expect(match.down).toBe(true);
     expect(match.downStatus).toBe(429);
     expect(match.entry).toBeNull();

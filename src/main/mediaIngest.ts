@@ -57,6 +57,7 @@ import {
   type QbitTorrentSnapshot,
 } from '../shared/mediaIngest';
 import { MEDIA_DOWNLOAD_DIRECTORY } from '../shared/mediaLibraryEntries';
+import { mapQbitPath } from '../shared/qbitPathMapping';
 import {
   DEFAULT_SCRAPER_QBITTORRENT_SETTINGS,
   validateScraperQbittorrentSettings,
@@ -330,10 +331,22 @@ export function registerMediaIngest(host: MediaIngestHost): MediaIngestService {
       qbit: {
         status: poller?.status() ?? 'off',
         lastCheckedAt: poller?.lastCheckedAt() ?? null,
+        unresolved: poller?.unresolvedCount() ?? 0,
       },
     };
   };
   const pushState = (): void => broadcast(MEDIA_INGEST_CHANNELS.state, buildState());
+  /** Files in qBittorrent's save path were held back while the poller could not vouch for them. */
+  let heldQbitArrivals = false;
+  const onQbitStatus = (): void => {
+    pushState();
+    // Held files were left unmarked; once the client answers, look again so
+    // the ones it does not claim (finished, baselined) are not stranded.
+    if (heldQbitArrivals && poller?.status() === 'watching') {
+      heldQbitArrivals = false;
+      watcher?.scanAll();
+    }
+  };
 
   // ---- watch folders ----
   const watchRoots = (): MediaWatchRoot[] => activeWatchFolders(settings)
@@ -368,8 +381,15 @@ export function registerMediaIngest(host: MediaIngestHost): MediaIngestService {
     // a download whose client was closed mid-way. While the client that could
     // say so is configured but not answering, those files wait — unmarked, so
     // the next scan (or the poller, once it answers) picks them up.
+    // Held unless the poller is 'watching' (then `claims` decides): unreachable,
+    // refused and not-yet-polled alike cannot say a file is finished. Only a
+    // profile that is gone ('not-configured') leaves the folder a plain folder.
     const origin = settings.folders.find((folder) => keyOf(folder.path) === keyOf(root))?.origin;
-    if (origin === 'qbittorrent' && poller?.status() === 'unreachable') return;
+    const qbitStatus = poller?.status();
+    if (origin === 'qbittorrent' && poller && qbitStatus !== 'watching' && qbitStatus !== 'not-configured') {
+      heldQbitArrivals = true;
+      return;
+    }
     const mine = paths.filter((filePath) => !poller?.claims(filePath));
     if (!mine.length) return;
     const groups = new Map<string, { entry?: MediaIngestLedgerEntry; paths: string[] }>();
@@ -458,9 +478,25 @@ export function registerMediaIngest(host: MediaIngestHost): MediaIngestService {
       const stored = await hasScraperSecret(qbitCredentialRef(config)).catch(() => false);
       return !qbitCredentialGap({ qbittorrent: config, secretStored: stored });
     },
-    poll: (config) => qbitPollTorrents({ config }),
+    // A remote client's paths are translated once, here, so `resolveFiles`,
+    // `claims` and the watch folder all see this machine's paths.
+    poll: async (config) => {
+      const polled = await qbitPollTorrents({ config });
+      if (!polled.ok || !config.pathMappings?.length) return polled;
+      return {
+        ok: true,
+        value: polled.value.map((torrent) => ({
+          ...torrent,
+          savePath: mapQbitPath(torrent.savePath, config.pathMappings),
+          contentPath: mapQbitPath(torrent.contentPath, config.pathMappings),
+        })),
+      };
+    },
     files: (config, hash) => qbitFiles({ config }, hash),
-    defaultSavePath: (config) => qbitDefaultSavePath({ config }),
+    defaultSavePath: async (config) => {
+      const found = await qbitDefaultSavePath({ config });
+      return found.ok ? { ok: true, value: mapQbitPath(found.value, config.pathMappings) } : found;
+    },
     state: qbitState,
     saveState: saveSettings,
     ledgerHashes: () => new Set(Object.keys(ledger.entries)),
@@ -471,9 +507,13 @@ export function registerMediaIngest(host: MediaIngestHost): MediaIngestService {
       markLedgerIngested(torrent.hash.toLowerCase());
     },
     onSavePath: (savePath) => addAutoFolder(savePath, 'qbittorrent'),
-    onStatus: pushState,
+    onStatus: onQbitStatus,
     ignoreCategories: new Set([QBIT_SUBTITLE_CATEGORY]),
     keyOf,
+    log: (message) => {
+      console.warn(`[media-ingest] ${message}`);
+      pushState();
+    },
   });
 
   // ---- handoffs from the Scraper ----

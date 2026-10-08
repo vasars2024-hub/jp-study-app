@@ -283,8 +283,11 @@ describe('the study keys reach a player that exists', () => {
       'video.subDelayReset',
       'video.toggleSubtitles',
       'video.cycleVideoFit',
+      // The study loop's A-B cycle and translation reveal (bound to X and T).
+      'video.abLoopCycle',
+      'video.revealTranslation',
     ]));
-    expect(registered).toHaveLength(19);
+    expect(registered).toHaveLength(21);
 
     // And exactly one dispatcher: the hardcoded `event.code` switch is gone, so a keypress
     // cannot fire both the overlay's own handler and the command it is registered under.

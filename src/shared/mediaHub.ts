@@ -2,6 +2,7 @@ import type { MediaItem } from './types';
 import { isVideoKind } from './mediaKind';
 import { mediaCategory, type MediaCategory } from './mediaCategories';
 import { mediaLibraryTarget } from './mediaFileIdentity';
+import { isWatchFinished } from './watchFinished';
 
 // The taxonomy lives in a leaf module so `mediaFileIdentity` can share it without a
 // cycle; re-exported here because this is where the rest of the app looks for it.
@@ -116,7 +117,8 @@ export function buildMediaHubSections(items: readonly MediaItem[]): MediaHubSect
       .filter((item) => {
         if (!isVideoKind(item.kind)) return false;
         const position = item.positionSec ?? 0;
-        return position > 0 && (!item.durationSec || position < item.durationSec - 5);
+        // The app-wide finished rule, not a private "last five seconds" tail.
+        return position > 0 && !isWatchFinished(position, item.durationSec);
       })
       .sort(byRecent)
       .slice(0, 6),

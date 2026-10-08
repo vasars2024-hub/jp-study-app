@@ -48,6 +48,7 @@ import {
 } from '../readerSettings';
 import { addBookmark, loadBookmarks, removeBookmark, type Bookmark } from '../bookmarks';
 import { getSummary, onStatsChanged, recordReading } from '../stats';
+import { activeReadingSeconds, creditReadingProgress, READING_IDLE_MS } from '../readingCredit';
 import { chapterCharsRemaining, estimateReadingMinutes } from '../../shared/readingTime';
 import { scrollIntoViewReliably } from '../utils/reliableScroll';
 import { loadEpub, type LoadedEpub } from '../epubLoader';
@@ -439,6 +440,10 @@ export default function NovelReader({ item, onClose }: Props) {
   const totalCharsRef = useRef(0);
   const curGlobalRef = useRef(progress);
   const maxGlobalRef = useRef<number | null>(null);
+  /** Until this time (performance.now) a position update re-anchors instead of crediting: a navigation is landing. */
+  const jumpUntilRef = useRef(0);
+  /** Last scroll / page turn / click / key in the reader — drives the idle cut-off. */
+  const lastInteractionRef = useRef(Date.now());
   const pendingCharsRef = useRef(0);
   const readStartRef = useRef(Date.now());
   const activeReadingRef = useRef(true);
@@ -769,12 +774,10 @@ export default function NovelReader({ item, onClose }: Props) {
 
   const updateGlobal = useCallback((g: number) => {
     curGlobalRef.current = g;
-    if (maxGlobalRef.current == null) {
-      maxGlobalRef.current = g;
-    } else if (g > maxGlobalRef.current && totalCharsRef.current > 0) {
-      pendingCharsRef.current += Math.round((g - maxGlobalRef.current) * totalCharsRef.current);
-      maxGlobalRef.current = g;
-    }
+    // A jump (TOC, bookmark, slider) re-anchors the furthest point: skipping
+    // ahead 200 pages is not reading them.
+    const jump = performance.now() < jumpUntilRef.current;
+    pendingCharsRef.current += creditReadingProgress(maxGlobalRef, g, totalCharsRef.current, jump);
   }, []);
 
   const saveNow = useCallback(
@@ -1361,6 +1364,8 @@ export default function NovelReader({ item, onClose }: Props) {
       const last = book.chapters.length - 1;
       const pi = Math.min(Math.max(piRaw, 0), last);
       setPopup(null);
+      // Every caller is a navigation: let the landing re-anchor the stats.
+      jumpUntilRef.current = performance.now() + 1500;
 
       if (layoutRef.current.paged) {
         if (pi === partRef.current) {
@@ -1652,9 +1657,10 @@ export default function NovelReader({ item, onClose }: Props) {
   useEffect(() => {
     const flush = () => {
       const now = Date.now();
-      let secs = (now - readStartRef.current) / 1000;
+      // Idle-aware: minutes stop accruing READING_IDLE_MS after the last interaction.
+      let secs = activeReadingSeconds(readStartRef.current, now, lastInteractionRef.current);
       readStartRef.current = now;
-      if (!activeReadingRef.current || secs < 0 || secs > 3600) secs = 0;
+      if (!activeReadingRef.current) secs = 0;
       const chars = pendingCharsRef.current;
       pendingCharsRef.current = 0;
       if (secs > 0 || chars > 0) recordReading(item.id, titleRef.current, secs, chars);
@@ -1665,6 +1671,7 @@ export default function NovelReader({ item, onClose }: Props) {
       if (on) {
         activeReadingRef.current = true;
         readStartRef.current = Date.now();
+        lastInteractionRef.current = Date.now();
       } else {
         flush();
         activeReadingRef.current = false;
@@ -1672,15 +1679,32 @@ export default function NovelReader({ item, onClose }: Props) {
     };
     activeReadingRef.current = true;
     readStartRef.current = Date.now();
+    lastInteractionRef.current = Date.now();
     const iv = window.setInterval(flush, 20000);
     const onFocus = () => setActive(true);
     const onBlur = () => setActive(false);
     const onVis = () => setActive(!document.hidden);
+    // Any sign of a reader at the keyboard keeps the reading clock running.
+    let lastMark = 0;
+    const onInteract = () => {
+      const now = Date.now();
+      if (now - lastMark < 1000) return;
+      lastMark = now;
+      // Resuming after an idle stretch starts a fresh span: the idle minutes stay uncredited.
+      if (now - lastInteractionRef.current > READING_IDLE_MS) {
+        flush();
+        readStartRef.current = now;
+      }
+      lastInteractionRef.current = now;
+    };
+    const interactionEvents = ['keydown', 'pointerdown', 'pointermove', 'wheel', 'touchstart', 'scroll'] as const;
+    for (const type of interactionEvents) window.addEventListener(type, onInteract, { capture: true, passive: true });
     window.addEventListener('focus', onFocus);
     window.addEventListener('blur', onBlur);
     document.addEventListener('visibilitychange', onVis);
     return () => {
       window.clearInterval(iv);
+      for (const type of interactionEvents) window.removeEventListener(type, onInteract, { capture: true });
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('blur', onBlur);
       document.removeEventListener('visibilitychange', onVis);

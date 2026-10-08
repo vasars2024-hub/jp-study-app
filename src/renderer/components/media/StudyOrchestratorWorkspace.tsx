@@ -123,7 +123,7 @@ import {
 } from '../../subtitleStore';
 import { createStudyAgentHandlers } from '../../studyAgentHandlers';
 import { confirmDialog } from '../ui/dialogService';
-import { setHandoffJson } from '../../pendingHandoff';
+import { openInAdoptedPlayer, studyContextStartSec } from '../../sceneRoundTrip';
 import {
   loadMediaStudyDatabase,
   onMediaStudyDatabaseChanged,
@@ -841,13 +841,18 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
       }
       return;
     }
+    // The adopted player, at the line. This used to raise `os:open 'video'` and then, 80 ms
+    // later, `study:open-media-context` — an event only the retired player listened for,
+    // so every "open scene" here landed at the file's resume point or nowhere at all.
     const item = surface.items.find((candidate) => candidate.id === context.mediaId);
-    if (!item) throw new Error('The source media is no longer in the library.');
-    setHandoffJson('studyContextRef', context);
-    window.dispatchEvent(new CustomEvent('os:open', { detail: 'video' }));
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('study:open-media-context', { detail: context }));
-    }, 80);
+    if (!item?.path) {
+      setError(t('studyLoop.scene.mediaMissing'));
+      return;
+    }
+    setError('');
+    await openInAdoptedPlayer(item.path, studyContextStartSec(context), (message) => {
+      setError(message);
+    });
   };
 
   const actOnEpisodeReadiness = async (entry: StudyEpisodeReadinessEntry): Promise<void> => {

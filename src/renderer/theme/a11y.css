@@ -95,3 +95,63 @@ html[data-text-size='xlarge'] { font-size: 125%; }
     --focus-ring-width: 3px;
   }
 }
+
+
+/* ---------- Windows high contrast (forced-colors) -------------------------
+   In a Windows contrast theme the browser swaps colours for system ones, but
+   anything drawn with background images, box-shadows or translucent glass
+   disappears: Aero buttons lost their edges, focus rings drawn with
+   box-shadow vanished, and frosted panels had no border at all. These rules
+   put the core chrome back in system colours. */
+@media (forced-colors: active) {
+  :root {
+    --focus-ring-color: Highlight;
+    --focus-ring-width: 2px;
+  }
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+  button,
+  [role='button'],
+  .btn,
+  select,
+  input,
+  textarea,
+  [role='tab'],
+  [role='menuitem'],
+  [role='option'] {
+    border: 1px solid ButtonText;
+    forced-color-adjust: auto;
+  }
+  button:disabled,
+  .btn:disabled,
+  [aria-disabled='true'] {
+    border-color: GrayText;
+    color: GrayText;
+  }
+  [aria-pressed='true'],
+  [aria-selected='true'],
+  [aria-checked='true'],
+  [aria-current]:not([aria-current='false']) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  [role='dialog'],
+  [role='menu'],
+  [role='listbox'],
+  [role='tooltip'],
+  .ui-popover,
+  .ui-dialog {
+    border: 1px solid CanvasText;
+  }
+  /* Glass and gradient backgrounds carry no information here. */
+  * {
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+  /* Icons drawn with currentColor keep following the system text colour. */
+  svg {
+    forced-color-adjust: auto;
+  }
+}

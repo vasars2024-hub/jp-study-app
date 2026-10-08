@@ -19,14 +19,22 @@ const h = vi.hoisted(() => ({
   dialog: null as null | Promise<{ canceled: boolean; filePath?: string }>,
   archive: [] as Array<{ trigger: string; target: string }>,
   archiveGate: null as null | Promise<void>,
+  errorBoxes: [] as string[],
 }));
 
 vi.mock('electron', () => ({
-  app: { getPath: () => h.userData, getVersion: () => '0.0.0-test' },
+  app: {
+    getPath: () => h.userData,
+    getVersion: () => '0.0.0-test',
+    relaunch: () => {
+      throw new Error('relaunch refused');
+    },
+    exit: () => undefined,
+  },
   BrowserWindow: { fromWebContents: () => undefined },
-  dialog: { showSaveDialog: () => h.dialog },
+  dialog: { showSaveDialog: () => h.dialog, showErrorBox: (_t: string, body: string) => void h.errorBoxes.push(body) },
   ipcMain: { handle: (channel: string, fn: (...args: unknown[]) => unknown) => h.handlers.set(channel, fn) },
-  session: {},
+  session: { defaultSession: { flushStorageData: async () => undefined } },
   shell: {},
 }));
 vi.mock('../backup/backupArchive', () => ({
@@ -53,7 +61,7 @@ vi.mock('../atomicJson', () => ({
 vi.mock('../errorLog', () => ({ logDiagnostic: () => undefined }));
 vi.mock('../i18n', () => ({ mt: (key: string) => key }));
 
-import { registerBackupIpc } from '../backup/backupService';
+import { registerBackupIpc, relaunchForTests } from '../backup/backupService';
 
 const event = { sender: {}, senderFrame: { origin: 'app://bundle' } };
 const call = (channel: string, args: unknown = {}) => h.handlers.get(channel)!(event, args) as Promise<unknown>;
@@ -103,6 +111,26 @@ describe('backup lock', () => {
     expect(await call('backup:createAuto', {})).toEqual({ ok: false, skipped: 'busy' });
     gate.resolve();
     expect(await manual).toMatchObject({ ok: true });
+  });
+
+  it('a restore commit refuses while a backup archive is being written', async () => {
+    const gate = deferred<void>();
+    h.archiveGate = gate.promise;
+    h.dialog = Promise.resolve({ canceled: false, filePath: path.join(h.userData, 'manual.zip') });
+    const manual = call('backup:create', {});
+    await new Promise((r) => setTimeout(r, 0));
+    const commit = (await h.handlers.get('backup:restoreCommit')!(event, 'tok', {})) as { ok: boolean; failures?: Array<{ error: string }> };
+    expect(commit.ok).toBe(false);
+    expect(commit.failures?.[0]?.error).toBe('backup.error.busy');
+    gate.resolve();
+    expect(await manual).toMatchObject({ ok: true });
+  });
+
+  it('a relaunch that throws releases the lock and tells the user', async () => {
+    const r = await relaunchForTests();
+    expect(r).toEqual({ ok: false, error: 'fix3.backup.relaunchFailed' });
+    expect(h.errorBoxes).toEqual(['fix3.backup.relaunchFailed']);
+    expect(await call('backup:createAuto', {})).toMatchObject({ ok: true });
   });
 
   it('holds nothing when the dialog is cancelled', async () => {

@@ -65,13 +65,20 @@ const LEVEL_RANK: Record<ScraperLoggingSettings['level'], number> = {
 };
 
 let policy: ScraperLoggingSettings = DEFAULT_SCRAPER_LOGGING_SETTINGS;
+/** Whether retention has been applied since the process (or test) started. */
+let prunedThisSession = false;
 
 /** Adopts a profile's Logging group. Called as each job scope is built. */
 export function configureScraperLogging(next: ScraperLoggingSettings): void {
   const rotated = next.persistToDisk !== policy.persistToDisk
     || next.retentionDays !== policy.retentionDays;
   policy = next;
-  if (rotated && next.persistToDisk) void pruneOldLogs();
+  // Also on the first policy of the session: an unchanged policy used to mean
+  // old files were never pruned at all across restarts.
+  if ((rotated || !prunedThisSession) && next.persistToDisk) {
+    prunedThisSession = true;
+    void pruneOldLogs();
+  }
 }
 
 /** Test seam — restores the shipped defaults. */
@@ -135,6 +142,13 @@ function appendToDisk(line: LogLine): void {
   const text = `${new Date().toISOString()} ${line.level.toUpperCase()} [${line.channel}]`
     + `${line.correlationId ? ` (${line.correlationId})` : ''} ${line.message}\n`;
   const size = Buffer.byteLength(text, 'utf-8');
+
+  // The first write of a session applies retention even when no policy change
+  // ever happened (lines logged before any job scope was built).
+  if (!prunedThisSession) {
+    prunedThisSession = true;
+    writeChain = writeChain.then(() => pruneOldLogs()).then(() => undefined, () => undefined);
+  }
 
   writeChain = writeChain.then(async () => {
     const dir = scraperStorePath(LOG_DIR);
@@ -217,8 +231,20 @@ export function flushScraperLogWrites(): Promise<void> {
 const REDACTIONS: { pattern: RegExp; replace: string }[] = [
   // `?token=…`, `&api_key=…`, `#access_token=…`
   {
-    pattern: /([?&#](?:api[-_]?key|token|access[-_]?token|auth|password|passwd|pwd|secret|sid|session)=)[^&#\s]+/gi,
+    pattern: /([?&#;](?:api[-_]?key|apikey|token|access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|passkey|auth|password|passwd|pwd|secret|sid|session)=)[^&#\s]+/gi,
     replace: '$1‹redacted›',
+  },
+  // The same names outside a query string: a tracker's announce path
+  // (`/announce?…` is covered above, `passkey=` in prose or a form body is not),
+  // an OAuth error message echoing `refresh_token=…` or `client_secret: …`.
+  {
+    pattern: /\b((?:passkey|refresh[-_]?token|client[-_]?secret|access[-_]?token|api[-_]?key)\s*[=:]\s*)(?!‹redacted›)[^\s&#"',;]+/gi,
+    replace: '$1‹redacted›',
+  },
+  // JSON bodies: `"password":"…"`, `"token": "…"`, `"api_key":"…"`.
+  {
+    pattern: /("(?:password|passwd|passkey|token|access_token|refresh_token|id_token|api_?key|apiKey|client_secret|secret)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi,
+    replace: '$1"‹redacted›"',
   },
   // `Authorization: Bearer …`, `Cookie: …`. Deliberately greedy to the end of
   // the line: a credential header's value can contain spaces (`Bearer <jwt>`,
@@ -231,6 +257,9 @@ const REDACTIONS: { pattern: RegExp; replace: string }[] = [
   },
   // `https://user:pass@host`
   { pattern: /(\/\/)[^/\s:@]+:[^/\s@]+@/g, replace: '$1‹redacted›@' },
+  // A bare `Bearer <token>` with no header name in front of it (an error
+  // message quoting the credential it was given).
+  { pattern: /\b(Bearer\s+)(?!‹redacted›)[A-Za-z0-9\-._~+/]+=*/g, replace: '$1‹redacted›' },
 ];
 
 export function redactLogText(text: string): string {
@@ -295,7 +324,11 @@ export function onScraperLog(listener: (line: LogLine) => void): () => void {
 
 /** The most recent lines, oldest first — what a newly opened Logs tab shows. */
 export function recentScraperLogs(limit = 200): LogLine[] {
-  return ring.slice(-Math.max(0, limit));
+  // `slice(-0)` is `slice(0)` — the whole ring — so 0 (and anything not a
+  // positive number) has to be answered explicitly.
+  const count = Math.floor(Number(limit));
+  if (!Number.isFinite(count) || count <= 0) return [];
+  return ring.slice(-count);
 }
 
 /** Lines belonging to one job, in order. Used to build a ScrapeResult. */
@@ -309,5 +342,6 @@ export function resetScraperLogs(): void {
   listeners.clear();
   seq = 0;
   cursor = null;
+  prunedThisSession = false;
   resetScraperLoggingPolicy();
 }

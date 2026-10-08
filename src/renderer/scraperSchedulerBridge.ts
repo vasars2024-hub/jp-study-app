@@ -12,8 +12,32 @@
  * into the save that triggered it.
  */
 
-import { resolveScraperSettings, type ScraperSettingsDocument } from '../shared/scraperSettings';
+import {
+  resolveScraperSettings,
+  type ScraperSettings,
+  type ScraperSettingsDocument,
+} from '../shared/scraperSettings';
 import { scraperRunScope } from './scraperRunContext';
+
+/**
+ * The settings each schedule entry's own profile resolves to (P6). The entry
+ * editor offers a profile picker; without this, main only ever received the
+ * active profile and every entry ran under it whatever the picker said.
+ */
+export function entryProfileSettings(
+  document: ScraperSettingsDocument,
+  entries: readonly { profileId: string }[],
+): Record<string, ScraperSettings> {
+  const out: Record<string, ScraperSettings> = {};
+  for (const { profileId } of entries) {
+    if (!profileId || out[profileId]) continue;
+    if (!document.profiles.some((profile) => profile.id === profileId)) continue;
+    out[profileId] = scraperRunScope(
+      resolveScraperSettings({ ...document, activeProfileId: profileId }),
+    ).settings;
+  }
+  return out;
+}
 
 export function syncSchedulerConfigToMain(document: ScraperSettingsDocument): void {
   if (typeof window === 'undefined') return;
@@ -22,7 +46,12 @@ export function syncSchedulerConfigToMain(document: ScraperSettingsDocument): vo
   let payload;
   try {
     const { settings, context } = scraperRunScope(resolveScraperSettings(document));
-    payload = { scheduler: settings.scheduler, settings, context };
+    payload = {
+      scheduler: settings.scheduler,
+      settings,
+      context,
+      profileSettings: entryProfileSettings(document, settings.scheduler.entries),
+    };
   } catch {
     return;
   }

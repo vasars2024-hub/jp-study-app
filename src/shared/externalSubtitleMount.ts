@@ -33,6 +33,15 @@ export type ExternalSubtitleMountState = {
   mountedName: string | null;
   /** The label `media:subtitleForPath` resolves right now, or null when it resolves none. */
   resolvedName: string | null;
+  /**
+   * Language-aware mode: each track's short language tag ('' when the track does not say)
+   * and the study language. With both given, only a container track that IS in the study
+   * language — or does not say what it is — outranks the sidecar. A release that ships only
+   * English (or Chinese for a Japanese learner) used to hide the downloaded Japanese track
+   * the learner actually needs.
+   */
+  trackLanguages?: Readonly<Record<number, string>>;
+  studyLang?: string;
 };
 
 export function decideExternalSubtitleMount(
@@ -40,9 +49,12 @@ export function decideExternalSubtitleMount(
 ): ExternalSubtitleMountDecision {
   // Deliberately "any track that is not ours", not "any track at all": once we have
   // mounted one, a plain non-empty check would refuse every later change forever.
-  const foreign = state.trackNumbers.some(
-    (number) => number !== state.mountedTrackNumber,
-  );
+  const foreign = state.trackNumbers.some((number) => {
+    if (number === state.mountedTrackNumber) return false;
+    if (!state.trackLanguages || !state.studyLang) return true;
+    const lang = state.trackLanguages[number] ?? '';
+    return !lang || lang === state.studyLang;
+  });
   if (foreign) return 'container';
   if (!state.resolvedName) return 'unchanged';
   if (

@@ -58,6 +58,14 @@ export interface DictEntry {
   source?: string;
   /** Gloss language codes of the source dictionary (e.g. ['ru']). */
   sourceLangs?: string[];
+  /**
+   * How the lookup reached this entry. Only `exact`, `deinflected` and
+   * `reading` mean the query IS this word; `prefix` is a headword that merely
+   * starts with the query, `gloss` a reverse hit on a definition, `fuzzy` a
+   * close spelling. Absent on entries from sources that do not record it
+   * (Jisho, CC-CEDICT, older callers).
+   */
+  via?: 'exact' | 'deinflected' | 'reading' | 'prefix' | 'gloss' | 'fuzzy';
 }
 
 /** Installed Yomitan dictionary metadata (Settings list). */

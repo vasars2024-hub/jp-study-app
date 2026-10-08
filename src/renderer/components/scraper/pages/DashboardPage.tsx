@@ -35,7 +35,7 @@ import {
 import type { ScrapeJobSummary, SourceStatus } from '../../../../shared/scraperResults';
 import { sx, sx2, sxn, sxNumber, sxs } from '../strings';
 import { SCRAPER_POSTER, scraperArtwork } from '../artwork';
-import { sourceKindText, tr, unitMs } from '../localize';
+import { scraperErrorText, sourceKindText, tr, unitMs } from '../localize';
 
 const HEALTH_LABEL: Record<SourceStatus['health'], 'health.ok' | 'health.degraded' | 'health.blocked' | 'health.offline' | 'health.unknown'> = {
   ok: 'health.ok',
@@ -188,6 +188,47 @@ export default function DashboardPage() {
   const bytes = useMemo(() => downloadedBytes(snap.jobs), [snap.jobs]);
   const healthy = useMemo(() => healthySources(snap.sources), [snap.sources]);
   const activeJob = running[0] ?? null;
+  const activeJobId = activeJob?.id ?? null;
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  // The card follows the job it shows: a stage change, a finish or a failure
+  // lands in the snapshot, so "Running" and its Cancel button go away when the
+  // job does instead of staying until the page is reopened.
+  useEffect(() => {
+    if (!activeJobId) return undefined;
+    return port.subscribeJob(activeJobId, (event) => {
+      const patch: Partial<ScrapeJobSummary> | null =
+        event.kind === 'stage'
+          ? { stage: event.stage }
+          : event.kind === 'done'
+            ? { ...event.summary, id: activeJobId, stage: 'done' }
+            : event.kind === 'error'
+              ? { stage: 'failed' }
+              : null;
+      if (!patch) return;
+      setSnap((current) => ({
+        ...current,
+        jobs: current.jobs.map((job) => (job.id === activeJobId ? { ...job, ...patch } : job)),
+      }));
+    });
+  }, [port, activeJobId]);
+
+  const cancelActiveJob = async (jobId: string) => {
+    setCancellingId(jobId);
+    try {
+      await port.cancelScrape(jobId);
+      setSnap((current) => ({
+        ...current,
+        jobs: current.jobs.map((job) => (job.id === jobId ? { ...job, stage: 'cancelled' } : job)),
+      }));
+      ctl.cancelDashboardJob?.();
+      setJobNotice(sx('dash.cancelled'));
+    } catch (error) {
+      setJobNotice(tr('scraperFix.ui.run.cancelFailed', { detail: scraperErrorText(error) }));
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   return (
     <div className="scr-page scr-page--dashboard">
@@ -354,13 +395,12 @@ export default function DashboardPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => {
-                  void port.cancelScrape(activeJob.id).catch(() => undefined);
-                  setJobNotice(sx('dash.cancelled'));
-                }}
+                disabled={cancellingId === activeJob.id}
+                onClick={() => void cancelActiveJob(activeJob.id)}
               >
-                {sx('dash.cancel')}
+                {cancellingId === activeJob.id ? tr('scraperFix.ui.dash.cancelling') : sx('dash.cancel')}
               </Button>
+              {jobNotice && <small role="status">{jobNotice}</small>}
             </div>
           ) : (
             <div className="scr-job-empty">

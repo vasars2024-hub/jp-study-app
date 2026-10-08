@@ -1,7 +1,7 @@
 /**
  * Study milestone detector — emits companion events for streaks & daily goals (L5).
  */
-import { getSummary, READING_RECORDED_EVENT, REVIEW_RECORDED_EVENT } from '../stats';
+import { getSummary, MEDIA_STUDY_RECORDED_EVENT, READING_RECORDED_EVENT, REVIEW_RECORDED_EVENT } from '../stats';
 import { emitCompanionEvent } from './companionEvents';
 import { STREAK_MILESTONES, unlockTrinketsForStreak } from './companionTrinkets';
 import { t } from '../i18n';
@@ -130,6 +130,8 @@ export function startAchievementWatcher(): () => void {
   const onRead = () => checkAchievements();
   window.addEventListener(READING_RECORDED_EVENT, onRead);
   window.addEventListener(REVIEW_RECORDED_EVENT, onRead);
+  // A day with only video mining or line study is a study day too.
+  window.addEventListener(MEDIA_STUDY_RECORDED_EVENT, onRead);
   // Initial check (e.g. already mid-streak today)
   try {
     checkAchievements();
@@ -139,6 +141,7 @@ export function startAchievementWatcher(): () => void {
   return () => {
     window.removeEventListener(READING_RECORDED_EVENT, onRead);
     window.removeEventListener(REVIEW_RECORDED_EVENT, onRead);
+    window.removeEventListener(MEDIA_STUDY_RECORDED_EVENT, onRead);
     started = false;
   };
 }

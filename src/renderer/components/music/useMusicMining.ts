@@ -17,11 +17,14 @@ import {
   appendVideoCoreMiningHistory,
   createVideoCoreMiningDraft,
   createVideoCoreMiningHistoryEntry,
-  normalizeVideoCoreMiningHistory,
+  createVideoCoreMiningOutcomeEntry,
   withVideoCoreMiningAsset,
-  VIDEO_CORE_MINING_HISTORY_KEY,
 } from '../../../shared/videoCoreMining';
 import { recordCueAudio } from '../../../media/cueAudioCapture';
+import {
+  readVideoCoreMiningHistory,
+  writeVideoCoreMiningHistory,
+} from '../../../media/useMinedCueKeys';
 import { getLeaderAudioElement } from '../../playerBus';
 import {
   musicMiningSource,
@@ -31,9 +34,9 @@ import {
 } from '../../../shared/musicMining';
 import type { MediaItem } from '../../../shared/types';
 import { mineToStudy, videoCoreStudyInput } from '../../studyMining';
+import { recordMediaMined } from '../../stats';
 import { getStudyLang } from '../../studyEnvironment';
 import { studyLangOfText } from '../../../shared/studyLang';
-import { writeLocalStorageJson } from '../../localStorageWrite';
 
 export type MusicMineOutcome =
   | { kind: 'idle' }
@@ -53,17 +56,9 @@ export interface MusicMining {
   reset: () => void;
 }
 
-function readHistory(): ReturnType<typeof normalizeVideoCoreMiningHistory> {
-  try {
-    return normalizeVideoCoreMiningHistory(
-      JSON.parse(localStorage.getItem(VIDEO_CORE_MINING_HISTORY_KEY) ?? '[]'),
-    );
-  } catch {
-    // A corrupt key must not stop a user mining; the normaliser already drops bad rows,
-    // and this covers the JSON itself being unparseable.
-    return [];
-  }
-}
+// A corrupt key must not stop a user mining: the reader drops bad rows, and returns []
+// when the JSON itself is unparseable.
+const readHistory = readVideoCoreMiningHistory;
 
 export function useMusicMining(current: MediaItem | null): MusicMining {
   const [outcome, setOutcome] = useState<MusicMineOutcome>({ kind: 'idle' });
@@ -117,9 +112,16 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
       // Local study card first; the Anki half joins it or waits for Anki.
       const mined = await mineToStudy({ ...videoCoreStudyInput(draft, 'lyrics'), notify: false });
       const result = mined.ankiResult;
-      if (result) {
-        const entry = createVideoCoreMiningHistoryEntry(draft, result);
-        writeLocalStorageJson(VIDEO_CORE_MINING_HISTORY_KEY, appendVideoCoreMiningHistory(readHistory(), entry));
+      // Every outcome is a line the user mined, queued or app-only included.
+      const entry = createVideoCoreMiningOutcomeEntry(draft, mined.anki, result, mined.error);
+      writeVideoCoreMiningHistory(appendVideoCoreMiningHistory(readHistory(), entry));
+      // Statistics count media mines (the player does the same); a new card only.
+      if (mined.created) {
+        try {
+          recordMediaMined(1);
+        } catch {
+          // Statistics never block a mine.
+        }
       }
       if (mined.anki === 'added' && result?.ok) {
         setOutcome({
@@ -142,7 +144,7 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
         error: err instanceof Error ? err.message : String(err),
       });
       // Storage full or unavailable — the outcome below still tells the user.
-      writeLocalStorageJson(VIDEO_CORE_MINING_HISTORY_KEY, appendVideoCoreMiningHistory(readHistory(), entry));
+      writeVideoCoreMiningHistory(appendVideoCoreMiningHistory(readHistory(), entry));
       setOutcome({
         kind: 'error',
         index: line.index,

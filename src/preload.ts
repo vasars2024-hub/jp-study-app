@@ -1083,6 +1083,13 @@ const api = {
     ipcRenderer.invoke('filedrop:listFolderImages', dirPath),
   fileDropFolderFiles: (dirPath: string): Promise<string[]> =>
     ipcRenderer.invoke('filedrop:listFolderFiles', dirPath),
+  /** Files Windows opened with Gum (main/fileOpenRouter.ts): take the queue, then listen. */
+  fileOpenDrain: (): Promise<string[]> => ipcRenderer.invoke('fileOpen:drain'),
+  onFileOpenPaths: (cb: (paths: string[]) => void): (() => void) => {
+    const handler = (_e: unknown, paths: string[]): void => cb(paths);
+    ipcRenderer.on('fileOpen:paths', handler);
+    return () => ipcRenderer.removeListener('fileOpen:paths', handler);
+  },
 
   // ----- Files app: the index over every store the app owns -----
   filesIndex: (force?: boolean): Promise<FilesIndexSnapshot> =>
@@ -1303,12 +1310,28 @@ const api = {
   blancGetLaunchPrefs: (): Promise<{ blancOnly: boolean }> => ipcRenderer.invoke('blanc:getLaunchPrefs'),
   blancSetLaunchPrefs: (patch: { blancOnly?: boolean }): Promise<{ blancOnly: boolean }> =>
     ipcRenderer.invoke('blanc:setLaunchPrefs', patch),
+  /** Keep running in the tray / start at sign-in (main/appLifecycle.ts). */
+  appGetLifecycle: (): Promise<{ keepRunningInTray: boolean; startAtLogin: boolean; startMinimized: boolean; loginItemSupported: boolean }> =>
+    ipcRenderer.invoke('app:getLifecycle'),
+  appSetLifecycle: (
+    patch: Partial<{ keepRunningInTray: boolean; startAtLogin: boolean; startMinimized: boolean }>,
+  ): Promise<{ keepRunningInTray: boolean; startAtLogin: boolean; startMinimized: boolean; loginItemSupported: boolean }> =>
+    ipcRenderer.invoke('app:setLifecycle', patch),
   /** Whether a Study OS window (main or pop-out) is alive; Blanc runs the background jobs when not. */
   blancStudyOsAlive: (): Promise<boolean> => ipcRenderer.invoke('blanc:studyOsAlive'),
   onStudyOsAlive: (cb: (alive: boolean) => void): (() => void) => {
     const handler = (_e: unknown, alive: boolean): void => cb(alive === true);
     ipcRenderer.on('blanc:study-os-alive', handler);
     return () => ipcRenderer.removeListener('blanc:study-os-alive', handler);
+  },
+  /** Study OS renderer: "my background jobs are installed" — Blanc drops its copy only on this. */
+  blancStudyOsJobsReady: (): Promise<boolean> => ipcRenderer.invoke('blanc:studyOsJobsReady'),
+  /** Whether any Study OS renderer has acked its background jobs installed. */
+  blancStudyOsJobsReadyState: (): Promise<boolean> => ipcRenderer.invoke('blanc:studyOsJobsReadyState'),
+  onStudyOsJobsReady: (cb: (ready: boolean) => void): (() => void) => {
+    const handler = (_e: unknown, ready: boolean): void => cb(ready === true);
+    ipcRenderer.on('blanc:study-os-jobs-ready', handler);
+    return () => ipcRenderer.removeListener('blanc:study-os-jobs-ready', handler);
   },
   /** Show Study OS, creating its window when there is none. */
   blancOpenStudyOs: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('blanc:openStudyOs'),
@@ -1406,10 +1429,32 @@ const api = {
   lockscreenSetSize: (size: { width: number; height: number }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('lockscreen:setSize', size),
   lockscreenIsOpen: (): Promise<boolean> => ipcRenderer.invoke('lockscreen:isOpen'),
+  /** Salted scrypt hash of a 4-digit PIN (main/lockscreenPin.ts). */
+  lockscreenHashPin: (pin: string): Promise<string | null> => ipcRenderer.invoke('lockscreen:hashPin', pin),
+  /** Check a PIN against the stored value, with attempt backoff; legacy values come back upgraded. */
+  lockscreenVerifyPin: (
+    pin: string,
+    stored: string,
+  ): Promise<{ ok: boolean; retryAfterMs?: number; upgradedHash?: string }> =>
+    ipcRenderer.invoke('lockscreen:verifyPin', pin, stored),
+  /** Mirror the lock settings to main, which owns the lock (ignored while locked). */
+  lockscreenSyncConfig: (
+    config: { enabled: boolean; pinHash: string },
+    rendererLocked: boolean,
+  ): Promise<{ ok: boolean; locked: boolean }> => ipcRenderer.invoke('lockscreen:syncConfig', config, rendererLocked),
+  /** Arm main's lock (Secret OS / Wired entry). */
+  lockscreenLock: (): Promise<{ locked: boolean }> => ipcRenderer.invoke('lockscreen:lock'),
+  lockscreenIsLocked: (): Promise<boolean> => ipcRenderer.invoke('lockscreen:isLocked'),
   onLockscreenUnlocked: (cb: () => void): (() => void) => {
     const handler = (): void => cb();
     ipcRenderer.on('lockscreen:unlocked', handler);
     return () => ipcRenderer.removeListener('lockscreen:unlocked', handler);
+  },
+  /** Main is locked and is bringing this window forward: show the PIN pad. */
+  onLockscreenLocked: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('lockscreen:locked', handler);
+    return () => ipcRenderer.removeListener('lockscreen:locked', handler);
   },
 
   // Imported companion sprite packs (main/companionPacks.ts). The import opens a
@@ -1534,6 +1579,14 @@ const api = {
   appVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
   checkAppRelease: (): Promise<AppReleaseInfo | null> => ipcRenderer.invoke('release:check'),
   releaseStatus: (): Promise<import('./shared/release').ReleaseStatus> => ipcRenderer.invoke('release:status'),
+  /** Squirrel self-update (main/squirrelUpdater.ts); idle on the portable zip. */
+  appUpdateStatus: (): Promise<import('./shared/appUpdate').AppUpdateStatus> => ipcRenderer.invoke('appUpdate:status'),
+  appUpdateRestart: (): Promise<boolean> => ipcRenderer.invoke('appUpdate:restart'),
+  onAppUpdateChanged: (cb: (status: import('./shared/appUpdate').AppUpdateStatus) => void): (() => void) => {
+    const handler = (_e: unknown, status: import('./shared/appUpdate').AppUpdateStatus): void => cb(status);
+    ipcRenderer.on('appUpdate:changed', handler);
+    return () => ipcRenderer.removeListener('appUpdate:changed', handler);
+  },
 
   // Remote Resources catalogue (fetched from GitHub, cached in userData)
   catalogGet: (): Promise<import('./shared/resourcesCatalog').ResourcesCatalog | null> =>
@@ -1673,6 +1726,15 @@ const api = {
     req: import('./shared/videoClip').VideoClipRequest,
   ): Promise<import('./main/videoClip').VideoClipResult> =>
     ipcRenderer.invoke('video:extractClip', req),
+  // One cue's audio (mp3, the listened-to stream) and one still, for one-key mining.
+  extractAudioClip: (
+    req: import('./shared/videoClip').AudioClipRequest,
+  ): Promise<import('./main/videoClip').VideoClipResult> =>
+    ipcRenderer.invoke('video:extractAudioClip', req),
+  extractVideoFrame: (
+    req: import('./shared/videoClip').VideoFrameRequest,
+  ): Promise<import('./main/videoClip').VideoClipResult> =>
+    ipcRenderer.invoke('video:extractFrame', req),
   // "Sentence deck from a video": the text tracks, one track's cues, and the
   // batch audio cut with progress and Cancel (main/sentenceDeckIpc.ts).
   sentenceDeckSources: (input: {
@@ -3447,6 +3509,8 @@ const api = {
       anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
       /** The exact note main sent; a queued mine is replayed from it. */
       ankiRequest?: import('./shared/anki').MineNoteRequest;
+      /** Main's id for this mine; ack it with `ackExtensionMined`. A replay repeats it. */
+      mineId?: string;
     }) => void,
   ): (() => void) => {
     const handler = (
@@ -3466,10 +3530,19 @@ const api = {
         lang?: 'ja' | 'zh' | 'ru';
         anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
         ankiRequest?: import('./shared/anki').MineNoteRequest;
+        mineId?: string;
       },
     ): void => cb(payload);
     ipcRenderer.on('extension:mined', handler);
     return () => ipcRenderer.removeListener('extension:mined', handler);
+  },
+  /** Tell main this window handled an extension mine (removes it from the pending store). */
+  ackExtensionMined: (mineId: string, result?: { ok: boolean; error?: string }): void => {
+    ipcRenderer.send('extension:mined-ack', { mineId, ok: result?.ok ?? true, error: result?.error });
+  },
+  /** The study bridges are installed: main may replay pending mines to this window. */
+  extensionBridgeReady: (): void => {
+    ipcRenderer.send('extension:bridge-ready');
   },
   // ---- transcription queue ----
   enqueueTranscription: (
@@ -3613,6 +3686,79 @@ const api = {
   captionsInjectSnapshot: (lines: string[], windowTitle?: string): Promise<unknown> =>
     ipcRenderer.invoke('liveCaptions:injectSnapshot', lines, windowTitle),
 
+  // Region Recorder (main/regionRecorder.ts). Channel names: shared/regionRecorder.ts.
+  recorderGetState: (): Promise<import('./shared/regionRecorder').RecorderState> =>
+    ipcRenderer.invoke('recorder:get-state'),
+  recorderSetSettings: (
+    patch: Partial<import('./shared/regionRecorder').RecorderSettings>,
+  ): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:set-settings', patch),
+  recorderStart: (
+    mode: import('./shared/regionRecorder').RecorderStartMode = 'select',
+  ): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:start', mode),
+  recorderStop: (): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:stop'),
+  recorderPause: (paused: boolean): Promise<import('./shared/regionRecorder').RecorderState> =>
+    ipcRenderer.invoke('recorder:pause', paused),
+  recorderChooseFolder: (): Promise<import('./shared/regionRecorder').RecorderState> =>
+    ipcRenderer.invoke('recorder:choose-folder'),
+  recorderJobAction: (
+    id: string,
+    action: import('./shared/regionRecorder').RecorderJobAction,
+  ): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:job-action', id, action),
+  recorderRecoveryAction: (
+    id: string,
+    action: import('./shared/regionRecorder').RecorderRecoveryAction,
+  ): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:recovery-action', id, action),
+  onRecorderState: (cb: (state: import('./shared/regionRecorder').RecorderState) => void): (() => void) => {
+    const handler = (_e: unknown, state: import('./shared/regionRecorder').RecorderState): void => cb(state);
+    ipcRenderer.on('recorder:state', handler);
+    return () => ipcRenderer.removeListener('recorder:state', handler);
+  },
+  onRecorderLevels: (cb: (levels: { mic: number; system: number }) => void): (() => void) => {
+    const handler = (_e: unknown, levels: { mic: number; system: number }): void => cb(levels);
+    ipcRenderer.on('recorder:levels', handler);
+    return () => ipcRenderer.removeListener('recorder:levels', handler);
+  },
+  /** The region overlay. */
+  recorderSelectGetInit: (): Promise<import('./shared/regionRecorder').RecorderSelectInit | null> =>
+    ipcRenderer.invoke('recorder:select-get-init'),
+  onRecorderSelectInit: (cb: (init: import('./shared/regionRecorder').RecorderSelectInit) => void): (() => void) => {
+    const handler = (_e: unknown, init: import('./shared/regionRecorder').RecorderSelectInit): void => cb(init);
+    ipcRenderer.on('recorder:select-init', handler);
+    return () => ipcRenderer.removeListener('recorder:select-init', handler);
+  },
+  /** `null` cancels. */
+  recorderSelectDone: (
+    region: import('./shared/regionRecorder').RectLike | null,
+  ): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:select-done', region),
+  recorderSelectNextDisplay: (): Promise<import('./shared/regionRecorder').RecorderSelectInit | null> =>
+    ipcRenderer.invoke('recorder:select-next-display'),
+  /** The hidden recording window. */
+  onRecorderHostCommand: (cb: (command: import('./shared/regionRecorder').RecorderHostCommand) => void): (() => void) => {
+    const handler = (_e: unknown, command: import('./shared/regionRecorder').RecorderHostCommand): void => cb(command);
+    ipcRenderer.on('recorder:host-command', handler);
+    return () => ipcRenderer.removeListener('recorder:host-command', handler);
+  },
+  recorderHostChunk: (seq: number, data: Uint8Array): void => ipcRenderer.send('recorder:host-chunk', seq, data),
+  recorderHostEvent: (event: import('./shared/regionRecorder').RecorderHostEvent): void =>
+    ipcRenderer.send('recorder:host-event', event),
+  /** The recording panel. */
+  recorderPanelResize: (height: number): void => ipcRenderer.send('recorder:panel-resize', height),
+  onRecorderModelCheck: (cb: (request: { requestId: string; lang: string }) => void): (() => void) => {
+    const handler = (_e: unknown, request: { requestId: string; lang: string }): void => cb(request);
+    ipcRenderer.on('recorder:model-check', handler);
+    return () => ipcRenderer.removeListener('recorder:model-check', handler);
+  },
+  recorderModelCheckReply: (reply: { requestId: string; ready: boolean }): void =>
+    ipcRenderer.send('recorder:model-check-reply', reply),
+  /** The main window opens a finished recording in the study player. */
+  onRecorderOpenInPlayer: (cb: (request: { requestId: string; path: string; mediaId?: string }) => void): (() => void) => {
+    const handler = (_e: unknown, request: { requestId: string; path: string; mediaId?: string }): void => cb(request);
+    ipcRenderer.on('recorder:open-in-player', handler);
+    return () => ipcRenderer.removeListener('recorder:open-in-player', handler);
+  },
+  recorderOpenInPlayerReply: (reply: { requestId: string; reach: string }): void =>
+    ipcRenderer.send('recorder:open-in-player-reply', reply),
+
   cancelTranscription: (mediaId?: string): Promise<void> =>
     ipcRenderer.invoke('transcription:cancel', mediaId),
   transcriptionQueue: (): Promise<import('./shared/transcriptionIpc').TranscriptionJob[]> =>
@@ -3745,6 +3891,24 @@ const api = {
   },
   replyKnownLevels: (id: string, levels: Record<string, number>): void => {
     ipcRenderer.send('extension:known-levels-reply', { id, levels });
+  },
+  onKnownSnapshotRequest: (cb: (payload: { id: string }) => void): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string }): void => cb(payload);
+    ipcRenderer.on('extension:known-snapshot-request', handler);
+    return () => ipcRenderer.removeListener('extension:known-snapshot-request', handler);
+  },
+  replyKnownSnapshot: (id: string, payload: { words: Record<string, number>; lang?: string }): void => {
+    ipcRenderer.send('extension:known-snapshot-reply', { id, words: payload.words, lang: payload.lang });
+  },
+  onExtensionAnnotateRequest: (
+    cb: (payload: { id: string; texts: string[]; lang: string }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string; texts: string[]; lang: string }): void => cb(payload);
+    ipcRenderer.on('extension:annotate-request', handler);
+    return () => ipcRenderer.removeListener('extension:annotate-request', handler);
+  },
+  replyExtensionAnnotate: (id: string, results: unknown[]): void => {
+    ipcRenderer.send('extension:annotate-reply', { id, results });
   },
   onKnownLevelSet: (
     cb: (payload: { id: string; term: string; level: number }) => void,

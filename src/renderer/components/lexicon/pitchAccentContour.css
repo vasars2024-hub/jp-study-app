@@ -26,3 +26,18 @@
 .pitch-mora.is-drop {
   border-right: 2px solid currentColor;
 }
+
+/* The downstep number beside a contour: the notation dictionaries print ([0] heiban). */
+.pitch-downstep {
+  margin-left: 4px;
+  font-size: 0.78em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.72;
+  align-self: flex-end;
+}
+
+/* In the dictionary popup's pitch row: start-aligned and one line where it fits. */
+.dict-pitch .pitch-contour-list {
+  justify-content: flex-start;
+  gap: 2px 10px;
+}

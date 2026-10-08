@@ -24,8 +24,11 @@ region clamping and the OCR failure paths — but **Electron is stubbed througho
 Nothing exercises a real `desktopCapturer` capture, a real global-hotkey press, or
 a real OCR read of the actual screen.
 
-The Lens is enabled by default and claims an OS-level accelerator at boot
-(`readingLens.ts:57`), so the gap matters. Per `jp-dispatch` §9.2 it is
+Since 2026-10-08 the Lens is **opt-in**: a fresh install no longer claims
+`Ctrl+Shift+Space` (an IME / editor chord on many machines) at boot — it is
+switched on in Settings → Reading Lens, and a profile that already had a
+`reading-lens.json` keeps it on (`readingLens.ts` `DEFAULTS`, `loadSettings`).
+The end-to-end gap below still stands. Per `jp-dispatch` §9.2 it is
 **"implemented", not "works"**.
 
 Confirming it means pressing `Ctrl+Shift+Space` on a real desktop and reading a

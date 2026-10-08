@@ -32,7 +32,7 @@
  */
 
 /** Bumped when a command identity or queue kind is added or removed. */
-export const EXTENSION_CONTRACT_VERSION = 1;
+export const EXTENSION_CONTRACT_VERSION = 2;
 
 /* -------------------------------------------------------------------------- */
 /* Identities — what the user can invoke                                       */
@@ -78,6 +78,8 @@ export const EXTENSION_COMMAND_IDS = [
   'capture.ocr',
   'capture.audio.record',
   'capture.audio.save',
+  'capture.video.record',
+  'capture.audio.tab',
   'capture.manga',
   'media.download',
   'media.transcribe',
@@ -120,6 +122,10 @@ export const EXTENSION_COMMANDS: readonly ExtensionCommandContract[] = [
   { id: 'capture.ocr', category: 'capture', contexts: ['page'], pageSide: true },
   { id: 'capture.audio.record', category: 'capture', contexts: ['page'], pageSide: true },
   { id: 'capture.audio.save', category: 'capture', contexts: ['page'], pageSide: false },
+  // Tab recording runs in the service worker + offscreen document and uploads
+  // through /v1/recordings, so the app observes it.
+  { id: 'capture.video.record', category: 'capture', contexts: ['page'], pageSide: false },
+  { id: 'capture.audio.tab', category: 'capture', contexts: ['page'], pageSide: false },
   { id: 'capture.manga', category: 'capture', contexts: ['page:manga'], pageSide: false },
   { id: 'media.download', category: 'capture', contexts: ['page:youtube'], pageSide: false },
   { id: 'media.transcribe', category: 'capture', contexts: ['page:youtube'], pageSide: false },
@@ -214,6 +220,19 @@ export const EXTENSION_BRIDGE_ROUTES = [
   '/v1/translate',
   '/v1/level-estimate',
   '/v1/lookup',
+  // The hover engine: every prefix of the scan window in one batched read.
+  '/v1/scan',
+  // "Already in deck" marker for the popup's entries.
+  '/v1/mine/check',
+  // Native word audio for the popup's play buttons.
+  '/v1/word-audio',
+  // Page word-status colouring + furigana: tokens with lemma and known level,
+  // and the versioned known-word map the extension caches in IndexedDB.
+  '/v1/annotate',
+  '/v1/known-snapshot',
+  // Tab / microphone recordings, uploaded in chunks (create, chunks, finish,
+  // status, delete live under this prefix).
+  '/v1/recordings',
   '/v1/sentence-analysis',
   '/v1/sentence-analysis/prefs',
   '/v1/sentence-analysis/snapshot',

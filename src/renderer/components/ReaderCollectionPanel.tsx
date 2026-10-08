@@ -8,7 +8,6 @@ import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import { scrollToReliably } from '../utils/reliableScroll';
 import {
-  addDeckCards,
   loadDeck,
   onDeckChanged,
   removeDeckCard,
@@ -24,6 +23,7 @@ import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
 import { normalizeStudyLang, studyLangOfText, type StudyLang } from '../../shared/studyLang';
 import { cardContentLang, getStudyLang, studyContentLang } from '../studyEnvironment';
 import { glossFor } from '../companionMine';
+import { mineReaderCollectionCard } from '../studyMiningRoutes';
 
 type SortMode = 'newest' | 'oldest' | 'word' | 'frequency';
 type TargetLang = 'en' | 'ru' | 'zh';
@@ -259,6 +259,7 @@ export default function ReaderCollectionPanel({
         frequency?: number;
         jlptLevel?: string;
         sceneReference?: string;
+        studyLang?: StudyLang;
       },
       deckOverride?: string,
     ): Promise<{ ok: boolean; noteId?: number; error?: string; deck?: string }> => {
@@ -398,42 +399,37 @@ export default function ReaderCollectionPanel({
 
       const sentenceVal =
         sentence && sentence !== word ? sentence : sentence || undefined;
-      const payload = {
-        word: front,
-        reading,
-        meaning: back,
-        sentence: sentenceVal,
-        front,
-        back,
-        source: 'epub' as const,
-        bookId,
-        bookTitle,
-      };
 
+      // One write through mineToStudy: the local card (found again, not doubled,
+      // when the same word is mined twice) and, with auto-Anki on, the note.
       const saveToDeck = autoFlashcards || !autoAnki;
       let card: DeckFlashcard | undefined;
-      if (saveToDeck) {
-        const created = addDeckCards([payload]);
-        card = created[0];
-        setCards(loadDeck());
-      }
-
       let ankiOk = false;
       let ankiFail = false;
-      if (autoAnki) {
-        const res = await sendToAnki(
-          {
-            id: card?.id,
-            word: payload.word,
-            reading: payload.reading,
-            meaning: payload.meaning,
-            sentence: payload.sentence,
-          },
-          ankiDeck,
-        );
-        ankiOk = res.ok;
-        ankiFail = !res.ok;
+      try {
+        const mined = await mineReaderCollectionCard({
+          front,
+          back,
+          reading,
+          sentence: sentenceVal,
+          bookId,
+          bookTitle,
+          studyLang: sourceLang,
+          sendToAnki: autoAnki,
+          ankiDeck: ankiDeck || undefined,
+        });
+        card = mined.card;
+        if (autoAnki) {
+          ankiOk = mined.anki === 'added' || mined.anki === 'duplicate';
+          ankiFail = !ankiOk;
+          const noteId = mined.ankiResult?.ok ? mined.ankiResult.noteId : undefined;
+          // Undo can delete the note we just created (AnkiConnect deleteNotes).
+          if (noteId) pushAnkiNoteUndo(front, noteId, mined.card.id);
+        }
+      } catch {
+        ankiFail = autoAnki;
       }
+      setCards(loadDeck());
 
       if (seq !== addSeqRef.current) return;
       setStatusKind(ankiFail ? 'error' : 'ok');
@@ -453,7 +449,7 @@ export default function ReaderCollectionPanel({
         scrollToReliably(listRef.current, { top: 0 });
       }
     })();
-  }, [pendingAdd, onPendingConsumed, bookId, bookTitle, runTranslate, sendToAnki]);
+  }, [pendingAdd, onPendingConsumed, bookId, bookTitle, runTranslate]);
 
   const mine = useMemo(() => {
     let list = cards.filter((c) => c.bookId === bookId || (!c.bookId && c.bookTitle === bookTitle));

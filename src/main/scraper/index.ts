@@ -195,7 +195,9 @@ export function registerScraperIpc(): void {
   ipcMain.handle(
     SCRAPER_CHANNELS.fetchHttp,
     async (_event, request: ScraperHttpProbeRequest): Promise<ScraperHttpProbeResult> =>
-      probeHttp(request),
+      // The private-address guard is on unless the renderer says the active
+      // profile allows private networks.
+      probeHttp(request, { allowPrivateNetwork: request?.allowPrivateNetwork === true }),
   );
 
   ipcMain.handle(
@@ -223,7 +225,7 @@ export function registerScraperIpc(): void {
   ipcMain.handle(
     SCRAPER_CHANNELS.probeSource,
     async (_event, input: ScraperProbeInput): Promise<SourceStatus> =>
-      probeSource(input.entry, input.timeoutMs, input.path),
+      probeSource(input.entry, input.timeoutMs, input.path, input.allowPrivateNetwork !== true),
   );
 
   // The download dialog's first call: what units does this catalogue entry have?

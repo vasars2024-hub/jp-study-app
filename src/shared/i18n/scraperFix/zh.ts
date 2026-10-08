@@ -1,0 +1,69 @@
+// Scraper audit fixes (2026-10) -- Simplified Chinese.
+//
+// One block per work package of the scraper audit, so the packages that ran
+// side by side never edited the same lines. Keys live under `scraperFix.`;
+// English is the source of truth and every key exists in all four languages.
+import type { Catalog } from '../core';
+
+export const SCRAPER_FIX_ZH: Catalog = {
+  // ---- http (P3 / P8) ----
+  'scraperDrawer.field.safety.allowPrivateNetwork.label': '允许私有网络',
+  'scraperDrawer.field.safety.allowPrivateNetwork.hint': '允许抓取、来源探测和 HTTP 检查器访问 localhost 和局域网地址。关闭时将拒绝这些请求；qBittorrent 和 Seanime 不受影响。',
+  // ---- subtitles (P1 / P4 / P7) ----
+  // ---- qbittorrent and ingest (P5) ----
+  'scraperDrawer.field.qbittorrent.pathMappings.label': '路径映射',
+  'scraperDrawer.field.qbittorrent.pathMappings.hint': '用于运行在其他机器上的 qBittorrent：填写它报告的文件夹，以及这台电脑看到的同一文件夹。',
+  'scraperFix.qbit.mappings.hint': 'Docker 或 NAS 上的 qBittorrent 会报告自己的路径，例如 /downloads。把每个路径与这台电脑看到的同一文件夹对应起来，下载完成的文件才能加入媒体库。',
+  'scraperFix.qbit.mappings.remote': 'qBittorrent 中的路径',
+  'scraperFix.qbit.mappings.local': '这台电脑上的路径',
+  'scraperFix.qbit.unresolved': '有 {count} 个已完成的下载暂时无法在这台电脑上找到。如果 qBittorrent 运行在其他机器上，请在其设置中添加路径映射。',
+  // ---- engine (P4 / P6 / P8) ----
+  'scraperFix.rule.nextPageSelector': '下一页链接',
+  'scraperFix.rule.maxPages': '最大页数',
+  'scraperFix.rule.maxPagesHint': '设为 1 时只读取第一页。只会跟随同一站点内的页面。',
+  // ---- outputs, logs, notifications, scheduler (P6 / P7) ----
+  'scraperFix.notice.complete.title': '抓取完成',
+  'scraperFix.notice.complete.body': '{subject} — {count} 集。',
+  'scraperFix.notice.error.title': '抓取失败',
+  'scraperFix.notice.error.body': '失败：{subject}',
+  'scraperFix.notice.new-episode.title': '发现新剧集',
+  'scraperFix.notice.new-episode.body': '{subject} — {count} 集新剧集。',
+  'scraperFix.notice.schedule-run.title': '计划任务已开始运行',
+  'scraperFix.notice.schedule-run.body': '运行：{subject}',
+  'scraperFix.notice.study-ready.title': '字幕已可用于学习',
+  'scraperFix.notice.study-ready.body': '{subject} — {count} 集带有字幕轨道。',
+  'scraperFix.notice.digest.title': '抓取器 — {count} 条更新',
+  'scraperFix.notice.digest.complete': '{count} 次抓取完成',
+  'scraperFix.notice.digest.new-episode': '{count} 部系列有新剧集',
+  'scraperFix.notice.digest.study-ready': '{count} 部系列可用于学习',
+  'scraperFix.notice.digest.schedule-run': '{count} 次计划运行',
+  'scraperFix.notice.digest.error': '{count} 次失败',
+  // ---- ui (P9) ----
+  'scraperFix.ui.stage.queued': '排队中',
+  'scraperFix.ui.stage.searching': '搜索中',
+  'scraperFix.ui.stage.fetching': '获取中',
+  'scraperFix.ui.stage.parsing': '提取中',
+  'scraperFix.ui.stage.streams': '正在检查镜像',
+  'scraperFix.ui.stage.subtitles': '正在收集字幕',
+  'scraperFix.ui.stage.validating': '验证中',
+  'scraperFix.ui.stage.done': '已完成',
+  'scraperFix.ui.stage.failed': '失败',
+  'scraperFix.ui.stage.cancelled': '已取消',
+  'scraperFix.ui.run.failed': '抓取已停止：{detail}',
+  'scraperFix.ui.run.cancelFailed': '无法取消抓取：{detail}',
+  'scraperFix.ui.err.httpStatus': '{target} 返回了 HTTP {status}。',
+  'scraperFix.ui.err.ruleNoMatch': '{host} 的站点规则在 {url} 上没有匹配到任何内容。',
+  'scraperFix.ui.err.validationFailed': '验证失败的剧集：{count}。',
+  'scraperFix.ui.err.nothingToSearch': '没有可搜索的内容。请输入网址或标题。',
+  'scraperFix.ui.err.noCatalogueMatch': '目录中没有与“{query}”匹配的条目。',
+  'scraperFix.ui.err.contentType': '{type} 的抓取尚未连接到目录提供方。',
+  'scraperFix.ui.err.autoDownloaderOff': 'Seanime 自动下载器已关闭。',
+  'scraperFix.ui.err.unknown': '未知错误。',
+  'scraperFix.ui.field.notNumber': '未保存：请输入数字。',
+  'scraperFix.ui.field.outOfRange': '未保存：请输入 {min} 到 {max} 之间的值。',
+  'scraperFix.ui.dash.cancelling': '正在取消...',
+  'scraperFix.ui.plugins.notReady': '插件功能尚未就绪。此页面上的操作不会保存，也不会改变抓取器的运行方式，因此开关和按钮已停用。',
+  'scraperFix.ui.note.ruleChecks': '部分规则检查未通过。',
+  'scraperFix.ui.note.missing': '缺少的集数编号：{list}。',
+  'scraperFix.ui.note.missingMore': '缺少的集数编号：{list}，另有 {more} 个。',
+};

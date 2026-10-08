@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "__MSG_ext_name__",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "__MSG_ext_description__",
   "default_locale": "en",
-  "permissions": ["activeTab", "scripting", "storage", "contextMenus", "alarms", "tabs"],
+  "permissions": ["activeTab", "scripting", "storage", "contextMenus", "alarms", "tabs", "tabCapture", "offscreen"],
+  "optional_permissions": ["downloads"],
   "host_permissions": ["http://127.0.0.1:18765/*", "<all_urls>"],
   "action": {
     "default_title": "__MSG_ext_actionTitle__",
@@ -18,14 +19,6 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "content_scripts": [
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["shared.js", "settings.js", "content.js"],
-      "css": ["content.css"],
-      "run_at": "document_idle"
-    }
-  ],
   "commands": {
     "save-page": {
       "suggested_key": { "default": "Alt+Shift+R" },
@@ -48,6 +41,9 @@
     },
     "analyze-selection": {
       "description": "__MSG_manifestCmd_analyze__"
+    },
+    "record-tab": {
+      "description": "__MSG_manifestCmd_recordTab__"
     }
   }
 }

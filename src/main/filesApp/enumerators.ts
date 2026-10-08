@@ -557,7 +557,9 @@ export const sidecarSubtitleEnumerator: FilesEnumerator = {
       }
       for (const entry of entries) {
         if (!entry.isFile() || !SUBTITLE_EXT.has(extOf(entry.name))) continue;
-        if (!entry.name.toLowerCase().startsWith(stem)) continue;
+        // The stem must end at a `.`/`_`: `Show - 010.ja.srt` is not `Show - 01.mkv`'s.
+        const lowerName = entry.name.toLowerCase();
+        if (!lowerName.startsWith(stem) || !['.', '_'].includes(lowerName.charAt(stem.length))) continue;
         const full = path.join(dir, entry.name);
         const key = full.toLowerCase();
         if (taken.has(key)) continue;
@@ -1206,53 +1208,89 @@ export function buildFilesIndex(
   ctx: FilesEnumeratorContext,
   enumerators: readonly FilesEnumerator[] = FILES_ENUMERATORS,
 ): FilesIndexSnapshot {
-  const items: FilesItem[] = [];
-  const seen = new Set<string>();
-  const seenPaths = new Set<string>();
-  const reports: FilesEnumeratorReport[] = [];
+  const state = newIndexState();
+  for (const enumerator of enumerators) runEnumeratorInto(state, enumerator, ctx);
+  return finishIndex(state);
+}
 
+/**
+ * The same index, built without holding the main process for the whole walk.
+ *
+ * The Files app froze on open and on refresh (D315/D345): every enumerator ran
+ * back to back inside one synchronous IPC handler, so on a large profile the
+ * main process — and with it every window's IPC, menus and the media pipe —
+ * stalled until the last store had been read. This runs the same enumerators in
+ * the same (load-bearing) order and yields to the event loop between them, so
+ * other work interleaves; the snapshot is identical to `buildFilesIndex`.
+ */
+export async function buildFilesIndexAsync(
+  ctx: FilesEnumeratorContext,
+  enumerators: readonly FilesEnumerator[] = FILES_ENUMERATORS,
+  yieldToLoop: () => Promise<void> = () => new Promise((resolve) => setImmediate(resolve)),
+): Promise<FilesIndexSnapshot> {
+  const state = newIndexState();
   for (const enumerator of enumerators) {
-    const started = Date.now();
-    try {
-      const produced = enumerator.run(ctx);
-      let kept = 0;
-      let duplicatePaths = 0;
-      for (const item of produced) {
-        if (seen.has(item.id)) continue;
-        const pathKey = filesItemPathKey(item);
-        if (pathKey !== null && seenPaths.has(pathKey)) {
-          duplicatePaths += 1;
-          continue;
-        }
-        seen.add(item.id);
-        if (pathKey !== null) seenPaths.add(pathKey);
-        items.push(item);
-        kept += 1;
-      }
-      reports.push({
-        source: enumerator.source,
-        itemCount: kept,
-        elapsedMs: Date.now() - started,
-        ...(duplicatePaths ? { duplicatePathCount: duplicatePaths } : {}),
-      });
-    } catch (err) {
-      reports.push({
-        source: enumerator.source,
-        itemCount: 0,
-        elapsedMs: Date.now() - started,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    await yieldToLoop();
+    runEnumeratorInto(state, enumerator, ctx);
   }
+  return finishIndex(state);
+}
 
+interface IndexState {
+  items: FilesItem[];
+  seen: Set<string>;
+  seenPaths: Set<string>;
+  reports: FilesEnumeratorReport[];
+}
+
+function newIndexState(): IndexState {
+  return { items: [], seen: new Set(), seenPaths: new Set(), reports: [] };
+}
+
+function runEnumeratorInto(state: IndexState, enumerator: FilesEnumerator, ctx: FilesEnumeratorContext): void {
+  const { items, seen, seenPaths, reports } = state;
+  const started = Date.now();
+  try {
+    const produced = enumerator.run(ctx);
+    let kept = 0;
+    let duplicatePaths = 0;
+    for (const item of produced) {
+      if (seen.has(item.id)) continue;
+      const pathKey = filesItemPathKey(item);
+      if (pathKey !== null && seenPaths.has(pathKey)) {
+        duplicatePaths += 1;
+        continue;
+      }
+      seen.add(item.id);
+      if (pathKey !== null) seenPaths.add(pathKey);
+      items.push(item);
+      kept += 1;
+    }
+    reports.push({
+      source: enumerator.source,
+      itemCount: kept,
+      elapsedMs: Date.now() - started,
+      ...(duplicatePaths ? { duplicatePathCount: duplicatePaths } : {}),
+    });
+  } catch (err) {
+    reports.push({
+      source: enumerator.source,
+      itemCount: 0,
+      elapsedMs: Date.now() - started,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+function finishIndex(state: IndexState): FilesIndexSnapshot {
   // Gate 4: state that only exists ACROSS stores, derived once here rather
   // than inside an enumerator that would have to read a store it does not own.
-  const derived = deriveCrossStoreFlags(items);
+  const derived = deriveCrossStoreFlags(state.items);
 
   return {
     items: derived,
     counts: countByCategory(derived),
-    enumerators: reports,
+    enumerators: state.reports,
     builtAt: Date.now(),
   };
 }

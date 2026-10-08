@@ -59,6 +59,20 @@
 .wired-wall-node.node-a { left: 26px; top: 32px; }
 .wired-wall-node.node-b { left: 36%; top: 20%; }
 .wired-wall-node.node-c { right: 34px; bottom: 92px; color: rgba(255, 177, 59, 0.65); }
+/* The last line mined from a video: sentence, then source and time as dim fields. */
+.wired-wall-node.node-d {
+  left: 36%;
+  bottom: 132px;
+  max-width: 42vw;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wired-wall-node.node-d i {
+  margin-left: 10px;
+  font-style: normal;
+  opacity: 0.7;
+}
 
 :root[data-materials='wired'] .os-wall-dim {
   background: rgba(0, 0, 0, 0.18);

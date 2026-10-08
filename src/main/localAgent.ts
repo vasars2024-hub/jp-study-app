@@ -12,6 +12,7 @@ import {
   type LocalAgentSettings,
 } from '../shared/localAgentSettings';
 import { effectiveAgentPermission } from '../shared/localAgentProfiles';
+import { operationsForPlanner } from '../shared/agentCloudStudyDataGate';
 import { AI_PROVIDERS, type AiProviderId } from '../shared/aiProviders';
 import type {
   LocalAgentPlanFailureCode,
@@ -286,7 +287,14 @@ async function planWithCloud(
   const promptContext = {
     permission,
     profile: request.profile,
-    availableOperations: normalizeAvailableOperations(request.availableOperations),
+    // Study statistics, known words and library titles stay home until the user
+    // answers the one-time notice with Allow. Enforced here, where the cloud
+    // request is built, so a renderer that skipped the notice cannot widen it.
+    availableOperations: operationsForPlanner(
+      normalizeAvailableOperations(request.availableOperations),
+      'cloud',
+      settings.agentCloudShareStudyData,
+    ),
     memories: sendPrivate ? memoriesInAgentScope(settings, request.memories) : [],
     applicationState: settings.privacyMode || !sendPrivate ? {} : request.applicationState,
   };

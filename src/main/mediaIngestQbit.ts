@@ -40,6 +40,8 @@ export const QBIT_BACKOFF_MAX_MS = 10 * 60_000;
 export const QBIT_SAVE_PATH_REFRESH_MS = 30 * 60_000;
 /** How many handled hashes are remembered. */
 export const QBIT_HANDLED_LIMIT = 5_000;
+/** Polls a finished torrent whose files cannot be found is retried on before it is given up. */
+export const QBIT_UNRESOLVED_RETRIES = 20;
 
 export interface QbitPollerState {
   /** Finished torrents already imported or baselined, lowercase hex. */
@@ -72,6 +74,8 @@ export interface QbitPollerDeps {
   /** Categories that are never imported (the subtitle fetches' own). */
   ignoreCategories: ReadonlySet<string>;
   keyOf: (value: string) => string;
+  /** A finished torrent's files were not found (first miss, and when the retries give up). */
+  log?: (message: string) => void;
 }
 
 export interface QbitCompletionPoller {
@@ -83,6 +87,8 @@ export interface QbitCompletionPoller {
   /** The poller will import this path itself (its torrent is unfinished, or finished and not yet imported). */
   claims: (filePath: string) => boolean;
   status: () => MediaIngestQbitStatus;
+  /** Finished torrents whose files have not been found on this machine yet (still being retried). */
+  unresolvedCount: () => number;
   lastCheckedAt: () => number | null;
   /** Resolves once the current run's first poll has settled, whatever its outcome. */
   firstPoll: () => Promise<void>;
@@ -97,6 +103,8 @@ export function createQbitCompletionPoller(deps: QbitPollerDeps): QbitCompletion
   let generation = 0;
   let timer: { cancel: () => void } | null = null;
   let inflight: Promise<void> | null = null;
+  /** The generation `inflight` belongs to. */
+  let inflightGen = -1;
   let failures = 0;
   let snapshot: QbitTorrentSnapshot[] = [];
   /** When the current snapshot was taken; null when there is none. */
@@ -105,7 +113,9 @@ export function createQbitCompletionPoller(deps: QbitPollerDeps): QbitCompletion
   let savePathAt: number | null = null;
   let lastOk: number | null = null;
   let status: MediaIngestQbitStatus = 'off';
-  let first: { promise: Promise<void>; resolve: () => void } = settledGate();
+  /** Finished torrents whose files were not found yet → attempts so far. */
+  const unresolved = new Map<string, number>();
+  let first:{ promise: Promise<void>; resolve: () => void } = settledGate();
 
   function settledGate(): { promise: Promise<void>; resolve: () => void } {
     let resolve: () => void = () => undefined;
@@ -138,12 +148,38 @@ export function createQbitCompletionPoller(deps: QbitPollerDeps): QbitCompletion
     for (const hash of keep) handled.add(hash);
   }
 
-  async function ingestTorrent(config: ScraperQbittorrentSettings, torrent: QbitTorrentSnapshot): Promise<void> {
+  /** False when none of the torrent's files could be found on this machine. */
+  async function ingestTorrent(config: ScraperQbittorrentSettings, torrent: QbitTorrentSnapshot): Promise<boolean> {
     const listed = await deps.files(config, torrent.hash);
     const paths = deps.resolveFiles(torrent, listed.ok ? listed.value : null);
-    if (!paths.length) return;
+    if (!paths.length) return false;
     const hint = deps.ledgerHint(torrent.hash) ?? hintFromTags(torrent.tags);
     await deps.ingest(paths, hint, torrent);
+    return true;
+  }
+
+  /**
+   * A finished torrent whose files cannot be found here. It used to be marked
+   * handled on the first miss and never looked at again — which, for a remote
+   * client without a path mapping or a drive that was not mounted yet, meant
+   * the download silently never arrived. It is now retried on later polls, up
+   * to `QBIT_UNRESOLVED_RETRIES`, logged, and counted for the settings panel.
+   */
+  function noteUnresolved(torrent: QbitTorrentSnapshot): boolean {
+    const hash = torrent.hash.toLowerCase();
+    const attempts = (unresolved.get(hash) ?? 0) + 1;
+    unresolved.set(hash, attempts);
+    const final = attempts >= QBIT_UNRESOLVED_RETRIES;
+    if (attempts === 1 || final) {
+      deps.log?.(
+        `Finished torrent "${torrent.name}" (${hash.slice(0, 8)}): no files found at "${torrent.contentPath || torrent.savePath}". `
+        + (final
+          ? 'Giving up; if qBittorrent runs on another machine, add a path mapping in its settings.'
+          : 'Will retry on the next polls.'),
+      );
+    }
+    if (final) unresolved.delete(hash);
+    return final;
   }
 
   async function tick(gen: number): Promise<void> {
@@ -196,7 +232,12 @@ export function createQbitCompletionPoller(deps: QbitPollerDeps): QbitCompletion
     for (const torrent of plan.toIngest) {
       if (gen !== generation) return;
       try {
-        await ingestTorrent(config, torrent);
+        const found = await ingestTorrent(config, torrent);
+        if (gen !== generation) return;
+        // Not found yet: left unhandled (so the poller still claims it) and
+        // retried on later polls until the cap gives up on it.
+        if (!found && !noteUnresolved(torrent)) continue;
+        if (found) unresolved.delete(torrent.hash.toLowerCase());
       } catch {
         // One torrent whose files cannot be read must not stall the others. It
         // is still marked handled: retrying it every poll would never succeed,
@@ -213,7 +254,12 @@ export function createQbitCompletionPoller(deps: QbitPollerDeps): QbitCompletion
   }
 
   function run(gen: number): Promise<void> {
-    if (inflight) return inflight;
+    // A poll of an older generation bails at its first check without polling.
+    // Sharing it would lose this generation's poll entirely: two `start()`s in
+    // one tick (service start, then the renderer's config sync) left the poller
+    // 'off' with nothing scheduled — the E2E suite caught it.
+    if (inflight) return inflightGen === gen ? inflight : inflight.then(() => run(gen));
+    inflightGen = gen;
     const gate = first;
     inflight = tick(gen)
       .catch(() => {
@@ -276,6 +322,7 @@ export function createQbitCompletionPoller(deps: QbitPollerDeps): QbitCompletion
       return !isTorrentComplete(torrent) || !deps.state.handled.has(torrent.hash.toLowerCase());
     },
     status: () => status,
+    unresolvedCount: () => unresolved.size,
     lastCheckedAt: () => lastOk,
     firstPoll: () => first.promise,
   };

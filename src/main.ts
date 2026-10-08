@@ -3,7 +3,17 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
-import started from 'electron-squirrel-startup';
+import {
+  launchedToTray,
+  loadAppLifecyclePrefs,
+  markAppQuitting,
+  onAppLifecyclePrefsChanged,
+  registerTrayLifecycleIpc,
+  setAppLifecyclePrefs,
+  shouldHideOnClose,
+} from './main/appLifecycle';
+import { resolveSavedPlacement, trackWindowState } from './main/windowState';
+import { createLockGate, registerLockscreenPinIpc, type LockGate } from './main/lockscreenPin';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, listLibraryItems, onLibraryItemsAdded } from './main/library';
 import { loadAfterCacheClear, loadWindowWithRetry, loadWithRetry } from './main/bootLoad';
 import { registerReadingListsIpc } from './main/readingListsIpc';
@@ -75,7 +85,7 @@ import { registerCredentialIpc } from './main/credentials/ipc';
 import { initDownloads, registerDownloadIpc } from './main/downloads';
 import { registerMangaOcrIpc } from './main/mangaOcr';
 import { registerBookOcrIpc } from './main/bookOcrJob';
-import { registerMainI18nIpc } from './main/i18n';
+import { mt, registerMainI18nIpc } from './main/i18n';
 import { registerStudyLanguageIpc } from './main/studyLanguage';
 import { startDebugBridge, stopDebugBridge, recordDebugLog } from './main/debugBridge';
 import { stopLlamaHost } from './main/llamaHost';
@@ -84,6 +94,7 @@ import {
   startExtensionServer,
   stopExtensionServer,
 } from './main/extensionServer';
+import { registerExtensionBridgeHostIpc, setExtensionBridgeHostResolver } from './main/extensionBridgeHost';
 import {
   loadWindowChromePrefs,
   mainWindowOptions,
@@ -125,7 +136,9 @@ import { registerCompanionPacksIpc } from './main/companionPacks';
 import { registerBuddySchedulerIpc, stopBuddyScheduler } from './main/buddyScheduler';
 import {
   configureSystemDictionary,
+  refreshAppTray,
   registerSystemDictionaryIpc,
+  setAppTrayItems,
   startSystemDictionary,
   stopSystemDictionary,
 } from './main/systemDictionary';
@@ -148,8 +161,10 @@ import {
 } from './main/osHotkeyHelper';
 import {
   legacyChordResult,
+  listGlobalCommands,
   registerGlobalCommand,
   registerGlobalCommandsIpc,
+  runGlobalCommand,
   setGlobalCommandChord,
   stopGlobalCommands,
 } from './main/globalCommands';
@@ -159,13 +174,27 @@ import {
   configureSystemAudioCapture,
   registerSystemAudioCaptureIpc,
 } from './main/systemAudioCapture';
+import {
+  configureRegionRecorder,
+  registerRegionRecorderIpc,
+  startRegionRecorder,
+} from './main/regionRecorder';
 import { registerFlashcardAudioIpc } from './main/flashcardAudio';
 import { logDiagnostic, errorDetail } from './main/errorLog';
 import { resolveAppAsset } from './main/appProtocolResolve';
+import { createFileOpenRouter, filePathsFromArgv, type FileOpenRouter } from './main/fileOpenRouter';
+import { APP_USER_MODEL_ID, handleSquirrelStartup } from './main/squirrelEvents';
 
-if (started) {
-  app.quit();
-}
+// Windows identity, before any window or notification exists: the id Squirrel stamps
+// on the installer's shortcuts, used by every build so the zip and an installed copy
+// are one app to Windows (taskbar pins, toast attribution).
+if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
+
+// Squirrel.Windows install/update/uninstall launches (shortcuts, file associations),
+// replacing the never-configured `electron-squirrel-startup`. Handled synchronously and
+// BEFORE the single-instance lock: during an update the old copy is usually running,
+// and taking the lock would forward `--squirrel-updated` into it instead of installing.
+const squirrelEventOnly = handleSquirrelStartup(process.argv);
 
 // A dev-only, opt-in userData redirect, so a second instance can be driven while
 // another one holds the machine.
@@ -193,7 +222,7 @@ if (altUserData) {
 
 // Single instance so a Startup hotkey can launch with `--toggle` / `--open=` /
 // `--restart` and route into the already-running copy.
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
+const gotSingleInstanceLock = !squirrelEventOnly && app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 }
@@ -238,11 +267,50 @@ export function argvOpenSection(argv: string[] = process.argv): string | null {
 }
 
 function queueOrOpenSection(section: string): void {
+  // Locked: the pop-out waits for the unlock (`lockscreen:unlock` opens it).
+  if (isAppLocked()) {
+    pendingOpenSection = section;
+    focusAppHandler?.();
+    return;
+  }
   if (openSectionHandler) openSectionHandler(section);
   else pendingOpenSection = section;
 }
 
-app.on('second-instance', (_event, argv) => {
+/**
+ * Main owns the lock (`main/lockscreenPin.ts`): the PIN is checked against
+ * main's own record and only a verified PIN lifts it. Created on first use so
+ * `userData` is final by then.
+ */
+let lockGateInstance: LockGate | null = null;
+function lockGate(): LockGate {
+  if (!lockGateInstance) {
+    const file = path.join(app.getPath('userData'), 'lockscreen-lock.json');
+    lockGateInstance = createLockGate({
+      read: () => readJsonSync<unknown>(file, null) as ReturnType<LockGate['record']>,
+      write: (record) => writeJsonAtomicSync(file, record),
+    });
+  }
+  return lockGateInstance;
+}
+function isAppLocked(): boolean {
+  return lockGate().isLocked();
+}
+
+/** Files Windows opened with Gum (fileOpenRouter.ts); paths before ready wait here. */
+let fileOpenRouter: FileOpenRouter | null = null;
+const earlyOpenPaths: string[] = [];
+function openFilesFromShell(paths: string[]): void {
+  if (fileOpenRouter) fileOpenRouter.open(paths);
+  else earlyOpenPaths.push(...paths);
+}
+
+app.on('second-instance', (_event, argv, workingDirectory) => {
+  const openedFiles = filePathsFromArgv(argv, { cwd: workingDirectory });
+  if (openedFiles.length) {
+    openFilesFromShell(openedFiles);
+    return;
+  }
   if (argvWantsRestart(argv)) {
     app.relaunch();
     app.exit(0);
@@ -722,6 +790,19 @@ function isStudyOsAlive(): boolean {
   }
   return false;
 }
+/**
+ * The one window that answers the Chrome extension (extensionBridgeHost.ts):
+ * the Study OS main window, else the first live pop-out, else Blanc (which
+ * installs the bridges only while no Study OS window is alive), else none.
+ */
+function extensionBridgeHost(): BrowserWindow | null {
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
+  for (const win of popoutWindows.values()) {
+    if (!win.isDestroyed()) return win;
+  }
+  if (blancWindow && !blancWindow.isDestroyed()) return blancWindow;
+  return null;
+}
 /** Floating Mini craft widget — frameless, transparent, always-on-top. */
 let miniWidgetWindow: BrowserWindow | null = null;
 /** Compact Blanc Toolbox side window — parallel to the full Study OS. */
@@ -838,19 +919,37 @@ function attachNavGuards(win: BrowserWindow): void {
   });
 }
 
+/** Saved main-window placement (windowState.ts). */
+function mainWindowStateFile(): string {
+  return path.join(app.getPath('userData'), 'main-window-state.json');
+}
+
+/**
+ * Main windows whose next `close` must really close even when "Keep running
+ * in the tray" is on: a chrome-change recreate, and the lock screen dismissed
+ * without unlocking (hiding there would leave an unlocked window one tray click away).
+ */
+const forceMainWindowClose = new WeakSet<BrowserWindow>();
+
 const createWindow = (restore?: {
   bounds?: { x: number; y: number; width: number; height: number };
   maximized?: boolean;
   visible?: boolean;
 }): void => {
   const chrome = loadWindowChromePrefs();
+  // Reopen where the user left it (size, position, monitor, maximized). A
+  // recreate (`recreateMainWindow`) passes its own live bounds and wins.
+  const saved = restore?.bounds ? null : resolveSavedPlacement(mainWindowStateFile(), MAIN_WINDOW_MIN_SIZE);
+  const initialBounds = restore?.bounds ?? saved?.bounds;
+  const initialMaximized = restore?.maximized ?? saved?.maximized ?? false;
   mainWindow = new BrowserWindow({
-    width: restore?.bounds?.width ?? 1280,
-    height: restore?.bounds?.height ?? 860,
-    x: restore?.bounds?.x,
-    y: restore?.bounds?.y,
+    width: initialBounds?.width ?? 1280,
+    height: initialBounds?.height ?? 860,
+    x: initialBounds?.x,
+    y: initialBounds?.y,
+    title: 'Gum',
     // 800x500 DIP, never more than the work area it opens on (see windowBounds.ts).
-    ...minimumSizeAt(MAIN_WINDOW_MIN_SIZE, restore?.bounds),
+    ...minimumSizeAt(MAIN_WINDOW_MIN_SIZE, initialBounds),
     backgroundColor: '#1b1b21',
     autoHideMenuBar: true,
     // Deferred show + ready-to-show, matching every other window in this file
@@ -868,7 +967,19 @@ const createWindow = (restore?: {
   });
   guardWindowToWorkArea(mainWindow, MAIN_WINDOW_MIN_SIZE);
 
-  if (restore?.maximized) mainWindow.maximize();
+  if (initialMaximized) mainWindow.maximize();
+  trackWindowState(mainWindow, mainWindowStateFile());
+  {
+    // "Keep running in the tray when closed": the close button hides the window
+    // so global hotkeys, the companion and calendar reminders stay alive. A real
+    // quit (tray Quit, app menu Exit, Windows shutdown) sets `isAppQuitting`.
+    const win = mainWindow;
+    win.on('close', (event) => {
+      if (forceMainWindowClose.has(win) || !shouldHideOnClose()) return;
+      event.preventDefault();
+      win.hide();
+    });
+  }
   // Blanc hands its background jobs back the moment a Study OS window exists.
   broadcastStudyOsAlive(true);
   mainWindow.once('ready-to-show', () => {
@@ -969,6 +1080,7 @@ function recreateMainWindow(): void {
   old.once('closed', () => {
     createWindow(restore);
   });
+  forceMainWindowClose.add(old);
   old.close();
 }
 
@@ -980,25 +1092,12 @@ function blancBoundsFile(): string {
   return path.join(app.getPath('userData'), 'blanc-window.json');
 }
 
-/** Last Blanc window size, saved on close. Applied only when the caller passes
- *  no explicit size (the renderer omits it when rememberWindowBounds is on). */
-function readSavedBlancSize(): { width: number; height: number } | null {
-  const parsed = readJsonSync<{ width?: unknown; height?: unknown } | null>(blancBoundsFile(), null);
-  if (!parsed || typeof parsed.width !== 'number' || typeof parsed.height !== 'number') return null;
-  return { width: parsed.width, height: parsed.height };
-}
-
-function saveBlancSize(win: BrowserWindow): void {
-  try {
-    const { width, height } = win.getBounds();
-    writeJsonAtomicSync(blancBoundsFile(), { width, height }, { space: 0, backup: false });
-  } catch {
-    /* best effort; the default size is always safe */
-  }
-}
-
 function createBlancWindow(size?: { width?: number; height?: number }): void {
-  const saved = size ? null : readSavedBlancSize();
+  // Last Blanc placement (size, position, monitor, maximized — windowState.ts),
+  // applied only when the caller passes no explicit size (the renderer omits it
+  // when rememberWindowBounds is on). The older size-only file still reads.
+  const placement = size ? null : resolveSavedPlacement(blancBoundsFile(), { width: BLANC_MIN_W, height: BLANC_MIN_H });
+  const saved = placement?.bounds ?? null;
   const width = Math.min(
     BLANC_MAX_W,
     Math.max(BLANC_MIN_W, Math.round(size?.width ?? saved?.width ?? BLANC_DEFAULT_W)),
@@ -1019,6 +1118,7 @@ function createBlancWindow(size?: { width?: number; height?: number }): void {
   blancWindow = new BrowserWindow({
     width,
     height,
+    ...(saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? { x: saved.x, y: saved.y } : {}),
     minWidth: BLANC_MIN_W,
     minHeight: BLANC_MIN_H,
     // No maxWidth/maxHeight: the window may fill any monitor. The layout is
@@ -1049,15 +1149,15 @@ function createBlancWindow(size?: { width?: number; height?: number }): void {
   const win = blancWindow;
   attachNavGuards(win);
   if (isDevServer()) forwardRendererConsole(win);
+  guardWindowToWorkArea(win, { width: BLANC_MIN_W, height: BLANC_MIN_H });
+  if (placement?.maximized) win.maximize();
+  trackWindowState(win, blancBoundsFile());
 
   win.once('ready-to-show', () => {
     if (!win.isDestroyed()) win.show();
     // Under "Start in Blanc only" this is the first window to paint, so the
     // deferred boot work (extension server, dictionaries…) starts here.
     runAfterFirstPaint();
-  });
-  win.on('close', () => {
-    if (!win.isDestroyed()) saveBlancSize(win);
   });
   win.on('closed', () => {
     blancWindow = null;
@@ -1121,6 +1221,8 @@ function registerBlancIpc(): void {
       hideAllWindows(BrowserWindow.getAllWindows());
       return;
     }
+    // Locked: the lock UI only — hidden pop-outs stay hidden until the unlock.
+    if (showLockUiIfLocked()) return;
     if (!mainAlive) recreateMainWindow();
     if (!mainWindow || mainWindow.isDestroyed()) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1130,6 +1232,14 @@ function registerBlancIpc(): void {
     restoreHiddenWindows(mainWindow);
   }
   function focusApp(): void {
+    // Locked: bring the PIN pad forward, never the window it is guarding (the
+    // tray's "Open Gum" and the focus hotkey both land here).
+    if (lockscreenWindow && !lockscreenWindow.isDestroyed()) {
+      lockscreenWindow.show();
+      lockscreenWindow.focus();
+      return;
+    }
+    if (showLockUiIfLocked()) return;
     if (!mainWindow || mainWindow.isDestroyed()) recreateMainWindow();
     if (!mainWindow || mainWindow.isDestroyed()) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1182,6 +1292,7 @@ function registerBlancIpc(): void {
     (_event, target: unknown): { ok: boolean } => {
       const t = String(target || '').trim().toLowerCase();
       if (!t) return { ok: false };
+      if (showLockUiIfLocked()) return { ok: false };
       if (!mainWindow || mainWindow.isDestroyed()) recreateMainWindow();
       if (!mainWindow || mainWindow.isDestroyed()) return { ok: false };
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1390,6 +1501,7 @@ function createLockscreenWindow(size?: { width?: number; height?: number }): voi
     if (!lockscreenDismissedViaUnlock) {
       // Closing the lock widget without unlocking should not reveal the desktop.
       if (mainWindow && !mainWindow.isDestroyed()) {
+        forceMainWindowClose.add(mainWindow);
         mainWindow.close();
       } else {
         app.quit();
@@ -1422,21 +1534,56 @@ function broadcastLockscreenUnlocked(): void {
   }
 }
 
+/**
+ * Every path that brings Study OS forward (file open, second instance, tray,
+ * hotkeys, Blanc's "Open Study OS") asks this first. While locked it brings the
+ * lock UI forward instead — the PIN widget, or the main window told to show its
+ * PIN pad — and answers true, so the caller does nothing else.
+ */
+function showLockUiIfLocked(): boolean {
+  if (!isAppLocked()) return false;
+  if (lockscreenWindow && !lockscreenWindow.isDestroyed()) {
+    if (lockscreenWindow.isMinimized()) lockscreenWindow.restore();
+    lockscreenWindow.show();
+    lockscreenWindow.focus();
+    return true;
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  if (!mainWindow || mainWindow.isDestroyed()) return true;
+  mainWindow.webContents.send('lockscreen:locked');
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  return true;
+}
+
 function registerLockscreenIpc(): void {
   ipcMain.handle(
     'lockscreen:open',
     (_e, size?: { width?: number; height?: number }): { ok: boolean } => {
+      lockGate().lock();
       createLockscreenWindow(size);
       return { ok: true };
     },
   );
+  // Arming the lock is always allowed; lifting it takes a verified PIN.
+  ipcMain.handle('lockscreen:lock', (): { locked: boolean } => ({ locked: lockGate().lock() }));
   ipcMain.handle('lockscreen:unlock', (): { ok: boolean } => {
+    // Only `lockscreen:verifyPin` with the right PIN lifts main's lock.
+    if (isAppLocked()) return { ok: false };
     lockscreenDismissedViaUnlock = true;
     closeLockscreenWindow();
     broadcastLockscreenUnlocked();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show();
       mainWindow.focus();
+    }
+    // What arrived while locked: opened files, then a `--open=` pop-out.
+    fileOpenRouter?.release();
+    if (pendingOpenSection && openSectionHandler) {
+      const section = pendingOpenSection;
+      pendingOpenSection = null;
+      openSectionHandler(section);
     }
     return { ok: true };
   });
@@ -1893,6 +2040,19 @@ app.whenReady().then(async () => {
   registerStudyBlockWindowIpc();
   registerDeskDragIpc();
   registerFileRouterIpc();
+  fileOpenRouter = createFileOpenRouter({
+    getMainWindow: () => mainWindow,
+    // Opened files wait for the unlock (`lockscreen:unlock` releases them).
+    isLocked: isAppLocked,
+    showMainWindow: () => {
+      if (showLockUiIfLocked()) return;
+      if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    },
+  });
   registerFilesAppIpc(filesAppIpcDeps(() => mainWindow));
   registerTranslateIpc();
   registerTranslateAnalysisIpc();
@@ -1938,15 +2098,20 @@ app.whenReady().then(async () => {
   registerMainI18nIpc();
   registerStudyLanguageIpc();
   registerExtensionBridgeIpc();
+  // Extension requests and mines go to one host window, not every window.
+  setExtensionBridgeHostResolver(extensionBridgeHost);
+  registerExtensionBridgeHostIpc();
   registerWindowChromeIpc(recreateMainWindow);
   registerPopoutIpc();
   // Before every module that plugs a system-wide command into it (Blanc, the
   // popup dictionary, the Reading Lens, the companion).
   registerGlobalCommandsIpc();
   registerBlancIpc();
+  registerTrayLifecycleIpc();
   registerBlancLaunchIpc({
     isStudyOsAlive,
     openStudyOs: () => {
+      if (showLockUiIfLocked()) return;
       if (!mainWindow || mainWindow.isDestroyed()) createWindow();
       if (!mainWindow || mainWindow.isDestroyed()) return;
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1967,6 +2132,7 @@ app.whenReady().then(async () => {
   });
   registerMiniWidgetIpc();
   registerLockscreenIpc();
+  registerLockscreenPinIpc(lockGate());
   registerPlayerSyncIpc();
   registerCompanionPacksIpc();
   configureCompanionHost({
@@ -2000,6 +2166,15 @@ app.whenReady().then(async () => {
     isDevServer: isDevServer(),
   });
   registerSystemAudioCaptureIpc();
+  // The Region Recorder: record a box on screen → MP4 → library → Whisper → player.
+  configureRegionRecorder({
+    rendererUrl,
+    getMainWindow: () => mainWindow,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+  });
+  registerRegionRecorderIpc();
 
   // The desktop companion: radial wheel, card preview and notices over any app,
   // forwarding mines to this main window's renderer.
@@ -2028,13 +2203,18 @@ app.whenReady().then(async () => {
     studyOsDeferredAtLaunch = true;
     createBlancWindow();
   } else {
-    createWindow();
+    // Started by Windows at sign-in with "Keep running in the tray": boot the
+    // window hidden, so hotkeys and reminders run without a window popping up.
+    createWindow(launchedToTray() ? { visible: false } : undefined);
   }
+  installAppTrayItems();
   // Fallback: a hidden start or a failed load never fires ready-to-show.
   setTimeout(runAfterFirstPaint, 8000);
   // Cold-start `--open=library` (etc.): main boots for services, then open the pop-out.
   const coldOpen = argvOpenSection(process.argv);
   if (coldOpen) createPopoutWindow(coldOpen);
+  // Cold-start "Open with Gum": the Study OS renderer drains these once mounted.
+  fileOpenRouter.open([...earlyOpenPaths.splice(0), ...filePathsFromArgv(process.argv)]);
   afterFirstPaint(() => {
     // Assignments are seeded from `screen`, which is only live now. Run once the
     // main window exists, so its own display is excluded from the secondaries.
@@ -2045,6 +2225,8 @@ app.whenReady().then(async () => {
     startSystemDictionary();
     // Reading Lens: registers its own global hotkey (screen-region OCR reader).
     startReadingLens();
+    // Region Recorder: offer any recording a crash left unfinished.
+    startRegionRecorder();
     // Companion wheel, card preview, mine-last, Mini View: their chords go live now.
     startCompanion();
     // Provision the offline dictionaries and load their metadata (pitch, IPA,
@@ -2068,6 +2250,40 @@ app.whenReady().then(async () => {
     }
   });
 });
+
+// From here on a main-window close is a real close (see "Keep running in the tray").
+app.on('before-quit', () => {
+  markAppQuitting();
+});
+
+/**
+ * Gum's own rows in the notification-area menu. There is ONE app tray — the
+ * companion tray `systemDictionary.ts` owns (Companion submenu, Open Gum, Quit);
+ * these rows are added to it rather than a second icon. The live-captions red
+ * dot (`systemAudioCapture.ts`) is a separate, temporary "audio is being held"
+ * indicator that exists only while capture is on, so the two do not compete.
+ */
+function installAppTrayItems(): void {
+  setAppTrayItems(() => {
+    const recorder = listGlobalCommands().find((s) => /^(recorder|record)\./.test(s.id) && s.hasHandler && s.available);
+    return [
+      { label: mt('polish.tray.openBlanc'), click: () => createBlancWindow() },
+      // Feature-detected: offered only once the region recorder registers its command.
+      // TODO(main session): the recorder agent should register `recorder.region` as a global command.
+      ...(recorder ? [{ label: mt('polish.tray.recordRegion'), click: () => void runGlobalCommand(recorder.id) }] : []),
+      {
+        label: mt('polish.tray.keepRunning'),
+        type: 'checkbox' as const,
+        checked: loadAppLifecyclePrefs().keepRunningInTray,
+        click: () => {
+          setAppLifecyclePrefs({ keepRunningInTray: !loadAppLifecyclePrefs().keepRunningInTray });
+        },
+      },
+      { type: 'separator' as const },
+    ];
+  });
+  onAppLifecyclePrefsChanged(() => refreshAppTray());
+}
 
 app.on('window-all-closed', () => {
   // Companion host is skipTaskbar; still count as a window — close it so quit proceeds.

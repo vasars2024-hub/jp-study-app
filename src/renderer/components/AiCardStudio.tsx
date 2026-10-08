@@ -33,7 +33,7 @@ import AiGenerationProgressPanel from './AiGenerationProgressPanel';
 import AiStudioConfigLog, { appendStudioLog, type AiStudioLogLine } from './AiStudioConfigLog';
 import type { MappingPreviewState } from './AnkiCardPreview';
 import Icon from './Icons';
-import { addDeckCards } from '../flashcardDeck';
+import { mirrorAiStudioCard } from '../studyMiningRoutes';
 import { saveAiResultsToDeck } from '../aiDeckSave';
 import { shouldClaimAgentCardBatch } from '../../shared/agentCardBatchStaging';
 import type { AgentStagedCardBatch } from '../../shared/agentCardBatchStaging';
@@ -522,7 +522,12 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     if (!batchResults.length || !localizedFormat) return;
     let ok = 0;
     let total = 0;
-    const localEntries: Parameters<typeof addDeckCards>[0] = [];
+    let local = 0;
+    // Same rule as the flashcards save: an adopted batch keeps its own deck name
+    // so the local mirror of an Anki send lands where the batch belongs. The
+    // existing fallback is left exactly as it was — changing it would regroup
+    // decks users already have.
+    const deckLabel = agentBatch?.deckLabel ?? selectedPreset?.label ?? 'AI card studio';
     for (const aiResult of batchResults) {
       for (const card of aiResult.cards) {
         total += 1;
@@ -546,27 +551,25 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         });
         if (res.ok) {
           ok += 1;
-          localEntries.push({
-            word: aiResult.expression,
-            reading: aiResult.reading || '',
-            meaning: aiResult.meaning || '',
+          // The local mirror goes through mineToStudy (with Anki's answer), so a
+          // batch sent twice finds the card it already made.
+          const mirrored = await mirrorAiStudioCard({
+            expression: aiResult.expression,
+            reading: aiResult.reading,
+            meaning: aiResult.meaning,
             sentence: aiResult.sentence,
             front: card.front,
             back: card.back,
-            source: 'epub-ai',
-            // Same rule as the flashcards save: an adopted batch keeps its own
-            // deck name so the local mirror of an Anki send lands where the
-            // batch belongs. The existing fallback is left exactly as it was —
-            // changing it would regroup decks users already have.
-            bookTitle: agentBatch?.deckLabel ?? selectedPreset?.label ?? 'AI card studio',
-          });
+            deckLabel,
+            ankiResult: res,
+          }).catch(() => undefined);
+          if (mirrored?.created) local += 1;
         }
       }
     }
-    if (localEntries.length) addDeckCards(localEntries);
     setStatus(
-      localEntries.length
-        ? t('aiStudio.status.sentAnkiLocal', { ok, total, local: localEntries.length })
+      local
+        ? t('aiStudio.status.sentAnkiLocal', { ok, total, local })
         : t('aiStudio.status.sentAnki', { ok, total }),
     );
   }

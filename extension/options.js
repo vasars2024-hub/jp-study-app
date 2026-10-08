@@ -133,6 +133,14 @@ function readForm() {
     popupFontSize: Number($('popup-font').value),
     popupCompact: $('popup-compact').checked,
     popupPinOnClick: $('popup-pin-click').checked,
+    popupTheme: $('popup-theme').value,
+    popupAutoAudio: $('popup-auto-audio').checked,
+    offlineCache: $('offline-cache').checked,
+    furigana: $('furigana').checked,
+    allFrames: $('all-frames').checked,
+    recordMaxMinutes: Number($('rec-max').value) || 60,
+    recordAutoCrop: $('rec-autocrop').checked,
+    recordTranscribe: $('rec-transcribe').checked,
     saveDestination: dest ? dest.value : 'both',
     confirmBeforeCard: $('confirm-card').checked,
     folderLabel: $('folder-label').value.trim() || 'Extension',
@@ -173,6 +181,14 @@ function fillForm(s) {
   $('popup-font').value = String(s.popupFontSize);
   $('popup-compact').checked = !!s.popupCompact;
   $('popup-pin-click').checked = s.popupPinOnClick !== false;
+  $('popup-theme').value = s.popupTheme || 'auto';
+  $('popup-auto-audio').checked = !!s.popupAutoAudio;
+  $('offline-cache').checked = s.offlineCache !== false;
+  $('furigana').checked = s.furigana === true;
+  $('all-frames').checked = s.allFrames === true;
+  $('rec-max').value = String(s.recordMaxMinutes || 60);
+  $('rec-autocrop').checked = s.recordAutoCrop !== false;
+  $('rec-transcribe').checked = s.recordTranscribe !== false;
   document.querySelectorAll('input[name="dest"]').forEach((r) => {
     r.checked = r.value === s.saveDestination;
   });
@@ -323,7 +339,17 @@ async function testConnection(silent) {
   const state = $('conn-state');
   const f = readForm();
   try {
-    const res = await fetch(`http://127.0.0.1:${f.port}/v1/health`);
+    // An authenticated route, so "Test" checks the pairing and not only that
+    // something answers on the port (/v1/health needs no token).
+    const res = await fetch(`http://127.0.0.1:${f.port}/v1/mine-info`, {
+      headers: f.token ? { Authorization: `Bearer ${f.token}` } : {},
+    });
+    if (res.status === 401 || res.status === 403) {
+      state.textContent = t('opt_connTokenRejected');
+      state.className = 'conn-state err';
+      if (!silent) showStatus(t('opt_connTokenRejected'), 'err');
+      return false;
+    }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     state.textContent = t('opt_connReachable');
     state.className = 'conn-state ok';
@@ -477,4 +503,21 @@ void (async () => {
   );
   void renderShortcuts();
   void testConnection(true);
+  if (initial === 'mic') void grantMicrophone();
 })();
+
+/**
+ * Microphone recordings run in the offscreen document, which cannot show a
+ * permission prompt. The first one sends the user here (options.html#mic):
+ * this page asks once, for the extension origin, and the recorder can then
+ * open the mic without asking again.
+ */
+async function grantMicrophone() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    for (const track of stream.getTracks()) track.stop();
+    showStatus(t('opt_micGranted'), 'ok');
+  } catch {
+    showStatus(t('opt_micDenied'), 'err');
+  }
+}

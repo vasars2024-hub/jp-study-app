@@ -36,7 +36,7 @@ export function blobToBase64(blob: Blob): Promise<string> {
       const value = typeof reader.result === 'string' ? reader.result : '';
       resolve(value.split(',', 2)[1] ?? '');
     };
-    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+    reader.onerror = () => reject(new Error(translateUi('studyLoop.mine.error.readFailed')));
     reader.readAsDataURL(blob);
   });
 }

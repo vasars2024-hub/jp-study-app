@@ -35,8 +35,8 @@
  *    progress bar only where it is present; everywhere else it states the timestamp, which is
  *    a fact. Inventing a denominator to fill the bar is the 1×1-GIF shape in miniature.
  *
- * 4. **"Finished" needs a duration to be knowable.** With one, a file inside
- *    {@link CONTINUE_WATCHING_FINISHED_TAIL_SEC} of its end is done and is dropped — offering
+ * 4. **"Finished" needs a duration to be knowable.** With one, a file the app-wide rule
+ *    (`isWatchFinished`, `./watchFinished`) calls finished is done and is dropped — offering
  *    to "continue" the credits is worse than an empty list. Without one, no claim is made and
  *    the row stays. That is not a gap: `StudyPlayerSlice` already clears its resume entry near
  *    EOF, so VideoCore-sourced rows are unfinished by construction.
@@ -56,6 +56,7 @@ import type { MediaItem } from './types';
 import { studyLibraryPathKey } from './seanimeStudyLibrary';
 import { seanimeWatchLoopByEntry, type WatchLoopCard } from './seanimeWatchLoop';
 import type { VideoCoreResumePosition } from './videoCoreStudy';
+import { isWatchFinished } from './watchFinished';
 
 /**
  * Seconds of run-up when resuming.
@@ -72,9 +73,6 @@ export const CONTINUE_WATCHING_REWIND_SEC = 5;
  * player writes a position for anything it opens, including a file glanced at and closed.
  */
 export const CONTINUE_WATCHING_MIN_POSITION_SEC = 10;
-
-/** Within this of a measured end, the file is finished rather than in progress. */
-export const CONTINUE_WATCHING_FINISHED_TAIL_SEC = 30;
 
 /** Which store supplied the position. Reported so a surface can explain a disagreement. */
 export type ContinueWatchingSource = 'videocore' | 'library';
@@ -254,10 +252,7 @@ export function seanimeContinueWatching(
       && item.durationSec > 0
       ? item.durationSec
       : undefined;
-    if (
-      durationSec != null
-      && candidate.positionSec >= durationSec - CONTINUE_WATCHING_FINISHED_TAIL_SEC
-    ) continue;
+    if (isWatchFinished(candidate.positionSec, durationSec)) continue;
 
     // The resume key is lower-cased by construction, so prefer any path that was actually
     // recorded. Display quality only — all three open the same file on Windows.

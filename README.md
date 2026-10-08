@@ -55,17 +55,39 @@ reproduces it. Read those two before relying on something.
 
 ## Install
 
-1. Download **`jp-study-app-win32-x64-<version>.zip`** from the
+### Installer (recommended)
+
+1. Download **`Gum-<version> Setup.exe`** from the
    [latest release](https://github.com/vasars2024-hub/jp-study-app/releases/latest).
+2. Run it. It installs for your Windows user only (no administrator prompt) into
+   `%LOCALAPPDATA%\jp_study_app`, adds **Gum** to the Start menu and the desktop,
+   and starts it.
+3. Gum then updates itself: a new release downloads in the background and Gum
+   offers **Restart to update**.
+
+The installer also adds **Open with Gum** for `.epub`, `.cbz`, `.apkg`, `.srt`,
+`.ass`, `.mkv` and `.mp4` files. It never makes itself the default app for a
+type; pick it under **Open with** if you want that. An opened file goes where a
+file dropped on the window would: books and manga to the Library, `.apkg` to
+Anki import, subtitles onto their video, a video to the media library and the
+player. Uninstall from **Settings → Apps → Installed apps → Gum**; that removes
+the shortcuts and the file-type entries, and leaves your data under
+`%APPDATA%\jp-study-app` in place.
+
+### Portable zip
+
+1. Download **`jp-study-app-win32-x64-<version>.zip`** from the same release.
 2. Extract it anywhere, for example to `C:\Apps`.
 3. Run `jp-study-app.exe` inside the extracted `jp-study-app-win32-x64` folder.
-   There is no installer, and nothing is written outside the folder except your
-   own data under `%APPDATA%`.
+   Nothing is written outside the folder except your own data under `%APPDATA%`.
+   The zip does not update itself; Gum tells you when a newer release exists.
 
-Windows SmartScreen may warn that the app is unrecognised, because the build is
-not code-signed. Choose **More info → Run anyway**.
+Both use the same data folder, so you can switch between them.
 
-The Japanese tokenizer, OCR engine and Chinese dictionary ship inside the zip.
+Windows SmartScreen may warn that the app is unrecognised, because the builds
+are not code-signed yet. Choose **More info → Run anyway**.
+
+The Japanese tokenizer, OCR engine and Chinese dictionary ship inside the app.
 The Japanese–English dictionary, pitch accent, example sentences and the larger
 OCR, speech and AI models are downloaded from inside the app under
 **Settings → Storage**, so you only fetch what you use. Downloads resume if
@@ -98,10 +120,49 @@ runtime file is missing and names the feature it would break.
 | `npm test` | Run the test suite (Vitest). |
 | `npm run lint` | Lint the TypeScript sources. |
 | `npm run package:win` | Build a Windows package into `out/`. |
+| `npm run package:installer` | Also build the installer into `out/make/squirrel.windows/x64/`. |
 | `node tools/i18n-check.cjs` | List interface strings missing a translation. |
 
 Development mode uses noticeably more memory than a packaged build. On a machine
 with 8 GB of RAM, close other heavy apps first.
+
+### Publishing a release
+
+`npm run package:installer` (or `node tools/package-app.cjs --installer --zip`
+for both) packages, prunes and then writes three files to
+`out/make/squirrel.windows/x64/`: `Gum-<version> Setup.exe`, `RELEASES` and
+`jp_study_app-<version>-full.nupkg`. It needs about three times the packaged
+app's size free on the drive, because Squirrel copies the app to `%TEMP%` and
+compresses it twice. Bump `version` in `package.json` first; an installed copy
+only updates to a higher version.
+
+Upload **all three** files, plus the zip, to the GitHub release, and mark it as
+the latest release. Installed copies look for
+`https://github.com/vasars2024-hub/jp-study-app/releases/latest/download/RELEASES`
+and download the `.nupkg` it names from the same release, so a release without
+`RELEASES` and the `.nupkg` cannot update anyone (they still get the "new
+release" notice that links to the page).
+
+### Code signing
+
+Unsigned builds trigger SmartScreen and some antivirus heuristics. Signing needs
+an Authenticode code-signing certificate (OV or EV) bought from a certificate
+authority; none is included. With a `.pfx` file, set two environment variables
+before building, and the build signs the app exe (through `@electron/windows-sign`)
+and `Setup.exe`/`Update.exe` (through Squirrel):
+
+```powershell
+$env:GUM_WIN_CERT_FILE = 'C:\path\to\certificate.pfx'
+$env:GUM_WIN_CERT_PASSWORD = '...'
+npm run package:installer
+```
+
+Nothing is signed when `GUM_WIN_CERT_FILE` is unset. For a hardware token or a
+cloud-hosted EV certificate, replace the `signing` object in `forge.config.ts`
+with Squirrel's `signWithParams` (raw `signtool.exe` arguments, for example
+`/a /n "Your Name" /fd sha256 /tr http://timestamp.digicert.com /td sha256`) and
+a matching `windowsSign` entry in `packagerConfig`. Check a signed build with
+`Get-AuthenticodeSignature '<path>\Gum-<version> Setup.exe'`.
 
 ## Browser extension
 

@@ -62,6 +62,9 @@
   let toastEl = null;
   let extensionDead = false;
 
+  /** True once the page shows text in a language Gum studies (see detectStudyPage). */
+  let studyPage = false;
+  let heavyStarted = false;
   let lastLevelBadge = '';
   let levelScanTimer = null;
   let levelScanInFlight = false;
@@ -73,8 +76,6 @@
   let storageChangeListener = null;
   let runtimeMessageListener = null;
 
-  let mediaRecorder = null;
-  let recordChunks = [];
   let recording = false;
   let audioClipboardDataUrl = '';
   let audioClipboardMime = 'audio/webm';
@@ -116,6 +117,12 @@
         ocrSelectEl.remove();
         ocrSelectEl = null;
       }
+      if (aiPanel) {
+        closeAiPanel();
+        aiPanel.remove();
+        aiPanel = null;
+      }
+      clearLookupMarks();
       document.documentElement.classList.remove('jp-study-hl-mode');
       for (const t of THEMES) {
         if (t) document.documentElement.classList.remove(`jp-study-theme-${t}`);
@@ -336,39 +343,81 @@
     return null;
   }
 
+  /** Characters of block text kept on each side of the hovered node. */
+  const BLOCK_CONTEXT_BEFORE = 600;
+  const BLOCK_CONTEXT_AFTER = 400;
+  const SKIP_TEXT_IN = 'script, style, noscript, template, textarea, rt, rp';
+
+  /**
+   * The hovered node inside an <rt> is the reading, not the text: map it to the
+   * start of the ruby's base so 漢字 is looked up, not かんじ.
+   */
+  function rubyBaseFor(node) {
+    const rt = node && node.parentElement ? node.parentElement.closest('rt, rp') : null;
+    if (!rt) return null;
+    const ruby = rt.closest('ruby');
+    if (!ruby) return null;
+    const walker = document.createTreeWalker(ruby, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const n = walker.currentNode;
+      if (n.parentElement && n.parentElement.closest('rt, rp')) continue;
+      if ((n.nodeValue || '').trim()) return { node: n, offset: 0 };
+    }
+    return null;
+  }
+
+  /**
+   * The text around a hovered node, as one string plus a node map.
+   *
+   * Capped on both sides (a hover on a 50 000-character page used to walk the
+   * whole block it sat in, scripts and styles included) and never reading
+   * <script>/<style>/<rt>.
+   */
   function blockTextAndOffset(node, offset) {
-    const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    const ruby = node && node.nodeType === Node.TEXT_NODE ? rubyBaseFor(node) : null;
+    if (ruby) {
+      node = ruby.node;
+      offset = ruby.offset;
+    }
+    const isText = node.nodeType === Node.TEXT_NODE;
+    const el = isText ? node.parentElement : node;
     const block =
       el?.closest('p, li, td, th, h1, h2, h3, h4, h5, h6, article, section, blockquote, pre, div') ||
       el ||
       document.body;
-    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-      acceptNode(n) {
-        // Skip furigana readings so ruby text doesn't corrupt sentences.
-        const p = n.parentElement;
-        if (p && p.closest('rt, rp')) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    });
+    const accept = (n) => {
+      const p = n.parentElement;
+      return p && p.closest(SKIP_TEXT_IN) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    };
+    const before = [];
+    const after = [];
+    if (isText) {
+      const back = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, { acceptNode: accept });
+      back.currentNode = node;
+      let len = 0;
+      while (len < BLOCK_CONTEXT_BEFORE && back.previousNode()) {
+        before.unshift(back.currentNode);
+        len += (back.currentNode.nodeValue || '').length;
+      }
+      const fwd = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, { acceptNode: accept });
+      fwd.currentNode = node;
+      len = 0;
+      while (len < BLOCK_CONTEXT_AFTER && fwd.nextNode()) {
+        after.push(fwd.currentNode);
+        len += (fwd.currentNode.nodeValue || '').length;
+      }
+    }
+    const list = isText ? [...before, node, ...after] : [];
     let text = '';
     let abs = 0;
-    let found = false;
     const nodes = [];
-    while (walker.nextNode()) {
-      const n = walker.currentNode;
+    for (const n of list) {
       nodes.push({ node: n, start: text.length });
-      if (!found && n === node) {
-        abs = text.length + offset;
-        found = true;
-      }
+      if (n === node) abs = text.length + offset;
       text += n.nodeValue || '';
-    }
-    if (!found && node.nodeType === Node.TEXT_NODE) {
-      abs = Math.min(offset, text.length);
     }
     return { block, text, offset: abs, nodes };
   }
-
   function isCjkChar(ch) {
     return /[぀-ヿㇰ-ㇿ㐀-鿿ｦ-ﾟ々〆ヶ]/.test(ch || '');
   }
@@ -420,22 +469,29 @@
     return { start: 0, end: text.length };
   }
 
-  /* ------------------------- range highlight (mark) ------------------------- */
+  /* ------------------------ range highlight (no DOM) ------------------------ */
 
+  const LOOKUP_HIGHLIGHT = 'gum-lookup';
+
+  /**
+   * The looked-up word is marked with the CSS Custom Highlight API: the page's
+   * DOM is never touched. Wrapping it in <mark> and calling normalize() after
+   * split and merged the page's own text nodes, which broke React/Vue pages and
+   * any script holding a reference to them.
+   */
   function clearLookupMarks() {
-    document.querySelectorAll('mark.jp-lookup-active').forEach((mark) => {
-      const parent = mark.parentNode;
-      if (!parent) return;
-      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-      parent.removeChild(mark);
-      parent.normalize();
-    });
+    try {
+      if (globalThis.CSS && CSS.highlights) CSS.highlights.delete(LOOKUP_HIGHLIGHT);
+    } catch {
+      /* ignore */
+    }
   }
 
   /** Highlight [start,end) of a block's concatenated text using its node map. */
   function markBlockRange(blockInfo, start, end) {
     clearLookupMarks();
     if (!blockInfo || !Array.isArray(blockInfo.nodes)) return;
+    if (!(globalThis.CSS && CSS.highlights && typeof Highlight === 'function')) return;
     try {
       let startNode = null;
       let startOff = 0;
@@ -456,75 +512,77 @@
       const range = document.createRange();
       range.setStart(startNode, startOff);
       range.setEnd(endNode, endOff);
-      const mark = document.createElement('mark');
-      mark.className = 'jp-lookup-active';
-      range.surroundContents(mark);
+      CSS.highlights.set(LOOKUP_HIGHLIGHT, new Highlight(range));
     } catch {
-      /* complex ranges (across elements) — skip the highlight */
+      /* a range the engine refuses — skip the highlight */
     }
   }
 
   /* ------------------------------ lookup cache ------------------------------ */
 
-  const lookupCache = new Map(); // query → response
-  const LOOKUP_CACHE_MAX = 120;
+  const lookupCache = new Map(); // `${lang}:${text}` → response
+  const LOOKUP_CACHE_MAX = 200;
+
+  function cacheGet(key) {
+    if (!lookupCache.has(key)) return undefined;
+    const hit = lookupCache.get(key);
+    lookupCache.delete(key);
+    lookupCache.set(key, hit); // LRU bump
+    return hit;
+  }
+
+  function cachePut(key, value) {
+    lookupCache.set(key, value);
+    while (lookupCache.size > LOOKUP_CACHE_MAX) lookupCache.delete(lookupCache.keys().next().value);
+  }
 
   async function cachedLookup(query) {
     // The page's language (kana → ja, Cyrillic → ru, Han → the page hint) so the
     // app answers from that language's dictionary, not Japanese by default. The
     // cache is per language: the same Han word is a different entry in each.
     const lang = lookupLangFor(query);
-    const key = `${lang}:${query}`;
-    if (lookupCache.has(key)) {
-      const hit = lookupCache.get(key);
-      lookupCache.delete(key);
-      lookupCache.set(key, hit); // LRU bump
-      return hit;
-    }
+    const key = `L${lang}:${query}`;
+    const hit = cacheGet(key);
+    if (hit) return hit;
     const res = await safeRuntimeSend({ type: 'lookup', query, lang });
     if (res?.invalidated) return res;
     // Cache only definitive answers (hits and true misses) — never offline
     // errors, so results recover as soon as the app starts.
-    if (res && res.ok) {
-      lookupCache.set(key, res);
-      while (lookupCache.size > LOOKUP_CACHE_MAX) {
-        lookupCache.delete(lookupCache.keys().next().value);
-      }
-    }
+    if (res && res.ok) cachePut(key, res);
     return res;
   }
 
+  /** Lookup provenance that counts as the word itself. */
+  function isRealMatch(entry) {
+    return !entry || !entry.via || entry.via === 'exact' || entry.via === 'deinflected' || entry.via === 'reading';
+  }
+
   /**
-   * Longest-prefix dictionary match. The bridge de-inflects but does not trim,
-   * so try progressively shorter prefixes of the scan window.
+   * Longest dictionary match at the start of the scan window — ONE request.
+   *
+   * The app looks every prefix up in one batched read (`/v1/scan`). This used
+   * to try at most ten prefixes, one round trip each, longest first, so on a
+   * 12-character window a one- or two-character word (私, 猫) was never tried.
    * Returns { matched, entries, deinflection, offline } — matched '' on miss.
    */
   async function prefixLookup(windowText, script) {
     const full = String(windowText || '').trim();
     if (!full) return { matched: '', entries: [] };
-    if (script !== 'cjk') {
-      const res = await cachedLookup(full);
-      if (res?.invalidated) return { matched: '', entries: [], invalidated: true };
-      if (res?.ok && res.entries?.length) {
-        return { matched: full, entries: res.entries, deinflection: res.deinflection };
-      }
-      return { matched: '', entries: [], offline: !!res?.offline, error: res?.error };
-    }
-    const maxAttempts = 10;
-    let attempts = 0;
-    for (let len = Math.min(full.length, cfg.scanLength); len >= 1 && attempts < maxAttempts; len--) {
-      attempts++;
-      const q = full.slice(0, len);
-      const res = await cachedLookup(q);
-      if (res?.invalidated) return { matched: '', entries: [], invalidated: true };
-      if (res?.offline) return { matched: '', entries: [], offline: true, error: res?.error };
-      if (res?.ok && res.entries?.length) {
-        return { matched: matchedSurface(q, res), entries: res.entries, deinflection: res.deinflection };
-      }
-    }
-    return { matched: '', entries: [] };
+    const text = script === 'cjk' ? [...full].slice(0, Math.max(4, cfg.scanLength)).join('') : full;
+    const lang = lookupLangFor(text);
+    const key = `S${lang}:${text}`;
+    const hit = cacheGet(key);
+    if (hit) return hit;
+    const res = await safeRuntimeSend({ type: 'scan', text, lang });
+    if (res?.invalidated) return { matched: '', entries: [], invalidated: true };
+    if (!res || !res.ok) return { matched: '', entries: [], offline: !!res?.offline, error: res?.error };
+    const entries = (res.entries || []).filter(isRealMatch);
+    const out = entries.length
+      ? { matched: matchedSurface(res.matched || text, { ...res, entries }), entries, deinflection: res.deinflection, offline: !!res.fromCache }
+      : { matched: '', entries: [] };
+    if (!res.fromCache) cachePut(key, out);
+    return out;
   }
-
   /**
    * How much of `q` the app's answer actually covers. The app segments a
    * window itself (the Chinese dictionary answers 学习中文 with 学习), so a
@@ -565,6 +623,26 @@
     popup.style.setProperty('--rp-width', `${cfg.popupWidth}px`);
     popup.style.setProperty('--rp-font', `${cfg.popupFontSize}px`);
     popup.classList.toggle('compact', !!cfg.popupCompact);
+    popup.dataset.theme = popupThemeFor();
+  }
+
+  /** light | dark: the setting, else the page's own background, else the OS. */
+  function popupThemeFor() {
+    if (cfg.popupTheme === 'light' || cfg.popupTheme === 'dark') return cfg.popupTheme;
+    try {
+      for (const el of [document.body, document.documentElement]) {
+        if (!el) continue;
+        const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(getComputedStyle(el).backgroundColor || '');
+        if (m && (m[4] === undefined || Number(m[4]) > 0.5)) {
+          const lum = (0.2126 * Number(m[1]) + 0.7152 * Number(m[2]) + 0.0722 * Number(m[3])) / 255;
+          return lum > 0.55 ? 'light' : 'dark';
+        }
+      }
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+    } catch {
+      /* fall through */
+    }
+    return 'dark';
   }
 
   function esc(s) {
@@ -575,8 +653,32 @@
       .replace(/"/g, '&quot;');
   }
 
+  /**
+   * The popup lives in a CLOSED shadow root on a bare host element, so page CSS
+   * cannot restyle it and its CSS (popup-css.js) cannot leak into the page.
+   * The host carries the popup's id, so `closest('#jp-study-popup')` on a
+   * retargeted page-level event still recognises the popup as own UI.
+   */
+  let popupHost = null;
+  let popupShadow = null;
+
+  /** True when `target` (possibly a retargeted event target) is inside the popup. */
+  function isInPopup(target) {
+    if (!popup || !target) return false;
+    return target === popupHost || popup.contains(target);
+  }
+
   function ensurePopup() {
     if (popup) return popup;
+    popupHost = document.createElement('div');
+    popupHost.id = 'jp-study-popup';
+    popupHost.setAttribute('data-gum-host', 'popup');
+    popupHost.style.cssText =
+      'all: initial; position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 2147483646; overflow: visible;';
+    popupShadow = popupHost.attachShadow({ mode: 'closed' });
+    const style = document.createElement('style');
+    style.textContent = typeof GUM_POPUP_CSS === 'string' ? GUM_POPUP_CSS : '';
+    popupShadow.appendChild(style);
     popup = document.createElement('div');
     popup.id = 'jp-study-popup';
     popup.setAttribute('role', 'dialog');
@@ -638,7 +740,8 @@
     });
     popup.addEventListener('click', onPopupClick);
     popup.addEventListener('keydown', onPopupKeyDown);
-    document.documentElement.appendChild(popup);
+    popupShadow.appendChild(popup);
+    document.documentElement.appendChild(popupHost);
     applyPopupSizing();
     return popup;
   }
@@ -679,19 +782,23 @@
     if (popup) popup.classList.toggle('pinned', popupPinned);
   }
 
-  function positionPopup(el, x, y) {
+  /**
+   * Anchor the popup to the word (below it, left-aligned), flipping above when
+   * it would clip — like Yomitan/10ten — rather than to wherever the cursor was.
+   */
+  function positionPopup(el, x, y, anchor) {
     const pad = 8;
     const w = Math.min(cfg.popupWidth, window.innerWidth - pad * 2);
     const maxH = Math.min(Math.floor(window.innerHeight * 0.72), 560);
     el.style.maxHeight = `${maxH}px`;
     el.style.width = `${w}px`;
-    let left = x + 10;
-    if (left + w + pad > window.innerWidth) left = Math.max(pad, x - w - 10);
+    const a = anchor || { left: x, right: x, top: y - 8, bottom: y + 8 };
+    let left = a.left;
+    if (left + w + pad > window.innerWidth) left = Math.max(pad, a.right - w);
     left = Math.min(Math.max(pad, left), window.innerWidth - w - pad);
-    // Prefer below the cursor; flip above when it would clip.
     const estH = Math.min(maxH, el.offsetHeight || 320);
-    let top = y + 18;
-    if (top + estH + pad > window.innerHeight) top = Math.max(pad, y - estH - 12);
+    let top = a.bottom + 6;
+    if (top + estH + pad > window.innerHeight) top = Math.max(pad, a.top - estH - 6);
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
   }
@@ -766,8 +873,97 @@
 
   /* ----- Meaning tab ----- */
 
+  /* ----- dictionary HTML: defense in depth ----- */
+
+  const SAFE_TAGS = new Set([
+    'B', 'I', 'EM', 'STRONG', 'U', 'S', 'SUB', 'SUP', 'SMALL', 'SPAN', 'DIV', 'P', 'BR', 'UL', 'OL', 'LI',
+    'RUBY', 'RT', 'RP', 'RB', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'DETAILS', 'SUMMARY', 'HR',
+  ]);
+  const DROP_WITH_CONTENT = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH', 'TEMPLATE', 'NOSCRIPT', 'TEXTAREA', 'TITLE', 'LINK', 'META', 'FORM']);
+  const SAFE_STYLE = /^(font-weight|font-style|text-decoration(-line)?|vertical-align|display|padding(-(top|right|bottom|left))?|margin(-(top|right|bottom|left))?|border(-(top|right|bottom|left))?|font-size|color)$/;
+
+  /**
+   * Dictionary markup from the app, re-checked before it touches the page.
+   *
+   * The app sanitizes glossaries and pitch markup (src/shared/dictHtmlSanitize.ts),
+   * but an older app — or a dictionary row stored before that fix — must not be
+   * able to run script in every page the popup opens on. Parsed inertly
+   * (DOMParser never runs scripts or loads images), then rebuilt from an
+   * allowlist: no on* attributes, no href/src, no url() in styles.
+   */
+  function sanitizeDictHtml(html) {
+    const raw = String(html || '');
+    if (!raw) return '';
+    let doc;
+    try {
+      doc = new DOMParser().parseFromString(`<body>${raw}</body>`, 'text/html');
+    } catch {
+      return esc(raw);
+    }
+    const out = document.createElement('div');
+    const copy = (from, to, depth) => {
+      if (depth > 32) return;
+      for (const node of from.childNodes) {
+        if (node.nodeType === 3) {
+          to.appendChild(document.createTextNode(node.nodeValue || ''));
+          continue;
+        }
+        if (node.nodeType !== 1) continue;
+        const tag = node.tagName.toUpperCase();
+        if (DROP_WITH_CONTENT.has(tag)) continue;
+        if (!SAFE_TAGS.has(tag)) {
+          copy(node, to, depth + 1); // unknown wrapper: keep its text, drop the tag
+          continue;
+        }
+        const el = document.createElement(tag.toLowerCase());
+        const cls = (node.getAttribute('class') || '').split(/\s+/).filter((c) => /^[A-Za-z0-9_-]{1,40}$/.test(c));
+        if (cls.length) el.setAttribute('class', cls.join(' '));
+        const lang = node.getAttribute('lang');
+        if (lang && /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(lang)) el.setAttribute('lang', lang);
+        const title = node.getAttribute('title');
+        if (title) el.setAttribute('title', title.slice(0, 200));
+        const style = node.getAttribute('style');
+        if (style) {
+          const kept = style
+            .split(';')
+            .map((d) => d.trim())
+            .filter((d) => {
+              const m = /^([a-z-]+)\s*:\s*(.+)$/i.exec(d);
+              return m && SAFE_STYLE.test(m[1].toLowerCase()) && !/url\(|expression|javascript:|[<>\\@]/i.test(m[2]);
+            });
+          if (kept.length) el.setAttribute('style', kept.join(';'));
+        }
+        copy(node, el, depth + 1);
+        to.appendChild(el);
+      }
+    };
+    copy(doc.body, out, 0);
+    return out.innerHTML;
+  }
+
+  /* ----- Meaning tab ----- */
+
+  /** Duplicate check results for the popup's headwords: term → in deck. */
+  const inDeck = new Map();
+
+  async function checkInDeck(hit) {
+    const terms = [...new Set((hit.entries || []).slice(0, 5).map((e) => e.word || e.term).filter(Boolean))].filter(
+      (t) => !inDeck.has(t),
+    );
+    if (!terms.length) return;
+    const res = await safeRuntimeSend({ type: 'mine-check', terms });
+    if (!res || !res.ok || !res.duplicates) return;
+    for (const t of terms) inDeck.set(t, !!res.duplicates[t]);
+    if (currentHit === hit && popupTab === 'meaning' && popup) {
+      popup.querySelectorAll('.rp-entry[data-word]').forEach((el) => {
+        el.classList.toggle('in-deck', !!inDeck.get(el.getAttribute('data-word')));
+      });
+    }
+  }
+
   function renderMeaningTab(body) {
     const hit = currentHit;
+    focusedEntry = 0;
     if (!hit.entries || !hit.entries.length) {
       const offlineNote = hit.lookupOffline
         ? uiMsg('content_rpDictOffline')
@@ -778,12 +974,15 @@
     body.innerHTML = '';
     hit.entries.slice(0, 5).forEach((entry, idx) => {
       const block = document.createElement('div');
-      block.className = 'rp-entry' + (idx === 0 ? ' first' : '');
+      block.className = 'rp-entry' + (idx === 0 ? ' first focused' : '');
       const word = entry.word || entry.term || hit.term;
       const reading = entry.reading || '';
+      block.setAttribute('data-word', word);
+      block.setAttribute('data-idx', String(idx));
+      if (inDeck.get(word)) block.classList.add('in-deck');
       let sensesHtml = '';
       if (entry.glossaryHtml) {
-        sensesHtml = `<div class="rp-gloss-html">${entry.glossaryHtml}</div>`;
+        sensesHtml = `<div class="rp-gloss-html">${sanitizeDictHtml(entry.glossaryHtml)}</div>`;
       } else if (Array.isArray(entry.senses) && entry.senses.length) {
         sensesHtml =
           '<ol class="rp-senses">' +
@@ -805,17 +1004,32 @@
       } else {
         sensesHtml = `<div class="rp-empty">${uiHtml('content_rpNoGloss')}</div>`;
       }
-      const pitch = entry.pitchHtml
-        ? `<div class="rp-pitch"><span class="rp-pitch-label">${uiHtml('content_rpPitch')}</span> ${entry.pitchHtml}</div>`
+      const pitchSafe = entry.pitchHtml ? sanitizeDictHtml(entry.pitchHtml) : '';
+      const drop = pitchSafe ? pitchDownstep(pitchSafe) : null;
+      const pitch = pitchSafe
+        ? `<span class="rp-pitch" title="${uiHtml('content_rpPitch')}">${pitchSafe}${drop != null ? `<span class="rp-pitch-num">[${drop}]</span>` : ''}</span>`
         : '';
+      const jlpt = Array.isArray(entry.jlpt) ? entry.jlpt[0] : entry.jlpt;
+      const badges = [
+        entry.isCommon ? `<span class="rp-badge common">${uiHtml('content_rpCommon')}</span>` : '',
+        jlpt ? `<span class="rp-badge jlpt" title="${uiHtml('content_rpJlptTitle')}">${esc(jlpt)}</span>` : '',
+        entry.frequency != null && entry.frequency !== ''
+          ? `<span class="rp-badge freq" title="${uiHtml('content_rpFreqTitle')}">#${esc(entry.frequency)}</span>`
+          : '',
+      ].join('');
       block.innerHTML = `
         <div class="rp-entry-head">
           <span class="rp-entry-word" lang="${studyLangAttr(word)}">${esc(word)}</span>
           ${reading && reading !== word ? `<span class="rp-entry-reading" lang="${studyLangAttr(word)}">${esc(reading)}</span>` : ''}
-          ${entry.source ? `<span class="rp-entry-src" title="${uiHtml('content_rpDictSource')}">${esc(entry.source)}</span>` : ''}
+          ${pitch}
+          <span class="rp-entry-badges">${badges}</span>
+          <span class="rp-entry-tools">
+            <button type="button" class="rp-mini rp-entry-audio" data-act="entry-audio" data-idx="${idx}" title="${uiHtml('content_rpPronounce')}" aria-label="${uiHtml('content_rpPronounce')}">&#9654;</button>
+            <button type="button" class="rp-mini rp-entry-add" data-act="entry-save" data-idx="${idx}" title="${uiHtml('content_rpSaveEntry')}" aria-label="${uiHtml('content_rpSaveEntry')}">+</button>
+          </span>
         </div>
-        ${idx === 0 ? pitch : ''}
         ${sensesHtml}
+        ${entry.source ? `<div class="rp-entry-src" title="${uiHtml('content_rpDictSource')}">${esc(entry.source)}</div>` : ''}
       `;
       body.appendChild(block);
     });
@@ -825,8 +1039,65 @@
       more.textContent = tn('content_rpMoreEntries', hit.entries.length - 5);
       body.appendChild(more);
     }
+    void checkInDeck(hit);
   }
 
+  /**
+   * The accent nucleus as the usual number ([0] heiban, [1] atamadaka, …) from
+   * the app's pitch markup, where each mora is a span and a high mora carries a
+   * top border. Null when the markup is not that shape.
+   */
+  function pitchDownstep(html) {
+    const box = document.createElement('div');
+    box.innerHTML = html;
+    const morae = [...box.querySelectorAll('span')].filter((s) => !s.querySelector('span'));
+    if (morae.length < 1) return null;
+    const high = morae.map((s) => /border-top/i.test(s.getAttribute('style') || ''));
+    if (!high.some(Boolean)) return null;
+    if (high[0]) return 1; // atamadaka: high first mora, low after
+    for (let i = 1; i < high.length; i++) if (high[i - 1] && !high[i]) return i;
+    return 0; // rises and stays high (heiban, or odaka without the particle)
+  }
+
+  /* ----- word audio ----- */
+
+  let audioCtx = null;
+  const audioCache = new Map();
+
+  /**
+   * Native audio for an entry (the app's JapanesePod101 cache). Played through
+   * WebAudio from bytes, so a page's media-src CSP cannot block it; falls back
+   * to the browser's speech voice when the app has no clip.
+   */
+  async function playEntryAudio(entry, fallbackText) {
+    const term = entry ? entry.word || entry.term || '' : '';
+    const reading = entry ? entry.reading || '' : '';
+    const key = `${term}|${reading}`;
+    let clip = audioCache.get(key);
+    if (!clip && term) {
+      const res = await safeRuntimeSend({ type: 'word-audio', term, reading, lang: lookupLangFor(term) });
+      if (res && res.ok && res.dataBase64) {
+        clip = res.dataBase64;
+        audioCache.set(key, clip);
+        while (audioCache.size > 40) audioCache.delete(audioCache.keys().next().value);
+      }
+    }
+    if (clip) {
+      try {
+        audioCtx = audioCtx || new AudioContext();
+        const bytes = Uint8Array.from(atob(clip), (ch) => ch.charCodeAt(0));
+        const buf = await audioCtx.decodeAudioData(bytes.buffer);
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start();
+        return;
+      } catch {
+        /* fall back to speech */
+      }
+    }
+    speak(reading || term || fallbackText);
+  }
   /* ----- Grammar tab ----- */
 
   async function renderGrammarTab(body) {
@@ -1021,7 +1292,12 @@
       const res = await cachedLookup(ch);
       if (token !== lookupToken || popupTab !== 'kanji') return;
       if (res?.invalidated) return;
-      results.push({ ch, entry: res?.ok && res.entries && res.entries[0] ? res.entries[0] : null, offline: !!res?.offline });
+      results.push({
+        ch,
+        entry: res?.ok && res.entries && res.entries[0] ? res.entries[0] : null,
+        info: res?.ok && res.character ? res.character : null,
+        offline: !!res?.offline,
+      });
     }
     if (results.every((r) => r.offline)) {
       body.innerHTML = `<div class="rp-empty">${uiHtml('content_rpKanjiOffline')}</div>`;
@@ -1029,25 +1305,40 @@
     }
     body.innerHTML = results
       .map((r) => {
-        const meanings = r.entry
-          ? (r.entry.meanings || []).slice(0, 4).join('; ') ||
-            (r.entry.senses || [])
-              .flatMap((s) => s.definitions || [])
-              .slice(0, 4)
-              .join('; ')
-          : '';
+        const info = r.info;
+        // The app's character data (KANJIDIC): on'yomi in katakana, kun'yomi in hiragana.
+        const readings = info && Array.isArray(info.readings) ? info.readings : [];
+        const on = readings.filter((x) => /[ァ-ヿ]/.test(x)).slice(0, 4);
+        const kun = readings.filter((x) => /[ぁ-ゟ]/.test(x)).slice(0, 4);
+        const meanings =
+          (info && Array.isArray(info.meanings) && info.meanings.slice(0, 4).join('; ')) ||
+          (r.entry
+            ? (r.entry.meanings || []).slice(0, 4).join('; ') ||
+              (r.entry.senses || [])
+                .flatMap((s) => s.definitions || [])
+                .slice(0, 4)
+                .join('; ')
+            : '');
+        const meta = [
+          info && info.strokes ? uiMsg('content_rpStrokes', String(info.strokes)) : '',
+          info && info.jlpt ? String(info.jlpt) : '',
+          info && Array.isArray(info.components) && info.components.length ? uiMsg('content_rpParts', info.components.slice(0, 6).join(' ')) : '',
+        ].filter(Boolean);
+        const lang = studyLangAttr(hit.term);
         return `
         <div class="rp-kanji">
-          <button type="button" class="rp-kanji-char" data-act="lookup-nested" data-term="${esc(r.ch)}" lang="${studyLangAttr(hit.term)}" title="${uiHtml('content_rpLookUpChar', r.ch)}">${esc(r.ch)}</button>
+          <button type="button" class="rp-kanji-char" data-act="lookup-nested" data-term="${esc(r.ch)}" lang="${lang}" title="${uiHtml('content_rpLookUpChar', r.ch)}">${esc(r.ch)}</button>
           <div class="rp-kanji-meta">
-            ${r.entry && r.entry.reading ? `<div class="rp-kanji-reading" lang="${studyLangAttr(hit.term)}">${esc(r.entry.reading)}</div>` : ''}
+            ${on.length ? `<div class="rp-kanji-reading" lang="${lang}">${esc(on.join('、'))}</div>` : ''}
+            ${kun.length ? `<div class="rp-kanji-reading" lang="${lang}">${esc(kun.join('、'))}</div>` : ''}
+            ${!on.length && !kun.length && r.entry && r.entry.reading ? `<div class="rp-kanji-reading" lang="${lang}">${esc(r.entry.reading)}</div>` : ''}
             <div class="rp-kanji-meanings">${esc(meanings || uiMsg('content_rpNoKanjiEntry'))}</div>
+            ${meta.length ? `<div class="rp-dim">${esc(meta.join(' · '))}</div>` : ''}
           </div>
         </div>`;
       })
       .join('');
   }
-
   /* ----- Examples tab ----- */
 
   async function renderExamplesTab(body) {
@@ -1093,7 +1384,7 @@
     const sources = [...new Set((hit.entries || []).map((e) => e.source).filter(Boolean))];
     const rows = [];
     if (first && first.pitchHtml) {
-      rows.push(`<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpPitchAccent')}</span><span class="rp-more-v">${first.pitchHtml}</span></div>`);
+      rows.push(`<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpPitchAccent')}</span><span class="rp-more-v">${sanitizeDictHtml(first.pitchHtml)}</span></div>`);
     }
     if (hit.deinflection && hit.deinflection.term) {
       const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
@@ -1150,8 +1441,23 @@
         updatePinButton();
         return;
       case 'tts':
-        speak(hit.term);
+        void playEntryAudio(hit.entries && hit.entries[focusedEntry || 0], hit.term);
         return;
+      case 'entry-audio': {
+        const entry = hit.entries && hit.entries[Number(btn.getAttribute('data-idx')) || 0];
+        void playEntryAudio(entry, hit.term);
+        return;
+      }
+      case 'entry-save': {
+        const idx = Number(btn.getAttribute('data-idx')) || 0;
+        const entry = hit.entries && hit.entries[idx];
+        const word = (entry && (entry.word || entry.term)) || hit.deinflection?.term || hit.term;
+        void doSave(word, 'word', false, mineContextFor(hit, idx)).then(() => {
+          inDeck.set(word, true);
+          btn.closest('.rp-entry')?.classList.add('in-deck');
+        });
+        return;
+      }
       case 'wk': {
         const level = Number(btn.getAttribute('data-level'));
         if ([0, 1, 2, 3].includes(level)) void setKnownLevel(hit.deinflection?.term || hit.term, level);
@@ -1163,10 +1469,10 @@
         return;
       }
       case 'save-word':
-        void doSave(hit.deinflection?.term || hit.term, 'word', false);
+        void doSave(hit.deinflection?.term || hit.term, 'word', false, mineContextFor(hit, focusedEntry || 0));
         return;
       case 'save-sentence':
-        void doSave(hit.sentence?.text || hit.term, 'sentence', false);
+        void doSave(hit.sentence?.text || hit.term, 'sentence', false, { lemma: hit.deinflection?.term || hit.term });
         return;
       case 'create-card':
         openCardPreview();
@@ -1185,12 +1491,12 @@
         return;
       case 'open-app':
         void safeRuntimeSend({ type: 'ui-open', target: 'inbox' }).then((res) => {
-          if (!res?.ok) toast(res?.error || uiMsg('common_gumNotRunning'), 'err');
+          if (!res?.ok) toast(appErrorText(res, 'common_gumNotRunning'), 'err');
         });
         return;
       case 'open-grammar':
         void safeRuntimeSend({ type: 'ui-open', target: 'grammar' }).then((res) => {
-          if (!res?.ok) toast(res?.error || uiMsg('common_gumNotRunning'), 'err');
+          if (!res?.ok) toast(appErrorText(res, 'common_gumNotRunning'), 'err');
         });
         return;
       case 'retry-grammar':
@@ -1245,8 +1551,11 @@
     }
   }
 
-  function onPopupKeyDown(e) {
+  function onPopupKeyDown(e, opts = {}) {
     if (!popup || !popup.classList.contains('open')) return;
+    // Held as the hover key, Shift is part of the gesture, not a modifier.
+    const shift = opts.viaHoverKey && cfg.hoverKey === 'shift' ? false : e.shiftKey;
+    if (e.ctrlKey || e.metaKey || (e.altKey && cfg.hoverKey !== 'alt')) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -1263,13 +1572,18 @@
       return;
     }
     const k = e.key.toLowerCase();
-    if (k === 's' && !e.shiftKey) {
+    if (k === 'j' || k === 'k' || (!opts.viaHoverKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp'))) {
+      e.preventDefault();
+      moveEntryFocus(k === 'j' || e.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+    if (k === 's' && !shift) {
       e.preventDefault();
       handlePopupAction('save-word', popup);
-    } else if (k === 's' && e.shiftKey) {
+    } else if ((k === 's' && shift) || k === 'w') {
       e.preventDefault();
       handlePopupAction('save-sentence', popup);
-    } else if (k === 'c' && !e.ctrlKey && !e.metaKey) {
+    } else if (k === 'c') {
       e.preventDefault();
       handlePopupAction('create-card', popup);
     } else if (k === 'p') {
@@ -1282,6 +1596,18 @@
       e.preventDefault();
       popHitHistory();
     }
+  }
+
+  /** j/k (and the arrows inside the popup) move between dictionary entries. */
+  let focusedEntry = 0;
+  function moveEntryFocus(delta) {
+    const body = popup && popup.querySelector('.rp-body');
+    const entries = body ? [...body.querySelectorAll('.rp-entry')] : [];
+    if (!entries.length) return;
+    focusedEntry = Math.max(0, Math.min(entries.length - 1, focusedEntry + delta));
+    entries.forEach((el, i) => el.classList.toggle('focused', i === focusedEntry));
+    const target = entries[focusedEntry];
+    if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'nearest' });
   }
 
   /** The study language a looked-up string is in: its script, else the page's hint. */
@@ -1344,21 +1670,60 @@
     }
   }
 
+  /** A failed reply's message in the UI language (app error codes → _locales), else `fallbackKey`. */
+  function appErrorText(res, fallbackKey) {
+    const code = typeof S.serverErrorCode === 'function' ? S.serverErrorCode(res, res && res.error) : '';
+    if (code && S.SERVER_ERROR_KEYS && S.SERVER_ERROR_KEYS[code]) return uiMsg(S.SERVER_ERROR_KEYS[code]);
+    return (res && res.error) || uiMsg(fallbackKey);
+  }
+
   async function setKnownLevel(term, level) {
     const t = String(term || '').trim();
     if (!t) return;
     const res = await safeRuntimeSend({ type: 'known-level', term: t, level });
     if (res?.invalidated) return;
     if (!res?.ok) {
-      toast(res?.error || uiMsg('content_knownFailed'), 'err');
+      toast(appErrorText(res, 'content_knownFailed'), 'err');
       return;
     }
     if (currentHit) currentHit.knownLevel = level;
+    knownCache.set(t, level);
+    if (learningOn) scheduleTint();
     refreshKnownButtons(level);
     toast(uiMsg('content_knownSet', [uiMsg(WK_LABELS[level]), t.slice(0, 24)]), 'ok');
   }
 
-  async function doSave(text, mode, forceAnki) {
+  /**
+   * What a card needs beyond the word: the sentence it was read in, the entry
+   * the user chose (reading + gloss), the dictionary form and the surface form.
+   * Save word used to send the bare selection, so Anki got an empty back.
+   */
+  function mineContextFor(hit, entryIndex) {
+    if (!hit) return {};
+    const entry = (hit.entries || [])[entryIndex] || (hit.entries || [])[0] || null;
+    const gloss = entry
+      ? (Array.isArray(entry.senses) && entry.senses.length
+          ? entry.senses
+              .slice(0, 3)
+              .map((s) => (Array.isArray(s.definitions) ? s.definitions.join('; ') : ''))
+              .filter(Boolean)
+              .join(' / ')
+          : Array.isArray(entry.meanings)
+            ? entry.meanings.slice(0, 4).join('; ')
+            : '')
+      : '';
+    const sentence = hit.sentence && hit.sentence.text && hit.sentence.text !== hit.term ? hit.sentence.text : '';
+    return {
+      ...(sentence ? { sentence: sentence.slice(0, 200) } : {}),
+      ...(entry && entry.reading && entry.reading !== (entry.word || '') ? { reading: entry.reading } : {}),
+      ...(gloss ? { meaning: gloss.slice(0, 1000) } : {}),
+      lemma: (entry && entry.word) || hit.deinflection?.term || hit.term,
+      surface: hit.term,
+      entryIndex: Math.max(0, entryIndex | 0),
+    };
+  }
+
+  async function doSave(text, mode, forceAnki, context) {
     const t = String(text || '').trim();
     if (!t) {
       toast(uiMsg('content_nothingToSave'), 'err');
@@ -1367,7 +1732,8 @@
     const working = saveWorkingLabel(forceAnki);
     toast(working, 'pending');
     setFabBusy(working);
-    const res = await safeRuntimeSend({ type: 'save-text', text: t, mode, forceAnki, lang: lookupLangFor(t) });
+    const extra = context && typeof context === 'object' ? context : {};
+    const res = await safeRuntimeSend({ type: 'save-text', text: t, mode, forceAnki, lang: lookupLangFor(t), ...extra });
     setFabBusy('');
     if (res?.invalidated) return;
     toast(formatSaveToast(res), res?.ok || res?.queued ? 'ok' : 'err');
@@ -1483,7 +1849,9 @@
     if (hitInfo.blockText) {
       const b = detectSentenceBounds(hitInfo.blockText, hitInfo.start);
       sentence = {
-        text: hitInfo.blockText.slice(b.start, b.end).trim(),
+        // Capped like sentenceAt (and the desktop app): a page with no
+        // punctuation for a thousand characters is not a sentence.
+        text: hitInfo.blockText.slice(b.start, b.end).trim().slice(0, 200),
         start: b.start,
         end: b.end,
       };
@@ -1497,11 +1865,12 @@
     tabLoaded.examples = false;
     renderPopupHeader();
     el.classList.add('open');
-    positionPopup(el, hitInfo.x, hitInfo.y);
+    positionPopup(el, hitInfo.x, hitInfo.y, hitInfo.anchorRect);
     setActiveTab(hitInfo.mode === 'sentence' ? 'sentence' : 'meaning');
     // Re-position after content renders (height changes).
-    requestAnimationFrame(() => positionPopup(el, hitInfo.x, hitInfo.y));
+    requestAnimationFrame(() => positionPopup(el, hitInfo.x, hitInfo.y, hitInfo.anchorRect));
     void loadKnownLevel();
+    if (cfg.popupAutoAudio && hitInfo.entries && hitInfo.entries.length) void playEntryAudio(hitInfo.entries[0], hitInfo.term);
   }
 
   /** Look up arbitrary text (selection, context menu, command) and show the popup. */
@@ -1560,7 +1929,12 @@
   let hoverTimer = null;
   let lastHoverPoint = { x: 0, y: 0 };
   let lastShownKey = '';
-  let hoverScanBusy = false;
+  /** Sequence of hover scans; only the newest may render (latest pointer wins). */
+  let hoverSeq = 0;
+  /** Milliseconds from the last scan's start to its popup — read by the test harness. */
+  let lastHoverLatencyMs = 0;
+  const OWN_UI_SELECTOR =
+    '#jp-study-popup, #jp-study-fab, #jp-study-wheel, #jp-study-toast, #jp-study-ocr-overlay, #jp-study-ocr-select, #jp-study-more-menu, #jp-study-card-preview, #jp-study-ai';
 
   function hoverKeyMatches(e) {
     if (cfg.hoverKey === 'shift') return e.key === 'Shift';
@@ -1610,15 +1984,20 @@
       handleWheelKey(e);
       return;
     }
-    // Route popup shortcuts globally while the popup is open, but never
-    // interfere with typing on the page or inside the popup's own inputs.
+    // Popup shortcuts reach the popup from the page ONLY while the hover key is
+    // held. They used to fire whenever the popup was open, so S, C, P, A,
+    // Backspace and the arrows stopped working on the page itself (a site's own
+    // shortcuts, a video player's seek keys). Focus inside the popup is handled
+    // by the popup's own listener.
     if (
       popup &&
       popup.classList.contains('open') &&
-      !popup.contains(e.target) &&
+      !isInPopup(e.target) &&
+      hoverKeyDown &&
+      !hoverKeyMatches(e) &&
       !(e.target && e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]'))
     ) {
-      onPopupKeyDown(e);
+      onPopupKeyDown(e, { viaHoverKey: true });
       if (e.defaultPrevented) return;
     }
     if (hoverKeyMatches(e) && !hoverKeyDown) {
@@ -1655,7 +2034,7 @@
       markExtensionDead();
       return;
     }
-    if (e.target && e.target.closest && e.target.closest('#jp-study-popup, #jp-study-fab, #jp-study-wheel, #jp-study-toast, #jp-study-ocr-overlay, #jp-study-ocr-select, #jp-study-more-menu, #jp-study-card-preview')) {
+    if (e.target && e.target.closest && e.target.closest(OWN_UI_SELECTOR)) {
       return;
     }
     scheduleHoverScan(cfg.hoverDelayMs);
@@ -1669,50 +2048,135 @@
     }, Math.max(0, delay));
   }
 
-  async function runHoverScan() {
-    if (!cfg.hoverLookup || !hoverKeyDown || hoverScanBusy) return;
+  /**
+   * Scan under the pointer and open the popup.
+   *
+   * Latest pointer wins: every scan takes a sequence number and only the newest
+   * one may render. The old busy flag DROPPED any hover that arrived while a
+   * lookup was in flight, so moving quickly across a sentence left the popup on
+   * a word the pointer had already left.
+   *
+   * `opts.force` is the key+click path: it works with hover lookup switched off
+   * and with the key released, and re-opens a word already shown.
+   */
+  async function runHoverScan(opts = {}) {
+    const force = !!opts.force;
+    if (!force && (!cfg.hoverLookup || !hoverKeyDown)) return;
     if (ocrSelectActive || wheelActive) return;
-    const { x, y } = lastHoverPoint;
-    const caret = caretFromPoint(x, y);
-    if (!caret || !caret.node || caret.node.nodeType !== Node.TEXT_NODE) return;
-    const parent = caret.node.parentElement;
-    if (parent && parent.closest('#jp-study-popup, #jp-study-fab, #jp-study-wheel, #jp-study-toast, #jp-study-ocr-overlay, #jp-study-more-menu, #jp-study-card-preview')) return;
-    if (!cfg.lookupInEditable && parent && parent.closest('input, textarea, [contenteditable="true"], [contenteditable=""]')) return;
-    const blockInfo = blockTextAndOffset(caret.node, caret.offset);
-    if (!blockInfo.text.trim()) return;
+    const { x, y } = opts.point || lastHoverPoint;
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    let caret = caretFromPoint(x, y);
+    let blockInfo = null;
+    if (caret && caret.node && caret.node.nodeType === Node.TEXT_NODE) {
+      const parent = caret.node.parentElement;
+      if (parent && parent.closest(OWN_UI_SELECTOR)) return;
+      if (!cfg.lookupInEditable && parent && parent.closest('input, textarea, [contenteditable="true"], [contenteditable=""]')) return;
+      blockInfo = blockTextAndOffset(caret.node, caret.offset);
+    } else if (cfg.lookupInEditable) {
+      blockInfo = formControlTextAt(x, y);
+    }
+    if (!blockInfo || !blockInfo.text.trim()) return;
     const win = scanWindowAt(blockInfo.text, blockInfo.offset);
     if (!win) return;
     const key = `${blockInfo.text.length}:${win.start}:${win.text}`;
-    if (key === lastShownKey && popup && popup.classList.contains('open')) return;
-    hoverScanBusy = true;
+    if (!force && key === lastShownKey && popup && popup.classList.contains('open')) return;
+    const seq = ++hoverSeq;
+    const token = ++lookupToken;
+    const found = await prefixLookup(win.text, win.script);
+    // A newer pointer position (or any newer lookup) owns the popup now.
+    if (seq !== hoverSeq || token !== lookupToken || found.invalidated) return;
+    if (!force && !hoverKeyDown && cfg.closeOnRelease) return;
+    if (!found.matched && !found.offline) return; // no dictionary hit — don't flicker a popup
+    const matched = found.matched || win.text;
+    const end = win.start + matched.length;
+    lastShownKey = key;
+    if (blockInfo.nodes) markBlockRange(blockInfo, win.start, end);
+    openPopupForHit({
+      term: matched,
+      mode: 'word',
+      x,
+      y,
+      anchorRect: rangeRectFor(blockInfo, win.start, end),
+      entries: found.entries || [],
+      deinflection: found.deinflection,
+      lookupOffline: !!found.offline,
+      block: blockInfo.block,
+      blockText: blockInfo.text,
+      start: win.start,
+      end,
+    });
+    const ms = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+    lastHoverLatencyMs = ms;
+  }
+
+  /** The viewport rect of [start,end) in a block, for anchoring the popup to the word. */
+  function rangeRectFor(blockInfo, start, end) {
     try {
-      const token = ++lookupToken;
-      const found = await prefixLookup(win.text, win.script);
-      if (token !== lookupToken || found.invalidated) return;
-      if (!hoverKeyDown && cfg.closeOnRelease) return;
-      if (!found.matched && !found.offline) return; // no dictionary hit — don't flicker a popup
-      const matched = found.matched || win.text;
-      const end = win.start + matched.length;
-      lastShownKey = key;
-      markBlockRange(blockInfo, win.start, end);
-      openPopupForHit({
-        term: matched,
-        mode: 'word',
-        x,
-        y,
-        entries: found.entries || [],
-        deinflection: found.deinflection,
-        lookupOffline: !!found.offline,
-        block: blockInfo.block,
-        blockText: blockInfo.text,
-        start: win.start,
-        end,
-      });
-    } finally {
-      hoverScanBusy = false;
+      if (!blockInfo || !Array.isArray(blockInfo.nodes)) return null;
+      const s = blockInfo.nodes.find((it) => start >= it.start && start < it.start + (it.node.nodeValue || '').length);
+      const e = blockInfo.nodes.find((it) => end > it.start && end <= it.start + (it.node.nodeValue || '').length);
+      if (!s || !e) return null;
+      const range = document.createRange();
+      range.setStart(s.node, start - s.start);
+      range.setEnd(e.node, end - e.start);
+      if (typeof range.getBoundingClientRect !== 'function') return null;
+      const r = range.getBoundingClientRect();
+      return r && (r.width || r.height) ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom } : null;
+    } catch {
+      return null;
     }
   }
 
+  /**
+   * Text under the pointer inside an <input>/<textarea> (caretRangeFromPoint
+   * does not see into form controls): a mirror element with the control's
+   * typography finds the character offset. Used only with lookup in fields on.
+   */
+  function formControlTextAt(x, y) {
+    const el = document.elementFromPoint ? document.elementFromPoint(x, y) : null;
+    if (!el || !(el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|)$/i.test(el.type || '')))) return null;
+    const value = String(el.value || '');
+    if (!value.trim()) return null;
+    const cs = getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    const mirror = document.createElement('div');
+    for (const prop of ['font', 'letterSpacing', 'padding', 'border', 'boxSizing', 'lineHeight', 'whiteSpace', 'wordBreak', 'textIndent']) {
+      mirror.style[prop] = cs[prop];
+    }
+    if (el.tagName === 'INPUT') mirror.style.whiteSpace = 'pre';
+    else mirror.style.whiteSpace = 'pre-wrap';
+    Object.assign(mirror.style, {
+      position: 'fixed',
+      left: `${rect.left}px`,
+      top: `${rect.top - el.scrollTop}px`,
+      width: `${rect.width}px`,
+      visibility: 'hidden',
+      pointerEvents: 'none',
+      overflow: 'hidden',
+    });
+    mirror.textContent = value;
+    document.documentElement.appendChild(mirror);
+    let offset = -1;
+    try {
+      const range = document.createRange();
+      const textNode = mirror.firstChild;
+      for (let i = 0; textNode && i < value.length; i++) {
+        range.setStart(textNode, i);
+        range.setEnd(textNode, i + 1);
+        const r = range.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+          offset = i;
+          break;
+        }
+      }
+    } catch {
+      offset = -1;
+    } finally {
+      mirror.remove();
+    }
+    if (offset < 0) return null;
+    return { block: el, text: value, offset, nodes: null };
+  }
   /* --------------------------- click / selection --------------------------- */
 
   let downX = 0;
@@ -1763,7 +2227,12 @@
     e.stopPropagation();
     lastHoverPoint = { x: e.clientX, y: e.clientY };
     if (cfg.popupPinOnClick) popupPinned = true;
-    void runHoverScan().then(() => updatePinButton());
+    // The forced path: works with hover lookup off and the key already released.
+    if (hoverTimer) {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
+    void runHoverScan({ force: true, point: { x: e.clientX, y: e.clientY } }).then(() => updatePinButton());
   }
 
   function onMouseUp(e) {
@@ -1874,7 +2343,11 @@
       return { text: sel, mode: S.classifyMineSelection ? S.classifyMineSelection(sel) : 'word' };
     }
     if (currentHit && popup && popup.classList.contains('open')) {
-      return { text: currentHit.term, mode: currentHit.mode || 'word' };
+      return {
+        text: currentHit.deinflection?.term || currentHit.term,
+        mode: currentHit.mode || 'word',
+        context: { ...mineContextFor(currentHit, focusedEntry || 0), lang: lookupLangFor(currentHit.term) },
+      };
     }
     if (lastSavedSelection) {
       return {
@@ -2430,9 +2903,9 @@
         } else if (id === 'media.download') {
           toast(res?.ok ? uiMsg('content_downloadQueued') : res?.error || uiMsg('content_downloadFailed'), res?.ok ? 'ok' : 'err');
         } else if (id === 'tabs.picker') {
-          if (!res?.ok) toast(res?.error || uiMsg('common_readingListFailed'), 'err');
+          if (!res?.ok) toast(appErrorText(res, 'common_readingListFailed'), 'err');
         } else if (id === 'app.open') {
-          if (!res?.ok) toast(res?.error || uiMsg('common_gumNotRunning'), 'err');
+          if (!res?.ok) toast(appErrorText(res, 'common_gumNotRunning'), 'err');
         } else {
           toast(res?.ok || res?.queued ? uiMsg('content_done') : res?.error || uiMsg('content_failed'), res?.ok || res?.queued ? 'ok' : 'err');
         }
@@ -2505,14 +2978,242 @@
     updateFab();
   }
 
+  /*
+   * Word status (WP8). Only visible text is annotated: an IntersectionObserver
+   * watches the elements that hold study text, and when one is on screen its
+   * text nodes go to the app's tokenizer (/v1/annotate, through the service
+   * worker, which falls back to the cached known-word snapshot offline). Each
+   * word is coloured by its lemma's known level with the CSS Custom Highlight
+   * API (gum-wk-0 new, gum-wk-1 learning, gum-wk-2 familiar; known words stay
+   * plain), so the page's DOM is not touched. Furigana (cfg.furigana, opt-in)
+   * is the one mode that does mutate the page: <ruby data-gum-ruby> over new and
+   * learning words. Scrolling (via the observer) and page mutations re-run it,
+   * throttled. This replaced the old whole-run tint, which looked up every
+   * kanji/kana run as if it were one word.
+   */
+  const WK_HIGHLIGHTS = ['gum-wk-0', 'gum-wk-1', 'gum-wk-2', 'gum-wk-3'];
+  const WS_TEXT_RE = /[぀-ヿ㐀-鿿Ѐ-ӿ]/;
+  const WS_BATCH = 48;
+  const WS_MAX_OBSERVED = 4000;
+  const WS_THROTTLE_MS = 250;
+  const WS_SKIP = `script,style,noscript,textarea,input,select,rt,rp,ruby[data-gum-ruby],[contenteditable="true"],${OWN_UI_SELECTOR}`;
+  let tintTimer = null;
+  let tintObserver = null;
+  let wsIo = null;
+  let wsDiscoverTimer = null;
+  let wsInflight = false;
+  let wsObservedCount = 0;
+  let wsObserved = new WeakSet();
+  let wsNodeTokens = new WeakMap();
+  const wsVisible = new Set();
+  /** Levels the reader set in this page (popup buttons), by term — they win over the app's answer. */
+  const knownCache = new Map();
+
+  function wsHasIo() {
+    return typeof window.IntersectionObserver === 'function';
+  }
+
+  function removeRubies() {
+    const rubies = document.querySelectorAll('ruby[data-gum-ruby]');
+    if (!rubies.length) return;
+    const parents = new Set();
+    for (const ruby of rubies) {
+      let base = '';
+      for (const child of ruby.childNodes) if (child.nodeType === 3) base += child.nodeValue;
+      const parent = ruby.parentNode;
+      if (!parent) continue;
+      parent.replaceChild(document.createTextNode(base), ruby);
+      parents.add(parent);
+    }
+    for (const p of parents) {
+      try {
+        p.normalize();
+      } catch {
+        /* ignore */
+      }
+    }
+    if (tintObserver) tintObserver.takeRecords();
+  }
+
   function clearLearningHighlights() {
-    document.querySelectorAll('span[data-jp-wk]').forEach((el) => {
-      const parent = el.parentNode;
-      if (!parent) return;
-      while (el.firstChild) parent.insertBefore(el.firstChild, el);
-      parent.removeChild(el);
-      parent.normalize();
+    try {
+      if (globalThis.CSS && CSS.highlights) for (const name of WK_HIGHLIGHTS) CSS.highlights.delete(name);
+    } catch {
+      /* ignore */
+    }
+    if (tintObserver) {
+      tintObserver.disconnect();
+      tintObserver = null;
+    }
+    if (wsIo) {
+      wsIo.disconnect();
+      wsIo = null;
+    }
+    clearTimeout(tintTimer);
+    clearTimeout(wsDiscoverTimer);
+    tintTimer = null;
+    wsDiscoverTimer = null;
+    wsVisible.clear();
+    wsObserved = new WeakSet();
+    wsNodeTokens = new WeakMap();
+    wsObservedCount = 0;
+    removeRubies();
+  }
+
+  function scheduleTint() {
+    if (!learningOn || tintTimer) return;
+    tintTimer = setTimeout(() => {
+      tintTimer = null;
+      void paintLearningHighlights();
+    }, WS_THROTTLE_MS);
+  }
+
+  function scheduleDiscover() {
+    if (!learningOn || wsDiscoverTimer) return;
+    wsDiscoverTimer = setTimeout(() => {
+      wsDiscoverTimer = null;
+      wsDiscover();
+      scheduleTint();
+    }, WS_THROTTLE_MS * 2);
+  }
+
+  /** Watch every element that directly holds study text (capped). */
+  function wsDiscover() {
+    if (!document.body) return;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node.nodeValue || !WS_TEXT_RE.test(node.nodeValue)) return NodeFilter.FILTER_REJECT;
+        const p = node.parentElement;
+        if (!p || p.closest(WS_SKIP)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
     });
+    while (walker.nextNode() && wsObservedCount < WS_MAX_OBSERVED) {
+      const el = walker.currentNode.parentElement;
+      if (wsObserved.has(el)) continue;
+      wsObserved.add(el);
+      wsObservedCount += 1;
+      if (wsIo) wsIo.observe(el);
+      else wsVisible.add(el);
+    }
+  }
+
+  function wsTextNodesOf(el) {
+    const out = [];
+    for (const child of el.childNodes) {
+      if (child.nodeType === 3 && child.nodeValue && WS_TEXT_RE.test(child.nodeValue)) out.push(child);
+    }
+    return out;
+  }
+
+  function wsLevelOf(tok) {
+    if (knownCache.has(tok.l)) return knownCache.get(tok.l);
+    return typeof tok.k === 'number' ? tok.k : -1;
+  }
+
+  /** Split `node` around each ruby token; the pieces keep their tokens (no re-annotation). */
+  function wsInjectRuby(node, tokens, rubyToks) {
+    let remaining = tokens.slice();
+    for (const t of rubyToks.slice().sort((a, b) => b.o - a.o)) {
+      const text = node.nodeValue || '';
+      if (t.o + t.n > text.length || !node.parentNode) continue;
+      const word = node.splitText(t.o);
+      const rest = word.splitText(t.n);
+      const cut = t.o + t.n;
+      const restToks = remaining.filter((x) => x.o >= cut).map((x) => ({ ...x, o: x.o - cut }));
+      remaining = remaining.filter((x) => x.o + x.n <= t.o);
+      wsNodeTokens.set(rest, { text: rest.nodeValue, tokens: restToks });
+      const ruby = document.createElement('ruby');
+      ruby.setAttribute('data-gum-ruby', '');
+      word.parentNode.insertBefore(ruby, word);
+      ruby.appendChild(word);
+      const rt = document.createElement('rt');
+      rt.textContent = t.r;
+      ruby.appendChild(rt);
+      wsNodeTokens.set(word, { text: word.nodeValue, tokens: [{ ...t, o: 0, ruby: true }] });
+    }
+    wsNodeTokens.set(node, { text: node.nodeValue, tokens: remaining });
+  }
+
+  async function wsAnnotatePending(nodes) {
+    const stale = nodes.filter((n) => {
+      const got = wsNodeTokens.get(n);
+      return !got || got.text !== n.nodeValue;
+    });
+    for (let i = 0; i < stale.length && learningOn; i += WS_BATCH) {
+      const batch = stale.slice(i, i + WS_BATCH);
+      const texts = batch.map((n) => String(n.nodeValue || '').slice(0, 2000));
+      const res = await safeRuntimeSend({ type: 'annotate', texts, lang: lookupLangFor(texts.join('').slice(0, 200)) });
+      if (!res || res.invalidated || !res.ok || !Array.isArray(res.results)) return false;
+      batch.forEach((n, j) => {
+        const tokens = Array.isArray(res.results[j]) ? res.results[j] : [];
+        wsNodeTokens.set(n, { text: texts[j], tokens });
+      });
+    }
+    return true;
+  }
+
+  async function paintLearningHighlights() {
+    if (!learningOn || !isExtensionAlive()) return;
+    if (wsInflight) {
+      scheduleTint();
+      return;
+    }
+    wsInflight = true;
+    try {
+      const nodes = [];
+      for (const el of wsVisible) {
+        if (!el.isConnected) {
+          wsVisible.delete(el);
+          continue;
+        }
+        nodes.push(...wsTextNodesOf(el));
+      }
+      await wsAnnotatePending(nodes);
+      if (!learningOn) return;
+      // Furigana first (it splits text nodes), then colour what is there.
+      if (cfg.furigana) {
+        for (const node of nodes) {
+          const got = wsNodeTokens.get(node);
+          if (!got || got.text !== node.nodeValue || !node.parentNode) continue;
+          if (node.parentElement && node.parentElement.closest('ruby')) continue;
+          const rubyToks = got.tokens.filter((t) => t.r && wsLevelOf(t) >= 0 && wsLevelOf(t) <= 1);
+          if (rubyToks.length) wsInjectRuby(node, got.tokens, rubyToks);
+        }
+        if (tintObserver) tintObserver.takeRecords();
+      } else if (document.querySelector('ruby[data-gum-ruby]')) {
+        // Furigana was switched off: put the page's text back, then re-annotate it.
+        removeRubies();
+        scheduleTint();
+      }
+      if (!(globalThis.CSS && CSS.highlights && typeof Highlight === 'function')) return;
+      const groups = WK_HIGHLIGHTS.map(() => []);
+      const paintNode = (node) => {
+        const got = wsNodeTokens.get(node);
+        if (!got || got.text !== node.nodeValue) return;
+        for (const t of got.tokens) {
+          const level = wsLevelOf(t);
+          if (level < 0 || level > 2) continue;
+          try {
+            const range = document.createRange();
+            range.setStart(node, t.o);
+            range.setEnd(node, t.o + t.n);
+            groups[level].push(range);
+          } catch {
+            /* the node changed under us */
+          }
+        }
+      };
+      for (const el of wsVisible) {
+        for (const node of wsTextNodesOf(el)) paintNode(node);
+        for (const ruby of el.querySelectorAll ? el.querySelectorAll('ruby[data-gum-ruby]') : []) {
+          for (const child of ruby.childNodes) if (child.nodeType === 3) paintNode(child);
+        }
+      }
+      WK_HIGHLIGHTS.forEach((name, i) => CSS.highlights.set(name, new Highlight(...groups[i])));
+    } finally {
+      wsInflight = false;
+    }
   }
 
   async function applyLearningHighlights() {
@@ -2521,61 +3222,33 @@
       return;
     }
     clearLearningHighlights();
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-      acceptNode(node) {
-        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-        const p = node.parentElement;
-        if (!p || p.closest('script,style,noscript,#jp-study-fab,#jp-study-popup,#jp-study-ocr-overlay,#jp-study-wheel,#jp-study-more-menu,#jp-study-card-preview')) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    });
-    const nodes = [];
-    const texts = [];
-    while (walker.nextNode() && nodes.length < 100) {
-      const t = walker.currentNode.nodeValue || '';
-      if (/[぀-ヿ㐀-鿿]{2,}/.test(t)) {
-        nodes.push(walker.currentNode);
-        const parts = t.match(/[぀-ヿ㐀-鿿]{2,}/g) || [];
-        texts.push(...parts.slice(0, 15));
-      }
+    if (wsHasIo()) {
+      wsIo = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) wsVisible.add(e.target);
+            else wsVisible.delete(e.target);
+          }
+          scheduleTint();
+        },
+        { rootMargin: '200px 0px' },
+      );
     }
-    const unique = [...new Set(texts)].slice(0, 250);
-    if (!unique.length) return;
-    const res = await safeRuntimeSend({ type: 'known-levels', terms: unique });
-    if (res?.invalidated) return;
-    const levels = (res && res.levels) || {};
-    for (const node of nodes) {
-      if (!node.parentNode) continue;
-      const raw = node.nodeValue || '';
-      const frag = document.createDocumentFragment();
-      let last = 0;
-      const re = /[぀-ヿ㐀-鿿]{2,}/g;
-      let m;
-      while ((m = re.exec(raw))) {
-        if (m.index > last) frag.appendChild(document.createTextNode(raw.slice(last, m.index)));
-        const term = m[0];
-        const level = levels[term];
-        if (typeof level === 'number' && level >= 0 && level <= 3) {
-          const span = document.createElement('span');
-          span.className = `jp-wk-${level}`;
-          span.dataset.jpWk = String(level);
-          span.textContent = term;
-          frag.appendChild(span);
-        } else {
-          frag.appendChild(document.createTextNode(term));
-        }
-        last = m.index + term.length;
-      }
-      if (last < raw.length) frag.appendChild(document.createTextNode(raw.slice(last)));
-      node.parentNode.replaceChild(frag, node);
+    try {
+      tintObserver = new MutationObserver(scheduleDiscover);
+      if (document.body) tintObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+    } catch {
+      /* ignore */
     }
+    wsDiscover();
+    if (!wsHasIo()) await paintLearningHighlights();
   }
-
   /* --------------------------- page panel (FAB) ----------------------------- */
 
   function isFabHiddenHere() {
+    // The panel, the level scan and its observer only run on pages that have
+    // text in a language Gum studies; every other site pays nothing.
+    if (!studyPage) return true;
     if (!cfg.fabVisible) return true;
     return (cfg.fabHiddenOrigins || []).includes(location.origin);
   }
@@ -2734,7 +3407,7 @@
         if (
           !p ||
           p.closest(
-            'script,style,noscript,textarea,input,#jp-study-fab,#jp-study-popup,#jp-study-ocr-overlay,#jp-study-toast,#jp-study-wheel,#jp-study-more-menu,#jp-study-card-preview',
+            'script,style,noscript,textarea,input,#jp-study-fab,#jp-study-popup,#jp-study-ocr-overlay,#jp-study-toast,#jp-study-wheel,#jp-study-more-menu,#jp-study-card-preview,#jp-study-ai',
           )
         ) {
           return NodeFilter.FILTER_REJECT;
@@ -2879,7 +3552,11 @@
     }
     const secs = immersionSeconds;
     immersionSeconds = 0;
-    const chars = samplePageText(8000).length;
+    // Reading time is logged only for pages in Japanese, and counts Japanese
+    // characters — not every site visited for a minute, not menus in English.
+    const sample = samplePageText(8000);
+    if (!pageHasJapanese(sample)) return;
+    const chars = (sample.match(/[぀-ヿ㐀-鿿々〆ヶ]/g) || []).length;
     void safeRuntimeSend({
       type: 'immersion-visit',
       url: location.href,
@@ -2910,60 +3587,40 @@
 
   /* ------------------------------ audio record ------------------------------ */
 
+  /*
+   * The clip is recorded by the extension's offscreen document (background
+   * handleMicClip), not here: a getUserMedia in the content script made every
+   * site ask for the microphone in its own name. The finished clip comes back
+   * as a data URL and is attached to the next saved card, as before.
+   */
   async function toggleRecording() {
-    if (recording && mediaRecorder) {
-      mediaRecorder.stop();
+    if (recording) {
+      recording = false;
+      const res = await safeRuntimeSend({ type: 'mic-clip', action: 'stop' });
+      if (!res || res.invalidated) return;
+      if (!res.ok) {
+        toast(appErrorText(res, 'content_recordingUnreadable'), 'err');
+        return;
+      }
+      if (res.empty || !res.dataUrl) {
+        toast(uiMsg('content_recordingEmpty'), 'err');
+        return;
+      }
+      audioClipboardDataUrl = String(res.dataUrl);
+      audioClipboardMime = String(res.mimeType || 'audio/webm');
+      toast(uiMsg('content_recordingReady'), 'ok');
       return;
     }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast(uiMsg('content_micUnavailable'), 'err');
+    // A new recording replaces the last clip; Save never sends a stale one.
+    audioClipboardDataUrl = '';
+    const res = await safeRuntimeSend({ type: 'mic-clip', action: 'start' });
+    if (!res || res.invalidated) return;
+    if (!res.ok) {
+      toast(appErrorText(res, 'content_micUnavailable'), 'err');
       return;
     }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      recordChunks = [];
-      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      audioClipboardMime = mime.split(';')[0] || 'audio/webm';
-      mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
-      mediaRecorder.ondataavailable = (ev) => {
-        if (ev.data && ev.data.size) recordChunks.push(ev.data);
-      };
-      mediaRecorder.onstop = () => {
-        recording = false;
-        stream.getTracks().forEach((t) => t.stop());
-        mediaRecorder = null;
-        const blob = new Blob(recordChunks, { type: audioClipboardMime });
-        recordChunks = [];
-        if (!blob.size) {
-          toast(uiMsg('content_recordingEmpty'), 'err');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          audioClipboardDataUrl = String(reader.result || '');
-          toast(uiMsg('content_recordingReady'), 'ok');
-        };
-        reader.onerror = () => toast(uiMsg('content_recordingUnreadable'), 'err');
-        reader.readAsDataURL(blob);
-      };
-      mediaRecorder.start();
-      recording = true;
-      toast(uiMsg('content_recording'), 'ok');
-    } catch (err) {
-      // Chromium's DOMException messages are English ("Permission denied");
-      // the two a user can act on are named in the UI language.
-      const name = err && err.name;
-      toast(
-        name === 'NotAllowedError' || name === 'SecurityError'
-          ? uiMsg('content_micDenied')
-          : name === 'NotFoundError' || name === 'NotReadableError'
-            ? uiMsg('content_micUnavailable')
-            : String((err && err.message) || err || uiMsg('content_micDenied')),
-        'err',
-      );
-    }
+    recording = true;
+    toast(uiMsg('content_recording'), 'ok');
   }
 
   /* ----------------------------------- OCR ---------------------------------- */
@@ -2980,6 +3637,8 @@
   let ocrCaptureHidden = [];
 
   const OCR_SELECT_MIN_PX = 20;
+  /** What the drag box is for: an OCR crop, or the area of a tab recording. */
+  let regionPurpose = 'ocr';
 
   function ocrSelectBoxFromDrag(drag) {
     const left = Math.min(drag.startX, drag.currentX);
@@ -3014,6 +3673,7 @@
       '#jp-study-ocr-select',
       '#jp-study-more-menu',
       '#jp-study-card-preview',
+      '#jp-study-ai',
     ];
     if (hide) {
       ocrCaptureHidden = [];
@@ -3061,6 +3721,7 @@
       ocrSelectEl.classList.remove('open');
       updateOcrSelectRect(null);
     }
+    regionPurpose = 'ocr';
     if (showToast) toast(uiMsg('content_ocrCancelled'), 'ok');
   }
 
@@ -3123,7 +3784,7 @@
     ocrSelectEl.id = 'jp-study-ocr-select';
     ocrSelectEl.innerHTML = `
       <div class="jp-ocr-select-rect"></div>
-      <div class="jp-ocr-select-hint">Drag a box around the text · Esc cancels</div>
+      <div class="jp-ocr-select-hint">${uiHtml('content_ocrSelectHint')}</div>
     `;
     // Swallow events while unarmed so the menu click cannot fall through or finish a drag.
     ocrSelectEl.addEventListener('pointerdown', (e) => {
@@ -3244,6 +3905,15 @@
     cancelOcrRegionSelect(false);
     if (!isExtensionAlive()) {
       markExtensionDead();
+      return;
+    }
+    if (regionPurpose === 'record') {
+      // The same drag box picks the area of a tab recording.
+      regionPurpose = 'ocr';
+      void safeRuntimeSend({ type: 'record-start', video: true, crop: region }).then((res) => {
+        if (res?.invalidated) return;
+        toast(res?.ok ? uiMsg('content_recArea') : res?.error || uiMsg('content_failed'), res?.ok ? 'ok' : 'err');
+      });
       return;
     }
     toast(uiMsg('content_runningOcr'), 'pending');
@@ -3630,7 +4300,7 @@
     // the outcome they asked for \u2014 reporting it as a failure would be wrong.
     aiState.mine = res && (res.ok || res.error === 'duplicate') ? 'done' : 'error';
     renderAiAnalysis();
-    if (aiState.mine === 'error') toast((res && res.error) || uiMsg('content_cardAddFailed'), 'err');
+    if (aiState.mine === 'error') toast(appErrorText(res, 'content_cardAddFailed'), 'err');
   }
 
   async function aiSnapshot() {
@@ -3645,7 +4315,7 @@
     });
     aiState.snapshot = res && res.ok ? 'done' : 'error';
     renderAiAnalysis();
-    if (aiState.snapshot === 'error') toast((res && res.error) || uiMsg('content_snapshotFailed'), 'err');
+    if (aiState.snapshot === 'error') toast(appErrorText(res, 'content_snapshotFailed'), 'err');
   }
 
   function aiSelectSegment(index) {
@@ -3735,6 +4405,25 @@
               : rawErr) || uiMsg('content_aiFailed');
     }
     renderAiAnalysis();
+  }
+
+  /** The largest visible <video> as a CSS-viewport region, for auto-cropping a tab recording. */
+  function largestVideoRegion() {
+    let best = null;
+    let bestArea = 0;
+    for (const v of document.querySelectorAll('video')) {
+      const r = v.getBoundingClientRect();
+      const w = Math.min(r.right, window.innerWidth) - Math.max(r.left, 0);
+      const h = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+      if (w < 160 || h < 90) continue;
+      if (w * h > bestArea) {
+        bestArea = w * h;
+        best = { left: Math.max(r.left, 0), top: Math.max(r.top, 0), width: w, height: h };
+      }
+    }
+    if (!best) return null;
+    const vp = viewportCssSize();
+    return { ...best, viewportWidth: vp.width, viewportHeight: vp.height, devicePixelRatio: window.devicePixelRatio || 1 };
   }
 
   /* ------------------------------ message wiring ---------------------------- */
@@ -3842,8 +4531,23 @@
       return true;
     }
     if (msg?.type === 'jp-record-toggle') {
-      void toggleRecording();
-      sendResponse({ ok: true, recording });
+      // Answer with the state AFTER the toggle (it used to reply the old one).
+      void toggleRecording().then(() => sendResponse({ ok: true, recording }));
+      return true;
+    }
+    if (msg?.type === 'jp-clear-audio-clipboard') {
+      audioClipboardDataUrl = '';
+      sendResponse({ ok: true });
+      return true;
+    }
+    if (msg?.type === 'jp-select-record-region') {
+      regionPurpose = 'record';
+      startOcrRegionSelect();
+      sendResponse({ ok: true, selecting: true });
+      return true;
+    }
+    if (msg?.type === 'jp-video-rect') {
+      sendResponse({ ok: true, region: largestVideoRegion() });
       return true;
     }
     if (msg?.type === 'jp-show-fab') {
@@ -3905,13 +4609,68 @@
     if (isContextInvalidatedError(err)) markExtensionDead();
   }
 
+  /** Kana anywhere, or a real run of Han (a Chinese page), in a capped sample. */
+  function detectStudyPage() {
+    const sample = samplePageText(4000);
+    return /[぀-ヿㇰ-ㇿ]/.test(sample) || (sample.match(/[㐀-䶿一-鿿]/g) || []).length >= 20;
+  }
+
+  function startHeavyFeatures() {
+    if (heavyStarted || !studyPage || !isExtensionAlive()) return;
+    heavyStarted = true;
+    rebuildFab();
+    startLevelDetector();
+    void loadTheme();
+    void refreshComprehensibility();
+  }
+
+  /**
+   * Single-page apps fill in their text late: watch for it, throttled, for a
+   * minute at most, then stop watching a page that never became Japanese.
+   */
+  function watchForStudyText() {
+    let timer = null;
+    const started = Date.now();
+    const observer = new MutationObserver(() => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        if (detectStudyPage()) {
+          studyPage = true;
+          observer.disconnect();
+          startHeavyFeatures();
+        } else if (Date.now() - started > 60000) {
+          observer.disconnect();
+        }
+      }, 2000);
+    });
+    try {
+      observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+    } catch {
+      /* ignore */
+    }
+    setTimeout(() => observer.disconnect(), 61000);
+  }
+
   if (isExtensionAlive()) {
     void loadCfg().then(() => {
-      ensureFab();
-      startLevelDetector();
-      void loadTheme();
-      void refreshComprehensibility();
+      // The panel belongs to the page, not to each embedded frame.
+      studyPage = window === window.top && detectStudyPage();
+      if (studyPage) startHeavyFeatures();
+      else if (window === window.top) watchForStudyText();
     });
+  }
+
+  // Test hook. Content scripts live in an isolated world, so a page's own
+  // scripts can neither set this flag nor see what it publishes.
+  if (window.__JP_STUDY_TEST__ === true) {
+    window.__jpStudyTestHooks = {
+      popup: () => popup,
+      popupRoot: () => popupShadow,
+      currentHit: () => currentHit,
+      lastHoverLatencyMs: () => lastHoverLatencyMs,
+      sanitizeDictHtml,
+    };
   }
 
   try {

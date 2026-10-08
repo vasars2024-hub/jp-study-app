@@ -50,7 +50,7 @@ export default function AutoAudioPreferencesPanel() {
     // Mined screenshots live under the same managed root (studyMining.ts), so
     // an image a card still shows is as referenced as its audio.
     const referenced = loadDeck()
-      .flatMap((card) => [card.audioPath, card.imagePath])
+      .flatMap((card) => [card.audioPath, card.imagePath, card.clipPath])
       .filter((entry): entry is string => Boolean(entry));
     setArmed(false);
     void window.api.flashcardSweepAudio(referenced).then((result) => {

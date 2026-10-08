@@ -64,6 +64,7 @@ import { getMainStudyLang, onMainStudyLanguageChanged } from './studyLanguage';
 import { subtitleRecordName } from './subtitleRecordName';
 import { decideAudioIsLanguage } from '../shared/subtitleDiscoveryStatus';
 import { parseSubtitles } from '../shared/subtitleCues';
+import { decodeSubtitleBytes } from '../shared/subtitleDecode';
 import { shiftSubtitleText, worthShifting } from '../shared/subtitleDiscoveryTiming';
 import {
   SUBTITLE_DISCOVERY_SETTINGS_FILE,
@@ -79,8 +80,11 @@ import {
   guessSidecarLanguage,
   listEmbeddedSubtitleStreams,
   normalizeStreamLanguage,
+  sidecarFlagTags,
+  sidecarNameMatchesStem,
   type EmbeddedSubtitleStream,
 } from './subtitleLocalSources';
+import { mergeSweepSubtitles } from './subtitleSweepMerge';
 import {
   fetchSubtitleCandidateDetailed,
   hasSubtitleProviderKey,
@@ -148,6 +152,11 @@ let host: SubtitleDiscoveryHost | null = null;
 const running = new Set<string>();
 const cancelled = new Set<string>();
 let sweeping = false;
+/**
+ * "Cancel all" was pressed during the running sweep. Cancelling only the items
+ * in `running` stopped the current episode and let the sweep walk on to the next.
+ */
+let sweepCancelled = false;
 /** A library-wide sweep was asked for while one ran; run it once this one ends. */
 let followUpSweep = false;
 
@@ -298,7 +307,7 @@ function subtitleRecordFile(record: SubtitleRecord): string {
 /** Reads a record's text, whether it is cached in userData or a sidecar in place. */
 export function readSubtitleRecord(record: SubtitleRecord): string | null {
   try {
-    return fs.readFileSync(subtitleRecordFile(record), 'utf-8');
+    return decodeSubtitleBytes(fs.readFileSync(subtitleRecordFile(record))).text;
   } catch {
     return null;
   }
@@ -1168,6 +1177,12 @@ export function cancelSubtitleDiscovery(mediaId?: string): void {
     if (running.has(mediaId)) cancelled.add(mediaId);
     return;
   }
+  // The whole sweep, not just the item it is on.
+  if (sweeping) {
+    sweepCancelled = true;
+    // A follow-up queued by an import would restart what the user just stopped.
+    followUpSweep = false;
+  }
   for (const id of running) cancelled.add(id);
 }
 
@@ -1237,6 +1252,7 @@ export async function runSubtitleDiscovery(
   if (items.length === 0) return { ok: true, attached: 0, empty: 0, unreachable: 0, files: 0 };
 
   sweeping = true;
+  sweepCancelled = false;
   const startedAt = Date.now();
   // One per run: the OpenSubtitles listing for a series/season is fetched once
   // and every episode of it in this run picks from the same answer.
@@ -1252,6 +1268,8 @@ export async function runSubtitleDiscovery(
 
   try {
     for (const item of items) {
+      // "Cancel all" ends the sweep; the items not reached yet stay unsearched.
+      if (sweepCancelled) break;
       running.add(item.id);
       cancelled.delete(item.id);
       const title = item.title?.trim() || item.fileName;
@@ -1278,7 +1296,7 @@ export async function runSubtitleDiscovery(
           asAcquisitionConfig(request.acquisition),
           run,
         );
-        if (cancelled.has(item.id)) {
+        if (cancelled.has(item.id) || sweepCancelled) {
           emit('cancelled');
           continue;
         }
@@ -1332,13 +1350,20 @@ export async function runSubtitleDiscovery(
         files += outcome.files;
         if (outcome.storageFull) storageFull += 1;
 
-        host.patchItems([item.id], {
-          // A forced search replaces only what it reacquired; see `mergeForcedRecords`.
-          subtitles: request.force === true ? mergeForcedRecords(item.subtitles, outcome.records) : outcome.records,
-          // Failures accumulate but are bounded, so the record cannot grow forever.
-          subtitleFailures: keptFailures([...(item.subtitleFailures ?? []), ...outcome.failures]).slice(-24),
-          subtitlesCheckedAt: Date.now(),
-        });
+        // Re-read before writing: `item` is the read this sweep started from, and
+        // the user may have attached, removed or re-synced a track since. Their
+        // edits are replayed onto the sweep's answer; see `mergeSweepSubtitles`.
+        const latest = host.listItems().find((entry) => entry.id === item.id);
+        if (latest) {
+          const answer = request.force === true ? mergeForcedRecords(item.subtitles, outcome.records) : outcome.records;
+          host.patchItems([item.id], {
+            // A forced search replaces only what it reacquired; see `mergeForcedRecords`.
+            subtitles: mergeSweepSubtitles(item.subtitles, latest.subtitles, answer),
+            // Failures accumulate but are bounded, so the record cannot grow forever.
+            subtitleFailures: keptFailures([...(latest.subtitleFailures ?? []), ...outcome.failures]).slice(-24),
+            subtitlesCheckedAt: Date.now(),
+          });
+        }
         done += 1;
         emit('done', { languages: [...new Set(outcome.records.map((record) => record.lang))].sort() });
       } catch (error) {
@@ -1355,6 +1380,7 @@ export async function runSubtitleDiscovery(
     }
   } finally {
     sweeping = false;
+    sweepCancelled = false;
     running.clear();
     cancelled.clear();
     emitEvent({ type: 'idle' });
@@ -1792,7 +1818,8 @@ export function attachSubtitleFile(input: unknown): NyaaSubtitleAcceptResult {
     if (typeof entry.path !== 'string' || !entry.path) return false;
     if (path.dirname(entry.path).toLowerCase() !== dir) return false;
     const stem = path.basename(entry.path, path.extname(entry.path));
-    return fileName.toLowerCase().startsWith(stem.toLowerCase());
+    // Stem then `.`/`_`: `Show - 010.ja.srt` is not `Show - 01.mkv`'s.
+    return sidecarNameMatchesStem(fileName, stem);
   });
   if (!owner) {
     return {
@@ -1829,7 +1856,8 @@ export function attachSubtitleFile(input: unknown): NyaaSubtitleAcceptResult {
     path: filePath,
     external: true,
     label: fileName,
-    hearingImpaired: /\b(sdh|cc|hi)\b/.test(fileName.toLowerCase()),
+    // Only the tags after the stem: "Hi Score Girl" is not a hearing-impaired track.
+    hearingImpaired: sidecarFlagTags(fileName, stem).hearingImpaired,
     addedAt: Date.now(),
   };
   host?.patchItems([owner.id], {

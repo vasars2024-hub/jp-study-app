@@ -38,6 +38,30 @@ const ASS_DEFAULT_EVENT_FORMAT = [
   'layer', 'start', 'end', 'style', 'name', 'marginl', 'marginr', 'marginv', 'effect', 'text',
 ];
 
+/**
+ * The readable text of one ASS `Dialogue:` text field.
+ *
+ * Two ASS-only pieces of syntax `cleanLine` does not know: `\h` is a hard space
+ * (it used to survive as a literal `\h`), and an override block with `\pN`
+ * (N > 0) switches the line into vector-drawing mode until a `\p0`, so what
+ * follows is path commands (`m 0 0 l 100 0 ...`), never words. Drawn text is
+ * dropped here; a line that was nothing but a drawing comes out empty.
+ */
+function assDialogueText(raw: string): string {
+  let out = '';
+  let drawing = false;
+  let last = 0;
+  const blocks = /\{([^}]*)\}/g;
+  for (let m = blocks.exec(raw); m; m = blocks.exec(raw)) {
+    if (!drawing) out += raw.slice(last, m.index);
+    const modes = m[1].match(/\\p\d+/g);
+    if (modes) drawing = parseInt(modes[modes.length - 1].slice(2), 10) > 0;
+    last = blocks.lastIndex;
+  }
+  if (!drawing) out += raw.slice(last);
+  return cleanLine(out.replace(/\\h/g, ' '));
+}
+
 export function parseAss(raw: string): Cue[] {
   const cues: Cue[] = [];
   // Columns come from the `[Events]` section's own `Format:` line. Almost every file uses the
@@ -62,7 +86,7 @@ export function parseAss(raw: string): Cue[] {
     if (!line.startsWith('Dialogue:')) continue;
     const f = line.slice('Dialogue:'.length).split(',');
     if (f.length < columns.length) continue;
-    const text = cleanLine(f.slice(columns.indexOf('text')).join(','));
+    const text = assDialogueText(f.slice(columns.indexOf('text')).join(','));
     // Trimmed and dropped when blank so consumers can treat "no style" and "empty style"
     // as the same thing.
     const styleAt = columns.indexOf('style');

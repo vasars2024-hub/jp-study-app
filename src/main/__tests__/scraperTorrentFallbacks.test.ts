@@ -10,7 +10,7 @@ import type { ScraperSourceEntry } from '../../shared/scraperSourceSettings';
 import { DEFAULT_SCRAPER_TORRENT_SETTINGS } from '../../shared/scraperSourceSettings';
 
 vi.mock('electron', () => ({
-  app: { getPath: () => process.cwd(), getAppMetrics: () => [] },
+  app: { getPath: () => `${process.env.TEMP ?? process.env.TMPDIR ?? '/tmp'}/gum-vitest-userdata`, getAppMetrics: () => [] },
   ipcMain: { handle: () => undefined },
 }));
 

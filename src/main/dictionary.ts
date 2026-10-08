@@ -5,6 +5,7 @@ import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { mt } from './i18n';
 import { isoDateLocal } from '../shared/watchLibrary';
 import type {
+  DeinflectionInfo,
   DictEntry,
   DictResult,
   ExampleResult,
@@ -50,7 +51,8 @@ import {
 } from './dictionary/lexiconAdapter';
 import { DICT_LOOKUP_LIMIT, clampLookupLimit } from '../shared/dictionaryLookup';
 import { interlinearFallbackLang, legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
-import { cedictInterlinearLookup, type CedictIndex } from './dictionary/chineseLookup';
+import { cedictInterlinearLookup, lookupCedictIndex, type CedictIndex } from './dictionary/chineseLookup';
+import { buildScanPrefixes, pickLongestScanHit, SCAN_DEFAULT_MAX_LEN } from '../shared/dictScan';
 import { cleanReadingAidWords, type ReadingAidResult } from '../shared/readingAid';
 import { TATOEBA_LANG } from '../shared/studyLang';
 import {
@@ -403,6 +405,12 @@ async function lookupOfflineMany(
   texts: readonly string[],
   limit = DICT_LOOKUP_LIMIT,
   lang?: 'ja' | 'zh' | 'ru',
+  /**
+   * `raw`: the database answers only — no per-miss fallback (CC-CEDICT, the
+   * legacy stores) and no legacy metadata. For `scanOfflinePrefixes`, which
+   * asks for many prefixes, picks one, and does its own bounded fallback.
+   */
+  options: { raw?: boolean } = {},
 ): Promise<DictResult[]> {
   const queries = texts.map((text) => (text ?? '').trim());
   const asked = queries.filter(Boolean);
@@ -432,6 +440,10 @@ async function lookupOfflineMany(
     }
     const hit = unified[next];
     next += 1;
+    if (options.raw) {
+      out.push(hit ? lookupResultToPerLanguageDictResult(hit) : { query: q, entries: [] });
+      continue;
+    }
     if (hit?.entries.length) {
       out.push(withLegacyMetadata(lookupResultToPerLanguageDictResult(hit)));
       continue;
@@ -466,6 +478,122 @@ async function lookupOfflineMany(
 export async function lookupTermOffline(query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult> {
   const [result] = await lookupOfflineMany([query ?? ''], DICT_LOOKUP_LIMIT, lang);
   return result;
+}
+
+export interface OfflineScanResult {
+  /** The page text the hit covers; '' on a miss. */
+  matched: string;
+  /** Only entries that ARE the matched word (exact / reading / de-inflected). */
+  entries: DictEntry[];
+  deinflection?: DeinflectionInfo;
+  /** The best provenance among `entries`. */
+  via?: string;
+  /** The source language asked for, or 'zh' when CC-CEDICT answered. */
+  lang?: string;
+}
+
+/**
+ * The longest dictionary word at the start of a hover window — the browser
+ * extension's hover scan.
+ *
+ * Every prefix of the window (longest first, up to `maxLen` code points; for
+ * spaced scripts just the leading word, see `buildScanPrefixes`) is looked up in
+ * ONE batched database read, and the longest prefix with an entry that is the
+ * word itself wins. Prefix, gloss and fuzzy rows are near misses and never count:
+ * the extension used to treat them as hits, so hovering 猫 could answer 猫舌.
+ *
+ * Fallbacks run only when the database had nothing at least as long, only for
+ * the prefixes longer than its best, longest first, stopping at the first hit:
+ * - Chinese: CC-CEDICT, by exact in-memory probes of its index. Not
+ *   `lookupChineseInDictionary` per prefix — that re-asks the database the batch
+ *   already asked and then takes CC-CEDICT's own longest-prefix guess, which
+ *   would credit a shorter word to a longer prefix.
+ * - Japanese (or no language): the legacy in-memory stores, exact and
+ *   de-inflected only (`exactOnly`), and only while a store is still waiting for
+ *   its database import (`initYomitan()`); otherwise they are never loaded.
+ * - Russian: none.
+ * Both fallbacks are in-memory, so the database still sees exactly one read.
+ */
+export async function scanOfflinePrefixes(
+  windowText: string,
+  lang?: 'ja' | 'zh' | 'ru',
+  opts: { maxLen?: number; limit?: number } = {},
+): Promise<OfflineScanResult> {
+  const miss: OfflineScanResult = { matched: '', entries: [] };
+  const prefixes = buildScanPrefixes(windowText ?? '', opts.maxLen ?? SCAN_DEFAULT_MAX_LEN);
+  if (!prefixes.length) return miss;
+  const limit = clampLookupLimit(opts.limit ?? DICT_LOOKUP_LIMIT);
+
+  // The one database read: every prefix in a single batch, no per-miss fallback.
+  const results = await lookupOfflineMany(prefixes, limit, lang, { raw: true });
+  const dbHit = pickLongestScanHit(prefixes, results);
+  // Prefixes are longest first, so the ones longer than the database's best are
+  // exactly those before it.
+  const longer = dbHit ? prefixes.slice(0, dbHit.index) : prefixes;
+  const fallback = longer.length ? await scanFallback(longer, lang) : null;
+  if (fallback) return fallback;
+  if (!dbHit) return miss;
+  // Legacy pitch / frequency / IPA, for the one result that is returned.
+  const enriched = withLegacyMetadata({ query: prefixes[dbHit.index], entries: dbHit.entries });
+  return {
+    matched: dbHit.matched,
+    entries: enriched.entries,
+    ...(dbHit.deinflection ? { deinflection: dbHit.deinflection } : {}),
+    ...(dbHit.via ? { via: dbHit.via } : {}),
+    ...(lang ? { lang } : {}),
+  };
+}
+
+/** The in-memory fallbacks of `scanOfflinePrefixes`, longest prefix first. */
+async function scanFallback(
+  prefixes: readonly string[],
+  lang: 'ja' | 'zh' | 'ru' | undefined,
+): Promise<OfflineScanResult | null> {
+  if (lang === 'ru') return null;
+  if (lang === 'zh') {
+    let index: CedictIndex;
+    try {
+      index = await loadCedictIndex();
+    } catch {
+      return null; // no Chinese dictionary installed
+    }
+    for (const prefix of prefixes) {
+      // Exact probe first: `lookupCedictIndex` would otherwise fall back to its
+      // own longest-prefix guess and credit a shorter word to this prefix.
+      if (!index.byWord.has(prefix)) continue;
+      const found = lookupCedictIndex(index, prefix);
+      if (!found.entries.length) continue;
+      return {
+        matched: prefix,
+        entries: found.entries.map((entry): DictEntry => ({ ...entry, via: 'exact' })),
+        via: 'exact',
+        lang: 'zh',
+      };
+    }
+    return null;
+  }
+  const legacyReady = await initYomitan().catch(() => false);
+  if (!legacyReady) return null;
+  for (const prefix of prefixes) {
+    // exactOnly: the legacy prefix scan is exactly the near miss the hover scan
+    // must not report.
+    const local = lookupOfflineDeinflected(prefix, true);
+    const hit = pickLongestScanHit([prefix], [{
+      query: prefix,
+      entries: local.entries,
+      ...(local.deinflection ? { deinflection: local.deinflection } : {}),
+    }]);
+    if (hit) {
+      return {
+        matched: hit.matched,
+        entries: hit.entries,
+        ...(hit.deinflection ? { deinflection: hit.deinflection } : {}),
+        ...(hit.via ? { via: hit.via } : {}),
+        ...(lang ? { lang } : {}),
+      };
+    }
+  }
+  return null;
 }
 
 /**

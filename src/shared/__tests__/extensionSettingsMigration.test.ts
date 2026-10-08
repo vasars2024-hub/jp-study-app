@@ -67,7 +67,7 @@ describe('settings migration — the renames the README promises', () => {
   const out = normalize(V1_SETTINGS);
 
   it('stamps the current schema version', () => {
-    expect(out.version).toBe(2);
+    expect(out.version).toBe(3);
     expect(out.version).toBe(settings.VERSION);
   });
 
@@ -107,14 +107,14 @@ describe('settings migration — the renames the README promises', () => {
     const ancient = { ...V1_SETTINGS } as Record<string, unknown>;
     delete ancient.version;
     const migrated = normalize(ancient);
-    expect(migrated.version).toBe(2);
+    expect(migrated.version).toBe(3);
     expect(migrated.folderLabel).toBe('Chrome');
     expect(migrated.saveDestination).toBe('both');
   });
 
   it('fills a completely empty store with the defaults', () => {
     const fresh = normalize({});
-    expect(fresh.version).toBe(2);
+    expect(fresh.version).toBe(3);
     expect(fresh.wheelSlots).toEqual(settings.DEFAULT_WHEEL_SLOTS);
     expect(fresh.saveDestination).toBe('both');
     expect(fresh.folderLabel).toBe('Extension');
@@ -122,7 +122,7 @@ describe('settings migration — the renames the README promises', () => {
 
   it('survives junk where an object was expected', () => {
     for (const junk of [null, undefined, 'nope', 42, []]) {
-      expect(normalize(junk).version).toBe(2);
+      expect(normalize(junk).version).toBe(3);
       expect(normalize(junk).wheelSlots).toHaveLength(6);
     }
   });
@@ -303,7 +303,7 @@ describe('settings normalization — clamping and coercion', () => {
 
   it('falls back rather than clamping when a number is not a number', () => {
     expect(normalize({ port: 'nonsense' }).port).toBe(18765);
-    expect(normalize({ hoverDelayMs: NaN }).hoverDelayMs).toBe(140);
+    expect(normalize({ hoverDelayMs: NaN }).hoverDelayMs).toBe(40);
     expect(normalize({ scanLength: undefined }).scanLength).toBe(12);
     expect(normalize({ popupWidth: {} }).popupWidth).toBe(360);
   });
@@ -392,13 +392,20 @@ describe('settings normalization — safe to run twice, safe to run on shared st
     }
   });
 
-  it('migrate() short-circuits on a v2 object without copying it', () => {
+  it('migrate() short-circuits on a current-version object without copying it', () => {
     // Documented behaviour, and the reason normalize() must not mutate: on a
-    // v2 blob migrate hands the *same* reference straight back.
-    const v2 = { version: 2, folderLabel: 'Chrome' };
-    expect(settings.migrate(v2)).toBe(v2);
+    // current blob migrate hands the *same* reference straight back.
+    const v3 = { version: 3, folderLabel: 'Chrome' };
+    expect(settings.migrate(v3)).toBe(v3);
     // normalize still strips the dead keys the short-circuit skipped.
     expect(normalize({ version: 2, fabShowDest: true })).not.toHaveProperty('fabShowDest');
+  });
+
+  it('v2 → v3 lowers only the untouched old default hover delay', () => {
+    // The hover scan is one batched request now; 140 ms was the old default.
+    expect(normalize({ version: 2, hoverDelayMs: 140 }).hoverDelayMs).toBe(40);
+    expect(normalize({ version: 2, hoverDelayMs: 220 }).hoverDelayMs).toBe(220);
+    expect(normalize({ version: 3, hoverDelayMs: 140 }).hoverDelayMs).toBe(140);
   });
 
   it('hands out fresh arrays, never a view onto DEFAULTS', () => {
@@ -425,7 +432,7 @@ describe('settings storage — load and save through chrome.storage.local', () =
   it('migrates what is on disk when the extension first wakes up', async () => {
     const { settings: mod } = loadSettings({ jpStudySettings: { ...V1_SETTINGS } });
     const loaded = await mod.load();
-    expect(loaded.version).toBe(2);
+    expect(loaded.version).toBe(3);
     expect(loaded.folderLabel).toBe('Chrome');
     expect(loaded.wheelSlots[0]).toBe('save.word');
     expect(loaded).not.toHaveProperty('preferAnki');
@@ -460,7 +467,7 @@ describe('settings storage — load and save through chrome.storage.local', () =
     expect(storage.jpStudyPort).toBe(19001);
     // The v1 keys are gone from disk, not just from the returned object.
     expect(storage.jpStudySettings).not.toHaveProperty('preferAnki');
-    expect((storage.jpStudySettings as JpSettings).version).toBe(2);
+    expect((storage.jpStudySettings as JpSettings).version).toBe(3);
   });
 
   it('a save of nothing still upgrades the stored blob in place', async () => {
@@ -469,7 +476,7 @@ describe('settings storage — load and save through chrome.storage.local', () =
     const { settings: mod, storage } = loadSettings({ jpStudySettings: { ...V1_SETTINGS } });
     await mod.save(await mod.load());
     const stored = storage.jpStudySettings as JpSettings;
-    expect(stored.version).toBe(2);
+    expect(stored.version).toBe(3);
     expect(stored.wheelSlots).toEqual([
       'save.word',
       'lookup.selection',

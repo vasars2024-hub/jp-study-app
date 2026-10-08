@@ -9,10 +9,36 @@
 // Sourced gloss, attribution, HTML and de-inflection information are retained.
 
 import type { DictEntry, DictResult, DictSense, DeinflectionInfo } from '../../shared/types';
+import { sanitizeDictHtml } from '../../shared/dictHtmlSanitize';
 import type { LookupEntry, LookupResult, LookupSense } from './dictService';
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
+}
+
+/** `dictService.normalizeForLookup`, inlined so this adapter stays free of the database module. */
+function normalizeForCompare(text: string): string {
+  return text.normalize('NFKC').trim().toLowerCase();
+}
+
+/**
+ * The legacy shape's `via` for a database entry.
+ *
+ * The database reports a traditional-Chinese row as `variant` whichever probe
+ * found it, which hides whether it was a match or a near miss. It is resolved
+ * against the query here: the variant written (or read) exactly as the query is
+ * a match, one that only starts with it is a prefix hit, and anything else is
+ * left unlabelled rather than guessed.
+ */
+function legacyVia(entry: LookupEntry, query: string | undefined): DictEntry['via'] {
+  if (entry.via !== 'variant') return entry.via;
+  if (query === undefined) return undefined;
+  const q = normalizeForCompare(query);
+  if (!q) return undefined;
+  if (normalizeForCompare(entry.text) === q) return 'exact';
+  if (entry.readingNorm && normalizeForCompare(entry.readingNorm) === q) return 'reading';
+  if (normalizeForCompare(entry.text).startsWith(q)) return 'prefix';
+  return undefined;
 }
 
 function toLegacySense(sense: LookupSense): DictSense {
@@ -23,20 +49,29 @@ function toLegacySense(sense: LookupSense): DictSense {
   };
 }
 
-function toLegacyEntry(entry: LookupEntry): DictEntry {
+function toLegacyEntry(entry: LookupEntry, query?: string): DictEntry {
   const glosses = entry.senses.flatMap((sense) => sense.glosses);
-  const glossaryHtml = glosses.find((gloss) => gloss.html)?.html;
+  // Stored gloss HTML came from an imported dictionary file (or a JSON store
+  // written before the import escaped its text) and is inserted with innerHTML
+  // by the pop-ups, so it is sanitized here, on every read, not trusted.
+  const rawHtml = glosses.find((gloss) => gloss.html)?.html;
+  const glossaryHtml = rawHtml ? sanitizeDictHtml(rawHtml) : '';
   const sourceLangs = unique(glosses.map((gloss) => gloss.lang));
+  const via = legacyVia(entry, query);
   return {
     word: entry.text,
     reading: entry.reading,
     isCommon: entry.score > 0,
+    // No word-level JLPT source exists on this path: the database has no JLPT
+    // column for headwords (only KANJIDIC's per-character `chars.jlpt`), and the
+    // bundled JMdict carries none. Left empty rather than estimated.
     jlpt: [],
     senses: entry.senses.map(toLegacySense),
     ...(entry.ipa?.length ? { ipa: [...entry.ipa] } : {}),
     ...(glossaryHtml ? { glossaryHtml } : {}),
     source: entry.dictTitle,
     ...(sourceLangs.length ? { sourceLangs } : {}),
+    ...(via ? { via } : {}),
   };
 }
 
@@ -83,7 +118,7 @@ export function lookupResultToDictResult(result: LookupResult): DictResult {
     : undefined;
   return {
     query: result.query,
-    entries: result.entries.map(toLegacyEntry),
+    entries: result.entries.map((entry) => toLegacyEntry(entry, result.query)),
     ...(character ? { character } : {}),
     ...(deinflection ? { deinflection } : {}),
     ...(isApproximate(result) ? { approximate: true } : {}),
@@ -109,7 +144,7 @@ export function lookupResultToDictResult(result: LookupResult): DictResult {
  * agree. When they do not (a source whose senses were all duplicates), the
  * entry's own primary title is the honest answer.
  */
-function toLegacyEntriesByGlossLang(entry: LookupEntry): DictEntry[] {
+function toLegacyEntriesByGlossLang(entry: LookupEntry, query?: string): DictEntry[] {
   const groups = new Map<string, LookupSense[]>();
   for (const sense of entry.senses) {
     const lang = sense.glosses[0]?.lang ?? '';
@@ -117,11 +152,11 @@ function toLegacyEntriesByGlossLang(entry: LookupEntry): DictEntry[] {
     if (list) list.push(sense);
     else groups.set(lang, [sense]);
   }
-  if (groups.size <= 1) return [toLegacyEntry(entry)];
+  if (groups.size <= 1) return [toLegacyEntry(entry, query)];
   const titles = entry.sources.map((source) => source.dictTitle);
   const attributable = titles.length === groups.size;
   return [...groups.values()].map((senses, index) =>
-    toLegacyEntry({ ...entry, senses, dictTitle: (attributable && titles[index]) || entry.dictTitle }));
+    toLegacyEntry({ ...entry, senses, dictTitle: (attributable && titles[index]) || entry.dictTitle }, query));
 }
 
 /**
@@ -132,7 +167,7 @@ function toLegacyEntriesByGlossLang(entry: LookupEntry): DictEntry[] {
 export function lookupResultToPerLanguageDictResult(result: LookupResult): DictResult {
   return {
     ...lookupResultToDictResult(result),
-    entries: result.entries.flatMap(toLegacyEntriesByGlossLang),
+    entries: result.entries.flatMap((entry) => toLegacyEntriesByGlossLang(entry, result.query)),
   };
 }
 
@@ -162,7 +197,10 @@ export function enrichLexiconResultMetadata(
   return {
     ...result,
     entries: result.entries.map((entry) => {
-      const pitchHtml = metadata.pitchHtml(entry.word, entry.reading);
+      // Built from escaped morae by `pitchPatternHtml`; sanitized again here
+      // because the resolver is injected and the result reaches innerHTML.
+      const rawPitch = metadata.pitchHtml(entry.word, entry.reading);
+      const pitchHtml = rawPitch ? sanitizeDictHtml(rawPitch) : '';
       const freq = metadata.frequency(entry.word, entry.reading);
       const rank = typeof freq === 'number' ? freq : freq?.rank;
       const source = typeof freq === 'number' ? undefined : freq?.source;

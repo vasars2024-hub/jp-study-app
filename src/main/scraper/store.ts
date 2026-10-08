@@ -51,3 +51,25 @@ export function readScraperJsonSync<T>(name: string, fallback: T): T {
 export async function writeScraperJson(name: string, value: unknown): Promise<void> {
   await writeJsonAtomic(scraperStorePath(name), value);
 }
+
+const fileChains = new Map<string, Promise<unknown>>();
+
+/**
+ * Runs `task` after every earlier task queued for the same file has settled.
+ *
+ * A read-modify-write (append an export record, append a history entry) that
+ * two finishing jobs run at once would otherwise both read the same old file
+ * and the second write would drop the first one's entry. A failed task does
+ * not break the chain for the next one.
+ */
+export function withScraperFileQueue<T>(name: string, task: () => Promise<T>): Promise<T> {
+  const key = scraperStorePath(name);
+  const previous = fileChains.get(key) ?? Promise.resolve();
+  const run = previous.then(task, task);
+  const settled = run.then(() => undefined, () => undefined);
+  fileChains.set(key, settled);
+  void settled.then(() => {
+    if (fileChains.get(key) === settled) fileChains.delete(key);
+  });
+  return run;
+}

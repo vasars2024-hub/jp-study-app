@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { PluginBase } from '@electron-forge/plugin-base';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
@@ -119,9 +120,44 @@ class SeanimeSidecarStagingPlugin extends PluginBase<Record<string, never>> {
   }
 }
 
+/**
+ * Windows identity and installer. The exe stays `jp-study-app.exe` and package.json
+ * keeps `productName: jp-study-app` on purpose: `productName` is Electron's app name,
+ * and that names the user-data folder (%APPDATA%\jp-study-app, many GB of decks, books
+ * and dictionaries). What Windows SHOWS — Task Manager, the taskbar, "Open with",
+ * Programs and Features, the Start-menu shortcut — comes from the version resource
+ * below and from the Squirrel title, and those say "Gum".
+ *
+ * `SQUIRREL_APP_ID` must equal `src/main/squirrelEvents.ts` (it names the install
+ * folder and the shortcut AppUserModelID); `squirrelEvents.test.ts` pins the two.
+ */
+const PRODUCT_NAME = 'Gum';
+const SQUIRREL_APP_ID = 'jp_study_app';
+const APP_VERSION: string = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')).version;
+/**
+ * Code signing is OFF until the owner has an Authenticode certificate (README,
+ * "Code signing"). Set both variables and `make` signs the app exe (packager, via
+ * @electron/windows-sign) and Setup.exe/Update.exe (Squirrel). Nothing is ever
+ * signed implicitly.
+ */
+const SIGN_CERT_FILE = process.env.GUM_WIN_CERT_FILE?.trim() || '';
+const SIGN_CERT_PASSWORD = process.env.GUM_WIN_CERT_PASSWORD ?? '';
+const signing = SIGN_CERT_FILE
+  ? { certificateFile: SIGN_CERT_FILE, certificatePassword: SIGN_CERT_PASSWORD }
+  : undefined;
+
 const config: ForgeConfig = {
   packagerConfig: {
     icon: 'assets/icon',
+    appCopyright: `Copyright (C) ${new Date().getFullYear()} Arseniy. GPL-3.0-or-later.`,
+    win32metadata: {
+      CompanyName: PRODUCT_NAME,
+      FileDescription: PRODUCT_NAME,
+      ProductName: PRODUCT_NAME,
+      InternalName: PRODUCT_NAME,
+      OriginalFilename: 'jp-study-app.exe',
+    },
+    ...(signing ? { windowsSign: signing } : {}),
     // No asar: the app bundles ~945 MB of model/engine/dictionary files, and
     // packing that into an asar archive chokes the packager. Shipping loose
     // files is simpler and faster — the app:// protocol reads them by path, and
@@ -149,8 +185,27 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    // Squirrel copies the full app to temp then compresses again — it routinely
-    // deadlocks at 0% CPU on ~1 GB bundles. ZIP the packaged folder instead.
+    // The Windows installer: per-user (no admin), Start-menu + desktop shortcut,
+    // an uninstaller in Settings > Apps, and in-place updates (squirrelUpdater.ts).
+    // src/main/squirrelEvents.ts handles its lifecycle events and file associations.
+    //
+    // Squirrel copies the whole app to %TEMP% and compresses it again, and has been
+    // seen to stall at 0% CPU on a ~1 GB bundle. Build it with
+    // `node tools/package-app.cjs --installer`: that packages and PRUNES first (2 GB of
+    // node_modules -> ~0.4 GB) and then runs only this maker over the pruned app.
+    new MakerSquirrel({
+      name: SQUIRREL_APP_ID,
+      title: PRODUCT_NAME,
+      authors: 'Arseniy',
+      exe: 'jp-study-app.exe',
+      setupExe: `${PRODUCT_NAME}-${APP_VERSION} Setup.exe`,
+      setupIcon: path.resolve(process.cwd(), 'assets', 'icon.ico'),
+      // Programs and Features fetches the uninstall icon from a URL at install time.
+      iconUrl: 'https://raw.githubusercontent.com/vasars2024-hub/jp-study-app/master/assets/icon.ico',
+      noMsi: true,
+      ...(signing ?? {}),
+    }),
+    // The portable build, unchanged: extract anywhere, run jp-study-app.exe.
     new MakerZIP({}, ['win32', 'darwin']),
     new MakerRpm({}),
     new MakerDeb({}),

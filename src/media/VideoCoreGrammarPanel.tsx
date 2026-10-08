@@ -1,8 +1,69 @@
+import { useMemo } from 'react';
 import SentenceAnalysisView from '../renderer/components/analysis/SentenceAnalysisView';
-import { useAnalysisActions } from '../renderer/analysisActions';
+import { useAnalysisActions, type AnalysisMineProvenance } from '../renderer/analysisActions';
 import { useT } from '../renderer/i18n';
 import type { CueAnalysisState, OfflineAiStatus } from './useCueAnalysis';
 import { openAiSettings } from '../renderer/aiSetupClient';
+import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
+
+/**
+ * What the player knows about the line under analysis. `source` is the same object the
+ * mining panel gets (`miningSource`); the cue times are PLAYBACK seconds — subtitle
+ * delay already applied (`cuePlaybackStartSec` / `cuePlaybackEndSec`) — because they are
+ * what "Play in video" seeks to.
+ */
+export interface VideoCoreGrammarMineContext {
+  source: VideoCoreMiningSource | null;
+  cueStartSec?: number;
+  cueEndSec?: number;
+}
+
+const finite = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+/**
+ * The player mining panel's provenance (`videoCoreStudyInput`), for a span mined from the
+ * grammar panel: a `subtitle` card under the show's deck id, the file as its URL, and the
+ * line's place in it — so the card can go back to the scene like any other player mine.
+ * Null when the player has no source (nothing to attribute the card to), which leaves the
+ * panel mining exactly as before.
+ */
+export function grammarMineProvenance(
+  context: VideoCoreGrammarMineContext | null | undefined,
+  sentence: string | undefined,
+): AnalysisMineProvenance | null {
+  const origin = context?.source;
+  if (!origin) return null;
+  const title = [origin.mediaTitle, origin.episodeNumber != null ? `#${origin.episodeNumber}` : '']
+    .filter(Boolean)
+    .join(' ');
+  const sourceId = origin.mediaId != null
+    ? `media-${origin.mediaId}`
+    : origin.localFilePath || origin.playbackId;
+  const start = context?.cueStartSec;
+  const end = context?.cueEndSec;
+  return {
+    source: 'subtitle',
+    sourceId,
+    ...(title ? { sourceTitle: title } : {}),
+    ...(origin.localFilePath || origin.streamPath
+      ? { sourceUrl: origin.localFilePath || origin.streamPath }
+      : {}),
+    folder: 'Media',
+    ...(finite(start) && start >= 0
+      ? {
+          sourceRef: {
+            mediaId: sourceId,
+            ...(origin.episodeNumber != null ? { episode: origin.episodeNumber } : {}),
+            cueStartSec: start,
+            ...(finite(end) && end > start ? { cueEndSec: end } : {}),
+            ...(sentence?.trim() ? { sentence: sentence.trim() } : {}),
+            returnTarget: { section: 'video' as const, positionSec: start },
+          },
+        }
+      : {}),
+  };
+}
 
 /**
  * The explanation half of grammar highlight.
@@ -24,6 +85,12 @@ interface Props {
   onLookup: (surface: string, context: string) => void;
   /** Analyze the current line without waiting for a pause. */
   onAnalyzeNow: () => void;
+  /**
+   * The playing file and line. Optional: without it a mined span is an `analysis` card
+   * with no way back to the video, which is what a detached window without a source
+   * still gets.
+   */
+  mineContext?: VideoCoreGrammarMineContext | null;
 }
 
 export default function VideoCoreGrammarPanel({
@@ -33,15 +100,35 @@ export default function VideoCoreGrammarPanel({
   onSelectedIndexChange,
   onLookup,
   onAnalyzeNow,
+  mineContext,
 }: Props) {
   const { t, lang: uiLang } = useT();
   const result = state.kind === 'ready' ? state.result : null;
+  const sentence = result?.sentence;
+  const contextStart = mineContext?.cueStartSec;
+  const contextEnd = mineContext?.cueEndSec;
+  // Keyed on the values, not the objects: the overlay rebuilds its mining source and
+  // would build `mineContext` inline, and a new provenance every render would rebuild
+  // the mine callbacks every render.
+  const sourceKey = mineContext?.source ? JSON.stringify(mineContext.source) : '';
+  const mineProvenance = useMemo(
+    () => grammarMineProvenance(
+      {
+        source: sourceKey ? JSON.parse(sourceKey) as VideoCoreMiningSource : null,
+        cueStartSec: contextStart,
+        cueEndSec: contextEnd,
+      },
+      sentence,
+    ),
+    [sourceKey, contextStart, contextEnd, sentence],
+  );
   const actions = useAnalysisActions({
     lang,
     uiLang,
     source: 'app',
     sourceLabel: t('mediaWorkspace.study.grammarSource'),
     result,
+    mineProvenance,
   });
 
   return (

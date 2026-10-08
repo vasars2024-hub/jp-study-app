@@ -18,7 +18,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NormalizedGrammarPoint } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
-import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
+import { createDeckFolder } from '../../flashcardDeck';
+import { mineGrammarPoints } from '../../studyMiningRoutes';
 import { appendReviewLog } from '../../reviewLog';
 import {
   loadGrammarSrs,
@@ -220,18 +221,7 @@ export default function GrammarTestModal({
   function addMissedToDeck(): void {
     if (!missed.length) return;
     createDeckFolder('Grammar');
-    addDeckCards(
-      missed.map((p) => ({
-        word: p.title,
-        reading: '',
-        meaning: p.meaning,
-        sentence: p.examples[0]?.jp,
-        front: p.title,
-        back: `${p.meaning}${p.structure ? `\n${p.structure}` : ''}`,
-        source: 'import' as const,
-        folder: 'Grammar',
-      })),
-    );
+    void mineGrammarPoints(missed, 'Grammar');
   }
 
   const typeLabels = useMemo(

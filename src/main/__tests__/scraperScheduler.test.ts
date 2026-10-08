@@ -27,11 +27,16 @@ vi.mock('electron', () => ({
 
 /** Jobs the stubbed engine was asked to start, newest last. */
 const started: { jobId: string; targetUrl: string; profileId: string }[] = [];
+/** The user agent of the settings each started job was given, by job id. */
+const startedAgents = new Map<string, string>();
 let engineActiveJobs = 0;
 let jobSeq = 0;
 
 vi.mock('../scraper/engine', () => ({
-  startScrape: (input: { request: { targetUrl: string; profileId: string } }) => {
+  startScrape: (input: {
+    request: { targetUrl: string; profileId: string };
+    settings?: { network?: { userAgent?: string } };
+  }) => {
     jobSeq += 1;
     const jobId = `job-test-${jobSeq}`;
     started.push({
@@ -39,6 +44,7 @@ vi.mock('../scraper/engine', () => ({
       targetUrl: input.request.targetUrl,
       profileId: input.request.profileId,
     });
+    startedAgents.set(jobId, input.settings?.network?.userAgent ?? '');
     return jobId;
   },
   activeJobCount: () => engineActiveJobs,
@@ -586,5 +592,87 @@ describe('persistence', () => {
     // A fresh, valid next run was computed in place of the garbage.
     expect(record?.nextRunAt).toBeTruthy();
     expect(started).toEqual([]);
+  });
+});
+
+describe('scheduler P6 fixes', () => {
+  it('re-arms on the minute boundary instead of drifting by a fixed 60 s', () => {
+    expect(scheduler.delayToNextMinute(at(2026, 7, 27, 3, 0) + 59_000)).toBe(1_250);
+    expect(scheduler.delayToNextMinute(at(2026, 7, 27, 3, 0) + 250)).toBe(60_000);
+    expect(scheduler.delayToNextMinute(at(2026, 7, 27, 3, 0))).toBe(60_250);
+  });
+
+  it('does not let a hold longer than a minute become a skip', async () => {
+    attach();
+    await sync([entry({ cron: '0 3 * * *' })], { missedRunPolicy: 'skip' });
+    engineActiveJobs = 1;
+    await sync([entry({ cron: '0 3 * * *' })], { missedRunPolicy: 'skip', skipIfRunning: true });
+    // Due at 03:00, held by a running job until 03:20.
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 0));
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 10));
+    expect(started).toEqual([]);
+    engineActiveJobs = 0;
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 20));
+    expect(started).toHaveLength(1);
+  });
+
+  it('keeps the stored run record when a sync races the first load', async () => {
+    attach();
+    await sync([entry({ cron: '0 3 * * *' })]);
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 0));
+    await scheduler.whenSchedulerPersisted();
+    expect(started).toHaveLength(1);
+
+    // Restart: a tick and a sync arrive together before the state file is read.
+    scheduler.resetScheduler();
+    attach();
+    const [, state] = await Promise.all([
+      scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 1)),
+      sync([entry({ cron: '0 3 * * *' })]),
+    ]);
+    expect(state.entries[0]?.lastJobId).toBe('job-test-1');
+    expect(started).toHaveLength(1);
+  });
+
+  it('migrates a saved configuration from an older build', async () => {
+    const legacySettings: Record<string, unknown> = JSON.parse(JSON.stringify(DEFAULT_SCRAPER_SETTINGS));
+    delete legacySettings.notifications;
+    await fsp.mkdir(path.dirname(scraperStorePath('scheduler-config.json')), { recursive: true });
+    await fsp.writeFile(
+      scraperStorePath('scheduler-config.json'),
+      JSON.stringify({
+        scheduler: { enabled: true, entries: [{ id: 'nightly', label: 'N', cron: '0 3 * * *', targetUrl: 'https://anilist.co/anime/21', profileId: 'balanced', enabled: true }] },
+        settings: legacySettings,
+      }),
+      'utf-8',
+    );
+    attach();
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 2, 59));
+    // A notification group missing from the file must not throw when the run starts.
+    await expect(scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 0))).resolves.toBeUndefined();
+    expect(started).toHaveLength(1);
+  });
+
+  it('runs each entry under the profile its picker names', async () => {
+    attach();
+    const night = JSON.parse(JSON.stringify(DEFAULT_SCRAPER_SETTINGS));
+    night.network.userAgent = 'night-profile-agent';
+    await scheduler.syncScheduler({
+      scheduler: {
+        ...DEFAULT_SCRAPER_SCHEDULER_SETTINGS,
+        enabled: true,
+        entries: [
+          entry({ id: 'a', profileId: 'night', cron: '0 3 * * *' }),
+          entry({ id: 'b', profileId: 'missing', cron: '0 3 * * *' }),
+        ],
+      },
+      settings: DEFAULT_SCRAPER_SETTINGS,
+      profileSettings: { night },
+    });
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 0));
+    const byProfile = Object.fromEntries(started.map((job) => [job.profileId, startedAgents.get(job.jobId)]));
+    expect(byProfile.night).toBe('night-profile-agent');
+    // A profile the sync did not carry falls back to the active settings.
+    expect(byProfile.missing).toBe(DEFAULT_SCRAPER_SETTINGS.network.userAgent);
   });
 });

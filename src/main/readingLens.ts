@@ -33,6 +33,7 @@ import {
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { ocrClipboardImage, ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
+import { coverDisplay } from './screenSources';
 import {
   getGlobalCommandChord,
   getGlobalCommandStatus,
@@ -153,8 +154,14 @@ const STATE_FILE = 'reading-lens.json';
 // tends to be free (Ctrl+Alt+<key> combos are widely claimed by IMEs and vendor
 // utilities). If it is taken, the Settings section lets the user rebind and the
 // failure is surfaced rather than swallowed.
+//
+// Opt-in (KI-6): a fresh install no longer claims Ctrl+Shift+Space (and the other
+// Lens chords) system-wide at boot — that chord is an IME toggle and an editor
+// shortcut on many machines. The Lens is switched on in Settings → Reading Lens.
+// A profile that already has a reading-lens.json from before this default keeps
+// the Lens on (see loadSettings), so nobody loses a hotkey they were using.
 const DEFAULTS: ReadingLensSettings = {
-  enabled: true,
+  enabled: false,
   hotkey: 'Ctrl+Shift+Space',
   lastRegion: null,
   defaultEngine: READING_LENS_ENGINE_DEFAULT,
@@ -239,7 +246,11 @@ function loadSettings(): ReadingLensSettings {
       validate: (v) => typeof v === 'object' && v !== null,
     });
     return {
-      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULTS.enabled,
+      // No file: a fresh install (off). A file without the flag: an older profile
+      // that always had the Lens on — keep it on.
+      enabled: typeof parsed.enabled === 'boolean'
+        ? parsed.enabled
+        : Object.keys(parsed).length > 0 || DEFAULTS.enabled,
       hotkey:
         typeof parsed.hotkey === 'string' && parsed.hotkey.trim()
           ? parsed.hotkey.trim()
@@ -266,25 +277,8 @@ function preloadPath(): string {
   return path.join(__dirname, 'preload.js');
 }
 
-/**
- * Make the overlay cover exactly `bounds` (one display, in DIP).
- *
- * Electron on Windows sizes a window that lands on a monitor whose scale factor differs from
- * the one it was created or last shown on in the wrong DIPs. Measured on a 1280×720 @150%
- * primary with a 1920×1080 @100% second monitor: the overlay for the second monitor came up
- * 1280×720, so the right and bottom thirds of that screen could not be selected. Once the
- * window is on the target monitor, setting the same bounds again sticks.
- */
-export function coverDisplay(
-  win: Pick<BrowserWindow, 'setBounds' | 'getBounds'>,
-  bounds: Electron.Rectangle,
-): void {
-  win.setBounds(bounds);
-  const got = win.getBounds();
-  if (got.x !== bounds.x || got.y !== bounds.y || got.width !== bounds.width || got.height !== bounds.height) {
-    win.setBounds(bounds);
-  }
-}
+// `coverDisplay` (make the overlay cover exactly one display) moved to
+// `screenSources.ts`, shared with the Region Recorder's overlay.
 
 function displayUnderCursor(): Electron.Display {
   return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());

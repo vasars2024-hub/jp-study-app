@@ -163,6 +163,7 @@ const readyPanels = () => import('./BlancReadyToolPanels');
 const BatchConverterPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.BatchConverterPanel })));
 const BlancModelsPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.BlancModelsPanel })));
 const BlancYoutubePanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.BlancYoutubePanel })));
+const RecorderLauncherPanel = retryableLazy(() => import('../../recorder/RecorderLauncherPanel'));
 const DifficultyAnalyzerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.DifficultyAnalyzerPanel })));
 const FrequencyExplorerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.FrequencyExplorerPanel })));
 const ImmersionTrackerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.ImmersionTrackerPanel })));
@@ -1525,6 +1526,7 @@ type BlancToolId =
   | 'subtitle-importer'
   | 'kanji-inspector'
   | 'youtube-library'
+  | 'screen-recorder'
   | 'furigana'
   | 'counter-reader'
   | 'conjugation-drill'
@@ -1589,6 +1591,7 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
   // Mine & review
   'audio-mine',
   'subtitle-importer',
+  'screen-recorder',
   'review-forecast',
   'games',
   'mono-blocks',
@@ -1658,6 +1661,7 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   'subtitle-importer': 'caption',
   'kanji-inspector': 'scan',
   'youtube-library': 'player',
+  'screen-recorder': 'video',
   'mono-blocks': 'app',
 };
 
@@ -1707,6 +1711,7 @@ const TOOL_CATEGORY: Record<BlancToolId, BlancToolCategory> = {
   'immersion-tracker': 'read-watch',
   'audio-mine': 'mine-review',
   'subtitle-importer': 'mine-review',
+  'screen-recorder': 'mine-review',
   'review-forecast': 'mine-review',
   games: 'mine-review',
   'mono-blocks': 'mine-review',
@@ -1926,6 +1931,7 @@ function renderBlancTool(
   if (tool === 'subtitle-importer') return <SubtitleImporterPanel />;
   if (tool === 'kanji-inspector') return <KanjiInspectorPanel />;
   if (tool === 'youtube-library') return <BlancYoutubePanel />;
+  if (tool === 'screen-recorder') return <RecorderLauncherPanel />;
   if (tool === 'mono-blocks') return <MonoBlocks />;
   if (tool === 'visual-novels') return <BlancVisualNovelsPanel />;
   return <BlancCalendarPanel />;
@@ -3793,14 +3799,16 @@ function BlancSettingsPanel({
   };
 
   const savePin = (): void => {
-    const next = setLockscreenPin(pin);
-    if (!next) {
-      setPinMsg(t('blanc.settings.pinFourDigits'));
-      return;
-    }
-    setPin('');
-    setPinSet(true);
-    setPinMsg(t('blanc.settings.pinSaved'));
+    // Hashed in main (scrypt), so saving is async.
+    void setLockscreenPin(pin).then((next) => {
+      if (!next) {
+        setPinMsg(t('blanc.settings.pinFourDigits'));
+        return;
+      }
+      setPin('');
+      setPinSet(true);
+      setPinMsg(t('blanc.settings.pinSaved'));
+    });
   };
 
   const toggleLock = (on: boolean): void => {

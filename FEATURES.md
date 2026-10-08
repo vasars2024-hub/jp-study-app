@@ -24,11 +24,11 @@ is the whole point of the column.
 
 | Registry | Where | Holds |
 |---|---|---|
-| Desktop window sections | `src/shared/desktop.ts:8` | 24 |
+| Desktop window sections | `src/shared/desktop.ts:23` (`DESKTOP_WIN_SECTIONS`) | 26 |
 | Settings pages | `src/renderer/components/settings/types.ts:21` | 21 |
 | Settings sidebar order | `src/renderer/components/settings/settingsRegistry.ts:11` | — |
 | Scraper pages | `src/shared/scraperShell.ts:15` | 17 |
-| Games | `src/renderer/games/engine.ts:20` | 15 |
+| Games | `src/renderer/games/types.ts` (`GameId`) | 19 |
 | Blanc toolbox modules | `src/shared/toolboxRegistry.ts:146` | 38 |
 | Downloadable assets | `src/shared/assetRegistry.ts:293` | 21 |
 | Keyboard commands | `src/renderer/keyboardShortcuts.ts:72` | 125 |
@@ -41,10 +41,15 @@ The app presents as a small desktop OS: a wallpaper, draggable windows, a Start
 menu and a taskbar. Every major surface below opens as a window section from
 `DesktopWinSection` (`src/shared/desktop.ts:8`).
 
-The 24 sections: `library`, `novels`, `dictionary`, `grammar`, `notebook`,
+The 26 sections: `agent`, `library`, `novels`, `dictionary`, `grammar`,
 `translate`, `player`, `video`, `music`, `anki`, `flashcards`, `games`, `stats`,
 `resources`, `settings`, `note`, `visualizer`, `musicwidget`, `city`,
-`immersion`, `calendar`, `reading`, `youtube`, `scraper`.
+`immersion`, `calendar`, `reading`, `youtube`, `scraper`, `files`,
+`visualnovels`.
+
+The Notebook section was removed at Files-app gate 7b; a persisted `notebook`
+window (and `--open=notebook`) is aliased to `files`
+(`LEGACY_WIN_SECTION_ALIASES`, `src/shared/desktop.ts`).
 
 | Feature | Entry point | Reachability | Status |
 |---|---|---|---|
@@ -53,7 +58,11 @@ The 24 sections: `library`, `novels`, `dictionary`, `grammar`, `notebook`,
 | Taskbar clock, locale-formatted | `DesktopShell.tsx` | Always | **DRIVEN** — C1-2 verified the clock renders `5 авг.` in RU and `8月5日` in JA while the host locale stayed `en-US` |
 | Keyboard command palette / shortcuts | `src/renderer/keyboardShortcuts.ts:72` (125 commands) | Global | UNVERIFIED |
 | Mini shell | `src/renderer/components/MiniShell.tsx` | Settings → Mini | UNVERIFIED |
-| Lockscreen | `src/renderer/components/Lockscreen.tsx` | Settings → Lockscreen | UNVERIFIED |
+| Lockscreen (PIN hashed with scrypt in main, attempt backoff) | `src/renderer/components/Lockscreen.tsx`, `src/main/lockscreenPin.ts` | Settings → Lockscreen | TESTED |
+| Window placement memory (size, position, monitor, maximized; main + Blanc) | `src/main/windowState.ts` | Always | TESTED |
+| Keep running in the tray / start at sign-in (both off by default) | `src/main/appLifecycle.ts`, tray rows in `src/main/systemDictionary.ts` | Settings → Shortcuts → Startup and tray | TESTED |
+| Files app (absorbed the Notebook) | `src/renderer/components/filesapp/FilesApp.tsx` | Start → Files | UNVERIFIED |
+| Agent (local/cloud planner, tool registry) | `src/renderer/components/agent/`, `src/renderer/agentToolRegistry.ts` | Start → Agent | UNVERIFIED |
 | Notification centre | `src/renderer/components/shell/NotificationCenter.tsx` | Taskbar | UNVERIFIED |
 | Themes (incl. `soft-sepia`, `rose-pine`, `frutiger-aero`) | `src/renderer/theme/engine.ts:73`, `:77` | Settings → Appearance | **DRIVEN** — audit U6 measured both themes live and closed them working-as-intended |
 
@@ -61,12 +70,13 @@ The 24 sections: `library`, `novels`, `dictionary`, `grammar`, `notebook`,
 
 ## 2. Reading Lens
 
-A **system-wide screen-OCR reader**. It is **enabled by default** and claims an
-OS-level global accelerator at boot.
+A **system-wide screen-OCR reader**. It is **opt-in**: a fresh install claims no
+OS-level accelerator until the Lens is switched on in Settings → Reading Lens
+(a profile that already had a `reading-lens.json` keeps it on).
 
 | Feature | Entry point | Reachability | Status |
 |---|---|---|---|
-| Global hotkey capture | `src/main/readingLens.ts:57` — `{ enabled: true, hotkey: 'Ctrl+Shift+Space' }` | Global hotkey, anywhere in the OS | TESTED |
+| Global hotkey capture | `src/main/readingLens.ts` — `DEFAULTS = { enabled: false, hotkey: 'Ctrl+Shift+Space' }` | Global hotkey, anywhere in the OS, once enabled | TESTED |
 | Lens configuration | `src/main/readingLens.ts:76` | Settings → Reading | TESTED |
 | Screen region OCR | `src/main/screenOcr.ts` | Via the hotkey | TESTED |
 | Lens overlay / reader / analysis panels | `src/renderer/components/lens/` | After a capture | TESTED |
@@ -82,26 +92,29 @@ performs a real `desktopCapturer` capture or a real hotkey press. See
 | Feature | Entry point | Reachability | Status |
 |---|---|---|---|
 | Dictionary lookup | `src/renderer/views/DictionaryView.tsx` | Start → Dictionary | UNVERIFIED |
-| Jiten dictionary backend | `src/shared/jiten.ts` | Dictionary | UNVERIFIED |
+| Jiten.moe deck catalog — search media decks, a study plan, deck/EPUB downloads into the Library (API key in the credentials vault) | `src/main/jiten.ts`, `src/shared/jiten.ts` | Reading plan, Library | UNVERIFIED |
 | Grammar explorer | `src/renderer/components/grammar/GrammarExplorer.tsx` | Start → Grammar | UNVERIFIED |
 | Grammar practice | `src/renderer/components/grammar/GrammarPracticePanel.tsx` | Grammar | UNVERIFIED |
 | Grammar curation | `src/renderer/components/grammar/GrammarCurationPanel.tsx` | Grammar | UNVERIFIED |
 | Sentence analysis | `src/renderer/components/SentenceAnalysisPanel.tsx` | Reader, Dictionary | UNVERIFIED |
 | Pitch accent | `src/shared/pitchAccent.ts` | Dictionary | UNVERIFIED |
-| Review forecast | `src/shared/reviewForecast.ts` | Stats, Blanc | Partly **BROKEN** — `dayLabel` renders in the OS locale and hardcodes English. `docs/KNOWN_ISSUES.md` **KI-1** |
+| Review forecast | `src/shared/reviewForecast.ts` | Stats, Blanc | UNVERIFIED |
+| Reading Lists | `src/shared/readingLists.ts`, `src/main/readingListsIpc.ts`, `src/renderer/components/reading/ReadingList*.tsx` | Reading | UNVERIFIED |
 
 ---
 
-## 4. Anki, flashcards, notebook
+## 4. Anki and flashcards
 
 | Feature | Entry point | Reachability | Status |
 |---|---|---|---|
+| Deck Workbench | `src/renderer/components/anki/DeckWorkbench.tsx` | Anki | UNVERIFIED |
+| "Anki owns scheduling" (cards with an Anki twin leave the built-in queue; off by default) | `src/renderer/ankiSchedulingOwner.ts` | Settings → Study | TESTED |
 | Anki card preview | `src/renderer/components/AnkiCardPreview.tsx` | Start → Anki | UNVERIFIED |
 | `.apkg` import | `src/main/anki/apkgImport.ts` | Anki | UNVERIFIED |
 | Field mapping editor | `src/renderer/components/FieldMappingEditor.tsx` | Anki | UNVERIFIED |
 | Note CSS editor | `src/renderer/components/NoteCssEditor.tsx` | Anki | UNVERIFIED |
 | Jiten mining panel | `src/renderer/components/JitenMiningPanel.tsx` | Reader, Dictionary | UNVERIFIED |
-| Live captions | `src/renderer/components/notebook/LiveCaptionsPanel.tsx` | Start → Notebook | UNVERIFIED |
+| Live captions | `src/renderer/captions/CaptionsOverlay.tsx`, `src/main/systemAudioCapture.ts` | Shortcut / tray | UNVERIFIED |
 
 > **U3 is a standing user-only item.** Five `JP Study App::*` note types in the
 > real Anki collection cannot be removed programmatically — AnkiConnect has no
@@ -111,13 +124,14 @@ performs a real `desktopCapturer` capture or a real hotkey press. See
 
 ## 5. Games
 
-15 games, all defined in `src/renderer/games/engine.ts:20` (`GAME_DEFINITIONS`).
-Reachable from Start → Games.
+19 games (`GameId`, `src/renderer/games/types.ts`; definitions in
+`src/renderer/games/engine.ts`). Reachable from Start → Games.
 
 `sentence-builder`, `speed-type`, `word-match`, `kana-sprint`, `kanji-reading`,
 `cloze-blitz`, `listening-flash`, `particle-panic`, `counter-quiz`,
 `reverse-recall`, `star-invaders`, `comet-courier`, `capsule-sorter`,
-`signal-simon`, `mirror-writing`.
+`signal-simon`, `aero-breakout`, `aero-blocks`, `aero-pong`, `aero-snake`,
+`mirror-writing`.
 
 Status: UNVERIFIED as gameplay. i18n coverage **is** tested
 (`src/renderer/__tests__/arcadeGamesI18n.test.tsx`).
@@ -163,8 +177,8 @@ Storage page (`StoragePage.tsx:28-33`).
 
 | Finding | Status |
 |---|---|
-| Default Japanese tier `kotoba-whisper-v2.0` is gated — HF answers **401** | **BROKEN**, `docs/KNOWN_ISSUES.md` **KI-7** |
-| Default WebGPU device returns degenerate Japanese transcripts | **BROKEN**, `docs/KNOWN_ISSUES.md` **KI-8** |
+| Default Japanese tier was gated (HF answered **401**) | Fixed — former KI-7, closed and removed from `docs/KNOWN_ISSUES.md` |
+| Default WebGPU device returned degenerate Japanese transcripts | Former KI-8, no longer listed in `docs/KNOWN_ISSUES.md`; UNVERIFIED since |
 | Transcription on CPU/fp32 with `Xenova/whisper-base` | **DRIVEN** — transcribed synthesised Japanese speech correctly |
 
 ### Measured cost, so the real price is known before triggering it
@@ -176,7 +190,7 @@ Driven 2026-08-05 on the live app (C1-9). Times are wall clock on this machine.
 | `whisper-base` ggml asset (catalog; **not used by transcription**) | 147,951,465 B (141 MiB) | ~13.3 s transfer, peak 68.4 MB/s |
 | `Xenova/whisper-base` fp32, CPU — first use incl. download | — | **54.4 s** |
 | `Xenova/whisper-base` fp32, CPU — cached | — | 7.1 s for 3.7 s of audio |
-| `Xenova/whisper-base` q4/WebGPU — cached | — | 8.2 s (but see KI-8) |
+| `Xenova/whisper-base` q4/WebGPU — cached | — | 8.2 s (measured while the WebGPU transcript defect, former KI-8, was open) |
 
 ---
 
@@ -342,18 +356,12 @@ P3 found **two BROKEN and zero DEAD** features in that matrix; see
 ## 15. Known-broken index
 
 The single list of measured, reproducible defects is **`docs/KNOWN_ISSUES.md`**.
-As of 2026-08-05 it holds:
+As of 2026-10-08 it holds one row (KI-1 to KI-5, KI-7 and KI-8 were fixed or
+closed and removed there, per that file's own rule):
 
 | Row | Summary |
 |---|---|
-| KI-1 | `dayLabel` renders in the OS locale and hardcodes English |
-| KI-2 | 60 `toLocaleString()` calls format numbers in the OS locale (ratcheted) |
-| KI-3 | `grammar-audit.json` still carries pre-de-branding identifiers |
-| KI-4 | Four dead catalog keys, `mediaWorkspace.section.reopen` |
-| KI-5 | `Surfaces.tsx` is dead — all three primitives, not just `.ui-card` |
-| KI-6 | Reading Lens is untested end to end |
-| KI-7 | Default Japanese Whisper model is gated; first-use transcription fails |
-| KI-8 | Default WebGPU path returns degenerate Japanese transcripts |
+| KI-6 | Reading Lens is untested end to end (now opt-in, so it no longer claims a hotkey at boot) |
 
 Items that remain the user's to run, and cannot be closed from here: **U3**
 (Anki note types), **U5** (MyAnimeList token against a real account), **U7**

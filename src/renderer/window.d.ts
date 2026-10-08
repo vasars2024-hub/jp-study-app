@@ -682,6 +682,9 @@ declare global {
       fileDropClassify(paths: string[]): Promise<DropPlan[]>;
       fileDropFolderImages(dirPath: string): Promise<string[]>;
       fileDropFolderFiles(dirPath: string): Promise<string[]>;
+      /** Files Windows opened with Gum, queued in main until this renderer drains them. */
+      fileOpenDrain?(): Promise<string[]>;
+      onFileOpenPaths?(cb: (paths: string[]) => void): () => void;
       filesDelete(
         request: import('../shared/filesApp/deletion').FilesDeleteRequest,
       ): Promise<import('../shared/filesApp/deletion').FilesDeletionResult>;
@@ -784,8 +787,16 @@ declare global {
       blancSetGlobalShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;
       blancGetLaunchPrefs(): Promise<{ blancOnly: boolean }>;
       blancSetLaunchPrefs(patch: { blancOnly?: boolean }): Promise<{ blancOnly: boolean }>;
+      /** Keep running in the tray when closed / start Gum at sign-in (main/appLifecycle.ts). */
+      appGetLifecycle?(): Promise<{ keepRunningInTray: boolean; startAtLogin: boolean; startMinimized: boolean; loginItemSupported: boolean }>;
+      appSetLifecycle?(
+        patch: Partial<{ keepRunningInTray: boolean; startAtLogin: boolean; startMinimized: boolean }>,
+      ): Promise<{ keepRunningInTray: boolean; startAtLogin: boolean; startMinimized: boolean; loginItemSupported: boolean }>;
       blancStudyOsAlive(): Promise<boolean>;
       onStudyOsAlive(cb: (alive: boolean) => void): () => void;
+      blancStudyOsJobsReady?(): Promise<boolean>;
+      blancStudyOsJobsReadyState?(): Promise<boolean>;
+      onStudyOsJobsReady?(cb: (ready: boolean) => void): () => void;
       blancOpenStudyOs(): Promise<{ ok: boolean }>;
       appMemoryMetrics(): Promise<import('../shared/appMemory').AppMemoryReport>;
       appToggle(): Promise<{ ok: boolean }>;
@@ -857,7 +868,13 @@ declare global {
       lockscreenUnlock(): Promise<{ ok: boolean }>;
       lockscreenSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
       lockscreenIsOpen(): Promise<boolean>;
+      lockscreenHashPin?(pin: string): Promise<string | null>;
+      lockscreenVerifyPin?(pin: string, stored: string): Promise<{ ok: boolean; retryAfterMs?: number; upgradedHash?: string }>;
       onLockscreenUnlocked(cb: () => void): () => void;
+      lockscreenSyncConfig?(config: { enabled: boolean; pinHash: string }, rendererLocked: boolean): Promise<{ ok: boolean; locked: boolean }>;
+      lockscreenLock?(): Promise<{ locked: boolean }>;
+      lockscreenIsLocked?(): Promise<boolean>;
+      onLockscreenLocked?(cb: () => void): () => void;
       companionPacksList?(): Promise<unknown[]>;
       companionPacksImport?(opts?: { kind?: 'file' | 'folder' }): Promise<import('../shared/companionPacks').CompanionPackImportResult>;
       companionPacksRename?(id: string, name: string): Promise<boolean>;
@@ -912,6 +929,10 @@ declare global {
       checkAppRelease(): Promise<AppReleaseInfo | null>;
       /** Honest update status for Settings > Help (see shared/release.ts ReleaseStatusKind). */
       releaseStatus(): Promise<import('../shared/release').ReleaseStatus>;
+      /** Squirrel self-update state (installed builds); `install: 'portable'` on the zip. */
+      appUpdateStatus?(): Promise<import('../shared/appUpdate').AppUpdateStatus>;
+      appUpdateRestart?(): Promise<boolean>;
+      onAppUpdateChanged?(cb: (status: import('../shared/appUpdate').AppUpdateStatus) => void): () => void;
       catalogGet(): Promise<import('../shared/resourcesCatalog').ResourcesCatalog | null>;
       catalogRefresh(): Promise<
         import('../shared/resourcesCatalog').CatalogResult<
@@ -1015,6 +1036,13 @@ declare global {
       // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
       extractVideoClip(
         req: import('../shared/videoClip').VideoClipRequest,
+      ): Promise<import('../main/videoClipExtract').VideoClipResult>;
+      // One cue's audio (mp3, the listened-to stream) and one still, for one-key mining.
+      extractAudioClip(
+        req: import('../shared/videoClip').AudioClipRequest,
+      ): Promise<import('../main/videoClipExtract').VideoClipResult>;
+      extractVideoFrame(
+        req: import('../shared/videoClip').VideoFrameRequest,
       ): Promise<import('../main/videoClipExtract').VideoClipResult>;
       // "Sentence deck from a video" (main/sentenceDeckIpc.ts).
       sentenceDeckSources(input: {
@@ -2148,8 +2176,14 @@ declare global {
           anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
           /** The exact note main sent; a queued mine is replayed from it. */
           ankiRequest?: import('../shared/anki').MineNoteRequest;
+          /** Main's id for this mine; ack it with `ackExtensionMined`. A replay repeats it. */
+          mineId?: string;
         }) => void,
       ): () => void;
+      /** Tell main this window handled an extension mine (removes it from the pending store). */
+      ackExtensionMined?(mineId: string, result?: { ok: boolean; error?: string }): void;
+      /** The study bridges are installed: main may replay pending mines to this window. */
+      extensionBridgeReady?(): void;
       onExtensionClipboardAppend(
         cb: (payload: { text: string; type?: string; url?: string; title?: string }) => void,
       ): () => void;
@@ -2165,6 +2199,12 @@ declare global {
       extensionFocusMainAndOpen(target: string): Promise<{ ok: boolean }>;
       onKnownLevelsRequest(cb: (payload: { id: string; terms: string[] }) => void): () => void;
       replyKnownLevels(id: string, levels: Record<string, number>): void;
+      /** Main asks for every known word and its level (extension page word-status colouring). */
+      onKnownSnapshotRequest?(cb: (payload: { id: string }) => void): () => void;
+      replyKnownSnapshot?(id: string, payload: { words: Record<string, number>; lang?: string }): void;
+      /** Main asks the host window to tokenize page text and level each word (extension /v1/annotate). */
+      onExtensionAnnotateRequest?(cb: (payload: { id: string; texts: string[]; lang: string }) => void): () => void;
+      replyExtensionAnnotate?(id: string, results: unknown[]): void;
       onKnownLevelSet(cb: (payload: { id: string; term: string; level: number }) => void): () => void;
       replyKnownLevelSet(id: string, result: { ok: boolean; error?: string }): void;
       onComprehensibilityRequest(cb: (payload: { id: string; text: string }) => void): () => void;
@@ -2279,6 +2319,30 @@ declare global {
       captionsHostStatus(status: { bufferedMs?: number; gumModelMissing?: boolean }): void;
       captionsHostUtterance(utterance: { text: string; startMs: number; endMs: number }): void;
       captionsInjectSnapshot(lines: string[], windowTitle?: string): Promise<unknown>;
+
+      // Region Recorder (main/regionRecorder.ts).
+      recorderGetState(): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderSetSettings(patch: Partial<import('../shared/regionRecorder').RecorderSettings>): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderStart(mode?: import('../shared/regionRecorder').RecorderStartMode): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderStop(): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderPause(paused: boolean): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderChooseFolder(): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderJobAction(id: string, action: import('../shared/regionRecorder').RecorderJobAction): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderRecoveryAction(id: string, action: import('../shared/regionRecorder').RecorderRecoveryAction): Promise<import('../shared/regionRecorder').RecorderState>;
+      onRecorderState(cb: (state: import('../shared/regionRecorder').RecorderState) => void): () => void;
+      onRecorderLevels(cb: (levels: { mic: number; system: number }) => void): () => void;
+      recorderSelectGetInit(): Promise<import('../shared/regionRecorder').RecorderSelectInit | null>;
+      onRecorderSelectInit(cb: (init: import('../shared/regionRecorder').RecorderSelectInit) => void): () => void;
+      recorderSelectDone(region: import('../shared/regionRecorder').RectLike | null): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderSelectNextDisplay(): Promise<import('../shared/regionRecorder').RecorderSelectInit | null>;
+      onRecorderHostCommand(cb: (command: import('../shared/regionRecorder').RecorderHostCommand) => void): () => void;
+      recorderHostChunk(seq: number, data: Uint8Array): void;
+      recorderHostEvent(event: import('../shared/regionRecorder').RecorderHostEvent): void;
+      recorderPanelResize(height: number): void;
+      onRecorderModelCheck(cb: (request: { requestId: string; lang: string }) => void): () => void;
+      recorderModelCheckReply(reply: { requestId: string; ready: boolean }): void;
+      onRecorderOpenInPlayer(cb: (request: { requestId: string; path: string; mediaId?: string }) => void): () => void;
+      recorderOpenInPlayerReply(reply: { requestId: string; reach: string }): void;
       cancelTranscription(mediaId?: string): Promise<void>;
       transcriptionQueue(): Promise<import('../shared/transcriptionIpc').TranscriptionJob[]>;
       fusionTrackMeta(

@@ -49,22 +49,25 @@ import {
   extractWithRule,
   ruleForUrl,
   type RuleDocument,
+  type RuleElement,
   type RuleExtraction,
   type ScraperSiteRule,
 } from '../../shared/scraperSiteRules';
-import { applyExtractionSettings } from './extractionRules';
+import { episodeRowId } from '../../shared/scraperEpisodeId';
+import { applyExtractionSettings, decodeHtmlEntities } from './extractionRules';
 import {
   applyEpisodeProcessing,
   missingEpisodeNumbers,
   missingEpisodesNote,
 } from './episodeProcessingRules';
 import { buildImageRows, episodeThumbnailFor } from './imageSet';
-import { scraperRequest } from './http';
+import { isScraperAbortError, scraperRequest } from './http';
 import { scraperLog, scraperLogsFor } from './logBus';
 import { runWithScraperRuntime, scraperRuntimeFor } from './runtime';
 import { searchTorrents } from './torrents';
 import { resolveSeanimeStreams } from './seanimeSources';
 import { enabledSourcesOfKind, metadataProviderOrder } from '../../shared/scraperSourceOrder';
+import { releaseCoversEpisode } from '../../shared/malDownload';
 
 export type JobEmitter = (jobId: string, event: ScrapeJobEvent) => void;
 
@@ -78,6 +81,12 @@ interface Job {
   /** Measured stage durations, in the order the run passed through them. */
   timings: ScrapeStageTiming[];
   cancelled: boolean;
+  /**
+   * Aborted by `cancelScrape`. Every request the job makes carries its signal
+   * (explicitly, or through the runtime scope), so a cancel ends an in-flight
+   * request instead of waiting for it.
+   */
+  controller: AbortController;
   rows: EpisodeRow[];
   result: ScrapeResult | null;
   summary: ScrapeJobSummary | null;
@@ -222,7 +231,11 @@ export function isSiteNameOnly(title: string, url: string): boolean {
  * A URL is fetched and its `<title>` used — that is the one case where the
  * scraper reads a page the user chose, and it reads only the title element.
  */
-export async function resolveQuery(target: string, correlationId: string): Promise<string> {
+export async function resolveQuery(
+  target: string,
+  correlationId: string,
+  signal?: AbortSignal,
+): Promise<string> {
   const trimmed = target.trim();
   if (!trimmed) return '';
   if (!URL_LIKE.test(trimmed)) return trimmed;
@@ -235,9 +248,12 @@ export async function resolveQuery(target: string, correlationId: string): Promi
       // A page the user pointed us at, read for its <title>. This and the site
       // rule fetch below are the two requests robots.txt governs.
       crawl: true,
+      signal,
     });
     const title = /<title[^>]*>([\s\S]{1,300}?)<\/title>/i.exec(response.body)?.[1] ?? '';
-    const cleaned = cleanPageTitle(title.replace(/&amp;/g, '&').replace(/&#\d+;/g, ''));
+    // Numeric references (`&#x30AC;`) are often how a page writes its Japanese
+    // title; deleting them would search for the Latin remainder alone.
+    const cleaned = cleanPageTitle(decodeHtmlEntities(title));
     if (cleaned && !isSiteNameOnly(cleaned, trimmed)) {
       scraperLog('info', 'engine', `Page title: "${cleaned}"`, { correlationId });
       return cleaned;
@@ -248,6 +264,9 @@ export async function resolveQuery(target: string, correlationId: string): Promi
       });
     }
   } catch (error) {
+    // A cancel is not "could not read the page": falling back to the slug
+    // would carry on a run the user stopped.
+    if (isScraperAbortError(error)) throw error;
     scraperLog('warn', 'engine', `Could not read that page: ${
       error instanceof Error ? error.message : String(error)
     }`, { correlationId });
@@ -293,7 +312,7 @@ function subtitlesFromReleases(
   // the release covers it: a batch covers everything, a single episode has its
   // number in the name.
   const relevant = releases.filter(
-    (row) => row.isBatch || new RegExp(`\\b0*${episodeNumber}\\b`).test(row.name),
+    (row) => row.isBatch || releaseCoversEpisode(row.name, episodeNumber),
   );
   const byLanguage = new Map<string, SubtitleAvailability>();
   for (const release of relevant) {
@@ -337,7 +356,7 @@ export function buildRuleRows(
     // it still gets a stable id rather than colliding on `-eNaN`.
     const number = row.number ?? row.index;
     return {
-      id: `${seriesId}-e${number}`,
+      id: episodeRowId(seriesId, 1, 'episode', number),
       seriesId,
       number,
       numberLabel: numberLabel(number),
@@ -403,11 +422,11 @@ export function buildEpisodeRows(
 
   let rows = episodes.map((episode): EpisodeRow => {
     const matching = releases.filter(
-      (row) => row.isBatch || new RegExp(`\\b0*${episode.number}\\b`).test(row.name),
+      (row) => row.isBatch || releaseCoversEpisode(row.name, episode.number),
     );
     const best = matching[0];
     return {
-      id: `${seriesId}-e${episode.number}`,
+      id: episodeRowId(seriesId, 1, episode.recap ? 'recap' : 'episode', episode.number),
       seriesId,
       number: episode.number,
       numberLabel: numberLabel(episode.number),
@@ -559,6 +578,87 @@ function closeStageTimings(job: Job): ScrapeStageTiming[] {
   return [...job.timings];
 }
 
+/**
+ * The URL of a listing's next page, or null when there is none to follow.
+ *
+ * Resolved against the page it was found on. A link to another origin is never
+ * followed — a "next" selector that happens to match an ad or a mirror must not
+ * turn a site rule into a crawler of somebody else's site.
+ */
+export function nextPageUrl(
+  doc: RuleDocument,
+  selector: string,
+  currentUrl: string,
+  originUrl: string,
+): string | null {
+  if (!selector.trim()) return null;
+  let element: RuleElement | undefined;
+  try {
+    element = doc.querySelectorAll(selector)[0];
+  } catch {
+    return null;
+  }
+  const href = element?.getAttribute('href')?.trim() ?? '';
+  if (!href || href.startsWith('#') || /^javascript:/i.test(href)) return null;
+  try {
+    const next = new URL(href, currentUrl);
+    if (next.origin !== new URL(originUrl).origin) return null;
+    next.hash = '';
+    return next.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Follows a site rule's next-page link up to `maxPages`, appending each page's
+ * rows to page one's. Row positions continue across pages so the positional
+ * fallback numbering stays unique. Stops on a repeated URL, another origin, a
+ * failed fetch or a page that yields no rows — partial results are kept.
+ */
+async function followNextPages(
+  job: Job,
+  rule: ScraperSiteRule,
+  firstDoc: RuleDocument,
+  first: RuleExtraction,
+): Promise<RuleExtraction> {
+  const maxPages = Math.min(50, Math.max(1, Math.round(rule.maxPages || 1)));
+  if (maxPages <= 1 || !rule.nextPageSelector?.trim()) return first;
+  const { settings, request } = job.input;
+  const correlationId = job.id;
+  const seen = new Set<string>([request.targetUrl]);
+  const rows = [...first.rows];
+  let doc = firstDoc;
+  let currentUrl = request.targetUrl;
+  for (let page = 2; page <= maxPages; page += 1) {
+    if (job.cancelled) throw new Cancelled();
+    const next = nextPageUrl(doc, rule.nextPageSelector, currentUrl, request.targetUrl);
+    if (!next || seen.has(next)) break;
+    seen.add(next);
+    let response: Awaited<ReturnType<typeof scraperRequest>>;
+    try {
+      response = await scraperRequest(next, { correlationId, crawl: true });
+    } catch (error) {
+      scraperLog('warn', 'engine', `Next page ${next} failed: ${error instanceof Error ? error.message : String(error)}`, { correlationId });
+      break;
+    }
+    if (response.status >= 400) {
+      scraperLog('warn', 'engine', `Next page ${next} answered ${response.status}; keeping ${rows.length} row(s).`, { correlationId });
+      break;
+    }
+    doc = new DOMParser().parseFromString(response.body, 'text/html') as unknown as RuleDocument;
+    const extraction = extractWithRule(doc, rule, next, {
+      ignoreHiddenElements: settings.extraction.ignoreHiddenElements,
+    });
+    if (extraction.error || !extraction.rows.length) break;
+    const offset = rows.length;
+    for (const row of extraction.rows) rows.push({ ...row, index: offset + row.index });
+    currentUrl = next;
+    scraperLog('debug', 'engine', `Page ${page}: ${extraction.rows.length} row(s) from ${next}.`, { correlationId });
+  }
+  return { ...first, rows };
+}
+
 async function runWithSiteRule(
   job: Job,
   rule: ScraperSiteRule,
@@ -576,7 +676,11 @@ async function runWithSiteRule(
   // No per-call network options: the job runs inside its profile's runtime
   // scope, so the timeout, user agent, custom headers, cookie, proxy, retries
   // and redirect policy are already applied by `scraperRequest`.
-  const response = await scraperRequest(request.targetUrl, { correlationId, crawl: true });
+  const response = await scraperRequest(request.targetUrl, {
+    correlationId,
+    crawl: true,
+    signal: job.controller.signal,
+  });
   if (response.status >= 400) {
     throw new Error(`${request.targetUrl} answered ${response.status}.`);
   }
@@ -601,8 +705,10 @@ async function runWithSiteRule(
     });
   }
 
+  const paged = await followNextPages(job, rule, doc as unknown as RuleDocument, extraction);
+
   const seriesId = `site-${rule.id}-${idSlugFromUrl(request.targetUrl)}`;
-  const parsed = buildRuleRows(extraction, rule, settings, seriesId);
+  const parsed = buildRuleRows(paged, rule, settings, seriesId);
   emitRows(job, parsed, settings, emit, progress);
 
   stage('validating');
@@ -703,7 +809,7 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
     );
   }
 
-  const query = await resolveQuery(request.targetUrl, correlationId);
+  const query = await resolveQuery(request.targetUrl, correlationId, job.controller.signal);
   if (!query) throw new Error('There is nothing to search for.');
   // The Source Manager's metadata order when it lists a catalogue, the
   // metadata group's own order otherwise — see `metadataProviderOrder`.
@@ -721,6 +827,7 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
 
   stage('fetching');
   const detail = (await catalogueDetail(chosen, correlationId)) ?? chosen;
+  let incompleteEpisodePage = 0;
   const episodes = await catalogueEpisodes(detail, correlationId, (page, count) => {
     if (job.cancelled) return;
     // Episode pages are the only part of the run whose size is knowable in
@@ -728,6 +835,9 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
     const total = detail.episodeCount || count;
     progress(Math.min(count, total), total, 0);
     scraperLog('debug', 'engine', `Episode page ${page}: ${count} so far.`, { correlationId });
+  }, (page) => {
+    // P6: a page that failed to load truncates the list; say so in the summary.
+    incompleteEpisodePage = page;
   });
   if (job.cancelled) throw new Cancelled();
   if (!episodes.length) {
@@ -749,6 +859,7 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
       timeoutMs: settings.sources.perSourceTimeoutMs,
       pool: settings.sources.entries,
       maxFallbackDepth: settings.sources.maxFallbackDepth,
+      signal: job.controller.signal,
     });
   } else {
     scraperLog(
@@ -816,6 +927,9 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
     failed: validated.failures,
     bytes: job.rows.reduce((total, row) => total + row.sizeBytes, 0),
     note: [
+      incompleteEpisodePage
+        ? `Partial episode list: page ${incompleteEpisodePage} of the catalogue failed to load.`
+        : '',
       settings.episodeProcessing.detectMissingNumbers
         ? missingEpisodesNote(missingEpisodeNumbers(job.rows))
         : '',
@@ -883,6 +997,7 @@ export function startScrape(input: ScraperStartInput, emit: JobEmitter): string 
     stageStartedAt: Date.now(),
     timings: [],
     cancelled: false,
+    controller: new AbortController(),
     rows: [],
     result: null,
     summary: null,
@@ -897,7 +1012,11 @@ export function startScrape(input: ScraperStartInput, emit: JobEmitter): string 
     // agent, headers, cookie, proxy, retries, pacing, concurrency limit and
     // cache behaviour from this scope.
     runWithScraperRuntime(
-      scraperRuntimeFor(input.settings, id, input.context?.hosts),
+      // The job's cancel signal rides on the scope too, so requests deep in
+      // catalogue.ts / torrents.ts that never name it are still cancelled.
+      Object.assign(scraperRuntimeFor(input.settings, id, input.context?.hosts), {
+        signal: job.controller.signal,
+      }),
       () => run(job, emit),
     )
       .catch((error: unknown) => {
@@ -942,6 +1061,8 @@ export function cancelScrape(jobId: string): void {
   const job = jobs.get(jobId);
   if (!job || job.stage === 'done') return;
   job.cancelled = true;
+  // Ends whatever request is in flight now, rather than at the next stage.
+  job.controller.abort();
 }
 
 export function jobResult(jobId: string): ScrapeResult | null {

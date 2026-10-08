@@ -30,4 +30,6 @@ export const MINING_HISTORY_STATUS_KEY: Record<VideoCoreMiningHistoryStatus, str
   duplicate: 'mediaWorkspace.mining.statusDuplicate',
   failed: 'mediaWorkspace.mining.statusFailed',
   undone: 'mediaWorkspace.mining.statusUndone',
+  queued: 'studyLoop.mine.statusQueued',
+  local: 'studyLoop.mine.statusLocal',
 };

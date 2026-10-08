@@ -28,17 +28,33 @@ interface Props {
   /** The card's study language; anything but Japanese renders nothing. */
   lang: string;
   className?: string;
+  /**
+   * Pitch data the host already holds (the dictionary popup reads it through its own
+   * per-session cache). Given, the component draws it and asks for nothing.
+   */
+  entries?: readonly PitchEntry[];
+  /** Also print the downstep number (`[2]`, `[0]` for heiban) after each contour. */
+  showDownstep?: boolean;
 }
 
-export default function PitchAccentContour({ word, reading, lang, className }: Props) {
+export default function PitchAccentContour({
+  word,
+  reading,
+  lang,
+  className,
+  entries: suppliedEntries,
+  showDownstep = false,
+}: Props) {
   const { t } = useT();
-  const [entries, setEntries] = useState<PitchEntry[]>([]);
+  const [fetchedEntries, setEntries] = useState<PitchEntry[]>([]);
   const term = word.trim();
   const kana = (reading ?? '').trim();
+  const supplied = suppliedEntries !== undefined;
+  const entries = suppliedEntries ?? fetchedEntries;
 
   useEffect(() => {
     setEntries([]);
-    if (lang !== 'ja' || !term) return undefined;
+    if (supplied || lang !== 'ja' || !term) return undefined;
     const api = window.api?.dictPitch;
     if (typeof api !== 'function') return undefined;
     let alive = true;
@@ -52,9 +68,9 @@ export default function PitchAccentContour({ word, reading, lang, className }: P
     return () => {
       alive = false;
     };
-  }, [term, kana, lang]);
+  }, [term, kana, lang, supplied]);
 
-  if (!entries.length) return null;
+  if (lang !== 'ja' || !entries.length) return null;
   return (
     <span className={['pitch-contour-list', className].filter(Boolean).join(' ')} lang="ja">
       {entries.flatMap((entry) =>
@@ -86,6 +102,9 @@ export default function PitchAccentContour({ word, reading, lang, className }: P
                   {mora}
                 </span>
               ))}
+              {showDownstep && (
+                <span className="pitch-downstep" aria-hidden="true">[{downstep}]</span>
+              )}
             </span>
           );
         }),

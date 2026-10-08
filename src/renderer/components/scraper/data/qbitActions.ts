@@ -9,6 +9,7 @@ import type {
   ScraperQbitTorrentAction,
 } from '../../../../shared/scraperIpc';
 import { sxs, type ScraperTextKey } from '../strings';
+import { ipcErrorText } from '../../../../shared/ipcErrorText';
 
 export interface ActionNotice {
   text: string;
@@ -23,9 +24,12 @@ const DONE_KEY: Record<ScraperQbitTorrentAction, ScraperTextKey> = {
   delete: 'transfer.removedKept',
 };
 
-/** A thrown error as one readable line. */
+/**
+ * A thrown error as one readable line, without Electron's
+ * "Error invoking remote method '...': Error: " wrapper.
+ */
 export function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return ipcErrorText(error);
 }
 
 /**

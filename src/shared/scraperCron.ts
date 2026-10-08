@@ -168,10 +168,28 @@ export function nextCronRun(expression: string, afterMs: number): number | null 
   // minute we are already inside.
   const cursor = new Date(afterMs);
   cursor.setSeconds(0, 0);
+  const startHour = cursor.getHours();
+  const startDate = cursor.getDate();
   cursor.setMinutes(cursor.getMinutes() + 1);
 
   const limit = new Date(cursor.getTime());
   limit.setDate(limit.getDate() + MAX_SEARCH_DAYS);
+
+  /**
+   * DST spring-forward: an advance that lands more than one wall-clock hour
+   * later on the same day jumped over hours that do not exist today (02:00 to
+   * 03:00 in most zones). A schedule for one of those hours still runs once
+   * that day — at the first instant after the gap — rather than silently
+   * skipping a day, which is what cron implementations conventionally do.
+   */
+  const skippedScheduledHour = (beforeHour: number, beforeDate: number): boolean => {
+    if (cursor.getDate() !== beforeDate) return false;
+    for (let hour = beforeHour + 1; hour < cursor.getHours(); hour += 1) {
+      if (cron.hour.values.includes(hour)) return true;
+    }
+    return false;
+  };
+  if (matchesDate(cron, cursor) && skippedScheduledHour(startHour, startDate)) return cursor.getTime();
 
   while (cursor.getTime() <= limit.getTime()) {
     if (!matchesDate(cron, cursor)) {
@@ -181,11 +199,17 @@ export function nextCronRun(expression: string, afterMs: number): number | null 
       continue;
     }
     if (!cron.hour.values.includes(cursor.getHours())) {
+      const beforeHour = cursor.getHours();
+      const beforeDate = cursor.getDate();
       cursor.setHours(cursor.getHours() + 1, 0, 0, 0);
+      if (skippedScheduledHour(beforeHour, beforeDate)) return cursor.getTime();
       continue;
     }
     if (!cron.minute.values.includes(cursor.getMinutes())) {
+      const beforeHour = cursor.getHours();
+      const beforeDate = cursor.getDate();
       cursor.setMinutes(cursor.getMinutes() + 1, 0, 0);
+      if (skippedScheduledHour(beforeHour, beforeDate)) return cursor.getTime();
       continue;
     }
     return cursor.getTime();
@@ -263,6 +287,15 @@ export interface SchedulerTickOptions {
    * a backlog replay this scheduler has never performed.
    */
   missedRunPolicy: 'skip' | 'run-once' | 'run-all';
+  /**
+   * When this process started evaluating schedules. With it, 'skip' drops only
+   * slots that passed before the session began — runs missed while the app was
+   * closed, which is what the policy names. A slot that came due during the
+   * session and was then *held* (quiet hours, battery, concurrency, a late
+   * tick) is never dropped, however long the hold lasted: a hold defers. Without
+   * it (older callers) the previous one-minute staleness rule applies.
+   */
+  sessionStartedMs?: number;
 }
 
 /**
@@ -300,8 +333,16 @@ export function planSchedulerTick(options: SchedulerTickOptions): SchedulerTickD
   // entry forward would make a hold silently equal to a cancellation: a single
   // long-running job could keep a nightly schedule from ever firing, and the
   // screen would never explain why. So a hold defers instead.
+  const session = options.sessionStartedMs;
   const stale = options.missedRunPolicy === 'skip'
-    ? overdue.filter((entry) => options.nowMs - Date.parse(entry.nextRunAt as string) >= 60_000)
+    ? overdue.filter((entry) => {
+      const at = Date.parse(entry.nextRunAt as string);
+      // A minute of grace either way: a slot a few seconds before launch, or a
+      // tick that lands a little late, is still "on time".
+      return typeof session === 'number' && Number.isFinite(session)
+        ? at < session - 60_000
+        : options.nowMs - at >= 60_000;
+    })
     : [];
   for (const entry of stale) recompute(entry, options.nowMs);
 

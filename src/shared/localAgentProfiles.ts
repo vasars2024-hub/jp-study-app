@@ -56,7 +56,7 @@ const ALL_OPERATIONS: AgentToolOperationId[] = [
   'study.get-context', 'study.list-opportunities', 'study.prepare-media',
   'study.filter-vocabulary', 'study.undo-filter', 'study.preview-cards',
   'study.create-cards', 'study.preview-anki', 'study.export-anki',
-  'study.resume-session', 'study.open-context',
+  'study.resume-session', 'study.open-context', 'study.stats-summary', 'study.known-words',
   'dictionary.lookup', 'dictionary.explain-grammar', 'dictionary.analyze-sentence',
   'dictionary.search-knowledge', 'calendar.list', 'calendar.schedule-session',
   'calendar.create-reminder', 'calendar.delete-event', 'settings.read',
@@ -81,6 +81,7 @@ const TUTOR_OPERATIONS: AgentToolOperationId[] = [
   'study.get-context', 'study.list-opportunities', 'study.filter-vocabulary',
   'study.undo-filter', 'study.preview-cards', 'study.create-cards',
   'study.preview-anki', 'study.export-anki', 'study.resume-session', 'study.open-context',
+  'study.stats-summary', 'study.known-words',
 ];
 const MEDIA_OPERATIONS: AgentToolOperationId[] = [
   'media.search', 'media.add-item', 'media.analyze-subtitles', 'media.generate-profile',
@@ -93,6 +94,7 @@ const MEDIA_OPERATIONS: AgentToolOperationId[] = [
 const RESEARCH_OPERATIONS: AgentToolOperationId[] = [
   'dictionary.search-knowledge', 'dictionary.lookup', 'media.search', 'anime.search',
   'visual-novel.search', 'calendar.list', 'settings.read',
+  'study.stats-summary', 'study.known-words',
 ];
 const AUTOMATION_OPERATIONS: AgentToolOperationId[] = [
   'media.search', 'media.organize-files', 'anime.check-releases', 'flashcard.list-decks',

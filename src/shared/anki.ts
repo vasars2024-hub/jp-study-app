@@ -39,8 +39,27 @@ export function translateAnkiReason(
   if (!reason) return reason;
   if (reason === ANKI_UNREACHABLE_MSG) return t('anki.unreachableReason');
   if (reason === ANKI_COLLECTION_UNAVAILABLE_MSG) return t('anki.collectionUnavailableReason');
+  // The mining gateway's own refusals (main/anki/index.ts `mineNote`), also authored here.
+  if (reason === MINE_TERM_REQUIRED_MSG) return t('studyLoop.mine.error.termRequired');
+  if (reason.startsWith(MINE_UNKNOWN_PROFILE_PREFIX)) return t('studyLoop.mine.error.unknownProfile');
+  const templates = MINE_TEMPLATES_MISMATCH_PATTERN.exec(reason);
+  if (templates) return t('studyLoop.mine.error.templatesMismatch').replace('{model}', templates[1] ?? '');
   return reason;
 }
+
+/** `mineNote` refusals main writes in English; `translateAnkiReason` maps them to keys. */
+export const MINE_TERM_REQUIRED_MSG = 'term is required';
+export const MINE_UNKNOWN_PROFILE_PREFIX = 'Unknown profile: ';
+export const MINE_TEMPLATES_MISMATCH_PATTERN = /^None of the saved field templates match the fields of "(.*)"\.$/;
+export function mineTemplatesMismatchMessage(modelName: string): string {
+  return `None of the saved field templates match the fields of "${modelName}".`;
+}
+
+/**
+ * Media a mine was given but could not put on the note. Reported rather than dropped, so
+ * a card never claims a screenshot or clip that never reached Anki.
+ */
+export type MineMediaWarning = 'image-too-large' | 'image-failed' | 'clip-failed' | 'audio-failed';
 
 export const APP_TAG = 'jp-study-app';
 export const KINOMOTO_MODEL_NAME = 'jidoujisho Kinomoto';
@@ -181,6 +200,8 @@ export interface MineNoteResult {
   deckName?: string;
   /** True when a caller-supplied `deckName` was overridden by a matched rule's profile. */
   deckOverriddenByRule?: boolean;
+  /** Supplied media that did not make it onto the note (the note itself was still added). */
+  mediaWarnings?: MineMediaWarning[];
 }
 
 export interface DeleteMinedNotesResult {
@@ -444,6 +465,21 @@ export function levelForIntervalDays(
   if (ivlDays >= thresholds.known) return 3;
   if (ivlDays >= thresholds.familiar) return 2;
   return 1;
+}
+
+/**
+ * Knowledge level an Anki card is evidence for, or 0 when it is evidence of
+ * nothing: a card never reviewed (interval 0 — new, or still in its first
+ * learning steps) says the word was added, not learned, and a suspended card
+ * is out of rotation. Neither may lift a word to Learning or above.
+ */
+export function ankiEntryKnowledgeLevel(
+  entry: Pick<IntervalEntry, 'ivlDays' | 'suspended'>,
+  thresholds: { familiar: number; known: number },
+): 0 | 1 | 2 | 3 {
+  if (entry.suspended === true) return 0;
+  if (!Number.isFinite(entry.ivlDays) || entry.ivlDays <= 0) return 0;
+  return levelForIntervalDays(entry.ivlDays, thresholds);
 }
 
 /** Rollup rule: WkLevel >= 3 -> 'known'; WkLevel 0..2 -> 'new'. */

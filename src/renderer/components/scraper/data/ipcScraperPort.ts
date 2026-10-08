@@ -166,6 +166,8 @@ export function createIpcScraperPort(
           return window.api.scraperProbeSource({
             entry,
             timeoutMs: settings.sources.perSourceTimeoutMs,
+            // Main refuses private addresses unless the profile allows them.
+            allowPrivateNetwork: settings.safety.allowPrivateNetwork === true,
           });
         },
         () => fallback.probeSource(id),
@@ -335,7 +337,11 @@ export function createIpcScraperPort(
     fetchHttp: (request) =>
       route(
         'fetchHttp',
-        () => window.api.scraperFetchHttp(request),
+        () => window.api.scraperFetchHttp({
+          ...request,
+          // Main refuses private addresses unless the active profile allows them.
+          allowPrivateNetwork: getActiveScraperSettings().safety.allowPrivateNetwork === true,
+        }),
         () => fallback.fetchHttp(request),
       ),
 

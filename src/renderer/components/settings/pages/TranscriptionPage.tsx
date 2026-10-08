@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import CaptionsCaptureSection from './CaptionsCaptureSection';
+import RecorderSection from './RecorderSection';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import { WHISPER_MODEL_SPECS, type WhisperModelTier } from '../../../../shared/whisperModels';
@@ -179,6 +180,7 @@ export default function TranscriptionPage() {
       </SettingsCard>
 
       <CaptionsCaptureSection />
+      <RecorderSection />
     </>
   );
 }

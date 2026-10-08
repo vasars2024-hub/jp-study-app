@@ -73,6 +73,7 @@ import { resolveSubtitleTranslationEngine, translateSubtitleTrack } from './subt
 import { enqueueTranscription, onMainTranscriptionProgress } from './transcriptionJobs';
 import { listAudioStreamLanguages } from './subtitleLocalSources';
 import { getMainStudyLang, getMainStudyLangTag } from './studyLanguage';
+import { mt } from './i18n';
 
 export interface SubtitleAutoHost {
   listItems: () => MediaItem[];
@@ -242,13 +243,44 @@ function recentAttempt(
   to: string,
   outcomes: readonly SubtitleAutoAttempt['outcome'][],
   now = Date.now(),
+  windowMs = RETRY_FAILED_MS,
 ): SubtitleAutoAttempt | undefined {
   return (item.subtitleAuto?.attempts ?? []).find((attempt) =>
     attempt.task === task
     && (attempt.from ?? '') === (from ?? '')
     && attempt.to === to
     && outcomes.includes(attempt.outcome)
-    && now - attempt.at < RETRY_FAILED_MS);
+    && now - attempt.at < windowMs);
+}
+
+/**
+ * How long a "queued" transcription may stand in for a real job. A queued attempt was never
+ * settled when its job finished, failed or was lost with the app, so it blocked automatic
+ * transcription for the whole 24 h failure back-off. Now the job's own outcome settles it
+ * (`settleQueuedTranscription`), and a queued mark older than this is treated as lost.
+ */
+const QUEUED_STALE_MS = 2 * 60 * 60 * 1000;
+
+/** Record how a queued automatic transcription ended (or drop the mark if it was cancelled). */
+function settleQueuedTranscription(mediaId: string, phase: string, error?: string): void {
+  const item = findItem(mediaId);
+  if (!host || !item) return;
+  const queued = (item.subtitleAuto?.attempts ?? [])
+    .find((attempt) => attempt.task === 'transcribe' && attempt.outcome === 'queued');
+  if (!queued) return;
+  if (phase === 'cancelled') {
+    const previous = item.subtitleAuto ?? {};
+    host.patchItems([mediaId], {
+      subtitleAuto: { ...previous, attempts: (previous.attempts ?? []).filter((attempt) => attempt !== queued) },
+    });
+    return;
+  }
+  recordAttempt(mediaId, {
+    ...queued,
+    at: Date.now(),
+    outcome: phase === 'done' ? 'done' : 'failed',
+    ...(phase === 'done' ? {} : { reason: error ?? phase }),
+  });
 }
 
 function recordAttempt(id: string, attempt: SubtitleAutoAttempt): void {
@@ -397,10 +429,14 @@ async function translateInto(
       source: 'generated',
       format: 'srt',
       path: relative,
-      // Study content, not chrome: the track picker shows it verbatim, and the
-      // words "machine translation" are what keep it from being trusted as a
-      // human subtitle.
-      label: `${langName(target)} · machine translation of ${source.label?.trim() || langName(from)}`,
+      // The track picker shows it verbatim, and the words "machine translation" are
+      // what keep it from being trusted as a human subtitle — so they are in the
+      // interface language (`subtitleRecordLabel` re-renders it from the fields below
+      // when the language changes later).
+      label: mt('studyLoop2.subtitle.machineTranslationOf', {
+        lang: langName(target),
+        source: source.label?.trim() || langName(from),
+      }),
       machineGenerated: true,
       derivation: 'machine-translation',
       translatedFromId: source.id,
@@ -507,7 +543,11 @@ export async function prepareItem(mediaId: string): Promise<void> {
   } else if (!studyTrack && !helperTrack && settings.autoTranscribe) {
     // Whisper hears the study language only on audio in it: Japanese anime for
     // a Japanese learner, a Chinese drama for a Chinese one.
-    if (!recentAttempt(item, 'transcribe', undefined, study, ['failed', 'queued']) && await audioIsStudyLanguage(item, study)) {
+    if (
+      !recentAttempt(item, 'transcribe', undefined, study, ['failed'])
+      && !recentAttempt(item, 'transcribe', undefined, study, ['queued'], Date.now(), QUEUED_STALE_MS)
+      && await audioIsStudyLanguage(item, study)
+    ) {
       if (enqueueTranscription({ mediaId, lang: study }).ok) {
         recordAttempt(mediaId, { task: 'transcribe', to: study, at: Date.now(), outcome: 'queued' });
       }
@@ -681,6 +721,8 @@ function onTranscription(progress: { mediaId: string; phase: string; error?: str
     // A fusion that failed (no Whisper model, no window, unreadable audio) falls
     // back to translating the English track — once, through the normal queue.
     if (phase === 'error') requestSubtitlePreparation([mediaId], 'retry');
+  } else {
+    settleQueuedTranscription(mediaId, phase, progress.error);
   }
   refresh([mediaId]);
 }

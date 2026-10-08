@@ -42,6 +42,7 @@ import {
 } from '../shared/mediaLibraryEntries';
 import { YOUTUBE_MEDIA_SUBTITLE_DIRECTORY } from '../shared/youtubeStorage';
 import { classifyMediaKind } from '../shared/mediaKind';
+import { ingestPathKey } from '../shared/mediaIngest';
 import { clearMediaArtwork, ensureMediaArtwork } from './mediaArtwork';
 import { resolveSubtitleFallbackFont } from './subtitleFallbackFont';
 import { registerMediaMetadataIpc, runMediaMetadata } from './mediaMetadata';
@@ -69,6 +70,7 @@ import {
 import type { SecondarySubtitlePick } from '../shared/subtitleDiscoveryStatus';
 import { estimateSubtitleOffset } from './subtitleSync';
 import { pickSidecarSubtitleForLanguage, sidecarTagMatches } from './subtitleSidecar';
+import { decodeSubtitleBytes } from '../shared/subtitleDecode';
 import type { SubtitleSyncEstimate } from '../shared/subtitleSync';
 import { mt } from './i18n';
 import type { PlaybackHandoff } from '../shared/externalPlayer';
@@ -271,13 +273,17 @@ export function addOrGetItems(requests: readonly AddRequest[]): MediaItem[] {
   const db = readDb();
   const byPath = new Map<string, MediaItem>();
   const byYoutube = new Map<string, MediaItem>();
+  // Keyed like the ingest keys paths (slashes, NFC, case on Windows/macOS), so
+  // `D:/A/ep.mkv` from a torrent client and `d:\a\ep.mkv` from a watcher are
+  // one library item, not two.
+  const pathKey = (value: string): string => ingestPathKey(value, process.platform !== 'linux');
   for (const item of db.items) {
-    if (item.path && !byPath.has(item.path)) byPath.set(item.path, item);
+    if (item.path && !byPath.has(pathKey(item.path))) byPath.set(pathKey(item.path), item);
     if (item.youtubeId && !byYoutube.has(item.youtubeId)) byYoutube.set(item.youtubeId, item);
   }
   const added: MediaItem[] = [];
   const out = requests.map(({ absPath, touch = true, extra }) => {
-    let item = byPath.get(absPath);
+    let item = byPath.get(pathKey(absPath));
     if (!item && extra?.youtubeId) item = byYoutube.get(extra.youtubeId);
     if (!item) {
       const fileName = path.basename(absPath);
@@ -297,7 +303,7 @@ export function addOrGetItems(requests: readonly AddRequest[]): MediaItem[] {
       if (!item.kind) item.kind = classifyMediaKind(item.fileName, item.durationSec);
       if (extra?.sourceUrl) item.sourceUrl = extra.sourceUrl;
       if (extra?.youtubeId) item.youtubeId = extra.youtubeId;
-      if (item.path !== absPath && fs.existsSync(absPath)) {
+      if (pathKey(item.path) !== pathKey(absPath) && fs.existsSync(absPath)) {
         item.path = absPath;
         item.fileName = path.basename(absPath);
         item.title = cleanTitle(absPath);
@@ -305,7 +311,7 @@ export function addOrGetItems(requests: readonly AddRequest[]): MediaItem[] {
       if (item.seriesKey === undefined) applyReleaseIdentity(item, item.fileName);
       else refreshReleaseIdentity(item);
     }
-    byPath.set(item.path, item);
+    byPath.set(pathKey(item.path), item);
     if (item.youtubeId) byYoutube.set(item.youtubeId, item);
     if (touch) item.lastPlayedAt = Date.now();
     return item;
@@ -710,13 +716,39 @@ function clearAllMedia(): MediaItem[] {
 
 // ----- ffmpeg helpers -----
 
-/** Decode a file's audio to mono 16 kHz 32-bit-float PCM (what Whisper wants). */
+/**
+ * Decode durationSec seconds of a file's audio from startSec to 16 kHz mono
+ * float32 PCM. For long files (a two-hour recording is ~460 MB as one buffer)
+ * the transcription queue decodes window by window instead of all at once.
+ * Past the end of the audio it resolves to an empty buffer.
+ */
+export function extractAudioPcmRange(file: string, startSec: number, durationSec: number): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const args = ['-ss', String(Math.max(0, startSec)), '-t', String(Math.max(0.1, durationSec)), '-i', file,
+      '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le', '-hide_banner', '-loglevel', 'error', 'pipe:1'];
+    const proc = spawn(ffmpegPath, args, { windowsHide: true });
+    const chunks: Buffer[] = [];
+    let err = '';
+    proc.stdout.on('data', (d: Buffer) => chunks.push(d));
+    proc.stderr.on('data', (d: Buffer) => (err += d.toString()));
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code === 0) {
+        const buf = Buffer.concat(chunks);
+        resolve(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+      } else {
+        reject(new Error(err.trim() || `ffmpeg exited with code ${code}`));
+      }
+    });
+  });
+}
+
 /** Decode any ffmpeg-readable media file to 16 kHz mono float32 PCM (Whisper input). */
 export function extractAudioPcm(file: string): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const args = ['-i', file, '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le',
       '-hide_banner', '-loglevel', 'error', 'pipe:1'];
-    const proc = spawn(ffmpegPath, args);
+    const proc = spawn(ffmpegPath, args, { windowsHide: true });
     const chunks: Buffer[] = [];
     let err = '';
     proc.stdout.on('data', (d: Buffer) => chunks.push(d));
@@ -750,7 +782,7 @@ async function extractCoverArt(id: string, file: string): Promise<string | null>
   const ok = await new Promise<boolean>((resolve) => {
     const args = ['-i', file, '-an', '-frames:v', '1', '-f', 'image2', '-y',
       '-hide_banner', '-loglevel', 'error', out];
-    const proc = spawn(ffmpegPath, args);
+    const proc = spawn(ffmpegPath, args, { windowsHide: true });
     proc.on('error', () => resolve(false));
     proc.on('close', (code) => resolve(code === 0));
   });
@@ -819,7 +851,7 @@ async function convertToMp4(file: string): Promise<string> {
       const args = ['-err_detect', 'ignore_err', '-fflags', '+genpts', '-i', resolved,
         ...videoArgs, '-c:a', 'aac', '-movflags', '+faststart', '-y',
         '-hide_banner', '-loglevel', 'error', output];
-      const proc = spawn(ffmpegPath, args, { shell: false });
+      const proc = spawn(ffmpegPath, args, { shell: false, windowsHide: true });
       let err = '';
       proc.stderr.on('data', (d: Buffer) => (err += d.toString()));
       proc.on('error', reject);
@@ -987,7 +1019,7 @@ function subtitleRank(name: string, wanted: string): number {
 
 function readSubtitleFile(dir: string, name: string): SubtitlePick | undefined {
   try {
-    return { name, text: fs.readFileSync(path.join(dir, name), 'utf8') };
+    return { name, text: decodeSubtitleBytes(fs.readFileSync(path.join(dir, name))).text };
   } catch {
     return undefined;
   }
@@ -1049,7 +1081,7 @@ function findDownloadedSubtitle(mediaFile: string, lang: YouTubeSubtitleLang | u
   const picked = candidates[0];
   if (!picked) return undefined;
   try {
-    return { name: picked, text: fs.readFileSync(path.join(dir, picked), 'utf-8') };
+    return { name: picked, text: decodeSubtitleBytes(fs.readFileSync(path.join(dir, picked))).text };
   } catch {
     return undefined;
   }
@@ -1954,7 +1986,7 @@ export function registerMediaIpc(): void {
     });
     if (res.canceled || !res.filePaths[0]) return null;
     try {
-      return { name: path.basename(res.filePaths[0]), text: fs.readFileSync(res.filePaths[0], 'utf-8') };
+      return { name: path.basename(res.filePaths[0]), text: decodeSubtitleBytes(fs.readFileSync(res.filePaths[0])).text };
     } catch {
       return null;
     }

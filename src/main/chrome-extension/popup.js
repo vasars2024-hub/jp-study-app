@@ -5,6 +5,8 @@
 // popup.html is only what shows for the instant before this runs.
 const t = (key, subs) => globalThis.jpStudyShared.msg(key, subs);
 const tn = (key, count, subs) => globalThis.jpStudyShared.msgCount(key, count, subs);
+/** A failed reply's message in the UI language (app error codes → _locales), else `fallbackKey`. */
+const appErr = (res, fallbackKey) => globalThis.jpStudyShared.appErrorText(res, fallbackKey);
 globalThis.jpStudyShared.applyI18n(document);
 
 const chipEl = document.getElementById('status-chip');
@@ -245,7 +247,7 @@ actionsEl.addEventListener('click', async (e) => {
     if (action === 'lookup') {
       const res = await send({ type: 'run-command', command: 'lookup.selection' });
       if (res?.ok) window.close();
-      else feedback(res?.error || t('popup_lookupFailed'), 'err');
+      else feedback(appErr(res, 'popup_lookupFailed'), 'err');
     } else if (action === 'save-selection') {
       feedback(t('popup_savingSelection'), 'pending');
       const res = await send({ type: 'save-selection', mode: 'auto' });
@@ -257,7 +259,7 @@ actionsEl.addEventListener('click', async (e) => {
     } else if (action === 'download') {
       feedback(t('popup_queueingDownload'), 'pending');
       const res = await send({ type: 'run-command', command: 'media.download' });
-      feedback(res?.ok ? t('popup_downloadQueued') : res?.error || t('popup_downloadFailed'), res?.ok ? 'ok' : 'err');
+      feedback(res?.ok ? t('popup_downloadQueued') : appErr(res, 'popup_downloadFailed'), res?.ok ? 'ok' : 'err');
     } else if (action === 'transcribe') {
       feedback(t('popup_askingTranscribe'), 'pending');
       const res = await send({ type: 'run-command', command: 'media.transcribe' });
@@ -270,19 +272,19 @@ actionsEl.addEventListener('click', async (e) => {
     } else if (action === 'ocr') {
       const res = await send({ type: 'run-command', command: 'capture.ocr' });
       if (res?.ok) window.close();
-      else feedback(res?.error || t('popup_ocrFailed'), 'err');
+      else feedback(appErr(res, 'popup_ocrFailed'), 'err');
     } else if (action === 'scan-strip') {
       feedback(t('popup_scanningManga'), 'pending');
       const res = await send({ type: 'scan-strip' });
       feedback(
         res?.ok
           ? tn('popup_mangaImported', res.pageCount ?? res.imageCount ?? 0)
-          : res?.error || t('popup_importFailed'),
+          : appErr(res, 'popup_importFailed'),
         res?.ok ? 'ok' : 'err',
       );
     } else if (action === 'open-app') {
       const res = await send({ type: 'ui-open', target: 'inbox' });
-      if (!res?.ok) feedback(res?.error || t('common_gumNotRunning'), 'err');
+      if (!res?.ok) feedback(appErr(res, 'common_gumNotRunning'), 'err');
       else window.close();
     }
   } finally {
@@ -380,12 +382,12 @@ function formatTranscribe(res) {
     const key = TRANSCRIBE_REFUSALS[res.reason];
     return key ? t(key) : res.reason || t('popup_transcriptionRefused');
   }
-  return res.error || t('popup_transcriptionFailed');
+  return appErr(res, 'popup_transcriptionFailed');
 }
 
 function formatSave(res) {
   if (!res) return t('save_failed');
-  if (!res.ok && !res.queued) return res.error || t('save_failed');
+  if (!res.ok && !res.queued) return appErr(res, 'save_failed');
   if (res.queued) return t('common_queuedWillSync');
   if (res.anki?.ok) return t('popup_cardCreated');
   return t('popup_savedToGum');
@@ -393,7 +395,7 @@ function formatSave(res) {
 
 function formatCapture(res) {
   if (!res) return t('capture_failed');
-  if (!res.ok && !res.queued) return res.error || t('capture_failed');
+  if (!res.ok && !res.queued) return appErr(res, 'capture_failed');
   if (res.queued) return t('capture_queued');
   if (res.action === 'playlist') return t('capture_playlistSaved');
   if (res.action === 'video') return res.duplicate ? t('capture_videoDuplicate') : t('capture_videoSaved');
@@ -434,13 +436,13 @@ async function refreshRecent() {
 document.getElementById('nav-tabs').addEventListener('click', async () => {
   const res = await send({ type: 'open-tab-picker' });
   if (res?.ok) window.close();
-  else feedback(res?.error || t('common_readingListFailed'), 'err');
+  else feedback(appErr(res, 'common_readingListFailed'), 'err');
 });
 
 document.getElementById('nav-app').addEventListener('click', async () => {
   const res = await send({ type: 'ui-open', target: 'inbox' });
   if (res?.ok) window.close();
-  else feedback(res?.error || t('popup_gumNotRunningStart'), 'err');
+  else feedback(appErr(res, 'popup_gumNotRunningStart'), 'err');
 });
 
 document.getElementById('nav-settings').addEventListener('click', () => {
@@ -511,8 +513,105 @@ function bindModeSeg(id, key) {
 bindModeSeg('mode-highlight', 'aiOnHighlight');
 bindModeSeg('mode-ocr', 'aiOnOcr');
 
+/* -------------------------------- recorder --------------------------------- */
+
+const recTabBtn = document.getElementById('rec-tab');
+const recAudioBtn = document.getElementById('rec-audio');
+const recMicBtn = document.getElementById('rec-mic');
+const recAreaBtn = document.getElementById('rec-area');
+const recStopBtn = document.getElementById('rec-stop');
+const recPendingEl = document.getElementById('rec-pending');
+
+async function refreshRecorder() {
+  const st = await send({ type: 'record-status' });
+  const active = st?.ok && Array.isArray(st.active) ? st.active : [];
+  const pending = st?.ok && Array.isArray(st.pending) ? st.pending : [];
+  recTabBtn.hidden = active.length > 0;
+  recAudioBtn.hidden = active.length > 0;
+  if (recMicBtn) recMicBtn.hidden = active.length > 0;
+  recAreaBtn.hidden = active.length > 0;
+  recStopBtn.hidden = active.length === 0;
+  if (active.length) {
+    const secs = Math.round((Date.now() - (active[0].startedAt || Date.now())) / 1000);
+    recStopBtn.textContent = t('popup_recStopFor', `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`);
+  }
+  recPendingEl.hidden = !pending.length;
+  recPendingEl.innerHTML = pending
+    .map(
+      (r) => `<div class="rec-item" data-id="${escapeHtml(r.id)}">
+        <span class="name" title="${escapeHtml(r.url || '')}">${escapeHtml(r.title || r.url || '')}</span>
+        <span>${escapeHtml(t(r.status === 'failed' ? 'popup_recFailed' : 'popup_recWaiting', String(Math.round((r.bytes || 0) / 1048576))))}</span>
+        <button type="button" data-rec="upload">${escapeHtml(t('popup_recUpload'))}</button>
+        <button type="button" data-rec="save-disk" title="${escapeHtml(t('popup_recSaveDiskTitle'))}">${escapeHtml(t('popup_recSaveDisk'))}</button>
+        <button type="button" data-rec="discard">${escapeHtml(t('popup_recDiscard'))}</button>
+      </div>`,
+    )
+    .join('');
+}
+
+async function startRec(video, source = 'tab') {
+  const res = await send({ type: 'record-start', video, source });
+  if (!res?.ok) feedback(appErr(res, 'popup_recFailedStart'), 'err');
+  else feedback(t(source === 'mic' ? 'popup_recStartedMic' : video ? 'popup_recStartedVideo' : 'popup_recStartedAudio'), 'ok');
+  void refreshRecorder();
+}
+
+recTabBtn.addEventListener('click', () => void startRec(true));
+recAudioBtn.addEventListener('click', () => void startRec(false));
+if (recMicBtn) recMicBtn.addEventListener('click', () => void startRec(false, 'mic'));
+
+/**
+ * `downloads` is optional: asked for on this click (the user gesture Chrome
+ * requires), never at install. The request must be the first await.
+ */
+async function saveRecordingToDisk(id) {
+  let granted = false;
+  try {
+    granted = await chrome.permissions.request({ permissions: ['downloads'] });
+  } catch {
+    granted = false;
+  }
+  if (!granted) {
+    feedback(t('popup_recSaveDiskDenied'), 'err');
+    return;
+  }
+  const res = await send({ type: 'recording-save-disk', id });
+  if (res?.ok) feedback(t('popup_recSaveDiskStarted'), 'ok');
+  else feedback(appErr(res, 'popup_recSaveDiskFailed'), 'err');
+}
+// Drag a box on the page; the recording starts with that area once it is drawn.
+recAreaBtn.addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  try {
+    await send({ type: 'ensure-content' });
+    await chrome.tabs.sendMessage(tab.id, { type: 'jp-select-record-region' });
+    window.close();
+  } catch {
+    feedback(t('popup_recFailedStart'), 'err');
+  }
+});
+recStopBtn.addEventListener('click', async () => {
+  await send({ type: 'record-stop' });
+  feedback(t('popup_recStoppedUploading'), 'ok');
+  void refreshRecorder();
+});
+recPendingEl.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-rec]');
+  const row = e.target.closest('.rec-item');
+  if (!btn || !row) return;
+  const id = row.dataset.id;
+  if (btn.dataset.rec === 'save-disk') {
+    await saveRecordingToDisk(id);
+    return;
+  }
+  if (btn.dataset.rec === 'discard') await send({ type: 'recording-discard', id });
+  else await send({ type: 'recording-upload', id });
+  void refreshRecorder();
+});
+
 /* ---------------------------------- init ----------------------------------- */
 
 void (async () => {
-  await Promise.all([refreshStatus(), refreshPage(), refreshRecent(), refreshModes()]);
+  await Promise.all([refreshStatus(), refreshPage(), refreshRecent(), refreshModes(), refreshRecorder()]);
 })();

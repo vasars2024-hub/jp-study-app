@@ -78,11 +78,15 @@ describe('orderUpNext', () => {
 });
 
 describe('watch state helpers', () => {
-  it('treats 92% or more as finished, not as something to resume', () => {
-    const nearlyDone = video({ id: 'x', positionSec: 1288, durationSec: 1400 });
-    expect(watchProgress(nearlyDone)).toBeCloseTo(0.92);
+  it('treats 90% or more as finished, not as something to resume', () => {
+    // The shared rule in `shared/watchFinished.ts`; 1260 / 1400 is exactly 0.9.
+    const nearlyDone = video({ id: 'x', positionSec: 1260, durationSec: 1400 });
+    expect(watchProgress(nearlyDone)).toBeCloseTo(0.9);
     expect(isFinished(nearlyDone)).toBe(true);
     expect(isStarted(nearlyDone)).toBe(false);
+    const notQuite = video({ id: 'x2', positionSec: 1259, durationSec: 1400 });
+    expect(isFinished(notQuite)).toBe(false);
+    expect(isStarted(notQuite)).toBe(true);
   });
 
   it('reports nothing for an item with no duration probe', () => {

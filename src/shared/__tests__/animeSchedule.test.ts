@@ -12,6 +12,7 @@ import {
   entryTitles,
   matchEntry,
   matchScheduleReleases,
+  scheduleReleaseKey,
   releaseNameCoversEpisode,
   releaseQueryFor,
   summariseSchedule,
@@ -207,6 +208,19 @@ describe('matchScheduleReleases keys releases per entry', () => {
     expect(rows[0].disposition).toBe('exact');
     expect(rows[1].release).toBeNull();
     expect(rows[1].reason).toBe('no-releases-returned');
+  });
+
+  it('keeps two episodes of one show apart when keyed by show and episode', () => {
+    const ep7 = entry({ mediaId: 1, episode: 7 });
+    const ep8 = entry({ mediaId: 1, episode: 8 });
+    const releases = new Map<string, TorrentRow[] | null>([
+      [scheduleReleaseKey(ep7), [release('[SubsPlease] Sousou no Frieren - 07 (1080p) [ABCD1234].mkv')]],
+      [scheduleReleaseKey(ep8), null],
+    ]);
+    const rows = matchScheduleReleases([ep7, ep8], releases);
+    expect(rows[0].disposition).toBe('exact');
+    expect(rows[1].reason).toBe('search-failed');
+    expect(scheduleReleaseKey(ep7)).not.toBe(scheduleReleaseKey(ep8));
   });
 });
 

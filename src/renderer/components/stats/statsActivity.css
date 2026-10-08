@@ -1,0 +1,84 @@
+/* Year heatmap, review / game counts and the 30-day forecast (StatsContent.tsx).
+   Theme tokens only, so Aero, Wired and Blanc each colour it their own way. */
+
+.stats-heatmap,
+.stats-reviews-games {
+  margin-top: 16px;
+}
+
+.stats-heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.stats-heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 11px);
+  grid-auto-flow: column;
+  grid-auto-columns: 11px;
+  gap: 2px;
+  width: max-content;
+}
+
+.stats-heatmap-cell {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.stats-heatmap-cell.is-blank {
+  background: transparent;
+}
+
+.stats-heatmap-cell[data-level='1'] {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.stats-heatmap-cell[data-level='2'] {
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.stats-heatmap-cell[data-level='3'] {
+  background: color-mix(in srgb, var(--accent) 74%, transparent);
+}
+
+.stats-heatmap-cell[data-level='4'] {
+  background: var(--accent);
+}
+
+.stats-heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.stats-heatmap-legend > span:first-child {
+  margin-right: 4px;
+}
+
+.stats-heatmap-legend > span:last-child {
+  margin-left: 4px;
+}
+
+.stats-forecast-caption {
+  margin: 8px 0 4px;
+  font-size: 12px;
+}
+
+.stats-forecast.stats-forecast-30 {
+  gap: 2px;
+}
+
+.stats-forecast.stats-forecast-30 .stats-forecast-track {
+  width: 80%;
+}
+
+.stats-forecast.stats-forecast-30 .stats-bar-lbl {
+  min-height: 1em;
+  white-space: nowrap;
+}

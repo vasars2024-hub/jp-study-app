@@ -773,6 +773,17 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
     global: false,
     worksWhileTyping: false,
     editable: true,
+  },  {
+    id: 'toolbox.openScreenRecorder',
+    name: 'Open Screen Recorder',
+    description: 'Record a part of the screen into a study video.',
+    category: 'Language',
+    feature: 'screen-recorder',
+    defaultShortcut: '',
+    scope: 'toolbox',
+    global: false,
+    worksWhileTyping: false,
+    editable: true,
   },
   {
     id: 'focusTimer.startPause',

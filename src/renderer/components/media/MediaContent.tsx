@@ -97,11 +97,7 @@ import {
   readStoredPlayerPreferences,
   writePlayerPreferencesPatch,
 } from '../../playerPreferencesStore';
-import { takeHandoff, takeHandoffJson } from '../../pendingHandoff';
-import {
-  studyContextSeekPosition,
-  type StudyContextRef,
-} from '../../../shared/mediaStudyOrchestrator';
+import { takeHandoff } from '../../pendingHandoff';
 import type { StudyListeningAvailability } from '../../../shared/studyListeningFirstRecipe';
 import { inspectStudyListeningAudio } from '../../studyListeningAudio';
 import { STUDY_LANG_NATIVE_NAME } from '../../../shared/studyLang';
@@ -301,12 +297,6 @@ export interface MediaState {
   revealDictation: () => void;
   shadowingMode: boolean;
   setShadowingMode: React.Dispatch<React.SetStateAction<boolean>>;
-  shadowRecording: boolean;
-  shadowAudioUrl: string;
-  shadowError: string;
-  startShadowRecording: () => Promise<void>;
-  stopShadowRecording: () => void;
-  clearShadowRecording: () => void;
   subtitleSearchQuery: string;
   setSubtitleSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   subtitleSearchMatches: number[];
@@ -409,14 +399,8 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const lastCueEndRef = useRef<number | null>(null);
   const rafRef = useRef(0);
   const currentYoutubeIdRef = useRef<string | undefined>(undefined);
-  const shadowRecorderRef = useRef<MediaRecorder | null>(null);
-  const shadowStreamRef = useRef<MediaStream | null>(null);
-  const shadowStopTimerRef = useRef<number | null>(null);
-  const shadowAudioUrlRef = useRef('');
-  const shadowGenerationRef = useRef(0);
   const studySessionIdRef = useRef('');
   const studySessionMediaIdRef = useRef('');
-  const pendingStudyContextRef = useRef<StudyContextRef | null>(null);
 
   const [items, setItems] = useState<MediaItem[]>([]);
   const [watchFolder, setWatchFolder] = useState<string | null>(null);
@@ -478,9 +462,6 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   useEffect(() => () => { dictationRequestRef.current += 1; }, [active, dictationInput]);
   const [dictationRevealed, setDictationRevealed] = useState(false);
   const [shadowingMode, setShadowingMode] = useState(initialPlayerPreferences.shadowingMode);
-  const [shadowRecording, setShadowRecording] = useState(false);
-  const [shadowAudioUrl, setShadowAudioUrl] = useState('');
-  const [shadowError, setShadowError] = useState('');
   const [subtitleSearchQuery, setSubtitleSearchQuery] = useState('');
   const [subtitleSearchPosition, setSubtitleSearchPosition] = useState(-1);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
@@ -709,103 +690,6 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setDictationRevealed(true);
     checkDictation();
   }, [active, checkDictation]);
-
-  const clearShadowRecording = useCallback(() => {
-    shadowGenerationRef.current += 1;
-    const url = shadowAudioUrlRef.current;
-    shadowAudioUrlRef.current = '';
-    setShadowAudioUrl('');
-    if (url) URL.revokeObjectURL(url);
-  }, []);
-
-  const stopShadowRecording = useCallback(() => {
-    if (shadowStopTimerRef.current != null) {
-      window.clearTimeout(shadowStopTimerRef.current);
-      shadowStopTimerRef.current = null;
-    }
-    const recorder = shadowRecorderRef.current;
-    if (recorder?.state === 'recording') recorder.stop();
-  }, []);
-
-  const startShadowRecording = useCallback(async () => {
-    if (shadowRecorderRef.current?.state === 'recording') return;
-    setShadowError('');
-    clearShadowRecording();
-    try {
-      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-        throw new Error('Microphone recording is not supported in this player.');
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      shadowStreamRef.current = stream;
-      const mimeType = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-      ].find((candidate) => MediaRecorder.isTypeSupported(candidate));
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      const generation = shadowGenerationRef.current;
-      const chunks: Blob[] = [];
-      shadowRecorderRef.current = recorder;
-      recorder.ondataavailable = (event) => {
-        if (event.data.size) chunks.push(event.data);
-      };
-      recorder.onerror = () => {
-        setShadowError('The microphone recording stopped unexpectedly.');
-      };
-      recorder.onstop = () => {
-        if (shadowStopTimerRef.current != null) {
-          window.clearTimeout(shadowStopTimerRef.current);
-          shadowStopTimerRef.current = null;
-        }
-        for (const track of stream.getTracks()) track.stop();
-        if (shadowStreamRef.current === stream) shadowStreamRef.current = null;
-        if (shadowRecorderRef.current === recorder) shadowRecorderRef.current = null;
-        setShadowRecording(false);
-        if (!chunks.length || generation !== shadowGenerationRef.current) return;
-        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-        const url = URL.createObjectURL(blob);
-        shadowAudioUrlRef.current = url;
-        setShadowAudioUrl(url);
-      };
-      recorder.start(250);
-      setShadowRecording(true);
-      shadowStopTimerRef.current = window.setTimeout(() => {
-        if (recorder.state === 'recording') recorder.stop();
-      }, 60_000);
-    } catch (recordingError) {
-      for (const track of shadowStreamRef.current?.getTracks() ?? []) track.stop();
-      shadowStreamRef.current = null;
-      shadowRecorderRef.current = null;
-      setShadowRecording(false);
-      setShadowError(
-        recordingError instanceof Error
-          ? recordingError.message
-          : t('media.error.microphoneStartFailed'),
-      );
-    }
-  }, [clearShadowRecording, lang, t]);
-
-  useEffect(() => {
-    stopShadowRecording();
-    clearShadowRecording();
-    setShadowError('');
-  }, [active?.start, active?.text, clearShadowRecording, stopShadowRecording]);
-
-  useEffect(() => () => {
-    shadowGenerationRef.current += 1;
-    if (shadowStopTimerRef.current != null) window.clearTimeout(shadowStopTimerRef.current);
-    const recorder = shadowRecorderRef.current;
-    if (recorder?.state === 'recording') recorder.stop();
-    for (const track of shadowStreamRef.current?.getTracks() ?? []) track.stop();
-    const url = shadowAudioUrlRef.current;
-    if (url) URL.revokeObjectURL(url);
-  }, []);
 
   useEffect(() => {
     window.api.listMedia().then(setItems);
@@ -1120,71 +1004,10 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setWatchFolder(null);
   }, []);
 
-  const applyStudyContext = useCallback(async (context: StudyContextRef): Promise<void> => {
-    const opened = await window.api.openMedia(context.mediaId);
-    if (!opened) {
-      setError(t('media.error.sourceMoved'));
-      return;
-    }
-    loadOpened(opened);
-    const seekPosition = studyContextSeekPosition(context);
-    resumeRef.current = seekPosition;
-    if (
-      typeof context.cueEndSec === 'number'
-      && Number.isFinite(context.cueEndSec)
-      && context.cueEndSec > seekPosition
-    ) {
-      setAbStart(seekPosition);
-      setAbEnd(context.cueEndSec);
-      setAbLoop(true);
-    } else {
-      setAbStart(null);
-      setAbEnd(null);
-      setAbLoop(false);
-    }
-    if (context.subtitleRecordId) {
-      const subtitle = await window.api.readSubtitleRecord(
-        context.mediaId,
-        context.subtitleRecordId,
-      );
-      // A track whose file was moved or deleted: main has detached it and
-      // queued a new search, and the user is told rather than left with no
-      // subtitles and no reason.
-      if (subtitle?.missing) setError(t('media.subtitles.fileMissing', { name: subtitle.name }));
-      else if (subtitle) applySubtitleFile(subtitle.name, subtitle.text);
-    }
-    if (context.listeningMode === 'dictation') {
-      stopShadowRecording();
-      setShadowingMode(false);
-      setLoopLine(false);
-      setAutoPause(true);
-      setPrimarySubs(true);
-      setDictationInput('');
-      setDictationResult(null);
-      setDictationRevealed(false);
-      setDictationMode(true);
-    }
-    window.setTimeout(() => {
-      if (videoRef.current) videoRef.current.currentTime = seekPosition;
-    }, 160);
-  }, [applySubtitleFile, loadOpened, stopShadowRecording, lang, t]);
-
-  useEffect(() => {
-    if (!showPlayer) return;
-    const openPendingContext = (context: StudyContextRef): void => {
-      pendingStudyContextRef.current = null;
-      void applyStudyContext(context);
-    };
-    const onStudyContext = (event: Event): void => {
-      const context = (event as CustomEvent<StudyContextRef>).detail;
-      if (context?.mediaId) openPendingContext(context);
-    };
-    window.addEventListener('study:open-media-context', onStudyContext);
-    const pending = pendingStudyContextRef.current
-      ?? takeHandoffJson<StudyContextRef>('studyContextRef');
-    if (pending?.mediaId) openPendingContext(pending);
-    return () => window.removeEventListener('study:open-media-context', onStudyContext);
-  }, [applyStudyContext, showPlayer]);
+  // The Study OS "open scene" hand-off (`study:open-media-context` plus the
+  // `studyContextRef` handoff) used to land here. It now opens the adopted player
+  // directly with `{ localFilePath, startAtSec }` (see `renderer/sceneRoundTrip.ts`),
+  // so nothing raises that event any more and this player no longer listens for it.
 
   const openSubs = useCallback(async () => {
     // YouTube-sourced media pulls its own subtitles first — sidecar files from
@@ -1220,10 +1043,10 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setDualSubs(true);
     setSubStatus(
       parsed.length
-        ? `Loaded ${parsed.length} translation subtitle lines from ${result.name}.`
-        : `No subtitle lines found in ${result.name}.`,
+        ? t('studyLoop.scene.secondaryLoaded', { count: parsed.length, name: result.name })
+        : t('studyLoop.scene.secondaryEmpty', { name: result.name }),
     );
-  }, []);
+  }, [lang, t]);
 
   const convertAndPlay = useCallback(async () => {
     if (!src) return;
@@ -1738,12 +1561,6 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     revealDictation,
     shadowingMode,
     setShadowingMode,
-    shadowRecording,
-    shadowAudioUrl,
-    shadowError,
-    startShadowRecording,
-    stopShadowRecording,
-    clearShadowRecording,
     subtitleSearchQuery,
     setSubtitleSearchQuery,
     subtitleSearchMatches,

@@ -1,0 +1,214 @@
+/* Region Recorder windows: the region picker, the pill/job panel and the border. */
+html.region-recorder-window,
+html.region-recorder-window body,
+html.region-recorder-window #root {
+  /* As the Reading Lens: the app's themed page background must not paint here. */
+  background: transparent !important;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: system-ui, 'Segoe UI', 'Yu Gothic UI', sans-serif;
+}
+
+.rr-select {
+  position: fixed;
+  inset: 0;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.rr-select-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.rr-select-box {
+  position: absolute;
+  outline: 2px solid #e5484d;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+}
+
+.rr-select-box--small {
+  outline-style: dashed;
+}
+
+.rr-select-size {
+  position: absolute;
+  left: 0;
+  top: -26px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rr-select-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(24, 24, 28, 0.92);
+  color: #f2f2f4;
+  font-size: 13px;
+  cursor: default;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.rr-select-hint {
+  margin-right: 4px;
+  opacity: 0.85;
+}
+
+.rr-btn {
+  min-height: 28px;
+  min-width: 28px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rr-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.rr-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rr-btn--primary {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+.rr-btn--stop {
+  background: #e5484d;
+  border-color: #e5484d;
+  color: #fff;
+}
+
+.rr-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: #1b1b1f;
+  color: #f2f2f4;
+  font-size: 13px;
+}
+
+.rr-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rr-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e5484d;
+  animation: rr-blink 1.2s ease-in-out infinite;
+}
+
+.rr-dot--paused {
+  background: #f5a524;
+  animation: none;
+}
+
+@keyframes rr-blink {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rr-dot { animation: none; }
+}
+
+.rr-clock {
+  min-width: 56px;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rr-level,
+.rr-progress {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.rr-level > span,
+.rr-progress > span {
+  display: block;
+  height: 100%;
+  background: #46a758;
+  transition: width 0.15s linear;
+}
+
+.rr-progress > span {
+  background: #3b82f6;
+}
+
+.rr-note,
+.rr-job-note {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.rr-error {
+  color: #ff8b8b;
+}
+
+.rr-job {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rr-job--error .rr-job-status {
+  color: #ff8b8b;
+}
+
+.rr-job-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rr-job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.rr-frame {
+  position: fixed;
+  inset: 0;
+  border: 3px dashed #e5484d;
+  box-sizing: border-box;
+  pointer-events: none;
+}

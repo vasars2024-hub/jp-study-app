@@ -63,6 +63,7 @@ export function emptyRankDrops(): NyaaRankDrops {
   return { titleMatched: 0, seeders: 0, title: 0, muxed: 0, shape: 0, language: 0 };
 }
 import { VIDEO_EXT } from '../shared/mediaKind';
+import { decodeSubtitleBytes } from '../shared/subtitleDecode';
 import { loadDiscoverySettings } from './subtitleDiscovery';
 
 export type { NyaaAcquisitionConfig };
@@ -613,7 +614,7 @@ async function readSubtitleFile(savePath: string, torrentName: string, fileName:
   try {
     const stat = await fsp.stat(at);
     if (stat.size > MAX_SUBTITLE_BYTES) return null;
-    return await fsp.readFile(at, 'utf-8');
+    return decodeSubtitleBytes(await fsp.readFile(at)).text;
   } catch {
     return null;
   }

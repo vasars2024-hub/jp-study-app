@@ -47,6 +47,7 @@
  * the component was a rule with no test. That glob exists now (2026-08-02) and the rule is
  * covered in place by `__tests__/videoCoreResumeWrite.test.ts`.
  */
+import { isWatchFinished } from '../shared/watchFinished';
 
 /**
  * Below this, a stored position is already meaningless to every reader in the app —
@@ -55,11 +56,13 @@
  */
 export const RESUME_MIN_MEANINGFUL_SEC = 1;
 
-/**
- * How close to the end counts as finished. Matches the margin `resolveVideoCoreResumePosition`
- * uses when it refuses to resume an entry, so the store and its reader agree on "done".
+/*
+ * How close to the end counts as finished is no longer this module's own margin: it is the
+ * app-wide rule in `shared/watchFinished.ts` (90% of a measured duration), so the resume
+ * store, Continue Watching, the library tick and the tracker all agree on "done". It used to
+ * be "within 5 s of the end", which left an episode stopped in its credits resumable here
+ * while every other surface called it watched.
  */
-export const RESUME_END_MARGIN_SEC = 5;
 
 export interface ResumeWriteInput {
   /** `video.currentTime` at the moment the write was triggered. */
@@ -93,12 +96,7 @@ export function resumeWriteAction(input: ResumeWriteInput): ResumeWriteAction {
   // clock reads afterwards, so it outranks every other rule here.
   if (finished) return 'clear';
   if (!hasMedia) return 'skip';
-  if (
-    typeof durationSec === 'number'
-    && Number.isFinite(durationSec)
-    && durationSec > 0
-    && positionSec >= durationSec - RESUME_END_MARGIN_SEC
-  ) return 'clear';
+  if (isWatchFinished(positionSec, durationSec)) return 'clear';
   if (positionSec >= RESUME_MIN_MEANINGFUL_SEC) return 'save';
   // Sub-threshold. Only a session that had genuinely started may throw a stored point away.
   return Number.isFinite(sessionMaxSec) && sessionMaxSec >= RESUME_MIN_MEANINGFUL_SEC

@@ -138,13 +138,16 @@ export default function Lockscreen({
   const tryUnlock = useCallback(
     (pin: string) => {
       if (pin.length !== 4) return;
-      if (!verifyLockscreenPin(pin)) {
-        fail();
-        return;
-      }
-      setUnlocking(true);
-      markLockscreenUnlocked();
-      onUnlocked();
+      // Main checks the hash (and backs off after repeated misses), so this is async.
+      void verifyLockscreenPin(pin).then((ok) => {
+        if (!ok) {
+          fail();
+          return;
+        }
+        setUnlocking(true);
+        markLockscreenUnlocked();
+        onUnlocked();
+      });
     },
     [fail, onUnlocked],
   );

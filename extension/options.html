@@ -325,6 +325,22 @@
               <span><span data-i18n="opt_popupCompact">Compact mode</span><span class="sub" data-i18n="opt_popupCompactSub">Fewer definitions per entry — lighter for long reading sessions.</span></span></label>
             <label class="check"><input type="checkbox" id="popup-pin-click" />
               <span><span data-i18n="opt_popupPin">Pin the popup on key + click</span><span class="sub" data-i18n="opt_popupPinSub">Pinned popups can be dragged by their header and stay open while you read.</span></span></label>
+            <div class="field">
+              <label class="name" for="popup-theme" data-i18n="opt_popupTheme">Colours</label>
+              <select id="popup-theme">
+                <option value="auto" data-i18n="opt_popupThemeAuto">Follow the page</option>
+                <option value="light" data-i18n="opt_popupThemeLight">Light</option>
+                <option value="dark" data-i18n="opt_popupThemeDark">Dark</option>
+              </select>
+            </div>
+            <label class="check"><input type="checkbox" id="popup-auto-audio" />
+              <span><span data-i18n="opt_popupAutoAudio">Play the word's audio when the popup opens</span></span></label>
+            <label class="check"><input type="checkbox" id="offline-cache" />
+              <span><span data-i18n="opt_offlineCache">Keep recent lookups for when Gum is closed</span><span class="sub" data-i18n="opt_offlineCacheSub">Up to 20,000 words, stored only in this browser.</span></span></label>
+            <label class="check"><input type="checkbox" id="furigana" />
+              <span><span data-i18n="opt_furigana">Furigana over new and learning words</span><span class="sub" data-i18n="opt_furiganaSub">Shown while word status colouring is on. Adds ruby text to the page.</span></span></label>
+            <label class="check"><input type="checkbox" id="all-frames" />
+              <span><span data-i18n="opt_allFrames">Also work inside embedded frames</span><span class="sub" data-i18n="opt_allFramesSub">Hover lookups in iframes such as embedded readers and comment widgets.</span></span></label>
             <p class="hint" data-i18n-html="opt_popupKeysHtml">Inside the popup: <kbd>←</kbd><kbd>→</kbd> switch tabs · <kbd>S</kbd> save word · <kbd>Shift+S</kbd> save sentence · <kbd>C</kbd> create card · <kbd>P</kbd> pin · <kbd>A</kbd> audio · <kbd>Esc</kbd> close.</p>
           </div>
         </section>
@@ -412,6 +428,15 @@
             </div>
             <label class="check"><input type="checkbox" id="yt-audio" />
               <span><span data-i18n="opt_ytAudio">Audio only when downloading</span><span class="sub" data-i18n="opt_ytAudioSub">Smaller files — useful for listening practice.</span></span></label>
+            <h3 style="margin-top:16px" data-i18n="opt_recHeading">Tab recording</h3>
+            <div class="field">
+              <label class="name" for="rec-max" data-i18n="opt_recMax">Stop a recording after (minutes)</label>
+              <input id="rec-max" type="number" min="1" max="240" />
+            </div>
+            <label class="check"><input type="checkbox" id="rec-autocrop" />
+              <span><span data-i18n="opt_recAutoCrop">On a page with a video, record just the video</span></span></label>
+            <label class="check"><input type="checkbox" id="rec-transcribe" />
+              <span><span data-i18n="opt_recTranscribe">Transcribe finished recordings in Gum</span></span></label>
             <p class="hint" data-i18n="opt_mediaHint">“Download video” is always available explicitly on YouTube pages from the popup, wheel, and More menu.</p>
           </div>
         </section>

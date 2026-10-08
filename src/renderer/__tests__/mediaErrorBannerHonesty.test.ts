@@ -30,15 +30,19 @@ const CONTENT = readFileSync(
  */
 const CATALOGS = { en, ja, zh, ru } as const;
 
-/** Every key introduced for D87/D88, i.e. every string that can reach the alert. */
+/**
+ * Every key introduced for D87/D88 that can still reach the alert. `sourceMoved`
+ * left with the Study OS scene hand-off: scenes now open the adopted player
+ * directly (`renderer/sceneRoundTrip.ts`), which reports its own failures.
+ * `microphoneStartFailed` left with the unused shadowing recorder in this file;
+ * shadowing lives in the study overlay now.
+ */
 const KEYS = [
   'media.error.fileMoved',
-  'media.error.sourceMoved',
   'media.error.loopEndBeforeStart',
   'media.error.fullscreenFailed',
   'media.error.pictureInPictureFailed',
   'media.error.volumeNormalizationFailed',
-  'media.error.microphoneStartFailed',
   'media.subs.noneFoundGenerating',
   'mediaCenter.video.dismissError',
 ] as const;
@@ -116,7 +120,8 @@ describe('the translated callbacks re-resolve when the language changes', () => 
     // Both `useCallback` shapes: the one-line `}, [a, lang, t]);` and the wrapped
     // `},\n    [a, lang, t],\n  );` — matching only the first undercounted by one and made
     // the floor below look wrong rather than the code.
+    // 7 since `applyStudyContext` (one of the eight) was removed with the scene hand-off.
     const withLang = CONTENT.match(/\[[^[\]]*\blang\b[^[\]]*\][,)]/g) ?? [];
-    expect(withLang.length).toBeGreaterThanOrEqual(8);
+    expect(withLang.length).toBeGreaterThanOrEqual(7);
   });
 });

@@ -25,7 +25,7 @@ import { openSectionSurface } from '../../../sectionSurface';
 import {
   canShowBalloon,
   isFirstTimeToday,
-  localDayKey,
+  aeroDayKey,
   pickBalloonCard,
   planUpdates,
   screensaverShouldStart,
@@ -194,12 +194,12 @@ export default function AeroMechanicsHost({ taskbarRef }: { taskbarRef: RefObjec
         && settings.updateBalloon
         && now - mountedAt >= FIRST_UPDATE_DELAY_MS
         && !blocked
-        && readMark('update-notice-day') !== localDayKey(now)
+        && readMark('update-notice-day') !== aeroDayKey(now)
         && !winsRef.current.some((w) => w.app === 'update')
       ) {
         const plan = planUpdates(snap.cards, snap.newPerDay, snap.introducedToday);
         if (plan.important.length > 0) {
-          writeMark('update-notice-day', localDayKey(now));
+          writeMark('update-notice-day', aeroDayKey(now));
           setBalloon({ kind: 'update', count: plan.important.length });
           void playSound('notification', 'notify');
           return;

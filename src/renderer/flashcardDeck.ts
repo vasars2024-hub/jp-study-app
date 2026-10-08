@@ -92,6 +92,8 @@ export interface DeckFlashcard {
   audioPath?: string;
   /** Managed VN capture image, loaded on demand to avoid localStorage bloat. */
   imagePath?: string;
+  /** Managed scene clip (mp4/webm) mined from the player, loaded on demand like `imagePath`. */
+  clipPath?: string;
   /** Backward-compatible last-result rollup used by knowledge surfaces. */
   known?: boolean;
   /** Local-copy schedule; an exported Anki copy remains owned by Anki's scheduler. */
@@ -161,7 +163,10 @@ import { isOverEncoded, quarantineIfUnrepaired, unwrapOverEncoded } from '../sha
 import { emitCompanionEvent } from './environment/companionEvents';
 import { logBlanc } from './blancConsole';
 import { levelForIntervalDays } from '../shared/anki';
-import { setInferredLevel, type WkLevel } from './knownWords';
+import { getLevel, isManualLevel, setInferredLevel, type WkLevel } from './knownWords';
+import { getStudyLang } from './studyEnvironment';
+import { getTokenizer, tokenizeSync, tokenizerReady } from './tokenizer';
+import { withoutAnkiOwned } from './ankiSchedulingOwner';
 import { getActiveProfile } from './profileState';
 import { appendReviewLog, removeReviewLogEntry } from './reviewLog';
 import type { ReviewLogEntry } from '../shared/reviewLog';
@@ -1036,6 +1041,7 @@ export function updateDeckCard(
       | 'back'
       | 'imagePath'
       | 'audioPath'
+      | 'clipPath'
       | 'audioDataUrl'
       | 'studyKind'
       | 'frequency'
@@ -1148,13 +1154,140 @@ export function setDeckCardKnown(id: string, known: boolean): DeckFlashcard[] {
  * about one lemma, and grading "猫が好きです" as a word would put a sentence
  * into the knowledge store that every reader highlight then consults.
  */
-export function reviewKnowledgeWord(card: Pick<DeckFlashcard, 'word' | 'sentence' | 'studyKind'>): string | null {
+export function reviewKnowledgeWord(
+  card: Pick<DeckFlashcard, 'word' | 'sentence' | 'studyKind'> & Partial<Pick<DeckFlashcard, 'studyLang'>>,
+): string | null {
   if (card.studyKind && card.studyKind !== 'vocabulary') return null;
+  // The knowledge store is per study language: a Chinese card reviewed while
+  // studying Japanese must not land in the Japanese store (or vice versa).
+  const cardLang = card.studyLang || 'ja';
+  if (cardLang !== getStudyLang()) return null;
   const word = (card.word ?? '').trim();
   if (!word || word.length > 16) return null;
-  if (/[\s。．、，！？!?「」『』()（）]/.test(word)) return null;
+  // 〜/～ marks a grammar pattern ("〜てしまう"): grammar cards saved before
+  // they carried `studyKind: 'grammar'` are still recognised by it.
+  if (/[\s。．、，！？!?「」『』()（）〜～~]/.test(word)) return null;
   if (card.sentence && card.sentence.trim() === word && word.length > 6) return null;
-  return word;
+  return cardLang === 'ja' ? knowledgeLemma(word) : word;
+}
+
+/**
+ * The lemma the knowledge store keys a Japanese word under, exactly as the
+ * reader and the Anki sync do: "食べた" is graded as "食べる", so every
+ * inflected form highlights. Only a word that is ONE content token (plus
+ * inflection) is reduced — a compound such as 日本語 stays whole rather than
+ * collapsing to its first part. Unchanged while the tokenizer is not built.
+ */
+export function knowledgeLemma(word: string): string {
+  if (!tokenizerReady()) return word;
+  let tokens: ReturnType<typeof tokenizeSync>;
+  try {
+    tokens = tokenizeSync(word);
+  } catch {
+    return word;
+  }
+  if (!tokens.length || !tokens[0].content) return word;
+  if (tokens.filter((token) => token.content).length !== 1) return word;
+  const lemma = tokens[0].lemma;
+  return lemma && lemma !== '*' ? lemma : word;
+}
+
+/**
+ * What a passing review of a SENTENCE card may speak for, or null.
+ *
+ * `reviewKnowledgeWord` keeps sentences out of the store, so a sentence deck
+ * used to leave known words untouched however well it went. The rule here is
+ * deliberately conservative: a sentence card with its own target word speaks
+ * for that word only; a pure sentence card (the word IS the line) speaks for
+ * its content words, and only to nudge the ones already being learned
+ * (`sentenceKnowledgeNudges`). One Good on a sentence never marks a word Known.
+ */
+export type SentenceKnowledgeTarget =
+  | { kind: 'word'; word: string }
+  | { kind: 'sentence'; text: string };
+
+export function sentenceKnowledgeTarget(
+  card: Pick<DeckFlashcard, 'word' | 'sentence' | 'studyKind'> & Partial<Pick<DeckFlashcard, 'studyLang'>>,
+): SentenceKnowledgeTarget | null {
+  const word = (card.word ?? '').trim();
+  const sentence = (card.sentence ?? '').trim();
+  const isSentenceCard = card.studyKind === 'sentence' || (!card.studyKind && !!sentence && sentence === word);
+  if (!isSentenceCard) return null;
+  // A plain short card whose sentence equals its word is already graded as a word.
+  if (!card.studyKind && reviewKnowledgeWord(card)) return null;
+  const cardLang = card.studyLang || 'ja';
+  if (cardLang !== getStudyLang()) return null;
+  // A target word needs a separate sentence; with no sentence the word IS the line.
+  if (word && sentence && word !== sentence && word.length <= 16 && !/[\s。．、，！？!?「」『』()（）〜～~]/.test(word)) {
+    return { kind: 'word', word: cardLang === 'ja' ? knowledgeLemma(word) : word };
+  }
+  const text = sentence || word;
+  // Content-word nudges need the Japanese tokenizer.
+  if (!text || cardLang !== 'ja') return null;
+  return { kind: 'sentence', text };
+}
+
+/** At most this many words move per sentence review. */
+const SENTENCE_NUDGE_LIMIT = 8;
+
+/**
+ * The words a passing review of a pure sentence nudges: distinct content-word
+ * lemmas the learner already has at Learning (1), raised to Familiar (2). New
+ * words stay new (one sentence is not evidence about a word never studied),
+ * Familiar and Known stay put, and a hand-set level is never touched.
+ */
+export function sentenceKnowledgeNudges(
+  tokens: ReadonlyArray<{ lemma: string; surface?: string; content: boolean }>,
+  levelOf: (word: string) => WkLevel,
+  isManual: (word: string) => boolean,
+  limit = SENTENCE_NUDGE_LIMIT,
+): Array<{ word: string; level: WkLevel }> {
+  const seen = new Set<string>();
+  const out: Array<{ word: string; level: WkLevel }> = [];
+  for (const token of tokens) {
+    if (!token.content) continue;
+    const lemma = token.lemma && token.lemma !== '*' ? token.lemma : (token.surface ?? '');
+    if (!lemma || seen.has(lemma)) continue;
+    seen.add(lemma);
+    if (isManual(lemma) || levelOf(lemma) !== 1) continue;
+    out.push({ word: lemma, level: 2 });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/**
+ * Apply a passing sentence review to the knowledge store; every change is
+ * recorded into `changes` so the review can be undone. Never blocks the review:
+ * without a built tokenizer the nudge waits for it off the review path.
+ */
+function applySentenceKnowledge(
+  target: SentenceKnowledgeTarget,
+  intervalDays: number,
+  changes: Array<{ word: string; previous: WkLevel }>,
+): void {
+  if (target.kind === 'word') {
+    // Only ever raises: a sentence missed may have been missed for another word.
+    const level = levelForIntervalDays(intervalDays, getActiveProfile().deckParams.thresholds);
+    if (level <= getLevel(target.word)) return;
+    const prior = setInferredLevel(target.word, level);
+    if (prior !== null) changes.push({ word: target.word, previous: prior });
+    return;
+  }
+  const nudge = (): void => {
+    let tokens: ReturnType<typeof tokenizeSync>;
+    try {
+      tokens = tokenizeSync(target.text);
+    } catch {
+      return;
+    }
+    for (const { word, level } of sentenceKnowledgeNudges(tokens, getLevel, isManualLevel)) {
+      const prior = setInferredLevel(word, level);
+      if (prior !== null) changes.push({ word, previous: prior });
+    }
+  };
+  if (tokenizerReady()) nudge();
+  else void getTokenizer().then(nudge, () => undefined);
 }
 
 /** What one review changed, kept so the review can be taken back. */
@@ -1167,6 +1300,8 @@ export interface DeckReviewUndo {
   log: ReviewLogEntry;
   /** Knowledge level before the review changed it, when it did. */
   knowledge?: { word: string; previous: WkLevel };
+  /** Levels a sentence-card review moved (may fill in after the tokenizer loads). */
+  sentenceKnowledge?: Array<{ word: string; previous: WkLevel }>;
 }
 
 const REVIEW_UNDO_LIMIT = 50;
@@ -1218,6 +1353,14 @@ export function reviewDeckCard(
     const prior = setInferredLevel(word, level);
     if (prior !== null) knowledge = { word, previous: prior };
   }
+  let sentenceKnowledge: DeckReviewUndo['sentenceKnowledge'];
+  if (!word && (rating === 'good' || rating === 'easy')) {
+    const target = sentenceKnowledgeTarget(next);
+    if (target) {
+      sentenceKnowledge = [];
+      applySentenceKnowledge(target, next.srs?.intervalDays ?? 0, sentenceKnowledge);
+    }
+  }
   const log = appendReviewLog({
     at: reviewedAt,
     mode: 'review',
@@ -1229,7 +1372,7 @@ export function reviewDeckCard(
     intervalDays: next.srs?.intervalDays ?? 0,
     ...(previous.srs === undefined ? { isNew: true } : {}),
   });
-  reviewUndoStack.push({ cardId: id, word: next.word, rating, previous, log, knowledge });
+  reviewUndoStack.push({ cardId: id, word: next.word, rating, previous, log, knowledge, sentenceKnowledge });
   if (reviewUndoStack.length > REVIEW_UNDO_LIMIT) reviewUndoStack = reviewUndoStack.slice(-REVIEW_UNDO_LIMIT);
   return store.cards;
 }
@@ -1262,6 +1405,8 @@ export function undoLastReview(): { undo: DeckReviewUndo; cards: DeckFlashcard[]
   }
   removeReviewLogEntry(undo.log);
   if (undo.knowledge) setInferredLevel(undo.knowledge.word, undo.knowledge.previous);
+  // Newest first, so a word moved twice ends at its oldest level.
+  for (const change of [...(undo.sentenceKnowledge ?? [])].reverse()) setInferredLevel(change.word, change.previous);
   return { undo, cards: store.cards };
 }
 
@@ -1566,13 +1711,14 @@ export function reviewSessionCards(
  * editor validated and nothing ever read. The allowance is deck-wide: cards
  * introduced today in one folder use up the same daily budget as another.
  */
-export function dueDeckCards<T extends { srs?: unknown }>(
+export function dueDeckCards<T extends { srs?: unknown; ankiNoteId?: number; ankiExported?: boolean; ankiPending?: boolean; ankiDuplicate?: boolean }>(
   cards: readonly T[],
   now = Date.now(),
   newPerDay: number | undefined = getActiveProfile().deckParams.newPerDay,
   introducedToday: number = introducedTodayCount(now),
 ): T[] {
-  return limitNewCards(filterLocalReviewsDue(cards, now), newPerDay, introducedToday);
+  // "Anki owns scheduling": a card with an Anki twin is reviewed there only.
+  return limitNewCards(filterLocalReviewsDue(withoutAnkiOwned(cards), now), newPerDay, introducedToday);
 }
 
 let introducedMemo: { cards: readonly DeckFlashcard[]; from: number; stamps: number[] } | null = null;

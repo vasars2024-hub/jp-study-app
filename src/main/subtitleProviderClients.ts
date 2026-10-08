@@ -15,15 +15,21 @@
  */
 
 import { net } from 'electron';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import type { SubtitleRecordFormat } from '../shared/subtitleRecord';
 import { chooseJimakuEntry } from '../shared/subtitleHarvest';
+import { decodeSubtitleBytes } from '../shared/subtitleDecode';
+import { parseRetryAfterMs } from '../shared/resilience';
+import { parseReleaseEpisode } from '../shared/releaseEpisodeNumber';
 import type { SubtitleProviderExecutionId } from '../shared/subtitleDiscoveryIpc';
 import {
   readSubtitleProviderSecret,
   writeSubtitleProviderSecret,
 } from './credentials/subtitles';
 import { recordTestResult } from './credentials/vault';
+import { extractSubtitlesFromArchive, isExtractableArchive } from './subtitleArchive';
 
 const USER_AGENT = 'jp-study-app v1';
 const TIMEOUT_MS = 20_000;
@@ -51,7 +57,19 @@ function keyFor(id: 'jimaku' | 'opensubtitles'): string | null {
 interface HttpResponse {
   status: number;
   body: Buffer;
+  /** The `Retry-After` header, when the reply carried one. */
+  retryAfter?: string;
 }
+
+/**
+ * Largest reply body accepted. A subtitle over it is refused as an error: the
+ * old cap kept the first 16 MB and returned it as a success, so the tail of an
+ * oversized file was dropped without a word and the cut file was stored.
+ */
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
+
+/** The message a body over `MAX_BODY_BYTES` fails with. */
+const BODY_TOO_LARGE = 'The subtitle provider sent more than 16 MB, which is not a subtitle file; it was not accepted.';
 
 /**
  * Electron's `net` rather than global fetch, so requests inherit the app's proxy
@@ -84,12 +102,31 @@ function request(
 
     req.on('response', (response) => {
       const chunks: Buffer[] = [];
+      let received = 0;
       response.on('data', (chunk: Buffer) => {
-        if (chunks.reduce((n, c) => n + c.length, 0) < 16_000_000) chunks.push(chunk);
+        if (settled) return;
+        received += chunk.length;
+        // Over the cap is a failure, never a silently shortened success.
+        if (received > MAX_BODY_BYTES) {
+          finish(() => {
+            try {
+              req.abort();
+            } catch {
+              /* already finished */
+            }
+            reject(new Error(BODY_TOO_LARGE));
+          });
+          return;
+        }
+        chunks.push(chunk);
       });
+      const retryAfterHeader = (response.headers as Record<string, string | string[] | undefined> | undefined)?.['retry-after'];
       response.on('end', () => finish(() => resolve({
         status: response.statusCode ?? 0,
         body: Buffer.concat(chunks),
+        ...(retryAfterHeader !== undefined
+          ? { retryAfter: Array.isArray(retryAfterHeader) ? retryAfterHeader[0] : retryAfterHeader }
+          : {}),
       })));
       response.on('error', (error: Error) => finish(() => reject(error)));
     });
@@ -97,6 +134,61 @@ function request(
     if (options.body !== undefined) req.write(options.body, 'utf-8');
     req.end();
   });
+}
+
+/** Minimum gap between two requests to the same provider host. */
+const PROVIDER_SPACING_MS = 300;
+/** A 429 asking for a longer wait than this is answered as-is, not waited out. */
+const MAX_RATE_LIMIT_WAIT_MS = 30_000;
+/** How many times one request is retried after a 429. */
+const RATE_LIMIT_RETRIES = 2;
+/** When each provider host may next be asked. */
+const nextRequestAtByHost = new Map<string, number>();
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Waits for the host's next slot and reserves the one after it. */
+async function paceProviderHost(url: string): Promise<void> {
+  let host: string;
+  try {
+    host = new URL(url).host;
+  } catch {
+    return;
+  }
+  const now = Date.now();
+  const slot = Math.max(now, nextRequestAtByHost.get(host) ?? 0);
+  nextRequestAtByHost.set(host, slot + PROVIDER_SPACING_MS);
+  if (slot > now) await sleep(slot - now);
+}
+
+/**
+ * `request`, spaced and retried on a rate limit.
+ *
+ * Jimaku and OpenSubtitles both answer a burst with 429, and a sweep over a
+ * season is exactly a burst: back-to-back searches came back empty and filled
+ * again when spaced out (see `JsonReply`). Requests to one host are spaced, and
+ * a 429 is retried after the wait its `Retry-After` names (a short backoff when
+ * it names none). A wait longer than `MAX_RATE_LIMIT_WAIT_MS` — a daily quota,
+ * not a burst — is not waited out: the 429 goes back to the caller.
+ */
+async function requestPaced(
+  url: string,
+  options: { method?: string; headers?: Record<string, string>; body?: string } = {},
+): Promise<HttpResponse> {
+  for (let attempt = 0; ; attempt += 1) {
+    await paceProviderHost(url);
+    const response = await request(url, options);
+    if (response.status !== 429 || attempt >= RATE_LIMIT_RETRIES) return response;
+    // A spent daily allowance answers 429 too; asking again cannot change that.
+    if (/allowed \d+ subtitles|download limit|quota/i.test(response.body.subarray(0, 2048).toString('utf-8'))) {
+      return response;
+    }
+    const wait = parseRetryAfterMs(response.retryAfter) ?? 500 * 2 ** attempt;
+    if (wait > MAX_RATE_LIMIT_WAIT_MS) return response;
+    await sleep(wait);
+  }
 }
 
 /**
@@ -123,7 +215,7 @@ async function requestJsonReply<T>(
 ): Promise<JsonReply<T>> {
   let response;
   try {
-    response = await request(url, {
+    response = await requestPaced(url, {
       ...options,
       headers: { Accept: 'application/json', ...options.headers },
     });
@@ -218,17 +310,10 @@ function groupFromName(name: string): string | null {
  * merely failing to block one.
  */
 function episodeFromName(name: string): number | null {
-  const patterns = [
-    /\bs\d{1,2}[\s._-]*e(\d{1,3})\b/i,
-    /\b(?:episode|ep)[\s._-]*(\d{1,3})\b/i,
-    /\s-\s*(\d{1,3})(?=\D|$)/,
-    /(?<![a-z0-9])e(\d{1,3})(?![a-z0-9])/i,
-  ];
-  for (const pattern of patterns) {
-    const value = Number(pattern.exec(name)?.[1]);
-    if (Number.isFinite(value)) return value;
-  }
-  return null;
+  // The shared reader keeps the fences described above (alphanumeric lookaround
+  // around a bare `E`, CRC32 tags blanked first) and adds `第N話` / `#N` /
+  // full-width digits, which Japanese subtitle file names use constantly.
+  return parseReleaseEpisode(name).episode;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,13 +423,17 @@ export async function jimakuSearchDetailed(
     return { ...empty, down: true, downStatus: filesReply.status };
   }
   const files = filesReply.value;
+  const archives: { name: string; url: string }[] = [];
 
   for (const file of files) {
     const name = file.name?.trim();
     const url = file.url?.trim();
     if (!name || !url) continue;
     const format = formatFromName(name);
-    if (!format) continue;
+    if (!format) {
+      if (isExtractableArchive(name)) archives.push({ name, url });
+      continue;
+    }
     out.push({
       providerId: 'jimaku',
       providerItemId: `jimaku:${entry.id}:${name}`,
@@ -360,6 +449,12 @@ export async function jimakuSearchDetailed(
       fetchToken: url,
     });
   }
+  // Season packs filed as `.zip`/`.7z` were dropped, so an entry that only
+  // ships one read as "no files". They are opened only when no loose file
+  // answers the episode, since each is a download.
+  if (archives.length && !out.some((candidate) => episode === null || candidate.episode === episode)) {
+    out.push(...await jimakuArchiveCandidates(entry.id, archives.slice(0, JIMAKU_ARCHIVE_LIMIT), episode));
+  }
   return {
     candidates: out,
     entry: { id: entry.id, name: (entry.name || entry.english_name || entry.japanese_name || '').trim() },
@@ -370,10 +465,89 @@ export async function jimakuSearchDetailed(
   };
 }
 
+/** Archives opened per search, at most. */
+const JIMAKU_ARCHIVE_LIMIT = 2;
+/** Refuse an archive whose subtitles declare more than this unpacked. */
+const JIMAKU_ARCHIVE_MAX_UNPACKED = 64 * 1024 * 1024;
+/** Fetch tokens of members already unpacked; the text is served from memory. */
+const JIMAKU_ARCHIVE_TOKEN = 'jimaku-archive:';
+const JIMAKU_ARCHIVE_CACHE_LIMIT = 400;
+const jimakuArchiveTexts = new Map<string, string>();
+
+function rememberJimakuArchiveText(token: string, text: string): void {
+  jimakuArchiveTexts.delete(token);
+  jimakuArchiveTexts.set(token, text);
+  while (jimakuArchiveTexts.size > JIMAKU_ARCHIVE_CACHE_LIMIT) {
+    const oldest = jimakuArchiveTexts.keys().next().value;
+    if (oldest === undefined) break;
+    jimakuArchiveTexts.delete(oldest);
+  }
+}
+
+/**
+ * The subtitle members of Jimaku archives, as candidates.
+ *
+ * Unpacked with the same 7-Zip reader the Nyaa route uses (`subtitleArchive`),
+ * into memory; the archive itself only touches a temp folder removed at once.
+ * A member's episode comes from its own name; a lone member of an archive
+ * falls back to the episode asked for, a member of a season pack never does.
+ */
+async function jimakuArchiveCandidates(
+  entryId: number | string,
+  archives: { name: string; url: string }[],
+  episode: number | null,
+): Promise<ProviderSubtitleCandidate[]> {
+  const out: ProviderSubtitleCandidate[] = [];
+  for (const archive of archives) {
+    let dir: string | null = null;
+    try {
+      const response = await requestPaced(archive.url);
+      if (response.status < 200 || response.status >= 300 || response.body.length === 0) continue;
+      dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'jimaku-archive-'));
+      const at = path.join(dir, `archive${path.extname(archive.name).toLowerCase()}`);
+      await fsp.writeFile(at, response.body);
+      const unpacked = await extractSubtitlesFromArchive(at, {
+        extensions: FORMATS.map((format) => `.${format}`),
+        maxUnpackedBytes: JIMAKU_ARCHIVE_MAX_UNPACKED,
+      });
+      if (!unpacked.ok) continue;
+      for (const member of unpacked.files) {
+        const base = member.name.split(/[\\/]/).pop() ?? member.name;
+        const format = formatFromName(base);
+        const text = member.text.trim();
+        if (!format || !text) continue;
+        const token = `${JIMAKU_ARCHIVE_TOKEN}${entryId}:${archive.name}:${member.name}`;
+        rememberJimakuArchiveText(token, text);
+        out.push({
+          providerId: 'jimaku',
+          providerItemId: `jimaku:${entryId}:${archive.name}/${member.name}`,
+          language: 'ja',
+          format,
+          releaseName: base,
+          season: null,
+          episode: episodeFromName(base) ?? (unpacked.files.length === 1 ? episode : null),
+          releaseGroup: groupFromName(base) ?? groupFromName(archive.name),
+          hearingImpaired: false,
+          hashMatch: false,
+          downloads: null,
+          fetchToken: token,
+        });
+      }
+    } catch {
+      // One unreadable archive does not fail the listing.
+    } finally {
+      if (dir) await fsp.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+  return out;
+}
+
 /** Jimaku serves files from its own CDN; the URL is fetched as-is. */
 async function jimakuFetch(url: string): Promise<string | null> {
+  // A member of an archive opened during the search.
+  if (url.startsWith(JIMAKU_ARCHIVE_TOKEN)) return jimakuArchiveTexts.get(url) ?? null;
   try {
-    const response = await request(url);
+    const response = await requestPaced(url);
     if (response.status < 200 || response.status >= 300) return null;
     return decodeSubtitle(response.body);
   } catch {
@@ -599,7 +773,7 @@ async function openSubtitlesFetch(fileId: string): Promise<SubtitleFetchOutcome>
   if (!key) return none;
   let ticket: ReturnType<typeof readOpenSubtitlesTicket>;
   try {
-    const response = await request(`${OPENSUBTITLES}/download`, {
+    const response = await requestPaced(`${OPENSUBTITLES}/download`, {
       method: 'POST',
       headers: { 'Api-Key': key, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ file_id: Number(fileId) }),
@@ -611,7 +785,7 @@ async function openSubtitlesFetch(fileId: string): Promise<SubtitleFetchOutcome>
   const meta = { quotaExceeded: ticket.quotaExceeded, resetAt: ticket.resetAt, remaining: ticket.remaining };
   if (!ticket.link) return { text: null, ...meta };
   try {
-    const response = await request(ticket.link);
+    const response = await requestPaced(ticket.link);
     if (response.status < 200 || response.status >= 300) return { text: null, ...meta };
     return { text: decodeSubtitle(response.body), ...meta };
   } catch {
@@ -628,24 +802,12 @@ async function openSubtitlesFetch(fileId: string): Promise<SubtitleFetchOutcome>
  *
  * Japanese subtitle files in circulation are frequently Shift_JIS rather than
  * UTF-8, and decoding those as UTF-8 yields a screen of replacement characters —
- * which looks like a broken download rather than a wrong encoding. The heuristic:
- * if a UTF-8 read produces replacement characters, try Shift_JIS.
+ * which looks like a broken download rather than a wrong encoding. The shared
+ * detector handles BOMs, UTF-16, Shift_JIS, EUC-JP and the other legacy encodings.
  */
 function decodeSubtitle(body: Buffer): string | null {
   if (body.length === 0) return null;
-  // Strip a UTF-8 BOM, which some tools emit and cue parsers choke on.
-  const bytes = body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf ? body.subarray(3) : body;
-
-  const utf8 = bytes.toString('utf-8');
-  if (!utf8.includes('�')) return utf8.trim() || null;
-  try {
-    const decoded = new TextDecoder('shift_jis', { fatal: false }).decode(bytes);
-    // Only prefer it when it is genuinely cleaner.
-    const cleaner = (decoded.match(/�/g)?.length ?? 0) < (utf8.match(/�/g)?.length ?? 0);
-    return (cleaner ? decoded : utf8).trim() || null;
-  } catch {
-    return utf8.trim() || null;
-  }
+  return decodeSubtitleBytes(body).text.trim() || null;
 }
 
 /** Fetches a chosen candidate's text, routing to the provider that offered it. */

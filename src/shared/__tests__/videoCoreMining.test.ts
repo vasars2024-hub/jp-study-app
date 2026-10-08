@@ -137,12 +137,13 @@ describe('videoCoreMining', () => {
       { ok: true, noteId: 42 },
       3000,
     );
-    const history = Array.from({ length: 110 }, (_, index) => ({
+    // Every outcome is recorded now (queued and app-only too), so the cap is 500, not 100.
+    const history = Array.from({ length: 510 }, (_, index) => ({
       ...entry,
       id: `entry-${index}`,
       createdAt: index,
     }));
-    expect(appendVideoCoreMiningHistory(history, entry)).toHaveLength(100);
+    expect(appendVideoCoreMiningHistory(history, entry)).toHaveLength(500);
     expect(normalizeVideoCoreMiningHistory([null, entry])).toEqual([entry]);
   });
 });

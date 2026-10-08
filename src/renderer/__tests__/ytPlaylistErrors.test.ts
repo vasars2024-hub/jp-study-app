@@ -25,8 +25,20 @@ describe('YouTube playlist refusal localization', () => {
   });
 
   it('keeps an unknown provider diagnostic under a translated explanation', () => {
-    expect(localizeYtPlaylistError('HTTP Error 429', t)).toBe(
-      'yt.refusal.providerError {"detail":"HTTP Error 429"}',
+    expect(localizeYtPlaylistError('ERROR: something odd happened', t)).toBe(
+      'yt.refusal.providerError {"detail":"ERROR: something odd happened"}',
     );
+  });
+
+  it.each([
+    ['HTTP Error 429', 'rateLimited'],
+    ['ERROR: [youtube] abc123: Private video. Sign in if you\'ve been granted access', 'private'],
+    ['ERROR: [youtube] abc123: Sign in to confirm your age', 'signIn'],
+    ['ERROR: [youtube] abc123: Video unavailable', 'unavailable'],
+    ['ERROR: [youtube:tab] PLx: The playlist does not exist.', 'notFound'],
+    ['ERROR: Unable to download webpage: <urlopen error [Errno 11001] getaddrinfo failed>', 'network'],
+    ['ERROR: [youtube] abc123: Join this channel to get access to members-only content', 'membersOnly'],
+  ])('maps raw yt-dlp stderr %s to a translated message', (raw, key) => {
+    expect(localizeYtPlaylistError(raw, t)).toBe(`polish2.yt.error.${key}`);
   });
 });

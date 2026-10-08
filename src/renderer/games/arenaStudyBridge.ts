@@ -20,7 +20,6 @@
 import { levelForIntervalDays } from '../../shared/anki';
 import { isLocalReviewDue } from '../../shared/localSrs';
 import { normalizeStudyLang } from '../../shared/studyLang';
-import type { StudyLang } from '../../shared/levelScale';
 import type { ReviewLogEntry } from '../../shared/reviewLog';
 import { loadDeck, reviewDeckCard } from '../flashcardDeck';
 import { getLevel, setInferredLevel } from '../knownWords';
@@ -51,15 +50,7 @@ export function levelForGameStreak(streakDays: number, correct: boolean): 1 | 2 
   return levelForIntervalDays(streakDays, getActiveProfile().deckParams.thresholds);
 }
 
-async function feedWord(word: string, lang: StudyLang, correct: boolean, at: number): Promise<void> {
-  const card = loadDeck().find((c) => c.word === word && normalizeStudyLang(c.studyLang) === lang);
-  if (card) {
-    // The deck's own review path does the scheduling, the review row and the
-    // known-word inference, so a game answer means the same thing there.
-    if (!correct) reviewDeckCard(card.id, 'again', at);
-    else if (card.srs && isLocalReviewDue(card.srs, at)) reviewDeckCard(card.id, 'good', at);
-    return;
-  }
+async function inferWordLevel(word: string, correct: boolean): Promise<void> {
   const rows = await loadReviewLog();
   const level = levelForGameStreak(correctStreakDays(rows, word), correct);
   const current = getLevel(word);
@@ -67,10 +58,28 @@ async function feedWord(word: string, lang: StudyLang, correct: boolean, at: num
   if (!correct ? current > 1 || current === 0 : level > current) setInferredLevel(word, level);
 }
 
-/** Bank one answered round. */
+/**
+ * Bank one answered round.
+ *
+ * - A word whose deck card is DUE: the answer is that card's review (Good /
+ *   Again) through the deck's own path, which writes the one review row — no
+ *   extra `game` row, so the answer is not counted twice in the day's totals.
+ * - A word with a deck card that is not due (or never studied): practice only.
+ *   A game miss used to send a card scheduled weeks out straight back to
+ *   relearning; the schedule now belongs to real reviews.
+ * - A word with no card: practice row plus known-word inference from its streak.
+ */
 export function bankArenaAnswer(round: GameRound, correct: boolean, at = Date.now()): void {
-  appendReviewLog({ mode: 'game', word: (round.word ?? round.jp).slice(0, 120), correct, at });
-  if (round.word) void feedWord(round.word, round.studyLang, correct, at).catch(() => undefined);
+  const word = round.word;
+  const card = word
+    ? loadDeck().find((c) => c.word === word && normalizeStudyLang(c.studyLang) === round.studyLang)
+    : undefined;
+  if (card?.srs && isLocalReviewDue(card.srs, at)) {
+    reviewDeckCard(card.id, correct ? 'good' : 'again', at);
+    return;
+  }
+  appendReviewLog({ mode: 'game', word: (word ?? round.jp).slice(0, 120), correct, at });
+  if (word && !card) void inferWordLevel(word, correct).catch(() => undefined);
 }
 
 /** Bank a finished session's time as study time. */

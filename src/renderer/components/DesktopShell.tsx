@@ -3610,6 +3610,17 @@ export default function DesktopShell({
                     </button>
                     <button
                       type="button"
+                      className="os-start-aero-tool"
+                      onClick={() => {
+                        setStartOpen(false);
+                        void window.api.recorderStart?.('select');
+                      }}
+                    >
+                      <Icon name="video" size={17} />
+                      <span>{t('recorder.start.menu')}</span>
+                    </button>
+                    <button
+                      type="button"
                       className="os-start-aero-tool os-start-tour"
                       onClick={() => {
                         setStartOpen(false);

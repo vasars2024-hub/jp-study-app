@@ -187,6 +187,12 @@ interface Props {
    * same callback without a second mechanism.
    */
   onLookup?: (word: string) => void;
+  /**
+   * Draws an entry's pitch accent in place of the presentation-HTML row main attaches.
+   * The dictionary popup passes a contour (`DictionaryPopup`); without it the HTML row
+   * is shown as before.
+   */
+  renderPitch?: (entry: DictEntry) => ReactNode;
 }
 
 /**
@@ -324,6 +330,7 @@ export default function DictionaryResults({
   lang = 'ja',
   context,
   onLookup,
+  renderPitch,
 }: Props) {
   const { t, lang: uiLang } = useT();
   /**
@@ -1180,7 +1187,7 @@ export default function DictionaryResults({
                   />
                 )}
               </div>
-              {entry.pitchHtml && (
+              {renderPitch ? renderPitch(entry) : entry.pitchHtml && (
                 <div className="dict-pitch" lang="ja">
                   <span className="dict-pitch-label">{t('dict.results.pitch')}</span>
                   <span

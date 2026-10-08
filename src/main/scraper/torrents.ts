@@ -20,6 +20,7 @@ import type { ScraperTorrentQuery, ScraperTorrentSearchInput } from '../../share
 import { scraperRequest } from './http';
 import { scraperLog } from './logBus';
 import { fallbackChain } from '../../shared/scraperSourceOrder';
+import { releaseEpisodeRange } from '../../shared/releaseEpisodeNumber';
 
 /** Trackers attached to a magnet when the feed does not carry its own. */
 export const DEFAULT_TRACKERS = [
@@ -79,12 +80,12 @@ export function parseResolution(name: string): string {
  * only by coincidence, and `preferBatches` sorts on this.
  */
 export function looksLikeBatch(name: string): boolean {
-  const text = name ?? '';
-  if (/\b(batch|complete|全\d+話)\b/i.test(text)) return true;
-  if (/\bseason\s*\d+\b/i.test(text) && /\bcomplete\b/i.test(text)) return true;
-  // An episode range: `01-12`, `01~12`, `E01-E12`. Bounded to three digits so a
-  // year range or a `1920-1080` style dimension pair cannot match.
-  return /\b(?:e|ep|episode)?\s?\d{1,3}\s*[-~]\s*(?:e|ep)?\s?\d{1,3}\b/i.test(text);
+  const text = (name ?? '').normalize('NFKC');
+  if (/\b(batch|complete)\b/i.test(text) || /全\s*\d+\s*話/.test(text)) return true;
+  // An episode range: `01-12`, `01~12`, `E01-E12`, `第1話～第12話`. The shared
+  // reader refuses `Mob Psycho 100 - 07` (a title number, then the episode),
+  // which the bare range pattern that used to live here read as a batch.
+  return releaseEpisodeRange(text) !== null;
 }
 
 /** Language tags a release advertises, normalised to ISO 639-1 where obvious. */
@@ -249,6 +250,19 @@ export function applyTorrentPreferences(
 
 // ------------------------------------------------------------------ search ---
 
+/**
+ * Where an index entry's feed lives. A bare host (`nyaa.si`) is https — every
+ * public index is — but an entry may name its scheme (`http://127.0.0.1:9696`
+ * for a local indexer proxy), and that is honoured rather than rewritten to an
+ * https URL the local service does not answer. A trailing path is kept, so an
+ * index mounted under a prefix works too.
+ */
+export function indexOrigin(host: string): string {
+  const trimmed = (host ?? '').trim().replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 /** Nyaa's RSS endpoint, sorted so the best-seeded releases arrive first. */
 export function buildIndexUrl(host: string, query: ScraperTorrentQuery): string {
   const params = new URLSearchParams({
@@ -263,7 +277,7 @@ export function buildIndexUrl(host: string, query: ScraperTorrentQuery): string 
     s: 'seeders',
     o: 'desc',
   });
-  return `https://${host}/?${params.toString()}`;
+  return `${indexOrigin(host)}/?${params.toString()}`;
 }
 
 /** One index's answer: its rows, or null when it could not be searched. */
@@ -277,6 +291,7 @@ async function queryIndex(
     const response = await scraperRequest(url, {
       timeoutMs: input.timeoutMs,
       correlationId: 'torrents',
+      signal: input.signal,
     });
     if (response.status !== 200) {
       scraperLog('warn', 'torrents', `${entry.label} answered ${response.status}.`, {

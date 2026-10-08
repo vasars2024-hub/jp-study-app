@@ -3,10 +3,59 @@ import type { VideoCoreStudyCue } from './videoCoreStudy';
 import type { StudyLang } from './studyLang';
 
 export const VIDEO_CORE_MINING_HISTORY_KEY = 'jp-video-core-mining-history-v1';
-export const VIDEO_CORE_MINING_HISTORY_LIMIT = 100;
+/**
+ * Every mine is recorded now (queued and local ones too), so the log fills faster than
+ * when only immediate Anki answers were kept; 500 is a few weeks of heavy mining.
+ */
+export const VIDEO_CORE_MINING_HISTORY_LIMIT = 500;
+/** Dispatched on `window` after any writer changes the mining history. */
+export const VIDEO_CORE_MINING_HISTORY_EVENT = 'video-core-mining-history-changed';
 
 export type VideoCoreMiningCardKind = 'word' | 'sentence';
-export type VideoCoreMiningHistoryStatus = 'exported' | 'duplicate' | 'failed' | 'undone';
+/**
+ * `queued`: saved in the app, the Anki note waits for Anki to come back.
+ * `local`: saved in the app only (no Anki set up here).
+ */
+export type VideoCoreMiningHistoryStatus =
+  | 'exported'
+  | 'duplicate'
+  | 'failed'
+  | 'undone'
+  | 'queued'
+  | 'local';
+
+const HISTORY_STATUSES: readonly VideoCoreMiningHistoryStatus[] = [
+  'exported', 'duplicate', 'failed', 'undone', 'queued', 'local',
+];
+
+/** Statuses that mean "this line is a card you have" (the mined marker). */
+export function isMinedHistoryStatus(status: VideoCoreMiningHistoryStatus): boolean {
+  return status !== 'failed' && status !== 'undone';
+}
+
+/**
+ * One mine request from the player: the shortcut, a Mine button, or the popup's Mine.
+ * `seq` strictly increases per request so the same line mined twice is two requests.
+ */
+export interface VideoCoreMineRequest {
+  seq: number;
+  /**
+   * Unique per request (`media/mineRequestGuard.ts`): a panel that remounts with the same
+   * request must not mine it again. Absent on older callers.
+   */
+  id?: string;
+  /** Line to mine; absent = the panel's current `cue`. */
+  cue?: VideoCoreStudyCue;
+  /** Stripped display text for `cue`. */
+  text?: string;
+  /** User-chosen word; absent = the first unknown content word (i+1). */
+  target?: { surface: string; reading?: string; meaning?: string };
+}
+
+/** A cue's identity for the mined-line markers: its rounded start and end. */
+export function minedCueKey(cue: { startMs: number; endMs: number }): string {
+  return `${Math.round(cue.startMs)}:${Math.round(cue.endMs)}`;
+}
 
 export interface VideoCoreMiningSource {
   playbackId: string;
@@ -48,6 +97,11 @@ export interface VideoCoreCueProvenance {
 export interface VideoCoreMiningDraft {
   cardKind: VideoCoreMiningCardKind;
   term: string;
+  /**
+   * The target word as it appears in `sentence` (食べた for the term 食べる), for the
+   * cloze split. Absent means the term itself.
+   */
+  surface?: string;
   reading: string;
   meaning: string;
   translation: string;
@@ -148,6 +202,7 @@ function provenance(value: unknown): VideoCoreCueProvenance | null {
     assets: {
       ...(asset(raw.assets?.screenshot) ? { screenshot: asset(raw.assets?.screenshot) } : {}),
       ...(asset(raw.assets?.audio) ? { audio: asset(raw.assets?.audio) } : {}),
+      ...(asset(raw.assets?.clip) ? { clip: asset(raw.assets?.clip) } : {}),
     },
     capturedAt: Math.max(0, Math.round(finite(raw.capturedAt) ?? Date.now())),
   };
@@ -240,7 +295,7 @@ export function buildVideoCoreMineRequest(draft: VideoCoreMiningDraft): MineNote
     ...(draft.meaning.trim() ? { meaning: draft.meaning.trim() } : {}),
     ...(draft.translation.trim() ? { translation: draft.translation.trim() } : {}),
     sentence: draft.sentence.trim(),
-    surface: draft.term.trim(),
+    surface: draft.surface?.trim() || draft.term.trim(),
     ...(draft.translation.trim()
       ? { sentenceTranslation: draft.translation.trim() }
       : {}),
@@ -299,6 +354,35 @@ export function createVideoCoreMiningHistoryEntry(
   };
 }
 
+/** How `mineToStudy` settled the Anki half (renderer/studyMining.ts `MineAnkiOutcome`). */
+export type VideoCoreMineOutcome = 'added' | 'duplicate' | 'queued' | 'failed' | 'local';
+
+/**
+ * A history entry for EVERY mine outcome, not only an immediate Anki answer: a card
+ * queued for Anki or kept in the app is still a line you mined, and leaving it out
+ * made the log (and the mined markers built on it) forget it.
+ *
+ * `added` without a fresh Anki result means the same card was mined before and reused;
+ * it is recorded as `duplicate` (you already had it), like Anki's own refusal.
+ */
+export function createVideoCoreMiningOutcomeEntry(
+  draft: VideoCoreMiningDraft,
+  outcome: VideoCoreMineOutcome,
+  result?: MineNoteResult,
+  error?: string,
+  now = Date.now(),
+): VideoCoreMiningHistoryEntry {
+  if (result && (outcome === 'added' || outcome === 'duplicate' || outcome === 'failed')) {
+    const entry = createVideoCoreMiningHistoryEntry(draft, result, now);
+    return error && !entry.error ? { ...entry, error } : entry;
+  }
+  const status: VideoCoreMiningHistoryStatus = outcome === 'added' || outcome === 'duplicate'
+    ? 'duplicate'
+    : outcome;
+  const synthetic: MineNoteResult = { ok: false, ...(error ? { error } : {}) };
+  return { ...createVideoCoreMiningHistoryEntry(draft, synthetic, now), status };
+}
+
 export function markVideoCoreMiningHistoryUndone(
   history: readonly VideoCoreMiningHistoryEntry[],
   noteId: number,
@@ -324,7 +408,7 @@ export function normalizeVideoCoreMiningHistory(value: unknown): VideoCoreMining
       !id
       || createdAt == null
       || !normalizedProvenance
-      || !['exported', 'duplicate', 'failed', 'undone'].includes(String(status))
+      || !HISTORY_STATUSES.includes(status as VideoCoreMiningHistoryStatus)
     ) return [];
     return [{
       id,

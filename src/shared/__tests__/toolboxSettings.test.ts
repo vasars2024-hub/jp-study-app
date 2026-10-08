@@ -15,7 +15,7 @@ describe('toolbox settings schema', () => {
       defaultTool: 'not-real',
       sidebarWidth: 999,
       maxRecentTools: -10,
-      enabledTools: ['calculator', 'screen-recorder', 'calculator'],
+      enabledTools: ['calculator', 'screenshot-studio', 'calculator'],
       hiddenTools: ['calculator', 'dictionary'],
       density: 'huge',
     });

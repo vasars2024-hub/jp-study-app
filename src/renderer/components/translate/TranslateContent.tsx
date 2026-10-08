@@ -23,7 +23,9 @@ import {
   type TranslationHistoryEntry,
 } from '../../translationHistory';
 import { appendNotebookEvent, saveTranslationNote } from '../../notebookTimeline';
-import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
+import { createDeckFolder } from '../../flashcardDeck';
+import { mineToStudy } from '../../studyMining';
+import { studyLangFromTag, studyLangOfText } from '../../../shared/studyLang';
 import { useT } from '../../i18n';
 import { confirmDialog } from '../ui';
 import { LANG_TAGS } from '../../../shared/i18n/core';
@@ -224,18 +226,29 @@ export function useTranslate(): TranslateController {
     // The folder is named in the UI language, like every folder the app creates for the learner.
     const folder = t('translate.deckFolder');
     createDeckFolder(folder);
-    addDeckCards([
-      {
-        word: e.sourceText.slice(0, 80),
-        reading: '',
-        meaning: e.resultText.slice(0, 400),
-        sentence: e.sourceText.slice(0, 2000),
-        source: 'import',
-        folder,
-      },
-    ]);
-    // Mining used to succeed silently; say where the card went.
-    window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('translate.history.mined', { folder }), kind: 'ok' } }));
+    // Through the one mining gateway (studyMining.ts): it dedupes a second mine
+    // of the same line, stamps the study language and keeps the card's identity,
+    // which a bare addDeckCards did not — mining twice made two cards.
+    const word = e.sourceText.slice(0, 80);
+    const sentence = e.sourceText.slice(0, 2000);
+    void mineToStudy({
+      word,
+      meaning: e.resultText.slice(0, 400),
+      sentence,
+      source: 'import',
+      sourceId: 'translate',
+      folder,
+      // A translated passage is a sentence card, never one word's evidence.
+      ...(word.length > 16 || /[\s。．！？!?]/.test(word) ? { studyKind: 'sentence' as const } : {}),
+      studyLang: studyLangFromTag(e.sourceLang) ?? studyLangOfText(e.sourceText, getStudyLang()),
+      notify: false,
+    }).then((result) => {
+      // Mining used to succeed silently; say where the card went (or that it was already there).
+      const message = result.created
+        ? t('translate.history.mined', { folder })
+        : t('polish.mine.alreadyInDeck');
+      window.dispatchEvent(new CustomEvent('os:toast', { detail: { message, kind: 'ok' } }));
+    }).catch(() => undefined);
   }
 
   function clear() {

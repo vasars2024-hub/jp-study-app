@@ -21,6 +21,11 @@
 
 import type { AcquisitionContentType, AcquisitionTorrentCandidate } from './acquisition';
 import type { DiscoveryProviderId } from './mediaDiscovery';
+import {
+  foldReleaseWidth,
+  maskReleaseNoise,
+  releaseMarkerIsEpisode,
+} from './releaseEpisodeNumber';
 
 /** The catalogue entry a download was started from. */
 export interface MalDownloadTarget {
@@ -293,7 +298,11 @@ export function releaseCoversEpisode(name: string, number: number): boolean {
   // carry no such ambiguity, which is why they are matched unconditionally
   // above and parentheses are not.
   if (number < 1_900 || number > 2_099) patterns.push(`\\(${digits}\\)`);
-  return patterns.some((pattern) => new RegExp(pattern, 'i').test(name ?? ''));
+  // Full-width digits folded, and CRC32 / resolution / codec tags blanked first:
+  // `Show - 05 [E9ED99BE]` must not read as episode 9 through the `E` rule.
+  const text = maskReleaseNoise(foldReleaseWidth((name ?? '').normalize('NFKC')));
+  return patterns.some((pattern) => new RegExp(pattern, 'i').test(text))
+    || releaseMarkerIsEpisode(name ?? '', number);
 }
 
 /**

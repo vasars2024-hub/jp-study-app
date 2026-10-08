@@ -33,7 +33,7 @@ export interface ShellNotification {
   i18n?: NotificationI18n;
 }
 
-export type NotificationClientAction = 'extension-settings' | 'open-calendar' | 'open-shortcuts';
+export type NotificationClientAction = 'extension-settings' | 'open-calendar' | 'open-shortcuts' | 'restart-to-update';
 
 export interface NotificationI18n {
   title?: string;

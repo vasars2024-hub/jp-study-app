@@ -472,6 +472,17 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                     </span>
                                     <span className="aero-flash-meaning">{card.meaning || card.back || '-'}</span>
                                     <span className="aero-flash-row-actions">
+                                      {state.cardHasScene(card.id) && (
+                                        <Button
+                                          size="sm"
+                                          data-flash-action="row-play-in-video"
+                                          title={t('studyLoop.replayNamed', { term: card.word })}
+                                          aria-label={t('studyLoop.replayNamed', { term: card.word })}
+                                          onClick={() => void state.playCardInVideo(card.id)}
+                                        >
+                                          <Icon name="video" size={13} />
+                                        </Button>
+                                      )}
                                       <FlashcardFileMenu
                                         open={fileMenu === card.id}
                                         folders={folders}

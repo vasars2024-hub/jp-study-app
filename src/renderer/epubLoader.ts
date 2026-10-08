@@ -253,9 +253,22 @@ const CHUNK_ELEMENTS = 30;
 const CHUNK_CHARS = 6000;
 const WRAPPER_TAGS = new Set(['DIV', 'SECTION', 'ARTICLE', 'MAIN']);
 
-function charCount(el: Element): number {
-  return (el.textContent ?? '').replace(/\s+/g, '').length;
+/**
+ * Characters a reader actually reads: whitespace and furigana excluded. A
+ * book with full ruby counted every reading twice (漢字 + かんじ), inflating
+ * the characters-read statistics by up to ~2x.
+ */
+export function readableCharCount(el: Element): number {
+  const all = (el.textContent ?? '').replace(/\s+/g, '').length;
+  let ruby = 0;
+  el.querySelectorAll('rt, rp').forEach((node) => {
+    if (node.parentElement?.closest('rt, rp')) return; // nested: counted by its ancestor
+    ruby += (node.textContent ?? '').replace(/\s+/g, '').length;
+  });
+  return Math.max(0, all - ruby);
 }
+
+const charCount = readableCharCount;
 
 function splitBody(body: Element): { html: string; chars: number }[] {
   const kids = Array.from(body.children);

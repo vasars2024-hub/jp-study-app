@@ -9,6 +9,7 @@ export const SCRAPER_SETTING_ACTIONS = {
   'qbit-test': { kind: 'test' },
   'qbit-password': { kind: 'credential' },
   'qbit-apikey': { kind: 'credential' },
+  'qbit-path-mappings': { kind: 'pairs' },
 } as const satisfies Record<
   string,
   | { kind: 'navigate'; page: ScraperPageId }

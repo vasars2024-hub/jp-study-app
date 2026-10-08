@@ -2,7 +2,7 @@
 // intervals become knowledge levels; words the user graded by hand are left
 // untouched (handled inside knownWords.bulkSetFromAnki).
 import type { AnkiLinkState, IntervalSnapshot, IntervalSyncOutcome } from '../shared/anki';
-import { classifyIntervalSyncOutcome, levelForIntervalDays } from '../shared/anki';
+import { ankiEntryKnowledgeLevel, classifyIntervalSyncOutcome } from '../shared/anki';
 import { bulkSetFromAnki, type WkLevel } from './knownWords';
 import { getActiveProfile } from './profileState';
 import { getTokenizer, tokenizeSync, tokenizerReady } from './tokenizer';
@@ -38,7 +38,10 @@ async function foldSnapshot(
 
   const levels: Record<string, WkLevel> = {};
   for (const entry of snapshot.entries) {
-    const level = levelForIntervalDays(entry.ivlDays, thresholds);
+    // Unseen (interval 0) and suspended cards are skipped outright rather than
+    // folded as 0: a 0 would erase a level the built-in SRS inferred.
+    const level = ankiEntryKnowledgeLevel(entry, thresholds);
+    if (level === 0) continue;
     let key = entry.expression;
     if (ready) {
       const toks = tokenizeSync(entry.expression);

@@ -2083,5 +2083,206 @@
   },
   "cmd_wheel_more_desc": {
     "message": "Открыть дополнительный список действий (OCR, медиа, инструменты страницы)."
+  },
+  "bg_stopRecordingFirst": {
+    "message": "Сначала остановите запись, затем сохраните её."
+  },
+  "bg_recUnsupported": {
+    "message": "Эта версия Chrome не умеет записывать вкладки."
+  },
+  "bg_recNeedsGesture": {
+    "message": "Начните запись кнопкой Gum на панели или её сочетанием клавиш — Chrome разрешает записывать только вкладку, где расширение было вызвано."
+  },
+  "bg_recFailed": {
+    "message": "Не удалось начать запись."
+  },
+  "bg_recStopped": {
+    "message": "Запись остановлена — отправляю в Gum."
+  },
+  "bg_recStarted": {
+    "message": "Записываю вкладку…"
+  },
+  "bg_recSaved": {
+    "message": "Запись сохранена в Gum."
+  },
+  "menu_recordTab": {
+    "message": "Записать эту вкладку"
+  },
+  "manifestCmd_recordTab": {
+    "message": "Начать или остановить запись вкладки"
+  },
+  "cmd_capture_video_record_label": {
+    "message": "Записать вкладку"
+  },
+  "cmd_capture_video_record_short": {
+    "message": "Запись"
+  },
+  "cmd_capture_video_record_desc": {
+    "message": "Записать эту вкладку (изображение и звук) в Gum."
+  },
+  "cmd_capture_audio_tab_label": {
+    "message": "Записать звук вкладки"
+  },
+  "cmd_capture_audio_tab_short": {
+    "message": "Звук вкладки"
+  },
+  "cmd_capture_audio_tab_desc": {
+    "message": "Записать в Gum только звук этой вкладки."
+  },
+  "content_rpSaveEntry": {
+    "message": "Сохранить эту статью"
+  },
+  "content_ocrSelectHint": {
+    "message": "Обведите текст рамкой · Esc — отмена"
+  },
+  "content_rpStrokes": {
+    "message": "черт: $1"
+  },
+  "content_rpParts": {
+    "message": "части: $1"
+  },
+  "popup_recTab": {
+    "message": "Записать вкладку"
+  },
+  "popup_recAudio": {
+    "message": "Записать звук"
+  },
+  "popup_recStop": {
+    "message": "Остановить запись"
+  },
+  "popup_recStopFor": {
+    "message": "Остановить запись ($1)"
+  },
+  "popup_recWaiting": {
+    "message": "$1 МБ ожидает"
+  },
+  "popup_recFailed": {
+    "message": "ошибка ($1 МБ)"
+  },
+  "popup_recUpload": {
+    "message": "Отправить"
+  },
+  "popup_recDiscard": {
+    "message": "Удалить"
+  },
+  "popup_recFailedStart": {
+    "message": "Не удалось начать запись."
+  },
+  "popup_recStartedVideo": {
+    "message": "Вкладка записывается — откройте это окно снова, чтобы остановить."
+  },
+  "popup_recStartedAudio": {
+    "message": "Записывается звук вкладки — откройте окно снова, чтобы остановить."
+  },
+  "popup_recStoppedUploading": {
+    "message": "Остановлено — отправляю в Gum."
+  },
+  "opt_connTokenRejected": {
+    "message": "Gum запущен, но не принимает этот токен"
+  },
+  "opt_popupTheme": {
+    "message": "Цвета"
+  },
+  "opt_popupThemeAuto": {
+    "message": "Как у страницы"
+  },
+  "opt_popupThemeLight": {
+    "message": "Светлые"
+  },
+  "opt_popupThemeDark": {
+    "message": "Тёмные"
+  },
+  "opt_popupAutoAudio": {
+    "message": "Проигрывать звук слова при открытии окна"
+  },
+  "opt_offlineCache": {
+    "message": "Хранить недавние поиски на случай, когда Gum закрыт"
+  },
+  "opt_offlineCacheSub": {
+    "message": "До 20 000 слов, хранятся только в этом браузере."
+  },
+  "opt_recHeading": {
+    "message": "Запись вкладки"
+  },
+  "opt_recMax": {
+    "message": "Остановить запись через (минут)"
+  },
+  "opt_recAutoCrop": {
+    "message": "На странице с видео записывать только видео"
+  },
+  "opt_recTranscribe": {
+    "message": "Расшифровывать готовые записи в Gum"
+  },
+  "content_recArea": {
+    "message": "Записываю выбранную область…"
+  },
+  "popup_recArea": {
+    "message": "Записать область"
+  },
+  "opt_furigana": {
+    "message": "Фуригана над новыми и изучаемыми словами"
+  },
+  "opt_furiganaSub": {
+    "message": "Показывается, когда включена раскраска статуса слов. Добавляет на страницу текст руби."
+  },
+  "opt_allFrames": {
+    "message": "Работать и во встроенных фреймах"
+  },
+  "opt_allFramesSub": {
+    "message": "Поиск при наведении во фреймах, например во встроенных читалках и виджетах комментариев. Перезагрузите открытые вкладки, чтобы применить."
+  },
+  "bg_errAppWindowClosed": {
+    "message": "Gum запущен, но его окно закрыто. Откройте окно Gum и повторите попытку."
+  },
+  "bg_errTimeout": {
+    "message": "Gum слишком долго не отвечал. Повторите попытку чуть позже."
+  },
+  "bg_errBadRequest": {
+    "message": "Gum не смог прочитать этот запрос. Обновите расширение и Gum до совместимых версий."
+  },
+  "bg_errTooLarge": {
+    "message": "Это слишком велико, чтобы отправить в Gum за один раз."
+  },
+  "bg_errAnkiUnreachable": {
+    "message": "Gum не смог связаться с Anki. Запустите Anki с AnkiConnect и повторите попытку."
+  },
+  "popup_recMic": {
+    "message": "Записать микрофон"
+  },
+  "popup_recStartedMic": {
+    "message": "Идёт запись с микрофона."
+  },
+  "popup_recSaveDisk": {
+    "message": "Сохранить на диск"
+  },
+  "popup_recSaveDiskTitle": {
+    "message": "Сохранить запись как файл .webm. Chrome один раз спросит разрешение на загрузку файлов."
+  },
+  "popup_recSaveDiskDenied": {
+    "message": "Для сохранения на диск нужно разрешение на загрузку. Запись по-прежнему ждёт отправки."
+  },
+  "popup_recSaveDiskStarted": {
+    "message": "Запись сохраняется."
+  },
+  "popup_recSaveDiskFailed": {
+    "message": "Не удалось сохранить запись на диск."
+  },
+  "bg_micGrantNeeded": {
+    "message": "Разрешите доступ к микрофону на открывшейся странице и снова начните запись."
+  },
+  "bg_recSaveNeedsPermission": {
+    "message": "Для сохранения на диск нужно разрешение на загрузку."
+  },
+  "bg_recSaveMissing": {
+    "message": "В браузере не осталось данных этой записи для сохранения."
+  },
+  "opt_micGranted": {
+    "message": "Микрофон разрешён. Снова начните запись микрофона с панели инструментов."
+  },
+  "opt_micDenied": {
+    "message": "Доступ к микрофону не разрешён. Чтобы записывать голос, разрешите его этому расширению в настройках сайтов Chrome."
+  },
+  "bg_recSaveInApp": {
+    "message": "Часть этой записи уже передана в Gum, поэтому в браузере нет целого файла. Откройте её в Gum."
   }
 }

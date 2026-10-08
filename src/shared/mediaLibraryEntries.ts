@@ -21,6 +21,7 @@ import { hasJapaneseSubtitles, subtitleLanguages } from './subtitleRecord';
 import type { SubtitleRecord } from './subtitleRecord';
 import { sortMediaItems, seriesLabel } from './mediaSorting';
 import type { MediaItem } from './types';
+import { isWatchFinished, watchFinishedProgress } from './watchFinished';
 
 /** Main-owned media library document, relative to Electron userData. */
 export const MEDIA_LIBRARY_STORE_FILE = 'media.json';
@@ -128,9 +129,6 @@ export interface LibraryEntry {
   studyQueue: boolean;
 }
 
-/** Fraction of an item considered "finished" — the tail is usually credits. */
-const WATCHED_THRESHOLD = 0.92;
-
 const GROUPING: Record<MediaCategory, LibraryGrouping> = {
   anime: 'series',
   drama: 'series',
@@ -156,23 +154,20 @@ export function isExtraRelease(item: MediaItem): boolean {
 }
 
 export function watchedFraction(item: MediaItem): number | null {
-  const position = item.positionSec;
-  const duration = item.durationSec;
-  if (typeof position !== 'number' || !Number.isFinite(position)) return null;
-  if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) return null;
-  return Math.min(1, Math.max(0, position / duration));
+  return watchFinishedProgress(item.positionSec, item.durationSec);
 }
 
+/** The tail is usually credits — the app-wide rule lives in `./watchFinished`. */
 export function isWatched(item: MediaItem): boolean {
-  const fraction = watchedFraction(item);
-  return fraction !== null && fraction >= WATCHED_THRESHOLD;
+  return isWatchFinished(item.positionSec, item.durationSec);
 }
 
 /**
  * Whether an item belongs on the Continue watching shelf.
  *
  * Named and shared because it was written twice and the two copies disagreed
- * (D269). The shelf itself dropped anything `isWatched` — 92% — while the rail
+ * (D269). The shelf itself dropped anything `isWatched` — then 92%, now the shared
+ * 90% of `./watchFinished` — while the rail
  * badge counting that same shelf dropped only the last five seconds, so an
  * episode watched to 95% was counted in the badge and absent from the list it
  * labelled. Two predicates for one shelf is the bug; a shared one is the fix.

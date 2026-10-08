@@ -12,6 +12,7 @@ import { knowledgeCounts, onKnowledgeChanged } from '../knownWords';
 import { writeLocalStorageJson } from '../localStorageWrite';
 import {
   getSummary,
+  MEDIA_STUDY_RECORDED_EVENT,
   READING_RECORDED_EVENT,
   REVIEW_RECORDED_EVENT,
   STATS_RESET_EVENT,
@@ -172,7 +173,14 @@ export function startWiredLayerTracking(debounceMs = 1500): () => void {
       refreshWiredLayer(true);
     }, debounceMs);
   };
-  const events = [REVIEW_RECORDED_EVENT, STUDY_RECORDED_EVENT, READING_RECORDED_EVENT, WATCH_RECORDED_EVENT, STATS_RESET_EVENT];
+  const events = [
+    REVIEW_RECORDED_EVENT,
+    STUDY_RECORDED_EVENT,
+    MEDIA_STUDY_RECORDED_EVENT,
+    READING_RECORDED_EVENT,
+    WATCH_RECORDED_EVENT,
+    STATS_RESET_EVENT,
+  ];
   events.forEach((e) => window.addEventListener(e, schedule));
   const offKnowledge = onKnowledgeChanged(schedule);
   // First read happens right away so the badge is real on entry.

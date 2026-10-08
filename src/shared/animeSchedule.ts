@@ -35,6 +35,11 @@ import {
 export const ANIME_SCHEDULE_CHANNEL = 'scraper:animeSchedule';
 
 /** One scheduled episode, as the catalogue publishes it. */
+/** The key one airing's release search is stored under: show and episode. */
+export function scheduleReleaseKey(entry: Pick<AiringEntry, 'mediaId' | 'episode'>): string {
+  return `${entry.mediaId}:${entry.episode}`;
+}
+
 export interface AiringEntry {
   /** AniList media id — stable, and what the row is keyed on. */
   mediaId: number;
@@ -211,11 +216,16 @@ export function matchEntry(
  */
 export function matchScheduleReleases(
   entries: readonly AiringEntry[],
-  releasesByMediaId: ReadonlyMap<number, readonly TorrentRow[] | null>,
+  releasesByMediaId: ReadonlyMap<number | string, readonly TorrentRow[] | null>,
   options: ScheduleMatchOptions = {},
 ): ScheduleRow[] {
   return entries.map((entry) => {
-    const releases = releasesByMediaId.get(entry.mediaId);
+    // P6: keyed by show *and* episode first (`scheduleReleaseKey`), so two
+    // episodes of one show in the same window each keep their own search; a
+    // plain media id key is still read for callers that search per show.
+    const releases = releasesByMediaId.has(scheduleReleaseKey(entry))
+      ? releasesByMediaId.get(scheduleReleaseKey(entry))
+      : releasesByMediaId.get(entry.mediaId);
     if (releases === null || releases === undefined) {
       return {
         entry,

@@ -10,7 +10,8 @@ import {
   savePracticeFilters,
   type PracticeFilters,
 } from '../../data/grammar/practiceFilters';
-import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
+import { createDeckFolder } from '../../flashcardDeck';
+import { mineGrammarPoints } from '../../studyMiningRoutes';
 import {
   applyFamiliarity,
   loadFamiliarity,
@@ -293,18 +294,8 @@ export default function GrammarExplorer({
   const addToDeck = useCallback(() => {
     if (!deckEligible.length) return;
     createDeckFolder('Grammar');
-    addDeckCards(
-      deckEligible.map((p) => ({
-        word: p.title,
-        reading: '',
-        meaning: p.meaning,
-        sentence: p.examples[0]?.jp,
-        front: p.title,
-        back: `${p.meaning}${p.structure ? `\n${p.structure}` : ''}`,
-        source: 'import' as const,
-        folder: 'Grammar',
-      })),
-    );
+    // Through mineToStudy: a point already in the deck is not added twice.
+    void mineGrammarPoints(deckEligible, 'Grammar');
     setStatus(
       deckSkipped > 0
         ? t('grammar.explorer.status.addedSkipped', {

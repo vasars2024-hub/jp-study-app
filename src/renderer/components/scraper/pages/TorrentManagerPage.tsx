@@ -5,7 +5,7 @@
 // scraper set, and the episode a transfer belongs to. If it only repeated what
 // qBittorrent already displays there would be no reason to look at it here.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icons';
 import { Button, IconButton, Select } from '../../ui';
 import ScrCard from '../ScrCard';
@@ -74,6 +74,9 @@ const STATE_TONE: Record<QbitTransferRow['state'], 'good' | 'warn' | 'bad' | 'ne
   stalled: 'warn',
   error: 'bad',
 };
+
+/** How long typing must pause before the indexers are asked again. */
+const TORRENT_SEARCH_DEBOUNCE_MS = 300;
 
 function speed(bps: number): string {
   return bps > 0 ? `${formatBytes(bps)}/s` : '—';
@@ -185,7 +188,14 @@ export default function TorrentManagerPage() {
 
   const credentialPresence = resolveCredentialPresence({ ref: credentialRef, vaultHas });
 
+  // Every search is tagged with a sequence number, and only the newest one may
+  // write the table: indexers answer out of order, so a slow reply for "fri"
+  // could otherwise land after the one for "frieren" and overwrite it.
+  const searchSeq = useRef(0);
+  const firstSearch = useRef(true);
+
   const search = useCallback(async () => {
+    const requestId = ++searchSeq.current;
     // No reachable index, no request. Main would refuse it into `[]` anyway; not
     // asking keeps the empty table and the reason beside it from disagreeing
     // about whether a search ever ran.
@@ -198,12 +208,25 @@ export default function TorrentManagerPage() {
       minSeeders: minSeeders ? Number(minSeeders) : undefined,
       resolution: resolution || undefined,
     });
-    setResults(rows);
+    if (requestId === searchSeq.current) setResults(rows);
   }, [port, query, minSeeders, resolution, reachableIndexers.length]);
 
+  // The first search runs at once (the page opens with results); later ones
+  // wait until typing pauses, so one keystroke is not one indexer request.
   useEffect(() => {
-    void search();
+    if (firstSearch.current) {
+      firstSearch.current = false;
+      void search();
+      return;
+    }
+    const timer = window.setTimeout(() => void search(), TORRENT_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
   }, [search]);
+
+  // A reply that arrives after the page closed must not write into it.
+  useEffect(() => () => {
+    searchSeq.current += 1;
+  }, []);
 
   // Re-read after every action: the mirror shows what qBittorrent reports,
   // never a row patched to look like the click worked.

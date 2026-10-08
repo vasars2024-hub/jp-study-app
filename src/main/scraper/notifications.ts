@@ -34,7 +34,67 @@ import {
   type ScraperNoticeFacts,
   type ScraperNoticeKind,
 } from '../../shared/scraperNotices';
-import { scraperLog } from './logBus';
+import { mt } from '../i18n';
+import { redactLogText, scraperLog } from './logBus';
+
+// ---------------------------------------------------------------------------
+// P7 (2026-10): a notice is translated here, in main, through `mt()` — the
+// system banner is drawn by the OS and never passes through the renderer's t().
+// Its text is redacted with the log bus's rules (a failure message can quote a
+// URL with a token in it), and an identical notice raised again within a short
+// window is dropped (a scheduler retry or two windows finishing the same job).
+// ---------------------------------------------------------------------------
+
+/** Identical notices inside this window are delivered once. */
+export const SCRAPER_NOTICE_DEDUPE_MS = 10_000;
+const recentNotices = new Map<string, number>();
+
+function isDuplicateNotice(key: string, now: number): boolean {
+  for (const [seen, at] of recentNotices) {
+    if (now - at >= SCRAPER_NOTICE_DEDUPE_MS) recentNotices.delete(seen);
+  }
+  if (recentNotices.has(key)) return true;
+  recentNotices.set(key, now);
+  return false;
+}
+
+/** The two lines of a notice, in the main process's UI language. */
+export function localizedNotice(
+  kind: ScraperNoticeKind,
+  facts: ScraperNoticeFacts,
+): { title: string; body: string } {
+  const vars = { subject: facts.subject, count: facts.count };
+  switch (kind) {
+    case 'complete':
+    case 'error':
+    case 'new-episode':
+    case 'schedule-run':
+    case 'study-ready':
+      return {
+        title: mt(`scraperFix.notice.${kind}.title`),
+        body: mt(`scraperFix.notice.${kind}.body`, vars),
+      };
+    default:
+      return describeNotice(kind, facts);
+  }
+}
+
+/** A digest window's notice, in the main process's UI language. */
+export function localizedDigest(
+  items: { kind: ScraperNoticeKind; facts: ScraperNoticeFacts }[],
+): { title: string; body: string } {
+  const order: ScraperNoticeKind[] = ['complete', 'new-episode', 'study-ready', 'schedule-run', 'error'];
+  const counts = new Map<ScraperNoticeKind, number>();
+  for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
+  const parts = order
+    .filter((kind) => counts.get(kind))
+    .map((kind) => mt(`scraperFix.notice.digest.${kind}`, { count: counts.get(kind) ?? 0 }));
+  if (!parts.length) return describeDigest(items);
+  return {
+    title: mt('scraperFix.notice.digest.title', { count: items.length }),
+    body: parts.join(' · '),
+  };
+}
 
 /** Where an in-app notice goes. Set by index.ts; null in tests until attached. */
 export type ScraperNoticeSink = (notice: ScraperNotice) => void;
@@ -74,7 +134,8 @@ function noticeId(): string {
  * A system notification on a platform that has none is a log line rather than a
  * throw: losing a notification must never fail the run that produced it.
  */
-function deliver(notice: ScraperNotice, settings: ScraperNotificationSettings): void {
+function deliver(raw: ScraperNotice, settings: ScraperNotificationSettings): void {
+  const notice: ScraperNotice = { ...raw, title: redactLogText(raw.title), body: redactLogText(raw.body) };
   const wantsToast = settings.channel === 'toast' || settings.channel === 'both';
   const wantsSystem = settings.channel === 'system' || settings.channel === 'both';
 
@@ -110,7 +171,7 @@ function flushDigest(): void {
   if (window.timer) clearTimeout(window.timer);
   if (!window.items.length) return;
 
-  const { title, body } = describeDigest(window.items);
+  const { title, body } = localizedDigest(window.items);
   deliver(
     {
       id: noticeId(),
@@ -152,6 +213,10 @@ export function notifyScraper(
 
   const facts: ScraperNoticeFacts = { subject: input.subject, count: input.count };
   const correlationId = input.correlationId ?? '';
+  if (isDuplicateNotice(`${kind}\u0000${facts.subject}\u0000${facts.count}`, Date.now())) {
+    scraperLog('debug', 'notify', `Dropped a repeated "${kind}" notice.`, { correlationId });
+    return false;
+  }
 
   if (settings.digestMinutes > 0) {
     if (!digest) {
@@ -171,7 +236,7 @@ export function notifyScraper(
     return true;
   }
 
-  const { title, body } = describeNotice(kind, facts);
+  const { title, body } = localizedNotice(kind, facts);
   deliver(
     {
       id: noticeId(),
@@ -193,4 +258,5 @@ export function resetScraperNotifications(): void {
   digest = null;
   sink = null;
   sequence = 0;
+  recentNotices.clear();
 }

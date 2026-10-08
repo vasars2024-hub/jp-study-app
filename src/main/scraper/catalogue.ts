@@ -15,7 +15,7 @@ import type {
   ScraperMetadataSettings,
   ScraperTitleLanguage,
 } from '../../shared/scraperOutputSettings';
-import { scraperRequest } from './http';
+import { isScraperAbortError, scraperRequest } from './http';
 import { scraperLog } from './logBus';
 
 const JIKAN = 'https://api.jikan.moe/v4';
@@ -577,6 +577,12 @@ export async function catalogueEpisodes(
   work: CatalogueWork,
   correlationId: string,
   onPage?: (page: number, count: number) => void,
+  /**
+   * Called when a page *failed* (an error status or a body that is not JSON) as
+   * opposed to coming back empty. The list returned is then a partial one; the
+   * caller says so instead of presenting a truncated list as the whole show.
+   */
+  onIncomplete?: (page: number) => void,
 ): Promise<CatalogueEpisode[]> {
   if (work.provider === 'anilist') {
     // Already built during the search — AniList publishes it as part of the
@@ -593,7 +599,20 @@ export async function catalogueEpisodes(
     const json = await getJson<{
       data?: JikanEpisode[];
       pagination?: { has_next_page?: boolean };
-    }>(`${JIKAN}/anime/${malId}/episodes?page=${page}`, correlationId);
+    }>(`${JIKAN}/anime/${malId}/episodes?page=${page}`, correlationId).catch((error: unknown) => {
+      // A network failure on page one is the run's failure; on a later page it
+      // leaves a partial list, which is reported below. Cancellation always
+      // propagates.
+      if (page === 1 || isScraperAbortError(error)) throw error;
+      return null;
+    });
+    if (json === null) {
+      scraperLog('warn', 'catalogue', `Episode page ${page} failed; the episode list is incomplete.`, {
+        correlationId,
+      });
+      onIncomplete?.(page);
+      break;
+    }
     const rows = json?.data ?? [];
     if (!rows.length) break;
     for (const row of rows) {

@@ -17,7 +17,7 @@ import { Pill } from '../result/Pill';
 import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { sx, sxn, sxs } from '../strings';
-import { localizeScraperMessage, sourceKindText, tr } from '../localize';
+import { localizeScraperMessage, scraperErrorText, sourceKindText, tr } from '../localize';
 import { loadVerifiedSitesDocument } from '../../../verifiedSitesStore';
 import { verifiedSiteForSource, type VerifiedSitesDocument } from '../../../../shared/verifiedSites';
 import {
@@ -200,7 +200,7 @@ export default function SourceManagerPage() {
         stored.map((e) => (e.id === id ? { ...e, health: status.health } : e)),
       );
     } catch (error) {
-      setProbeNotice(sxs('sources.testFailed', error instanceof Error ? error.message : String(error)));
+      setProbeNotice(sxs('sources.testFailed', scraperErrorText(error)));
     } finally {
       setProbing(null);
     }

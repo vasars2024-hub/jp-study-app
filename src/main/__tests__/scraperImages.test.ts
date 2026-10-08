@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ScraperImageSettings } from '../../shared/scraperOutputSettings';
 
 vi.mock('electron', () => ({
-  app: { getPath: () => process.cwd(), getAppMetrics: () => [] },
+  app: { getPath: () => `${process.env.TEMP ?? process.env.TMPDIR ?? '/tmp'}/gum-vitest-userdata`, getAppMetrics: () => [] },
   ipcMain: { handle: () => undefined },
 }));
 
@@ -158,7 +158,7 @@ describe('buildImageRows', () => {
     ]);
     expect(built).toHaveLength(1);
     expect(built[0].kind).toBe('thumbnail');
-    expect(built[0].episodeId).toBe('mal-52991-e1');
+    expect(built[0].episodeId).toBe('mal-52991-s1-e1');
   });
 
   it('collects no stills when Download Thumbnails is off', () => {

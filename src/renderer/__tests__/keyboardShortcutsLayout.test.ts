@@ -44,6 +44,29 @@ describe('chordFromEvent under a non-Latin layout', () => {
   });
 });
 
+describe('AltGr typing is never a shortcut', () => {
+  function altGr(init: KeyboardEventInit): KeyboardEvent {
+    const event = key({ ...init, ctrlKey: true, altKey: true });
+    Object.defineProperty(event, 'getModifierState', { value: (m: string) => m === 'AltGraph' || m === 'Control' || m === 'Alt' });
+    return event;
+  }
+
+  it('Polish AltGr letters (Ctrl+Alt on Windows) yield no chord', () => {
+    expect(chordFromEvent(altGr({ key: 'ż', code: 'KeyZ' }))).toBeNull();
+    expect(chordFromEvent(altGr({ key: 'ś', code: 'KeyS' }))).toBeNull();
+    expect(chordFromEvent(altGr({ key: '@', code: 'KeyQ' }))).toBeNull();
+    expect(chordFromEvent(altGr({ key: 'Dead', code: 'Digit6' }))).toBeNull();
+  });
+
+  it('a real Ctrl+Alt chord without AltGraph still resolves', () => {
+    expect(chordFromEvent(key({ key: 'z', code: 'KeyZ', ctrlKey: true, altKey: true }))).toMatch(/Z$/);
+  });
+
+  it('AltGr with a named key stays a chord', () => {
+    expect(chordFromEvent(altGr({ key: 'ArrowLeft', code: 'ArrowLeft' }))).toMatch(/ArrowLeft$/);
+  });
+});
+
 describe('IME composition is never a shortcut', () => {
   it('composing keystrokes yield no chord', () => {
     expect(chordFromEvent(key({ key: 'k', code: 'KeyK', isComposing: true }))).toBeNull();

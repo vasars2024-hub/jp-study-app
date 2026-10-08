@@ -17,6 +17,12 @@ import {
   type SchedulerTickDecision,
 } from '../../shared/scraperCron';
 import type { ScraperSchedulerState, ScraperSchedulerSyncInput } from '../../shared/scraperIpc';
+import {
+  DEFAULT_SCRAPER_SCHEDULER_SETTINGS,
+  validateScraperSchedulerSettings,
+} from '../../shared/scraperOutputSettings';
+import { validateScraperSettings } from '../../shared/scraperSettings';
+import type { ScraperSettingsIssue } from '../../shared/scraperSettingsPrimitives';
 import { isRunningStage, type ScrapeJobEvent } from '../../shared/scraperResults';
 import { activeJobCount, startScrape, type JobEmitter } from './engine';
 import { scraperLog } from './logBus';
@@ -37,6 +43,8 @@ const CONFIG_FILE = 'scheduler-config.json';
 
 /** How often the runner re-evaluates. One minute is cron's own resolution. */
 const TICK_MS = 60_000;
+/** Ticks land this long after the minute boundary, never a hair before it. */
+const TICK_ALIGN_MARGIN_MS = 250;
 
 /**
  * A short first tick so a schedule that came due while the app was closed is
@@ -68,6 +76,11 @@ interface Runtime {
   emit: JobEmitter | null;
   onState: ((state: ScraperSchedulerState) => void) | null;
   loaded: boolean;
+  /**
+   * The first tick's clock. 'skip' drops only slots older than this (missed
+   * while the app was closed); a slot held during the session is never dropped.
+   */
+  sessionStartedMs: number | null;
 }
 
 const runtime: Runtime = {
@@ -79,6 +92,7 @@ const runtime: Runtime = {
   emit: null,
   onState: null,
   loaded: false,
+  sessionStartedMs: null,
 };
 
 function record(id: string): EntryRecord {
@@ -146,9 +160,33 @@ function storedConfig(value: unknown): ScraperSchedulerSyncInput | null {
     && typeof entry.id === 'string' && entry.id
     && typeof entry.cron === 'string'
     && typeof entry.targetUrl === 'string');
+  // Migration: a file saved by an older build lacks every field added since.
+  // Run both halves through the same validators a settings document goes
+  // through, so a missing group or field gets its default instead of reaching
+  // the engine as `undefined` (e.g. `settings.notifications.channel`).
+  const issues: ScraperSettingsIssue[] = [];
+  const migratedScheduler = validateScraperSchedulerSettings(
+    { ...scheduler, entries },
+    DEFAULT_SCRAPER_SCHEDULER_SETTINGS,
+    issues,
+    'scheduler',
+  );
+  const settings = validateScraperSettings(candidate.settings).value;
+  const profileSettings: Record<string, ScraperSchedulerSyncInput['settings']> = {};
+  const rawProfiles = candidate.profileSettings;
+  if (rawProfiles && typeof rawProfiles === 'object') {
+    for (const [id, value] of Object.entries(rawProfiles)) {
+      if (value && typeof value === 'object') profileSettings[id] = validateScraperSettings(value).value;
+    }
+  }
+  if (issues.length) {
+    scraperLog('debug', 'scheduler', `Migrated the saved schedule configuration (${issues.length} field(s)).`);
+  }
   return {
     ...(candidate as ScraperSchedulerSyncInput),
-    scheduler: { ...(scheduler as ScraperSchedulerSyncInput['scheduler']), entries },
+    scheduler: migratedScheduler,
+    settings,
+    profileSettings,
   };
 }
 
@@ -164,7 +202,28 @@ function persistConfig(config: ScraperSchedulerSyncInput): Promise<void> {
   return configChain;
 }
 
-async function load(): Promise<void> {
+/**
+ * One load per session, shared by every caller.
+ *
+ * The flag used to be set before the reads finished, so a sync or a "Run now"
+ * landing while the first tick was still reading saw `loaded` and went ahead
+ * with an empty record set — then persisted that, erasing the run history.
+ * Every caller now awaits the same in-flight promise.
+ */
+let loading: Promise<void> | null = null;
+
+function load(): Promise<void> {
+  if (!loading) {
+    loading = loadOnce().catch((error: unknown) => {
+      loading = null;
+      runtime.loaded = false;
+      throw error;
+    });
+  }
+  return loading;
+}
+
+async function loadOnce(): Promise<void> {
   if (runtime.loaded) return;
   runtime.loaded = true;
   // A sync that already arrived is newer than anything on disk.
@@ -183,6 +242,8 @@ async function load(): Promise<void> {
   // a bad nextRunAt would otherwise make an entry fire on every tick.
   for (const [id, value] of Object.entries(stored ?? {})) {
     if (!value || typeof value !== 'object') continue;
+    // A record a sync or a run already wrote this session is newer than disk.
+    if (runtime.records[id]) continue;
     const item = value as Partial<EntryRecord>;
     runtime.records[id] = {
       lastRunAt: typeof item.lastRunAt === 'string' ? item.lastRunAt : null,
@@ -208,6 +269,8 @@ export function runScheduleNow(entryId: string): string | null {
   const emit = runtime.emit;
   if (!emit) return null;
 
+  // P6: the entry's own profile when the sync carried it, the active one else.
+  const settings = (entry.profileId && config.profileSettings?.[entry.profileId]) || config.settings;
   const jobId = startScrape(
     {
       request: {
@@ -215,7 +278,7 @@ export function runScheduleNow(entryId: string): string | null {
         profileId: entry.profileId,
         sourceId: '',
       },
-      settings: config.settings,
+      settings,
       context: config.context,
     },
     emit,
@@ -231,7 +294,7 @@ export function runScheduleNow(entryId: string): string | null {
   // Fires for "Run now" as well as for the timer. The setting's own label is
   // "Scheduled Run Started", and a manual start of a schedule is still that —
   // suppressing it would make the toggle mean something narrower than it says.
-  notifyScraper('schedule-run', config.settings.notifications, {
+  notifyScraper('schedule-run', settings.notifications, {
     subject: entry.label,
     count: 0,
     correlationId: jobId,
@@ -266,6 +329,10 @@ async function tick(nowMs = Date.now()): Promise<void> {
   if (!config) return;
 
   const scheduler = config.scheduler;
+  // A clock that moved backwards (a test, a corrected RTC) restarts the session.
+  if (runtime.sessionStartedMs === null || nowMs < runtime.sessionStartedMs) {
+    runtime.sessionStartedMs = nowMs;
+  }
 
   // An edited cron invalidates whatever next-run time was derived from the old
   // one. Dropping it here makes the planner reseed from the new expression.
@@ -293,6 +360,7 @@ async function tick(nowMs = Date.now()): Promise<void> {
     skipIfRunning: scheduler.skipIfRunning,
     anyJobRunning: activeJobCount() > 0,
     missedRunPolicy: scheduler.missedRunPolicy,
+    sessionStartedMs: runtime.sessionStartedMs ?? undefined,
     requireExternalPower: scheduler.requireExternalPower,
     onBattery: onBatteryPower(),
   });
@@ -360,10 +428,23 @@ export function startScheduler(emit: JobEmitter, onState: (state: ScraperSchedul
   if (runtime.timer) return;
   const arm = (delay: number) => {
     runtime.timer = setTimeout(() => {
-      void tick().finally(() => arm(TICK_MS));
+      void tick().finally(() => arm(delayToNextMinute(Date.now())));
     }, delay);
   };
   arm(FIRST_TICK_MS);
+}
+
+/**
+ * Milliseconds until just after the next wall-clock minute.
+ *
+ * A fixed 60 s interval re-armed after each tick drifts by the tick's own
+ * duration, so a 03:00 slot was seen at 03:00:5x and sometimes in the next
+ * minute. Aligning every re-arm to the minute boundary (plus a small margin so
+ * the tick never lands a hair early) keeps ticks at hh:mm:00.25.
+ */
+export function delayToNextMinute(nowMs: number): number {
+  const into = ((nowMs % TICK_MS) + TICK_MS) % TICK_MS;
+  return TICK_MS - into + TICK_ALIGN_MARGIN_MS;
 }
 
 export function stopScheduler(): void {
@@ -381,6 +462,8 @@ export function resetScheduler(): void {
   runtime.emit = null;
   runtime.onState = null;
   runtime.loaded = false;
+  runtime.sessionStartedMs = null;
+  loading = null;
 }
 
 /** Test seam — runs one tick at a caller-chosen instant. */

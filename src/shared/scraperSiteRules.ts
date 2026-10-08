@@ -49,6 +49,13 @@ export interface ScraperSiteRule {
    * found. The first capture group wins when there is one.
    */
   numberPattern: string;
+  /**
+   * Selector (document-wide) for the listing's "next page" link. Empty means
+   * the listing is a single page. Only followed while `maxPages` allows it.
+   */
+  nextPageSelector: string;
+  /** Upper bound on listing pages fetched, 1..50. 1 means page one only. */
+  maxPages: number;
   enabled: boolean;
   /** Populated by a validation run; null until one has happened. */
   lastValidatedAt: string | null;
@@ -62,6 +69,8 @@ export const DEFAULT_SITE_RULE: Omit<ScraperSiteRule, 'id' | 'host' | 'sampleUrl
   linkAttribute: '',
   numberSelector: '',
   numberPattern: '',
+  nextPageSelector: '',
+  maxPages: 1,
   enabled: false,
   lastValidatedAt: null,
   lastMatchCount: 0,

@@ -32,6 +32,7 @@ import {
 import { formatLayer, isUnlocked, requiredLayer } from '../../wiredMechanics/layer';
 import { getWiredLayerState, refreshWiredLayer, useWiredLayer } from '../../wiredMechanics/layerStore';
 import { closeWiredConsole } from '../../wiredMechanics/consoleBus';
+import { cardHasOwnMedia, playCardMedia, stopCardMedia, type CardMediaFields } from '../../wiredMechanics/cardMedia';
 
 const SESSION_CAP = 40;
 const FORCE_SCAN_SIZE = 10;
@@ -202,8 +203,13 @@ export default function SignalDecrypt({ stackIndex, top }: { stackIndex: number;
 
   const play = useCallback(() => {
     if (!item || phase !== 'revealed') return;
-    speak(item.card.reading || item.card.word, 'ja');
+    const card = item.card;
+    // The card's own mined clip or line audio first; the OS voice when it has none or it fails.
+    void playCardMedia(card as CardMediaFields, () => speak(card.reading || card.word, 'ja'));
   }, [item, phase]);
+
+  // Leaving a card (grade, new sitting) or the console silences its playback.
+  useEffect(() => stopCardMedia, [item]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
     if ((e.target as HTMLElement).closest('button') && (e.key === 'Enter' || e.key === ' ')) return;
@@ -240,7 +246,10 @@ export default function SignalDecrypt({ stackIndex, top }: { stackIndex: number;
       stackIndex={stackIndex}
       top={top}
       className="wmc-dcr"
-      onClose={() => window.speechSynthesis?.cancel?.()}
+      onClose={() => {
+        stopCardMedia();
+        window.speechSynthesis?.cancel?.();
+      }}
       status={
         <>
           <span>{t('wiredMech.dcr.queue', { left: remaining, total: queue.length })}</span>
@@ -338,7 +347,7 @@ export default function SignalDecrypt({ stackIndex, top }: { stackIndex: number;
                       <kbd>{g.key}</kbd> {g.rating === 'again' ? 'NAK' : 'ACK'} · {t(g.labelKey)}
                     </button>
                   ))}
-                  {ttsAvailable() && (
+                  {(ttsAvailable() || cardHasOwnMedia(card as CardMediaFields)) && (
                     <button type="button" className="wmc-btn is-ghost" onClick={play}>
                       <kbd>P</kbd> {t('wiredMech.dcr.play')}
                     </button>

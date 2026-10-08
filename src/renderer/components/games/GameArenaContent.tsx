@@ -143,6 +143,17 @@ function activeLevel(settings: GameArenaSettings, serviceLevel: number): 1 | 2 |
 
 const SPEECH_TAG: Record<StudyLang, string> = { ja: 'ja-JP', zh: 'zh-CN', ru: 'ru-RU' };
 
+/** An installed speech voice for the study language (getVoices() is empty until voices load). */
+function hasStudyVoice(lang: StudyLang): boolean {
+  if (!('speechSynthesis' in window)) return false;
+  try {
+    const prefix = SPEECH_TAG[lang].slice(0, 2).toLowerCase();
+    return window.speechSynthesis.getVoices().some((v) => v.lang.toLowerCase().startsWith(prefix));
+  } catch {
+    return false;
+  }
+}
+
 function speakStudy(text: string, lang: StudyLang): void {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -935,13 +946,30 @@ function TypeRoundPanel({
   useEffect(() => {
     if (round.speak && sounds) speakStudy(round.jp, round.studyLang);
   }, [round.id]);
+  // Voices arrive asynchronously; re-check once they load.
+  const [voiceReady, setVoiceReady] = useState(() => hasStudyVoice(round.studyLang));
+  useEffect(() => {
+    setVoiceReady(hasStudyVoice(round.studyLang));
+    if (!('speechSynthesis' in window)) return undefined;
+    const onVoices = (): void => setVoiceReady(hasStudyVoice(round.studyLang));
+    window.speechSynthesis.addEventListener?.('voiceschanged', onVoices);
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', onVoices);
+  }, [round.studyLang]);
+  // No voice for the language (or sound off): the round would be unplayable
+  // silence, so it falls back to showing the text.
+  const showListenText = !!round.speak && (!sounds || !voiceReady);
   return (
     <div className="game-round">
       <PromptBlock round={round} />
       {round.speak && (
-        <button type="button" className="btn" disabled={!sounds} onClick={() => speakStudy(round.jp, round.studyLang)}>
+        <button type="button" className="btn" disabled={!sounds || !voiceReady} onClick={() => speakStudy(round.jp, round.studyLang)}>
           <Icon name="volume" size={14} /> {t('games.action.listen')}
         </button>
+      )}
+      {showListenText && (
+        <p className="muted game-listen-fallback">
+          {t('polish.games.noVoice')} <span lang={round.studyLang}>{round.jp}</span>
+        </p>
       )}
       <textarea
         lang={round.inputLang === 'en' ? undefined : round.inputLang}

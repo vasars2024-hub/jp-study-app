@@ -115,6 +115,23 @@ export function mergeScraperSourceSettings(
   };
 }
 
+/**
+ * A torrent index typed with a scheme keeps it, and its port: a self-hosted
+ * indexer is often `http://192.168.1.5:9117`, and reducing that to a bare
+ * hostname would send the search to https on 443, where nothing listens.
+ * `buildIndexUrl` (torrents.ts) honours the scheme. Without one, the bare
+ * validated hostname is kept, as for every other source.
+ */
+function torrentIndexHost(raw: unknown, bareHost: string): string {
+  if (typeof raw !== 'string' || !/^\s*https?:\/\//i.test(raw)) return bareHost;
+  try {
+    const url = new URL(raw.trim());
+    return `${url.protocol}//${url.hostname.toLowerCase()}${url.port ? `:${url.port}` : ''}`;
+  } catch {
+    return bareHost;
+  }
+}
+
 function validateSourceEntry(
   input: unknown,
   index: number,
@@ -130,11 +147,12 @@ function validateSourceEntry(
     issues.push({ path: `${path}.id`, message: 'Ignored a source with no usable id.' });
     return null;
   }
-  const host = normalizeHost(input.host);
-  if (!host) {
+  const bareHost = normalizeHost(input.host);
+  if (!bareHost) {
     issues.push({ path: `${path}.host`, message: 'Ignored a source with no usable hostname.' });
     return null;
   }
+  const host = input.kind === 'torrent' ? torrentIndexHost(input.host, bareHost) : bareHost;
   return {
     id,
     label: stringValue(input.label, id, 80, `${path}.label`, issues),
@@ -528,7 +546,23 @@ export interface ScraperQbittorrentSettings {
   uploadLimitKbps: number;
   downloadLimitKbps: number;
   renameTemplate: string;
+  /**
+   * Where a remote client's paths are on this machine. qBittorrent in Docker or
+   * on a NAS reports `/downloads/...`; the ingest needs `D:\\Torrents\\...`.
+   * Longest matching `remote` prefix wins. Empty for a local client.
+   */
+  pathMappings: ScraperQbitPathMapping[];
 }
+
+export interface ScraperQbitPathMapping {
+  /** The prefix as qBittorrent reports it (POSIX or Windows). */
+  remote: string;
+  /** The same folder as this machine sees it. */
+  local: string;
+}
+
+/** How many path mappings a profile keeps. */
+export const SCRAPER_QBIT_PATH_MAPPINGS_MAX = 16;
 
 export const DEFAULT_SCRAPER_QBITTORRENT_SETTINGS: ScraperQbittorrentSettings = {
   enabled: false,
@@ -556,12 +590,55 @@ export const DEFAULT_SCRAPER_QBITTORRENT_SETTINGS: ScraperQbittorrentSettings = 
   uploadLimitKbps: 0,
   downloadLimitKbps: 0,
   renameTemplate: '',
+  pathMappings: [],
 };
 
 export function cloneScraperQbittorrentSettings(
   value: ScraperQbittorrentSettings,
 ): ScraperQbittorrentSettings {
-  return { ...value, tags: [...value.tags] };
+  return {
+    ...value,
+    tags: [...value.tags],
+    pathMappings: (value.pathMappings ?? []).map((mapping) => ({ ...mapping })),
+  };
+}
+
+/**
+ * Keeps the well-formed mappings: both sides non-empty strings of sane length,
+ * `local` absolute, no duplicate `remote`, at most `SCRAPER_QBIT_PATH_MAPPINGS_MAX`.
+ * A missing key is the fallback silently — profiles saved before this field
+ * existed are not "repaired".
+ */
+export function validateScraperQbitPathMappings(
+  input: unknown,
+  fallback: readonly ScraperQbitPathMapping[],
+  path: string,
+  issues: ScraperSettingsIssue[],
+): ScraperQbitPathMapping[] {
+  if (input === undefined) return fallback.map((mapping) => ({ ...mapping }));
+  if (!Array.isArray(input)) {
+    issues.push({ path, message: 'Expected a list of path mappings.' });
+    return fallback.map((mapping) => ({ ...mapping }));
+  }
+  const out: ScraperQbitPathMapping[] = [];
+  const seen = new Set<string>();
+  let dropped = 0;
+  for (const entry of input) {
+    const remote = isRecord(entry) && typeof entry.remote === 'string' ? entry.remote.trim() : '';
+    const local = isRecord(entry) && typeof entry.local === 'string' ? entry.local.trim() : '';
+    const absolute = /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/;
+    const key = remote.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    if (!remote || !local || remote.length > 1_024 || local.length > 1_024
+      || !absolute.test(remote) || !absolute.test(local) || seen.has(key)
+      || out.length >= SCRAPER_QBIT_PATH_MAPPINGS_MAX) {
+      dropped += 1;
+      continue;
+    }
+    seen.add(key);
+    out.push({ remote, local });
+  }
+  if (dropped) issues.push({ path, message: `Dropped ${dropped} malformed or extra path mapping(s).` });
+  return out;
 }
 
 /**
@@ -758,6 +835,12 @@ export function validateScraperQbittorrentSettings(
       fallback.renameTemplate,
       240,
       `${prefix}.renameTemplate`,
+      issues,
+    ),
+    pathMappings: validateScraperQbitPathMappings(
+      source.pathMappings,
+      fallback.pathMappings ?? [],
+      `${prefix}.pathMappings`,
       issues,
     ),
   };

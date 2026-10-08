@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { SubtitlePick } from '../shared/types';
 import { SUBTITLE_EXT } from '../shared/mediaKind';
+import { decodeSubtitleBytes } from '../shared/subtitleDecode';
 
 /** Tags a release names a language by, lower-cased. ISO 639-1 first, then 639-2 and the words. */
 const LANGUAGE_TAGS: Record<string, readonly string[]> = {
@@ -83,7 +84,7 @@ export function pickSidecarSubtitleForLanguage(mediaFile: string, lang: string):
     .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
   for (const candidate of candidates) {
     try {
-      return { name: candidate.name, text: fs.readFileSync(path.join(dir, candidate.name), 'utf8') };
+      return { name: candidate.name, text: decodeSubtitleBytes(fs.readFileSync(path.join(dir, candidate.name))).text };
     } catch {
       /* unreadable: try the next one */
     }

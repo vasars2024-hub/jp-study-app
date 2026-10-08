@@ -60,6 +60,7 @@ const {
   flushScraperNoticeDigest,
   notifyScraper,
   resetScraperNotifications,
+  SCRAPER_NOTICE_DEDUPE_MS,
   setScraperNoticeSink,
 } = await import('../scraper/notifications');
 const { clearScraperHistory, previousEpisodeIds, recordJob } = await import('../scraper/history');
@@ -340,11 +341,40 @@ describe('previousEpisodeIds', () => {
   it('returns the ids the earlier run of that series produced', async () => {
     await recordJob(summary({ id: 'job-1' }), result({ jobId: 'job-1' }));
     const ids = await previousEpisodeIds('anilist-21', 'job-2');
+    // The stored (legacy) ids, plus the season-and-kind ids the same rows get today.
     expect([...(ids ?? [])].sort()).toEqual([
       'anilist-21-e1',
       'anilist-21-e2',
       'anilist-21-e3',
+      'anilist-21-s1-e1',
+      'anilist-21-s1-e2',
+      'anilist-21-s1-e3',
     ]);
+  });
+
+  it('matches a legacy stored run against today\'s ids, so nothing is falsely new', async () => {
+    await recordJob(summary({ id: 'job-1' }), result({ jobId: 'job-1' }));
+    const previous = await previousEpisodeIds('anilist-21', 'job-2');
+    const today = result({
+      jobId: 'job-2',
+      episodes: [1, 2, 3].map((n) => ({ ...episode(n), id: `anilist-21-s1-e${n}` })),
+    });
+    const kinds = noticesForFinishedJob(summary({ id: 'job-2' }), today, previous).map((n) => n.kind);
+    expect(kinds).not.toContain('new-episode');
+  });
+
+  it('skips an earlier run that found nothing, rather than calling everything new', async () => {
+    await recordJob(summary({ id: 'job-1' }), result({ jobId: 'job-1', episodes: [episode(1)] }));
+    vi.setSystemTime(Date.now() + 60_000);
+    await recordJob(summary({ id: 'job-2', found: 0 }), result({ jobId: 'job-2', episodes: [] }));
+    const ids = await previousEpisodeIds('anilist-21', 'job-3');
+    expect(ids?.has('anilist-21-e1')).toBe(true);
+    expect(ids?.has('anilist-21-e2')).toBe(false);
+  });
+
+  it('is null when every earlier run found nothing', async () => {
+    await recordJob(summary({ id: 'job-1', found: 0 }), result({ jobId: 'job-1', episodes: [] }));
+    expect(await previousEpisodeIds('anilist-21', 'job-2')).toBeNull();
   });
 
   // Otherwise a re-run would be compared against itself and never be new.
@@ -449,6 +479,43 @@ describe('notifyScraper channels', () => {
     });
     expect(toasts[0].correlationId).toBe('job-7');
     expect(toasts[0].kind).toBe('error');
+  });
+});
+
+describe('notice safety and language (P7)', () => {
+  it('redacts a secret quoted in a failure message, on both surfaces', () => {
+    notifyScraper('error', settings({ channel: 'both' }), {
+      subject: 'https://t.test/rss?passkey=abc123 — 403',
+      count: 0,
+    });
+    expect(toasts[0].body).not.toContain('abc123');
+    expect(systemBanners[0].body).not.toContain('abc123');
+    expect(toasts[0].body).toContain('passkey=‹redacted›');
+  });
+
+  it('drops an identical notice raised again within the window, not after it', () => {
+    const toast = settings({ channel: 'toast' });
+    expect(notifyScraper('complete', toast, { subject: 'A', count: 1 })).toBe(true);
+    expect(notifyScraper('complete', toast, { subject: 'A', count: 1 })).toBe(false);
+    expect(notifyScraper('complete', toast, { subject: 'A', count: 2 })).toBe(true);
+    expect(toasts).toHaveLength(2);
+    vi.advanceTimersByTime(SCRAPER_NOTICE_DEDUPE_MS);
+    expect(notifyScraper('complete', toast, { subject: 'A', count: 1 })).toBe(true);
+    expect(toasts).toHaveLength(3);
+  });
+
+  it('translates title and body through the main-process language', async () => {
+    const { setMainLang } = await import('../i18n');
+    const { ensureCatalog } = await import('../../shared/i18n/catalogs');
+    await ensureCatalog('ja');
+    setMainLang('ja');
+    try {
+      notifyScraper('complete', settings({ channel: 'toast' }), { subject: 'ONE PIECE', count: 3 });
+      expect(toasts[0].title).toBe('スクレイプ完了');
+      expect(toasts[0].body).toBe('ONE PIECE — 3 話。');
+    } finally {
+      setMainLang('en');
+    }
   });
 });
 

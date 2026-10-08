@@ -1,4 +1,5 @@
 import type { MediaItem } from '../../../shared/types';
+import { WATCH_FINISHED_FRACTION } from '../../../shared/watchFinished';
 
 /**
  * Ordering for the Video tab's "Up next" shelf.
@@ -23,7 +24,7 @@ import type { MediaItem } from '../../../shared/types';
  */
 
 /** Fraction of the runtime past which an item counts as watched, not paused. */
-const FINISHED_AT = 0.92;
+const FINISHED_AT = WATCH_FINISHED_FRACTION;
 
 export function watchProgress(item: MediaItem): number {
   if (!item.durationSec || !item.positionSec) return 0;

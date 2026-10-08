@@ -46,6 +46,23 @@ describe('the player keymap the help page shows', () => {
       .toEqual(vendor);
   });
 
+  it('leaves the study-loop letters free, and no two study keys share a letter', () => {
+    // The app's video.* defaults (keyboardShortcuts.ts) must not land on a key the player
+    // owns, or one press would both seek and mine. Read from source so this file stays
+    // node-only (the shortcut store pulls the music bus at import).
+    const catalog = readFileSync(resolve(__dirname, '../keyboardShortcuts.ts'), 'utf8');
+    const studyKeys = [...catalog.matchAll(/id: 'video\.(\w+)'[\s\S]*?defaultKeys: '([^']*)'/g)]
+      .map((match) => ({ id: match[1] ?? '', keys: match[2] ?? '' }))
+      .filter((row) => /^[A-Z]$/.test(row.keys));
+    const playerCaps = new Set(PLAYER_DEFAULT_KEYBINDINGS.map((row) => formatPlayerKeyCode(row.code)));
+    expect(studyKeys.map((row) => row.id)).toEqual(expect.arrayContaining([
+      'mineCurrentLine', 'toggleAutoPause', 'toggleLoop', 'abLoopCycle', 'revealTranslation',
+    ]));
+    for (const row of studyKeys) expect(playerCaps.has(row.keys)).toBe(false);
+    const letters = studyKeys.map((row) => row.keys);
+    expect(new Set(letters).size).toBe(letters.length);
+  });
+
   it('shows key caps, and follows a rebind made in the player', () => {
     expect(formatPlayerKeyCode('KeyD')).toBe('D');
     expect(formatPlayerKeyCode('ArrowRight')).toBe('→');

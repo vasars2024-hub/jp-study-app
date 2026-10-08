@@ -13,6 +13,7 @@ import {
   QBIT_BACKOFF_MIN_MS,
   QBIT_POLL_ACTIVE_MS,
   QBIT_POLL_IDLE_MS,
+  QBIT_UNRESOLVED_RETRIES,
   createQbitCompletionPoller,
   type QbitPollerDeps,
   type QbitPollerState,
@@ -240,5 +241,48 @@ describe('protecting the user’s client', () => {
     // A snapshot younger than the limit is reused.
     await poller.refresh(5_000);
     expect(pollCount).toBe(2);
+  });
+});
+
+describe('a finished torrent whose files are not found', () => {
+  it('is retried on later polls, logged and counted, not marked handled on the first miss', async () => {
+    const hash = 'c'.repeat(40);
+    ledger.set(hash, { malId: 1 });
+    polls = [{ ok: true, value: [torrent({ hash })] }];
+    let found = false;
+    const logs: string[] = [];
+    const poller = createQbitCompletionPoller(deps({
+      resolveFiles: (t) => (found ? [t.contentPath] : []),
+      log: (message) => { logs.push(message); },
+    }));
+    poller.start();
+    await poller.firstPoll();
+    expect(ingested).toEqual([]);
+    expect(state.handled.has(hash)).toBe(false);
+    expect(poller.unresolvedCount()).toBe(1);
+    expect(logs).toHaveLength(1);
+    // Still claimed, so a watch folder does not import it without its identity.
+    expect(poller.claims('D:\\Downloads\\Show - 01.mkv')).toBe(true);
+    // The files appear (a share mounted, a mapping added): the next poll imports.
+    found = true;
+    await advance(QBIT_POLL_IDLE_MS);
+    expect(ingested).toHaveLength(1);
+    expect(state.handled.has(hash)).toBe(true);
+    expect(poller.unresolvedCount()).toBe(0);
+  });
+
+  it('gives up after the retry cap and marks it handled', async () => {
+    const hash = 'd'.repeat(40);
+    ledger.set(hash, { malId: 1 });
+    polls = [{ ok: true, value: [torrent({ hash })] }];
+    const logs: string[] = [];
+    const poller = createQbitCompletionPoller(deps({ resolveFiles: () => [], log: (m) => { logs.push(m); } }));
+    poller.start();
+    await poller.firstPoll();
+    await advance(QBIT_POLL_IDLE_MS * (QBIT_UNRESOLVED_RETRIES + 2));
+    expect(state.handled.has(hash)).toBe(true);
+    expect(poller.unresolvedCount()).toBe(0);
+    expect(logs).toHaveLength(2);
+    expect(logs[1]).toMatch(/path mapping/);
   });
 });

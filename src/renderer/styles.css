@@ -20628,6 +20628,25 @@ html[data-taskbar-size='large'] .os-tray-btn {
   font-size: 10px;
   font-style: italic;
 }
+/* A day with video study (watch time, lines mined or studied in the player). */
+.cal-media-tag {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-start: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+.cal-media-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.cal-media-note .cal-media-tag {
+  margin-inline-start: 0;
+}
 .cal-month-events {
   display: flex;
   flex-direction: column;

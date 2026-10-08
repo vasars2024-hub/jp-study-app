@@ -13,6 +13,7 @@
  */
 import { memo, useEffect, useState } from 'react';
 import { useT } from '../../i18n';
+import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import { formatLayer } from '../../wiredMechanics/layer';
 import { useWiredLayer } from '../../wiredMechanics/layerStore';
 import { useWiredMemory } from '../../wiredMechanics/memoryFeed';
@@ -117,9 +118,18 @@ function useWallMemory() {
   return { memory, layer: mech.layerDescent ? layer : 9 };
 }
 
+/** When a line was mined: the time today, the date and time before that. */
+function lineStamp(at: number, lang: UiLang): string {
+  const when = new Date(at);
+  const today = new Date().toDateString() === when.toDateString();
+  return when.toLocaleString(LANG_TAGS[lang], today
+    ? { hour: '2-digit', minute: '2-digit' }
+    : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function WiredWallpaper() {
   useWiredCssStrings();
-  const { t } = useT();
+  const { t, lang } = useT();
   const { memory, layer } = useWallMemory();
   const kanji = memory && memory.dueKanji.length ? memory.dueKanji.join(' ') : FIXED_KANJI;
   return (
@@ -157,6 +167,13 @@ function WiredWallpaper() {
           <span className={`wired-wall-node node-c${memory.dueCount > 0 ? ' is-due' : ''}`}>
             {t('wiredMech.mem.due', { count: memory.dueCount })}
           </span>
+          {memory.lastLine && (
+            <span className="wired-wall-node node-d">
+              {t('studyLoop.stats.wired.lastLine')} <b lang="ja">{memory.lastLine.sentence}</b>
+              <i>{memory.lastLine.title ?? t('studyLoop.stats.wired.unknownSource')}</i>
+              <i>{lineStamp(memory.lastLine.at, lang)}</i>
+            </span>
+          )}
         </>
       ) : (
         <>

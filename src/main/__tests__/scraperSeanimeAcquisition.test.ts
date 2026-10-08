@@ -215,6 +215,27 @@ describe('Seanime acquisition engine adapter', () => {
     expect(result).toMatchObject({ ok: true, accepted: 1 });
   });
 
+  it('hands a sent queued item to the media ingest with its AniList id and episode', async () => {
+    const { onAcquisitionHandoff } = await import('../scraper/handoffs');
+    const seen: unknown[] = [];
+    const off = onAcquisitionHandoff((handoff) => { seen.push(handoff); });
+    const hash = 'ab'.repeat(20);
+    api.handler = async (route) => {
+      if (route === '/api/v1/auto-downloader/items') {
+        return [{ id: 9, ruleId: 7, mediaId: 154587, episode: 4, magnet: `magnet:?xt=urn:btih:${hash}`, torrentName: 'Show - 04', downloaded: false, isDelayed: false, score: 1 }];
+      }
+      if (route === '/api/v1/torrent-client/rule-magnet') return true;
+      throw new Error(`Unexpected route ${route}`);
+    };
+    await runSeanimeAcquisitionAction({ kind: 'download-queued-item', itemId: 9 });
+    off();
+    expect(seen).toContainEqual(expect.objectContaining({
+      target: 'seanime-torrent-client',
+      rows: [expect.objectContaining({ infoHash: hash, name: 'Show - 04' })],
+      ingest: expect.objectContaining({ hint: expect.objectContaining({ anilistId: 154587, episodes: [4] }) }),
+    }));
+  });
+
   it('strips links and hashes from auto-downloader simulation results', async () => {
     api.handler = async (route) => {
       if (route === '/api/v1/status') {

@@ -137,6 +137,33 @@ describe('Agent planning without a local model', () => {
     expect(String(fetchMock.mock.calls[0][1].body)).toContain('SECRET-PREFERENCE');
   });
 
+  it('withholds the study-data tools from the cloud planner until the user allows sharing', async () => {
+    const operations = ['flashcard.list-decks', 'study.stats-summary', 'study.known-words', 'dictionary.search-knowledge'];
+    for (const share of [undefined, 'unset', 'local-only']) {
+      const fetchMock = vi.fn().mockResolvedValue(geminiReply(PLAN));
+      vi.stubGlobal('fetch', fetchMock);
+      await plan({
+        cloudProviderId: 'gemini-2.5-flash',
+        availableOperations: operations,
+        settings: { enabled: true, backend: 'local-gguf', permission: 'read-only', agentCloudShareStudyData: share },
+      });
+      const system = JSON.stringify(JSON.parse(String(fetchMock.mock.calls[0][1].body)).systemInstruction);
+      expect(system).toContain('flashcard.list-decks');
+      expect(system).not.toContain('study.stats-summary');
+      expect(system).not.toContain('study.known-words');
+      expect(system).not.toContain('dictionary.search-knowledge');
+    }
+    const allowed = vi.fn().mockResolvedValue(geminiReply(PLAN));
+    vi.stubGlobal('fetch', allowed);
+    await plan({
+      cloudProviderId: 'gemini-2.5-flash',
+      availableOperations: operations,
+      settings: { enabled: true, backend: 'local-gguf', permission: 'read-only', agentCloudShareStudyData: 'allow' },
+    });
+    expect(JSON.stringify(JSON.parse(String(allowed.mock.calls[0][1].body)).systemInstruction))
+      .toContain('study.stats-summary');
+  });
+
   it('names a missing model with a code when there is no key to fall back to', async () => {
     registry.keys.gemini = '';
     const fetchMock = vi.fn();

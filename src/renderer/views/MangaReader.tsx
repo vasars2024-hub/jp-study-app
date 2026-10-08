@@ -36,7 +36,7 @@ import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import Icon from '../components/Icons';
 import { ocrFailureKey, runOcr, tesseractReads, type OcrLang } from '../ocr';
-import { STUDY_LANG_NAME_KEY } from '../../shared/studyLang';
+import { STUDY_LANG_NAME_KEY, studyLangOfText } from '../../shared/studyLang';
 import {
   cropPageImage,
   orientationForBox,
@@ -74,6 +74,7 @@ import { recordReading } from '../stats';
 import { recordEpubPageRead } from '../readingGardenProgress';
 import { createMangaReadingTracker, mokuroPageCharCount } from '../mangaReadingStats';
 import { getStudyLang } from '../studyEnvironment';
+import { mineToStudy } from '../studyMining';
 
 type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
 
@@ -2462,6 +2463,21 @@ export default function MangaReader({ item, onClose }: Props) {
             y={popup.y}
             anchorTop={popup.top}
             context={popup.context}
+            // Mine on the surface where the word was found, through the one
+            // mining gateway (dedupe, study language, the book as its source).
+            onMine={() => {
+              const query = popup.query;
+              const sentence = popup.context;
+              void mineToStudy({
+                word: query,
+                sentence,
+                source: 'reader',
+                sourceId: item.id,
+                sourceTitle: item.title,
+                studyLang: studyLangOfText(sentence || query, getStudyLang()),
+              }).catch(() => undefined);
+              setPopup(null);
+            }}
             onClose={() => setPopup(null)}
           />
         ))}

@@ -41,6 +41,7 @@
 import { normalizeMediaTitleKey } from './mediaIdentity';
 import type { MalLibraryEntry } from './malLibrary';
 import type { MalListStatus } from './malSync';
+import { WATCH_FINISHED_FRACTION } from './watchFinished';
 
 export const WATCH_LIBRARY_SCHEMA_VERSION = 1;
 
@@ -1879,8 +1880,11 @@ export function watchObservationFromMedia(item: WatchLinkableMedia, now: number)
   };
 }
 
-/** Fraction of a file that counts as "watched" — the Trakt/Plex convention. */
-export const WATCH_COMPLETE_FRACTION = 0.9;
+/**
+ * Fraction of a file that counts as "watched" — the Trakt/Plex convention, and the one
+ * app-wide rule (`./watchFinished`), so the tracker and the library tick agree.
+ */
+export const WATCH_COMPLETE_FRACTION = WATCH_FINISHED_FRACTION;
 
 /** How long a repeat play of an already-counted file waits before it re-stamps `lastWatchedAt`. */
 export const WATCH_LAST_WATCHED_REFRESH_MS = 30 * 60 * 1000;

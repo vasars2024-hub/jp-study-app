@@ -23,7 +23,12 @@ import { normalizeIngestSettings } from '../../shared/filesApp/ingest';
 import { folderCandidatesFrom, resolveFolders } from '../../shared/filesApp/clipboardPaths';
 import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
 import type { FilesScanReportWithArchives } from '../../shared/filesApp/archive';
-import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
+import {
+  buildFilesIndex,
+  buildFilesIndexAsync,
+  type FilesEnumeratorContext,
+  type FilesSqliteLike,
+} from './enumerators';
 import {
   createFilesDeletionMainDependencies,
   registerFilesDeletionIpc,
@@ -49,6 +54,10 @@ import { ingestPathKey, isIngestCandidatePath, isPathKeyWithin } from '../../sha
 const INDEX_TTL_MS = 15_000;
 
 let cached: FilesIndexSnapshot | null = null;
+/** Bumped by every invalidation, so a build that started earlier is not cached. */
+let indexGeneration = 0;
+/** The async build in progress; concurrent opens/refreshes share it. */
+let building: { generation: number; promise: Promise<FilesIndexSnapshot> } | null = null;
 
 /** Gate 25's session. One at a time; see the `watch-set` handler for why. */
 let watchSession: FilesWatchSession | null = null;
@@ -168,12 +177,39 @@ export function defaultFilesContext(): FilesEnumeratorContext {
 /** Drop the cache. Called by whatever changes a store the index reads. */
 export function invalidateFilesIndex(): void {
   cached = null;
+  indexGeneration += 1;
 }
 
 export function getFilesIndex(force = false): FilesIndexSnapshot {
   if (!force && cached && Date.now() - cached.builtAt < INDEX_TTL_MS) return cached;
   cached = buildFilesIndex(defaultFilesContext());
   return cached;
+}
+
+/**
+ * What the Files app's open and refresh ask for (D315/D345). The build yields
+ * to the event loop between stores instead of holding the main process for the
+ * whole walk, and a second request while one is running joins it rather than
+ * starting another walk. A build that an invalidation overtook is returned to
+ * its callers but not cached, so the next request sees the change.
+ */
+export function getFilesIndexAsync(
+  force = false,
+  build: (ctx: FilesEnumeratorContext) => Promise<FilesIndexSnapshot> = (ctx) => buildFilesIndexAsync(ctx),
+): Promise<FilesIndexSnapshot> {
+  if (!force && cached && Date.now() - cached.builtAt < INDEX_TTL_MS) return Promise.resolve(cached);
+  if (building && building.generation === indexGeneration) return building.promise;
+  const generation = indexGeneration;
+  const promise = build(defaultFilesContext())
+    .then((snapshot) => {
+      if (generation === indexGeneration) cached = snapshot;
+      return snapshot;
+    })
+    .finally(() => {
+      if (building?.promise === promise) building = null;
+    });
+  building = { generation, promise };
+  return promise;
 }
 
 export interface FilesRevealResult {
@@ -196,8 +232,8 @@ export interface FilesAppIpcOptions {
 export function registerFilesAppIpc(options: FilesAppIpcOptions = {}): void {
   deps = options;
 
-  ipcMain.handle('filesapp:index', (_e, force: unknown): FilesIndexSnapshot =>
-    getFilesIndex(force === true),
+  ipcMain.handle('filesapp:index', (_e, force: unknown): Promise<FilesIndexSnapshot> =>
+    getFilesIndexAsync(force === true),
   );
 
   ipcMain.handle('filesapp:reveal', (_e, location: unknown): FilesRevealResult => {

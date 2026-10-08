@@ -26,6 +26,8 @@ function rule(over: Partial<ScraperSiteRule> = {}): ScraperSiteRule {
     linkAttribute: '',
     numberSelector: '',
     numberPattern: '',
+    nextPageSelector: '',
+    maxPages: 1,
     enabled: true,
     lastValidatedAt: null,
     lastMatchCount: 0,

@@ -1930,5 +1930,206 @@
   },
   "cmd_wheel_more_desc": {
     "message": "打开次级操作列表（OCR、媒体、页面工具）。"
+  },
+  "bg_stopRecordingFirst": {
+    "message": "请先停止录音，再保存。"
+  },
+  "bg_recUnsupported": {
+    "message": "此版本的 Chrome 无法录制标签页。"
+  },
+  "bg_recNeedsGesture": {
+    "message": "请从 Gum 工具栏按钮或其快捷键开始录制——Chrome 只允许扩展录制你调用它的标签页。"
+  },
+  "bg_recFailed": {
+    "message": "无法开始录制。"
+  },
+  "bg_recStopped": {
+    "message": "录制已停止，正在发送到 Gum。"
+  },
+  "bg_recStarted": {
+    "message": "正在录制此标签页…"
+  },
+  "bg_recSaved": {
+    "message": "录制已保存到 Gum。"
+  },
+  "menu_recordTab": {
+    "message": "录制此标签页"
+  },
+  "manifestCmd_recordTab": {
+    "message": "开始或停止录制标签页"
+  },
+  "cmd_capture_video_record_label": {
+    "message": "录制标签页"
+  },
+  "cmd_capture_video_record_short": {
+    "message": "录屏"
+  },
+  "cmd_capture_video_record_desc": {
+    "message": "将此标签页（画面和声音）录制到 Gum。"
+  },
+  "cmd_capture_audio_tab_label": {
+    "message": "录制标签页音频"
+  },
+  "cmd_capture_audio_tab_short": {
+    "message": "标签音频"
+  },
+  "cmd_capture_audio_tab_desc": {
+    "message": "只将此标签页的声音录制到 Gum。"
+  },
+  "content_rpSaveEntry": {
+    "message": "保存此词条"
+  },
+  "content_ocrSelectHint": {
+    "message": "拖动框选文字 · Esc 取消"
+  },
+  "content_rpStrokes": {
+    "message": "$1 画"
+  },
+  "content_rpParts": {
+    "message": "部件：$1"
+  },
+  "popup_recTab": {
+    "message": "录制标签页"
+  },
+  "popup_recAudio": {
+    "message": "录制标签页音频"
+  },
+  "popup_recStop": {
+    "message": "停止录制"
+  },
+  "popup_recStopFor": {
+    "message": "停止录制（$1）"
+  },
+  "popup_recWaiting": {
+    "message": "$1 MB 待上传"
+  },
+  "popup_recFailed": {
+    "message": "失败（$1 MB）"
+  },
+  "popup_recUpload": {
+    "message": "立即上传"
+  },
+  "popup_recDiscard": {
+    "message": "丢弃"
+  },
+  "popup_recFailedStart": {
+    "message": "无法开始录制。"
+  },
+  "popup_recStartedVideo": {
+    "message": "正在录制此标签页——再次打开此弹窗即可停止。"
+  },
+  "popup_recStartedAudio": {
+    "message": "正在录制此标签页的声音——再次打开即可停止。"
+  },
+  "popup_recStoppedUploading": {
+    "message": "已停止，正在发送到 Gum。"
+  },
+  "opt_connTokenRejected": {
+    "message": "Gum 正在运行，但拒绝了此令牌"
+  },
+  "opt_popupTheme": {
+    "message": "配色"
+  },
+  "opt_popupThemeAuto": {
+    "message": "跟随页面"
+  },
+  "opt_popupThemeLight": {
+    "message": "浅色"
+  },
+  "opt_popupThemeDark": {
+    "message": "深色"
+  },
+  "opt_popupAutoAudio": {
+    "message": "弹窗打开时播放单词音频"
+  },
+  "opt_offlineCache": {
+    "message": "保存最近的查询，以便 Gum 关闭时使用"
+  },
+  "opt_offlineCacheSub": {
+    "message": "最多 20,000 个词，仅保存在此浏览器中。"
+  },
+  "opt_recHeading": {
+    "message": "标签页录制"
+  },
+  "opt_recMax": {
+    "message": "录制自动停止时间（分钟）"
+  },
+  "opt_recAutoCrop": {
+    "message": "页面有视频时只录制视频区域"
+  },
+  "opt_recTranscribe": {
+    "message": "录制完成后在 Gum 中转写"
+  },
+  "content_recArea": {
+    "message": "正在录制所选区域…"
+  },
+  "popup_recArea": {
+    "message": "录制区域"
+  },
+  "opt_furigana": {
+    "message": "在新词和学习中的词上方显示注音"
+  },
+  "opt_furiganaSub": {
+    "message": "在开启词汇状态着色时显示。会在页面中加入注音文字。"
+  },
+  "opt_allFrames": {
+    "message": "在嵌入的框架中也启用"
+  },
+  "opt_allFramesSub": {
+    "message": "在嵌入式阅读器、评论组件等 iframe 中也可悬停查词。已打开的标签页需重新加载后生效。"
+  },
+  "bg_errAppWindowClosed": {
+    "message": "Gum 正在运行，但窗口已关闭。请打开 Gum 窗口后重试。"
+  },
+  "bg_errTimeout": {
+    "message": "Gum 响应超时。请稍后重试。"
+  },
+  "bg_errBadRequest": {
+    "message": "Gum 无法读取该请求。请将扩展和 Gum 更新到相互匹配的版本。"
+  },
+  "bg_errTooLarge": {
+    "message": "内容过大，无法一次发送给 Gum。"
+  },
+  "bg_errAnkiUnreachable": {
+    "message": "Gum 无法连接 Anki。请启动装有 AnkiConnect 的 Anki 后重试。"
+  },
+  "popup_recMic": {
+    "message": "录制麦克风"
+  },
+  "popup_recStartedMic": {
+    "message": "正在录制麦克风。"
+  },
+  "popup_recSaveDisk": {
+    "message": "保存到磁盘"
+  },
+  "popup_recSaveDiskTitle": {
+    "message": "将此录制保存为 .webm 文件。Chrome 会在第一次询问下载文件的权限。"
+  },
+  "popup_recSaveDiskDenied": {
+    "message": "保存到磁盘需要下载权限。录制仍在等待上传。"
+  },
+  "popup_recSaveDiskStarted": {
+    "message": "正在保存录制。"
+  },
+  "popup_recSaveDiskFailed": {
+    "message": "无法将录制保存到磁盘。"
+  },
+  "bg_micGrantNeeded": {
+    "message": "请在刚打开的页面中允许使用麦克风，然后重新开始录制。"
+  },
+  "bg_recSaveNeedsPermission": {
+    "message": "保存到磁盘需要下载权限。"
+  },
+  "bg_recSaveMissing": {
+    "message": "此录制在浏览器中已没有可保存的数据。"
+  },
+  "opt_micGranted": {
+    "message": "已允许使用麦克风。请从工具栏重新开始麦克风录制。"
+  },
+  "opt_micDenied": {
+    "message": "未允许使用麦克风。如需录制声音，请在 Chrome 的网站设置中为此扩展允许麦克风。"
+  },
+  "bg_recSaveInApp": {
+    "message": "此录制的一部分已上传到 Gum，浏览器中已没有完整文件。请在 Gum 中打开。"
   }
 }

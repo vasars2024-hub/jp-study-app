@@ -300,6 +300,25 @@ export function AgentGovernancePanel({
         </p>
       </div>
 
+      <div className="agent-governance-field">
+        <label className="agent-governance-switch">
+          <input
+            type="checkbox"
+            data-testid="agent-governance-study-data-local"
+            checked={settings.agentCloudShareStudyData !== 'allow'}
+            onChange={(event) => writeSettings({
+              agentCloudShareStudyData: event.target.checked ? 'local-only' : 'allow',
+            })}
+          />
+          <span>{t('fix3.agent.studyData.toggle')}</span>
+        </label>
+        <p className="agent-governance-note" data-testid="agent-governance-study-data-note">
+          {settings.agentCloudShareStudyData === 'allow'
+            ? t('fix3.agent.studyData.allowNote')
+            : t('fix3.agent.studyData.localNote')}
+        </p>
+      </div>
+
       <AgentContextSuggestionSettings />
 
       {/*

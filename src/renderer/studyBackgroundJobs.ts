@@ -17,7 +17,7 @@
 import { t as translateStatic } from './i18n';
 import { addDeckCards, loadDeck, removeDeckCards } from './flashcardDeck';
 import { recordClipboardEntry, loadClipboardHistory, type ClipboardEntryType } from './clipboardHistory';
-import { getLevel, setLevel, type WkLevel } from './knownWords';
+import { getLevel, listKnownEntries, setLevel, type WkLevel } from './knownWords';
 import { estimateLevelFromText } from './bookLevelEstimate';
 import { getStudyLang } from './studyEnvironment';
 import { studyLangOfText, type StudyLang } from '../shared/studyLang';
@@ -25,6 +25,8 @@ import { compactLevelBadge, resolvePageLevelLang } from '../shared/pageLevelDete
 import { appendNotebookEvent } from './notebookTimeline';
 import { appendTranslationHistory } from './translationHistory';
 import { scoreTextComprehensibility, knownPercent } from './comprehensibility';
+import { installRecorderMainBridge } from './recorder/recorderMainBridge';
+import { noteStudyOsJobInstalled } from './studyOsJobsReady';
 // `grammarMatch` is loaded on the first request: it carries the whole grammar
 // data set (~2 MB built), which a Blanc-only session must not pay for at start.
 
@@ -53,6 +55,28 @@ async function extensionWordGloss(term: string, lang: StudyLang): Promise<{ read
   }
 }
 
+/**
+ * Extension mines this renderer has handled (or is handling) this session, by
+ * main's `mineId`. Module-level so a re-install (StrictMode, remount) keeps it.
+ */
+const handledExtensionMines = new Map<string, 'running' | 'done'>();
+const MAX_HANDLED_EXTENSION_MINES = 500;
+
+function rememberExtensionMine(mineId: string, state: 'running' | 'done'): void {
+  handledExtensionMines.delete(mineId);
+  handledExtensionMines.set(mineId, state);
+  while (handledExtensionMines.size > MAX_HANDLED_EXTENSION_MINES) {
+    const oldest = handledExtensionMines.keys().next().value;
+    if (oldest === undefined) break;
+    handledExtensionMines.delete(oldest);
+  }
+}
+
+/** Test hook. */
+export function __resetHandledExtensionMinesForTests(): void {
+  handledExtensionMines.clear();
+}
+
 /** Installs every bridge listener and returns one uninstall. */
 export function installStudyRendererBridges(): () => void {
   const offs: Array<(() => void) | undefined | void> = [];
@@ -64,7 +88,22 @@ export function installStudyRendererBridges(): () => void {
   // carries the page title/URL, the sentence and — for a single word, where the
   // extension sends only the selection — a reading and meaning from the local
   // dictionary. A card that could not reach Anki joins the pending queue.
+  //
+  // Main sends each mine to one host window and keeps it pending until acked;
+  // a replay repeats its `mineId`, so one this window already saved is acked
+  // again without adding a second card.
   offs.push(window.api.onExtensionMined((payload) => {
+    const mineId = typeof payload.mineId === 'string' && payload.mineId ? payload.mineId : '';
+    if (mineId) {
+      const seen = handledExtensionMines.get(mineId);
+      if (seen === 'done') {
+        window.api.ackExtensionMined?.(mineId, { ok: true });
+        return;
+      }
+      // Still saving: its ack follows when that finishes.
+      if (seen === 'running') return;
+      rememberExtensionMine(mineId, 'running');
+    }
     void (async () => {
       const text = (payload.text || '').trim();
       const term =
@@ -130,7 +169,22 @@ export function installStudyRendererBridges(): () => void {
         origin: 'extension',
         href: 'flashcards',
       });
-    })();
+    })().then(
+      () => {
+        if (!mineId) return;
+        rememberExtensionMine(mineId, 'done');
+        window.api.ackExtensionMined?.(mineId, { ok: true });
+      },
+      (err: unknown) => {
+        if (!mineId) return;
+        // Not saved: a later replay of this mineId may try again.
+        handledExtensionMines.delete(mineId);
+        window.api.ackExtensionMined?.(mineId, {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      },
+    );
   }));
 
   // Extension audio → Whisper (installed model in renderer worker).
@@ -174,6 +228,9 @@ export function installStudyRendererBridges(): () => void {
   // A completed Japanese transcript becomes one reversible local-deck batch.
   // Re-running transcription replaces that media/language batch instead of
   // silently duplicating every sentence.
+  // Region Recorder: open a finished recording in this window's study player.
+  offs.push(installRecorderMainBridge());
+
   offs.push(window.api.onTranscriptionCardsReady((payload) => {
     const previousIds = loadDeck()
       .filter((card) => card.studyActionId === payload.batchId)
@@ -240,6 +297,38 @@ export function installStudyRendererBridges(): () => void {
       if (typeof term === 'string' && term) levels[term] = getLevel(term);
     }
     window.api.replyKnownLevels(id, levels);
+  }));
+
+  // Extension page word-status colouring: every known word and its level at once.
+  offs.push(window.api.onKnownSnapshotRequest?.(({ id }) => {
+    const words: Record<string, number> = {};
+    try {
+      for (const { word, level } of listKnownEntries()) words[word] = level;
+    } catch {
+      /* answer with what was read; main times out otherwise */
+    }
+    window.api.replyKnownSnapshot?.(id, { words, lang: getStudyLang() });
+  }));
+
+  // Extension /v1/annotate: page text → words with lemma, reading and known level.
+  offs.push(window.api.onExtensionAnnotateRequest?.(({ id, texts, lang }) => {
+    void (async () => {
+      let results: unknown[] = [];
+      try {
+        const [{ annotateTexts }, tokenizer] = await Promise.all([
+          import('./extensionAnnotate'),
+          import('./tokenizer'),
+        ]);
+        if (lang === 'ja' && !tokenizer.tokenizerReady()) await tokenizer.getTokenizer();
+        results = annotateTexts(Array.isArray(texts) ? texts : [], String(lang || getStudyLang()), {
+          tokenizeJa: tokenizer.tokenizerReady() ? tokenizer.tokenizeSync : null,
+          getLevel,
+        });
+      } catch {
+        /* answer empty: the extension simply paints nothing for this batch */
+      }
+      window.api.replyExtensionAnnotate?.(id, results);
+    })();
   }));
 
   offs.push(window.api.onKnownLevelSet(({ id, term, level }) => {
@@ -367,6 +456,13 @@ export function installStudyRendererBridges(): () => void {
       }));
     window.api.replyClipboardList(id, entries);
   }));
+
+  // Every listener is attached: main may now replay mines that arrived while
+  // no window (or a still-loading one) could take them. Main replays only to
+  // its host window, so a pop-out saying this is harmless.
+  window.api.extensionBridgeReady?.();
+  // Study OS acks Blanc only once this is in place (studyOsJobsReady.ts).
+  offs.push(noteStudyOsJobInstalled('bridges'));
 
   return () => {
     for (const off of offs) {

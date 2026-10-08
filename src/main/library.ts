@@ -195,6 +195,33 @@ function readDb(): LibraryItem[] {
   return overlayPendingProgress(result.value);
 }
 
+/**
+ * A READ-ONLY parsed copy of library.json, reused while the file's mtime and
+ * size are unchanged. `library:setProgress` fires on every page turn and only
+ * needs to find one item, yet it re-read and re-parsed the whole file each time
+ * (multi-MB for a large library). Callers must not mutate what this returns;
+ * anything that edits items still goes through `readDb()`.
+ */
+let dbSnapshot: { mtimeMs: number; size: number; items: readonly LibraryItem[] } | null = null;
+
+export function readDbSnapshot(): readonly LibraryItem[] {
+  let st: fs.Stats | null = null;
+  try {
+    st = fs.statSync(dbPath());
+  } catch {
+    st = null;
+  }
+  if (st && dbSnapshot && dbSnapshot.mtimeMs === st.mtimeMs && dbSnapshot.size === st.size) return dbSnapshot.items;
+  const items = readDb();
+  dbSnapshot = st ? { mtimeMs: st.mtimeMs, size: st.size, items } : null;
+  return items;
+}
+
+/** Test seam. */
+export function resetLibrarySnapshotForTests(): void {
+  dbSnapshot = null;
+}
+
 /** Write any coalesced progress now (timer, quit, or before a restore/backup). */
 export function flushLibraryProgress(): void {
   if (progressTimer) {
@@ -237,6 +264,7 @@ function writeDb(items: LibraryItem[]): void {
   const known = knownItemIds ?? new Set(readDb().map((item) => item.id));
   const added = items.filter((item) => !known.has(item.id));
   writeJsonAtomicSync(dbPath(), overlayPendingProgress(items));
+  dbSnapshot = null;
   pendingProgress.clear();
   if (progressTimer) {
     clearTimeout(progressTimer);
@@ -1750,15 +1778,16 @@ export function registerLibraryIpc(): void {
   });
 
   ipcMain.handle('library:setProgress', (_e, id: string, progress: Progress) => {
-    const items = readDb();
-    const it = items.find((x) => x.id === id);
+    // Every page turn lands here: a cached read-only parse, not a fresh one.
+    const it = readDbSnapshot().find((x) => x.id === id);
     if (it) {
       // Captured BEFORE the overwrite. This pair is the whole of §4.1's two-save
       // dwell — the position that is being replaced and when it was written — so
       // the completion detector needs no state of its own and keeps working
-      // across a restart.
-      const previous = it.progress;
-      const previousAt = it.lastReadAt;
+      // across a restart. A coalesced save not yet on disk is the newer one.
+      const pendingBefore = pendingProgress.get(it.id);
+      const previous = pendingBefore ? pendingBefore.progress : it.progress;
+      const previousAt = pendingBefore ? pendingBefore.lastReadAt : it.lastReadAt;
       const at = Date.now();
       // Coalesced: see `pendingProgress`. Atomic when it lands.
       pendingProgress.set(it.id, { progress, lastReadAt: at });

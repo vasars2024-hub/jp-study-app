@@ -51,7 +51,7 @@ import {
 } from './settingActions';
 
 interface PairEditorState {
-  kind: 'headers' | 'cookies';
+  kind: 'headers' | 'cookies' | 'pathMappings';
   title: string;
   path: string;
   rows: ScraperSettingPair[];
@@ -163,6 +163,17 @@ export default function ScraperSettingsDrawer() {
         ctl.closeDrawer();
         return;
       case 'pairs':
+        if (action === 'qbit-path-mappings') {
+          const mappings = settings.qbittorrent.pathMappings ?? [];
+          setPairEditor({
+            kind: 'pathMappings',
+            title: field.label,
+            path: field.path,
+            rows: (mappings.length ? mappings : [{ remote: '', local: '' }])
+              .map((mapping, index) => ({ id: `map-${index}`, key: mapping.remote, value: mapping.local })),
+          });
+          return;
+        }
         setPairEditor({
           kind: action === 'headers' ? 'headers' : 'cookies',
           title: field.label,
@@ -223,9 +234,14 @@ export default function ScraperSettingsDrawer() {
 
   const savePairs = () => {
     if (!pairEditor) return;
-    const value = pairEditor.kind === 'headers'
-      ? pairsToHeaderRecord(pairEditor.rows)
-      : pairsToCookieHeader(pairEditor.rows);
+    const value = pairEditor.kind === 'pathMappings'
+      // Main's validator drops anything malformed (relative, duplicate, past the cap).
+      ? pairEditor.rows
+        .map((row) => ({ remote: row.key.trim(), local: row.value.trim() }))
+        .filter((mapping) => mapping.remote && mapping.local)
+      : pairEditor.kind === 'headers'
+        ? pairsToHeaderRecord(pairEditor.rows)
+        : pairsToCookieHeader(pairEditor.rows);
     change(pairEditor.path, value);
     setNote(`${pairEditor.title} saved.`);
     setPairEditor(null);
@@ -487,9 +503,11 @@ export default function ScraperSettingsDrawer() {
               <div>
                 <h3>{pairEditor.title}</h3>
                 <p>
-                  {pairEditor.kind === 'headers'
-                    ? t('scraperDrawer.editor.headersHint')
-                    : t('scraperDrawer.editor.cookiesHint')}
+                  {pairEditor.kind === 'pathMappings'
+                    ? t('scraperFix.qbit.mappings.hint')
+                    : pairEditor.kind === 'headers'
+                      ? t('scraperDrawer.editor.headersHint')
+                      : t('scraperDrawer.editor.cookiesHint')}
                 </p>
               </div>
               <IconButton label={sx('common.close')} size="sm" onClick={() => setPairEditor(null)}>
@@ -498,8 +516,9 @@ export default function ScraperSettingsDrawer() {
             </header>
 
             <div className="scr-pair-editor-labels" aria-hidden>
-              <span>{t(pairEditor.kind === 'headers' ? 'scraperDrawer.editor.header' : 'scraperDrawer.editor.cookie')}</span>
-              <span>{t('scraperDrawer.editor.value')}</span>
+              <span>{t(pairEditor.kind === 'pathMappings' ? 'scraperFix.qbit.mappings.remote'
+                : pairEditor.kind === 'headers' ? 'scraperDrawer.editor.header' : 'scraperDrawer.editor.cookie')}</span>
+              <span>{t(pairEditor.kind === 'pathMappings' ? 'scraperFix.qbit.mappings.local' : 'scraperDrawer.editor.value')}</span>
             </div>
             <div className="scr-pair-editor-rows">
               {pairEditor.rows.map((row, index) => (
@@ -508,14 +527,16 @@ export default function ScraperSettingsDrawer() {
                     className="scr-input"
                     value={row.key}
                     aria-label={t('scraperDrawer.editor.rowName', { title: pairEditor.title, count: index + 1 })}
-                    placeholder={pairEditor.kind === 'headers' ? 'Accept-Language' : 'session'}
+                    placeholder={pairEditor.kind === 'pathMappings' ? '/downloads'
+                      : pairEditor.kind === 'headers' ? 'Accept-Language' : 'session'}
                     onChange={(event) => updatePair(row.id, { key: event.target.value })}
                   />
                   <input
                     className="scr-input"
                     value={row.value}
                     aria-label={t('scraperDrawer.editor.rowValue', { title: pairEditor.title, count: index + 1 })}
-                    placeholder={pairEditor.kind === 'headers' ? 'ja,en;q=0.8' : 'value'}
+                    placeholder={pairEditor.kind === 'pathMappings' ? 'D:\\Torrents'
+                      : pairEditor.kind === 'headers' ? 'ja,en;q=0.8' : 'value'}
                     onChange={(event) => updatePair(row.id, { value: event.target.value })}
                   />
                   <IconButton

@@ -42,6 +42,7 @@ function summary() {
 
 vi.mock('../stats', () => ({
   getSummary: () => summary(),
+  getStudyDaysByKey: () => ({}),
   getRestDayEnabled: () => false,
   setRestDayEnabled: () => undefined,
   resetStats: () => undefined,
@@ -111,7 +112,8 @@ afterEach(async () => {
   root = null;
 });
 
-const ACTIVITY_COLUMNS = '.stats-chart:not(.stats-reading-speed .stats-chart) .stats-bar-col';
+// The time chart only: the reading-speed and the reviews-and-games charts repeat the window.
+const ACTIVITY_COLUMNS = '.stats-chart:not(.stats-reading-speed .stats-chart):not(.stats-reviews-games .stats-chart) .stats-bar-col';
 
 describe('files-app gate 8 — statistics render in the Files app', () => {
   it('renders the capture\'s stable key: a 14-day recent window', async () => {

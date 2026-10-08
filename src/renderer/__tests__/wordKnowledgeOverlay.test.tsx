@@ -139,7 +139,7 @@ describe('Known-word overlay on Lexicon results', () => {
     expect(chips()[0].className).toContain('active');
   });
 
-  it('cycles through every level and back to New, clearing the entry', async () => {
+  it('cycles through every level and back to New, pinning New by hand', async () => {
     stubApi({ query: '食べる', entries: [TABERU] } as DictResult);
     await render(<DictionaryResults query="食べる" variant="page" lang="ja" />);
 
@@ -148,10 +148,10 @@ describe('Known-word overlay on Lexicon results', () => {
       expect(getLevel('食べる')).toBe(expected);
     }
     await act(async () => chips()[0].click());
-    // Back to New. `setLevel(word, 0, true)` deletes rather than storing a 0,
-    // so the round trip must leave no residue behind.
+    // Back to New. A hand-set New is stored as `{ l: 0, m: 1 }` so the next Anki
+    // sync cannot raise the word again (knownWords.ts); it still reads as New.
     expect(getLevel('食べる')).toBe(0);
-    expect(JSON.parse(localStorage.getItem(knowledgeKey('ja')) ?? '{}')).toEqual({});
+    expect(JSON.parse(localStorage.getItem(knowledgeKey('ja')) ?? '{}')).toEqual({ 食べる: { l: 0, m: 1 } });
     expect(chips()[0].textContent).toBe('lexicon.knowledge.new');
   });
 

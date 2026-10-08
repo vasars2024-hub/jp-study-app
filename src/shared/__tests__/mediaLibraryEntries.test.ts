@@ -319,28 +319,28 @@ describe('watched helpers', () => {
 
 // D269. `MediaLibrarySidebar` counted the Continue watching shelf with its own
 // inline rule — position past 0, and short of the last five seconds — while
-// `MediaLibraryShell` built the shelf itself from `!isWatched`, i.e. 92%. The
+// `MediaLibraryShell` built the shelf itself from `!isWatched`, then 92%. The
 // two agreed on every item in the user's library at the time (4 and 4), which is
 // exactly why a divergence like this survives: it only shows on the band between
 // them, and then the badge counts a row the list does not contain.
 describe('isContinueWatching — one predicate for the shelf and its badge', () => {
-  // `episode()` fixes durationSec at 1440; 0.92 of that is 1324.8.
+  // `episode()` fixes durationSec at 1440; the shared 90% rule (`watchFinished.ts`) puts
+  // the threshold at 1296.
 
-  it('excludes the 92%-to-nearly-over band that the old badge counted', () => {
+  it('excludes the finished-to-nearly-over band that the old badge counted', () => {
     // 1382 s of 1440 is 96%: past the watched threshold, and still 58 s short of
     // the five-second tail the badge used. This is the whole defect.
     expect(isContinueWatching(episode(1, { positionSec: 1382 }))).toBe(false);
-    // Just past it. NOT written as `DURATION * 0.92` — that lands on
-    // 1324.7999999999997, i.e. a hair UNDER the threshold, so the assertion
-    // would have been measuring float noise rather than the rule.
-    expect(isContinueWatching(episode(1, { positionSec: 1325 }))).toBe(false);
+    // Exactly on it: 1296 / 1440 is the double nearest 0.9, so this is the rule's
+    // own boundary rather than float noise either side of it.
+    expect(isContinueWatching(episode(1, { positionSec: 1296 }))).toBe(false);
   });
 
   it('still includes a part-watched episode', () => {
     // The discriminating positive: "always false" would pass the case above and
     // empty the shelf entirely.
     expect(isContinueWatching(episode(1, { positionSec: 720 }))).toBe(true);
-    expect(isContinueWatching(episode(1, { positionSec: 1324 }))).toBe(true);
+    expect(isContinueWatching(episode(1, { positionSec: 1295 }))).toBe(true);
   });
 
   it('excludes an untouched item', () => {

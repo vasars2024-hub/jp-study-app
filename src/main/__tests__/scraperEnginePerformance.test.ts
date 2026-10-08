@@ -24,7 +24,7 @@ import type { ScrapeJobEvent } from '../../shared/scraperResults';
 import { DEFAULT_SITE_RULE, type ScraperSiteRule } from '../../shared/scraperSiteRules';
 
 vi.mock('electron', () => ({
-  app: { getPath: () => process.cwd(), getAppMetrics: () => [] },
+  app: { getPath: () => `${process.env.TEMP ?? process.env.TMPDIR ?? '/tmp'}/gum-vitest-userdata`, getAppMetrics: () => [] },
   ipcMain: { handle: () => undefined },
   BrowserWindow: { getAllWindows: () => [] },
 }));
@@ -103,6 +103,8 @@ function settings(patch: (s: ScraperSettings) => void = () => undefined): Scrape
   // Each job in these tests must reach the server; a cache hit would remove the
   // very overlap being measured.
   value.cache.htmlEnabled = false;
+  // The page server is on 127.0.0.1, which a crawl refuses by default (SSRF guard).
+  value.safety.allowPrivateNetwork = true;
   patch(value);
   return value;
 }

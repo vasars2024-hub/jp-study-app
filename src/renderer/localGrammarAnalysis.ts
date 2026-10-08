@@ -101,7 +101,53 @@ function annotationFor(point: NormalizedGrammarPoint, text: string): UnalignedAn
       translation: example.en,
     })),
     vocabulary: [],
+    // Kept so a highlight can lead back to its library point (and the point to its
+    // scenes) instead of only to a title string several points can share.
+    grammarId: point.id,
   };
+}
+
+/**
+ * The library point id the highlighter reports for `point`, or null when the offline
+ * highlighter can never report it.
+ *
+ * The library is deduplicated by surface core (Japanese) or by frame (Chinese/Russian),
+ * keeping the earliest record, so a later point with the same core is reported under the
+ * earlier one's id — the same characters, so the same claim. A point whose core is too
+ * short to match safely is never reported, and a "scenes with this point" search for it
+ * would be a list that is always empty for a reason the user cannot see.
+ */
+export function localGrammarReportedId(
+  point: { id: string; title: string; lang?: string },
+): string | null {
+  const pointLang = point.lang ?? 'ja';
+  if (pointLang === 'zh' || pointLang === 'ru') {
+    const lang: MatchLang = pointLang;
+    const own = patternAlternatives(point.title, lang).map((parts) => parts.join('…'));
+    if (!own.length) return null;
+    const frames = framesFor(lang);
+    if (frames.some((entry) => entry.point.id === point.id)) return point.id;
+    return frames.find((entry) =>
+      entry.alternatives.some((parts) => own.includes(parts.join('…'))))?.point.id ?? null;
+  }
+  const core = grammarSurfaceCore(point.title);
+  if (!core) return null;
+  return libraryFor(pointLang).find((entry) => entry.core === core)?.point.id ?? null;
+}
+
+/**
+ * Whether the offline highlighter finds `pointId` in `sentence` — the same claim the
+ * subtitle overlay would colour. Reads the overlay's cache when the line is in it, but
+ * never writes it: a library-wide search would otherwise evict the lines on screen.
+ */
+export function sentenceHasLocalGrammarPoint(raw: string, lang: string, pointId: string): boolean {
+  const sentence = normalizeAnalysisText(raw);
+  if (!sentence) return false;
+  const key = `${lang}::${sentence}`;
+  const annotations = resultCache.has(key)
+    ? resultCache.get(key)?.annotations ?? []
+    : libraryAnnotations(sentence, lang);
+  return annotations.some((annotation) => annotation.grammarId === pointId);
 }
 
 /** Chinese / Russian spans, placed by offset and kept in reading order without overlaps. */
@@ -134,6 +180,21 @@ const MAX_EXAMPLES = 2;
 const CACHE_LIMIT = 200;
 const resultCache = new Map<string, SentenceAnalysisResult | null>();
 
+/** The library spans in an already-normalized sentence, aligned and non-overlapping. */
+function libraryAnnotations(sentence: string, lang: string): SentenceAnnotation[] {
+  if (lang === 'zh' || lang === 'ru') return frameAnnotations(sentence, lang);
+  const hits: Array<{ at: number; annotation: UnalignedAnnotation }> = [];
+  for (const { core, point } of libraryFor(lang)) {
+    const at = sentence.indexOf(core);
+    if (at < 0) continue;
+    hits.push({ at, annotation: annotationFor(point, core) });
+  }
+  // Reading order, longest first at one position: `alignAnnotations` keeps the longer of
+  // two overlapping spans, the more specific claim (〜なければならない over 〜ならない).
+  hits.sort((a, b) => a.at - b.at || b.annotation.text.length - a.annotation.text.length);
+  return alignAnnotations(sentence, hits.map((hit) => hit.annotation));
+}
+
 /**
  * The library patterns in `raw`, as a `SentenceAnalysisResult` the subtitle line and the
  * analysis panel render as they would the AI's. `null` when nothing in the library
@@ -145,21 +206,7 @@ export function localSentenceAnalysis(raw: string, lang: string): SentenceAnalys
   const key = `${lang}::${sentence}`;
   if (resultCache.has(key)) return resultCache.get(key) ?? null;
 
-  let annotations: SentenceAnnotation[];
-  if (lang === 'zh' || lang === 'ru') {
-    annotations = frameAnnotations(sentence, lang);
-  } else {
-    const hits: Array<{ at: number; annotation: UnalignedAnnotation }> = [];
-    for (const { core, point } of libraryFor(lang)) {
-      const at = sentence.indexOf(core);
-      if (at < 0) continue;
-      hits.push({ at, annotation: annotationFor(point, core) });
-    }
-    // Reading order, longest first at one position: `alignAnnotations` keeps the longer of
-    // two overlapping spans, the more specific claim (〜なければならない over 〜ならない).
-    hits.sort((a, b) => a.at - b.at || b.annotation.text.length - a.annotation.text.length);
-    annotations = alignAnnotations(sentence, hits.map((hit) => hit.annotation));
-  }
+  const annotations = libraryAnnotations(sentence, lang);
   const result = annotations.length
     ? { sentence, translations: {}, annotations, nuance: [], pitfalls: [] }
     : null;

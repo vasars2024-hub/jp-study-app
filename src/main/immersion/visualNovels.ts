@@ -66,6 +66,7 @@ import {
 } from './visualNovelReaderWindow';
 import { registerGlobalCommand } from '../globalCommands';
 import { showCompanionNotice } from '../companion';
+import { mt } from '../i18n';
 
 const MAX_SCAN_FILES = 3_000;
 const MAX_SCAN_DEPTH = 4;
@@ -1000,18 +1001,18 @@ export function registerVisualNovelIpc(): void {
 
   ipcMain.handle('visual-novel:pickExecutable', async () => {
     const result = await dialog.showOpenDialog({
-      title: 'Choose visual novel executable',
+      title: mt('polish2.vn.dialog.pickExecutable'),
       properties: ['openFile'],
       filters: process.platform === 'win32'
-        ? [{ name: 'Applications', extensions: ['exe'] }, { name: 'All files', extensions: ['*'] }]
-        : [{ name: 'All files', extensions: ['*'] }],
+        ? [{ name: mt('polish2.vn.filter.applications'), extensions: ['exe'] }, { name: mt('dialog.filter.allFiles'), extensions: ['*'] }]
+        : [{ name: mt('dialog.filter.allFiles'), extensions: ['*'] }],
     });
     return result.canceled ? null : result.filePaths[0] ?? null;
   });
 
   ipcMain.handle('visual-novel:discoverFolder', async () => {
     const result = await dialog.showOpenDialog({
-      title: 'Choose a folder containing visual novels',
+      title: mt('polish2.vn.dialog.discoverFolder'),
       properties: ['openDirectory'],
     });
     if (result.canceled || !result.filePaths[0]) return [];
@@ -1020,7 +1021,7 @@ export function registerVisualNovelIpc(): void {
 
   ipcMain.handle('visual-novel:exportLibrary', async () => {
     const result = await dialog.showSaveDialog({
-      title: 'Export Visual Novel library',
+      title: mt('polish2.vn.dialog.exportLibrary'),
       defaultPath: 'visual-novel-library.json',
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
@@ -1035,7 +1036,7 @@ export function registerVisualNovelIpc(): void {
 
   ipcMain.handle('visual-novel:importLibrary', async () => {
     const result = await dialog.showOpenDialog({
-      title: 'Import Visual Novel library',
+      title: mt('polish2.vn.dialog.importLibrary'),
       properties: ['openFile'],
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
@@ -1074,9 +1075,9 @@ export function registerVisualNovelIpc(): void {
       .trim()
       .slice(0, 80) || 'visual-novel';
     const result = await dialog.showSaveDialog({
-      title: 'Export Visual Novel community bundle',
+      title: mt('polish2.vn.dialog.exportBundle'),
       defaultPath: `${safeTitle}-study-bundle.json`,
-      filters: [{ name: 'Visual Novel study bundle', extensions: ['json'] }],
+      filters: [{ name: mt('polish2.vn.filter.bundle'), extensions: ['json'] }],
     });
     if (result.canceled || !result.filePath) return { ok: false as const, canceled: true };
     try {
@@ -1089,9 +1090,9 @@ export function registerVisualNovelIpc(): void {
 
   ipcMain.handle('visual-novel:pickCommunityBundle', async () => {
     const result = await dialog.showOpenDialog({
-      title: 'Import Visual Novel community bundle',
+      title: mt('polish2.vn.dialog.importBundle'),
       properties: ['openFile'],
-      filters: [{ name: 'Visual Novel study bundle', extensions: ['json'] }],
+      filters: [{ name: mt('polish2.vn.filter.bundle'), extensions: ['json'] }],
     });
     if (result.canceled || !result.filePaths[0]) return { ok: false as const, canceled: true };
     try {
@@ -1203,12 +1204,12 @@ export function registerVisualNovelIpc(): void {
     const entry = loadDatabase().entries.find((candidate) => candidate.id === id);
     if (!entry) return { ok: false as const, error: 'The visual novel does not exist.' };
     const result = await dialog.showOpenDialog({
-      title: 'Choose text-hook output file',
+      title: mt('polish2.vn.dialog.textHookFile'),
       defaultPath: entry.installPath || undefined,
       properties: ['openFile'],
       filters: [
-        { name: 'Text output', extensions: ['txt', 'log', 'csv'] },
-        { name: 'All files', extensions: ['*'] },
+        { name: mt('polish2.vn.filter.textOutput'), extensions: ['txt', 'log', 'csv'] },
+        { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
       ],
     });
     if (result.canceled || !result.filePaths[0]) return { ok: false as const, canceled: true };
@@ -1244,12 +1245,12 @@ export function registerVisualNovelIpc(): void {
     const entry = loadDatabase().entries.find((candidate) => candidate.id === id);
     if (!entry) return { ok: false as const, error: 'The visual novel does not exist.' };
     const result = await dialog.showOpenDialog({
-      title: 'Choose visual novel script files',
+      title: mt('polish2.vn.dialog.scriptFiles'),
       defaultPath: entry.installPath || undefined,
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Visual novel scripts', extensions: ['rpy', 'ks', 'txt', 'scr', 'csv'] },
-        { name: 'All files', extensions: ['*'] },
+        { name: mt('polish2.vn.filter.scripts'), extensions: ['rpy', 'ks', 'txt', 'scr', 'csv'] },
+        { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
       ],
     });
     if (result.canceled) return { ok: false as const, canceled: true };
@@ -1457,12 +1458,12 @@ export function registerVisualNovelIpc(): void {
     if (!capture) return { ok: false as const, error: 'The captured sentence does not exist.' };
     const entry = before.entries.find((candidate) => candidate.id === capture.visualNovelId);
     const result = await dialog.showOpenDialog({
-      title: 'Attach visual novel voice clip',
+      title: mt('polish2.vn.dialog.voiceClip'),
       defaultPath: entry?.installPath || undefined,
       properties: ['openFile'],
       filters: [
-        { name: 'Audio clips', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac'] },
-        { name: 'All files', extensions: ['*'] },
+        { name: mt('polish2.vn.filter.audioClips'), extensions: ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac'] },
+        { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
       ],
     });
     if (result.canceled || !result.filePaths[0]) return { ok: false as const, canceled: true };

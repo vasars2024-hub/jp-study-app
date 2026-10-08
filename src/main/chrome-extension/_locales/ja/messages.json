@@ -1930,5 +1930,206 @@
   },
   "cmd_wheel_more_desc": {
     "message": "補助のアクション一覧（OCR・メディア・ページツール）を開きます。"
+  },
+  "bg_stopRecordingFirst": {
+    "message": "先に録音を止めてから保存してください。"
+  },
+  "bg_recUnsupported": {
+    "message": "このバージョンの Chrome ではタブを録画できません。"
+  },
+  "bg_recNeedsGesture": {
+    "message": "Gum のツールバーボタンかショートカットから録画を開始してください（Chrome は呼び出したタブしか録画を許可しません）。"
+  },
+  "bg_recFailed": {
+    "message": "録画を開始できませんでした。"
+  },
+  "bg_recStopped": {
+    "message": "録画を停止しました。Gum に送信しています。"
+  },
+  "bg_recStarted": {
+    "message": "このタブを録画中…"
+  },
+  "bg_recSaved": {
+    "message": "録画を Gum に保存しました。"
+  },
+  "menu_recordTab": {
+    "message": "このタブを録画"
+  },
+  "manifestCmd_recordTab": {
+    "message": "タブの録画を開始／停止"
+  },
+  "cmd_capture_video_record_label": {
+    "message": "タブを録画"
+  },
+  "cmd_capture_video_record_short": {
+    "message": "録画"
+  },
+  "cmd_capture_video_record_desc": {
+    "message": "このタブ（映像と音声）を録画して Gum に保存します。"
+  },
+  "cmd_capture_audio_tab_label": {
+    "message": "タブの音声を録音"
+  },
+  "cmd_capture_audio_tab_short": {
+    "message": "タブ音声"
+  },
+  "cmd_capture_audio_tab_desc": {
+    "message": "このタブの音声だけを録音して Gum に保存します。"
+  },
+  "content_rpSaveEntry": {
+    "message": "この項目を保存"
+  },
+  "content_ocrSelectHint": {
+    "message": "文字を囲むようにドラッグ · Esc で取消"
+  },
+  "content_rpStrokes": {
+    "message": "$1 画"
+  },
+  "content_rpParts": {
+    "message": "部品: $1"
+  },
+  "popup_recTab": {
+    "message": "タブを録画"
+  },
+  "popup_recAudio": {
+    "message": "タブ音声を録音"
+  },
+  "popup_recStop": {
+    "message": "録画を停止"
+  },
+  "popup_recStopFor": {
+    "message": "録画を停止 ($1)"
+  },
+  "popup_recWaiting": {
+    "message": "$1 MB 待機中"
+  },
+  "popup_recFailed": {
+    "message": "失敗（$1 MB）"
+  },
+  "popup_recUpload": {
+    "message": "今すぐ送信"
+  },
+  "popup_recDiscard": {
+    "message": "破棄"
+  },
+  "popup_recFailedStart": {
+    "message": "録画を開始できませんでした。"
+  },
+  "popup_recStartedVideo": {
+    "message": "このタブを録画中です。停止するにはもう一度このポップアップを開いてください。"
+  },
+  "popup_recStartedAudio": {
+    "message": "このタブの音声を録音中です。停止するにはもう一度開いてください。"
+  },
+  "popup_recStoppedUploading": {
+    "message": "停止しました。Gum に送信中。"
+  },
+  "opt_connTokenRejected": {
+    "message": "Gum は起動していますが、このトークンを拒否しました"
+  },
+  "opt_popupTheme": {
+    "message": "配色"
+  },
+  "opt_popupThemeAuto": {
+    "message": "ページに合わせる"
+  },
+  "opt_popupThemeLight": {
+    "message": "ライト"
+  },
+  "opt_popupThemeDark": {
+    "message": "ダーク"
+  },
+  "opt_popupAutoAudio": {
+    "message": "ポップアップを開いたら単語の音声を再生"
+  },
+  "opt_offlineCache": {
+    "message": "Gum を閉じていても使えるよう最近の検索を保存"
+  },
+  "opt_offlineCacheSub": {
+    "message": "最大 20,000 語。このブラウザにのみ保存されます。"
+  },
+  "opt_recHeading": {
+    "message": "タブ録画"
+  },
+  "opt_recMax": {
+    "message": "録画を自動停止するまでの時間（分）"
+  },
+  "opt_recAutoCrop": {
+    "message": "動画のあるページでは動画部分だけを録画"
+  },
+  "opt_recTranscribe": {
+    "message": "録画が終わったら Gum で文字起こし"
+  },
+  "content_recArea": {
+    "message": "選択した範囲を録画中…"
+  },
+  "popup_recArea": {
+    "message": "範囲を録画"
+  },
+  "opt_furigana": {
+    "message": "未習・学習中の単語にふりがなを表示"
+  },
+  "opt_furiganaSub": {
+    "message": "単語ステータスの色分けがオンのときに表示します。ページにルビを追加します。"
+  },
+  "opt_allFrames": {
+    "message": "埋め込みフレーム内でも動作する"
+  },
+  "opt_allFramesSub": {
+    "message": "埋め込みリーダーやコメント欄などの iframe 内でもホバー検索を使えます。開いているタブは再読み込みすると反映されます。"
+  },
+  "bg_errAppWindowClosed": {
+    "message": "Gum は起動していますが、ウィンドウが閉じています。Gum のウィンドウを開いてからもう一度お試しください。"
+  },
+  "bg_errTimeout": {
+    "message": "Gum の応答に時間がかかりすぎました。少し待ってからもう一度お試しください。"
+  },
+  "bg_errBadRequest": {
+    "message": "Gum がこのリクエストを読み取れませんでした。拡張機能と Gum を対応するバージョンに更新してください。"
+  },
+  "bg_errTooLarge": {
+    "message": "Gum に一度に送るには大きすぎます。"
+  },
+  "bg_errAnkiUnreachable": {
+    "message": "Gum が Anki に接続できませんでした。AnkiConnect を入れた Anki を起動してから、もう一度お試しください。"
+  },
+  "popup_recMic": {
+    "message": "マイクを録音"
+  },
+  "popup_recStartedMic": {
+    "message": "マイクを録音しています。"
+  },
+  "popup_recSaveDisk": {
+    "message": "ディスクに保存"
+  },
+  "popup_recSaveDiskTitle": {
+    "message": "この録音を .webm ファイルとして保存します。初回のみ、ファイルのダウンロード許可を Chrome が確認します。"
+  },
+  "popup_recSaveDiskDenied": {
+    "message": "ディスクに保存するにはダウンロードの許可が必要です。録音はアップロード待ちのまま残っています。"
+  },
+  "popup_recSaveDiskStarted": {
+    "message": "録音を保存しています。"
+  },
+  "popup_recSaveDiskFailed": {
+    "message": "録音をディスクに保存できませんでした。"
+  },
+  "bg_micGrantNeeded": {
+    "message": "開いたページでマイクを許可してから、もう一度録音を開始してください。"
+  },
+  "bg_recSaveNeedsPermission": {
+    "message": "ディスクに保存するにはダウンロードの許可が必要です。"
+  },
+  "bg_recSaveMissing": {
+    "message": "この録音には、保存できるデータがブラウザーに残っていません。"
+  },
+  "opt_micGranted": {
+    "message": "マイクを許可しました。ツールバーからもう一度マイク録音を開始してください。"
+  },
+  "opt_micDenied": {
+    "message": "マイクが許可されませんでした。声を録音するには、Chrome のサイト設定でこの拡張機能にマイクを許可してください。"
+  },
+  "bg_recSaveInApp": {
+    "message": "この録音の一部はすでに Gum に送られているため、ブラウザーには完全なファイルが残っていません。Gum で開いてください。"
   }
 }

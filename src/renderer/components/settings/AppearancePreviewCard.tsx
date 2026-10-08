@@ -164,6 +164,7 @@ export default function AppearancePreviewCard({
             <span className="os-viz-label muted">{t('search.theme')}</span>
             <select
               className="set-select"
+              aria-label={t('search.theme')}
               value={draftTheme}
               onChange={(e) => {
                 setTouched(true);

@@ -35,6 +35,7 @@ import { WHISPER_MODEL_SPECS, type WhisperModelTier } from '../shared/whisperMod
 import type { WhisperDevice } from '../renderer/whisperSettings';
 import {
   clampStudyPlaybackRate,
+  HOVER_LOOKUP_MODIFIERS,
   nudgeSubtitlePosition,
   SECONDARY_SUB_LANG_LABELS,
   SECONDARY_SUB_LANGS,
@@ -62,6 +63,13 @@ import { useStudyWorkspace } from './StudyWorkspaceProvider';
 import StudyToolSheet, { StudyToolGroup } from './StudyToolSheet';
 
 const RATE_PRESETS = [0.5, 0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
+
+/** Key caps, shown as printed on the keyboard (not translated, like every key name here). */
+const HOVER_KEY_CAPS: Record<'shift' | 'ctrl' | 'alt', string> = {
+  shift: 'Shift',
+  ctrl: 'Ctrl',
+  alt: 'Alt',
+};
 
 /** One enum over the two mutually exclusive stored booleans. */
 export type PracticeMode = 'off' | 'dictation' | 'shadowing';
@@ -509,6 +517,23 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 onChange={(event) => updatePreference('dualSubs', event.currentTarget.checked)}
               /> {t('mediaWorkspace.study.dualSubs')}
             </label>
+            <label title={shortcutTitle('video.revealTranslation')}>
+              <input
+                type="checkbox"
+                data-study-pref="secondaryBlur"
+                checked={preferences.secondaryBlur === true}
+                disabled={!preferences.dualSubs}
+                onChange={(event) => updatePreference('secondaryBlur', event.currentTarget.checked)}
+              /> {t('studyLoop.player.secondaryBlur')}
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                data-study-pref="primaryBlur"
+                checked={preferences.primaryBlur === true}
+                onChange={(event) => updatePreference('primaryBlur', event.currentTarget.checked)}
+              /> {t('studyLoop.player.primaryBlur')}
+            </label>
             <label title={shortcutTitle('video.toggleFurigana')}>
               <input
                 type="checkbox"
@@ -568,12 +593,30 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 onChange={(event) => props.setPauseOnLookup(event.currentTarget.checked)}
               /> {t('mediaWorkspace.study.pauseOnLookup')}
             </label>
+            <label>
+              {t('studyLoop.player.hoverLookup')}
+              <select
+                data-study-pref="hoverLookup"
+                value={preferences.hoverLookup}
+                aria-label={t('studyLoop.player.hoverLookup')}
+                onChange={(event) => updatePreference(
+                  'hoverLookup',
+                  event.currentTarget.value as VideoCoreStudyPreferences['hoverLookup'],
+                )}
+              >
+                {HOVER_LOOKUP_MODIFIERS.map((modifier) => (
+                  <option key={modifier} value={modifier}>
+                    {modifier === 'off' ? t('common.off') : HOVER_KEY_CAPS[modifier]}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               disabled={!props.hasActiveCue || props.translationBusy}
               title={props.translationBusy
                 ? t('mediaWorkspace.study.translating')
-                : cueTitle('active-cue')}
+                : cueTitle('active-cue', shortcutKeysFor?.('video.revealTranslation'))}
               onClick={() => { props.onTranslateLine(); }}
             >
               {t(props.translationBusy
@@ -603,7 +646,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               type="button"
               data-study-action="mine-current-line"
               disabled={!props.hasActiveCue}
-              title={cueTitle('active-cue')}
+              title={cueTitle('active-cue', shortcutKeysFor?.('video.mineCurrentLine'))}
               onClick={() => {
                 close();
                 props.onMineCurrentLine();
@@ -653,7 +696,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
           </div>
 
           <StudyToolGroup labelKey="studyWorkspace.group.repetition">
-            <label>
+            <label title={shortcutTitle('video.toggleAutoPause')}>
               <input
                 type="checkbox"
                 data-study-pref="autoPause"
@@ -661,7 +704,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 onChange={(event) => updatePreference('autoPause', event.currentTarget.checked)}
               /> {t('mediaWorkspace.study.autoPause')}
             </label>
-            <label>
+            <label title={shortcutTitle('video.toggleLoop')}>
               <input
                 type="checkbox"
                 data-study-pref="loopLine"
@@ -675,7 +718,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
           </StudyToolGroup>
 
           <StudyToolGroup labelKey="mediaWorkspace.study.loopGroup">
-            <button type="button" disabled={!video} onClick={props.onSetA}>
+            <button type="button" disabled={!video} onClick={props.onSetA} title={shortcutTitle('video.abLoopCycle')}>
               A {props.abStartSec == null ? t('mediaWorkspace.study.set') : `${props.abStartSec.toFixed(2)}s`}
             </button>
             <button
@@ -1093,7 +1136,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               type="button"
               data-study-action="previous-cue"
               disabled={!props.hasCues}
-              title={cueTitle('cues', 'W')}
+              title={cueTitle('cues', shortcutKeysFor?.('video.prevLine'))}
               onClick={props.onPrevCue}
             >
               {t('mediaWorkspace.study.previousLine')}
@@ -1102,7 +1145,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               type="button"
               data-study-action="replay-cue"
               disabled={!props.hasActiveCue}
-              title={cueTitle('active-cue', 'R')}
+              title={cueTitle('active-cue', shortcutKeysFor?.('video.replayLine'))}
               onClick={props.onReplayCue}
             >
               {t('mediaWorkspace.study.replayLine')}
@@ -1111,7 +1154,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               type="button"
               data-study-action="next-cue"
               disabled={!props.hasCues}
-              title={cueTitle('cues', 'S')}
+              title={cueTitle('cues', shortcutKeysFor?.('video.nextLine'))}
               onClick={props.onNextCue}
             >
               {t('mediaWorkspace.study.nextLine')}

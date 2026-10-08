@@ -56,6 +56,7 @@ This document is intentionally stored under `src/` so it follows the project rul
 | `toolbox.openContextSearch` | Open Personal Context Search | Fuzzy-search commands, saved words, deck cards, and grammar. | context-search | Unbound | toolbox | Yes |
 | `toolbox.openKanjiInspector` | Open Kanji Inspector | Inspect a single character with radical membership and dictionary gloss. | kanji-inspector | Unbound | toolbox | Yes |
 | `toolbox.openYoutubeLibrary` | Open YouTube Library | Track playlists, download videos, and plan to watch. | youtube-library | Unbound | toolbox | Yes |
+| `toolbox.openScreenRecorder` | Open Screen Recorder | Record a part of the screen into a study video. | screen-recorder | Unbound | toolbox | Yes |
 | `focusTimer.startPause` | Start or Pause Focus Timer | Toggle the active focus timer. | focus-timer | Ctrl+Shift+Space | active-tool | Yes |
 | `focusTimer.reset` | Reset Focus Timer | Reset the active focus timer. | focus-timer | Ctrl+Shift+Backspace | active-tool | Yes |
 | `quickNotes.newNote` | New Quick Note | Clear the Blanc quick note editor for a new note. | quick-notes | Ctrl+N | active-tool | Yes |

@@ -31,6 +31,7 @@
 import type { ImageRow } from '../../shared/scraperResults';
 import type { ScraperImageSettings } from '../../shared/scraperOutputSettings';
 import type { CatalogueEpisode, CatalogueWork } from './catalogue';
+import { episodeRowId } from '../../shared/scraperEpisodeId';
 
 /** `…/cover.webp?x=1` → `webp`. '' when the URL names no format. */
 export function formatOf(url: string): string {
@@ -133,8 +134,9 @@ export function buildImageRows(
     for (const episode of episodes) {
       if (!episode.thumbnailUrl) continue;
       rows.push({
-        id: `${seriesId}-e${episode.number}-thumb`,
-        episodeId: `${seriesId}-e${episode.number}`,
+        id: `${episodeRowId(seriesId, 1, episode.recap ? 'recap' : 'episode', episode.number)}-thumb`,
+        // The same id the engine gives the row (shared/scraperEpisodeId.ts).
+        episodeId: episodeRowId(seriesId, 1, episode.recap ? 'recap' : 'episode', episode.number),
         kind: 'thumbnail',
         width: 0,
         height: 0,

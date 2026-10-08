@@ -1,0 +1,100 @@
+/*
+ * The "Up next" card at the end of an episode (`StudyUpNextCard.tsx`).
+ *
+ * Bottom-right over the picture, above the transport bar, so the transport stays usable
+ * for a replay of the last scene. Same graphite surface as the study blocks; no nested
+ * boxes. Every control clears the 24px hit-target floor.
+ */
+.study-up-next {
+  position: absolute;
+  right: 1rem;
+  bottom: calc(var(--study-dock-height, 4rem) + var(--study-bar-gap, 0.75rem) + 0.6rem);
+  z-index: 96;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: min(20rem, calc(100% - 2rem));
+  padding: 0.85rem 1rem;
+  border: var(--study-block-border, 1px solid rgb(255 255 255 / 0.14));
+  border-radius: var(--study-block-radius, 0.8rem);
+  background: var(--study-block-bg, rgb(14 13 19 / 0.93));
+  box-shadow: var(--study-block-shadow, 0 18px 44px rgb(0 0 0 / 0.46));
+  color: rgb(255 255 255 / 0.92);
+  pointer-events: auto;
+}
+
+.study-up-next-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.66;
+}
+
+.study-up-next-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.98rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.study-up-next-meta,
+.study-up-next-countdown {
+  margin: 0;
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
+.study-up-next-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.study-up-next-actions button {
+  min-height: 2rem;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 0.55rem;
+  background: rgb(255 255 255 / 0.06);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.study-up-next-actions .study-up-next-play {
+  border-color: transparent;
+  background: rgb(var(--color-brand-500, 99 102 241) / 0.95);
+  color: #fff;
+  font-weight: 600;
+}
+
+.study-up-next-actions button:hover {
+  filter: brightness(1.12);
+}
+
+.study-up-next-actions button:focus-visible,
+.study-up-next-autoplay input:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 0.85);
+  outline-offset: 2px;
+}
+
+.study-up-next-autoplay {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.5rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.study-up-next-autoplay input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  cursor: pointer;
+}

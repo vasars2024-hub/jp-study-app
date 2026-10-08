@@ -63,6 +63,16 @@ describe('scraper episode export builder', () => {
     expect(output.content).toContain('"Title, With Comma"');
   });
 
+  it('neutralises scraped cells that a spreadsheet would run as a formula', () => {
+    const titles = ['=HYPERLINK("x")', '+1', '-cmd', '@SUM(A1)', '\tTab'];
+    const csv = buildEpisodeExport(
+      titles.map((titleEn, i) => ({ ...EPISODE, id: `e${i}`, titleEn })),
+      settings({ format: 'csv', includeColumns: ['title'], includeSubtitleColumn: false }),
+    ).content;
+    const cells = csv.split('\r\n').slice(1).map((line) => line.split(',')[0]);
+    expect(cells).toEqual(["\"'=HYPERLINK(\"\"x\"\")\"", "'+1", "'-cmd", "'@SUM(A1)", "'\tTab"]);
+  });
+
   it('builds a playable M3U and a link list', () => {
     expect(buildEpisodeExport([EPISODE], settings({ format: 'm3u' })).content).toContain('#EXTM3U');
     expect(buildEpisodeExport([EPISODE], settings({ format: 'm3u' })).content).toContain('/episode-1');

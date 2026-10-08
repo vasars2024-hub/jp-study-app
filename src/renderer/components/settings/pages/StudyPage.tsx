@@ -9,6 +9,7 @@ import SystemDictionarySection from './SystemDictionarySection';
 import ReadingLensSection from './ReadingLensSection';
 import AiAnalysisSection from './AiAnalysisSection';
 import SubtitleStyleCard from './SubtitleStyleCard';
+import AnkiSchedulingCard from './AnkiSchedulingCard';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import {
@@ -173,6 +174,7 @@ export default function StudyPage() {
       >
         <ProfileSettingsSection />
       </SettingsCard>
+      <AnkiSchedulingCard />
       <SettingsCard
         id="dictionary"
         title={t('search.dictionary')}

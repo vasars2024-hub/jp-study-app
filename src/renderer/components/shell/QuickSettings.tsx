@@ -158,6 +158,7 @@ export default function QuickSettings() {
           <div className="os-qs-row">
             <span className="os-qs-row-label">{t('quickSettings.theme')}</span>
             <Select
+              aria-label={t('quickSettings.theme')}
               value={themeId}
               options={options}
               onChange={(e) => {
@@ -171,6 +172,7 @@ export default function QuickSettings() {
           <div className="os-qs-row">
             <span className="os-qs-row-label">{t('quickSettings.performance')}</span>
             <Select
+              aria-label={t('quickSettings.performance')}
               value={perf}
               options={perfOptions}
               onChange={(e) => {

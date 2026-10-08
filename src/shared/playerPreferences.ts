@@ -27,7 +27,9 @@ export const DEFAULT_PLAYER_PREFERENCES: PlayerPreferences = {
   loopLine: false,
   furigana: false,
   primarySubs: true,
-  dualSubs: true,
+  // Off for a first run, as in the player (`normalizeVideoCoreStudyPreferences`): a new
+  // learner reads the study language first and switches the translation on when wanted.
+  dualSubs: false,
   dictationMode: false,
   shadowingMode: false,
   volumeNormalization: false,
@@ -151,7 +153,8 @@ export function normalizePlayerPreferences(value: unknown): PlayerPreferences {
     loopLine: raw.loopLine === true,
     furigana: raw.furigana === true,
     primarySubs: raw.primarySubs !== false,
-    dualSubs: raw.dualSubs !== false,
+    // A stored set that predates the key keeps the old default (on); see the player's rule.
+    dualSubs: typeof raw.dualSubs === 'boolean' ? raw.dualSubs : Object.keys(raw).length > 0,
     dictationMode,
     shadowingMode: !dictationMode && raw.shadowingMode === true,
     volumeNormalization: raw.volumeNormalization === true,

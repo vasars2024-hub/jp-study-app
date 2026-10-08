@@ -24,6 +24,7 @@ import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { loadScraperSettingsDocument } from '../../../scraperSettingsStore';
 import { sx, sxn, sxs } from '../strings';
+import { scraperErrorText } from '../localize';
 import { scraperArtwork } from '../artwork';
 import { discoveryCandidateId } from '../../../../shared/mediaDiscovery';
 import AiringSchedulePanel from './AiringSchedulePanel';
@@ -74,7 +75,7 @@ export default function DiscoverPage() {
       });
       setNotice(sxs('discover.scrapeQueued', selected.candidate.title));
     } catch (error) {
-      setNotice(sxs('discover.scrapeFailed', error instanceof Error ? error.message : String(error)));
+      setNotice(sxs('discover.scrapeFailed', scraperErrorText(error)));
     }
   };
 

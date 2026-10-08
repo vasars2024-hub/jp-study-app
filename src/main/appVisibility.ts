@@ -14,21 +14,31 @@
  */
 import type { BrowserWindow } from 'electron';
 
-const TRANSIENT = /[?&](?:companion=(?:wheel|notice)|readingLens=1|sysDict=1)(?:&|#|$)/;
+const TRANSIENT = /[?&](?:companion=(?:wheel|notice)|readingLens=1|sysDict=1|regionRecorder=select)(?:&|#|$)/;
+
+/**
+ * Never hidden: the Region Recorder's pill and region border say that the
+ * screen is being recorded, and Hide must not make a running recording invisible.
+ */
+const RECORDING_INDICATORS = /[?&]regionRecorder=(?:panel|frame)(?:&|#|$)/;
 
 let hiddenByToggle: BrowserWindow[] = [];
 
-function isTransient(win: BrowserWindow): boolean {
+function urlMatches(win: BrowserWindow, pattern: RegExp): boolean {
   try {
-    return TRANSIENT.test(win.webContents.getURL());
+    return pattern.test(win.webContents.getURL());
   } catch {
     return false;
   }
 }
 
+function isTransient(win: BrowserWindow): boolean {
+  return urlMatches(win, TRANSIENT);
+}
+
 /** Hide every visible window, remembering which, for `restoreHiddenWindows`. */
 export function hideAllWindows(windows: readonly BrowserWindow[]): void {
-  hiddenByToggle = windows.filter((win) => !win.isDestroyed() && win.isVisible());
+  hiddenByToggle = windows.filter((win) => !win.isDestroyed() && win.isVisible() && !urlMatches(win, RECORDING_INDICATORS));
   for (const win of hiddenByToggle) win.hide();
 }
 

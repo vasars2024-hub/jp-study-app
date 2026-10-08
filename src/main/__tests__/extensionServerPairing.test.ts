@@ -33,7 +33,7 @@ vi.mock('electron', () => ({
   app: { getPath: () => tmpRoot, getAppPath: () => tmpRoot, isPackaged: false },
   ipcMain: { handle: () => undefined, on: () => undefined },
   BrowserWindow: {
-    getAllWindows: () => [{ webContents: { send: (channel: string, payload: unknown) => h.sent.push({ channel, payload }) } }],
+    getAllWindows: () => [{ isDestroyed: () => false, isAlwaysOnTop: () => false, webContents: { send: (channel: string, payload: unknown) => h.sent.push({ channel, payload }) } }],
   },
   safeStorage: { isEncryptionAvailable: () => false },
 }));

@@ -24,6 +24,7 @@ import { fetchProviderAudio } from './audio';
 import { normalizeAudioIdentity } from '../../shared/lexiconAudio';
 import { BUNDLED_GLOSS_LANGS, detectLangFromTitle } from './glossLang';
 import { parseTagBankRows, splitSenseTags, splitTagField, type DictTagBank } from '../../shared/dictTagBank';
+import { decodeBasicEntities, escapeHtmlText, sanitizeDictHtml } from '../../shared/dictHtmlSanitize';
 
 interface StoredGlossaryEntry {
   word: string;
@@ -323,7 +324,9 @@ export function pitchPatternHtml(reading: string, downstep: number): string {
     const style = high
       ? 'border-top:2px solid currentColor;padding-top:1px;display:inline-block'
       : 'display:inline-block';
-    return `<span style="${style}">${m}</span>`;
+    // The morae come from a dictionary's reading column, which is untrusted
+    // input: escaped so a reading like `<img onerror=...>` stays text.
+    return `<span style="${style}">${escapeHtmlText(m)}</span>`;
   });
   return parts.join('');
 }
@@ -341,16 +344,22 @@ function freqValue(raw: unknown): number | undefined {
   return undefined;
 }
 
-function renderStructuredContent(node: unknown): string {
+/**
+ * Yomitan structured content as HTML. Every string in it is dictionary text,
+ * not markup, so it is escaped here; only the tags this function writes itself
+ * are markup. (It used to return strings and `text` raw, which let a crafted
+ * dictionary inject script into every surface that renders `glossaryHtml`.)
+ */
+export function renderStructuredContent(node: unknown): string {
   if (node == null) return '';
-  if (typeof node === 'string') return node;
-  if (typeof node === 'number' || typeof node === 'boolean') return String(node);
+  if (typeof node === 'string') return escapeHtmlText(node);
+  if (typeof node === 'number' || typeof node === 'boolean') return escapeHtmlText(String(node));
   if (Array.isArray(node)) return node.map(renderStructuredContent).join('');
   if (typeof node !== 'object') return '';
   const o = node as Record<string, unknown>;
   if (o.type === 'image') return '';
   if (o.tag === 'br') return '<br>';
-  if (typeof o.text === 'string') return o.text;
+  if (typeof o.text === 'string') return escapeHtmlText(o.text);
   // Recurse into `content` whether it is an array, a nested object, or a string.
   // Yomitan/JMdict v3 nests content as single objects, not only arrays — the old
   // code only recursed on arrays, so every JMdict gloss rendered as empty.
@@ -372,13 +381,17 @@ function renderStructuredContent(node: unknown): string {
  */
 function htmlToDefinitions(html: string): string[] {
   if (!html) return [];
+  // The definitions are plain text (consumers escape them when rendering), so
+  // the entities the renderer above wrote are decoded back: `A&amp;B` must reach
+  // a consumer as `A&B`, not be escaped a second time into `A&amp;amp;B`.
   return html
     .split(/<\/li>|<br\s*\/?>|<\/p>|<\/div>/i)
-    .map((p) => p.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
+    .map((p) => decodeBasicEntities(p.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
 
-function definitionsToSenses(definitions: unknown): { senses: DictSense[]; glossaryHtml?: string } {
+/** Exported for the import tests; `parseTermBank` is the production caller. */
+export function definitionsToSenses(definitions: unknown): { senses: DictSense[]; glossaryHtml?: string } {
   if (!definitions) return { senses: [] };
   if (typeof definitions === 'string') {
     return { senses: [{ partsOfSpeech: [], definitions: [definitions], tags: [] }] };
@@ -388,8 +401,9 @@ function definitionsToSenses(definitions: unknown): { senses: DictSense[]; gloss
   const defArray = Array.isArray(definitions) ? definitions : [definitions];
   for (const def of defArray) {
     if (typeof def === 'string') {
+      // A plain string definition is text: kept raw for `senses`, escaped for HTML.
       plain.push(def);
-      htmlParts.push(def);
+      htmlParts.push(escapeHtmlText(def));
     } else {
       const rendered = renderStructuredContent(def);
       if (!rendered) continue;
@@ -398,7 +412,9 @@ function definitionsToSenses(definitions: unknown): { senses: DictSense[]; gloss
       htmlParts.push(rendered);
     }
   }
-  const glossaryHtml = htmlParts.length ? htmlParts.join('<br>') : undefined;
+  // Defence in depth: everything above is already escaped, but the allowlist
+  // pass guarantees the stored HTML whatever a future renderer change emits.
+  const glossaryHtml = htmlParts.length ? sanitizeDictHtml(htmlParts.join('<br>')) || undefined : undefined;
   return {
     senses: plain.length ? [{ partsOfSpeech: [], definitions: plain, tags: [] }] : [],
     glossaryHtml,
@@ -970,10 +986,13 @@ export function getFrequency(term: string, reading?: string): string {
   return rank !== undefined ? String(rank) : '';
 }
 
-function enrichEntry(entry: StoredGlossaryEntry): DictEntry {
+function enrichEntry(entry: StoredGlossaryEntry, via: 'exact' | 'prefix'): DictEntry {
   const pitchHtml = getPitch(entry.word, entry.reading);
   const ipa = getIpa(entry.word, entry.reading);
   const freq = getFrequencyDetail(entry.word, entry.reading);
+  // Stores written before the renderer escaped its text carry raw dictionary
+  // HTML on disk; it is sanitized on the way out, not trusted because it was ours.
+  const glossaryHtml = entry.glossaryHtml ? sanitizeDictHtml(entry.glossaryHtml) || undefined : undefined;
   return {
     word: entry.word,
     reading: entry.reading,
@@ -984,9 +1003,10 @@ function enrichEntry(entry: StoredGlossaryEntry): DictEntry {
     ...(ipa.length ? { ipa } : {}),
     frequency: freq?.rank,
     ...(freq?.source ? { frequencySource: freq.source } : {}),
-    glossaryHtml: entry.glossaryHtml,
+    glossaryHtml,
     source: entry.source,
     sourceLangs: entry.langs,
+    via,
   };
 }
 
@@ -995,15 +1015,16 @@ function lookupOffline(query: string, exactOnly = false): DictEntry[] {
   if (!q) return [];
 
   const direct = glossaryByTerm.get(q);
-  if (direct?.length) return direct.map(enrichEntry);
+  if (direct?.length) return direct.map((e) => enrichEntry(e, 'exact'));
   if (exactOnly) return [];
 
-  // Prefix scan for partial selections (cap at 8).
+  // Prefix scan for partial selections (cap at 8). Tagged `prefix` so a caller
+  // (the extension's hover scan) can tell a near miss from a match.
   const out: DictEntry[] = [];
   for (const [term, entries] of glossaryByTerm) {
     if (!term.startsWith(q)) continue;
     for (const e of entries) {
-      out.push(enrichEntry(e));
+      out.push(enrichEntry(e, 'prefix'));
       if (out.length >= 8) return out;
     }
   }
@@ -1041,7 +1062,10 @@ export function lookupOfflineDeinflected(query: string, exactOnly = false): {
     if (cand.reasons.length === 0) continue; // identity == the exact miss above
     const hit = lookupOffline(cand.term, exactOnly);
     if (hit.length) {
-      return { entries: hit, deinflection: { source: q, term: cand.term, reasons: cand.reasons } };
+      // An exact hit on a de-inflected root is a de-inflected match; a prefix hit
+      // on one stays a prefix match.
+      const entries = hit.map((e): DictEntry => (e.via === 'exact' ? { ...e, via: 'deinflected' } : e));
+      return { entries, deinflection: { source: q, term: cand.term, reasons: cand.reasons } };
     }
   }
   return { entries: [] };

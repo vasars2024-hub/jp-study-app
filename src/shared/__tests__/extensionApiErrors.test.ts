@@ -41,9 +41,20 @@ interface ApiResult {
   payload?: unknown;
 }
 
-/** Reach apiFetch directly: the `api` message is a raw path passthrough. */
-function api(h: BackgroundHarness, path: string, method = 'GET'): Promise<ApiResult> {
-  return h.send({ type: 'api', path, method }) as Promise<ApiResult>;
+/**
+ * Reach apiFetch directly. It used to be reachable through an all-routes `api`
+ * message — removed, because any content script could call every bridge route
+ * with the pairing token attached — so the test sandbox's hook is used instead,
+ * reporting a failure the way that handler did.
+ */
+async function api(h: BackgroundHarness, path: string, method = 'GET'): Promise<ApiResult> {
+  const bg = (h.sandbox as unknown as { __jpStudyBg: { apiFetch: (p: string, o: unknown) => Promise<unknown> } }).__jpStudyBg;
+  try {
+    return (await bg.apiFetch(path, { method })) as ApiResult;
+  } catch (err) {
+    const e = err as { message?: string; payload?: unknown };
+    return { ok: false, error: String(e.message || err), payload: e.payload } as ApiResult;
+  }
 }
 
 /* =================== the four classifications apiFetch makes ================ */
@@ -212,7 +223,6 @@ describe('the error taxonomy as each message handler reports it', () => {
     { label: 'lookup', msg: { type: 'lookup', query: '猫' } },
     { label: 'sentence-analysis', msg: { type: 'sentence-analysis', text: '猫が好き' } },
     { label: 'examples', msg: { type: 'examples', query: '猫' } },
-    { label: 'api', msg: { type: 'api', path: '/v1/anything' } },
     { label: 'ocr-status', msg: { type: 'ocr-status' } },
     { label: 'playlist-status', msg: { type: 'playlist-status' } },
     { label: 'immersion-visit', msg: { type: 'immersion-visit', url: 'https://x.test/', seconds: 5, chars: 10 } },
@@ -231,7 +241,6 @@ describe('the error taxonomy as each message handler reports it', () => {
       examples: { error: OFFLINE_MSG, offline: undefined },
       // AUDIT: the generic passthrough — the one the reader popup uses most —
       // is also the one that loses the flag.
-      api: { error: OFFLINE_MSG, offline: undefined },
       // Was `undefined` here too; ocr-status now forwards the flag alongside
       // the `available` fix below.
       'ocr-status': { error: OFFLINE_MSG, offline: true },
@@ -255,7 +264,6 @@ describe('the error taxonomy as each message handler reports it', () => {
       lookup: { error: AUTH_MSG, offline: false },
       'sentence-analysis': { error: AUTH_MSG, offline: false },
       examples: { error: AUTH_MSG, offline: undefined },
-      api: { error: AUTH_MSG, offline: undefined },
       'ocr-status': { error: AUTH_MSG, offline: false },
       'playlist-status': { error: AUTH_MSG, offline: false },
       'immersion-visit': { error: AUTH_MSG, offline: undefined },
@@ -270,7 +278,7 @@ describe('the error taxonomy as each message handler reports it', () => {
     // (the other is the listener's outer catch), so it is where the substitution
     // is observable end to end: the user reads the instruction, the caller can
     // still see the app's own words.
-    const res = (await h.send({ type: 'api', path: '/v1/anything' })) as ApiResult & {
+    const res = (await api(h, '/v1/anything')) as ApiResult & {
       payload?: { error?: string };
     };
     expect(res.error).toBe(AUTH_MSG);

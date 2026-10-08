@@ -73,6 +73,37 @@ describe('redactLogText', () => {
     const plain = 'parsed 24 episodes from list page 2';
     expect(redactLogText(plain)).toBe(plain);
   });
+
+  it('removes tracker passkeys and OAuth secrets, in or out of a query string', () => {
+    expect(redactLogText('GET https://t.test/announce?passkey=abcd1234&left=0'))
+      .toBe('GET https://t.test/announce?passkey=‹redacted›&left=0');
+    expect(redactLogText('body passkey=abcd1234 sent')).toBe('body passkey=‹redacted› sent');
+    expect(redactLogText('grant failed: refresh_token=r-123 client_secret: cs-456'))
+      .toBe('grant failed: refresh_token=‹redacted› client_secret: ‹redacted›');
+    expect(redactLogText('POST /token?client_secret=xyz')).toBe('POST /token?client_secret=‹redacted›');
+  });
+
+  it('removes JSON credential fields', () => {
+    expect(redactLogText('{"username":"me","password":"hun\\"ter2","page":1}'))
+      .toBe('{"username":"me","password":"‹redacted›","page":1}');
+    expect(redactLogText('{"token": "t-1", "api_key":"k-2", "apiKey":"k-3"}'))
+      .toBe('{"token": "‹redacted›", "api_key":"‹redacted›", "apiKey":"‹redacted›"}');
+  });
+
+  it('removes a bare Bearer token', () => {
+    expect(redactLogText('server rejected Bearer eyJhbGciOi.J9-x_y= (401)'))
+      .toBe('server rejected Bearer ‹redacted› (401)');
+  });
+});
+
+describe('recentScraperLogs', () => {
+  it('returns nothing for a limit of 0 or less, not the whole ring', () => {
+    scraperLog('info', 'test', 'one');
+    scraperLog('info', 'test', 'two');
+    expect(recentScraperLogs(0)).toEqual([]);
+    expect(recentScraperLogs(-3)).toEqual([]);
+    expect(recentScraperLogs(1).map((l) => l.message)).toEqual(['two']);
+  });
 });
 
 describe('scraperLog', () => {
@@ -261,6 +292,21 @@ describe('logging disk sink', () => {
     configureScraperLogging(logging({ persistToDisk: true, retentionDays: 14 }));
     expect(await pruneOldLogs()).toBe(1);
     expect(scraperLogFiles()).toEqual([`scraper-${fresh}.log`]);
+  });
+
+  it('prunes old files on the first write of a session, with no policy change', async () => {
+    const fsp = await import('node:fs/promises');
+    const path = await import('node:path');
+    const dir = path.join(root, 'logs');
+    await fsp.mkdir(dir, { recursive: true });
+    const old = isoDateLocal(Date.now() - 40 * 86_400_000);
+    await fsp.writeFile(path.join(dir, `scraper-${old}.log`), 'old\n');
+    // A fresh session whose very first policy already persists: no "change".
+    resetScraperLogs();
+    configureScraperLogging(logging({ persistToDisk: true, retentionDays: 7 }));
+    scraperLog('info', 'engine', 'first line');
+    await flushScraperLogWrites();
+    await vi.waitFor(() => expect(scraperLogFiles()).toEqual([`scraper-${isoDateLocal(Date.now())}.log`]));
   });
 
   it('expires by the date in the name, not by mtime', async () => {

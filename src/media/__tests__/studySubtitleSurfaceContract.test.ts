@@ -182,7 +182,9 @@ describe('dual subtitles stack', () => {
 
 describe('V hides every subtitle line at once', () => {
   it('gates the study line, the second line, its fallback hint and the timing readout', () => {
-    expect(OVERLAY).toMatch(/activeCue && preferences\.primarySubs && !preferences\.subtitlesHidden/);
+    // `lineCue`: the playing line, or the line just heard while paused (the study loop's
+    // lingering line); listening practice may hide it for the session too.
+    expect(OVERLAY).toMatch(/lineCue && preferences\.primarySubs && !listeningHidden && !preferences\.subtitlesHidden/);
     expect(OVERLAY).toMatch(/preferences\.dualSubs && !preferences\.subtitlesHidden && secondaryText/);
     expect(OVERLAY).toMatch(/preferences\.dualSubs && !preferences\.subtitlesHidden && secondaryIsFallback/);
     expect(OVERLAY).toMatch(/preferences\.cueTimingReadout && !preferences\.subtitlesHidden/);

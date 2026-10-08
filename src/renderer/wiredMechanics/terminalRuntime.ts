@@ -11,7 +11,8 @@ import { getUiLang, t } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import type { DictResult } from '../../shared/types';
 import { getSummary } from '../stats';
-import { getLevel, knowledgeCounts } from '../knownWords';
+import { knowledgeCounts } from '../knownWords';
+import { pickMineTarget } from '../mineTarget';
 import { dueDeckCards, loadDeck } from '../flashcardDeck';
 import { loadLookupHistory, recordLookup } from '../lookupHistory';
 import { getStudyLang } from '../studyEnvironment';
@@ -165,19 +166,12 @@ const JP = /[぀-ヿ㐀-鿿]/u;
 async function mine(sentence: string): Promise<MineOutcome> {
   const line = sentence.trim();
   if (!JP.test(line)) return { ok: false, noTarget: true };
-  let target = '';
-  let reading = '';
-  try {
-    await getTokenizer();
-    const tokens = tokenizeSync(line).filter((tk) => tk.content && !tk.proper && JP.test(tk.lemma || tk.surface));
-    const pick = tokens.find((tk) => getLevel(tk.lemma || tk.surface) < 3) ?? tokens[0];
-    if (pick) {
-      target = pick.lemma && pick.lemma !== '*' ? pick.lemma : pick.surface;
-      reading = pick.reading && pick.reading !== '*' ? pick.reading : '';
-    }
-  } catch {
-    /* tokenizer assets missing: fall back to the whole line */
-  }
+  // The shared i+1 rule (renderer/mineTarget.ts), the same one the player mines with;
+  // the terminal keeps its old fallback to the first content word when all are known.
+  const pick = await pickMineTarget(line, { fallbackToFirst: true, loadTimeoutMs: 30_000 });
+  let target = pick?.lemma ?? '';
+  let reading = pick?.reading ?? '';
+  // Tokenizer assets missing: fall back to the start of the line.
   if (!target) target = [...line].slice(0, 12).join('');
   let meaning = '';
   try {

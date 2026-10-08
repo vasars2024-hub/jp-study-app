@@ -3,7 +3,7 @@
 // Every control in the drawer renders through here so the twenty groups cannot
 // drift apart in spacing, hint placement or how a bound is enforced.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button, Select, Toggle } from '../../ui';
 import Icon from '../../Icons';
 import { readField, type ScraperFieldDef } from './fields';
@@ -30,6 +30,84 @@ function asString(value: unknown): string {
 function asList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((v) => String(v));
+}
+
+/**
+ * A number input that keeps what is typed as a local draft and only validates
+ * and saves on blur or Enter. Committing every keystroke ran the settings
+ * validator mid-number, so clearing a field to type "15" snapped it to the
+ * minimum before the "5" arrived. A draft that fails validation is NOT saved,
+ * and says so: the input is marked invalid and the reason sits under it until
+ * the next commit, rather than the old value silently coming back.
+ */
+function NumberDraftInput({
+  value,
+  min,
+  max,
+  step,
+  label,
+  onCommit,
+}: {
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  label: string;
+  onCommit: (next: number) => void;
+}) {
+  const { t } = useT();
+  const errorId = useId();
+  const [draft, setDraft] = useState(() => String(value));
+  const [error, setError] = useState('');
+  useEffect(() => {
+    setDraft(String(value));
+    setError('');
+  }, [value]);
+
+  const commit = () => {
+    const text = draft.trim();
+    const next = Number(text);
+    if (!text || !Number.isFinite(next)) {
+      setError(t('scraperFix.ui.field.notNumber'));
+      return;
+    }
+    if ((min !== undefined && next < min) || (max !== undefined && next > max)) {
+      setError(t('scraperFix.ui.field.outOfRange', { min: min ?? '', max: max ?? '' }));
+      return;
+    }
+    setError('');
+    if (next !== value) onCommit(next);
+  };
+
+  return (
+    <>
+      <input
+        type="number"
+        className={`scr-input${error ? ' is-invalid' : ''}`}
+        value={draft}
+        min={min}
+        max={max}
+        step={step ?? 1}
+        aria-label={label}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') {
+            setDraft(String(value));
+            setError('');
+          }
+        }}
+      />
+      {error && (
+        <span id={errorId} className="scr-field-error" role="alert">
+          {error}
+        </span>
+      )}
+    </>
+  );
 }
 
 /** How many things a "counted" field is standing in for. */
@@ -106,18 +184,13 @@ export default function FieldRow({
       case 'number':
         return (
           <div className="scr-field-num">
-            <input
-              type="number"
-              className="scr-input"
+            <NumberDraftInput
               value={asNumber(value)}
               min={field.min}
               max={field.max}
-              step={field.step ?? 1}
-              aria-label={field.label}
-              onChange={(e) => {
-                const next = Number(e.target.value);
-                if (Number.isFinite(next)) onChange(field.path, next);
-              }}
+              step={field.step}
+              label={field.label}
+              onCommit={(next) => onChange(field.path, next)}
             />
             {field.unit && <span className="scr-field-unit">{field.unit}</span>}
           </div>
@@ -205,33 +278,45 @@ export default function FieldRow({
         const toValue = readField(settings, toPath);
         return (
           <div className="scr-field-range">
-            <input
-              type={isClock ? 'time' : 'number'}
-              className="scr-input"
-              value={isClock ? asString(value) : asNumber(value)}
-              min={field.min}
-              max={field.max}
-              step={field.step ?? 1}
-              aria-label={t('scraperDrawer.field.from', { label: field.label })}
-              onChange={(e) =>
-                onChange(field.path, isClock ? e.target.value : Number(e.target.value))
-              }
-            />
+            {isClock ? (
+              <input
+                type="time"
+                className="scr-input"
+                value={asString(value)}
+                aria-label={t('scraperDrawer.field.from', { label: field.label })}
+                onChange={(e) => onChange(field.path, e.target.value)}
+              />
+            ) : (
+              <NumberDraftInput
+                value={asNumber(value)}
+                min={field.min}
+                max={field.max}
+                step={field.step}
+                label={t('scraperDrawer.field.from', { label: field.label })}
+                onCommit={(next) => onChange(field.path, next)}
+              />
+            )}
             <span className="scr-field-dash" aria-hidden>
               –
             </span>
-            <input
-              type={isClock ? 'time' : 'number'}
-              className="scr-input"
-              value={isClock ? asString(toValue) : asNumber(toValue)}
-              min={field.min}
-              max={field.max}
-              step={field.step ?? 1}
-              aria-label={t('scraperDrawer.field.to', { label: field.label })}
-              onChange={(e) =>
-                onChange(toPath, isClock ? e.target.value : Number(e.target.value))
-              }
-            />
+            {isClock ? (
+              <input
+                type="time"
+                className="scr-input"
+                value={asString(toValue)}
+                aria-label={t('scraperDrawer.field.to', { label: field.label })}
+                onChange={(e) => onChange(toPath, e.target.value)}
+              />
+            ) : (
+              <NumberDraftInput
+                value={asNumber(toValue)}
+                min={field.min}
+                max={field.max}
+                step={field.step}
+                label={t('scraperDrawer.field.to', { label: field.label })}
+                onCommit={(next) => onChange(toPath, next)}
+              />
+            )}
             {field.unit && <span className="scr-field-unit">{field.unit}</span>}
           </div>
         );

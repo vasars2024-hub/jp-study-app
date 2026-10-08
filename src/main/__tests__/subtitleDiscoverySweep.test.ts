@@ -14,7 +14,7 @@
 // set of provider replies and returns what was actually written to the store, so
 // a new provider arm or a new failure reason is a new case, not a new file.
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -852,5 +852,92 @@ describe('a full disk while saving a downloaded subtitle', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+// P4: "Cancel all" stops the sweep, and the sweep's write-back keeps what the
+// user changed on an item while it was being searched.
+describe('a sweep the user acts on while it runs', () => {
+  const userTrack = (id: string, lang = 'ja') => ({
+    id, lang, source: 'sidecar' as const, path: path.join(tmpRoot, 'p'), external: true,
+    format: 'srt' as const, addedAt: 2,
+  });
+
+  async function heldSweep(items: MediaItem[]): Promise<{
+    library: () => MediaItem[];
+    edit: (id: string, patch: Partial<MediaItem>) => void;
+    release: () => void;
+    done: Promise<unknown>;
+  }> {
+    script.keys = { jimaku: true, opensubtitles: false };
+    let library = items;
+    registerSubtitleDiscoveryIpc({
+      listItems: () => library,
+      patchItems: (ids, patch) => {
+        library = library.map((entry) => (ids.includes(entry.id) ? { ...entry, ...patch } : entry));
+      },
+    });
+    let open: () => void = () => undefined;
+    const inner = new Promise<void>((resolve) => { open = resolve; });
+    // A thenable, so the test knows the moment the sweep is waiting on Jimaku.
+    let entered = false;
+    jimakuGate = {
+      then: (resolve: () => void, reject: (error: unknown) => void) => {
+        entered = true;
+        return inner.then(resolve, reject);
+      },
+    } as unknown as Promise<void>;
+    releaseHeld = () => { jimakuGate = null; open(); };
+    jimakuAsked.length = 0;
+    const done = runSubtitleDiscovery({});
+    await vi.waitFor(() => expect(entered).toBe(true));
+    return {
+      library: () => library,
+      edit: (id, patch) => {
+        library = library.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry));
+      },
+      release: () => releaseHeld(),
+      done,
+    };
+  }
+
+  // A failed case must not leave the sweep held open for the next one.
+  let releaseHeld: () => void = () => undefined;
+  afterEach(() => {
+    releaseHeld();
+    releaseHeld = () => undefined;
+  });
+
+  it('"Cancel all" ends the whole sweep, not just the item it is on', async () => {
+    const { cancelSubtitleDiscovery } = await import('../subtitleDiscovery');
+    const held = await heldSweep([
+      mediaItem({ id: 'a' } as Partial<MediaItem>),
+      mediaItem({ id: 'b', episode: 8 } as Partial<MediaItem>),
+      mediaItem({ id: 'c', episode: 9 } as Partial<MediaItem>),
+    ]);
+    cancelSubtitleDiscovery();
+    held.release();
+    await held.done;
+    expect(jimakuAsked.map((call) => call.episode)).toEqual([7]);
+    expect(held.library().filter((entry) => entry.subtitlesCheckedAt).map((entry) => entry.id)).toEqual([]);
+  });
+
+  it('keeps a track the user attached while the item was being searched', async () => {
+    const held = await heldSweep([mediaItem({ id: 'a' } as Partial<MediaItem>)]);
+    held.edit('a', { subtitles: [userTrack('user-1')] } as Partial<MediaItem>);
+    held.release();
+    await held.done;
+    const [item] = held.library();
+    expect((item.subtitles ?? []).map((record) => record.id)).toEqual(['user-1']);
+    expect(item.subtitlesCheckedAt).toBeTypeOf('number');
+  });
+
+  it('does not bring back a track the user removed while the item was being searched', async () => {
+    // English, so the item still lacks the Japanese line and is searched.
+    const held = await heldSweep([mediaItem({ id: 'a', subtitles: [userTrack('old-1', 'en')] } as Partial<MediaItem>)]);
+    held.edit('a', { subtitles: [] } as Partial<MediaItem>);
+    held.release();
+    await held.done;
+    expect(held.library()[0].subtitles ?? []).toEqual([]);
   });
 });

@@ -808,6 +808,13 @@
   letter-spacing: 0.12em;
 }
 
+/* Video study on that day: a small square signal lamp instead of the round dot. */
+:root[data-materials='wired'] .cal-media-tag {
+  border-radius: 0;
+  background: var(--wired-cyan);
+  box-shadow: 0 0 6px rgba(109, 241, 255, 0.55);
+}
+
 :root[data-materials='wired'] .cal-month-dow {
   color: var(--wired-amber);
   font-size: 10px;

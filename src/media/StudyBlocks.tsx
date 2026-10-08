@@ -11,13 +11,13 @@ import type { VideoCore_VideoPlaybackInfo } from '@/app/(main)/_features/video-c
 import type { VideoCoreActiveCue } from '@/app/(main)/_features/video-core/video-core-subtitles';
 import {
   normalizeVideoCoreMiningHistory,
+  VIDEO_CORE_MINING_HISTORY_EVENT,
   VIDEO_CORE_MINING_HISTORY_KEY,
   type VideoCoreMiningHistoryEntry,
   type VideoCoreMiningSource,
 } from '../shared/videoCoreMining';
 import { findMinedCueEntry } from '../shared/seanimeWatchLoop';
 import { MINING_HISTORY_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
-import type { VideoCoreStudyPreferences } from '../shared/videoCoreStudy';
 import { useT } from '../renderer/i18n';
 
 /* ------------------------------------------------------------------------------ *
@@ -234,6 +234,12 @@ export function MiningQueueBlock({ mineSignal }: { mineSignal: number }): React.
   const { t } = useT();
   const [history, setHistory] = React.useState<VideoCoreMiningHistoryEntry[]>(loadHistory);
   React.useEffect(() => setHistory(loadHistory()), [mineSignal]);
+  // The mine finishes after the signal (Anki answers later), so also follow the log itself.
+  React.useEffect(() => {
+    const reload = (): void => setHistory(loadHistory());
+    window.addEventListener(VIDEO_CORE_MINING_HISTORY_EVENT, reload);
+    return () => window.removeEventListener(VIDEO_CORE_MINING_HISTORY_EVENT, reload);
+  }, []);
 
   const recent = history.slice(-12).reverse();
   return (
@@ -271,36 +277,36 @@ export function MiningQueueBlock({ mineSignal }: { mineSignal: number }): React.
  * express: hide the line, try to catch it, let it appear a few seconds in.
  */
 export function ListeningBlock({
-  preferences,
-  updatePreference,
+  hidden,
+  onHiddenChange,
   onReplay,
   cueKey,
 }: {
-  preferences: VideoCoreStudyPreferences;
-  updatePreference: <K extends keyof VideoCoreStudyPreferences>(
-    key: K, value: VideoCoreStudyPreferences[K],
-  ) => void;
+  /** The study line is hidden for listening — session state owned by the overlay. */
+  hidden: boolean;
+  onHiddenChange: (hidden: boolean) => void;
   onReplay: () => void;
   /** Changes when the line changes, which is what re-arms the reveal timer. */
   cueKey: string;
 }): React.ReactElement {
   const { t } = useT();
   const [delaySec, setDelaySec] = React.useState(0);
-  const [revealed, setRevealed] = React.useState(preferences.primarySubs);
+  const revealed = !hidden;
 
-  // Re-arm on every new line, so "reveal after N seconds" means after N seconds of THIS
-  // line rather than N seconds after the block was opened.
+  /*
+    Re-arm on every new line, so "reveal after N seconds" means after N seconds of THIS line
+    rather than N seconds after the block was opened. Session state only: this used to write
+    the saved "show subtitles" preference twice per line, and closing the block mid-delay left
+    the user's subtitles switched off for good.
+  */
   React.useEffect(() => {
     if (delaySec <= 0) return undefined;
-    setRevealed(false);
-    updatePreference('primarySubs', false);
-    const timer = window.setTimeout(() => {
-      setRevealed(true);
-      updatePreference('primarySubs', true);
-    }, delaySec * 1000);
+    onHiddenChange(true);
+    const timer = window.setTimeout(() => onHiddenChange(false), delaySec * 1000);
     return () => window.clearTimeout(timer);
-    // `updatePreference` is stable (useCallback with no deps in the overlay).
-  }, [cueKey, delaySec, updatePreference]);
+  }, [cueKey, delaySec, onHiddenChange]);
+  // Closing the block always gives the line back.
+  React.useEffect(() => () => onHiddenChange(false), [onHiddenChange]);
 
   return (
     <section className="study-mini-block" data-study-block="listening">
@@ -309,14 +315,10 @@ export function ListeningBlock({
         <button
           type="button"
           data-study-action="listening-reveal"
-          aria-pressed={preferences.primarySubs}
-          onClick={() => {
-            const next = !preferences.primarySubs;
-            setRevealed(next);
-            updatePreference('primarySubs', next);
-          }}
+          aria-pressed={revealed}
+          onClick={() => onHiddenChange(revealed)}
         >
-          {t(preferences.primarySubs
+          {t(revealed
             ? 'studyWorkspace.listening.hide'
             : 'studyWorkspace.listening.reveal')}
         </button>
@@ -331,9 +333,9 @@ export function ListeningBlock({
             onChange={(event) => setDelaySec(Number(event.currentTarget.value))}
           >
             <option value={0}>{t('common.off')}</option>
-            <option value={2}>2s</option>
-            <option value={4}>4s</option>
-            <option value={8}>8s</option>
+            {[2, 4, 8].map((seconds) => (
+              <option key={seconds} value={seconds}>{t('studyLoop.player.seconds', { seconds })}</option>
+            ))}
           </select>
         </label>
       </div>

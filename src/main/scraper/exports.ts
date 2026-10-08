@@ -16,7 +16,7 @@ import { app, dialog, shell } from 'electron';
 import type { ExportRecord } from '../../shared/scraperResults';
 import type { ScraperExportInput } from '../../shared/scraperIpc';
 import { scraperLog } from './logBus';
-import { readScraperJson, writeScraperJson } from './store';
+import { readScraperJson, withScraperFileQueue, writeScraperJson } from './store';
 
 const EXPORTS_FILE = 'exports.json';
 const MAX_RECORDS = 50;
@@ -48,10 +48,44 @@ export async function exportStartFolder(destinationRef: string): Promise<string>
   return app.getPath('downloads');
 }
 
-/** Keeps a user-supplied name from becoming a path. */
+/** Device names Windows reserves, with or without an extension. */
+const WINDOWS_RESERVED = /^(?:con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³]|conin\$|conout\$)$/i;
+/** Characters no file name may hold on Windows, plus controls and bidi overrides. */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_NAME_CHARS = /[<>:"/\\|?*\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069\s]+/g;
+const MAX_NAME_CHARS = 120;
+
+/**
+ * Keeps a user-supplied name from becoming a path, or a name Windows refuses.
+ *
+ * Non-ASCII titles are kept (a Japanese show title is a perfectly good file
+ * name); only separators, reserved punctuation, controls and whitespace are
+ * replaced. The fallback is used only when nothing usable is left.
+ */
 export function safeFileName(name: string, fallback = 'anime-export'): string {
-  const base = path.basename(name).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
-  return base || fallback;
+  // Both separators, whatever the platform: a name from the renderer may carry either.
+  const raw = String(name ?? '').split(/[\\/]/).pop() ?? '';
+  // Trailing dots and spaces are dropped by Windows itself; strip them before
+  // whitespace becomes a dash, or `name. .` would keep a ghost suffix.
+  const cleaned = raw.normalize('NFC').replace(/[.\s]+$/, '').replace(UNSAFE_NAME_CHARS, '-');
+  const extMatch = /\.[A-Za-z0-9]{1,10}$/.exec(cleaned);
+  const ext = extMatch ? extMatch[0] : '';
+  let stem = (ext ? cleaned.slice(0, -ext.length) : cleaned)
+    .replace(/^[-.]+/, '')
+    .replace(/[. ]+$/, '');
+  if (!stem) return ext ? `${fallback}${ext}` : fallback;
+  if (WINDOWS_RESERVED.test(stem.split('.')[0] ?? '')) stem = `_${stem}`;
+  // Cap by code points, so a surrogate pair is never split in half.
+  const chars = Array.from(stem);
+  const room = MAX_NAME_CHARS - ext.length;
+  if (chars.length > room) stem = chars.slice(0, room).join('').replace(/[. -]+$/, '');
+  return stem ? `${stem}${ext}` : `${fallback}${ext}`;
+}
+
+/** CSV is opened by spreadsheets: a BOM makes Excel read it as UTF-8. */
+export function withCsvBom(content: string, format: string): string {
+  if (format.toLowerCase() !== 'csv' || content.startsWith('\uFEFF')) return content;
+  return `\uFEFF${content}`;
 }
 
 export async function listExports(): Promise<ExportRecord[]> {
@@ -64,12 +98,16 @@ export async function listExports(): Promise<ExportRecord[]> {
 }
 
 async function record(entry: Omit<StoredExport, 'writtenAt'>): Promise<ExportRecord> {
-  const file = await readScraperJson<ExportsFile>(EXPORTS_FILE, EMPTY);
-  const stored: StoredExport = { ...entry, writtenAt: Date.now() };
-  await writeScraperJson(EXPORTS_FILE, {
-    exports: [stored, ...file.exports].slice(0, MAX_RECORDS),
+  // Queued per file: two exports finishing together must not both read the
+  // same old list and have the second write drop the first record.
+  return withScraperFileQueue(EXPORTS_FILE, async () => {
+    const file = await readScraperJson<ExportsFile>(EXPORTS_FILE, EMPTY);
+    const stored: StoredExport = { ...entry, writtenAt: Date.now() };
+    await writeScraperJson(EXPORTS_FILE, {
+      exports: [stored, ...file.exports].slice(0, MAX_RECORDS),
+    });
+    return { ...entry, ageMinutes: 0 };
   });
-  return { ...entry, ageMinutes: 0 };
 }
 
 export interface WriteExportRequest extends ScraperExportInput {
@@ -102,7 +140,7 @@ export async function writeExport(request: WriteExportRequest): Promise<ExportRe
   }
 
   try {
-    await fsp.writeFile(choice.filePath, request.content, 'utf-8');
+    await fsp.writeFile(choice.filePath, withCsvBom(request.content, String(request.format)), 'utf-8');
     scraperLog(
       'info',
       'export',

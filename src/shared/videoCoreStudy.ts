@@ -1,4 +1,5 @@
 import { evaluateJapaneseDictation } from './listeningTraining';
+import { isWatchFinished } from './watchFinished';
 
 export interface VideoCoreStudyCue {
   index: number;
@@ -240,7 +241,38 @@ export interface VideoCoreStudyPreferences {
   secondarySubScale: number;
   /** Second line colour, `#rrggbb`, or `''` for the stylesheet's pale blue-white. */
   secondarySubColor: string;
+  /**
+   * Blur the second (translation) line until the pointer is over it or it is revealed with
+   * the translation key. Language Reactor's "hide translation": the help stays one glance
+   * away without being read before the Japanese is. On by default for new users.
+   */
+  secondaryBlur: boolean;
+  /** Blur the study line itself until hovered — listen first, read second. Off by default. */
+  primaryBlur: boolean;
+  /** Pause the video when a word is looked up. Persisted (it used to reset every open). */
+  pauseOnLookup: boolean;
+  /**
+   * Look a word up by hovering it while this modifier is held, the way Yomitan does.
+   * `off` keeps lookup on click only.
+   */
+  hoverLookup: HoverLookupModifier;
   [key: string]: unknown;
+}
+
+export const HOVER_LOOKUP_MODIFIERS = ['off', 'shift', 'ctrl', 'alt'] as const;
+export type HoverLookupModifier = typeof HOVER_LOOKUP_MODIFIERS[number];
+
+/** Whether `event` holds the hover-lookup modifier the user chose. */
+export function hoverLookupHeld(
+  modifier: HoverLookupModifier,
+  event: { shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey?: boolean },
+): boolean {
+  switch (modifier) {
+    case 'shift': return event.shiftKey;
+    case 'ctrl': return event.ctrlKey || event.metaKey === true;
+    case 'alt': return event.altKey;
+    default: return false;
+  }
 }
 
 export interface VideoCoreDictationEvaluation {
@@ -367,6 +399,13 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     && Number.isFinite(raw.subtitleFontSize)
     ? Math.round(Math.max(16, Math.min(48, raw.subtitleFontSize)))
     : 26;
+  /*
+    A first run and an existing user are told apart by whether anything was stored at all.
+    The translation line used to be on for everyone; for a new learner it now starts off (and
+    blurred when switched on), but a stored preference set that simply predates a key keeps
+    what that user has been seeing — a default change must not rearrange someone's screen.
+  */
+  const firstRun = Object.keys(raw).length === 0;
   return {
     ...raw,
     playbackRate: clampStudyPlaybackRate(
@@ -376,7 +415,7 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     loopLine: raw.loopLine === true,
     furigana: raw.furigana === true,
     primarySubs: raw.primarySubs !== false,
-    dualSubs: raw.dualSubs !== false,
+    dualSubs: typeof raw.dualSubs === 'boolean' ? raw.dualSubs : !firstRun,
     subtitlesHidden: raw.subtitlesHidden === true,
     videoFit: VIDEO_FIT_MODES.includes(raw.videoFit as VideoFitMode) ? raw.videoFit as VideoFitMode : 'contain',
     dictationMode: raw.dictationMode === true,
@@ -425,6 +464,12 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
       ))
       : SECONDARY_SUB_SCALE_DEFAULT,
     secondarySubColor: normalizeSubtitleColor(raw.secondarySubColor),
+    secondaryBlur: typeof raw.secondaryBlur === 'boolean' ? raw.secondaryBlur : firstRun,
+    primaryBlur: raw.primaryBlur === true,
+    pauseOnLookup: raw.pauseOnLookup === true,
+    hoverLookup: (HOVER_LOOKUP_MODIFIERS as readonly string[]).includes(raw.hoverLookup as string)
+      ? raw.hoverLookup as HoverLookupModifier
+      : 'shift',
   };
 }
 
@@ -1327,6 +1372,122 @@ export function activeStudyCuesAtTime(
 }
 
 /**
+ * The line the study tools act on at `playbackTimeSec`: the active cue, else the line that
+ * last played, held until the next one starts.
+ *
+ * Everything in the player that works on "this line" — replay, mine, dictation, shadowing,
+ * the grammar card — used to key off the cue that is audible right now. Between two lines,
+ * and at the exact moment auto-pause stops the video (which is AFTER the line's end by
+ * definition), that cue is null: the subtitle vanished, Replay disabled itself and the mine
+ * key did nothing at the one moment a learner reaches for them. asbplayer, Language Reactor
+ * and mpvacious all act on the line just heard; this is that rule.
+ *
+ * `linger: false` is the caller's "a seek happened since the last line" — a jump lands on
+ * whatever is there, and a line from before the jump is not the one being studied. The caller
+ * turns lingering back on as soon as a cue is active again.
+ *
+ * A line whose text strips to nothing, or that is typesetting (a drawing, a positioned sign —
+ * `isTypesettingCueText`), is never the lingering line; the scan steps back past at most a
+ * few of them.
+ *
+ * `cues` must be sorted by `startMs`, as {@link activeStudyCuesAtTime} requires.
+ */
+export function studyCueAt(
+  cues: readonly VideoCoreStudyCue[],
+  playbackTimeSec: number,
+  subtitleDelaySec: number,
+  options: { linger?: boolean } = {},
+): VideoCoreStudyCue | null {
+  if (!cues.length || !Number.isFinite(playbackTimeSec)) return null;
+  const active = activeStudyCuesAtTime(cues, playbackTimeSec, subtitleDelaySec);
+  if (active.length) return active[0] ?? null;
+  if (options.linger === false) return null;
+  const sourceTimeMs = (playbackTimeSec - subtitleDelaySec) * 1000;
+  let index = lastStartedCueIndex(cues, sourceTimeMs);
+  for (let steps = 0; index >= 0 && steps < 4; steps += 1, index -= 1) {
+    const cue = cues[index];
+    if (
+      cue
+      && cue.endMs <= sourceTimeMs
+      && stripAssCueText(cue.text)
+      && !isTypesettingCueText(cue.text)
+    ) return cue;
+  }
+  return null;
+}
+
+/** Index of the last cue that has started at `sourceTimeMs` (binary search), or -1. */
+export function lastStartedCueIndex(
+  cues: readonly Pick<VideoCoreStudyCue, 'startMs'>[],
+  sourceTimeMs: number,
+): number {
+  let low = 0;
+  let high = cues.length - 1;
+  let found = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if ((cues[mid]?.startMs ?? Number.POSITIVE_INFINITY) <= sourceTimeMs) {
+      found = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return found;
+}
+
+/** Same line? Compared by timing and text, so a re-parsed copy of a track still matches. */
+export function sameStudyCue(
+  left: VideoCoreStudyCue | null | undefined,
+  right: VideoCoreStudyCue | null | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.trackNumber === right.trackNumber
+    && left.index === right.index
+    && left.startMs === right.startMs
+    && left.endMs === right.endMs
+    && left.text === right.text;
+}
+
+/**
+ * Where the spoken stretch around `playbackTimeSec` ends, in playback seconds: the end of the
+ * active cues, extended through any cue that OVERLAPS them (a second speaker cutting in), but
+ * not through one that merely starts as the last ends. Back-to-back lines are two lines, which
+ * is what lets auto-pause stop between them; overlapping lines are one exchange, and stopping
+ * in the middle of the second speaker would cut a sentence in half.
+ *
+ * `null` when nothing is active.
+ */
+export function activeCueGroupEndSec(
+  cues: readonly VideoCoreStudyCue[],
+  playbackTimeSec: number,
+  subtitleDelaySec: number,
+): number | null {
+  const active = activeStudyCuesAtTime(cues, playbackTimeSec, subtitleDelaySec);
+  if (!active.length) return null;
+  let endMs = Math.max(...active.map((cue) => cue.endMs));
+  const from = lastStartedCueIndex(cues, (playbackTimeSec - subtitleDelaySec) * 1000) + 1;
+  for (let index = from; index < cues.length; index += 1) {
+    const cue = cues[index];
+    if (!cue || cue.startMs >= endMs) break;
+    endMs = Math.max(endMs, cue.endMs);
+  }
+  return Math.max(0, endMs / 1000 + subtitleDelaySec);
+}
+
+/** Start of the first cue that begins after `playbackTimeSec`, in playback seconds, or null. */
+export function nextCueStartSec(
+  cues: readonly VideoCoreStudyCue[],
+  playbackTimeSec: number,
+  subtitleDelaySec: number,
+): number | null {
+  const index = lastStartedCueIndex(cues, (playbackTimeSec - subtitleDelaySec) * 1000) + 1;
+  const cue = cues[index];
+  return cue ? Math.max(0, cue.startMs / 1000 + subtitleDelaySec) : null;
+}
+
+/**
  * The longest silence the second line is allowed to sit across, in milliseconds.
  *
  * Measured on this repo's own harvest track (36,435 ASS dialogue lines, merged to 286
@@ -1512,12 +1673,9 @@ export function resolveVideoCoreResumePosition(
   const entry = normalizeVideoCoreResumePositions(positions)
     .find((position) => position.key === key);
   if (!entry || entry.positionSec < 1) return 0;
-  if (
-    typeof durationSec === 'number'
-    && Number.isFinite(durationSec)
-    && durationSec > 0
-    && entry.positionSec >= durationSec - 5
-  ) return 0;
+  // One "finished" rule for the whole app (`watchFinished.ts`): a file left in its credits
+  // opens from the start, exactly when the library ticks it and Continue Watching drops it.
+  if (isWatchFinished(entry.positionSec, durationSec)) return 0;
   return entry.positionSec;
 }
 

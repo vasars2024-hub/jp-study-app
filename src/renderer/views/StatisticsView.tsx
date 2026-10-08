@@ -19,6 +19,7 @@ import {
   StatsReviews,
   StatsShows,
   WordKnowledge,
+  mediaStudyFigures,
   useStats,
 } from '../components/stats/StatsContent';
 import { useT } from '../i18n';
@@ -145,6 +146,12 @@ export default function StatisticsView() {
                     </div>
                   </>
                 )}
+                {mediaStudyFigures(s).map((figure) => (
+                  <div key={figure.labelKey}>
+                    <dt>{t(figure.labelKey)}</dt>
+                    <dd>{formatNumber(figure.value)}</dd>
+                  </div>
+                ))}
               </dl>
             </aside>
 

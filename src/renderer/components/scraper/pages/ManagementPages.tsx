@@ -5,7 +5,7 @@ import ScrCard from '../ScrCard';
 import StatusDot from '../StatusDot';
 import { useScraper } from '../ScraperContext';
 import { useT } from '../../../i18n';
-import { profileDescription, profileName, profileReasonText } from '../localize';
+import { profileDescription, profileName, profileReasonText, scraperErrorText } from '../localize';
 import { LANG_TAGS, type UiLang } from '../../../../shared/i18n/core';
 import { useScraperPort } from '../data/scraperPort';
 import type { PluginInfo } from '../data/scraperPort';
@@ -777,7 +777,7 @@ export function ScheduledPage() {
         );
       })
       .catch((error: unknown) => {
-        setRunNotice(error instanceof Error ? error.message : String(error));
+        setRunNotice(scraperErrorText(error));
       });
   };
 
@@ -1008,6 +1008,7 @@ export function SiteRulesPage() {
         [t('scraperMgmt.rule.linkAttribute'), 'linkAttribute', 'href', true],
         [t('scraperMgmt.rule.numberCell'), 'numberSelector', 'th', true],
         [t('scraperMgmt.rule.numberPattern'), 'numberPattern', 'E(\\d+)', true],
+        [t('scraperFix.rule.nextPageSelector'), 'nextPageSelector', 'a[rel=next]', true],
       ] as const,
     // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
     // this repo, so the directive is itself an ESLint error. The deps below are
@@ -1197,6 +1198,21 @@ export function SiteRulesPage() {
                   </label>
                 );
               })}
+              <label className="scr-field">
+                <span className="scr-field-label">{t('scraperFix.rule.maxPages')}</span>
+                <input
+                  className="scr-input"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={selected.maxPages ?? 1}
+                  onChange={(event) => {
+                    const value = Math.round(Number(event.target.value));
+                    patch({ maxPages: Number.isFinite(value) ? Math.min(50, Math.max(1, value)) : 1 });
+                  }}
+                />
+                <span className="scr-field-hint">{t('scraperFix.rule.maxPagesHint')}</span>
+              </label>
             </div>
             <div className="scr-page-actions">
               <Button size="sm" variant="primary" disabled={busy} onClick={validate}>
@@ -1261,6 +1277,12 @@ export function SiteRulesPage() {
     </div>
   );
 }
+
+/**
+ * Plugin state is not persisted and no plugin is loaded by the engine, so the
+ * page's controls stay off until both exist. Flip this when they do.
+ */
+const PLUGINS_READY = false;
 
 export function PluginsPage() {
   const port = useScraperPort();
@@ -1364,12 +1386,22 @@ export function PluginsPage() {
               aria-label={t('scraperMgmt.plugins.manifestLabel')}
               onChange={(event) => void installPlugin(event.target.files?.[0])}
             />
-            <Button size="sm" leftIcon={<Icon name="plus" size={13} />} onClick={() => installInput.current?.click()}>
+            <Button
+              size="sm"
+              leftIcon={<Icon name="plus" size={13} />}
+              disabled={!PLUGINS_READY}
+              title={PLUGINS_READY ? undefined : t('scraperFix.ui.plugins.notReady')}
+              onClick={() => installInput.current?.click()}
+            >
               {t('scraperMgmt.plugins.installFromFile')}
             </Button>
           </>
         }
       />
+      {/* Nothing here is persisted or read by the engine yet: a switch that
+          flips, forgets on reload and changes nothing is a fake, so the
+          controls are off and the page says why. */}
+      {!PLUGINS_READY && <p className="scr-action-notice" role="note">{t('scraperFix.ui.plugins.notReady')}</p>}
       {notice && <p className="scr-action-notice" role="status">{notice}</p>}
       <div className="scr-tile-row">
         <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.plugins.tile.installed')}</span><span className="scr-tile-value">{plugins.length}</span></div>
@@ -1401,7 +1433,8 @@ export function PluginsPage() {
                 // per installed plugin. The other three Toggles in this file
                 // name themselves the same way.
                 aria-label={t('scraperMgmt.plugins.enablePlugin', { name: plugin.name })}
-                disabled={!plugin.compatible}
+                disabled={!PLUGINS_READY || !plugin.compatible}
+                title={PLUGINS_READY ? undefined : t('scraperFix.ui.plugins.notReady')}
                 onChange={(event) =>
                   setPlugins((current) =>
                     current.map((item) =>
@@ -1464,7 +1497,13 @@ export function PluginsPage() {
                   : t('scraperMgmt.updates.nonePending')}
               </small>
             </div>
-            <Button size="sm" leftIcon={<Icon name="refresh" size={13} />} onClick={applyUpdates}>
+            <Button
+              size="sm"
+              leftIcon={<Icon name="refresh" size={13} />}
+              disabled={!PLUGINS_READY}
+              title={PLUGINS_READY ? undefined : t('scraperFix.ui.plugins.notReady')}
+              onClick={applyUpdates}
+            >
               {t('scraperMgmt.updates.updateAll')}
             </Button>
           </div>

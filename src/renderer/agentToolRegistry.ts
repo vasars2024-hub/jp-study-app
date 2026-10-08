@@ -11,17 +11,28 @@ import { presetById, sanitizeThemeOverrides } from '../shared/blancTheme';
 import { sanitizeCustomCss } from '../shared/blancCustomCss';
 import { loadLocalAgentMemory } from './localAgentMemoryStore';
 import { loadLocalAgentSettings, saveLocalAgentSettings } from './localAgentSettingsStore';
+import { mineAgentCards } from './studyMiningRoutes';
 import {
-  addDeckCardsTracked,
   createDeckFolder,
   deleteDeckFolder,
+  dueDeckCards,
+  knowledgeLemma,
   loadDeck,
   loadDeckFolders,
   removeDeckCards,
   updateDeckCard,
   type DeckFlashcard,
 } from './flashcardDeck';
-import { addEvent, deleteEvent, loadEvents, type CalendarEvent } from './calendar';
+import {
+  addEvent,
+  deleteEvent,
+  loadEvents,
+  REMINDER_OFFSETS,
+  type CalendarEvent,
+  type ReminderOffset,
+} from './calendar';
+import { getSummary } from './stats';
+import { getLevel, knowledgeCounts, WK_LEVELS } from './knownWords';
 import { buildLocalAgentKnowledgeSnapshot } from './localAgentKnowledge';
 import { applyBlancTheme } from './blancThemeApply';
 import { applyBlancCustomCss } from './blancCustomCssApply';
@@ -88,9 +99,21 @@ function safeCardPatch(t: AgentToolRegistryTranslate, value: unknown): Partial<D
   return patch;
 }
 
+/**
+ * The reminder offset an agent asked for. A reminder that never notifies is
+ * not a reminder, so `calendar.create-reminder` defaults to "at the time";
+ * a study session defaults to no notification, as the Calendar's own form does.
+ */
+export function agentReminderOffset(value: unknown, fallback: ReminderOffset): ReminderOffset {
+  return typeof value === 'string' && (REMINDER_OFFSETS as readonly string[]).includes(value)
+    ? (value as ReminderOffset)
+    : fallback;
+}
+
 function safeCalendarEntry(
   t: AgentToolRegistryTranslate,
   arguments_: Readonly<Record<string, unknown>>,
+  defaultReminder: ReminderOffset = 'none',
 ): Omit<CalendarEvent, 'id' | 'createdAt'> {
   const date = textArgument(t, arguments_, 'date');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -107,9 +130,53 @@ function safeCalendarEntry(
     allDay: arguments_.allDay === true,
     color: typeof arguments_.color === 'string' ? arguments_.color.slice(0, 20) : '#6c7bff',
     category: arguments_.category === 'reminder' ? 'reminder' : 'study',
-    reminder: 'none',
+    reminder: agentReminderOffset(arguments_.reminder, defaultReminder),
     recurrence: 'none',
   };
+}
+
+/** Compact, read-only study statistics for the agent (no per-book titles beyond the top five). */
+function agentStatsSummary(): Record<string, unknown> {
+  const summary = getSummary();
+  const counts = knowledgeCounts();
+  return {
+    streak: summary.streak,
+    daysActive: summary.daysActive,
+    today: {
+      readingMinutes: Math.round(summary.todaySeconds / 60),
+      charactersRead: summary.todayChars,
+      watchMinutes: Math.round(summary.todayWatchSeconds / 60),
+      studyMinutes: Math.round(summary.todayStudySeconds / 60),
+      reviews: summary.todayReviews,
+    },
+    total: {
+      readingMinutes: Math.round(summary.totalSeconds / 60),
+      charactersRead: summary.totalChars,
+      watchMinutes: Math.round(summary.totalWatchSeconds / 60),
+      studyMinutes: Math.round(summary.totalStudySeconds / 60),
+      reviews: summary.totalReviews,
+      retention: summary.totalReviews > 0 ? Math.round((summary.totalReviewsPassed / summary.totalReviews) * 100) / 100 : null,
+    },
+    knownWords: { learning: counts[1], familiar: counts[2], known: counts[3] },
+    cardsDue: dueDeckCards(loadDeck()).length,
+    lastTwoWeeks: summary.recent.map((day) => ({
+      date: day.date,
+      readingMinutes: Math.round(day.seconds / 60),
+      reviews: day.reviews,
+    })),
+    recentBooks: summary.books.slice(0, 5).map((book) => ({ title: book.title, charactersRead: book.chars })),
+  };
+}
+
+/** Known-word counts, or one word's level (looked up by lemma, as the reader does). */
+function agentKnownWords(arguments_: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const counts = knowledgeCounts();
+  const base = { counts: { learning: counts[1], familiar: counts[2], known: counts[3] } };
+  const raw = typeof arguments_.word === 'string' ? arguments_.word.trim().slice(0, 40) : '';
+  if (!raw) return base;
+  const lemma = knowledgeLemma(raw);
+  const level = Math.max(getLevel(raw), getLevel(lemma));
+  return { ...base, word: raw, lemma, level, levelName: WK_LEVELS[level] };
 }
 
 /**
@@ -155,7 +222,7 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
         ...(!existed && folders.includes(name) ? { createdName: name } : {}),
       };
     },
-    'flashcard.add-cards': (arguments_) => {
+    'flashcard.add-cards': async (arguments_) => {
       if (!Array.isArray(arguments_.cards) || arguments_.cards.length < 1) {
         throw new Error(t('blanc.agent.error.needsCards'));
       }
@@ -167,14 +234,15 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
           reading: typeof card.reading === 'string' ? card.reading.slice(0, 200) : '',
           meaning: typeof card.meaning === 'string' ? card.meaning.slice(0, 500) : '',
           sentence: typeof card.sentence === 'string' ? card.sentence.slice(0, 500) : undefined,
-          source: 'import' as const,
           folder: typeof card.folder === 'string' ? card.folder.slice(0, 120) : undefined,
         };
       });
-      const created = addDeckCardsTracked(cards);
+      // Through mineToStudy: a card the deck already holds is found, not doubled,
+      // and only the rows this call actually made are reported as created.
+      const mined = await mineAgentCards(cards);
       return {
         cards: loadDeck().length,
-        createdIds: created.map((card) => card.id),
+        createdIds: mined.filter((result) => result.created).map((result) => result.card.id),
       };
     },
     'flashcard.delete-cards': (arguments_) => {
@@ -204,9 +272,11 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
     'calendar.list': () => ({ events: loadEvents().slice(0, 100) }),
     'calendar.schedule-session': (arguments_) => addEvent(safeCalendarEntry(t, arguments_)),
     'calendar.create-reminder': (arguments_) => addEvent({
-      ...safeCalendarEntry(t, arguments_),
+      ...safeCalendarEntry(t, arguments_, 'at'),
       category: 'reminder',
     }),
+    'study.stats-summary': () => agentStatsSummary(),
+    'study.known-words': (arguments_) => agentKnownWords(arguments_),
     'calendar.delete-event': (arguments_) => ({
       events: deleteEvent(textArgument(t, arguments_, 'id')),
     }),

@@ -113,6 +113,7 @@ import {
 import { recordWatching } from '../renderer/stats';
 import VideoCoreStudyOverlay from './VideoCoreStudyOverlay';
 import StudyWorkspaceProvider, { type StudySurfaceKind } from './StudyWorkspaceProvider';
+import StudyUpNextCard from './StudyUpNextCard';
 
 type ServerMessage = {
   type: string;
@@ -1771,6 +1772,14 @@ function StudyPlayerSession({
               }
             />
           </StudyWorkspaceProvider>
+        )}
+        {/*
+          "Up next" at a real `ended` only. The full workspace alone: the toolbox player
+          has its own open path, and raising the workspace's open event from it would
+          throw the full-screen overlay up behind a toolbox window.
+        */}
+        {surface === 'workspace' && playbackRequest?.kind === 'local' && !proofConfig && (
+          <StudyUpNextCard localFilePath={playbackRequest.localFilePath} />
         )}
       </section>
     </>

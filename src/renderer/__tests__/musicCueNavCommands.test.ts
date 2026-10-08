@@ -117,10 +117,11 @@ describe('the lyrics pane owns them, and does not own the video ones', () => {
       newest are dual subtitles, subtitle position up/down, delay reset, hide/show
       subtitles and picture fit) plus six
       `workspace.*` rows the overlay registers for the same reason it registers the
-      others: it is the surface that can carry them out.
+      others: it is the surface that can carry them out. Twenty-seven since the study loop
+      added the A-B cycle and the translation reveal (21 `video.*`).
     */
-    expect(overlayIds.size).toBe(25);
-    expect([...overlayIds].filter((id) => id.startsWith('video.'))).toHaveLength(19);
+    expect(overlayIds.size).toBe(27);
+    expect([...overlayIds].filter((id) => id.startsWith('video.'))).toHaveLength(21);
     expect([...overlayIds].filter((id) => id.startsWith('workspace.'))).toHaveLength(6);
     for (const id of CUE_NAV_IDS) expect(overlayIds.has(id)).toBe(false);
   });

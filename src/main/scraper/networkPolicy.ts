@@ -38,8 +38,12 @@ export class RequestGate {
     return this.active;
   }
 
-  async run<T>(fn: () => Promise<T>): Promise<T> {
-    await this.acquire();
+  /**
+   * Runs `fn` holding one slot. An aborted `signal` while still queued leaves
+   * the queue without ever taking a slot, and rejects with the signal's reason.
+   */
+  async run<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    await this.acquire(signal);
     try {
       return await fn();
     } finally {
@@ -47,16 +51,25 @@ export class RequestGate {
     }
   }
 
-  private acquire(): Promise<void> {
+  private acquire(signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return Promise.reject(signal.reason);
     if (this.active < this.limit) {
       this.active += 1;
       return Promise.resolve();
     }
-    return new Promise<void>((resolve) => {
-      this.waiting.push(() => {
+    return new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        const index = this.waiting.indexOf(take);
+        if (index >= 0) this.waiting.splice(index, 1);
+        reject(signal?.reason);
+      };
+      const take = () => {
+        signal?.removeEventListener('abort', onAbort);
         this.active += 1;
         resolve();
-      });
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      this.waiting.push(take);
     });
   }
 
@@ -163,7 +176,16 @@ export function isRetryableStatus(status: number): boolean {
 }
 
 /** Codes set by http.ts for failures that repeating cannot fix. */
-const FATAL_CODES = new Set(['ERR_URL', 'ERR_PROTOCOL', 'ERR_REDIRECT', 'ERR_PROXY_SCHEME']);
+const FATAL_CODES = new Set([
+  'ERR_URL',
+  'ERR_PROTOCOL',
+  'ERR_REDIRECT',
+  'ERR_PROXY_SCHEME',
+  // Refusals and a cancel: retrying would only ask the same question again.
+  'ERR_ABORTED',
+  'ERR_ROBOTS',
+  'ERR_PRIVATE_ADDRESS',
+]);
 
 export function isRetryableError(error: unknown): boolean {
   const code = (error as { code?: unknown })?.code;

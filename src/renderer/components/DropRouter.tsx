@@ -151,6 +151,37 @@ export default function DropRouter({
     [execute, prefs.overrides, prefs.undoDepth, t, undo],
   );
 
+  /** Classify real paths, then route them silently or ask in the triage sheet. */
+  const routePaths = useCallback(
+    async (paths: string[]) => {
+      const plans = await window.api.fileDropClassify(paths);
+      if (!plans.length) {
+        showOsToast(t('fileDrop.toast.notClassified', { count: paths.length }), 'err');
+        return;
+      }
+      const mustAsk =
+        !prefs.autoRoute ||
+        prefs.alwaysTriage ||
+        plans.some((p) => {
+          if (prefs.overrides[extOf(p.name)]) return false;
+          const top = p.candidates[0];
+          return !top || top.confidence === 'ambiguous' || top.target === 'unknown';
+        });
+      if (mustAsk) {
+        setChoices(
+          Object.fromEntries(
+            plans.map((p) => [p.path, prefs.overrides[extOf(p.name)] ?? p.candidates[0]?.target ?? 'unknown']),
+          ),
+        );
+        setTriage(plans);
+        return;
+      }
+      await runPlans(plans);
+    },
+    // `lang` for the same reason as the listener effect below.
+    [prefs, runPlans, t, lang],
+  );
+
   useEffect(() => {
     const hasFiles = (e: DragEvent): boolean => Boolean(e.dataTransfer?.types.includes('Files'));
 
@@ -200,31 +231,7 @@ export default function DropRouter({
         return;
       }
 
-      void (async () => {
-        const plans = await window.api.fileDropClassify(paths);
-        if (!plans.length) {
-          showOsToast(t('fileDrop.toast.notClassified', { count: paths.length }), 'err');
-          return;
-        }
-        const mustAsk =
-          !prefs.autoRoute ||
-          prefs.alwaysTriage ||
-          plans.some((p) => {
-            if (prefs.overrides[extOf(p.name)]) return false;
-            const top = p.candidates[0];
-            return !top || top.confidence === 'ambiguous' || top.target === 'unknown';
-          });
-        if (mustAsk) {
-          setChoices(
-            Object.fromEntries(
-              plans.map((p) => [p.path, prefs.overrides[extOf(p.name)] ?? p.candidates[0]?.target ?? 'unknown']),
-            ),
-          );
-          setTriage(plans);
-          return;
-        }
-        await runPlans(plans);
-      })();
+      void routePaths(paths);
     };
 
     window.addEventListener('dragenter', onEnter);
@@ -240,7 +247,26 @@ export default function DropRouter({
     // `lang`, never `t`: `t`'s identity is stable by design, so a listener
     // closed over it keeps the language it was registered with and the two new
     // refusals below would speak the old one after a UI-language switch.
-  }, [prefs, runPlans, t, lang]);
+  }, [prefs, routePaths, t, lang]);
+
+  /*
+   * Files Windows opened with Gum ("Open with Gum", a double-clicked associated
+   * type, a file dropped on the shortcut) — main/fileOpenRouter.ts queues them.
+   * They take exactly the drop path above: same classifier, same triage sheet,
+   * same importers, same undo. Drained once on mount (a cold start's files
+   * arrive before this component exists), then pushed.
+   */
+  const routePathsRef = useRef(routePaths);
+  routePathsRef.current = routePaths;
+  useEffect(() => {
+    const api = window.api;
+    if (!api.fileOpenDrain || !api.onFileOpenPaths) return;
+    const off = api.onFileOpenPaths((paths) => void routePathsRef.current(paths));
+    void api.fileOpenDrain().then((paths) => {
+      if (paths.length) void routePathsRef.current(paths);
+    }).catch(() => undefined);
+    return off;
+  }, []);
 
   return (
     <>

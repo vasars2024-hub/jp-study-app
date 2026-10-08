@@ -10,10 +10,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  RESUME_END_MARGIN_SEC,
   RESUME_MIN_MEANINGFUL_SEC,
   resumeWriteAction,
 } from '../videoCoreResumeWrite';
+import { isWatchFinished } from '../../shared/watchFinished';
 import {
   normalizeVideoCoreResumePositions,
   resolveVideoCoreResumePosition,
@@ -138,19 +138,30 @@ describe('resumeWriteAction', () => {
     })).toBe('clear');
   });
 
-  it('clears inside the end margin, and saves just outside it', () => {
+  it('clears once the shared finished rule says finished, and saves just before it', () => {
+    // `shared/watchFinished.ts`: 90% of a measured duration. 1260 / 1400 is exactly 0.9.
     const durationSec = 1_400;
     expect(resumeWriteAction({
-      positionSec: durationSec - RESUME_END_MARGIN_SEC,
+      positionSec: 1_260,
       hasMedia: true,
       sessionMaxSec: durationSec,
       durationSec,
     })).toBe('clear');
+    expect(isWatchFinished(1_260, durationSec)).toBe(true);
     expect(resumeWriteAction({
-      positionSec: durationSec - RESUME_END_MARGIN_SEC - 0.001,
+      positionSec: 1_259.9,
       hasMedia: true,
       sessionMaxSec: durationSec,
       durationSec,
+    })).toBe('save');
+  });
+
+  it('saves near the end when no duration is known — finished is not guessable', () => {
+    expect(resumeWriteAction({
+      positionSec: 1_399,
+      hasMedia: true,
+      sessionMaxSec: 1_399,
+      durationSec: Number.NaN,
     })).toBe('save');
   });
 

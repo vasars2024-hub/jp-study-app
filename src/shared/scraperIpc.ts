@@ -134,6 +134,8 @@ export interface ScraperHttpProbeRequest {
   /** Hard ceiling; main clamps it so a renderer bug cannot hang a request forever. */
   timeoutMs?: number;
   followRedirects?: boolean;
+  /** The active profile's `safety.allowPrivateNetwork`. Absent: private targets are refused. */
+  allowPrivateNetwork?: boolean;
 }
 
 export interface ScraperHttpProbeResult {
@@ -182,6 +184,8 @@ export interface ScraperTorrentSearchInput {
    */
   settings?: ScraperSettings;
   context?: ScraperRunContext;
+  /** Main-process only (never crosses IPC): the job's cancel signal. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -209,6 +213,8 @@ export interface ScraperProbeInput {
    * with `/`; anything else is ignored.
    */
   path?: string;
+  /** The active profile's `safety.allowPrivateNetwork`. Absent: private targets are refused. */
+  allowPrivateNetwork?: boolean;
 }
 
 export interface ScraperSelectorMatch {
@@ -322,6 +328,13 @@ export interface ScraperSchedulerSyncInput {
   scheduler: ScraperSchedulerSettings;
   settings: ScraperSettings;
   context?: ScraperRunContext;
+  /**
+   * Resolved settings of every profile a schedule entry names, keyed by profile
+   * id (P6). An entry runs under its own profile's settings when present here,
+   * and under `settings` (the active profile) otherwise — which is also how a
+   * config synced by an older build behaves.
+   */
+  profileSettings?: Record<string, ScraperSettings>;
 }
 
 export interface ScraperScheduleRunRecord {

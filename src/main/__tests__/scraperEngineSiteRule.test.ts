@@ -18,7 +18,7 @@ import type { ScrapeJobEvent } from '../../shared/scraperResults';
 import { DEFAULT_SITE_RULE, type ScraperSiteRule } from '../../shared/scraperSiteRules';
 
 vi.mock('electron', () => ({
-  app: { getPath: () => process.cwd(), getAppMetrics: () => [] },
+  app: { getPath: () => `${process.env.TEMP ?? process.env.TMPDIR ?? '/tmp'}/gum-vitest-userdata`, getAppMetrics: () => [] },
   ipcMain: { handle: () => undefined },
   BrowserWindow: { getAllWindows: () => [] },
 }));
@@ -112,6 +112,8 @@ function rule(over: Partial<ScraperSiteRule> = {}): ScraperSiteRule {
 function settingsWith(rules: ScraperSiteRule[], patch?: (s: ScraperSettings) => void): ScraperSettings {
   const settings = resolveScraperSettings(createDefaultScraperSettingsDocument());
   settings.extraction.siteRules = rules;
+  // The page server is on 127.0.0.1, which a crawl refuses by default (SSRF guard).
+  settings.safety.allowPrivateNetwork = true;
   patch?.(settings);
   return settings;
 }
@@ -272,7 +274,8 @@ describe('buildRuleRows', () => {
       'series-1',
     );
     expect(rows.map((row) => row.number)).toEqual([1, 2]);
-    expect(rows.map((row) => row.id)).toEqual(['series-1-e1', 'series-1-e2']);
+    // P6: ids carry season and kind (shared/scraperEpisodeId.ts).
+    expect(rows.map((row) => row.id)).toEqual(['series-1-s1-e1', 'series-1-s1-e2']);
   });
 
   it('sorts naturally when the profile asks it to', () => {

@@ -178,3 +178,20 @@
   color: var(--danger-text);
   font-size: 0.85em;
 }
+
+/*
+ * Per-day study line in the month grid: minutes and reviews done on a past day, reviews
+ * due on a coming one (`calendarStudyDay`). Small and muted: the events stay the cell's
+ * subject. Theme tokens only.
+ */
+.cal-study-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 10px;
+  line-height: 1.3;
+  overflow: hidden;
+}
+.cal-study-line .cal-study-due {
+  color: var(--accent);
+}

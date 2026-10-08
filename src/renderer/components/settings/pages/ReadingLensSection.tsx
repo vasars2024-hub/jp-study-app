@@ -421,6 +421,8 @@ export default function ReadingLensSection() {
         aria-label={t('settings.lens.enable')}
         label={status.enabled ? t('common.on') : t('common.off')}
       />
+      {/* KI-6: off on a fresh install, so it says why the hotkeys do nothing yet. */}
+      {!status.enabled && <p className="muted os-set-hint">{t('polish.lens.optInHint')}</p>}
 
       {/*
         The chords are rebound in Settings → Shortcuts with every other

@@ -15,14 +15,20 @@ const FILES = [
   'background.js',
   'content.css',
   'content.js',
+  'idb.js',
+  'offscreen.html',
+  'offscreen.js',
   'options.html',
   'options.js',
   'popup.html',
   'popup.js',
+  'popup-css.js',
   'settings.js',
   'shared.js',
   'tabs.html',
   'tabs.js',
+  // Compared by the mirror drift test (extensionManifestAudit), so copied too.
+  'README.md',
   // chrome.i18n catalogues (manifest default_locale "en"); Chrome refuses to
   // load the extension if the default one is missing.
   '_locales/en/messages.json',

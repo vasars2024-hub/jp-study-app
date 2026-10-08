@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { WidgetProps } from './types';
 import { readSetting } from './types';
 import { useNow } from './hooks';
-import { getSummary, formatDuration } from '../stats';
+import { getSummary, formatDuration, GAME_PROGRESS_EVENT, onStatsChanged } from '../stats';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import WorldHeatMap from '../components/resources/WorldHeatMap';
@@ -205,17 +205,35 @@ export function HabitTracker({ settings, setSettings }: WidgetProps) {
  */
 export function LearningHeatmap() {
   const { t } = useT();
-  const s = getSummary();
-  const dayTotal = (d: { seconds: number; watchSeconds: number }) => d.seconds + d.watchSeconds;
+  // It read the summary once at mount and never again, so a day's reading or
+  // reviews did not show until the widget was remounted.
+  const [s, setS] = useState(() => getSummary());
+  useEffect(() => {
+    const refresh = (): void => setS(getSummary());
+    const off = onStatsChanged(refresh);
+    window.addEventListener(GAME_PROGRESS_EVENT, refresh);
+    return () => {
+      off();
+      window.removeEventListener(GAME_PROGRESS_EVENT, refresh);
+    };
+  }, []);
+  // Reading + watching + active study (games, player study mode). Reviews have
+  // no duration of their own, so a day with reviews is never drawn empty.
+  const dayTotal = (d: { seconds: number; watchSeconds: number; studySeconds?: number }) =>
+    d.seconds + d.watchSeconds + (d.studySeconds ?? 0);
   const max = Math.max(1, ...s.recent.map(dayTotal));
-  const level = (sec: number) => (sec <= 0 ? 0 : Math.min(4, Math.ceil((sec / max) * 4)));
+  const level = (d: { seconds: number; watchSeconds: number; studySeconds?: number; reviews?: number }) => {
+    const sec = dayTotal(d);
+    if (sec <= 0) return (d.reviews ?? 0) > 0 ? 1 : 0;
+    return Math.min(4, Math.ceil((sec / max) * 4));
+  };
   return (
     <div className="wgt wgt-heatmap">
       <div className="wgt-heatmap-grid">
         {s.recent.map((d) => (
           <div
             key={d.date}
-            className={`wgt-heat-cell l${level(dayTotal(d))}`}
+            className={`wgt-heat-cell l${level(d)}`}
             title={
               d.watchSeconds > 0
                 ? t('widgets.heatmap.cellSplit', {

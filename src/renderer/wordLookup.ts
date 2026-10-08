@@ -370,15 +370,22 @@ function cjkSpanAt(text: string, offset: number): { start: number; end: number; 
   return query ? { start, end, query } : null;
 }
 
+/** A range's box without touching the DOM, or null when it has none. */
+function measuredRangeRect(range: Range): DOMRect | null {
+  const rect = range.getBoundingClientRect();
+  return rect.width || rect.height ? rect : null;
+}
+
 function hitFromSpan(
   block: Element,
   span: { start: number; end: number; query: string },
   doc: Document,
   fallbackX: number,
   fallbackY: number,
+  highlight = true,
 ): WordLookupHit | null {
   const range = domRangeForSpan(block, span.start, span.end);
-  const rect = range ? applyLookupHighlight(range, block, doc) : null;
+  const rect = range ? (highlight ? applyLookupHighlight(range, block, doc) : measuredRangeRect(range)) : null;
   return {
     query: span.query.slice(0, 40),
     x: rect?.left ?? fallbackX,
@@ -388,16 +395,17 @@ function hitFromSpan(
   };
 }
 
-function lookupWkSpan(wk: HTMLElement): WordLookupHit | null {
+function lookupWkSpan(wk: HTMLElement, highlight = true): WordLookupHit | null {
   // Prefer surface form for popup title + annotation matching; lemma is resolved
   // separately by the dictionary UI for grading. `data-surface` is the word as
   // written when the element also draws pinyin ruby or stress accents.
   const surface = wk.getAttribute('data-surface')?.trim() || wk.textContent?.trim() || '';
   const query = surface || wk.getAttribute('data-lemma') || '';
   if (!query) return null;
-  const doc = wk.ownerDocument;
-  clearLookupHighlight(doc);
-  wk.classList.add(ACTIVE_CLASS);
+  if (highlight) {
+    clearLookupHighlight(wk.ownerDocument);
+    wk.classList.add(ACTIVE_CLASS);
+  }
   const rect = wk.getBoundingClientRect();
   const block = nearestBlock(wk);
   return {
@@ -471,11 +479,28 @@ export function selectSentenceAtPoint(
   return text || null;
 }
 
-/** Resolve one word/expression at viewport coordinates and highlight it. */
-export function lookupWordAtPoint(clientX: number, clientY: number, doc: Document = document): WordLookupHit | null {
+export interface LookupAtPointOptions {
+  /**
+   * Mark the resolved word in the page (default true): clears any selection, wraps the
+   * word in a `<mark>` or tags its `span.wk`. A hover lookup driven by `pointermove`
+   * passes false — it must not create selections, rewrite text nodes React owns, or
+   * flash highlights while the pointer moves; the word's box is measured instead.
+   * With highlight off, punctuation resolves to nothing rather than to a sentence.
+   */
+  highlight?: boolean;
+}
+
+/** Resolve one word/expression at viewport coordinates and (by default) highlight it. */
+export function lookupWordAtPoint(
+  clientX: number,
+  clientY: number,
+  doc: Document = document,
+  options: LookupAtPointOptions = {},
+): WordLookupHit | null {
+  const highlight = options.highlight !== false;
   const el = doc.elementFromPoint(clientX, clientY);
   const wk = el?.closest?.('span.wk') as HTMLElement | null;
-  if (wk) return lookupWkSpan(wk);
+  if (wk) return lookupWkSpan(wk, highlight);
 
   const caret =
     doc.caretRangeFromPoint?.(clientX, clientY) ??
@@ -523,12 +548,17 @@ export function lookupWordAtPoint(clientX: number, clientY: number, doc: Documen
   // belongs to the sentence that ends there, an opening one (「『（() opens
   // the sentence that follows it. Select that sentence instead of failing or
   // (worse) treating the punctuation glyph itself as the dictionary query.
-  const punct = punctuationSentenceHit(block, globalOffset, doc, clientX, clientY);
-  if (punct) return punct;
+  if (!highlight) {
+    const ch = (block.textContent ?? '')[globalOffset];
+    if (ch && isSentencePunct(ch)) return null;
+  } else {
+    const punct = punctuationSentenceHit(block, globalOffset, doc, clientX, clientY);
+    if (punct) return punct;
+  }
 
   const span = tokenSpanAt(block, globalOffset);
   if (!span) return null;
-  return hitFromSpan(block, span, doc, clientX, clientY);
+  return hitFromSpan(block, span, doc, clientX, clientY, highlight);
 }
 
 function punctuationSentenceHit(

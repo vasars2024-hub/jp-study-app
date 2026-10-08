@@ -51,7 +51,7 @@ vi.mock('../scraper/qbittorrent', () => ({
   qbitDefaultSavePath: async () => ({ ok: true, value: qbit.savePath }),
 }));
 
-const { listExports, safeFileName, writeExport } = await import('../scraper/exports');
+const { listExports, safeFileName, withCsvBom, writeExport } = await import('../scraper/exports');
 const { downloadsFreeSpace, listDownloads, toDownloadRow, toDownloadState } = await import('../scraper/downloads');
 const { listPlugins, pluginsRoot, readManifest } = await import('../scraper/plugins');
 const { setScraperStoreRoot } = await import('../scraper/store');
@@ -99,6 +99,42 @@ describe('safeFileName', () => {
     expect(safeFileName('C:\\Windows\\system32\\x.csv')).toBe('x.csv');
     expect(safeFileName('a b/c*d?.json')).toBe('c-d-.json');
     expect(safeFileName('///')).toBe('anime-export');
+  });
+
+  it('keeps Japanese titles and falls back only when nothing is left', () => {
+    expect(safeFileName('葬送のフリーレン 第1話.csv')).toBe('葬送のフリーレン-第1話.csv');
+    expect(safeFileName('***.csv')).toBe('anime-export.csv');
+    expect(safeFileName('..')).toBe('anime-export');
+    expect(safeFileName('.csv')).toBe('anime-export.csv');
+  });
+
+  it('never yields a Windows reserved device name', () => {
+    expect(safeFileName('CON')).toBe('_CON');
+    expect(safeFileName('con.csv')).toBe('_con.csv');
+    expect(safeFileName('Lpt9.tar.json')).toBe('_Lpt9.tar.json');
+    expect(safeFileName('nul')).toBe('_nul');
+    expect(safeFileName('console.csv')).toBe('console.csv');
+  });
+
+  it('drops trailing dots and spaces, controls and bidi overrides', () => {
+    expect(safeFileName('name. . .')).toBe('name');
+    expect(safeFileName('a\u0000b\u202Ec.json')).toBe('a-b-c.json');
+  });
+
+  it('caps the length without splitting a surrogate pair', () => {
+    const long = `${'𠮷'.repeat(200)}.csv`;
+    const out = safeFileName(long);
+    expect(Array.from(out)).toHaveLength(120);
+    expect(out.endsWith('.csv')).toBe(true);
+    expect(out).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  });
+});
+
+describe('withCsvBom', () => {
+  it('prefixes a UTF-8 BOM to CSV once, and only to CSV', () => {
+    expect(withCsvBom('a,b', 'csv')).toBe('\uFEFFa,b');
+    expect(withCsvBom('\uFEFFa,b', 'CSV')).toBe('\uFEFFa,b');
+    expect(withCsvBom('{}', 'json')).toBe('{}');
   });
 });
 
@@ -160,6 +196,21 @@ describe('writeExport', () => {
     await writeExport(exportRequest({ destination: '' }));
     const downloads = path.join(tempRoot, 'downloads', 'frieren-2026-07-27.csv');
     expect(dialogPaths).toEqual([downloads, downloads, downloads]);
+  });
+
+  it('writes CSV with a BOM', async () => {
+    const target = path.join(tempRoot, 'bom.csv');
+    saveResult = { canceled: false, filePath: target };
+    await writeExport(exportRequest());
+    const bytes = await fsp.readFile(target);
+    expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
+  it('loses no record when exports finish at the same time', async () => {
+    saveResult = { canceled: false, filePath: path.join(tempRoot, 'same.csv') };
+    await Promise.all(Array.from({ length: 6 }, (_, i) => writeExport(exportRequest({ recordCount: i }))));
+    const listed = await listExports();
+    expect(listed.map((r) => r.records).sort()).toEqual([0, 1, 2, 3, 4, 5]);
   });
 
   it('keeps the newest records first and bounds the history', async () => {

@@ -1,6 +1,8 @@
 /**
  * Lockscreen — optional PIN gate at app launch.
- * Local-only UI lock (not cryptographic security). PIN is stored obfuscated in localStorage.
+ * Local-only UI lock. The PIN is stored as a salted scrypt hash computed in main
+ * (older profiles hold a reversible encoding, upgraded on the next unlock), and
+ * main backs off after repeated wrong PINs.
  */
 
 export interface LockscreenSettings {
@@ -92,21 +94,84 @@ export function saveLockscreen(patch: Partial<LockscreenSettings>): LockscreenSe
   } catch {
     /* ignore */
   }
+  syncLockscreenToMain(next, false);
   return next;
 }
 
-export function setLockscreenPin(pin: string): LockscreenSettings | null {
+/**
+ * Main owns the lock and keeps its own copy of the PIN hash; this one is the
+ * UI's mirror. Main adopts it once (profiles from before), then takes changes
+ * only while unlocked.
+ */
+export function syncLockscreenToMain(s: LockscreenSettings = loadLockscreen(), rendererLocked = false): void {
+  try {
+    const sync = typeof window !== 'undefined' ? window.api?.lockscreenSyncConfig : undefined;
+    void sync?.({ enabled: s.enabled, pinHash: s.pinHash }, rendererLocked).catch(() => undefined);
+  } catch {
+    /* no bridge (tests, a harness) */
+  }
+}
+
+/** A salted scrypt hash from main (`main/lockscreenPin.ts`). */
+export function isHashedPin(stored: string): boolean {
+  return stored.startsWith('scrypt1:');
+}
+
+/**
+ * Store a new PIN. Main hashes it with scrypt; only where main is unreachable
+ * (a harness without the bridge) does the legacy encoding stand in, and that
+ * value is upgraded on the next successful unlock.
+ */
+export async function setLockscreenPin(pin: string): Promise<LockscreenSettings | null> {
   if (!isValidPin(pin)) return null;
-  return saveLockscreen({ pinHash: encodePin(pin) });
+  let hashed: string | null = null;
+  try {
+    hashed = (await window.api?.lockscreenHashPin?.(pin)) ?? null;
+  } catch {
+    hashed = null;
+  }
+  return saveLockscreen({ pinHash: hashed && isHashedPin(hashed) ? hashed : encodePin(pin) });
 }
 
 export function clearLockscreenPin(): LockscreenSettings {
   return saveLockscreen({ pinHash: '', enabled: false });
 }
 
-export function verifyLockscreenPin(pin: string): boolean {
-  const stored = decodePin(loadLockscreen().pinHash);
-  return stored !== null && stored === pin;
+export interface LockscreenVerifyResult {
+  ok: boolean;
+  /** Too many wrong PINs: entry is locked for this long. */
+  retryAfterMs?: number;
+}
+
+/**
+ * Check a PIN. Main does the comparison (constant-time, with backoff after
+ * repeated misses) and returns an upgraded hash when the stored value was the
+ * old reversible encoding, which replaces it here.
+ */
+export async function verifyLockscreenPinDetailed(pin: string): Promise<LockscreenVerifyResult> {
+  const stored = loadLockscreen().pinHash;
+  if (!isValidPin(pin)) return { ok: false };
+  const verify = typeof window !== 'undefined' ? window.api?.lockscreenVerifyPin : undefined;
+  // Main checks against its own record (and lifts its lock on success);
+  // `stored` only seeds a profile main has never seen.
+  if (verify) {
+    try {
+      const res = await verify(pin, stored);
+      if (res.ok && res.upgradedHash && isHashedPin(res.upgradedHash)) {
+        saveLockscreen({ pinHash: res.upgradedHash });
+      }
+      return { ok: res.ok === true, ...(res.retryAfterMs ? { retryAfterMs: res.retryAfterMs } : {}) };
+    } catch {
+      /* bridge unavailable: fall through to the legacy check */
+    }
+  }
+  if (!stored || isHashedPin(stored)) return { ok: false };
+  const legacy = decodePin(stored);
+  return { ok: legacy !== null && legacy === pin };
+}
+
+export async function verifyLockscreenPin(pin: string): Promise<boolean> {
+  return (await verifyLockscreenPinDetailed(pin)).ok;
 }
 
 /** True when the lockscreen should block the main shell right now. */
@@ -137,11 +202,22 @@ export function clearLockscreenSession(): void {
   }
 }
 
+/** Re-arm main's lock too, so it guards every way back into the app (tray, hotkeys, file open). */
+function armMainLock(): void {
+  try {
+    const lock = typeof window !== 'undefined' ? window.api?.lockscreenLock : undefined;
+    void lock?.().catch(() => undefined);
+  } catch {
+    /* no bridge */
+  }
+}
+
 /** Lock first on Secret OS entry; defer the Aero boot splash until after unlock. */
 export function armLockscreenOnSecretEntry(): boolean {
   const s = loadLockscreen();
   if (!s.enabled || !s.pinHash) return false;
   clearLockscreenSession();
+  armMainLock();
   try {
     sessionStorage.setItem(PENDING_AERO_BOOT_KEY, '1');
   } catch {
@@ -164,6 +240,7 @@ export function armLockscreenOnWiredEntry(): boolean {
   const s = loadLockscreen();
   if (!s.enabled || !s.pinHash) return false;
   clearLockscreenSession();
+  armMainLock();
   try {
     sessionStorage.setItem(PENDING_WIRED_BOOT_KEY, '1');
   } catch {
@@ -192,5 +269,6 @@ export function onLockscreenChanged(cb: (s: LockscreenSettings) => void): () => 
 }
 
 export function hasLockscreenPin(): boolean {
-  return !!decodePin(loadLockscreen().pinHash);
+  const stored = loadLockscreen().pinHash;
+  return isHashedPin(stored) || !!decodePin(stored);
 }

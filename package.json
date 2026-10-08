@@ -11,6 +11,7 @@
     "package": "node tools/check-runtime-assets.cjs && node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge package",
     "make": "node tools/check-runtime-assets.cjs && node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge make",
     "package:win": "node tools/package-app.cjs",
+    "package:installer": "node tools/package-app.cjs --installer",
     "postinstall": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && node tools/sync-ort-assets.cjs && node tools/sync-kuromoji-assets.cjs && node tools/sync-tesseract-assets.cjs",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",

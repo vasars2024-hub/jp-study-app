@@ -13,8 +13,9 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { ScrapeJobSummary, ScrapeResult, SeriesMetadata } from '../../shared/scraperResults';
+import { episodeIdAliases } from '../../shared/scraperEpisodeId';
 import { scraperLog } from './logBus';
-import { readScraperJson, scraperStorePath, writeScraperJson } from './store';
+import { readScraperJson, scraperStorePath, withScraperFileQueue, writeScraperJson } from './store';
 import { removeJsonStore } from '../atomicJson';
 
 /**
@@ -83,20 +84,24 @@ function resultFile(jobId: string): string {
 export async function recordJob(summary: ScrapeJobSummary, result: ScrapeResult): Promise<void> {
   try {
     await writeScraperJson(resultFile(summary.id), resultForScraperHistory(result));
-    const file = await readScraperJson<unknown>(SCRAPER_HISTORY_INDEX_FILE, EMPTY);
-    // `ageMinutes` is relative and would be a lie the moment it is written;
-    // `finishedAt` replaces it and the age is recomputed on read.
-    const stored: StoredScrapeJobSummary = { ...summary, finishedAt: Date.now() };
-    const jobs: StoredScrapeJobSummary[] = [
-      stored,
-      ...scraperHistoryJobsFromStoredDocument(file).filter((job) => job.id !== summary.id),
-    ];
-    const kept = jobs.slice(0, MAX_HISTORY);
-    await writeScraperJson(SCRAPER_HISTORY_INDEX_FILE, { jobs: kept });
+    // Queued per file: two jobs finishing together must not both read the same
+    // index and have the second write drop the first job's entry.
+    await withScraperFileQueue(SCRAPER_HISTORY_INDEX_FILE, async () => {
+      const file = await readScraperJson<unknown>(SCRAPER_HISTORY_INDEX_FILE, EMPTY);
+      // `ageMinutes` is relative and would be a lie the moment it is written;
+      // `finishedAt` replaces it and the age is recomputed on read.
+      const stored: StoredScrapeJobSummary = { ...summary, finishedAt: Date.now() };
+      const jobs: StoredScrapeJobSummary[] = [
+        stored,
+        ...scraperHistoryJobsFromStoredDocument(file).filter((job) => job.id !== summary.id),
+      ];
+      const kept = jobs.slice(0, MAX_HISTORY);
+      await writeScraperJson(SCRAPER_HISTORY_INDEX_FILE, { jobs: kept });
 
-    for (const dropped of jobs.slice(MAX_HISTORY)) {
-      removeJsonStore(scraperStorePath(resultFile(dropped.id)));
-    }
+      for (const dropped of jobs.slice(MAX_HISTORY)) {
+        removeJsonStore(scraperStorePath(resultFile(dropped.id)));
+      }
+    });
     scraperLog('info', 'history', `Saved job ${summary.id} (${summary.found} rows).`, {
       correlationId: summary.id,
     });
@@ -135,13 +140,20 @@ export async function previousEpisodeIds(
 ): Promise<Set<string> | null> {
   if (!seriesId) return null;
   const file = await readScraperJson<unknown>(SCRAPER_HISTORY_INDEX_FILE, EMPTY);
-  const previous = scraperHistoryJobsFromStoredDocument(file)
+  const earlier = scraperHistoryJobsFromStoredDocument(file)
     .filter((job) => job.seriesId === seriesId && job.id !== excludeJobId)
-    .sort((a, b) => b.finishedAt - a.finishedAt)[0];
-  if (!previous) return null;
-  const result = await storedResult(previous.id);
-  if (!result) return null;
-  return new Set(result.episodes.map((episode) => episode.id));
+    .sort((a, b) => b.finishedAt - a.finishedAt);
+  // A run that found nothing (a site that was down, a filter that matched
+  // nothing) is not a baseline: comparing against it would announce every
+  // episode as new on the next good run. Walk back to the last run with rows.
+  for (const previous of earlier) {
+    const result = await storedResult(previous.id);
+    if (!result?.episodes?.length) continue;
+    // Old results hold `${seriesId}-e${n}` ids; aliases make them comparable
+    // with today's season-and-kind ids (shared/scraperEpisodeId.ts).
+    return new Set(result.episodes.flatMap((episode) => episodeIdAliases(episode)));
+  }
+  return null;
 }
 
 export async function storedResult(jobId: string): Promise<ScrapeResult | null> {

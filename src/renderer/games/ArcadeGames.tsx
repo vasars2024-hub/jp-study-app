@@ -62,10 +62,27 @@ function runAccuracy(points: number, misses: number): number {
   return points + misses <= 0 ? 0 : points / (points + misses);
 }
 
+/**
+ * A keydown aimed at a text field or a control that owns its own arrows/Space
+ * (select, slider, listbox, menu). The arcade listens on `window`, so without
+ * this a running game swallowed Space and arrows in every input app-wide.
+ */
+export function arcadeIgnoresKeyTarget(target: EventTarget | null): boolean {
+  if (!target || typeof (target as Element).closest !== 'function') return false;
+  const el = target as HTMLElement;
+  const tag = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (el.isContentEditable) return true;
+  return !!el.closest(
+    '[contenteditable=""], [contenteditable="true"], [role="textbox"], [role="combobox"], [role="slider"], [role="listbox"], [role="menu"], [role="menubar"], [role="tablist"], [role="spinbutton"]',
+  );
+}
+
 function usePressedKeys(): React.MutableRefObject<Set<string>> {
   const keys = useRef(new Set<string>());
   useEffect(() => {
     const down = (event: KeyboardEvent): void => {
+      if (arcadeIgnoresKeyTarget(event.target)) return;
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(event.key)) {
         event.preventDefault();
       }

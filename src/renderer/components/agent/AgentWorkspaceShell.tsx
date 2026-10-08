@@ -115,7 +115,9 @@ import { LOCAL_AGENT_CHAT_HISTORY_TURNS } from '../../../shared/localAgentSettin
 import {
   loadLocalAgentSettings,
   onLocalAgentSettingsChanged,
+  saveLocalAgentSettings,
 } from '../../localAgentSettingsStore';
+import { shouldAskCloudStudyDataConsent } from '../../../shared/agentCloudStudyDataGate';
 import { AgentPromptLibrary } from './AgentPromptLibrary';
 import { AgentContextSuggestions } from './AgentContextSuggestions';
 import { AgentPipelineTerminal } from './AgentPipelineTerminal';
@@ -1707,6 +1709,14 @@ export default function AgentWorkspaceShell() {
 
   useEffect(() => onLocalAgentSettingsChanged(setAgentSettings), []);
 
+  // One-time notice: with a cloud key saved, ask before study statistics,
+  // known words and library titles may reach the cloud planner. Main enforces
+  // the answer; until then those tools are withheld from cloud plans.
+  const askStudyDataConsent = shouldAskCloudStudyDataConsent(
+    agentSettings.agentCloudShareStudyData,
+    Boolean(aiSetupStatus && Object.values(aiSetupStatus.apiKeysSet).some(Boolean)),
+  );
+
   /**
    * Credential presence per cloud provider, so the picker can say a provider is
    * unusable *before* a prompt is spent on it rather than after the run comes
@@ -2802,6 +2812,26 @@ export default function AgentWorkspaceShell() {
                   <p className="agent-plan-notice">
                     {t('agent.plan.attachmentsUnsupported')}
                   </p>
+                ) : null}
+
+                {askStudyDataConsent ? (
+                  <div className="agent-plan-notice" role="group" data-testid="agent-study-data-consent">
+                    <p>{t('fix3.agent.studyData.notice')}</p>
+                    <button
+                      type="button"
+                      className="agent-action"
+                      onClick={() => saveLocalAgentSettings({ agentCloudShareStudyData: 'allow' })}
+                    >
+                      {t('fix3.agent.studyData.allow')}
+                    </button>
+                    <button
+                      type="button"
+                      className="agent-action"
+                      onClick={() => saveLocalAgentSettings({ agentCloudShareStudyData: 'local-only' })}
+                    >
+                      {t('fix3.agent.studyData.keepLocal')}
+                    </button>
+                  </div>
                 ) : null}
 
                 {planNotice ? (

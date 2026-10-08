@@ -131,6 +131,9 @@ import { startAiSetupSync } from './aiSetupClient';
 const VisualNovelReaderOverlay = React.lazy(() => import('./components/immersion/VisualNovelReaderOverlay'));
 const CaptionsOverlay = React.lazy(() => import('./captions/CaptionsOverlay'));
 const CompanionOverlay = React.lazy(() => import('./components/companion/CompanionOverlay'));
+const RegionSelectOverlay = React.lazy(() => import('./recorder/RegionSelectOverlay'));
+const RecorderPanel = React.lazy(() => import('./recorder/RecorderPanel'));
+const RecorderFrame = React.lazy(() => import('./recorder/RecorderFrame'));
 
 // Hydrates this window's view of the main-owned Agent queue, memory and
 // automations, and performs the one-way localStorage adoption. The schedule
@@ -213,6 +216,16 @@ const companionKind =
 const isCompanionSurface = companionKind === 'wheel' || companionKind === 'preview' || companionKind === 'notice';
 if (isCompanionSurface) {
   document.documentElement.classList.add('companion-window');
+}
+
+// The Region Recorder's windows (main/regionRecorder.ts): the region picker, the hidden
+// recording host, the pill/job panel and the region border. Same rule as the overlays above.
+const regionRecorderKind =
+  typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('regionRecorder') : null;
+const isRegionRecorder =
+  regionRecorderKind === 'select' || regionRecorderKind === 'host' || regionRecorderKind === 'panel' || regionRecorderKind === 'frame';
+if (isRegionRecorder) {
+  document.documentElement.classList.add('region-recorder-window');
 }
 
 function runWhenIdle(fn: () => void, timeout = 5000): void {
@@ -337,7 +350,7 @@ runWhenIdle(() => {
   installShellSounds();
 }, 3000);
 
-if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !isCaptionsOverlay && !isAudioCapture && !isCompanionSurface) {
+if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !isCaptionsOverlay && !isAudioCapture && !isCompanionSurface && !isRegionRecorder) {
   bootCustomCss();
   // Theme Studio's active theme was painted only while Settings > Appearance was
   // open, so a restart dropped it until then. Paint it at boot like the sandbox.
@@ -439,6 +452,19 @@ if (container) {
           </AppErrorBoundary>,
         ),
       );
+    } else if (regionRecorderKind === 'host') {
+      void import('./recorder/regionRecorderHost').then(({ installRegionRecorderHost }) => installRegionRecorderHost());
+    } else if (isRegionRecorder) {
+      const Surface = regionRecorderKind === 'select' ? RegionSelectOverlay : regionRecorderKind === 'panel' ? RecorderPanel : RecorderFrame;
+      createRoot(container).render(
+        withStrictMode(
+          <AppErrorBoundary>
+            <React.Suspense fallback={null}>
+              <Surface />
+            </React.Suspense>
+          </AppErrorBoundary>,
+        ),
+      );
     } else if (isAudioCapture) {
       void import('./captions/systemAudioCaptureHost').then(({ installSystemAudioCaptureHost }) =>
         installSystemAudioCaptureHost(),
@@ -484,6 +510,12 @@ if (container) {
           </AppErrorBoundary>,
         ),
       );
+      // Blanc keeps its copy of the background jobs until App's are installed
+      // (bridges + pending-Anki replay, from effects) — not merely until this
+      // window exists. See studyOsJobsReady.ts.
+      void import('./studyOsJobsReady')
+        .then(({ announceStudyOsJobsReady }) => announceStudyOsJobsReady(window.api))
+        .catch((err) => console.warn('[study-os] jobs-ready ack failed:', err));
       // Re-apply after mount so compensated size is correct once #root is live.
       applyZoom(loadZoom());
     }

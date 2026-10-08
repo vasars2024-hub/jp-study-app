@@ -55,6 +55,7 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   'context-search': 'blanc.tool.contextSearch',
   'kanji-inspector': 'blanc.tool.kanjiInspector',
   'youtube-library': 'blanc.tool.youtubeLibrary',
+  'screen-recorder': 'recorder.tool',
   // Blanc-only tools (no registry entry).
   coverage: 'blanc.tool.coverage',
   agent: 'blanc.tool.agent',

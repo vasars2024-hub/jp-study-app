@@ -419,8 +419,11 @@ export default function SettingsApp(props: SettingsWallProps) {
 
   const meta = pageMeta(page);
   const reduceMotion = typeof document !== 'undefined' && document.documentElement.classList.contains('reduce-motion');
-  const pageLabel = meta?.label ?? 'Control Center';
-  const pageGroup = meta?.group ?? 'Settings';
+  // The window chrome (status bar, Agent hand-off line) shows these, so they are
+  // the translated names. (`meta.label` never existed: the status bar and the
+  // Agent hand-off always said the English "Control Center".)
+  const pageLabelText = meta ? t(meta.labelKey) : t('settings.nav.home');
+  const pageGroupText = meta?.group ? t(groupLabelKey(meta.group)) : t('settings.appTitle');
   /**
    * Hands the Agent the page the user is on — and the exact control, when the
    * Agent's own guided navigation put them here.
@@ -438,8 +441,8 @@ export default function SettingsApp(props: SettingsWallProps) {
     // a destination they never agreed to.
     const controlId = guidedPage === page ? guidedControlId ?? undefined : undefined;
     void handOffToAgent(
-      settingsRouteAgentContext(page, pageLabel, controlId),
-      t('agent.conversation.fromSettings', { label: pageLabel }),
+      settingsRouteAgentContext(page, pageLabelText, controlId),
+      t('agent.conversation.fromSettings', { label: pageLabelText }),
     );
   };
 
@@ -554,8 +557,8 @@ export default function SettingsApp(props: SettingsWallProps) {
   ];
   const settingsStatus = (
     <>
-      <StatusBarField>{pageLabel}</StatusBarField>
-      <StatusBarField>{pageGroup}</StatusBarField>
+      <StatusBarField>{pageLabelText}</StatusBarField>
+      <StatusBarField>{pageGroupText}</StatusBarField>
       <StatusBarSpacer />
       <StatusBarField>{t(advancedMode ? 'settings.status.advancedVisible' : 'settings.status.standardPages')}</StatusBarField>
       <StatusBarField title={t('settings.status.theme', { theme })}>{theme}</StatusBarField>

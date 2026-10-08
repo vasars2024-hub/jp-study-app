@@ -31,12 +31,14 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
 
   const submit = (pin: string): void => {
     if (pin.length !== 4) return;
-    if (!verifyLockscreenPin(pin)) {
-      setDigits('');
-      setError(t('blanc.tb.wrongPin'));
-      return;
-    }
-    onUnlocked();
+    void Promise.resolve(verifyLockscreenPin(pin)).then((ok) => {
+      if (!ok) {
+        setDigits('');
+        setError(t('blanc.tb.wrongPin'));
+        return;
+      }
+      onUnlocked();
+    });
   };
   // The keydown listener registers once; it reaches the latest `submit` here.
   const submitRef = useRef(submit);

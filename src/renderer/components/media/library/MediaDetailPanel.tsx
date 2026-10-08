@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, IconButton, Select, Tabs, showToast } from '../../ui';
 import Icon from '../../Icons';
 import { useT } from '../../../i18n';
+import { getStudyLang } from '../../../studyEnvironment';
 import MediaArtwork from './MediaArtwork';
 import MediaEpisodeRow from './MediaEpisodeRow';
 import MediaStudyPanel from './MediaStudyPanel';
@@ -438,7 +439,8 @@ export default function MediaDetailPanel({
                 onClick={() => {
                   void window.api.enqueueTranscription({
                     mediaId: entry.primary.id,
-                    lang: 'ja',
+                    // The study language: a Chinese learner's video is transcribed in Chinese.
+                    lang: getStudyLang(),
                     cardOptions,
                   });
                   showToast({ message: t('media.subtitles.transcribeQueued'), kind: 'default' });

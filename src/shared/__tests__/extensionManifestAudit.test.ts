@@ -35,6 +35,7 @@ import {
 interface Manifest {
   manifest_version: number;
   permissions: string[];
+  optional_permissions?: string[];
   host_permissions: string[];
   action?: { default_popup?: string };
   options_ui?: { page?: string };
@@ -46,7 +47,7 @@ interface Manifest {
 
 const manifest = JSON.parse(readExtensionFile('manifest.json')) as Manifest;
 
-const SCRIPTS = ['background.js', 'content.js', 'shared.js', 'settings.js', 'popup.js', 'options.js', 'tabs.js'];
+const SCRIPTS = ['background.js', 'content.js', 'shared.js', 'settings.js', 'popup.js', 'options.js', 'tabs.js', 'offscreen.js', 'idb.js'];
 const ALL_SOURCE = SCRIPTS.map((f) => readExtensionFile(f)).join('\n');
 
 /** Every `chrome.<namespace>` the extension actually touches. */
@@ -68,10 +69,28 @@ const PERMISSION_EVIDENCE: Record<string, RegExp> = {
   // `tabs` is what makes url/title readable on tabs other than the active one,
   // which is the whole reading list.
   tabs: /chrome\.tabs\.query|chrome\.windows\.getAll/,
+  // The tab recorder: a stream id for the tab the user invoked the extension on…
+  tabCapture: /chrome\.tabCapture\.getMediaStreamId/,
+  // …opened and recorded in an offscreen document (a service worker has no media).
+  offscreen: /chrome\.offscreen\.createDocument/,
 };
 
 /** APIs Chrome exposes without any permission entry. */
-const PERMISSION_FREE = new Set(['runtime', 'i18n', 'extension', 'action', 'commands', 'windows']);
+const PERMISSION_FREE = new Set(['runtime', 'i18n', 'extension', 'action', 'commands', 'windows', 'permissions']);
+
+/**
+ * Optional permissions: requested at click time, never held unasked. Each
+ * needs a `chrome.permissions.request` for it on an extension page, and its
+ * namespace must be guarded before use (the worker cannot assume the grant).
+ */
+const OPTIONAL_EVIDENCE: Record<string, { request: RegExp; use: RegExp; guard: RegExp }> = {
+  // Save to disk for a pending recording (popup → background saveRecordingToDisk).
+  downloads: {
+    request: /chrome\.permissions\.request\(\{ permissions: \['downloads'\] \}\)/,
+    use: /chrome\.downloads\.download\(/,
+    guard: /if \(!chrome\.downloads \|\| typeof chrome\.downloads\.download !== 'function'\)/,
+  },
+};
 
 describe('manifest — permissions match what the code does', () => {
   it('is on manifest v3 with a module service worker', () => {
@@ -90,7 +109,7 @@ describe('manifest — permissions match what the code does', () => {
   });
 
   it('uses no API it has not declared', () => {
-    const declared = new Set(manifest.permissions);
+    const declared = new Set([...manifest.permissions, ...(manifest.optional_permissions ?? [])]);
     const undeclared = [...USED_NAMESPACES].filter(
       (ns) => !PERMISSION_FREE.has(ns) && !declared.has(ns),
     );
@@ -108,10 +127,25 @@ describe('manifest — permissions match what the code does', () => {
       'activeTab',
       'alarms',
       'contextMenus',
+      'offscreen',
       'scripting',
       'storage',
+      'tabCapture',
       'tabs',
     ]);
+  });
+
+  it('keeps optional permissions to the audited set, each requested at click time and guarded', () => {
+    expect([...(manifest.optional_permissions ?? [])].sort()).toEqual(['downloads']);
+    // Never both required and optional.
+    expect(manifest.permissions).not.toContain('downloads');
+    for (const p of manifest.optional_permissions ?? []) {
+      const ev = OPTIONAL_EVIDENCE[p];
+      expect(ev, p).toBeTruthy();
+      expect(ALL_SOURCE).toMatch(ev.request);
+      expect(ALL_SOURCE).toMatch(ev.use);
+      expect(ALL_SOURCE).toMatch(ev.guard);
+    }
   });
 
   it('needs no web_accessible_resources, and declares none', () => {
@@ -150,20 +184,42 @@ describe('manifest — host permissions', () => {
 });
 
 describe('manifest — content scripts', () => {
-  const entry = manifest.content_scripts?.[0];
+  // The page scripts are registered dynamically by background.js
+  // (syncContentScriptRegistration), so settings.allFrames is one flag; the
+  // manifest declares none. `entry` is read from the worker's constants.
+  const background = readExtensionFile('background.js');
+  const constList = (name: string): string[] =>
+    JSON.parse((new RegExp(`const ${name} = (\\[[^\\]]*\\])`).exec(background)?.[1] ?? '[]').replace(/'/g, '"'));
+  const entry = {
+    js: constList('CONTENT_SCRIPT_FILES'),
+    matches: constList('CONTENT_SCRIPT_MATCHES'),
+    css: /css: \['content\.css'\],\s*runAt: 'document_idle'/.test(background) ? ['content.css'] : [],
+    run_at: /runAt: 'document_idle'/.test(background) ? 'document_idle' : '',
+  };
 
-  it('injects the three scripts in the order they depend on each other', () => {
-    // settings.js reads globalThis.jpStudyShared; content.js reads both.
-    expect(entry?.js).toEqual(['shared.js', 'settings.js', 'content.js']);
+  it('declares no static content_scripts (they are registered at runtime)', () => {
+    expect(manifest.content_scripts).toBeUndefined();
+    expect(background).toMatch(/registerContentScripts\(\[spec\]\)/);
+    expect(background).toMatch(/allFrames,\s*\n\s*persistAcrossSessions: true/);
+  });
+
+  it('injects the scripts in the order they depend on each other', () => {
+    // settings.js reads globalThis.jpStudyShared; content.js reads both, plus
+    // popup-css.js's GUM_POPUP_CSS for the shadow-root popup.
+    expect(entry?.js).toEqual(['shared.js', 'settings.js', 'popup-css.js', 'content.js']);
     expect(entry?.css).toEqual(['content.css']);
+  });
+
+  it('keeps the popup CSS out of the page stylesheet (it lives in the shadow root)', () => {
+    expect(readExtensionFile('content.css')).not.toMatch(/#jp-study-popup/);
+    expect(readExtensionFile('popup-css.js')).toMatch(/#jp-study-popup\.open/);
   });
 
   it('matches the list background.js injects programmatically', () => {
     // A tab open from before the install is scripted by hand; if the two lists
     // drift, those tabs silently run a different extension.
-    const background = readExtensionFile('background.js');
-    const files = /files: \['shared\.js', 'settings\.js', 'content\.js'\]/.test(background);
-    expect(files).toBe(true);
+    expect(background).toMatch(/js: CONTENT_SCRIPT_FILES/);
+    expect(background).toMatch(/files: CONTENT_SCRIPT_FILES/);
     expect(background).toMatch(/insertCSS\(\{ target: \{ tabId \}, files: \['content\.css'\] \}\)/);
   });
 
@@ -177,8 +233,8 @@ describe('manifest — content scripts', () => {
       manifest.background?.service_worker,
       manifest.action?.default_popup,
       manifest.options_ui?.page,
-      ...(entry?.js ?? []),
-      ...(entry?.css ?? []),
+      ...entry.js,
+      ...entry.css,
     ].filter((f): f is string => typeof f === 'string');
     for (const file of referenced) {
       expect({ file, exists: statSync(path.join(EXTENSION_DIR, file)).isFile() }).toEqual({

@@ -25,6 +25,7 @@
 import { normalizeMediaTitleKey } from './mediaIdentity';
 import { MEDIA_CATEGORIES, mediaCategory, type MediaCategory } from './mediaCategories';
 import type { MediaItem } from './types';
+import { findReleaseEpisode, foldReleaseWidth } from './releaseEpisodeNumber';
 
 // Declared in a leaf module so `types.ts` can name the kind on `MediaItem`
 // without importing this file, which imports `types.ts`. Re-exported here
@@ -121,7 +122,7 @@ export interface LocalMediaIdentityOptions {
  * stamped on each item and re-derives the four fields the parser owns. Raise it
  * in the same commit as the rule change, or the fix reaches new imports only.
  */
-export const RELEASE_IDENTITY_VERSION = 2;
+export const RELEASE_IDENTITY_VERSION = 3;
 
 const EXTENSION = /\.([a-z0-9]{1,5})$/i;
 const LEADING_GROUP = /^[[(]([^\])]{1,40})[\])]\s*/;
@@ -235,7 +236,7 @@ function toInt(value: string | undefined): number | null {
  * the title (season/episode markers, year, resolution, bracket groups) is noise, so the
  * earliest such marker is the title's right edge.
  */
-function titleBefore(name: string, markers: ReadonlyArray<RegExpExecArray | null>): string {
+function titleBefore(name: string, markers: ReadonlyArray<{ readonly index: number } | null>): string {
   let cut = name.length;
   for (const marker of markers) {
     if (marker && marker.index >= 0 && marker.index < cut) cut = marker.index;
@@ -285,11 +286,14 @@ export function parseMediaFileName(fileName: unknown): ParsedMediaFile {
   const ovaMarker = KIND_OVA.exec(name);
   const specialMarker = ovaMarker ? null : KIND_SPECIAL.exec(name);
 
-  const seasonEpisode = SEASON_EPISODE.exec(name);
-  const seasonXEpisode = seasonEpisode ? null : SEASON_X_EPISODE.exec(name);
-  const seasonOnly = seasonEpisode || seasonXEpisode ? null : SEASON_ONLY.exec(name);
-  const episodeWord = seasonEpisode || seasonXEpisode ? null : EPISODE_WORD.exec(name);
-  const episodeDash = seasonEpisode || seasonXEpisode || episodeWord ? null : EPISODE_DASH.exec(name);
+  // Full-width digits folded one-for-one, so `第１２話` and `- ０５` are read while
+  // every match index still lines up with `name` for the title cut below.
+  const probe = foldReleaseWidth(name);
+  const seasonEpisode = SEASON_EPISODE.exec(probe);
+  const seasonXEpisode = seasonEpisode ? null : SEASON_X_EPISODE.exec(probe);
+  const seasonOnly = seasonEpisode || seasonXEpisode ? null : SEASON_ONLY.exec(probe);
+  const episodeWord = seasonEpisode || seasonXEpisode ? null : EPISODE_WORD.exec(probe);
+  const episodeDash = seasonEpisode || seasonXEpisode || episodeWord ? null : EPISODE_DASH.exec(probe);
   /**
    * Last resort, and deliberately the narrowest of the five.
    *
@@ -305,12 +309,25 @@ export function parseMediaFileName(fileName: unknown): ParsedMediaFile {
     seasonEpisode || seasonXEpisode || episodeWord || episodeDash
       || !leadingGroup || ovaMarker || specialMarker
       ? null
-      : EPISODE_TRAILING.exec(name);
+      : EPISODE_TRAILING.exec(probe);
+  /**
+   * The Japanese conventions — `第3話`, `3話`, `第3回`, `#03`, `第2期` — read by
+   * the shared episode reader, and only when none of the Latin rules above found
+   * an episode, so every name those rules already read parses as it did.
+   */
+  const shared =
+    seasonEpisode || seasonXEpisode || episodeWord || episodeDash || episodeTrailing
+      || ovaMarker || specialMarker
+      ? null
+      : findReleaseEpisode(name);
+  const japaneseEpisode = shared && (shared.marker === 'japanese' || shared.marker === 'hash') ? shared : null;
+  const sharedSeason = shared && shared.season !== null && shared.seasonIndex >= 0 ? shared : null;
 
-  const season = toInt(seasonEpisode?.[1]) ?? toInt(seasonXEpisode?.[1]) ?? toInt(seasonOnly?.[1]);
+  const season = toInt(seasonEpisode?.[1]) ?? toInt(seasonXEpisode?.[1]) ?? toInt(seasonOnly?.[1])
+    ?? sharedSeason?.season ?? null;
   const episode =
     toInt(seasonEpisode?.[2]) ?? toInt(seasonXEpisode?.[2]) ?? toInt(episodeWord?.[1])
-    ?? toInt(episodeDash?.[1]) ?? toInt(episodeTrailing?.[1]);
+    ?? toInt(episodeDash?.[1]) ?? toInt(episodeTrailing?.[1]) ?? japaneseEpisode?.episode ?? null;
   const episodeEnd = toInt(seasonEpisode?.[3]);
 
   // A year is trusted when bracketed, or when delimited by separators on both sides.
@@ -357,6 +374,8 @@ export function parseMediaFileName(fileName: unknown): ParsedMediaFile {
     seasonEpisode, seasonXEpisode, seasonOnly, episodeWord, episodeDash, episodeTrailing,
     bracketedYear, delimitedYear, resolutionTag, resolutionDimensions,
     ovaMarker, specialMarker,
+    japaneseEpisode ? { index: japaneseEpisode.index } : null,
+    sharedSeason ? { index: sharedSeason.seasonIndex } : null,
   ])) || cleanTitle(name) || raw;
 
   return {

@@ -345,6 +345,7 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
               <div className="manga-settings-row">
                 <label>{t('manga.settings.theme')}</label>
                 <Select
+                  aria-label={t('manga.settings.theme')}
                   value={settings.theme}
                   onChange={(e) => {
                     const theme = e.target.value as MangaReaderSettings['theme'];

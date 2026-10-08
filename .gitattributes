@@ -1,0 +1,30 @@
+# Keep LF in every checkout. Many source-guard tests compare file text against
+# "\n" literals, so a CRLF checkout (core.autocrlf=true, the Git for Windows
+# default) fails them without any code change.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp3 binary
+*.mp4 binary
+*.webm binary
+*.wav binary
+*.ogg binary
+*.zip binary
+*.apkg binary
+*.epub binary
+*.cbz binary
+*.onnx binary
+*.wasm binary
+*.dat binary
+*.bin binary
+*.gz binary

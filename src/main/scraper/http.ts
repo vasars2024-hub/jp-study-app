@@ -48,6 +48,7 @@ import {
   randomDelayMs,
   type ScraperNetworkPolicy,
 } from './networkPolicy';
+import { publicOnlyLookup, resolvesToPrivateAddress } from './privateAddress';
 import { isCrawlAllowed } from './robots';
 import { currentScraperRuntime, runtimeForUrl, type ScraperRuntime } from './runtime';
 import { requestHost } from './safetyPolicy';
@@ -97,24 +98,78 @@ export function redactHeaders(
   return out;
 }
 
-/** `text/html; charset=shift_jis` → `shift_jis`. */
-export function charsetOf(contentType: string | undefined): string {
-  const match = /charset=["']?([\w-]+)/i.exec(contentType ?? '');
-  return (match?.[1] ?? 'utf-8').toLowerCase();
+/** Labels Japanese sites actually send, folded onto one WHATWG name each. */
+const CHARSET_ALIASES: Readonly<Record<string, string>> = {
+  'shift-jis': 'shift_jis',
+  sjis: 'shift_jis',
+  'x-sjis': 'shift_jis',
+  'windows-31j': 'shift_jis',
+  cp932: 'shift_jis',
+  ms_kanji: 'shift_jis',
+  csshiftjis: 'shift_jis',
+  eucjp: 'euc-jp',
+  'x-euc-jp': 'euc-jp',
+  cseucpkdfmtjapanese: 'euc-jp',
+  csiso2022jp: 'iso-2022-jp',
+  utf8: 'utf-8',
+  'unicode-1-1-utf-8': 'utf-8',
+};
+
+function normaliseCharset(label: string): string {
+  const key = label.trim().toLowerCase();
+  return CHARSET_ALIASES[key] ?? key;
 }
 
-function decodeBody(buffer: Buffer, contentType: string | undefined): string {
-  const charset = charsetOf(contentType);
+const CHARSET_PARAM = /charset\s*=\s*["']?\s*([\w.:-]+)/i;
+
+/** `text/html; charset=Shift_JIS` → `shift_jis` (aliases folded); no charset → `utf-8`. */
+export function charsetOf(contentType: string | undefined): string {
+  const match = CHARSET_PARAM.exec(contentType ?? '');
+  return normaliseCharset(match?.[1] ?? 'utf-8');
+}
+
+/** The encoding a byte-order mark announces, or null. */
+function bomCharset(buffer: Uint8Array): string | null {
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) return 'utf-8';
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) return 'utf-16le';
+  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) return 'utf-16be';
+  return null;
+}
+
+/**
+ * The charset a document declares in its own first 1024 bytes (read as latin1):
+ * `<?xml ... encoding="..."?>`, `<meta charset=...>` or
+ * `<meta http-equiv="Content-Type" content="...; charset=...">`. A page that
+ * claims UTF-16 here cannot be UTF-16 (the declaration was readable as ASCII),
+ * so that claim means UTF-8, as the HTML sniffing rules say.
+ */
+function declaredCharset(buffer: Uint8Array): string | null {
+  const head = Buffer.from(buffer.subarray(0, 1024)).toString('latin1');
+  const xml = /^\s*<\?xml\b[^>]*?\bencoding\s*=\s*["']\s*([\w.:-]+)/i.exec(head);
+  const meta = xml ? null : /<meta\b[^>]*?\bcharset\s*=\s*["']?\s*([\w.:-]+)/i.exec(head);
+  const label = (xml ?? meta)?.[1];
+  if (!label) return null;
+  const charset = normaliseCharset(label);
+  return charset.startsWith('utf-16') ? 'utf-8' : charset;
+}
+
+/**
+ * Response bytes to text. Evidence order: byte-order mark, then the
+ * Content-Type charset, then a charset the document declares in its first
+ * 1024 bytes, then UTF-8. TextDecoder has full ICU in Node and Electron, so
+ * Shift_JIS, EUC-JP and ISO-2022-JP all decode; an unknown label falls back to
+ * UTF-8 rather than throwing.
+ */
+export function decodeBody(buffer: Buffer, contentType: string | undefined): string {
+  const headerMatch = CHARSET_PARAM.exec(contentType ?? '');
+  const charset = bomCharset(buffer)
+    ?? (headerMatch ? normaliseCharset(headerMatch[1]) : null)
+    ?? declaredCharset(buffer)
+    ?? 'utf-8';
   try {
-    // Node knows utf-8/latin1/utf-16le natively; anything else (Shift_JIS,
-    // EUC-JP — both common on Japanese sites) goes through TextDecoder, which
-    // ships with full ICU in Electron.
-    if (['utf-8', 'utf8', 'ascii', 'latin1', 'utf-16le', 'ucs-2'].includes(charset)) {
-      return buffer.toString(charset === 'utf8' ? 'utf-8' : (charset as BufferEncoding));
-    }
     return new TextDecoder(charset).decode(buffer);
   } catch {
-    return buffer.toString('utf-8');
+    return new TextDecoder('utf-8').decode(buffer);
   }
 }
 
@@ -147,6 +202,19 @@ export interface ScraperRequestOptions {
    * distinction is drawn here, at the call site, instead of being guessed.
    */
   crawl?: boolean;
+  /**
+   * Cancels the request: the socket is destroyed and the call rejects with an
+   * error whose code is `ERR_ABORTED` (see `isScraperAbortError`). Also ends
+   * a retry sleep or a wait for a concurrency slot.
+   */
+  signal?: AbortSignal;
+  /**
+   * Refuse loopback / private / link-local / unique-local targets, the first
+   * URL and every redirect hop (`ERR_PRIVATE_ADDRESS`). Inside a job scope a
+   * crawl defaults to the profile's `safety.allowPrivateNetwork`; elsewhere
+   * the default is off, and the Inspector and source probes set it.
+   */
+  blockPrivateNetwork?: boolean;
 }
 
 export interface ScraperResponse {
@@ -170,7 +238,68 @@ class HttpError extends Error {
   }
 }
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+function abortError(): HttpError {
+  return new HttpError('Request cancelled.', 'ERR_ABORTED');
+}
+
+/** True for the rejection a cancelled `signal` produces. */
+export function isScraperAbortError(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === 'ERR_ABORTED';
+}
+
+/** A sleep that a cancel ends early, by rejecting with the abort error. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+/** Methods a retry may safely repeat (RFC 9110 9.2.2). POST and PATCH never are. */
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE', 'TRACE']);
+const MAX_RETRY_AFTER_MS = 60_000;
+
+/**
+ * `Retry-After` as milliseconds, capped: either delta-seconds or an HTTP-date.
+ * null when the header is absent or unreadable.
+ */
+export function retryAfterMs(value: string | undefined, now = Date.now()): number | null {
+  const raw = (value ?? '').trim();
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) return Math.min(MAX_RETRY_AFTER_MS, Number(raw) * 1_000);
+  const at = Date.parse(raw);
+  if (Number.isNaN(at)) return null;
+  return Math.min(MAX_RETRY_AFTER_MS, Math.max(0, at - now));
+}
+
+/**
+ * Exponential backoff from the profile's base delay (base, 2x, 4x, ...) plus up
+ * to 25% jitter, so retries from parallel requests do not arrive in lockstep.
+ * Never shorter than the delay the user set.
+ */
+function backoffMs(baseMs: number, attempt: number): number {
+  if (baseMs <= 0) return 0;
+  const step = Math.min(MAX_RETRY_AFTER_MS, baseMs * 2 ** Math.min(attempt, 10));
+  return Math.round(step + Math.random() * step * 0.25);
+}
+
+/** Headers that never follow a redirect to another origin. */
+const CROSS_ORIGIN_DROPPED = new Set(['cookie', 'authorization', 'proxy-authorization']);
+
+function sameOrigin(a: URL, b: URL): boolean {
+  return a.protocol === b.protocol && a.hostname === b.hostname && a.port === b.port;
+}
 
 // ------------------------------------------------------------------ proxies ---
 
@@ -283,7 +412,27 @@ export interface ResolvedRequestOptions {
    * the jar and nowhere else, so persisting a session does not widen what a log
    * line can contain.
    */
-  captureSetCookie?: (rawSetCookie: string) => void;
+  captureSetCookie?: (rawSetCookie: string, hopUrl: string) => void;
+  /** The session jar's cookie for a redirect hop's own URL ('' for none). */
+  jarCookieFor?: (hopUrl: string) => string;
+  /**
+   * Asked before every connection, the first one and each redirect hop: throws
+   * to refuse (robots.txt, the private-address guard). `isRedirect` is false
+   * for the URL the caller named.
+   */
+  beforeHop?: (hop: URL, isRedirect: boolean) => Promise<void>;
+  /**
+   * Connect a direct request through `publicOnlyLookup`, so the addresses the
+   * socket really uses are checked too (DNS rebinding). Set with the guard.
+   */
+  publicOnlySockets?: boolean;
+  signal?: AbortSignal;
+  /**
+   * Wall-clock deadline for the whole attempt, redirects included. `timeoutMs`
+   * alone is an idle-socket timeout, which a server dribbling one byte a
+   * second never trips. Set by `performRequest` from `timeoutMs` when absent.
+   */
+  deadlineAt?: number;
 }
 
 /**
@@ -334,8 +483,14 @@ export function resolveRequestOptions(
     proxyUrl: options.proxyUrl ?? (policy ? proxyForAttempt(policy.proxies, attempt) : ''),
     correlationId: options.correlationId,
     exposeSetCookie: options.exposeSetCookie === true,
+    ...(options.signal ? { signal: options.signal } : {}),
   };
 }
+
+// Connection pools for requests under the private-address guard (see
+// `publicOnlySockets`); kept apart from the global agents on purpose.
+const guardedHttpAgent = new http.Agent({ keepAlive: true, timeout: 5_000 });
+const guardedHttpsAgent = new https.Agent({ keepAlive: true, timeout: 5_000 });
 
 function parseTarget(url: string): URL {
   let parsed: URL;
@@ -362,9 +517,17 @@ async function performRequest(
   resolved: ResolvedRequestOptions,
   redirectsLeft = MAX_REDIRECTS,
 ): Promise<ScraperResponse> {
+  if (resolved.deadlineAt === undefined) {
+    resolved = { ...resolved, deadlineAt: Date.now() + resolved.timeoutMs };
+  }
+  const deadlineAt = resolved.deadlineAt ?? Date.now() + resolved.timeoutMs;
+  const signal = resolved.signal;
+  if (signal?.aborted) throw abortError();
   const parsed = parseTarget(url);
   const proxy = resolved.proxyUrl ? parseProxyTarget(resolved.proxyUrl) : null;
   const secure = parsed.protocol === 'https:';
+  if (resolved.beforeHop) await resolved.beforeHop(parsed, redirectsLeft < MAX_REDIRECTS);
+  if (signal?.aborted) throw abortError();
 
   // The tunnel is opened before the timing clock starts: it is a second
   // connection, and charging its cost to this request's TTFB would make the
@@ -376,16 +539,53 @@ async function performRequest(
   const started = Date.now();
   const mark = { dns: 0, connect: 0, tls: 0, ttfb: 0 };
 
-  return new Promise<ScraperResponse>((resolve, reject) => {
+  return new Promise<ScraperResponse>((resolvePromise, rejectPromise) => {
+    // One settle for the attempt: the deadline timer and the abort listener are
+    // torn down whichever way it ends.
+    let settled = false;
+    let activeResponse: http.IncomingMessage | null = null;
+    let liveRequest: http.ClientRequest | null = null;
+    // Only ever called after `deadlineTimer` below is initialised.
+    const cleanup = () => {
+      settled = true;
+      clearTimeout(deadlineTimer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const resolve = (value: ScraperResponse | Promise<ScraperResponse>) => {
+      if (settled) return;
+      cleanup();
+      resolvePromise(value);
+    };
+    const reject = (error: unknown) => {
+      if (settled) return;
+      cleanup();
+      rejectPromise(error);
+    };
+    const kill = (error: Error) => {
+      reject(error);
+      activeResponse?.destroy(error);
+      liveRequest?.destroy(error);
+      tunnel?.destroy();
+    };
+    function onAbort() {
+      kill(abortError());
+    }
+    const deadlineTimer = setTimeout(() => {
+      kill(new HttpError(`Timed out after ${resolved.timeoutMs}ms in total.`, 'ERR_TIMEOUT'));
+    }, Math.max(0, deadlineAt - Date.now()));
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     const onResponse = (response: http.IncomingMessage) => {
+      activeResponse = response;
       mark.ttfb = Date.now() - started;
 
       // Before the redirect branch: a login flow commonly sets its cookie on the
       // 302 itself, and a jar that only read final responses would miss it.
+      // Stored against this hop's URL, not the one the caller named.
       if (resolved.captureSetCookie) {
         const setCookie = response.headers['set-cookie'];
         const raw = Array.isArray(setCookie) ? setCookie.join(', ') : String(setCookie ?? '');
-        if (raw) resolved.captureSetCookie(raw);
+        if (raw) resolved.captureSetCookie(raw, parsed.toString());
       }
 
       const location = response.headers.location;
@@ -401,11 +601,25 @@ async function performRequest(
           reject(new HttpError('Too many redirects.', 'ERR_REDIRECT'));
           return;
         }
-        const next = new URL(location, parsed).toString();
+        const nextUrl = new URL(location, parsed);
+        const next = nextUrl.toString();
         scraperLog('debug', 'http', `${response.statusCode} → ${next}`, {
           correlationId: resolved.correlationId,
         });
-        resolve(performRequest(next, resolved, redirectsLeft - 1));
+        let hop = resolved;
+        if (!sameOrigin(parsed, nextUrl)) {
+          // Credentials were meant for the origin the caller named. A redirect
+          // to anywhere else (another host, port or scheme) must not carry
+          // them; the jar may still supply cookies that belong to the new one.
+          const headers = { ...resolved.headers };
+          for (const name of Object.keys(headers)) {
+            if (CROSS_ORIGIN_DROPPED.has(name.toLowerCase())) delete headers[name];
+          }
+          const jarCookie = resolved.jarCookieFor?.(next) ?? '';
+          if (jarCookie) headers.cookie = jarCookie;
+          hop = { ...resolved, headers };
+        }
+        resolve(performRequest(next, hop, redirectsLeft - 1));
         return;
       }
 
@@ -528,10 +742,16 @@ async function performRequest(
           headers: resolved.headers,
           timeout: resolved.timeoutMs,
           ...(secure ? { rejectUnauthorized: resolved.verifySsl } : {}),
+          // Own pool, so a guarded request never reuses a socket an unguarded
+          // one opened to a (re-bound) private address.
+          ...(resolved.publicOnlySockets
+            ? { lookup: publicOnlyLookup, agent: secure ? guardedHttpsAgent : guardedHttpAgent }
+            : {}),
         },
         onResponse,
       );
     }
+    liveRequest = request;
 
     request.on('socket', (socket) => {
       // A keep-alive socket that is already open has no DNS/TCP/TLS cost to
@@ -594,7 +814,20 @@ function applySession(
   }
 
   if (runtime.session.persistCookies) {
-    resolved.captureSetCookie = (raw) => rememberSetCookie(runtime.session, url, raw);
+    // Per hop: a cookie set by a redirect's target belongs to that target.
+    resolved.captureSetCookie = (raw, hopUrl) => rememberSetCookie(runtime.session, hopUrl || url, raw);
+  }
+  resolved.jarCookieFor = (hopUrl) => cookieHeaderFor(runtime.session, hopUrl);
+}
+
+/** Refuses a private/local address with an `ERR_PRIVATE_ADDRESS` HttpError. */
+async function assertPublicHop(hop: URL): Promise<void> {
+  if (await resolvesToPrivateAddress(hop.hostname)) {
+    throw new HttpError(
+      `Refusing to fetch ${hop.hostname}: it is a private or local network address. `
+        + 'Turn on "Allow private network" in the profile\'s Safety settings to reach it.',
+      'ERR_PRIVATE_ADDRESS',
+    );
   }
 }
 
@@ -625,7 +858,16 @@ export async function scraperRequest(
   options: ScraperRequestOptions = {},
 ): Promise<ScraperResponse> {
   const scope = currentScraperRuntime();
-  if (!scope) return performRequest(url, resolveRequestOptions(options, null));
+  const signal = options.signal ?? scope?.signal;
+  if (signal && !options.signal) options = { ...options, signal };
+  if (!scope) {
+    const direct = resolveRequestOptions(options, null);
+    if (options.blockPrivateNetwork) {
+      direct.beforeHop = (hop) => assertPublicHop(hop);
+      direct.publicOnlySockets = true;
+    }
+    return performRequest(url, direct);
+  }
   // A host with its own Connection Profile gets that profile's timeouts,
   // headers, proxy, pacing and cache; every other host keeps the run's.
   const runtime = runtimeForUrl(scope, url);
@@ -634,7 +876,35 @@ export async function scraperRequest(
   const method = (options.method ?? 'GET').toUpperCase();
   const kind = cacheKindFor(url);
   const cacheable = !options.exposeSetCookie && isCacheableRequest(method, url, kind);
-  const key = cacheKeyFor(method, url, options.body);
+  // The effective cookie and authorization, as `applySession` will send them:
+  // two sessions must never be served each other's cached pages.
+  const effective = resolveRequestOptions(options, policy);
+  const credentials = [
+    mergeCookieHeaders(effective.headers.cookie ?? '', cookieHeaderFor(runtime.session, url)),
+    effective.headers.authorization ?? '',
+  ].filter(Boolean).join('\n');
+  const key = cacheKeyFor(method, url, options.body, credentials);
+  const correlationId = options.correlationId ?? runtime.correlationId;
+  // A crawl walks URLs a page supplied, so it is the request the private-address
+  // guard exists for; API calls go to hosts the app itself names.
+  const guardPrivate = options.blockPrivateNetwork
+    ?? (options.crawl === true && runtime.governor.policy.allowPrivateNetwork !== true);
+  const checkRobots = options.crawl === true && runtime.governor.policy.respectRobotsTxt;
+  const userAgent = effective.headers['user-agent'] ?? '';
+  const beforeHop = async (hop: URL, isRedirect: boolean): Promise<void> => {
+    if (!isRedirect) return;
+    if (guardPrivate) await assertPublicHop(hop);
+    // A crawl redirected to another path or host is a new crawl of that URL.
+    if (checkRobots) {
+      const allowed = await isCrawlAllowed(
+        hop.toString(),
+        userAgent,
+        (robotsUrl) => fetchRobotsText(robotsUrl, policy),
+        correlationId,
+      );
+      if (!allowed) throw new HttpError(`robots.txt disallows ${hop.toString()}.`, 'ERR_ROBOTS');
+    }
+  };
 
   if (cacheable) {
     const hit = readScraperCache(key, kind, runtime.cache);
@@ -662,46 +932,63 @@ export async function scraperRequest(
     throw new HttpError(`Offline cache mode: ${url} is not in the cache.`, 'ERR_OFFLINE');
   }
 
+  // Before robots.txt: asking a private host for its robots.txt would already
+  // be the request the guard exists to refuse.
+  if (guardPrivate) await assertPublicHop(parseTarget(url));
+
   // Checked before the gate is taken: a request robots.txt forbids should not
   // consume a concurrency slot or a pacing turn on the way to being refused.
-  if (options.crawl && runtime.governor.policy.respectRobotsTxt) {
+  if (checkRobots) {
     const allowed = await isCrawlAllowed(
       url,
-      resolveRequestOptions(options, policy).headers['user-agent'] ?? '',
+      userAgent,
       (robotsUrl) => fetchRobotsText(robotsUrl, policy),
-      options.correlationId ?? runtime.correlationId,
+      correlationId,
     );
     if (!allowed) {
       throw new HttpError(`robots.txt disallows ${url}.`, 'ERR_ROBOTS');
     }
   }
 
-  return policy.gate.run(async () => {
-    const pause = randomDelayMs(policy);
-    if (pause > 0) await sleep(pause);
-
-    for (let attempt = 0; ; attempt += 1) {
-      // Per host, per attempt: a retry is another request arriving at the same
-      // server, and exempting it would make the limit hold only while nothing
-      // was going wrong.
-      await runtime.governor.waitForTurn(url);
-      const resolved = resolveRequestOptions(options, policy, attempt);
-      applySession(resolved, runtime, url, options.headers);
-      const canRetry = attempt < policy.retryAttempts;
-      try {
-        const response = await performRequest(url, resolved);
-        if (canRetry && isRetryableStatus(response.status)) {
-          if (runtime.governor.noteFailure(url)) {
-            scraperLog('warn', 'http', `Pausing requests to ${requestHost(url)} after repeated failures.`, {
-              correlationId: resolved.correlationId ?? runtime.correlationId,
-            });
-          }
-          scraperLog('warn', 'http', `${method} ${url} answered ${response.status}; retrying.`, {
+  // Only a method that means the same thing twice is retried: a POST that
+  // timed out may well have been applied, and sending it again doubles it.
+  const idempotent = IDEMPOTENT_METHODS.has(method);
+  const pause = randomDelayMs(policy);
+  for (let attempt = 0; ; attempt += 1) {
+    const resolved = resolveRequestOptions(options, policy, attempt);
+    applySession(resolved, runtime, url, options.headers);
+    resolved.beforeHop = beforeHop;
+    if (guardPrivate) resolved.publicOnlySockets = true;
+    const canRetry = idempotent && attempt < policy.retryAttempts;
+    let waitMs = 0;
+    try {
+      // The slot is taken per attempt and released before a retry's sleep, so
+      // one host that is backing off does not hold a slot every other host
+      // is queued for.
+      const response = await policy.gate.run(async () => {
+        if (attempt === 0 && pause > 0) await sleep(pause, signal);
+        // Per host, per attempt: a retry is another request arriving at the
+        // same server, and exempting it would make the limit hold only while
+        // nothing was going wrong.
+        await runtime.governor.waitForTurn(url);
+        return performRequest(url, resolved);
+      }, signal);
+      if (canRetry && isRetryableStatus(response.status)) {
+        if (runtime.governor.noteFailure(url)) {
+          scraperLog('warn', 'http', `Pausing requests to ${requestHost(url)} after repeated failures.`, {
             correlationId: resolved.correlationId ?? runtime.correlationId,
           });
-          if (policy.retryDelayMs > 0) await sleep(policy.retryDelayMs);
-          continue;
         }
+        // The server's own `Retry-After` wins on 429/503: it is the one
+        // number that is not a guess.
+        const asked = response.status === 429 || response.status === 503
+          ? retryAfterMs(response.headers['retry-after'])
+          : null;
+        waitMs = asked ?? backoffMs(policy.retryDelayMs, attempt);
+        scraperLog('warn', 'http', `${method} ${url} answered ${response.status}; retrying in ${waitMs}ms.`, {
+          correlationId: resolved.correlationId ?? runtime.correlationId,
+        });
+      } else {
         // A 4xx that is not retryable is still the server answering, not a
         // failure of the host — only transport and transient errors count
         // toward the breaker, which is what "Pause After Failures" describes.
@@ -723,26 +1010,32 @@ export async function scraperRequest(
           );
         }
         return response;
-      } catch (error) {
-        if (runtime.governor.noteFailure(url)) {
-          scraperLog('warn', 'http', `Pausing requests to ${requestHost(url)} after repeated failures.`, {
-            correlationId: resolved.correlationId ?? runtime.correlationId,
-          });
-        }
-        if (!canRetry || !isRetryableError(error)) throw error;
-        const message = error instanceof Error ? error.message : String(error);
-        scraperLog('warn', 'http', `${method} ${url} failed (${message}); retrying.`, {
+      }
+    } catch (error) {
+      // A cancel is the user's decision, not the host failing.
+      if (signal?.aborted || isScraperAbortError(error)) throw abortError();
+      if (runtime.governor.noteFailure(url)) {
+        scraperLog('warn', 'http', `Pausing requests to ${requestHost(url)} after repeated failures.`, {
           correlationId: resolved.correlationId ?? runtime.correlationId,
         });
-        if (policy.retryDelayMs > 0) await sleep(policy.retryDelayMs);
       }
+      if (!canRetry || !isRetryableError(error)) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      waitMs = backoffMs(policy.retryDelayMs, attempt);
+      scraperLog('warn', 'http', `${method} ${url} failed (${message}); retrying in ${waitMs}ms.`, {
+        correlationId: resolved.correlationId ?? runtime.correlationId,
+      });
     }
-  });
+    if (waitMs > 0) await sleep(waitMs, signal);
+  }
 }
 
 /** The HTTP Inspector's handler: one request, projected onto the wire type. */
 export async function probeHttp(
   input: ScraperHttpProbeRequest,
+  // The active profile's `safety.allowPrivateNetwork`; the guard is on unless
+  // the caller says the profile allows it.
+  guard: { allowPrivateNetwork?: boolean } = {},
 ): Promise<ScraperHttpProbeResult> {
   const method = (input.method || 'GET').toUpperCase();
   scraperLog('info', 'http', `${method} ${input.url}`, { correlationId: 'inspector' });
@@ -755,6 +1048,7 @@ export async function probeHttp(
       timeoutMs: input.timeoutMs,
       followRedirects: input.followRedirects,
       correlationId: 'inspector',
+      blockPrivateNetwork: guard.allowPrivateNetwork !== true,
     });
     scraperLog(
       'info',

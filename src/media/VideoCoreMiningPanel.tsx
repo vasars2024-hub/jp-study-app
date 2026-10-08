@@ -2,12 +2,11 @@ import React from 'react';
 import {
   appendVideoCoreMiningHistory,
   createVideoCoreMiningDraft,
-  createVideoCoreMiningHistoryEntry,
+  createVideoCoreMiningOutcomeEntry,
   markVideoCoreMiningHistoryUndone,
   mergeVideoCoreMiningHistory,
-  normalizeVideoCoreMiningHistory,
-  VIDEO_CORE_MINING_HISTORY_KEY,
   withVideoCoreMiningAsset,
+  type VideoCoreMineRequest,
   type VideoCoreMiningDraft,
   type VideoCoreMiningHistoryEntry,
   type VideoCoreMiningSource,
@@ -15,9 +14,14 @@ import {
 import {
   cuePlaybackEndSec,
   cuePlaybackStartSec,
+  stripAssCueText,
   type VideoCoreStudyCue,
 } from '../shared/videoCoreStudy';
-import { videoClipFilename } from '../shared/videoClip';
+import { videoClipErrorKey, videoClipFilename } from '../shared/videoClip';
+import { lookupMineGloss, pickMineTarget } from '../renderer/mineTarget';
+import { recordMediaMined } from '../renderer/stats';
+import { beginCueMine, claimMineRequest, endCueMine, mineCueIdentity } from './mineRequestGuard';
+import { readVideoCoreMiningHistory, writeVideoCoreMiningHistory } from './useMinedCueKeys';
 import { findMinedCueEntry, formatWatchLoopTimestamp } from '../shared/seanimeWatchLoop';
 import { MINING_HISTORY_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
 import { t as translateUi, useT } from '../renderer/i18n';
@@ -29,7 +33,7 @@ import {
   type CapturedAsset,
 } from './cueAudioCapture';
 import MediaLensCaptureButton from './MediaLensCaptureButton';
-import { mineToStudy, videoCoreStudyInput } from '../renderer/studyMining';
+import { mineToStudy, notifyMined, videoCoreStudyInput } from '../renderer/studyMining';
 import { getStudyLang } from '../renderer/studyEnvironment';
 import { studyLangOfText } from '../shared/studyLang';
 import MediaCueAgentHandoffButton from './MediaCueAgentHandoffButton';
@@ -62,24 +66,30 @@ interface Props {
    * Watch and put Mine below the panel's fold (design audit 2026-09-23).
    */
   defaultExpanded?: boolean;
+  /**
+   * One-key mining: the overlay's request (shortcut, Mine buttons, the popup's Mine, a
+   * transcript row). Carries the line — which may not be the one playing — and the word the
+   * learner chose, if any. Each new `seq` is one mine; the outcome is always toasted, since
+   * the panel may be collapsed or not on screen at all.
+   */
+  mineRequest?: VideoCoreMineRequest | null;
+  /** The listened-to audio stream (0-based among the file's audio streams), for cue audio. */
+  audioStreamOrdinal?: number | null;
 }
 
 function loadHistory(): VideoCoreMiningHistoryEntry[] {
-  try {
-    return normalizeVideoCoreMiningHistory(
-      JSON.parse(localStorage.getItem(VIDEO_CORE_MINING_HISTORY_KEY) ?? '[]'),
-    );
-  } catch {
-    return [];
-  }
+  return readVideoCoreMiningHistory();
 }
 
-function canvasBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
+/** Largest screenshot edge kept on a card: plenty for review, far under Anki's limits. */
+const SCREENSHOT_MAX_WIDTH = 1280;
+
+function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
       else reject(new Error(translateUi('mediaWorkspace.capture.encodeFailed')));
-    }, type);
+    }, type, quality);
   });
 }
 
@@ -131,19 +141,23 @@ async function captureFrame(
   if (!video.videoWidth || !video.videoHeight) {
     throw new Error(translateUi('mediaWorkspace.capture.frameNotReady'));
   }
+  // Downscaled JPEG, not a full-resolution PNG: a 4K PNG frame is several megabytes, over
+  // the 2 MB the Anki gateway accepts, and used to be dropped from the note without a word.
+  const scale = Math.min(1, SCREENSHOT_MAX_WIDTH / video.videoWidth);
   const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+  canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
   const context = canvas.getContext('2d');
   if (!context) throw new Error(translateUi('mediaWorkspace.capture.canvasUnavailable'));
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
   drawWrappedCue(context, cueText, canvas.width, canvas.height);
-  const blob = await canvasBlob(canvas, 'image/png');
+  const blob = await canvasBlob(canvas, 'image/jpeg', 0.85);
   canvas.remove();
+  const jpeg = (blob.type || 'image/jpeg') === 'image/jpeg';
   return {
     base64: await blobToBase64(blob),
-    filename: `jp-video-cue-${cue.trackNumber}-${cue.index}-${cue.startMs}.png`,
-    mimeType: blob.type || 'image/png',
+    filename: `jp-video-cue-${cue.trackNumber}-${cue.index}-${cue.startMs}.${jpeg ? 'jpg' : 'png'}`,
+    mimeType: blob.type || 'image/jpeg',
     bytes: blob.size,
   };
 }
@@ -164,6 +178,8 @@ export default function VideoCoreMiningPanel({
   translationText = '',
   mineSignal = 0,
   defaultExpanded = false,
+  mineRequest = null,
+  audioStreamOrdinal = null,
 }: Props): React.ReactElement {
   const { t } = useT();
   const [draft, setDraft] = React.useState<VideoCoreMiningDraft | null>(null);
@@ -236,10 +252,9 @@ export default function VideoCoreMiningPanel({
     // `useMusicMining` mines into this same log with a fresh read every time. Fold against
     // what is actually in storage instead; the union is well defined because both owners
     // only append and every entry carries an id.
-    localStorage.setItem(
-      VIDEO_CORE_MINING_HISTORY_KEY,
-      JSON.stringify(mergeVideoCoreMiningHistory(history, loadHistory())),
-    );
+    // Through the guarded writer, which also tells the mined-line markers and the mining
+    // queue block that the log changed.
+    writeVideoCoreMiningHistory(mergeVideoCoreMiningHistory(history, loadHistory()));
   }, [history]);
 
   React.useEffect(() => {
@@ -336,9 +351,11 @@ export default function VideoCoreMiningPanel({
         filePath,
         startSec,
         endSec: cuePlaybackEndSec(selectedCue, subtitleDelaySec),
+        audioStreamOrdinal,
       });
       if (!result.ok || !result.base64) {
-        setMessage(result.error || t('mediaWorkspace.mining.clipFailed'));
+        const key = videoClipErrorKey(result.error);
+        setMessage(key ? t(key) : t('mediaWorkspace.mining.clipFailed'));
         return;
       }
       const asset = {
@@ -362,25 +379,142 @@ export default function VideoCoreMiningPanel({
     }
   };
 
-  const onMine = async (): Promise<void> => {
-    if (!draft || !draft.term.trim()) {
+  /**
+   * Fill in what a one-key mine needs and the draft does not have yet: the target word (the
+   * one the learner chose, else the first unknown word), cue audio and a screenshot. Every
+   * step is best-effort — a missing ffmpeg or tokenizer costs that one part, never the card.
+   */
+  const completeDraft = async (
+    base: VideoCoreMiningDraft,
+    lineCue: VideoCoreStudyCue,
+    target: VideoCoreMineRequest['target'] | undefined,
+  ): Promise<VideoCoreMiningDraft> => {
+    let next = base;
+    const untouched = next.cardKind === 'sentence' && next.term.trim() === next.sentence.trim();
+    if (untouched) {
+      const chosen = target?.surface.trim()
+        ? { surface: target.surface.trim(), lemma: target.surface.trim(), reading: target.reading ?? '' }
+        : await pickMineTarget(next.sentence);
+      if (chosen) {
+        const gloss = target?.meaning ? null : await lookupMineGloss(chosen.lemma);
+        next = {
+          ...next,
+          cardKind: 'word',
+          term: chosen.lemma,
+          surface: chosen.surface,
+          reading: chosen.reading || gloss?.reading || next.reading,
+          meaning: target?.meaning || gloss?.meaning || next.meaning,
+        };
+      }
+    }
+    const startSec = cuePlaybackStartSec(lineCue, subtitleDelaySec);
+    const endSec = cuePlaybackEndSec(lineCue, subtitleDelaySec);
+    const filePath = next.provenance.source.localFilePath ?? '';
+    const stem = `jp-video-cue-${lineCue.trackNumber}-${lineCue.index}-${lineCue.startMs}`;
+    if (!next.audio) {
+      try {
+        if (filePath && typeof window.api?.extractAudioClip === 'function') {
+          // Cut from the file: instant, and the player keeps playing.
+          const result = await window.api.extractAudioClip({ filePath, startSec, endSec, audioStreamOrdinal });
+          if (result.ok && result.base64) {
+            next = withVideoCoreMiningAsset(next, 'audio', {
+              base64: result.base64,
+              asset: { filename: `${stem}.mp3`, mimeType: result.mimeType ?? 'audio/mpeg', bytes: result.bytes ?? 0 },
+            });
+          }
+        } else if (video) {
+          // A stream has no file to cut: record the line off the element, as asbplayer does.
+          const captured = await recordCueAudio(video, { startSec, endSec, filenameStem: stem });
+          next = withVideoCoreMiningAsset(next, 'audio', { base64: captured.base64, asset: captured });
+        }
+      } catch {
+        // No audio on this card; the rest still goes.
+      }
+    }
+    if (!next.screenshot) {
+      try {
+        const onScreen = video
+          && video.currentTime >= startSec - 0.5
+          && video.currentTime <= endSec + 2;
+        if (video && onScreen) {
+          const captured = await captureFrame(video, next.provenance.cue.text, lineCue);
+          next = withVideoCoreMiningAsset(next, 'screenshot', { base64: captured.base64, asset: captured });
+        } else if (filePath && typeof window.api?.extractVideoFrame === 'function') {
+          const result = await window.api.extractVideoFrame({
+            filePath,
+            atSec: (startSec + endSec) / 2,
+            maxWidth: SCREENSHOT_MAX_WIDTH,
+          });
+          if (result.ok && result.base64) {
+            next = withVideoCoreMiningAsset(next, 'screenshot', {
+              base64: result.base64,
+              asset: { filename: `${stem}.jpg`, mimeType: result.mimeType ?? 'image/jpeg', bytes: result.bytes ?? 0 },
+            });
+          }
+        }
+      } catch {
+        // No screenshot on this card; the rest still goes.
+      }
+    }
+    return next;
+  };
+
+  const onMine = async (request?: VideoCoreMineRequest): Promise<void> => {
+    if (!source) return;
+    const announce = request != null;
+    // The requested line, or the one the panel is showing. A different line gets a fresh
+    // draft; the line on display keeps whatever the learner edited or armed.
+    const lineCue = request?.cue ?? selectedCue;
+    if (!lineCue) {
+      if (announce) notifyMined({ created: false, anki: 'failed', error: t('mediaWorkspace.mining.waiting') });
+      return;
+    }
+    const sameLine = !!draft
+      && draft.provenance.cue.index === lineCue.index
+      && draft.provenance.cue.trackNumber === lineCue.trackNumber
+      && draft.provenance.cue.startMs === lineCue.startMs;
+    const lineText = request?.text ?? stripAssCueText(lineCue.text);
+    let working = sameLine && draft
+      ? draft
+      : createVideoCoreMiningDraft(
+        lineCue, lineText, source, Date.now(), '', studyLangOfText(lineText, getStudyLang()),
+      );
+    if (!working.term.trim()) {
       setMessage(t('mediaWorkspace.mining.missingText'));
       return;
     }
+    // One mine per line at a time: a second press while the first is cutting audio is
+    // the same mine, not a second card (`mineRequestGuard.ts`).
+    const lineIdentity = mineCueIdentity(source.localFilePath || source.playbackId, lineCue);
+    if (!beginCueMine(lineIdentity)) return;
     setBusy('mine');
-    setMessage('');
+    setMessage(announce ? t('mediaWorkspace.mining.mining') : '');
     try {
+      if (announce) working = await completeDraft(working, lineCue, request?.target);
+      if (sameLine) setDraft(working);
       // The local study card is written first, whatever Anki's state; the
       // Anki half joins it or waits in the queue (renderer/studyMining.ts).
-      const mined = await mineToStudy({ ...videoCoreStudyInput(draft, 'subtitle'), notify: false });
+      const mined = await mineToStudy({
+        ...videoCoreStudyInput(working, 'subtitle', { subtitleDelaySec }),
+        notify: false,
+      });
       const result = mined.ankiResult;
-      if (result) {
-        const entry = createVideoCoreMiningHistoryEntry(draft, result);
-        setHistory((current) => appendVideoCoreMiningHistory(current, entry));
+      // Every outcome is a line mined — queued and app-only ones too — so the history (and
+      // the mined markers built on it) records all of them.
+      const entry = createVideoCoreMiningOutcomeEntry(working, mined.anki, result, mined.error);
+      setHistory((current) => appendVideoCoreMiningHistory(current, entry));
+      if (mined.created) {
+        try {
+          recordMediaMined(1);
+        } catch {
+          // Statistics never block a mine.
+        }
       }
+      // The panel may be collapsed or off screen: a requested mine always says what happened.
+      if (announce) notifyMined(mined);
       if (mined.anki === 'added' && result?.ok) {
         const destination = result.deckName
-          ?? draft.deckName
+          ?? working.deckName
           ?? result.profileName
           ?? t('mediaWorkspace.mining.activeDestination');
         // A matched mining rule owns its profile's deck, so a typed destination is
@@ -389,7 +523,7 @@ export default function VideoCoreMiningPanel({
           ? t('mediaWorkspace.mining.minedRule', {
               destination,
               rule: result.matchedRuleLabel || '—',
-              requested: draft.deckName || '—',
+              requested: working.deckName || '—',
             })
           : t('mediaWorkspace.mining.minedTo', { destination }));
       } else if (mined.anki === 'duplicate' || mined.anki === 'added') {
@@ -409,6 +543,7 @@ export default function VideoCoreMiningPanel({
         error instanceof Error ? error.message : t('mediaWorkspace.mining.exportFailed'),
       );
     } finally {
+      endCueMine(lineIdentity);
       setBusy(null);
     }
   };
@@ -423,9 +558,20 @@ export default function VideoCoreMiningPanel({
   */
   const onMineRef = React.useRef(onMine);
   onMineRef.current = onMine;
+  // A signal that was already raised when this panel mounted was handled by the panel that
+  // saw it raised; mounting is not a press.
+  const mountSignalRef = React.useRef(mineSignal);
   React.useEffect(() => {
-    if (mineSignal > 0) void onMineRef.current();
+    if (mineSignal > mountSignalRef.current) void onMineRef.current({ seq: mineSignal });
   }, [mineSignal]);
+  React.useEffect(() => {
+    // Consumed once per window by id, so a remount (or a second mounted copy of the card
+    // block) does not mine the same request again.
+    if (mineRequest && mineRequest.seq > 0 && claimMineRequest(mineRequest.id)) {
+      void onMineRef.current(mineRequest);
+    }
+    // A new request object with the same seq is the same mine.
+  }, [mineRequest?.seq, mineRequest?.id]);
 
   const onUndo = async (entry: VideoCoreMiningHistoryEntry): Promise<void> => {
     if (!entry.noteId || typeof window.api?.ankiDeleteNotes !== 'function') return;
@@ -547,7 +693,9 @@ export default function VideoCoreMiningPanel({
             data-study-action="mine-card"
             disabled={busy != null || missingTerm}
             title={missingTerm ? t('mediaWorkspace.mining.missingText') : undefined}
-            onClick={() => void onMine()}
+            // Collapsed, Mine is the one-key mine: target word, audio and screenshot are
+            // filled in. The expanded form's Mine sends the form exactly as edited.
+            onClick={() => void onMine({ seq: 0 })}
           >
             {busy === 'mine'
               ? t('mediaWorkspace.mining.mining')

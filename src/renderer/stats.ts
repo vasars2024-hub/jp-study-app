@@ -13,6 +13,7 @@
 
 import type { ArenaMistake, GameId, SourceLang } from './games/types';
 import type { LevelTier } from '../shared/levelScale';
+import type { StudyDayRaw } from '../shared/studyActivityHeatmap';
 import { getStudyLang, STUDY_LANG_EVENT, STUDY_LANG_KEY, type StudyLang } from './studyEnvironment';
 import { LANG_TAGS } from '../shared/i18n/core';
 import { getUiLang, t } from './i18n';
@@ -61,6 +62,10 @@ interface DayEntry {
    * "time watched".
    */
   studySeconds?: number;
+  /** Cards mined from the video player that day. Optional: older days lack it. */
+  mediaMined?: number;
+  /** Distinct subtitle lines actively studied in the player that day. */
+  linesStudied?: number;
 }
 interface BookEntry {
   title: string;
@@ -155,6 +160,7 @@ export function onStatsChanged(refresh: () => void): () => void {
     WATCH_RECORDED_EVENT,
     REVIEW_RECORDED_EVENT,
     STUDY_RECORDED_EVENT,
+    MEDIA_STUDY_RECORDED_EVENT,
     STATS_RESET_EVENT,
     STUDY_LANG_EVENT,
     REST_DAY_CHANGED_EVENT,
@@ -205,6 +211,10 @@ export interface DayStat {
   reviewsPassed: number;
   /** Active study seconds (games, player study mode). */
   studySeconds: number;
+  /** Cards mined from the video player. Optional so hand-built summaries stay valid. */
+  mediaMined?: number;
+  /** Distinct subtitle lines studied in the player. */
+  linesStudied?: number;
 }
 export interface BookStat {
   id: string;
@@ -240,6 +250,17 @@ export interface StatsSummary {
   todayReviews: number;
   totalReviews: number;
   totalReviewsPassed: number;
+  /**
+   * Cards mined from the video player, today / last 7 days (incl. today) / all time.
+   * Optional (always set by `getSummary`) so hand-built summaries stay valid.
+   */
+  todayMediaMined?: number;
+  weekMediaMined?: number;
+  totalMediaMined?: number;
+  /** Distinct subtitle lines studied in the player, today / last 7 days / all time. */
+  todayLinesStudied?: number;
+  weekLinesStudied?: number;
+  totalLinesStudied?: number;
   recent: DayStat[]; // last 14 days, oldest → newest (includes empty days)
   books: BookStat[]; // most-recently-read first
   shows: ShowStat[]; // most-recently-watched first
@@ -536,6 +557,59 @@ export function recordStudyTime(seconds: number, at = Date.now()): void {
 }
 
 /**
+ * Fired on window after recordMediaMined() / recordLinesStudied(); detail = MediaStudyDelta.
+ * Counts as activity, so streak watchers listen to it like the review event.
+ */
+export const MEDIA_STUDY_RECORDED_EVENT = 'jp-media-study-recorded';
+
+export interface MediaStudyDelta {
+  kind: 'mined' | 'lines';
+  count: number;
+}
+
+/** A finite count >= 0, for day fields read back from storage of unknown vintage. */
+function dayCount(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+}
+
+function recordMediaStudy(kind: MediaStudyDelta['kind'], count: number, at: number): void {
+  const step = Math.round(Number(count));
+  if (!(step > 0)) return;
+  const data = load();
+  const key = dayKey(new Date(Number.isFinite(at) ? at : Date.now()));
+  const day = data.days[key] ?? { seconds: 0, chars: 0 };
+  if (kind === 'mined') day.mediaMined = dayCount(day.mediaMined) + step;
+  else day.linesStudied = dayCount(day.linesStudied) + step;
+  data.days[key] = day;
+  save(data);
+  try {
+    window.dispatchEvent(
+      new CustomEvent<MediaStudyDelta>(MEDIA_STUDY_RECORDED_EVENT, { detail: { kind, count: step } }),
+    );
+  } catch {
+    /* non-browser context (tests) — ignore */
+  }
+}
+
+/**
+ * Count cards mined from the video player toward the day's totals. Called by the
+ * mining panel once per newly created card. A day with only mining is an active day.
+ */
+export function recordMediaMined(count = 1, at = Date.now()): void {
+  recordMediaStudy('mined', count, at);
+}
+
+/**
+ * Count distinct subtitle lines the learner actively studied in the player
+ * (replayed, looked up, dictated, shadowed, mined). The caller de-duplicates per
+ * line per session; this only accumulates. Counts toward the streak.
+ */
+export function recordLinesStudied(count = 1, at = Date.now()): void {
+  recordMediaStudy('lines', count, at);
+}
+
+/**
  * Count flashcard reviews (or practice answers) toward today's totals.
  *
  * Reviews are study: a day spent clearing the deck used to leave the streak
@@ -576,6 +650,8 @@ function dayIsActive(entry: DayEntry | undefined): boolean {
     || (entry.reviews ?? 0) > 0
     || (entry.practice ?? 0) > 0
     || (entry.studySeconds ?? 0) > 0
+    || dayCount(entry.mediaMined) > 0
+    || dayCount(entry.linesStudied) > 0
   );
 }
 
@@ -666,7 +742,11 @@ export function getSummary(): StatsSummary {
   let totalReviews = 0;
   let totalReviewsPassed = 0;
   let totalStudySeconds = 0;
+  let totalMediaMined = 0;
+  let totalLinesStudied = 0;
   for (const k of dayKeys) {
+    totalMediaMined += dayCount(data.days[k].mediaMined);
+    totalLinesStudied += dayCount(data.days[k].linesStudied);
     totalStudySeconds += data.days[k].studySeconds ?? 0;
     totalSeconds += data.days[k].seconds;
     totalChars += data.days[k].chars;
@@ -693,8 +773,13 @@ export function getSummary(): StatsSummary {
       reviews: e.reviews ?? 0,
       reviewsPassed: e.reviewsPassed ?? 0,
       studySeconds: e.studySeconds ?? 0,
+      mediaMined: dayCount(e.mediaMined),
+      linesStudied: dayCount(e.linesStudied),
     });
   }
+  const week = recent.slice(-7);
+  const weekMediaMined = week.reduce((sum, d) => sum + (d.mediaMined ?? 0), 0);
+  const weekLinesStudied = week.reduce((sum, d) => sum + (d.linesStudied ?? 0), 0);
 
   const books: BookStat[] = Object.entries(data.books)
     .map(([id, b]) => ({ id, title: b.title, seconds: b.seconds, chars: b.chars, lastRead: b.lastRead }))
@@ -720,6 +805,12 @@ export function getSummary(): StatsSummary {
     todayReviews: today.reviews ?? 0,
     totalReviews,
     totalReviewsPassed,
+    todayMediaMined: dayCount(today.mediaMined),
+    weekMediaMined,
+    totalMediaMined,
+    todayLinesStudied: dayCount(today.linesStudied),
+    weekLinesStudied,
+    totalLinesStudied,
     recent,
     books,
     shows,
@@ -741,6 +832,53 @@ export function getWatchedShowTitles(): ShowStat[] {
   return Object.entries(data.shows)
     .map(([id, s]) => ({ id, title: s.title, seconds: s.seconds, lastWatched: s.lastWatched }))
     .sort((a, b) => b.lastWatched - a.lastWatched);
+}
+
+export interface DayMediaActivity {
+  watchSeconds: number;
+  mediaMined: number;
+  linesStudied: number;
+  studySeconds: number;
+}
+
+/**
+ * Player activity per day (YYYY-MM-DD), only for days that have any — watch time,
+ * cards mined from video, lines studied and study-mode seconds. One storage read,
+ * for the calendar's month grid.
+ */
+export function getMediaActivityByDay(): Record<string, DayMediaActivity> {
+  const out: Record<string, DayMediaActivity> = {};
+  for (const [key, e] of Object.entries(load().days)) {
+    if (!e || typeof e !== 'object') continue;
+    const watchSeconds = Math.max(0, Number(e.watchSeconds) || 0);
+    const mediaMined = dayCount(e.mediaMined);
+    const linesStudied = dayCount(e.linesStudied);
+    const studySeconds = Math.max(0, Number(e.studySeconds) || 0);
+    if (watchSeconds > 0 || mediaMined > 0 || linesStudied > 0) {
+      out[key] = { watchSeconds, mediaMined, linesStudied, studySeconds };
+    }
+  }
+  return out;
+}
+
+/**
+ * Every recorded day's time and counts (YYYY-MM-DD), one storage read: the Statistics
+ * year heatmap and the Calendar's per-day study line (`shared/studyActivityHeatmap.ts`).
+ */
+export function getStudyDaysByKey(): Record<string, StudyDayRaw> {
+  const out: Record<string, StudyDayRaw> = {};
+  for (const [key, e] of Object.entries(load().days)) {
+    if (!e || typeof e !== 'object') continue;
+    out[key] = {
+      seconds: e.seconds,
+      watchSeconds: e.watchSeconds,
+      listenSeconds: e.listenSeconds,
+      studySeconds: e.studySeconds,
+      reviews: e.reviews,
+      mediaMined: dayCount(e.mediaMined),
+    };
+  }
+  return out;
 }
 
 export function getSyncPayload(): StatsSyncPayload {

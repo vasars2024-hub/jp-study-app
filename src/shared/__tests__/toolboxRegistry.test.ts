@@ -49,9 +49,15 @@ describe('toolbox registry', () => {
   });
 
   it('keeps planned GitHub-friendly adapters out of the live Blanc tab', () => {
-    expect(getToolboxModule('screen-recorder')?.externalAdapter.strategy).toBe('github-preferred');
-    expect(isToolboxModuleReady('screen-recorder')).toBe(false);
-    expect(listBlancToolboxModules().map((module) => module.id)).not.toContain('screen-recorder');
+    expect(getToolboxModule('screenshot-studio')?.externalAdapter.strategy).toBe('github-preferred');
+    expect(isToolboxModuleReady('screenshot-studio')).toBe(false);
+    expect(listBlancToolboxModules().map((module) => module.id)).not.toContain('screenshot-studio');
+  });
+
+  it('ships the Screen Recorder as a ready, built-in module', () => {
+    expect(isToolboxModuleReady('screen-recorder')).toBe(true);
+    expect(getToolboxModule('screen-recorder')?.externalAdapter.strategy).toBe('existing-service');
+    expect(listBlancToolboxModules().map((module) => module.id)).toContain('screen-recorder');
   });
 
   it('describes launch and migration contract for every module', () => {

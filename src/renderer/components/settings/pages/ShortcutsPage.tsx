@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
+import AppLifecycleCard from './AppLifecycleCard';
 import ShortcutSettings from '../../ShortcutSettings';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
@@ -112,6 +113,7 @@ export default function ShortcutsPage() {
 
   return (
     <>
+      <AppLifecycleCard />
       <SettingsCard
         id="os-hotkey"
         title={t('settings.osHotkey.title')}

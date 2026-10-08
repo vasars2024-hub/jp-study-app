@@ -394,7 +394,8 @@ export function findMinedCueEntry(
   for (let i = history.length - 1; i >= 0; i -= 1) {
     const entry = history[i];
     if (!entry) continue;
-    if (entry.status !== 'exported' && entry.status !== 'duplicate') continue;
+    // `queued` and `local` are cards too: saved in the app, Anki half pending or not set up.
+    if (entry.status === 'failed' || entry.status === 'undone') continue;
     const { cue: minedCue, source: minedSource } = entry.provenance;
     if (
       minedCue.trackNumber === cue.trackNumber

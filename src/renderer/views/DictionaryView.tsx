@@ -200,6 +200,7 @@ export default function DictionaryView() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={t(`dict.view.placeholder.${langKey}`)}
+          aria-label={t('polish2.dict.searchLabel')}
           lang={lang}
         />
         <button

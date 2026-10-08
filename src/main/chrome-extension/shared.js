@@ -421,6 +421,29 @@ const COMMANDS = [
     contextMenu: false,
   },
   {
+    // Runs in the background: chrome.tabCapture needs the extension to have
+    // been invoked on the tab (toolbar button, shortcut, context menu, or the
+    // wheel the shortcut opened), which a page-side command cannot prove.
+    id: 'capture.video.record',
+    label: 'Record tab',
+    shortLabel: 'Rec tab',
+    description: 'Record this tab (picture and sound) into Gum.',
+    category: 'capture',
+    contexts: ['page'],
+    wheel: true,
+    contextMenu: true,
+  },
+  {
+    id: 'capture.audio.tab',
+    label: 'Record tab audio',
+    shortLabel: 'Tab audio',
+    description: 'Record only the sound of this tab into Gum.',
+    category: 'capture',
+    contexts: ['page'],
+    wheel: true,
+    contextMenu: false,
+  },
+  {
     id: 'capture.manga',
     label: 'Import manga pages',
     shortLabel: 'Manga',
@@ -587,6 +610,7 @@ const COMMAND_ALIASES = {
   grammar: 'grammar.match',
   translate: 'translate.selection',
   more: 'wheel.more',
+  'record-tab': 'capture.video.record',
 };
 
 function resolveCommandId(id) {
@@ -692,26 +716,55 @@ function formatCaptureResultMessage(res) {
 
 const ENDERS = new Set(['。', '．', '！', '？', '!', '?', '…', '‥']);
 const TRAIL_CLOSE = new Set(['」', '』', '）', ')', '"', "'", '”', '’']);
+/** Closing brackets that can end a sentence on their own (dialogue without a 。). */
+const CJK_CLOSE = new Set(['」', '』', '）']);
+const OPEN_QUOTES = new Set(['「', '『', '（', '“']);
+
+/**
+ * Does the sentence end at `i`? Keep in step with src/shared/sentenceBounds.ts.
+ *
+ * A quote no longer ends a sentence just by being a quote: 「行く」と言った。
+ * and 彼は「行く。」と言った。 are one sentence each. A closing bracket ends
+ * one only when nothing carries on after it (end of text, a line break, a
+ * space, or the next quote opening). ASCII quotes and apostrophes are never
+ * boundaries on their own (an apostrophe split "don't").
+ */
+function sentenceBoundaryAt(text, i) {
+  const ch = text[i];
+  const ender = ENDERS.has(ch);
+  if (!ender && !CJK_CLOSE.has(ch)) return false;
+  let j = i + 1;
+  let sawCloser = false;
+  while (j < text.length && (TRAIL_CLOSE.has(text[j]) || (ender && ENDERS.has(text[j])))) {
+    if (TRAIL_CLOSE.has(text[j])) sawCloser = true;
+    j++;
+  }
+  if (ender && !sawCloser) return true;
+  if (j >= text.length) return true;
+  const next = text[j];
+  if (/\s/.test(next) || OPEN_QUOTES.has(next)) return true;
+  // 」。 — the 。 is the boundary. 「行く。」と / 「行く」と — the sentence goes on.
+  return false;
+}
 
 function detectSentenceBounds(text, offset) {
   if (!text) return { start: 0, end: 0 };
   const n = text.length;
   const o = Math.max(0, Math.min(offset, n));
-  const isBoundary = (ch) => ENDERS.has(ch) || TRAIL_CLOSE.has(ch);
   let start = 0;
   for (let i = 0; i < o; i++) {
-    if (isBoundary(text[i])) {
+    if (sentenceBoundaryAt(text, i)) {
       let j = i + 1;
-      while (j < n && (TRAIL_CLOSE.has(text[j]) || text[j] === ' ' || text[j] === '\n')) j++;
+      while (j < n && (TRAIL_CLOSE.has(text[j]) || ENDERS.has(text[j]) || text[j] === ' ' || text[j] === '\n')) j++;
       start = j;
     }
   }
   let end = n;
   for (let i = start; i < n; i++) {
     const ch = text[i];
-    if (isBoundary(ch)) {
+    if (sentenceBoundaryAt(text, i)) {
       end = i + 1;
-      while (end < n && TRAIL_CLOSE.has(text[end])) end++;
+      while (end < n && (TRAIL_CLOSE.has(text[end]) || ENDERS.has(text[end]))) end++;
       break;
     }
     if (ch === '\n' && i > start) {
@@ -1219,9 +1272,49 @@ function aiPanelHtml(state) {
   );
 }
 
+/**
+ * The app answers in English. A machine `code` (newer routes) or a known
+ * English error string maps to a _locales message so toasts follow the
+ * browser language; anything unrecognised keeps the app's own text.
+ */
+const JP_SERVER_ERROR_KEYS = {
+  app_window_closed: 'bg_errAppWindowClosed',
+  timeout: 'bg_errTimeout',
+  bad_request: 'bg_errBadRequest',
+  texts_required: 'bg_errBadRequest',
+  too_large: 'bg_errTooLarge',
+  anki_unreachable: 'bg_errAnkiUnreachable',
+  // Raised by the worker's offscreen microphone (recordings and page clips).
+  mic_permission: 'bg_micGrantNeeded',
+  mic_unavailable: 'content_micUnavailable',
+};
+
+function jpServerErrorCode(json, raw) {
+  const code = json && typeof json.code === 'string' ? json.code : '';
+  if (code && JP_SERVER_ERROR_KEYS[code]) return code;
+  const s = String(raw || '');
+  if (/Gum window is not open|no (?:Gum|app) window/i.test(s)) return 'app_window_closed';
+  // Only the bridge's own timeouts; a model's "timed out" is its own message.
+  if (/^(?:timeout|Level estimate timed out)$/i.test(s)) return 'timeout';
+  if (/too large|payload too/i.test(s)) return 'too_large';
+  if (/AnkiConnect|Anki is not (?:running|reachable)|ECONNREFUSED.*8765/i.test(s)) return 'anki_unreachable';
+  if (/^(?:text|term|query|url|texts|id) required$|^invalid json|Unexpected token .* JSON/i.test(s)) return 'bad_request';
+  return '';
+}
+
+/** A failed reply's message in the UI language: its code / known app text, else its own text, else `fallbackKey`. */
+function jpAppErrorText(res, fallbackKey) {
+  const code = jpServerErrorCode(res, res && res.error);
+  if (code) return jpMsg(JP_SERVER_ERROR_KEYS[code]);
+  return (res && res.error) || (fallbackKey ? jpMsg(fallbackKey) : '');
+}
+
 if (typeof globalThis !== 'undefined') {
   globalThis.jpStudyShared = {
     DEFAULT_PORT,
+    SERVER_ERROR_KEYS: JP_SERVER_ERROR_KEYS,
+    serverErrorCode: jpServerErrorCode,
+    appErrorText: jpAppErrorText,
     msg: jpMsg,
     msgCount: jpMsgCount,
     uiLocale: jpUiLocale,
@@ -1249,6 +1342,7 @@ if (typeof globalThis !== 'undefined') {
     formatClipboardResultMessage,
     formatCaptureResultMessage,
     detectSentenceBounds,
+    sentenceBoundaryAt,
     sentenceAt,
     langTagToOcrLang,
     detectScriptLang,

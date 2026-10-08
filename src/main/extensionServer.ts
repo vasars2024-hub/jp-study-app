@@ -34,6 +34,21 @@ import { extensionContractManifest } from '../shared/extensionContract';
 import { extractReadableFromHtml, htmlToText } from './readabilityExtract';
 import { importGeneratedArticle, importMangaFromImageUrls } from './library';
 import { mineNote } from './anki';
+import {
+  bridgeTargets,
+  deliverMined,
+  getCachedKnownSnapshot,
+  invalidateKnownSnapshotCache,
+  requestKnownSnapshot,
+  type DeliverMinedResult,
+} from './extensionBridgeHost';
+import {
+  clampAnnotateTexts,
+  knownSnapshotVersion,
+  registerExtensionAnnotateIpc,
+  requestAnnotate,
+} from './extensionAnnotate';
+import { handleRecordingsRoute, setMicRecordingHandler } from './extensionRecordings';
 import type { MineNoteRequest, MineNoteResult } from '../shared/anki';
 import {
   ensureChromeExtensionFolder,
@@ -65,6 +80,9 @@ import {
 } from '../shared/profileRules';
 
 const STATE_FILE = 'extension-bridge.json';
+
+/** Lookup provenance that counts as the word itself (dictService `via`). */
+const REAL_MATCH_VIA = new Set(['exact', 'deinflected', 'reading']);
 
 interface DownloadJob {
   id: string;
@@ -163,7 +181,7 @@ function broadcastClipboardAppend(entry: {
   url?: string;
   title?: string;
 }): void {
-  for (const w of BrowserWindow.getAllWindows()) {
+  for (const w of bridgeTargets()) {
     w.webContents.send('extension:clipboard-append', entry);
   }
 }
@@ -216,7 +234,7 @@ function requestKnownLevels(terms: string[]): Promise<KnownLevelsBridgeResult> {
   const id = crypto.randomUUID();
   const list = terms.filter((t) => typeof t === 'string' && t.trim()).slice(0, 400);
   if (!list.length) return Promise.resolve({ ok: true, levels: {} });
-  const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+  const windows = bridgeTargets();
   if (!windows.length) {
     return Promise.resolve({ ok: false, error: 'Gum window is not open', levels: {} });
   }
@@ -236,7 +254,7 @@ const MAX_LEVEL_ESTIMATE_CHARS = 40_000;
 
 function requestLevelEstimate(text: string): Promise<LevelEstimateBridgeResult> {
   const sample = String(text || '').slice(0, MAX_LEVEL_ESTIMATE_CHARS);
-  const windows = BrowserWindow.getAllWindows();
+  const windows = bridgeTargets();
   if (!windows.length) {
     return Promise.resolve({
       ok: false,
@@ -259,7 +277,7 @@ function requestLevelEstimate(text: string): Promise<LevelEstimateBridgeResult> 
 
 function requestClipboardList(): Promise<ClipboardListBridgeResult> {
   const id = crypto.randomUUID();
-  const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+  const windows = bridgeTargets();
   if (!windows.length) {
     return Promise.resolve({ ok: false, error: 'Gum window is not open', entries: [] });
   }
@@ -276,7 +294,7 @@ function requestClipboardList(): Promise<ClipboardListBridgeResult> {
 }
 
 function requestSetKnownLevel(term: string, level: number): Promise<{ ok: boolean; error?: string }> {
-  const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+  const windows = bridgeTargets();
   if (!windows.length) {
     return Promise.resolve({ ok: false, error: 'Gum window is not open' });
   }
@@ -301,7 +319,7 @@ function requestComprehensibility(text: string): Promise<{
   error?: string;
 }> {
   const sample = String(text || '').slice(0, MAX_LEVEL_ESTIMATE_CHARS);
-  const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+  const windows = bridgeTargets();
   if (!windows.length) {
     return Promise.resolve({ ok: false, error: 'Gum window is not open' });
   }
@@ -325,7 +343,7 @@ function requestGrammarMatch(text: string): Promise<{
 }> {
   const sample = String(text || '').trim().slice(0, 500);
   if (!sample) return Promise.resolve({ ok: false, error: 'text required', matches: [] });
-  const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+  const windows = bridgeTargets();
   if (!windows.length) {
     return Promise.resolve({ ok: false, error: 'Gum window is not open', matches: [] });
   }
@@ -345,7 +363,7 @@ function requestGrammarMatch(text: string): Promise<{
 /** Ask the renderer to run the installed Whisper pipeline on 16 kHz mono PCM. */
 function requestWhisperTranscribe(pcm: ArrayBuffer): Promise<{ ok: boolean; text?: string; error?: string }> {
   const id = crypto.randomUUID();
-  const windows = BrowserWindow.getAllWindows();
+  const windows = bridgeTargets();
   if (!windows.length) {
     return Promise.resolve({ ok: false, error: 'Gum window is not open — open the app to transcribe.' });
   }
@@ -569,7 +587,7 @@ function setCors(res: http.ServerResponse, origin: string | undefined): void {
   } else if (!origin) {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   res.setHeader('Access-Control-Max-Age', '86400');
   // Chrome Private Network Access preflight
@@ -579,14 +597,14 @@ function setCors(res: http.ServerResponse, origin: string | undefined): void {
 /** Largest request body any route reads. */
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
-function readBody(req: http.IncomingMessage): Promise<string> {
+function readBody(req: http.IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
     let tooLarge = false;
     req.on('data', (c: Buffer) => {
       size += c.length;
-      if (size > MAX_BODY_BYTES) {
+      if (size > maxBytes) {
         // Keep reading and discard: destroying the socket here made the answer
         // a connection reset, which the extension cannot tell from a closed app.
         tooLarge = true;
@@ -726,11 +744,15 @@ function broadcastMineQueued(payload: {
   profileId?: string;
   /** The page's language for this word, when the extension said it. */
   lang?: StudyLang;
-}): void {
-  for (const w of BrowserWindow.getAllWindows()) {
-    w.webContents.send('extension:mined', payload);
-  }
+}): Promise<DeliverMinedResult> {
+  // One host window, persisted until it acks (extensionBridgeHost.ts). Sending
+  // to every window added the card once per open window, and with no window
+  // open the local copy was lost while the answer said "saved in Gum".
+  return deliverMined(payload as unknown as Record<string, unknown>, { ackTimeoutMs: MINE_ACK_TIMEOUT_MS });
 }
+
+/** How long /v1/mine waits for the host renderer to confirm the local card. */
+const MINE_ACK_TIMEOUT_MS = 2500;
 
 async function handleInbox(body: {
   title?: string;
@@ -801,12 +823,24 @@ async function handleMine(body: {
   preferAnki?: boolean;
   /** Force Anki attempt regardless of preferAnki (dictionary “Add to Anki”). */
   forceAnki?: boolean;
+  /** Dictionary form of the word the popup showed (食べる for 食べさせられた). */
+  lemma?: string;
+  /** The form as it appeared on the page, for the card's cloze. */
+  surface?: string;
+  /** Which popup entry the user saved (0 = first). Informational. */
+  entryIndex?: number;
+  /** Optional cropped screenshot (PNG/JPEG data URL) for the card's image field. */
+  imageDataUrl?: string;
+  /** Ask Anki for the word's native audio. Default: on for a word with no recording. */
+  fetchAudio?: boolean;
 }): Promise<{
   ok: boolean;
   mode?: ExtensionMineMode;
   term?: string;
   anki?: MineNoteResult;
   error?: string;
+  /** The local copy is persisted but no Gum window has confirmed it yet. */
+  appPending?: boolean;
   localFolder?: string;
   profileName?: string;
   deckName?: string;
@@ -819,7 +853,7 @@ async function handleMine(body: {
   primaryDestination?: 'anki' | 'app';
   destinations?: {
     anki: { attempted: boolean; ok: boolean; error?: string; noteId?: number };
-    app: { ok: boolean; folder: string; label: string };
+    app: { ok: boolean; pending?: boolean; folder: string; label: string };
   };
 }> {
   const text = String(body.text ?? '').trim();
@@ -827,8 +861,15 @@ async function handleMine(body: {
 
   const mode: ExtensionMineMode =
     body.mode === 'word' || body.mode === 'sentence' ? body.mode : classifyMineSelection(text);
-  const term = extractMineTerm(text, mode);
+  // The popup knows the dictionary form; the selection text alone does not.
+  const lemma = typeof body.lemma === 'string' ? body.lemma.trim().slice(0, 80) : '';
+  const term = mode === 'word' && lemma ? lemma : extractMineTerm(text, mode);
   if (!term) return { ok: false, error: 'Could not extract a term to mine' };
+  const surface = typeof body.surface === 'string' && body.surface.trim() ? body.surface.trim().slice(0, 80) : '';
+  const imageMatch =
+    typeof body.imageDataUrl === 'string'
+      ? /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(body.imageDataUrl.trim())
+      : null;
 
   const contextSentence = typeof body.sentence === 'string' ? body.sentence.trim().slice(0, 2000) : '';
   const sentence = mode === 'sentence' ? text.slice(0, 2000) : contextSentence || undefined;
@@ -910,10 +951,17 @@ async function handleMine(body: {
     sentence,
     ...(reading ? { reading } : {}),
     ...(meaning ? { meaning } : {}),
-    surface: mode === 'word' ? term : undefined,
+    // The cloze needs the form on the page (食べた), not the lemma (食べる).
+    surface: mode === 'word' ? surface || term : undefined,
     profileId: profileId || undefined,
     audioBase64: audioBase64 || undefined,
     audioFilename: body.audioFilename,
+    // Native word audio for a word card with no recording of its own: the
+    // extension's cards used to reach Anki with an empty audio field.
+    ...(!audioBase64 && mode === 'word' && body.fetchAudio !== false ? { fetchAudio: true } : {}),
+    ...(imageMatch
+      ? { imageBase64: imageMatch[2], imageFilename: `gum-ext-${Date.now()}.${imageMatch[1] === 'jpeg' ? 'jpg' : imageMatch[1]}` }
+      : {}),
     extraTags: [
       'jp-study-app::extension',
       mode === 'word' ? 'jp-study-app::extension-word' : 'jp-study-app::extension-sentence',
@@ -930,7 +978,7 @@ async function handleMine(body: {
     anki = { ok: false, error: 'skipped' };
   }
 
-  broadcastMineQueued({
+  const local = await broadcastMineQueued({
     mode,
     term,
     sentence,
@@ -964,6 +1012,7 @@ async function handleMine(body: {
     forceAnki,
     ankiAttempted,
     primaryDestination,
+    ...(local.delivered ? {} : { appPending: true }),
     destinations: {
       anki: {
         attempted: ankiAttempted,
@@ -971,7 +1020,9 @@ async function handleMine(body: {
         error: anki.error,
         noteId: anki.noteId,
       },
-      app: { ok: true, folder, label: 'Gum' },
+      // pending: persisted in main and replayed once a Gum window is ready —
+      // not claimed as saved before a window has confirmed it.
+      app: { ok: local.delivered && !local.error, pending: !local.delivered, folder, label: 'Gum' },
     },
   };
 }
@@ -991,6 +1042,7 @@ async function handleAudioSave(body: {
   profileName?: string;
   deckName?: string;
   error?: string;
+  tooLarge?: boolean;
 }> {
   let bytes: Buffer | null = null;
   let mime = typeof body.mimeType === 'string' ? body.mimeType : 'audio/webm';
@@ -1003,7 +1055,36 @@ async function handleAudioSave(body: {
     bytes = Buffer.from(body.base64.trim(), 'base64');
   }
   if (!bytes || !bytes.length) return { ok: false, error: 'audio required' };
-  if (bytes.length > 25 * 1024 * 1024) return { ok: false, error: 'Audio too large (max 25 MB)' };
+  if (bytes.length > AUDIO_SAVE_MAX_BYTES) return { ok: false, tooLarge: true, error: 'Audio too large (max 25 MB)' };
+  return mineAudioBytes(bytes, mime, body);
+}
+
+/** Largest decoded recording /v1/audio/save takes (its JSON body may be a third larger). */
+const AUDIO_SAVE_MAX_BYTES = 25 * 1024 * 1024;
+/** Body cap for /v1/audio/save: base64 of AUDIO_SAVE_MAX_BYTES plus the JSON around it. */
+const AUDIO_SAVE_MAX_BODY_BYTES = Math.ceil((AUDIO_SAVE_MAX_BYTES * 4) / 3) + 64 * 1024;
+
+/**
+ * Transcribe a recording and mine it as a sentence card that carries the audio.
+ * A failed or empty transcription no longer throws the recording away: the card
+ * is made with the audio and the page title, and 	ranscribed: false says so.
+ */
+async function mineAudioBytes(
+  bytes: Buffer,
+  mime: string,
+  body: { url?: string; title?: string },
+): Promise<{
+  ok: boolean;
+  text?: string;
+  term?: string;
+  transcribed?: boolean;
+  transcribeError?: string;
+  anki?: MineNoteResult;
+  localFolder?: string;
+  profileName?: string;
+  deckName?: string;
+  error?: string;
+}> {
 
   const ext =
     mime.includes('wav') ? '.wav' : mime.includes('ogg') || mime.includes('opus') ? '.ogg' : mime.includes('mp4') || mime.includes('m4a') ? '.m4a' : '.webm';
@@ -1016,15 +1097,12 @@ async function handleAudioSave(body: {
     const pcm = await extractAudioPcm(tmpFile);
     if (!pcm.byteLength) return { ok: false, error: 'No audio track found in recording' };
     const asr = await requestWhisperTranscribe(pcm);
-    if (!asr.ok || !asr.text?.trim()) {
-      return { ok: false, error: asr.error || 'Transcription returned empty text' };
-    }
-    const text = asr.text.trim();
+    const heard = asr.ok ? String(asr.text || '').trim() : '';
+    const transcribed = Boolean(heard);
+    const fallbackLabel = String(body.title || '').trim().slice(0, 60) || `Audio ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+    const text = heard || fallbackLabel;
     const audioBase64 = bytes.toString('base64');
-    const audioDataUrl =
-      typeof body.dataUrl === 'string' && body.dataUrl.startsWith('data:')
-        ? body.dataUrl
-        : `data:${mime};base64,${audioBase64}`;
+    const audioDataUrl = `data:${mime};base64,${audioBase64}`;
     const mined = await handleMine({
       text,
       url: body.url,
@@ -1040,6 +1118,8 @@ async function handleAudioSave(body: {
     return {
       ok: true,
       text,
+      transcribed,
+      ...(transcribed ? {} : { transcribeError: asr.error || 'Transcription returned empty text' }),
       term: mined.term,
       anki: mined.anki,
       localFolder: mined.localFolder,
@@ -1142,14 +1222,22 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
   // A body no route would read is refused up front with a real answer (the
   // rest of it drained), never a reset connection — the extension reads a
   // reset as "Gum is not running" and queues the request forever.
-  if (Number(req.headers['content-length'] || 0) > MAX_BODY_BYTES) {
+  const url = new URL(req.url ?? '/', `http://127.0.0.1`);
+  const pathname = url.pathname.replace(/\/+$/, '') || '/';
+
+  // Recordings stream their own chunk bodies with their own caps
+  // (extensionRecordings.ts), so they are routed before the generic body cap.
+  if (pathname === '/v1/recordings' || pathname.startsWith('/v1/recordings/')) {
+    await handleRecordingsRoute(req, res, pathname, { requireAuth, json });
+    return;
+  }
+
+  const bodyCap = pathname === '/v1/audio/save' ? AUDIO_SAVE_MAX_BODY_BYTES : MAX_BODY_BYTES;
+  if (Number(req.headers['content-length'] || 0) > bodyCap) {
     req.resume();
     json(res, 413, { ok: false, error: 'Payload too large' });
     return;
   }
-
-  const url = new URL(req.url ?? '/', `http://127.0.0.1`);
-  const pathname = url.pathname.replace(/\/+$/, '') || '/';
 
   if (req.method === 'GET' && pathname === '/v1/extension-settings') {
     // The token used to go to any caller with no Origin (a DNS-rebinding page
@@ -1196,7 +1284,15 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       ok: true,
       version: 1,
       port: bridgeState?.port ?? EXTENSION_PORT,
-      features: { sentenceAnalysis: true },
+      features: {
+        sentenceAnalysis: true,
+        scan: true,
+        wordAudio: true,
+        mineCheck: true,
+        recordings: true,
+        annotate: true,
+        knownSnapshot: true,
+      },
       contract: extensionContractManifest(),
     });
     return;
@@ -1702,7 +1798,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
   if (req.method === 'POST' && pathname === '/v1/audio/save') {
     if (!requireAuth(req, res)) return;
     try {
-      const raw = await readBody(req);
+      const raw = await readBody(req, AUDIO_SAVE_MAX_BODY_BYTES);
       const body = JSON.parse(raw || '{}') as {
         dataUrl?: string;
         base64?: string;
@@ -1711,7 +1807,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         title?: string;
       };
       const out = await handleAudioSave(body);
-      json(res, out.ok ? 200 : 400, out);
+      json(res, out.ok ? 200 : out.tooLarge ? 413 : 400, out);
     } catch (err) {
       json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
     }
@@ -1840,10 +1936,56 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         return;
       }
       const result = await requestSetKnownLevel(term, level);
+      if (result.ok) invalidateKnownSnapshotCache();
       json(res, result.ok ? 200 : 504, result);
     } catch (err) {
       json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
     }
+    return;
+  }
+
+  /**
+   * Page word-status colouring (WP8): tokenize visible page text with the app's
+   * tokenizer (in the host renderer) and level each word's lemma.
+   */
+  if (req.method === 'POST' && pathname === '/v1/annotate') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}') as { texts?: unknown; lang?: string };
+      const texts = clampAnnotateTexts(body.texts);
+      if (!texts.length) {
+        json(res, 400, { ok: false, code: 'texts_required', error: 'texts required' });
+        return;
+      }
+      const lang = studyLangFromTag(body.lang) ?? studyLangOfText(texts.join(' ').slice(0, 400), getMainStudyLang());
+      const result = await requestAnnotate(texts, lang);
+      if (!result.ok) {
+        json(res, 504, { ok: false, code: result.error === 'timeout' ? 'timeout' : 'app_window_closed', error: result.error });
+        return;
+      }
+      json(res, 200, { ok: true, lang, results: result.results });
+    } catch (err) {
+      json(res, 400, { ok: false, code: 'bad_request', error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  /** Every known word and its level, versioned so an unchanged map costs nothing. */
+  if (req.method === 'GET' && pathname === '/v1/known-snapshot') {
+    if (!requireAuth(req, res)) return;
+    const snap = getCachedKnownSnapshot() ?? (await requestKnownSnapshot());
+    if (!snap.ok) {
+      json(res, 504, { ok: false, code: snap.error === 'timeout' ? 'timeout' : 'app_window_closed', error: snap.error });
+      return;
+    }
+    const version = knownSnapshotVersion(snap.words);
+    const since = url.searchParams.get('since') || '';
+    if (since && since === version) {
+      json(res, 200, { ok: true, version, unchanged: true, lang: snap.lang });
+      return;
+    }
+    json(res, 200, { ok: true, version, lang: snap.lang, words: snap.words });
     return;
   }
 
@@ -1936,7 +2078,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         target,
       });
       // Best-effort: append translation history via renderer if open
-      for (const w of BrowserWindow.getAllWindows()) {
+      for (const w of bridgeTargets()) {
         if (!w.isDestroyed()) {
           w.webContents.send('extension:translation-result', {
             sourceLang: source,
@@ -1989,9 +2131,13 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       // legacy in-memory index answered with, without loading that index.
       const { lookupTermOffline } = await import('./dictionary');
       const local = await lookupTermOffline(query, lang);
-      const entries = (local.entries || []).slice(0, 8).map((e) => ({
+      // A prefix or fuzzy row is a near miss, not the word: answering 猫 with 猫舌
+      // made the popup head the wrong word. Only real matches are returned.
+      const real = (local.entries || []).filter((e) => !e.via || REAL_MATCH_VIA.has(e.via));
+      const entries = real.slice(0, 8).map((e) => ({
         word: e.word,
         reading: e.reading,
+        via: e.via,
         pitchHtml: e.pitchHtml,
         glossaryHtml: e.glossaryHtml,
         senses: (e.senses || []).slice(0, 6).map((s) => ({
@@ -2012,9 +2158,112 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         query,
         entries,
         deinflection: local.deinflection,
+        // The single-character lookup carries the kanji's own data (readings,
+        // meanings, strokes, parts, JLPT) for the popup's Kanji tab.
+        ...(local.character ? { character: local.character } : {}),
       });
     } catch (err) {
       json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  /**
+   * The hover engine: every prefix of the scan window in ONE batched dictionary
+   * read, exact / de-inflected / reading matches only, longest wins. The
+   * extension used to walk at most ten prefixes, one request each, longest
+   * first — so on a 12-character window 私 and 猫 were never tried at all.
+   */
+  if (req.method === 'POST' && pathname === '/v1/scan') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}') as { text?: string; lang?: string; maxLen?: number };
+      const text = String(body.text ?? '').trim().slice(0, 64);
+      if (!text) {
+        json(res, 400, { ok: false, error: 'text required' });
+        return;
+      }
+      const lang = studyLangFromTag(body.lang) ?? studyLangOfText(text, getMainStudyLang());
+      const { scanOfflinePrefixes } = await import('./dictionary');
+      const found = await scanOfflinePrefixes(text, lang, {
+        maxLen: Math.min(24, Math.max(1, Number(body.maxLen) || 24)),
+      });
+      json(res, 200, {
+        ok: true,
+        query: text,
+        matched: found.matched,
+        via: found.via,
+        lang: found.lang ?? lang,
+        deinflection: found.deinflection,
+        entries: (found.entries || []).slice(0, 8).map((e) => ({
+          word: e.word,
+          reading: e.reading,
+          via: e.via,
+          pitchHtml: e.pitchHtml,
+          glossaryHtml: e.glossaryHtml,
+          senses: (e.senses || []).slice(0, 8).map((s) => ({
+            partsOfSpeech: s.partsOfSpeech || [],
+            definitions: (s.definitions || []).filter(Boolean).slice(0, 8),
+          })),
+          source: e.source,
+          isCommon: e.isCommon,
+          jlpt: e.jlpt,
+          frequency: e.frequency,
+        })),
+      });
+    } catch (err) {
+      json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  /** Native audio for one word (the popup's play buttons), from the app's audio cache. */
+  if (req.method === 'POST' && pathname === '/v1/word-audio') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}') as { term?: string; reading?: string; lang?: string };
+      const term = String(body.term ?? '').trim().slice(0, 40);
+      if (!term) {
+        json(res, 400, { ok: false, error: 'term required' });
+        return;
+      }
+      const lang = studyLangFromTag(body.lang) ?? studyLangOfText(term, getMainStudyLang());
+      const { getHeadwordAudioFromDb } = await import('./dictionary/service');
+      const result = await getHeadwordAudioFromDb({
+        lang,
+        term,
+        reading: String(body.reading ?? '').trim().slice(0, 40) || undefined,
+      });
+      json(res, 200, {
+        ok: result.status === 'ready',
+        status: result.status,
+        ...(result.clip ? { mimeType: result.clip.mimeType, dataBase64: result.clip.dataBase64 } : {}),
+      });
+    } catch (err) {
+      json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  /** Which of these words already have a note in the active profile's deck. */
+  if (req.method === 'POST' && pathname === '/v1/mine/check') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}') as { terms?: unknown[] };
+      const terms = Array.isArray(body.terms) ? body.terms.map(String) : [];
+      const { getProfileStore } = await import('./profiles');
+      const profile = getProfileStore().getActiveProfile();
+      const { checkAnkiDuplicates } = await import('./anki/extensionDuplicates');
+      const out = await checkAnkiDuplicates(terms, {
+        deckName: profile?.anki?.deckName || '',
+        modelName: profile?.anki?.modelName || '',
+      });
+      json(res, 200, out);
+    } catch (err) {
+      json(res, 400, { ok: false, duplicates: {}, error: err instanceof Error ? err.message : String(err) });
     }
     return;
   }
@@ -2362,6 +2611,20 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
 export function startExtensionServer(): void {
   if (server) return;
   ensureChromeExtensionFolder();
+  // A microphone clip uploaded through /v1/recordings (purpose "card") becomes a
+  // sentence card carrying its audio — the chunked successor of /v1/audio/save.
+  // A finished tab recording goes through the desktop recorder's pipeline
+  // (ffmpeg → media library → Whisper). Loaded lazily: ffmpeg and the media
+  // service are not extension-server startup cost.
+  void import('./extensionRecordingFinalizer')
+    .then((m) => m.installExtensionRecordingFinalizer())
+    .catch((err) => console.warn('[extensionServer] recording finalizer unavailable', err));
+  setMicRecordingHandler(async (filePath, meta) =>
+    mineAudioBytes(fs.readFileSync(filePath), meta.mimeType || 'audio/webm', {
+      url: meta.url,
+      title: meta.title,
+    }),
+  );
   const state = loadOrCreateState();
   server = http.createServer((req, res) => {
     void onRequest(req, res);
@@ -2391,6 +2654,7 @@ export function stopExtensionServer(): void {
 }
 
 export function registerExtensionBridgeIpc(): void {
+  registerExtensionAnnotateIpc();
   ipcMain.handle('extension:status', () => getExtensionBridgeStatus());
   ipcMain.handle('extension:regenerateToken', () => regenerateExtensionToken());
   ipcMain.handle('extension:pairNow', () => openExtensionPairingWindow());

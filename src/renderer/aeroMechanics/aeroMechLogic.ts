@@ -388,12 +388,12 @@ export function formatKb(kb: number, locale: string): string {
 /* ----------------------------------------------------------- Welcome Center */
 
 /** Local YYYY-MM-DD of `now` — the key for "once per day" gates. */
-export function localDayKey(now: number): string {
+export function aeroDayKey(now: number): string {
   const d = new Date(now);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /** True when a once-a-day surface has not run yet today. */
 export function isFirstTimeToday(lastDay: string | null | undefined, now: number): boolean {
-  return lastDay !== localDayKey(now);
+  return lastDay !== aeroDayKey(now);
 }

@@ -1,6 +1,7 @@
 /**
  * ICP — an intercepted transmission. One of the operator's own mined sentences
- * (or a deck word), spoken by the OS voice — or, without a Japanese voice,
+ * (or a deck word), played from the card's own mined clip or line audio when it
+ * has one, else spoken by the OS voice — or, without a Japanese voice,
  * flashed briefly as a signal burst — to be typed back. Scored with the app's
  * dictation comparison (kana-folded, reading-aware), shown as ACK/NAK with the
  * missed runs marked, and logged to the review log as a practice answer.
@@ -15,6 +16,23 @@ import { appendReviewLog } from '../../reviewLog';
 import { interceptPassed } from '../../wiredMechanics/intercept';
 import { noteInterceptAnswered, setActiveIntercept, useActiveIntercept } from '../../wiredMechanics/interceptStore';
 import { closeWiredConsole } from '../../wiredMechanics/consoleBus';
+import { loadDeck } from '../../flashcardDeck';
+import { cardHasOwnMedia, playCardMedia, stopCardMedia, type CardMediaFields, type CardMediaKind } from '../../wiredMechanics/cardMedia';
+
+/** The deck card a sentence intercept came from, when it carries mined media. */
+function mediaCardFor(cardId: string): CardMediaFields | null {
+  try {
+    const card = loadDeck().find((c) => c.id === cardId) as CardMediaFields | undefined;
+    return card && cardHasOwnMedia(card) ? card : null;
+  } catch {
+    return null;
+  }
+}
+
+function silence(): void {
+  stopSpeaking();
+  stopCardMedia();
+}
 
 type Phase = 'incoming' | 'burst' | 'transcribe' | 'scoring' | 'result';
 
@@ -39,9 +57,13 @@ export default function InterceptPanel({ stackIndex, top }: { stackIndex: number
   const [answer, setAnswer] = useState('');
   const [replays, setReplays] = useState(0);
   const [spoken, setSpoken] = useState(false);
+  /** What carried the transmission: the card's own clip/audio, or the OS voice. */
+  const [voice, setVoice] = useState<CardMediaKind | null>(null);
   const [result, setResult] = useState<{ passed: boolean; score: number; marks: DictationMark[] } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const burstTimer = useRef<number | null>(null);
+  /** Bumped per transmission and on teardown, so a late media answer is ignored. */
+  const transmitSeq = useRef(0);
 
   const code = active?.code ?? 'ICP-0000';
   const source = active?.source;
@@ -51,12 +73,15 @@ export default function InterceptPanel({ stackIndex, top }: { stackIndex: number
     setAnswer('');
     setReplays(0);
     setResult(null);
+    setVoice(null);
+    transmitSeq.current += 1;
   }, [active?.raisedAt]);
 
   useEffect(
     () => () => {
       if (burstTimer.current !== null) window.clearTimeout(burstTimer.current);
-      stopSpeaking();
+      transmitSeq.current += 1;
+      silence();
     },
     [],
   );
@@ -66,16 +91,16 @@ export default function InterceptPanel({ stackIndex, top }: { stackIndex: number
   }, [phase]);
 
   const close = useCallback(() => {
-    stopSpeaking();
+    transmitSeq.current += 1;
+    silence();
     setActiveIntercept(null);
     closeWiredConsole('intercept');
   }, []);
 
-  const transmit = useCallback(() => {
-    if (!source) return;
-    const voiced = hasJapaneseVoice() && speak(source.text, 'ja');
-    setSpoken(voiced);
-    if (voiced) {
+  const arrive = useCallback((kind: CardMediaKind | null) => {
+    setSpoken(kind !== null);
+    setVoice(kind);
+    if (kind !== null) {
       setPhase('transcribe');
       return;
     }
@@ -86,7 +111,23 @@ export default function InterceptPanel({ stackIndex, top }: { stackIndex: number
       burstTimer.current = null;
       setPhase('transcribe');
     }, BURST_MS);
-  }, [source]);
+  }, []);
+
+  const transmit = useCallback(() => {
+    if (!source) return;
+    const viaTts = (): boolean => hasJapaneseVoice() && speak(source.text, 'ja');
+    // A mined sentence is played in the speaker's own voice when the card kept
+    // its clip or line audio; a deck word's audio is a whole line, so it is not.
+    const media = source.kind === 'sentence' ? mediaCardFor(source.cardId) : null;
+    if (!media) {
+      arrive(viaTts() ? 'tts' : null);
+      return;
+    }
+    const seq = ++transmitSeq.current;
+    void playCardMedia(media, viaTts).then((kind) => {
+      if (seq === transmitSeq.current) arrive(kind);
+    });
+  }, [arrive, source]);
 
   const replay = useCallback(() => {
     if (!source || replays >= MAX_REPLAYS) return;
@@ -97,7 +138,8 @@ export default function InterceptPanel({ stackIndex, top }: { stackIndex: number
   const submit = useCallback(async () => {
     if (!source || !answer.trim() || phase !== 'transcribe') return;
     setPhase('scoring');
-    stopSpeaking();
+    transmitSeq.current += 1;
+    silence();
     const evaluation = await evaluateDictation(answer, source.text);
     const passed = interceptPassed(evaluation);
     const cmp = evaluation.comparison;
@@ -123,14 +165,15 @@ export default function InterceptPanel({ stackIndex, top }: { stackIndex: number
       top={top}
       className={`wmc-icp is-${phase}`}
       onClose={() => {
-        stopSpeaking();
+        transmitSeq.current += 1;
+        silence();
         setActiveIntercept(null);
       }}
       status={
         <>
           <span>{code}</span>
           <span>{source.kind === 'sentence' ? t('wiredMech.icp.kindSentence') : t('wiredMech.icp.kindWord')}</span>
-          <span className="wmc-status-right">{spoken ? 'VOX' : 'BURST'}</span>
+          <span className="wmc-status-right">{spoken ? (voice === 'tts' ? 'VOX' : 'REC') : 'BURST'}</span>
         </>
       }
     >

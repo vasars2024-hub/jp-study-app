@@ -100,6 +100,12 @@ export interface SentenceAnnotation {
   vocabulary: AnnotationVocabNote[];
   /** Register note specific to this span, when it carries one. */
   formality?: string;
+  /**
+   * The grammar library point this span was matched to. Set only by the offline
+   * highlighter (`localGrammarAnalysis`), which matches library points by construction;
+   * an AI annotation names a pattern, not a library id, and never carries one.
+   */
+  grammarId?: string;
 }
 
 /** The sentence rendered in each supported study/UI language. */

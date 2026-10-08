@@ -41,6 +41,11 @@ export interface ScraperRuntime {
    * across every request the run makes to it.
    */
   hosts?: Map<string, ScraperRuntime>;
+  /**
+   * The job's cancel signal. Read from the scope's root (not a host's own
+   * runtime) by `scraperRequest` when the call site passed none.
+   */
+  signal?: AbortSignal;
 }
 
 const storage = new AsyncLocalStorage<ScraperRuntime>();

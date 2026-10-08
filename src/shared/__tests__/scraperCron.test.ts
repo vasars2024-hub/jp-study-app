@@ -79,6 +79,45 @@ describe('parseCron', () => {
   });
 });
 
+/** The first spring-forward gap of 2026 in the process's time zone, if it has one. */
+function springForwardGap(): { y: number; m: number; d: number; hour: number } | null {
+  for (let day = new Date(2026, 0, 1); day.getFullYear() === 2026; day.setDate(day.getDate() + 1)) {
+    for (let hour = 1; hour < 23; hour += 1) {
+      const probe = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, 30);
+      if (probe.getHours() !== hour) {
+        return { y: day.getFullYear(), m: day.getMonth() + 1, d: day.getDate(), hour };
+      }
+    }
+  }
+  return null;
+}
+
+describe('nextCronRun across DST (P6)', () => {
+  // Runs where the zone has DST (e.g. `TZ=America/New_York npx vitest ...`);
+  // a zone without one has nothing to test.
+  const gap = springForwardGap();
+
+  it.runIf(gap)('runs a schedule inside the skipped hour once, right after the gap', () => {
+    const { y, m, d, hour } = gap!;
+    const cron = `30 ${hour} * * *`;
+    const fired = nextCronRun(cron, at(y, m, d, hour - 1, 0));
+    expect(fired).not.toBeNull();
+    const date = new Date(fired!);
+    // Same day, not tomorrow.
+    expect([date.getFullYear(), date.getMonth() + 1, date.getDate()]).toEqual([y, m, d]);
+    expect(date.getMinutes()).toBe(0);
+    // And once only: the next run is the following day's slot.
+    const following = new Date(nextCronRun(cron, fired!)!);
+    expect(following.getDate()).not.toBe(d);
+    expect(following.getHours()).toBe(hour);
+    expect(following.getMinutes()).toBe(30);
+  });
+
+  it('is unaffected on an ordinary day', () => {
+    expect(nextCronRun('30 2 * * *', at(2026, 7, 27, 1, 0))).toBe(at(2026, 7, 27, 2, 30));
+  });
+});
+
 describe('nextCronRun', () => {
   it('finds the next matching minute later the same day', () => {
     // 2026-07-27 is a Monday.
@@ -371,6 +410,39 @@ describe('planSchedulerTick', () => {
       ...base,
       missedRunPolicy: 'skip',
       entries: [entry({ nextRunAt: iso(now - 30_000) })],
+    });
+    expect(plan.due).toEqual(['a']);
+  });
+
+  // P6: with a session start, 'skip' means "missed while closed", not "late".
+  it('does not turn a long in-session hold into a skip', () => {
+    const plan = planSchedulerTick({
+      ...base,
+      missedRunPolicy: 'skip',
+      sessionStartedMs: at(2026, 7, 27, 8, 0),
+      // Due at 09:00, held (quiet hours, a long job) until 10:00.
+      entries: [entry({ nextRunAt: iso(at(2026, 7, 27, 9, 0)) })],
+    });
+    expect(plan.due).toEqual(['a']);
+  });
+
+  it('still skips a slot that passed before the session began', () => {
+    const plan = planSchedulerTick({
+      ...base,
+      missedRunPolicy: 'skip',
+      sessionStartedMs: at(2026, 7, 27, 9, 30),
+      entries: [entry({ nextRunAt: iso(at(2026, 7, 27, 9, 0)) })],
+    });
+    expect(plan.due).toEqual([]);
+    expect(plan.nextRunAt.a).toBe(iso(at(2026, 7, 27, 11, 0)));
+  });
+
+  it('gives a slot just before launch a minute of grace', () => {
+    const plan = planSchedulerTick({
+      ...base,
+      missedRunPolicy: 'skip',
+      sessionStartedMs: at(2026, 7, 27, 9, 0) + 30_000,
+      entries: [entry({ nextRunAt: iso(at(2026, 7, 27, 9, 0)) })],
     });
     expect(plan.due).toEqual(['a']);
   });

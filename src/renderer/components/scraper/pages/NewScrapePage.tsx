@@ -4,7 +4,7 @@
 // is driven by the ScraperPort, so when a real backend replaces the mock this
 // page does not change.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Icon from '../../Icons';
 import { Button, IconButton, Progress, Select } from '../../ui';
 import StatusDot from '../StatusDot';
@@ -22,24 +22,25 @@ import { resolveColumns, rowMatches, sortRows, type GroupKey } from '../result/c
 import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { formatEtaClock } from '../data/charts';
+import { scrapeRunTrackerFor } from '../data/scrapeRunTracker';
 import { sx, sxn, sxNumber, sxs } from '../strings';
-import { profileName, tr } from '../localize';
+import { profileName, scraperErrorText, tr } from '../localize';
 import {
   SCRAPER_PAGE_SIZES,
   type ScraperColumnId,
   type ScraperResultTab,
 } from '../../../../shared/scraperShell';
-import type {
-  EpisodeRow,
-  ImageRow,
-  LogLine,
-  ScrapeResult,
-  ScrapeStage,
-  StreamRow,
-  TorrentRow,
-} from '../../../../shared/scraperResults';
 import {
-  getActiveScraperSettings,
+  isRunningStage,
+  type EpisodeRow,
+  type ImageRow,
+  type LogLine,
+  type ScrapeStage,
+  type StreamRow,
+  type TorrentRow,
+} from '../../../../shared/scraperResults';
+import { resolveScraperSettings } from '../../../../shared/scraperSettings';
+import {
   loadScraperSettingsDocument,
   onScraperSettingsChanged,
   saveScraperSettingsDocument,
@@ -47,42 +48,30 @@ import {
 import { formatBytes } from '../../../../shared/assetRegistry';
 import { scraperArtwork } from '../artwork';
 
-const STAGE_LABEL: Record<ScrapeStage, string> = {
-  queued: 'Queued',
-  searching: 'Searching',
-  fetching: 'Fetching',
-  parsing: 'Extracting',
-  streams: 'Checking mirrors',
-  subtitles: 'Collecting subtitles',
-  validating: 'Validating',
-  done: 'Complete',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-};
-
-interface RunState {
-  jobId: string | null;
-  stage: ScrapeStage;
-  done: number;
-  total: number;
-  etaSec: number;
-  failed: number;
-}
-
-const IDLE: RunState = { jobId: null, stage: 'done', done: 0, total: 0, etaSec: 0, failed: 0 };
-
-function publishJobStatus(detail: { active: boolean; lastScrape?: string }) {
-  window.dispatchEvent(new CustomEvent('scraper:job-status', { detail }));
-}
+/** One key per stage, so a new stage is a compile error here rather than an untranslated label. */
+const STAGE_LABEL_KEY = {
+  queued: 'scraperFix.ui.stage.queued',
+  searching: 'scraperFix.ui.stage.searching',
+  fetching: 'scraperFix.ui.stage.fetching',
+  parsing: 'scraperFix.ui.stage.parsing',
+  streams: 'scraperFix.ui.stage.streams',
+  subtitles: 'scraperFix.ui.stage.subtitles',
+  validating: 'scraperFix.ui.stage.validating',
+  done: 'scraperFix.ui.stage.done',
+  failed: 'scraperFix.ui.stage.failed',
+  cancelled: 'scraperFix.ui.stage.cancelled',
+} as const satisfies Record<ScrapeStage, string>;
 
 export default function NewScrapePage() {
   const ctl = useScraper();
   const port = useScraperPort();
 
-  const [run, setRun] = useState<RunState>(IDLE);
-  const [result, setResult] = useState<ScrapeResult | null>(null);
-  const [liveRows, setLiveRows] = useState<EpisodeRow[]>([]);
-  const [liveLogs, setLiveLogs] = useState<LogLine[]>([]);
+  // The run lives in a tracker that outlives this page (it is remounted on
+  // every navigation), so coming back mid-scrape shows the job still running.
+  const tracker = useMemo(() => scrapeRunTrackerFor(port), [port]);
+  const snapshot = useSyncExternalStore(tracker.subscribe, tracker.getSnapshot);
+  const { run, result, rows: liveRows, logs: liveLogs } = snapshot;
+  const runError = snapshot.error === null ? '' : scraperErrorText(snapshot.error);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ResultFilters>(EMPTY_FILTERS);
@@ -90,13 +79,16 @@ export default function NewScrapePage() {
   const [startOpen, setStartOpen] = useState(false);
   const [previewRow, setPreviewRow] = useState<EpisodeRow | null>(null);
   const [actionNotice, setActionNotice] = useState('');
-  const unsubscribe = useRef<(() => void) | null>(null);
+  const startMenuRef = useRef<HTMLDivElement>(null);
+  const startToggleRef = useRef<HTMLButtonElement>(null);
 
-  const settings = useMemo(() => getActiveScraperSettings(), []);
   // The profile picker and the preflight line read the real document: they
   // used to say "Balanced" whichever profile a run would actually use.
   const [doc, setDoc] = useState(() => loadScraperSettingsDocument());
   useEffect(() => onScraperSettingsChanged(setDoc), []);
+  // Follows the document, not a snapshot taken at mount: a profile switched or
+  // a setting changed while this page is open shows (and runs) as changed.
+  const settings = useMemo(() => resolveScraperSettings(doc), [doc]);
   const activeProfile = doc.profiles.find((profile) => profile.id === doc.activeProfileId) ?? null;
   // Measured where downloads land; `null` renders as "unknown", never a guess.
   const [freeBytes, setFreeBytes] = useState<number | null>(null);
@@ -114,84 +106,47 @@ export default function NewScrapePage() {
   }, [port]);
   const languagePriority = settings.episodeProcessing.languagePriority;
 
-  useEffect(
-    () => () => {
-      unsubscribe.current?.();
-      publishJobStatus({ active: false });
-    },
-    [],
-  );
+  // A job already running in main (started before a reload, or by the
+  // scheduler) is picked up rather than hidden behind an idle form.
+  useEffect(() => {
+    let alive = true;
+    void port.listJobs().then(
+      (jobs) => {
+        if (!alive || tracker.isRunning()) return;
+        const live = jobs.find((job) => isRunningStage(job.stage));
+        if (live) tracker.adopt(live);
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [port, tracker]);
 
-  const running = run.jobId !== null && !['done', 'failed', 'cancelled'].includes(run.stage);
+  const running = run.jobId !== null && isRunningStage(run.stage);
+
+  // An opened start menu takes focus on its first item, so the arrow keys work
+  // from the moment it appears.
+  useEffect(() => {
+    if (!startOpen) return;
+    startMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+  }, [startOpen]);
 
   const start = useCallback(async () => {
-    unsubscribe.current?.();
-    setResult(null);
-    setLiveRows([]);
-    setLiveLogs([]);
     setSelected(new Set());
     setPreviewRow(null);
     setActionNotice('');
     setPageIndex(0);
-    setRun({ ...IDLE, stage: 'queued', jobId: 'pending' });
-    publishJobStatus({ active: true });
-
-    let jobId: string;
-    try {
-      jobId = await port.startScrape({
-        targetUrl: ctl.targetUrl,
-        profileId: 'balanced',
-      });
-    } catch {
-      setRun((prev) => ({ ...prev, jobId: null, stage: 'failed' }));
-      publishJobStatus({ active: false });
-      return;
-    }
-    setRun((prev) => ({ ...prev, jobId }));
-
-    unsubscribe.current = port.subscribeJob(jobId, (event) => {
-      switch (event.kind) {
-        case 'stage':
-          setRun((prev) => ({ ...prev, stage: event.stage }));
-          break;
-        case 'progress':
-          setRun((prev) => ({
-            ...prev,
-            done: event.done,
-            total: event.total,
-            etaSec: event.etaSec,
-          }));
-          break;
-        case 'row':
-          setLiveRows((prev) => (prev.some((r) => r.id === event.row.id) ? prev : [...prev, event.row]));
-          break;
-        case 'log':
-          // Newest first, and bounded — an unbounded live log is a memory leak
-          // dressed up as a feature.
-          setLiveLogs((prev) => [event.line, ...prev].slice(0, 500));
-          break;
-        case 'done':
-          setRun((prev) => ({ ...prev, stage: 'done', failed: event.summary.failed }));
-          publishJobStatus({
-            active: false,
-            lastScrape: `${event.summary.provider} · ${event.summary.found}/${event.summary.found}`,
-          });
-          void port.getResult(jobId).then(setResult, () => undefined);
-          break;
-        case 'error':
-          setRun((prev) => ({ ...prev, stage: 'failed' }));
-          publishJobStatus({ active: false });
-          break;
-      }
+    // Read at click time, not from this render: the active profile is whatever
+    // the document says now, never a hard-coded preset.
+    const current = loadScraperSettingsDocument();
+    await tracker.start({
+      targetUrl: ctl.targetUrl,
+      profileId: current.activeProfileId,
     });
-  }, [ctl.targetUrl, port]);
+  }, [ctl.targetUrl, tracker]);
 
-  const cancel = useCallback(async () => {
-    if (!run.jobId) return;
-    await port.cancelScrape(run.jobId);
-    setRun((prev) => ({ ...prev, stage: 'cancelled' }));
-    publishJobStatus({ active: false });
-  }, [port, run.jobId]);
+  const cancel = useCallback(() => tracker.cancel(), [tracker]);
 
   // Rows stream in during a run, then the finished result takes over.
   const allRows: EpisodeRow[] = result?.episodes ?? liveRows;
@@ -351,20 +306,58 @@ export default function NewScrapePage() {
               {running ? sx('scrape.cancel') : sx('scrape.start')}
             </Button>
             <IconButton
+              ref={startToggleRef}
               label={sx('scrape.startOptions')}
               className="scr-split-more"
+              aria-haspopup="menu"
               aria-expanded={startOpen}
               onClick={() => setStartOpen((v) => !v)}
+              onKeyDown={(e) => {
+                // Enter and Space are the button's own click; the arrows open
+                // the menu too, as a menu button's do.
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setStartOpen(true);
+                } else if (e.key === 'Escape' && startOpen) {
+                  e.preventDefault();
+                  setStartOpen(false);
+                }
+              }}
             >
               <Icon name="chevron" size={12} />
             </IconButton>
             {startOpen && (
               <div className="scr-pop scr-pop--split">
-                <div className="scr-pop-body">
+                <div
+                  className="scr-pop-body"
+                  role="menu"
+                  ref={startMenuRef}
+                  aria-label={sx('scrape.startOptions')}
+                  onKeyDown={(e) => {
+                    const items = Array.from(
+                      e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+                    );
+                    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const step = e.key === 'ArrowDown' ? 1 : -1;
+                      items[(at + step + items.length) % items.length]?.focus();
+                    } else if (e.key === 'Home' || e.key === 'End') {
+                      e.preventDefault();
+                      items[e.key === 'Home' ? 0 : items.length - 1]?.focus();
+                    } else if (e.key === 'Escape' || e.key === 'Tab') {
+                      if (e.key === 'Escape') e.preventDefault();
+                      setStartOpen(false);
+                      if (e.key === 'Escape') startToggleRef.current?.focus();
+                    }
+                  }}
+                >
                   {[sx('scrape.startPaused'), sx('scrape.previewOnly'), sx('scrape.queue')].map((label) => (
                     <button
                       key={label}
                       type="button"
+                      role="menuitem"
+                      tabIndex={-1}
                       className="scr-pop-item"
                       onClick={() => {
                         setStartOpen(false);
@@ -448,14 +441,23 @@ export default function NewScrapePage() {
               ))}
             </div>
             <div className="scr-run-bar">
-              <span className="scr-run-stage">{STAGE_LABEL[run.stage]}</span>
-              <Progress value={run.total ? run.done / run.total : null} />
+              {/* Polite, and only the stage: announcing every ETA tick would
+                  talk over whatever the user is reading. */}
+              <span className="scr-run-stage" aria-live="polite" aria-atomic="true">
+                {tr(STAGE_LABEL_KEY[run.stage])}
+              </span>
+              <Progress value={run.total ? run.done / run.total : undefined} />
               <span className="scr-run-pct">
                 {run.total ? `${Math.round((run.done / run.total) * 100)}%` : '—'}
               </span>
             </div>
           </div>
         )}
+        <div aria-live="polite">
+          {runError && (
+            <p className="scr-action-notice is-bad">{tr('scraperFix.ui.run.failed', { detail: runError })}</p>
+          )}
+        </div>
       </section>
 
       <section className="scr-result">

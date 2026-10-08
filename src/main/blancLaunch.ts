@@ -14,7 +14,7 @@
  * and Blanc takes them over only while there is no Study OS window.
  */
 import path from 'node:path';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, type WebContents } from 'electron';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { summarizeAppMemory, type AppMemoryReport, type AppProcessMemory, type AppProcessRole } from '../shared/appMemory';
 
@@ -65,6 +65,42 @@ export function broadcastStudyOsAlive(alive: boolean): void {
   }
 }
 
+/**
+ * Study OS renderers that have acked "my background jobs are installed"
+ * (renderer/studyOsJobsReady.ts). Blanc drops its own copy of the jobs only on
+ * this ack — "a Study OS window is alive" holds long before its handlers exist.
+ * An entry is cleared when its window is destroyed, its renderer dies, or it
+ * navigates/reloads (the new page acks again once installed).
+ */
+const studyOsJobsReadyIds = new Set<number>();
+
+export function isStudyOsJobsReady(): boolean {
+  return studyOsJobsReadyIds.size > 0;
+}
+
+/** Tell every renderer whether a Study OS window has its background jobs installed (Blanc listens). */
+export function broadcastStudyOsJobsReady(ready: boolean = isStudyOsJobsReady()): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('blanc:study-os-jobs-ready', ready);
+  }
+}
+
+function markStudyOsJobsReady(sender: WebContents): void {
+  const id = sender.id;
+  if (!studyOsJobsReadyIds.has(id)) {
+    studyOsJobsReadyIds.add(id);
+    const clear = (): void => {
+      sender.removeListener('did-navigate', clear);
+      sender.removeListener('render-process-gone', clear);
+      if (studyOsJobsReadyIds.delete(id)) broadcastStudyOsJobsReady();
+    };
+    sender.once('destroyed', clear);
+    sender.on('did-navigate', clear);
+    sender.on('render-process-gone', clear);
+  }
+  broadcastStudyOsJobsReady();
+}
+
 function processRole(type: string): AppProcessRole {
   if (type === 'Browser') return 'browser';
   if (type === 'GPU') return 'gpu';
@@ -112,6 +148,11 @@ export function registerBlancLaunchIpc(deps: BlancLaunchDeps): void {
     return saveBlancLaunchPrefs(next);
   });
   ipcMain.handle('blanc:studyOsAlive', (): boolean => deps.isStudyOsAlive());
+  ipcMain.handle('blanc:studyOsJobsReady', (event): boolean => {
+    markStudyOsJobsReady(event.sender);
+    return true;
+  });
+  ipcMain.handle('blanc:studyOsJobsReadyState', (): boolean => isStudyOsJobsReady());
   ipcMain.handle('blanc:openStudyOs', (): { ok: boolean } => {
     deps.openStudyOs();
     return { ok: true };

@@ -222,15 +222,19 @@ beforeEach(() => {
   ];
   h.env.shrinkNextPlacement = 0;
   clearState();
+  // The Lens is opt-in on a fresh install (KI-6); these suites exercise a
+  // profile where the user has switched it on.
+  writeState(JSON.stringify({ enabled: true }));
 });
 
 // ---- settings load ------------------------------------------------------
 
 describe('loadSettings', () => {
-  it('returns the defaults when no state file exists', async () => {
+  it('returns the defaults when no state file exists — off: a fresh install claims no hotkey (KI-6)', async () => {
+    clearState();
     const m = await load();
     expect(m.__readingLensTestables.loadSettings()).toEqual({
-      enabled: true,
+      enabled: false,
       hotkey: 'Ctrl+Shift+Space',
       lastRegion: null,
       defaultEngine: 'auto',
@@ -288,11 +292,24 @@ describe('loadSettings', () => {
 });
 
 describe('startReadingLens', () => {
-  it('boots to the default hotkey when the state file is corrupt', async () => {
+  it('boots safely (opt-in, nothing claimed) when the state file is corrupt', async () => {
     writeState('}}}not json{{{');
     const m = await load();
     expect(() => m.startReadingLens()).not.toThrow();
-    // Region select on its default chord (the word-under-cursor read holds its own).
+    expect(h.shortcut.registerCalls).toEqual([]);
+  });
+
+  it('a fresh install claims no system-wide chord until the Lens is switched on', async () => {
+    clearState();
+    const m = await load();
+    m.startReadingLens();
+    expect(h.shortcut.registerCalls).toEqual([]);
+  });
+
+  it('an older profile whose file predates the flag keeps the Lens on', async () => {
+    writeState(JSON.stringify({ hotkey: 'Ctrl+Shift+Space', lastRegion: null }));
+    const m = await load();
+    m.startReadingLens();
     expect(h.shortcut.registerCalls).toContain('Ctrl+Shift+Space');
   });
 

@@ -17,6 +17,7 @@
 import {
   matchScheduleReleases,
   releaseQueryFor,
+  scheduleReleaseKey,
   summariseSchedule,
   type AiringEntry,
   type AnimeScheduleRequest,
@@ -220,14 +221,17 @@ export async function loadAnimeSchedule(
     correlationId: CORRELATION,
   });
 
-  const releases = new Map<number, readonly TorrentRow[] | null>();
+  // Keyed by show and episode: keyed by show alone, episode 6's search replaced
+  // episode 5's when both aired inside the window, and episode 5 was matched
+  // against episode 6's releases.
+  const releases = new Map<string, readonly TorrentRow[] | null>();
   if (!request.scheduleOnly) {
     // Sequential and paced on purpose. Promise.all here would issue one request
     // per scheduled episode simultaneously, which is exactly the behaviour a
     // public index blocks for.
     for (const [index, entry] of entries.entries()) {
       if (index > 0) await sleep(INDEX_DELAY_MS);
-      releases.set(entry.mediaId, await fetchReleasesFor(entry));
+      releases.set(scheduleReleaseKey(entry), await fetchReleasesFor(entry));
     }
   }
 

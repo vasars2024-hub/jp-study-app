@@ -6,7 +6,7 @@
  * knowledge store.
  */
 import { useEffect, useMemo } from 'react';
-import { analyzeDeck, formatPct, localDayKey, planUpdates } from '../../../aeroMechanics/aeroMechLogic';
+import { analyzeDeck, formatPct, aeroDayKey, planUpdates } from '../../../aeroMechanics/aeroMechLogic';
 import type { AeroDeckSnapshot } from '../../../aeroMechanics/useAeroDeck';
 import { useStudyMeters } from '../../../aeroMechanics/useStudyMeters';
 import { openAeroMechApp, writeMark, type AeroMechSettings } from '../../../aeroMechanics/aeroMechSettings';
@@ -25,7 +25,7 @@ export default function WelcomeApp({ deck, settings, onToggleStartup }: WelcomeA
   const { t, lang } = useT();
   const meters = useStudyMeters(true);
   // Seen today: the once-a-day startup welcome is done.
-  useEffect(() => writeMark('welcome-day', localDayKey(Date.now())), []);
+  useEffect(() => writeMark('welcome-day', aeroDayKey(Date.now())), []);
   const now = deck.at || Date.now();
   const analysis = useMemo(() => analyzeDeck(deck.cards, now), [deck.cards, now]);
   const plan = useMemo(

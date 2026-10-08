@@ -82,7 +82,11 @@ function recordFor(
 }
 
 function csvCell(value: Cell): string {
-  const text = value === null ? '' : Array.isArray(value) ? value.join('|') : String(value);
+  let text = value === null ? '' : Array.isArray(value) ? value.join('|') : String(value);
+  // Formula-injection guard: a scraped title starting with = + - @ (or a tab /
+  // CR) would run as a formula when the CSV is opened in a spreadsheet. Numbers
+  // are ours, not scraped, and stay as they are.
+  if (typeof value !== 'number' && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

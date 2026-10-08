@@ -149,6 +149,12 @@ export interface ScraperSafetySettings {
   pauseAfterFailures: number;
   pauseDurationMs: number;
   domainRateLimits: Record<string, number>;
+  /**
+   * Lets the HTTP Inspector, source probes and crawls reach loopback, private,
+   * link-local and unique-local addresses. Off: those requests are refused
+   * (the SSRF guard). Never applies to qBittorrent or Seanime.
+   */
+  allowPrivateNetwork: boolean;
 }
 
 export interface ScraperAuthenticationSettings {
@@ -335,6 +341,7 @@ const BALANCED_SETTINGS: ScraperSettings = {
     pauseAfterFailures: 5,
     pauseDurationMs: 60_000,
     domainRateLimits: {},
+    allowPrivateNetwork: false,
   },
   authentication: {
     loginStatus: 'not-configured',
@@ -666,6 +673,8 @@ function validateSiteRules(
       linkAttribute: stringValue(raw.linkAttribute, '', 128, `${at}.linkAttribute`, issues).trim(),
       numberSelector: stringValue(raw.numberSelector, '', 512, `${at}.numberSelector`, issues),
       numberPattern: stringValue(raw.numberPattern, '', 512, `${at}.numberPattern`, issues),
+      nextPageSelector: stringValue(raw.nextPageSelector, '', 512, `${at}.nextPageSelector`, issues),
+      maxPages: boundedNumber(raw.maxPages, 1, 1, 50, `${at}.maxPages`, issues),
       enabled: booleanValue(raw.enabled, false, `${at}.enabled`, issues),
       lastValidatedAt: nullableDateValue(raw.lastValidatedAt, null, `${at}.lastValidatedAt`, issues),
       lastMatchCount: boundedNumber(raw.lastMatchCount, 0, 0, 1_000_000, `${at}.lastMatchCount`, issues),
@@ -819,6 +828,7 @@ export function validateScraperSettings(
       pauseAfterFailures: boundedNumber(safety.pauseAfterFailures, fallback.safety.pauseAfterFailures, 1, 1_000, 'safety.pauseAfterFailures', issues),
       pauseDurationMs: boundedNumber(safety.pauseDurationMs, fallback.safety.pauseDurationMs, 1_000, 86_400_000, 'safety.pauseDurationMs', issues),
       domainRateLimits: domainRateLimitsValue(safety.domainRateLimits, fallback.safety.domainRateLimits, 'safety.domainRateLimits', issues),
+      allowPrivateNetwork: booleanValue(safety.allowPrivateNetwork, fallback.safety.allowPrivateNetwork ?? false, 'safety.allowPrivateNetwork', issues),
     },
     authentication: {
       loginStatus: authentication.loginStatus === 'not-configured'

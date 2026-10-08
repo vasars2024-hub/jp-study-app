@@ -31,6 +31,13 @@ let cacheLang: StudyLang | null = null;
 let cache: Record<string, Entry> | null = null;
 let migrated = false;
 
+/** Drops the in-memory copy so a test that clears storage starts from it. */
+export function resetKnownWordsCacheForTests(): void {
+  cacheLang = null;
+  cache = null;
+  migrated = false;
+}
+
 function migrateLegacyOnce(): void {
   if (migrated) return;
   migrated = true;
@@ -208,10 +215,17 @@ export function getLevel(word: string): WkLevel {
 export function setLevel(word: string, level: WkLevel, manual = true): void {
   if (!word) return;
   const d = db();
-  if (level === 0 && manual) delete d[word];
+  // A hand-picked "New" is kept as `{ l: 0, m: 1 }`: deleting the entry erased
+  // the manual flag, and the next Anki sync raised the word straight back.
+  if (level === 0 && !manual) delete d[word];
   else d[word] = { l: level, ...(manual ? { m: 1 as const } : {}) };
   persist();
   emit([word]);
+}
+
+/** True when the user graded this word by hand (Anki/SRS inference leaves it alone). */
+export function isManualLevel(word: string): boolean {
+  return db()[word]?.m === 1;
 }
 
 /**
@@ -265,7 +279,9 @@ export function bulkSetFromAnki(levels: Record<string, WkLevel>): number {
 
 export function knowledgeCounts(): Record<WkLevel, number> {
   const out: Record<WkLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
-  for (const e of Object.values(db())) out[e.l] += 1;
+  // Manual "New" entries ({ l: 0, m: 1 }) only pin the word against sync; they
+  // are not counted, matching the time before they were stored at all.
+  for (const e of Object.values(db())) if (e.l > 0 && e.l <= 3) out[e.l] += 1;
   return out;
 }
 

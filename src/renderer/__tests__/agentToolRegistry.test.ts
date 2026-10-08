@@ -92,6 +92,30 @@ describe('central Agent tool registry', () => {
     expect(loadDeck().map((card) => card.id)).toEqual([created[1].id]);
   });
 
+  it('creates reminders that actually notify, honouring a requested offset', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    const plain = await handlers['calendar.create-reminder']?.({ title: 'Kanji', date: '2026-10-09', startTime: '09:00' });
+    expect(plain).toMatchObject({ category: 'reminder', reminder: 'at' });
+    const early = await handlers['calendar.create-reminder']?.({ title: 'JLPT', date: '2026-10-09', reminder: '1h' });
+    expect(early).toMatchObject({ reminder: '1h' });
+    const bogus = await handlers['calendar.create-reminder']?.({ title: 'x', date: '2026-10-09', reminder: '3 weeks' });
+    expect(bogus).toMatchObject({ reminder: 'at' });
+    const session = await handlers['calendar.schedule-session']?.({ title: 'Read', date: '2026-10-09' });
+    expect(session).toMatchObject({ reminder: 'none' });
+  });
+
+  it('answers read-only stats and known-word questions', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    const summary = await handlers['study.stats-summary']?.({});
+    expect(summary).toMatchObject({ streak: expect.any(Number), knownWords: { known: expect.any(Number) } });
+    expect(summary).toHaveProperty('cardsDue');
+    const { setLevel } = await import('../knownWords');
+    setLevel('猫', 3);
+    const word = await handlers['study.known-words']?.({ word: '猫' });
+    expect(word).toMatchObject({ word: '猫', level: 3, counts: { known: 1 } });
+    expect(await handlers['study.known-words']?.({})).not.toHaveProperty('word');
+  });
+
   it('returns authoritative ids for newly created decks and cards', async () => {
     const handlers = createCentralAgentToolRegistry(t);
     const deck = await handlers['flashcard.create-deck']?.({ name: 'Tracked deck' });

@@ -141,9 +141,14 @@ export type CreateBackupReply =
   | { ok: false; error: string; tooLarge?: boolean };
 
 let busy = false;
+/**
+ * A restore committed and the relaunch is a moment away: no backup may start
+ * now, or it would archive a half-swapped profile.
+ */
+let relaunchPending = false;
 
 async function withBusy<T>(fn: () => Promise<T>, whenBusy: T): Promise<T> {
-  if (busy) return whenBusy;
+  if (busy || relaunchPending) return whenBusy;
   busy = true;
   try {
     return await fn();
@@ -443,10 +448,38 @@ async function restoreCommit(token: unknown, args: RestoreCommitArgs): Promise<R
     appVersion: app.getVersion(),
   });
   if (!result.ok) return result;
+  relaunchPending = true;
   // Every module re-reads from disk on the next start. Guaranteed here rather
   // than left to the renderer, since writes stay frozen until it happens.
   setTimeout(() => void relaunch(), 1200);
   return result;
+}
+
+/**
+ * The restore commit takes the same lock as backups. It used to run outside it,
+ * so an automatic backup that started a few seconds after boot could be zipping
+ * `userData` while the commit was moving those very files — an archive of a
+ * half-restored profile, or a commit failing on a file the zipper held open.
+ */
+export function restoreCommitLocked(
+  run: () => Promise<RestoreCommitReply>,
+): Promise<RestoreCommitReply> {
+  return withBusy(run, {
+    ok: false,
+    failures: [{ path: '', error: mt('backup.error.busy') }],
+    rollbackFailures: [],
+  } as RestoreCommitReply);
+}
+
+/** Test seam for the backup lock. */
+export function backupLockForTests(): { withBusy: typeof withBusy; reset: () => void } {
+  return {
+    withBusy,
+    reset: () => {
+      busy = false;
+      relaunchPending = false;
+    },
+  };
 }
 
 /**
@@ -465,16 +498,39 @@ function broadcastRestoring(event: IpcMainInvokeEvent, active: boolean): void {
   }
 }
 
-async function relaunch(): Promise<void> {
+/**
+ * Never rejects. A relaunch that throws used to leave `relaunchPending` set for
+ * the rest of the session — every later backup answered "busy" — with nothing
+ * shown: it now clears the flag and tells the user to restart by hand.
+ */
+async function relaunch(): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await session.defaultSession.flushStorageData();
   } catch {
     /* best effort — localStorage commits are also flushed on exit */
   }
-  setTimeout(() => {
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  try {
     app.relaunch();
     app.exit(0);
-  }, 150);
+    return { ok: true };
+  } catch (err) {
+    relaunchPending = false;
+    const error = mt('fix3.backup.relaunchFailed', { error: err instanceof Error ? err.message : String(err) });
+    logDiagnostic('error', 'backup', 'relaunch-failed', error);
+    try {
+      dialog.showErrorBox(mt('fix3.backup.relaunchFailedTitle'), error);
+    } catch {
+      /* the log entry above still records it */
+    }
+    return { ok: false, error };
+  }
+}
+
+/** Test seam: run the relaunch step as `restoreCommit` does. */
+export function relaunchForTests(): ReturnType<typeof relaunch> {
+  relaunchPending = true;
+  return relaunch();
 }
 
 export function registerBackupIpc(): void {
@@ -489,11 +545,15 @@ export function registerBackupIpc(): void {
   ipcMain.handle('backup:restoreChoose', (event) => restoreChoose(event));
   ipcMain.handle('backup:restoreBegin', (event) => broadcastRestoring(event, true));
   ipcMain.handle('backup:restoreEnd', (event) => broadcastRestoring(event, false));
-  ipcMain.handle('backup:restoreCommit', (_e, token: unknown, args?: RestoreCommitArgs) => restoreCommit(token, args ?? {}));
+  ipcMain.handle('backup:restoreCommit', (_e, token: unknown, args?: RestoreCommitArgs) =>
+    restoreCommitLocked(() => restoreCommit(token, args ?? {})),
+  );
   ipcMain.handle('backup:restoreDiscard', () => {
     discardPending();
   });
-  ipcMain.handle('backup:relaunch', () => relaunch());
+  ipcMain.handle('backup:relaunch', async () => {
+    await relaunch();
+  });
   ipcMain.handle('backup:openFolder', async () => {
     fs.mkdirSync(backupsDir(), { recursive: true });
     return shell.openPath(backupsDir());

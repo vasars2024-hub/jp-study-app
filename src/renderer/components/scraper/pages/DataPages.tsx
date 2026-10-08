@@ -18,7 +18,7 @@ import { formatDuration } from '../../../stats';
 import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
 import { distinctEpisodes } from '../data/dashboardData';
 import { sx, sxn, sxNumber, sxs, sxss, type ScraperTextKey } from '../strings';
-import { episodeStatusText, tr } from '../localize';
+import { episodeStatusText, localizeScraperJobNote, tr } from '../localize';
 import { firstReason } from '../disabledReason';
 import TransferRemoveConfirm from '../TransferRemoveConfirm';
 import { errorText, qbitActionNotice, qbitListFailureKey } from '../data/qbitActions';
@@ -1105,7 +1105,7 @@ export function HistoryPage() {
         <ScrCard
           id="history-detail"
           title={open.titleEn}
-          description={open.note || sx('history.noNote')}
+          description={open.note ? localizeScraperJobNote(open.note) : sx('history.noNote')}
           statusId="page.history"
           trailing={
             <div className="scr-page-actions">

@@ -30,6 +30,7 @@ import {
   buildVideoCoreMineRequest,
   type VideoCoreMiningDraft,
 } from '../shared/videoCoreMining';
+import { cuePlaybackEndSec, cuePlaybackStartSec } from '../shared/videoCoreStudy';
 import {
   addDeckCardsTracked,
   FLASHCARD_DECK_STORAGE_EVENT,
@@ -47,6 +48,7 @@ import { t } from './i18n';
 import { writeLocalStorage } from './localStorageWrite';
 import { getStudyLang } from './studyEnvironment';
 import { normalizeStudyLang, studyLangFromTag, studyLangOfText, type StudyLang } from '../shared/studyLang';
+import { noteStudyOsJobInstalled } from './studyOsJobsReady';
 
 export interface MineMediaPayload {
   base64: string;
@@ -83,9 +85,12 @@ export interface MineToStudyInput {
   audioPath?: string;
   imagePath?: string;
   audioDataUrl?: string;
+  clipPath?: string;
   /** Raw media to keep as managed files on the local card. */
   audio?: MineMediaPayload;
   image?: MineMediaPayload;
+  /** The scene as a short video (mp4/webm), kept like the audio and the screenshot. */
+  clip?: MineMediaPayload;
   /**
    * The Anki half. Omit for a local-only save (the dictionary star). When
    * present it is sent as-is, so every surface keeps its own field mapping,
@@ -118,7 +123,15 @@ export interface MineToStudyResult {
   ankiResult?: MineNoteResult;
   /** Anki's own message for a `failed` outcome. */
   error?: string;
+  /**
+   * The card already existed and this mine filled in what it lacked: media it had no
+   * file for, or the player context. Absent when nothing changed.
+   */
+  merged?: MinedCardAddition[];
 }
+
+/** What a re-mine can add to a card that already exists. */
+export type MinedCardAddition = 'audio' | 'image' | 'clip' | 'sourceRef';
 
 // ---------------------------------------------------------------------------
 // Identity
@@ -469,6 +482,7 @@ export function requestStudyInput(
 export function videoCoreStudyInput(
   draft: VideoCoreMiningDraft,
   source: 'subtitle' | 'lyrics',
+  options: { subtitleDelaySec?: number } = {},
 ): MineToStudyInput {
   const origin = draft.provenance.source;
   const title = [origin.mediaTitle, origin.episodeNumber != null ? `#${origin.episodeNumber}` : '']
@@ -476,6 +490,7 @@ export function videoCoreStudyInput(
     .join(' ');
   const sentence = draft.sentence.trim();
   return {
+    ...(source === 'subtitle' ? { sourceRef: playerSourceRef(draft, options.subtitleDelaySec ?? 0) } : {}),
     word: draft.term.trim(),
     reading: draft.reading.trim(),
     meaning: draft.meaning.trim() || draft.translation.trim(),
@@ -493,7 +508,32 @@ export function videoCoreStudyInput(
     ...(draft.screenshotBase64 && draft.screenshot
       ? { image: { base64: draft.screenshotBase64, filename: draft.screenshot.filename } }
       : {}),
+    ...(draft.clipBase64 && draft.clip
+      ? { clip: { base64: draft.clipBase64, filename: draft.clip.filename } }
+      : {}),
     anki: buildVideoCoreMineRequest(draft),
+  };
+}
+
+/**
+ * Where a player-mined card came from, in the shape Flashcards' "Play in video" reads.
+ * Cue times are PLAYBACK seconds (the subtitle delay applied), so the jump lands on the
+ * line as it was heard, not as the subtitle file timed it.
+ */
+export function playerSourceRef(
+  draft: VideoCoreMiningDraft,
+  subtitleDelaySec: number,
+): NonNullable<DeckFlashcard['sourceRef']> {
+  const origin = draft.provenance.source;
+  const cueStartSec = cuePlaybackStartSec(draft.provenance.cue, subtitleDelaySec);
+  const cueEndSec = cuePlaybackEndSec(draft.provenance.cue, subtitleDelaySec);
+  return {
+    mediaId: origin.mediaId != null ? `media-${origin.mediaId}` : (origin.localFilePath || origin.playbackId),
+    ...(origin.episodeNumber != null ? { episode: origin.episodeNumber } : {}),
+    cueStartSec,
+    cueEndSec,
+    sentence: draft.sentence.trim() || draft.provenance.cue.text,
+    returnTarget: { section: 'video', positionSec: cueStartSec },
   };
 }
 
@@ -529,11 +569,20 @@ async function runMine(key: string, input: MineToStudyInput): Promise<MineToStud
   const word = input.word.trim();
   let card = findMinedCard(key, input);
   let created = false;
-  if (!card) {
-    const [audioPath, imagePath] = await Promise.all([storeMedia(input.audio), storeMedia(input.image)]);
+  let merged: MinedCardAddition[] | undefined;
+  if (card) {
+    merged = await mergeIntoExistingCard(card, input);
+  } else {
+    const [audioPath, imagePath, clipPath] = await Promise.all([
+      storeMedia(input.audio),
+      storeMedia(input.image),
+      storeMedia(input.clip),
+    ]);
     // A duplicate may have landed while media was being stored.
     card = findMinedCard(key, input);
-    if (!card) {
+    if (card) {
+      merged = await mergeIntoExistingCard(card, input);
+    } else {
       const draft: Omit<DeckFlashcard, 'id' | 'addedAt'> = {
         word: word.slice(0, 200),
         reading: (input.reading ?? '').trim(),
@@ -559,8 +608,10 @@ async function runMine(key: string, input: MineToStudyInput): Promise<MineToStud
       if (input.sceneReference?.trim()) draft.sceneReference = input.sceneReference.trim().slice(0, 400);
       const audio = input.audioPath || audioPath;
       const image = input.imagePath || imagePath;
+      const clip = input.clipPath || clipPath;
       if (audio) draft.audioPath = audio;
       if (image) draft.imagePath = image;
+      if (clip) draft.clipPath = clip;
       if (input.audioDataUrl && !audio) draft.audioDataUrl = input.audioDataUrl;
       card = addDeckCardsTracked([draft])[0];
       created = true;
@@ -595,9 +646,55 @@ async function runMine(key: string, input: MineToStudyInput): Promise<MineToStud
   }
   const cardId = card.id;
   const finalCard = loadDeck().find((row) => row.id === cardId) ?? card;
-  const result: MineToStudyResult = { card: finalCard, created, anki: outcome, ankiResult, error };
+  const result: MineToStudyResult = {
+    card: finalCard,
+    created,
+    anki: outcome,
+    ankiResult,
+    error,
+    ...(merged?.length ? { merged } : {}),
+  };
   if (input.notify !== false) notifyMined(result);
   return result;
+}
+
+/**
+ * Re-mining a line used to hand back the old card untouched: the screenshot, the cue
+ * audio or the clip captured this time were thrown away, so a card first saved without
+ * them could never get them. Fill in whatever the card lacks (media, and the player
+ * context that lets Flashcards jump back to the scene) and say what was added. Media the
+ * card already has is kept: it is the copy the learner has been reviewing.
+ */
+async function mergeIntoExistingCard(
+  card: DeckFlashcard,
+  input: MineToStudyInput,
+): Promise<MinedCardAddition[] | undefined> {
+  const patch: Partial<Pick<DeckFlashcard, 'audioPath' | 'imagePath' | 'clipPath' | 'sourceRef'>> = {};
+  const added: MinedCardAddition[] = [];
+  const [audioPath, imagePath, clipPath] = await Promise.all([
+    card.audioPath ? undefined : input.audioPath || storeMedia(input.audio),
+    card.imagePath ? undefined : input.imagePath || storeMedia(input.image),
+    card.clipPath ? undefined : input.clipPath || storeMedia(input.clip),
+  ]);
+  if (audioPath) {
+    patch.audioPath = audioPath;
+    added.push('audio');
+  }
+  if (imagePath) {
+    patch.imagePath = imagePath;
+    added.push('image');
+  }
+  if (clipPath) {
+    patch.clipPath = clipPath;
+    added.push('clip');
+  }
+  if (input.sourceRef && !card.sourceRef) {
+    patch.sourceRef = input.sourceRef;
+    added.push('sourceRef');
+  }
+  if (!added.length) return undefined;
+  updateDeckCard(card.id, patch);
+  return added;
 }
 
 /**
@@ -839,5 +936,7 @@ export function installStudyMining(): () => void {
   };
   window.addEventListener(FLASHCARD_DECK_STORAGE_EVENT, onStorage);
   offs.push(() => window.removeEventListener(FLASHCARD_DECK_STORAGE_EVENT, onStorage));
+  // Study OS acks Blanc only once this is in place (studyOsJobsReady.ts).
+  offs.push(noteStudyOsJobInstalled('mining'));
   return () => offs.forEach((off) => off());
 }

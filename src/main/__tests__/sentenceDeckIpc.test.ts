@@ -112,6 +112,12 @@ describe('listSentenceDeckSources', () => {
     expect(sources.tracks.filter((t) => t.id.endsWith('Show - 01.ja.srt'))).toHaveLength(1);
   }, 30_000);
 
+  it('does not hand episode 012\'s subtitle to episode 01 (P7 stem boundary)', () => {
+    // There is no `Show - 012.mkv`; the prefix `Show - 01` alone must not claim it.
+    expect(videoForSubtitle(path.join(videoDir, 'Show - 012.ja.srt'))).toBeNull();
+    expect(videoForSubtitle(path.join(videoDir, 'Show - 010.ja.srt'))).toBe(otherVideo);
+  });
+
   it('says why when a subtitle has no episode beside it', async () => {
     const lonely = path.join(tmpRoot, 'Lonely.ja.srt');
     fs.writeFileSync(lonely, SRT_JA);

@@ -30,8 +30,10 @@ import DictionaryPopup from '../renderer/components/DictionaryPopup';
 import SubtitleCueLine from '../renderer/components/SubtitleCueLine';
 import {
   isLookupClick,
+  lookupWordAtPoint,
   lookupWordFromMouseUp,
   noteLookupPointerDown,
+  type WordLookupHit,
 } from '../renderer/wordLookup';
 import { translateTo } from '../renderer/translator';
 import { SUBTITLE_FONT_SIZE_EVENT } from '../renderer/subtitleSizeBridge';
@@ -43,7 +45,7 @@ import {
   registerCommandHandler,
 } from '../renderer/keyboardShortcuts';
 import { t as translateUi, useT } from '../renderer/i18n';
-import { getChineseScript, getStudyLang, setStudyLang } from '../renderer/studyEnvironment';
+import { getChineseScript, getStudyLang } from '../renderer/studyEnvironment';
 import { studyLangTag } from '../shared/studyLang';
 import {
   loadWhisperDevice,
@@ -52,11 +54,17 @@ import {
   onWhisperModelChanged,
   setWhisperDevice as persistWhisperDevice,
   setWhisperModelTier,
-  whisperHfId,
   type WhisperDevice,
 } from '../renderer/whisperSettings';
-import { effectiveWhisperTier, markTierDownloaded } from '../renderer/whisperModelCache';
-import WhisperWorker from '../renderer/whisperWorker?worker';
+import {
+  ensureLibraryItemForPath,
+  latestWhisperRecord,
+  persistPlayerSubtitle,
+  PLAYER_TRANSCRIPTION_CARD_OPTIONS,
+  playerWhisperErrorKey,
+  playerWhisperView,
+} from './playerTranscription';
+import { newMineRequestId } from './mineRequestGuard';
 import {
   activeStudyCuesAtTime,
   adjacentStudyCue,
@@ -65,10 +73,11 @@ import {
   dismissVideoCoreComprehensionSuggestion,
   dismissVideoCoreShadowingSuggestion,
   dismissVideoCoreTimingRepair,
-  isCueEndTransition,
+  hoverLookupHeld,
   nextVideoCoreWhisperTrackNumber,
   normalizeVideoCoreStudyPreferences,
   studyTrackLanguage,
+  videoCoreStudyCueKey,
   nudgeSubtitlePosition,
   pickStudyPrimaryTrack,
   PLAYER_PREFERENCES_STORAGE_KEY,
@@ -83,7 +92,6 @@ import {
   recordVideoCoreComprehensionEvent,
   recordVideoCoreCueReplay,
   recordVideoCoreTimingAdjustment,
-  resolveStudyLoopSeekSec,
   shouldSuggestVideoCoreComprehensionRescue,
   shouldSuggestVideoCoreShadowing,
   shortLangTag,
@@ -105,8 +113,16 @@ import {
   nextVideoFit,
 } from '../shared/videoCoreStudy';
 import { decideExternalSubtitleMount } from '../shared/externalSubtitleMount';
+import { decodeSubtitleBytes } from '../shared/subtitleDecode';
 import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
-import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
+import {
+  minedCueKey,
+  type VideoCoreMineRequest,
+  type VideoCoreMiningSource,
+} from '../shared/videoCoreMining';
+import { createStudyCueClock, type StudyCueClock } from './studyCueClock';
+import { useMinedCueKeys } from './useMinedCueKeys';
+import { showToast } from '../renderer/components/ui/Toast';
 import { formatWatchLoopTimestamp } from '../shared/seanimeWatchLoop';
 import { pretokenizeInIdle } from '../renderer/tokenizer';
 import { evaluateDictation } from '../renderer/evaluateDictation';
@@ -156,7 +172,7 @@ import { setVolumeNormalization } from './volumeNormalization';
 import { registerLivePlayerProbe } from './livePlayerProbe';
 import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../renderer/subtitlesExport';
 import { useLineLevel } from '../renderer/lineLevel';
-import { recordStudyTime } from '../renderer/stats';
+import { recordLinesStudied, recordStudyTime } from '../renderer/stats';
 import { openSentenceDeckDialog } from '../renderer/components/sentenceDeck/SentenceDeckDialog';
 
 /** A dictation answer scoring under this percentage goes on the session's missed-lines list. */
@@ -209,17 +225,6 @@ type WhisperGenerationState =
   | 'transcribing'
   | 'done'
   | 'error';
-
-type WhisperWorkerMessage = {
-  type?: string;
-  status?: string;
-  progress?: number;
-  file?: string;
-  device?: 'webgpu' | 'wasm';
-  model?: string;
-  message?: string;
-  cues?: Array<{ start: number; end: number; text: string }>;
-};
 
 type CuePopup = {
   query: string;
@@ -390,7 +395,20 @@ export default function VideoCoreStudyOverlay({
     React.useState<VideoCoreActiveCue[]>([]);
   const [selectedAudioTrack, setSelectedAudioTrack] = React.useState<number | null>(null);
   const [subtitleDelaySec, setSubtitleDelaySec] = React.useState(0);
-  const [pauseOnLookup, setPauseOnLookup] = React.useState(false);
+  /**
+   * The line the study tools act on — the active line, or the line just heard, held until
+   * the next one starts or a seek (`studyCueAt`, published by the cue clock below). The
+   * display still follows `activeCues`; everything that DOES something with "this line"
+   * (replay, mine, dictation, shadowing, the grammar card) reads this instead, so none of
+   * it goes dead between two lines or at the moment auto-pause stops the video.
+   */
+  const [studyCue, setStudyCue] = React.useState<VideoCoreActiveCue | null>(null);
+  /** The translation line for the current study line was revealed (blur off) by key or click. */
+  const [translationRevealed, setTranslationRevealed] = React.useState(false);
+  /** Listening practice hides the study line for this session only — never the saved preference. */
+  const [listeningHidden, setListeningHidden] = React.useState(false);
+  /** The mine request the card panel is to carry out (shortcut, buttons, popup, transcript). */
+  const [mineRequest, setMineRequest] = React.useState<VideoCoreMineRequest | null>(null);
   const [translation, setTranslation] = React.useState('');
   const [translationBusy, setTranslationBusy] = React.useState(false);
   const [popup, setPopup] = React.useState<CuePopup | null>(null);
@@ -409,7 +427,6 @@ export default function VideoCoreStudyOverlay({
   const [mineSignal, setMineSignal] = React.useState(0);
   const popupOpenOnDownRef = React.useRef(false);
   const dockRef = React.useRef<HTMLDivElement | null>(null);
-  const previousCueRef = React.useRef<VideoCoreActiveCue | null>(null);
   const secondaryCuesRef = React.useRef<VideoCoreActiveCue[]>([]);
   /**
    * A file track's parsed timeline, cached against the track it belongs to.
@@ -425,9 +442,9 @@ export default function VideoCoreStudyOverlay({
   const shadowStopTimerRef = React.useRef<number | null>(null);
   const shadowAudioUrlRef = React.useRef('');
   const shadowGenerationRef = React.useRef(0);
-  const whisperWorkerRef = React.useRef<Worker | null>(null);
   const whisperGenerationRef = React.useRef(0);
-  const whisperCuesRef = React.useRef<Array<{ start: number; end: number; text: string }>>([]);
+  /** The queue job this overlay follows (see `playerTranscription.ts`). */
+  const whisperJobRef = React.useRef<{ mediaId: string; lang: string; generation: number } | null>(null);
   const ignoredPauseRef = React.useRef(false);
   const ignoredSeekTargetRef = React.useRef<number | null>(null);
   const seekOriginRef = React.useRef<number | null>(null);
@@ -476,8 +493,14 @@ export default function VideoCoreStudyOverlay({
 
   const activeCue = activeCues[0] ?? null;
   // Mirrored so the keyboard listener does not have to rebind on every cue change.
-  const activeCueRef = React.useRef(activeCue);
-  activeCueRef.current = activeCue;
+  const studyCueRef = React.useRef(studyCue);
+  studyCueRef.current = studyCue;
+  const pauseOnLookup = preferences.pauseOnLookup === true;
+  // Filled in further down, where their actions are defined; the key handlers registered
+  // above them read through these so they bind once.
+  const mineCurrentLineRef = React.useRef<() => void>(() => undefined);
+  const abCycleRef = React.useRef<() => void>(() => undefined);
+  const revealTranslationRef = React.useRef<() => void>(() => undefined);
   // Read by the detach bridge's command handler, which runs from an IPC callback rather
   // than in render and so must not close over a stale cue list.
   const allCuesRef = React.useRef(allCues);
@@ -534,10 +557,10 @@ export default function VideoCoreStudyOverlay({
     };
   }, []);
 
-  const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
+  const plainText = studyCue ? stripAssCueText(studyCue.text) : '';
   const dictationRequestRef = React.useRef(0);
   React.useEffect(() => () => { dictationRequestRef.current += 1; },
-    [plainText, dictationInput, activeCue?.index, activeCue?.trackNumber]);
+    [plainText, dictationInput, studyCue?.index, studyCue?.trackNumber]);
   // Tokenize the whole track in idle time, so a line is ready when it appears instead of
   // costing 4-53 ms on the main thread at that moment (profiled 2026-09-23). The cue line
   // tokenizes exactly this text when no grammar annotation splits it.
@@ -632,6 +655,8 @@ export default function VideoCoreStudyOverlay({
     secondaryLang: preferences.secondarySubLang,
   });
   const miningSource = miningSourceFromPlayback(playbackInfo);
+  // Lines of this video that are already cards: the line on screen and the transcript say so.
+  const minedCueKeys = useMinedCueKeys(miningSource);
   /** Which file this is, for everything remembered per file (delay, track choice). */
   const subtitleSource = React.useMemo(
     () => studySubtitleSource(playbackInfo, localFilePath),
@@ -670,13 +695,34 @@ export default function VideoCoreStudyOverlay({
    */
   const importSubtitleFile = React.useCallback(async (file: File) => {
     if (!manager) return;
-    const split = parseStudySubtitles(await file.text());
+    // Decoded by its bytes, not as UTF-8: Japanese fansub files are often Shift-JIS, and
+    // some tools write UTF-16 — both used to load as mojibake or as nothing at all.
+    const decoded = decodeSubtitleBytes(await file.arrayBuffer());
+    const split = parseStudySubtitles(decoded.text);
     if (!split.cues.length) {
       window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('mediaWorkspace.study.importSubtitleEmpty'), kind: 'error' } }));
       return;
     }
+    // Timed against the audio like the automatic sidecar: a file from another release is
+    // usually seconds off, and every replay, loop and mined card would inherit that.
+    // Measured directly rather than through the per-file cache: that cache holds the offset
+    // of the track mounted earlier, and this is a different file with its own timing.
+    const videoPath = localFilePath || playbackInfo?.localFile?.path;
+    let offsetSec = 0;
+    if (videoPath && typeof window.api?.subtitleSyncOffset === 'function') {
+      try {
+        const estimate = await window.api.subtitleSyncOffset(
+          videoPath,
+          split.cues.map((cue) => ({ start: cue.start, end: cue.end })),
+          video && Number.isFinite(video.duration) ? video.duration : undefined,
+        );
+        offsetSec = estimate?.confident ? estimate.offsetSec : 0;
+      } catch {
+        offsetSec = 0;
+      }
+    }
     const trackNumber = nextVideoCoreWhisperTrackNumber(manager.getTracks().map((track) => track.number));
-    const events = whisperCuesToVideoCoreEvents(split.cues, trackNumber) as MKVParser_SubtitleEvent[];
+    const events = whisperCuesToVideoCoreEvents(shiftCues(split.cues, offsetSec), trackNumber) as MKVParser_SubtitleEvent[];
     const track: MKVParser_TrackInfo = {
       number: trackNumber,
       uid: trackNumber,
@@ -701,8 +747,21 @@ export default function VideoCoreStudyOverlay({
       window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('mediaWorkspace.study.importSubtitleDone', { name: file.name, count: split.cues.length }), kind: 'ok' } }));
     } catch {
       window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('mediaWorkspace.study.importSubtitleEmpty'), kind: 'error' } }));
+      return;
     }
-  }, [manager, studyLang, t]);
+    // Kept with the video in the library, so the track is there the next time it opens.
+    if (videoPath) {
+      const outcome = await persistPlayerSubtitle({
+        videoPath,
+        fileName: file.name,
+        text: decoded.text,
+        lang: studyLang,
+      });
+      if (outcome !== 'saved') {
+        window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('studyLoop2.subtitle.notSaved'), kind: 'muted' } }));
+      }
+    }
+  }, [localFilePath, manager, playbackInfo?.localFile?.path, studyLang, t, video]);
 
   /*
    * Studied time, apart from watched time: seconds spent paused on a line with
@@ -746,17 +805,17 @@ export default function VideoCoreStudyOverlay({
   React.useEffect(() => setSelectedAnnotation(0), [plainText]);
   const showShadowingSuggestion = shouldSuggestVideoCoreShadowing(
     replaySignal,
-    activeCue,
+    studyCue,
     preferences.shadowingMode,
   );
-  const rescueScene = activeCue
-    ? videoCoreRescueScene(allCues, activeCue, subtitleDelaySec)
+  const rescueScene = studyCue
+    ? videoCoreRescueScene(allCues, studyCue, subtitleDelaySec)
     : null;
   const showComprehensionRescue = !showShadowingSuggestion
     && Boolean(rescueScene)
     && shouldSuggestVideoCoreComprehensionRescue(
       comprehensionSignal,
-      activeCue,
+      studyCue,
       playerPaused,
     );
   const timingDrift = React.useMemo(
@@ -767,13 +826,36 @@ export default function VideoCoreStudyOverlay({
     && !showComprehensionRescue
     && shouldSuggestVideoCoreTimingRepair(timingSignal, timingDrift, driftTracking);
 
+  /**
+   * Lines the learner actually worked on this session (replayed, looked up, mined, dictated,
+   * shadowed), once each, for Statistics' "lines studied in the player".
+   */
+  const studiedLineKeysRef = React.useRef(new Set<string>());
+  const noteLineStudied = React.useCallback((cue: VideoCoreActiveCue | null): void => {
+    if (!cue) return;
+    const key = videoCoreStudyCueKey(cue);
+    if (studiedLineKeysRef.current.has(key)) return;
+    studiedLineKeysRef.current.add(key);
+    try {
+      recordLinesStudied(1);
+    } catch {
+      // Statistics are a by-product; a store that refuses the write never blocks study.
+    }
+  }, []);
+
+  /*
+    Reads the study line through the ref, so this callback — and the seek listeners and
+    command handlers built on it — are made once rather than once per spoken line (they used
+    to re-register on every cue boundary).
+  */
   const recordComprehension = React.useCallback(
-    (event: VideoCoreComprehensionEvent, cue = activeCue): void => {
+    (event: VideoCoreComprehensionEvent, cue: VideoCoreActiveCue | null = studyCueRef.current): void => {
       if (!cue) return;
+      if (event !== 'pause') noteLineStudied(cue);
       setComprehensionSignal((current) =>
         recordVideoCoreComprehensionEvent(current, event, cue));
     },
-    [activeCue],
+    [noteLineStudied],
   );
 
   const markProgrammaticSeek = React.useCallback((targetSec: number): void => {
@@ -814,6 +896,27 @@ export default function VideoCoreStudyOverlay({
     setPreferences(next);
   }), []);
 
+  /*
+    Pin the first-run display choices (translation line off, blurred when switched on) the
+    first time the player opens, so a later write of some other preference cannot turn a new
+    learner into an "existing" one — `normalizeVideoCoreStudyPreferences` tells the two apart
+    only by whether anything is stored.
+  */
+  React.useEffect(() => {
+    let stored: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem(PLAYER_PREFERENCES_STORAGE_KEY) ?? 'null');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) stored = parsed as Record<string, unknown>;
+    } catch {
+      stored = {};
+    }
+    const patch: Record<string, unknown> = {};
+    for (const key of ['dualSubs', 'secondaryBlur'] as const) {
+      if (typeof stored[key] !== 'boolean') patch[key] = preferencesRef.current[key];
+    }
+    if (Object.keys(patch).length) writePlayerPreferencesPatch(patch, VIDEO_CORE_PREFS_SOURCE);
+  }, []);
+
   // Volume normalization, on the element this player actually plays through.
   // When it cannot be applied the preference goes back off, so the Media
   // Center's toggle shows what is true (and says why — MediaContent).
@@ -852,6 +955,22 @@ export default function VideoCoreStudyOverlay({
     if (video.playbackRate !== rate) video.playbackRate = rate;
   }, [preferences.playbackRate, video]);
 
+  /*
+    The other direction: the player's own `[` / `]` keys change the element's rate without
+    telling the preference, so the Playback sheet showed (and the next open restored) a
+    speed that was no longer playing.
+  */
+  React.useEffect(() => {
+    if (!video) return undefined;
+    const onRate = (): void => {
+      const rate = clampStudyPlaybackRate(video.playbackRate);
+      if (Math.abs(rate - preferencesRef.current.playbackRate) < 0.001) return;
+      updatePreference('playbackRate', rate);
+    };
+    video.addEventListener('ratechange', onRate);
+    return () => video.removeEventListener('ratechange', onRate);
+  }, [updatePreference, video]);
+
   React.useEffect(() => {
     if (!manager) {
       if (mediaCaptionsManager) return;
@@ -881,20 +1000,9 @@ export default function VideoCoreStudyOverlay({
       setTracks(manager.getTracks());
       setSelectedTrack(manager.getSelectedTrackNumberOrNull());
     };
+    // Auto-pause no longer lives here: it fired only for this (event-track) path and never
+    // between back-to-back lines. The cue clock (`studyCueClock.ts`) owns it for every path.
     const handleCueChange = (event: SubtitleManagerCueChangeEvent): void => {
-      const previous = previousCueRef.current;
-      const next = event.detail.cues[0] ?? null;
-      if (
-        !next
-        && previous
-        && preferences.autoPause
-        && video
-        && isCueEndTransition(video.currentTime, previous, subtitleDelaySec)
-      ) {
-        if (!video.paused) ignoredPauseRef.current = true;
-        video.pause();
-      }
-      previousCueRef.current = next ?? previous;
       setActiveCues(event.detail.cues);
       setAllCues(stableCueList(manager.getCues()));
       onCueChange?.(event);
@@ -950,9 +1058,6 @@ export default function VideoCoreStudyOverlay({
     mediaCaptionsManager,
     onCueChange,
     onManagerReady,
-    preferences.autoPause,
-    subtitleDelaySec,
-    video,
   ]);
 
   /**
@@ -1107,13 +1212,22 @@ export default function VideoCoreStudyOverlay({
         const mounted = externalSubtitleRef.current?.path === localPath
           ? externalSubtitleRef.current
           : null;
-        // A container track outranks a downloaded sidecar. Our own previously mounted track is
-        // excluded so a changed library selection can replace it instead of becoming write-only.
-        // Our own English helper track (below) is not a container track either.
+        // A container track IN THE STUDY LANGUAGE (or one that does not say) outranks a
+        // downloaded sidecar; an English- or Chinese-only release no longer hides the Japanese
+        // track the learner downloaded. Our own previously mounted track is excluded so a
+        // changed library selection can replace it, and our English helper track (below) is
+        // not a container track either.
         const helperNumber = helperTrackRef.current?.trackNumber;
-        if (manager.getTracks().some((track) => (
-          track.number !== mounted?.trackNumber && track.number !== helperNumber
-        ))) return;
+        const wantedLang = getStudyLang();
+        const trackLanguages: Record<number, string> = {};
+        for (const track of manager.getTracks()) {
+          trackLanguages[track.number] = track.number === helperNumber ? 'helper' : studyTrackLanguage(track);
+        }
+        if (manager.getTracks().some((track) => {
+          if (track.number === mounted?.trackNumber || track.number === helperNumber) return false;
+          const lang = trackLanguages[track.number];
+          return !lang || lang === wantedLang;
+        })) return;
         let pick: { name: string; text: string } | null = null;
         try {
           // `intent: 'play'` tells the subtitle automation this episode is being watched,
@@ -1128,6 +1242,8 @@ export default function VideoCoreStudyOverlay({
           mountedTrackNumber: mounted?.trackNumber ?? null,
           mountedName: mounted?.name ?? null,
           resolvedName: pick?.name ?? null,
+          trackLanguages,
+          studyLang: wantedLang,
         });
         if (decision !== 'mount' || !pick?.text) return;
 
@@ -1181,8 +1297,15 @@ export default function VideoCoreStudyOverlay({
           await manager.onSubtitleEvents(events);
           // A newly selected sidecar may replace only our earlier sidecar. A container-selected
           // track still wins if it arrived while parsing or mounting was in flight.
+          // A container track in another language (the English-only release this sidecar
+          // was mounted beside) gives way too: the study line is the study language's.
           const selected = manager.getSelectedTrackNumberOrNull();
-          if (selected === null || selected === mounted?.trackNumber) {
+          const selectedLang = selected == null ? '' : trackLanguages[selected] ?? '';
+          if (
+            selected === null
+            || selected === mounted?.trackNumber
+            || (selectedLang !== '' && selectedLang !== wantedLang)
+          ) {
             await manager.selectTrack(trackNumber);
           }
           if (cancelled) return;
@@ -1414,6 +1537,11 @@ export default function VideoCoreStudyOverlay({
       const renderer = manager.libassRenderer;
       if (!renderer?.renderer?.addFonts) return;
       if (libassFontRendererRef.current === renderer) return;
+      // While this overlay is mounted the stylesheet hides the libass canvas (it paints the
+      // overlay's own line), so a 9-13 MB face fetched for it would never draw a glyph.
+      // Re-checked on every tick, so a canvas that becomes visible still gets its font.
+      const canvas = document.querySelector('#media-workspace canvas.JASSUB');
+      if (canvas instanceof HTMLElement && getComputedStyle(canvas).visibility === 'hidden') return;
       libassFontRendererRef.current = renderer;
       try {
         const font = await window.api.subtitleFallbackFont(getStudyLang());
@@ -1763,43 +1891,82 @@ export default function VideoCoreStudyOverlay({
     video,
   ]);
 
+  // A new study line starts clean. Keyed on the STUDY line, so the dictation box and the
+  // translation survive the gap after a line (and the auto-pause) instead of clearing there.
   React.useEffect(() => {
     setTranslation('');
+    setTranslationRevealed(false);
     setDictationInput('');
     setDictationResult(null);
     setDictationRevealed(false);
-  }, [activeCue?.index, activeCue?.trackNumber]);
+  }, [studyCue?.index, studyCue?.trackNumber]);
 
+  /*
+    The cue clock — one for every subtitle source (`studyCueClock.ts`). It publishes the
+    study line (only when it changes) and carries out auto-pause, the line loop and the A-B
+    loop within a few milliseconds of the line's end, where the `timeupdate` loops this
+    replaced overshot by up to a quarter second and auto-pause existed only for event tracks.
+    Everything is read through refs, so the clock is built once per element and only
+    re-planned when the cues, the delay or a mode changes.
+  */
+  const clockRef = React.useRef<StudyCueClock | null>(null);
+  const clockInputRef = React.useRef({
+    cues: allCues as readonly VideoCoreActiveCue[],
+    delaySec: subtitleDelaySec,
+    autoPause: preferences.autoPause,
+    lineLoop: preferences.loopLine,
+    ab: null as { startSec: number; endSec: number } | null,
+  });
+  clockInputRef.current = {
+    cues: allCues,
+    delaySec: subtitleDelaySec,
+    autoPause: preferences.autoPause,
+    lineLoop: preferences.loopLine,
+    ab: abLoop && abStartSec != null && abEndSec != null && abEndSec > abStartSec
+      ? { startSec: abStartSec, endSec: abEndSec }
+      : null,
+  };
   React.useEffect(() => {
-    if (!video) return;
-    const handleTimeUpdate = (): void => {
-      const seekTo = resolveStudyLoopSeekSec(
-        video.currentTime,
-        activeCue,
-        subtitleDelaySec,
-        {
-          lineLoop: preferences.loopLine,
-          abLoop,
-          abStartSec,
-          abEndSec,
-        },
-      );
-      if (seekTo == null) return;
-      markProgrammaticSeek(seekTo);
-      video.currentTime = seekTo;
-      if (video.paused) void video.play();
+    if (!video) {
+      setStudyCue(null);
+      return undefined;
+    }
+    const clock = createStudyCueClock({
+      video,
+      getCues: () => clockInputRef.current.cues,
+      getDelaySec: () => clockInputRef.current.delaySec,
+      getMode: () => ({
+        autoPause: clockInputRef.current.autoPause,
+        lineLoop: clockInputRef.current.lineLoop,
+        ab: clockInputRef.current.ab,
+      }),
+      onStudyCue: (cue) => setStudyCue(cue as VideoCoreActiveCue | null),
+      pause: () => {
+        if (!video.paused) ignoredPauseRef.current = true;
+        video.pause();
+      },
+      seek: (targetSec) => {
+        markProgrammaticSeek(targetSec);
+        video.currentTime = targetSec;
+        if (video.paused) void video.play().catch(() => undefined);
+      },
+    });
+    clockRef.current = clock;
+    return () => {
+      clock.dispose();
+      if (clockRef.current === clock) clockRef.current = null;
     };
-    video.addEventListener('timeupdate', handleTimeUpdate);
-    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+  }, [markProgrammaticSeek, video]);
+  React.useEffect(() => {
+    clockRef.current?.refresh();
   }, [
     abEndSec,
     abLoop,
     abStartSec,
-    activeCue,
-    markProgrammaticSeek,
+    allCues,
+    preferences.autoPause,
     preferences.loopLine,
     subtitleDelaySec,
-    video,
   ]);
 
   React.useEffect(() => {
@@ -1822,7 +1989,7 @@ export default function VideoCoreStudyOverlay({
       seekOriginRef.current = null;
       lastPlaybackTimeRef.current = target;
       if (!ignored && origin - target >= 0.75) {
-        recordComprehension('rewind', manager?.getActiveCues()[0] ?? activeCue);
+        recordComprehension('rewind', manager?.getActiveCues()[0] ?? studyCueRef.current);
       }
     };
     const handlePause = (): void => {
@@ -1830,7 +1997,7 @@ export default function VideoCoreStudyOverlay({
         ignoredPauseRef.current = false;
         return;
       }
-      recordComprehension('pause', manager?.getActiveCues()[0] ?? activeCue);
+      recordComprehension('pause', manager?.getActiveCues()[0] ?? studyCueRef.current);
     };
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('seeking', handleSeeking);
@@ -1842,7 +2009,7 @@ export default function VideoCoreStudyOverlay({
       video.removeEventListener('seeked', handleSeeked);
       video.removeEventListener('pause', handlePause);
     };
-  }, [activeCue, manager, recordComprehension, video]);
+  }, [manager, recordComprehension, video]);
 
   const seekCue = React.useCallback(
     (cue: VideoCoreActiveCue | null, leadInSec = 0): void => {
@@ -1977,24 +2144,30 @@ export default function VideoCoreStudyOverlay({
    */
   React.useEffect(() => {
     const offs = [
-      registerCommandHandler('video.replayLine', () => replayCue(activeCueRef.current)),
+      registerCommandHandler('video.replayLine', () => replayCue(studyCueRef.current)),
       registerCommandHandler('video.prevLine', () => jumpCue(-1)),
       registerCommandHandler('video.nextLine', () => jumpCue(1)),
       registerCommandHandler('video.subEarlier', () => changeSubtitleDelay(-0.1)),
       registerCommandHandler('video.subLater', () => changeSubtitleDelay(0.1)),
       registerCommandHandler('video.subEarlierLarge', () => changeSubtitleDelay(-0.5)),
       registerCommandHandler('video.subLaterLarge', () => changeSubtitleDelay(0.5)),
+      // Bound keys say what they did: a toggle with no visible change reads as a dead key.
       registerCommandHandler('video.toggleAutoPause', () => {
-        updatePreference('autoPause', !preferencesRef.current.autoPause);
+        const next = !preferencesRef.current.autoPause;
+        updatePreference('autoPause', next);
+        showToast({ message: translateUi(next ? 'studyLoop.player.autoPauseOn' : 'studyLoop.player.autoPauseOff') });
       }),
       registerCommandHandler('video.toggleLoop', () => {
         const next = !preferencesRef.current.loopLine;
         updatePreference('loopLine', next);
         // The checkbox clears the A–B loop when line-loop goes on, because the two
-        // compete for the same timeupdate handler. A shortcut that skipped this could
+        // compete for the same end-of-line clock. A shortcut that skipped this could
         // reach a state the UI cannot express.
         if (next) setAbLoop(false);
+        showToast({ message: translateUi(next ? 'studyLoop.player.loopOn' : 'studyLoop.player.loopOff') });
       }),
+      registerCommandHandler('video.abLoopCycle', () => abCycleRef.current()),
+      registerCommandHandler('video.revealTranslation', () => revealTranslationRef.current()),
       registerCommandHandler('video.toggleFurigana', () => {
         updatePreference('furigana', !preferencesRef.current.furigana);
       }),
@@ -2032,10 +2205,7 @@ export default function VideoCoreStudyOverlay({
       */
       registerCommandHandler('video.seekBack', () => seekBy(-preferencesRef.current.seekStepSec)),
       registerCommandHandler('video.seekForward', () => seekBy(preferencesRef.current.seekStepSec)),
-      registerCommandHandler('video.mineCurrentLine', () => {
-        if (!activeCueRef.current) return;
-        setMineSignal((n) => n + 1);
-      }),
+      registerCommandHandler('video.mineCurrentLine', () => mineCurrentLineRef.current()),
     ];
     return () => offs.forEach((off) => off());
   }, [changeSubtitleDelay, jumpCue, replayCue, resetSubtitleDelay, seekBy, updatePreference]);
@@ -2153,6 +2323,30 @@ export default function VideoCoreStudyOverlay({
     [plainText, preferences.secondarySubLang, translationBusy],
   );
 
+  /**
+   * The word last looked up, and on which line — the one-key mine's target when it is still
+   * the line being studied ("the word I clicked", as mpvacious/Yomitan mine it).
+   */
+  const lastLookupRef = React.useRef<{ query: string; cueKey: string } | null>(null);
+
+  /** Open the dictionary on a word: click, hover-with-modifier or keyboard all land here. */
+  const openLookup = React.useCallback((hit: WordLookupHit): void => {
+    recordComprehension('lookup');
+    const cue = studyCueRef.current;
+    lastLookupRef.current = cue ? { query: hit.query, cueKey: videoCoreStudyCueKey(cue) } : null;
+    if (pauseOnLookup && video) {
+      if (!video.paused) ignoredPauseRef.current = true;
+      video.pause();
+    }
+    setPopup({
+      query: hit.query,
+      x: hit.x,
+      y: hit.y,
+      top: hit.top,
+      context: hit.context || plainText,
+    });
+  }, [pauseOnLookup, plainText, recordComprehension, video]);
+
   const handleLookupMouseUp = React.useCallback(
     (event: React.MouseEvent): void => {
       const dismissOnly = popupOpenOnDownRef.current && isLookupClick(event);
@@ -2162,29 +2356,44 @@ export default function VideoCoreStudyOverlay({
         return;
       }
       if (hit) {
-        recordComprehension('lookup');
-        if (pauseOnLookup && video) {
-          if (!video.paused) ignoredPauseRef.current = true;
-          video.pause();
-        }
-        setPopup({
-          query: hit.query,
-          x: hit.x,
-          y: hit.y,
-          top: hit.top,
-          context: hit.context || plainText,
-        });
+        openLookup(hit);
       } else if (dismissOnly) {
         setPopup(null);
       }
     },
-    [pauseOnLookup, plainText, recordComprehension, translateCue, video],
+    [openLookup, plainText, translateCue],
   );
+
+  /*
+    Hover lookup, Yomitan-style: with the chosen modifier held, the word under the pointer
+    opens in the popup. One lookup per animation frame at most, no highlight side effects
+    (`highlight: false`), and only when the word changes — so moving along a word does not
+    re-open the card on every mousemove.
+  */
+  const hoverFrameRef = React.useRef(0);
+  const hoverQueryRef = React.useRef('');
+  React.useEffect(() => () => cancelAnimationFrame(hoverFrameRef.current), []);
+  const handleLookupHover = React.useCallback((event: React.MouseEvent): void => {
+    const modifier = preferencesRef.current.hoverLookup;
+    if (modifier === 'off' || !hoverLookupHeld(modifier, event)) {
+      hoverQueryRef.current = '';
+      return;
+    }
+    const { clientX, clientY } = event;
+    cancelAnimationFrame(hoverFrameRef.current);
+    hoverFrameRef.current = requestAnimationFrame(() => {
+      const hit = lookupWordAtPoint(clientX, clientY, document, { highlight: false });
+      if (!hit || hit.translate || hit.query === hoverQueryRef.current) return;
+      hoverQueryRef.current = hit.query;
+      openLookup(hit);
+    });
+  }, [openLookup]);
 
   const checkDictation = React.useCallback((): void => {
     if (!plainText) return;
     const request = ++dictationRequestRef.current;
-    const cue = activeCue;
+    const cue = studyCue;
+    noteLineStudied(cue);
     void evaluateDictation(dictationInput, plainText).then((result) => {
       if (request !== dictationRequestRef.current) return;
       setDictationResult(result);
@@ -2197,7 +2406,7 @@ export default function VideoCoreStudyOverlay({
           : rest;
       });
     });
-  }, [activeCue, dictationInput, plainText]);
+  }, [dictationInput, noteLineStudied, plainText, studyCue]);
 
   const clearShadowRecording = React.useCallback((): void => {
     shadowGenerationRef.current += 1;
@@ -2233,6 +2442,7 @@ export default function VideoCoreStudyOverlay({
 
   const startShadowRecording = React.useCallback(async (): Promise<void> => {
     if (shadowRecorderRef.current?.state === 'recording') return;
+    noteLineStudied(studyCueRef.current);
     setShadowError('');
     clearShadowRecording();
     const generation = shadowGenerationRef.current;
@@ -2297,15 +2507,15 @@ export default function VideoCoreStudyOverlay({
           : translateUi('mediaWorkspace.study.micStartFailed'),
       );
     }
-  }, [clearShadowRecording]);
+  }, [clearShadowRecording, noteLineStudied]);
 
   React.useEffect(() => {
     stopShadowRecording();
     clearShadowRecording();
     setShadowError('');
   }, [
-    activeCue?.index,
-    activeCue?.trackNumber,
+    studyCue?.index,
+    studyCue?.trackNumber,
     clearShadowRecording,
     stopShadowRecording,
   ]);
@@ -2322,128 +2532,60 @@ export default function VideoCoreStudyOverlay({
     if (url) URL.revokeObjectURL(url);
   }, []);
 
-  const stopWhisperGeneration = React.useCallback((): void => {
+  /**
+   * Stop following the queue job without cancelling it. A transcript that keeps running
+   * after the player moves on is written to the library and mounts the next time the file
+   * opens — closing the player is not a request to throw the work away.
+   */
+  const detachWhisperJob = React.useCallback((): void => {
     whisperGenerationRef.current += 1;
-    whisperWorkerRef.current?.terminate();
-    whisperWorkerRef.current = null;
-    whisperCuesRef.current = [];
+    whisperJobRef.current = null;
     setWhisperState('idle');
     setWhisperMessage('');
     setWhisperProgress(0);
   }, []);
 
-  const runWhisperGeneration = React.useCallback(async (): Promise<void> => {
-    const localFilePath = playbackInfo?.localFile?.path;
-    if (!manager || !localFilePath) {
-      setWhisperState('error');
-      setWhisperError(translateUi('mediaWorkspace.study.whisperLocalOnly'));
-      return;
+  /** The Stop button: cancel the queue job for this file, then stop following it. */
+  const stopWhisperGeneration = React.useCallback((): void => {
+    const job = whisperJobRef.current;
+    if (job && typeof window.api?.cancelTranscription === 'function') {
+      void window.api.cancelTranscription(job.mediaId).catch(() => undefined);
     }
+    detachWhisperJob();
+  }, [detachWhisperJob]);
 
-    stopWhisperGeneration();
-    const generation = whisperGenerationRef.current;
-    setWhisperError('');
-    setWhisperProgress(0);
-    setWhisperState('extracting');
-    setWhisperMessage(translateUi('mediaWorkspace.study.extractingAudio'));
-
-    let audio: Float32Array;
-    try {
-      const buffer = await window.api.seanimeExtractAudio(localFilePath);
-      if (generation !== whisperGenerationRef.current) return;
-      audio = new Float32Array(buffer);
-      if (!audio.length) {
-        throw new Error(translateUi('mediaWorkspace.study.noAudioTrack'));
-      }
-    } catch (error) {
-      if (generation !== whisperGenerationRef.current) return;
-      setWhisperState('error');
-      setWhisperError(
-        error instanceof Error
-          ? error.message
-          : translateUi('mediaWorkspace.study.audioExtractionFailed'),
-      );
-      return;
-    }
-
-    setWhisperState('loading');
-    setWhisperMessage(translateUi('mediaWorkspace.study.loadingWhisper'));
-    let worker: Worker;
-    try {
-      worker = new WhisperWorker();
-    } catch (error) {
-      setWhisperState('error');
-      setWhisperError(
-        error instanceof Error
-          ? error.message
-          : translateUi('mediaWorkspace.study.whisperStartFailed'),
-      );
-      return;
-    }
-    whisperWorkerRef.current = worker;
-    whisperCuesRef.current = [];
-
-    const fail = (message: string): void => {
-      if (generation !== whisperGenerationRef.current) return;
-      worker.terminate();
-      if (whisperWorkerRef.current === worker) whisperWorkerRef.current = null;
-      setWhisperState('error');
-      setWhisperError(message);
-    };
-
-    worker.onmessage = (event: MessageEvent<WhisperWorkerMessage>) => {
-      if (generation !== whisperGenerationRef.current) return;
-      const message = event.data;
-      if (
-        message.type === 'progress'
-        && message.status === 'progress'
-        && typeof message.progress === 'number'
-      ) {
-        const file = message.file?.split('/').pop() || 'model';
-        setWhisperMessage(translateUi('mediaWorkspace.study.downloadProgress', {
-          file,
-          progress: Math.round(message.progress),
-        }));
+  /** Mount the SRT the queue wrote to the library item as the study track. */
+  const mountQueueTranscript = React.useCallback(
+    async (job: { mediaId: string; lang: string; generation: number }): Promise<void> => {
+      const fail = (key: string): void => {
+        if (job.generation !== whisperGenerationRef.current) return;
+        whisperJobRef.current = null;
+        setWhisperState('error');
+        setWhisperError(translateUi(key));
+      };
+      if (!manager) {
+        fail('mediaWorkspace.study.whisperMountFailed');
         return;
       }
-      if (message.type === 'status' && message.status === 'transcribing') {
-        const device = message.device === 'webgpu' ? 'webgpu' : 'wasm';
-        markTierDownloaded(effectiveWhisperTier(whisperModel, message.model), device, whisperDevice);
-        setWhisperState('transcribing');
-        setWhisperMessage(
-          translateUi('mediaWorkspace.study.whisperOnDevice', {
-            device: translateUi(
-              device === 'webgpu'
-                ? 'mediaWorkspace.study.gpu'
-                : 'mediaWorkspace.study.cpu',
-            ),
-          }),
-        );
-        return;
-      }
-      if (message.type === 'partial') {
-        if (Array.isArray(message.cues)) {
-          whisperCuesRef.current.push(...message.cues);
+      try {
+        const items = await window.api.listMedia();
+        const record = latestWhisperRecord(items.find((entry) => entry.id === job.mediaId), job.lang);
+        const pick = record ? await window.api.readSubtitleRecord(job.mediaId, record.id) : null;
+        if (job.generation !== whisperGenerationRef.current) return;
+        if (!record || !pick?.text) {
+          fail('mediaWorkspace.study.noWhisperCues');
+          return;
         }
-        setWhisperProgress(message.progress ?? 0);
-        return;
-      }
-      if (message.type === 'error') {
-        fail(message.message || translateUi('mediaWorkspace.study.whisperFailed'));
-        return;
-      }
-      if (message.type !== 'done') return;
-
-      void (async () => {
         const trackNumber = nextVideoCoreWhisperTrackNumber(
           manager.getTracks().map((track) => track.number),
         );
+        // The queue's cues are timed against this file's own audio: no sync offset.
         const subtitleEvents = whisperCuesToVideoCoreEvents(
-          whisperCuesRef.current,
+          parseSubtitles(pick.text),
           trackNumber,
         ) as MKVParser_SubtitleEvent[];
         if (!subtitleEvents.length) {
-          fail(translateUi('mediaWorkspace.study.noWhisperCues'));
+          fail('mediaWorkspace.study.noWhisperCues');
           return;
         }
         const track: MKVParser_TrackInfo = {
@@ -2451,78 +2593,154 @@ export default function VideoCoreStudyOverlay({
           uid: trackNumber,
           type: 'subtitle',
           codecID: 'S_TEXT/ASS',
-          name: translateUi('mediaWorkspace.study.whisperGenerated'),
-          language: whisperLanguage,
-          languageIETF: whisperLanguage,
+          // The record's label names the model that actually ran; study provenance.
+          name: record.label || translateUi('mediaWorkspace.study.whisperGenerated'),
+          language: job.lang,
+          languageIETF: job.lang,
           default: false,
           forced: false,
           enabled: true,
         };
-        try {
-          await manager.addEventTrack(track);
-          await manager.onSubtitleEvents(subtitleEvents);
-          await manager.selectTrack(trackNumber);
-          if (generation !== whisperGenerationRef.current) return;
-          setTracks(manager.getTracks());
-          setSelectedTrack(manager.getSelectedTrackNumberOrNull());
-          setAllCues(stableCueList(manager.getCues()));
-          setActiveCues(manager.getActiveCues());
-          setWhisperState('done');
-          setWhisperMessage(translateUi('mediaWorkspace.study.generatedLines', {
-            count: subtitleEvents.length,
-          }));
-          setWhisperProgress(1);
-          worker.terminate();
-          if (whisperWorkerRef.current === worker) whisperWorkerRef.current = null;
-        } catch (error) {
-          fail(
-            error instanceof Error
-              ? error.message
-              : translateUi('mediaWorkspace.study.whisperMountFailed'),
-          );
-        }
-      })();
-    };
-    worker.onerror = (error) => {
-      fail(error.message || translateUi('mediaWorkspace.study.whisperStartFailed'));
-    };
+        await manager.addEventTrack(track);
+        await manager.onSubtitleEvents(subtitleEvents);
+        await manager.selectTrack(trackNumber);
+        if (job.generation !== whisperGenerationRef.current) return;
+        whisperJobRef.current = null;
+        setTracks(manager.getTracks());
+        setSelectedTrack(manager.getSelectedTrackNumberOrNull());
+        setAllCues(stableCueList(manager.getCues()));
+        setActiveCues(manager.getActiveCues());
+        setWhisperState('done');
+        setWhisperMessage(translateUi('mediaWorkspace.study.generatedLines', {
+          count: subtitleEvents.length,
+        }));
+        setWhisperProgress(1);
+      } catch {
+        fail('mediaWorkspace.study.whisperMountFailed');
+      }
+    },
+    [manager],
+  );
+  const mountQueueTranscriptRef = React.useRef(mountQueueTranscript);
+  mountQueueTranscriptRef.current = mountQueueTranscript;
+
+  /** Follow the queue for the file being transcribed; one subscription for the overlay's life. */
+  React.useEffect(() => {
+    if (typeof window.api?.onTranscriptionProgress !== 'function') return undefined;
+    return window.api.onTranscriptionProgress((progress) => {
+      const job = whisperJobRef.current;
+      if (!job || progress.mediaId !== job.mediaId) return;
+      if (job.generation !== whisperGenerationRef.current) return;
+      const view = playerWhisperView(progress);
+      if (view.state === 'done') {
+        setWhisperMessage(translateUi('media.jobs.phase.aligning'));
+        void mountQueueTranscriptRef.current(job);
+        return;
+      }
+      if (view.state === 'error') {
+        whisperJobRef.current = null;
+        setWhisperState('error');
+        setWhisperError(translateUi(view.messageKey, view.messageParams));
+        return;
+      }
+      if (view.state === 'idle') {
+        whisperJobRef.current = null;
+        setWhisperState('idle');
+        setWhisperMessage('');
+        setWhisperProgress(0);
+        return;
+      }
+      setWhisperState(view.state);
+      setWhisperMessage(translateUi(view.messageKey, view.messageParams));
+      setWhisperProgress(view.progress);
+    });
+  }, []);
+
+  const runWhisperGeneration = React.useCallback(async (): Promise<void> => {
+    // The request's path first (always present for a local open); the reply's is optional.
+    const whisperPath = localFilePath || playbackInfo?.localFile?.path;
+    if (!manager || !whisperPath || typeof window.api?.enqueueTranscription !== 'function') {
+      setWhisperState('error');
+      setWhisperError(translateUi('mediaWorkspace.study.whisperLocalOnly'));
+      return;
+    }
+
+    // A job for another file keeps running in the queue; this overlay stops following it.
+    detachWhisperJob();
+    const generation = whisperGenerationRef.current;
+    setWhisperError('');
+    setWhisperProgress(0);
+    setWhisperState('loading');
+    setWhisperMessage(translateUi('media.jobs.phase.queued'));
+
+    let item: Awaited<ReturnType<typeof ensureLibraryItemForPath>> = null;
     try {
-      worker.postMessage(
-        {
-          audio,
-          model: whisperHfId(whisperModel),
-          prefer: whisperDevice,
-          lang: whisperLanguage,
-        },
-        [audio.buffer],
-      );
-    } catch (error) {
-      fail(
-        error instanceof Error
-          ? error.message
-          : translateUi('mediaWorkspace.study.audioSendFailed'),
-      );
+      item = await ensureLibraryItemForPath(whisperPath);
+    } catch {
+      item = null;
+    }
+    if (generation !== whisperGenerationRef.current) return;
+    if (!item) {
+      setWhisperState('error');
+      setWhisperError(translateUi('mediaWorkspace.study.whisperLocalOnly'));
+      return;
+    }
+    // Followed before the request goes out: the queue broadcasts its first phase at once.
+    const job = { mediaId: item.id, lang: whisperLanguage, generation };
+    whisperJobRef.current = job;
+    try {
+      const result = await window.api.enqueueTranscription({
+        mediaId: item.id,
+        lang: whisperLanguage,
+        cardOptions: PLAYER_TRANSCRIPTION_CARD_OPTIONS,
+      });
+      if (generation !== whisperGenerationRef.current) return;
+      if (!result?.ok) {
+        whisperJobRef.current = null;
+        setWhisperState('error');
+        setWhisperError(translateUi(playerWhisperErrorKey(result?.error)));
+      }
+    } catch {
+      if (generation !== whisperGenerationRef.current) return;
+      whisperJobRef.current = null;
+      setWhisperState('error');
+      setWhisperError(translateUi('mediaWorkspace.study.whisperStartFailed'));
     }
   }, [
+    detachWhisperJob,
+    localFilePath,
     manager,
     playbackInfo?.localFile?.path,
-    stopWhisperGeneration,
-    whisperDevice,
     whisperLanguage,
-    whisperModel,
   ]);
 
   React.useEffect(() => {
-    stopWhisperGeneration();
+    detachWhisperJob();
     setWhisperError('');
-  }, [playbackInfo?.id, stopWhisperGeneration]);
+  }, [playbackInfo?.id, detachWhisperJob]);
 
   React.useEffect(() => () => {
     whisperGenerationRef.current += 1;
-    whisperWorkerRef.current?.terminate();
+    whisperJobRef.current = null;
   }, []);
 
   const audioTracks: MKVParser_TrackInfo[] = playbackInfo?.mkvMetadata?.audioTracks ?? [];
+  /** What the grammar card mines with: this video, and the line in playback seconds. */
+  const grammarMineContext = React.useMemo(() => ({
+    source: miningSource,
+    ...(studyCue
+      ? {
+        cueStartSec: studyCue.startMs / 1000 + subtitleDelaySec,
+        cueEndSec: studyCue.endMs / 1000 + subtitleDelaySec,
+      }
+      : {}),
+    // `miningSource` is rebuilt every render; its identity fields are what matter.
+  }), [miningSource?.playbackId, miningSource?.localFilePath, studyCue, subtitleDelaySec]);
+  /** The listened-to audio track as an index among the file's audio streams (ffmpeg `0:a:N`). */
+  const audioStreamOrdinal = (() => {
+    const at = audioTracks.findIndex((track) => track.number === selectedAudioTrack);
+    return at >= 0 ? at : null;
+  })();
 
   /*
    * Player Diagnostics reads this player's live state from here (the Media
@@ -2611,7 +2829,7 @@ export default function VideoCoreStudyOverlay({
   // The grammar card follows the analysis, not the toggle: with highlighting on but no
   // sentence analysed there is nothing for the panel to say, and an empty card taking a
   // 24rem column is the exact failure this redesign is about.
-  const grammarPanelWanted = preferences.grammarHighlight && !!activeCue && !!plainText;
+  const grammarPanelWanted = preferences.grammarHighlight && !!studyCue && !!plainText;
   React.useEffect(() => {
     if (grammarPanelWanted) {
       workspaceDispatch({ type: 'open-block', blockId: 'grammar', placement: 'left' });
@@ -2660,18 +2878,112 @@ export default function VideoCoreStudyOverlay({
   }, [popup, workspaceTrigger]);
 
   /**
-   * Mine the line on screen.
+   * Mine a line — by default the study line (the one playing, or the one just heard).
    *
-   * Two things, in this order, and the order matters: the export fires first through
-   * `mineSignal` — unchanged behaviour, and what `videoMineShortcut.test.tsx` asserts —
-   * then the card surface is brought up so the result is visible. Reversing them would
-   * make the shortcut depend on a panel having mounted.
+   * One request carries everything the card panel needs: the line itself (so a press in the
+   * gap after a line, or right after auto-pause, mines that line instead of nothing), and the
+   * target word when the learner chose one — passed in (the popup's Mine) or the word last
+   * looked up on this same line. Without a target the panel picks the first unknown word.
+   * The request goes out first, then the card surface comes up so the result is visible;
+   * the panel toasts the outcome either way, because it may be collapsed or off screen.
+   * `mineSignal` still ticks for the blocks that list the mining history.
    */
-  const mineCurrentLine = React.useCallback((): void => {
-    if (!activeCueRef.current) return;
+  const mineSeqRef = React.useRef(0);
+  const mineLine = React.useCallback((
+    options: { cue?: VideoCoreActiveCue | null; target?: VideoCoreMineRequest['target'] } = {},
+  ): void => {
+    const cue = options.cue ?? studyCueRef.current;
+    if (!cue) {
+      showToast({ message: translateUi('studyLoop.player.noLineToMine') });
+      return;
+    }
+    const lookedUp = lastLookupRef.current;
+    const target = options.target
+      ?? (lookedUp && lookedUp.cueKey === videoCoreStudyCueKey(cue) ? { surface: lookedUp.query } : undefined);
+    noteLineStudied(cue);
+    mineSeqRef.current += 1;
+    setMineRequest({
+      seq: mineSeqRef.current,
+      id: newMineRequestId(),
+      cue,
+      text: stripAssCueText(cue.text),
+      ...(target ? { target } : {}),
+    });
     setMineSignal((value) => value + 1);
     workspaceTrigger('mine');
-  }, [workspaceTrigger]);
+  }, [noteLineStudied, workspaceTrigger]);
+  const mineCurrentLine = React.useCallback((): void => mineLine(), [mineLine]);
+  mineCurrentLineRef.current = mineCurrentLine;
+  /** A transcript row's Mine: that line, wherever playback is (stable for the row memo). */
+  const mineTranscriptCue = React.useCallback(
+    (cue: VideoCoreActiveCue): void => mineLine({ cue }),
+    [mineLine],
+  );
+  /**
+   * A transcript word: the same lookup as a click on the subtitle line, remembered against
+   * the row's own cue so the one-key mine never pairs the word with another line.
+   */
+  const lookupTranscriptWord = React.useCallback(
+    (hit: WordLookupHit, cue: VideoCoreActiveCue): void => {
+      openLookup(hit);
+      lastLookupRef.current = { query: hit.query, cueKey: videoCoreStudyCueKey(cue) };
+    },
+    [openLookup],
+  );
+
+  /** X: the first press marks A, the second marks B and starts the loop, the third clears. */
+  abCycleRef.current = (): void => {
+    if (!video) return;
+    const now = video.currentTime;
+    if (abStartSec != null && abEndSec != null) {
+      setAbStartSec(null);
+      setAbEndSec(null);
+      setAbLoop(false);
+      showToast({ message: translateUi('studyLoop.player.abCleared') });
+      return;
+    }
+    if (abStartSec == null) {
+      setAbStartSec(now);
+      showToast({ message: translateUi('studyLoop.player.abSetA', { time: formatWatchLoopTimestamp(now * 1000) }) });
+      return;
+    }
+    if (now <= abStartSec + 0.2) {
+      // B before A is not a loop; restart from here as A.
+      setAbStartSec(now);
+      showToast({ message: translateUi('studyLoop.player.abSetA', { time: formatWatchLoopTimestamp(now * 1000) }) });
+      return;
+    }
+    setAbEndSec(now);
+    setAbLoop(true);
+    updatePreference('loopLine', false);
+    showToast({
+      message: translateUi('studyLoop.player.abLooping', {
+        from: formatWatchLoopTimestamp(abStartSec * 1000),
+        to: formatWatchLoopTimestamp(now * 1000),
+      }),
+    });
+  };
+
+  /**
+   * T: show the help for THIS line. A blurred second line is unblurred; with no second line
+   * on screen the line is translated (and a second press hides that translation again).
+   */
+  revealTranslationRef.current = (): void => {
+    if (!studyCueRef.current) {
+      showToast({ message: translateUi('studyLoop.player.noLineToTranslate') });
+      return;
+    }
+    noteLineStudied(studyCueRef.current);
+    if (preferences.dualSubs && secondaryText) {
+      setTranslationRevealed((value) => !value);
+      return;
+    }
+    if (translation) {
+      setTranslation('');
+      return;
+    }
+    void translateCue();
+  };
 
   /**
    * The whole episode as a sentence deck. The track on screen is handed over as
@@ -2752,7 +3064,7 @@ export default function VideoCoreStudyOverlay({
     episode: playbackInfo?.episode?.episodeNumber ?? null,
     streamType: String(playbackInfo?.streamType ?? ''),
     playbackRate: preferences.playbackRate,
-    activeIndex: activeCue?.index ?? null,
+    activeIndex: studyCue?.index ?? null,
     trackLabel: selectedTrackLabel,
     trackCount: tracks.length,
     audioTrackCount: audioTracks.length,
@@ -2788,7 +3100,7 @@ export default function VideoCoreStudyOverlay({
         if (video.paused) void video.play().catch(() => undefined);
         else video.pause();
       },
-      replayLine: () => replayCue(activeCueRef.current),
+      replayLine: () => replayCue(studyCueRef.current),
       analyzeNow: () => cueAnalysis.analyzeNow(),
       selectAnnotation: setSelectedAnnotation,
       // The card opens over the player, anchored where a lookup from the grammar dock
@@ -2882,6 +3194,7 @@ export default function VideoCoreStudyOverlay({
         selectedIndex={selectedAnnotation}
         onSelectedIndexChange={setSelectedAnnotation}
         onAnalyzeNow={cueAnalysis.analyzeNow}
+        mineContext={grammarMineContext}
         onLookup={(surface, context) => {
           // Anchored to the grammar block's own edge, not the middle of the screen:
           // the lookup was opened from that panel, and a card that appears dead-centre
@@ -2905,11 +3218,13 @@ export default function VideoCoreStudyOverlay({
     */
     cardEditor: (
       <VideoCoreMiningPanel
-        cue={activeCue}
+        cue={studyCue}
         displayText={plainText}
         source={miningSource}
         video={video}
         subtitleDelaySec={subtitleDelaySec}
+        mineRequest={mineRequest}
+        audioStreamOrdinal={audioStreamOrdinal}
         /*
           The same second line that is on screen, so the card is captioned with the
           translation the user was actually reading. Gated on `dualSubs` rather than
@@ -2917,18 +3232,21 @@ export default function VideoCoreStudyOverlay({
           user has read and agreed with.
         */
         translationText={preferences.dualSubs ? secondaryText : ''}
-        mineSignal={mineSignal}
         defaultExpanded={workspace.layout.mode === 'mining'}
       />
     ),
     transcript: (
       <VideoCoreTranscriptPanel
         cues={allCues}
-        activeIndex={activeCue?.index ?? null}
+        activeIndex={studyCue?.index ?? null}
         lang={studyLang}
         trackLabel={selectedTrackLabel}
         trackNotice={transcriptTrackNotice}
         onSeek={seekTranscriptCue}
+        knownHighlight={preferences.knownHighlight}
+        minedCueKeys={minedCueKeys}
+        onMineCue={mineTranscriptCue}
+        onWordLookup={lookupTranscriptWord}
         onClose={() => {
           // The user closed it: that is the one "off" that hides a layout's own rail too.
           updatePreference('transcriptPanel', false);
@@ -2944,7 +3262,7 @@ export default function VideoCoreStudyOverlay({
       handlers — so Practice Mode can make them dominant and Watch Mode can not show
       them at all.
     */
-    dictation: activeCue ? (
+    dictation: studyCue ? (
       <div className="study-dictation">
         <input
           lang="ja"
@@ -3002,7 +3320,7 @@ export default function VideoCoreStudyOverlay({
       </div>
     ) : null,
 
-    shadowing: activeCue ? (
+    shadowing: studyCue ? (
       <section
         className="study-shadowing"
         aria-label={t('mediaWorkspace.study.shadowPractice')}
@@ -3014,7 +3332,7 @@ export default function VideoCoreStudyOverlay({
           <span>{t('mediaWorkspace.study.shadowInstructions')}</span>
         </div>
         <div className="study-shadowing-actions">
-          <button type="button" onClick={() => replayCue(activeCue)}>
+          <button type="button" onClick={() => replayCue(studyCue)}>
             {t('mediaWorkspace.study.replayOriginal')}
           </button>
           {!shadowRecording ? (
@@ -3056,10 +3374,10 @@ export default function VideoCoreStudyOverlay({
 
     listening: (
       <ListeningBlock
-        preferences={preferences}
-        updatePreference={updatePreference}
-        onReplay={() => replayCue(activeCueRef.current)}
-        cueKey={`${activeCue?.trackNumber ?? -1}:${activeCue?.index ?? -1}`}
+        hidden={listeningHidden}
+        onHiddenChange={setListeningHidden}
+        onReplay={() => replayCue(studyCueRef.current)}
+        cueKey={`${studyCue?.trackNumber ?? -1}:${studyCue?.index ?? -1}`}
       />
     ),
 
@@ -3067,7 +3385,7 @@ export default function VideoCoreStudyOverlay({
       <AiWorkspaceBlock
         mode={aiMode}
         onModeChange={setAiMode}
-        hasCue={!!activeCue}
+        hasCue={!!studyCue}
         translation={translation}
         translationBusy={translationBusy}
         onTranslate={() => void translateCue()}
@@ -3078,6 +3396,7 @@ export default function VideoCoreStudyOverlay({
             selectedIndex={selectedAnnotation}
             onSelectedIndexChange={setSelectedAnnotation}
             onAnalyzeNow={cueAnalysis.analyzeNow}
+            mineContext={grammarMineContext}
             onLookup={(surface, context) => setPopup({
               query: surface,
               x: 24,
@@ -3093,7 +3412,7 @@ export default function VideoCoreStudyOverlay({
 
     studyHud: (
       <StudyHudBlock
-        cue={activeCue}
+        cue={studyCue}
         cueCount={allCues.length}
         trackLabel={selectedTrackLabel}
         subtitleDelaySec={subtitleDelaySec}
@@ -3133,6 +3452,16 @@ export default function VideoCoreStudyOverlay({
    * the video does, so the bare condition was true for 0.5-1.9 s on EVERY open and flashed
    * the notice over files that do have subtitles (transition audit 2026-09-23).
    */
+  /*
+    The line on screen: the playing line, or — while paused — the line just heard. Auto-pause
+    stops the video AFTER the line's end by definition, so a display that followed only the
+    audible cue went blank at exactly the moment the learner stopped to read it. While playing
+    through a gap the screen stays clear, as a burned-in subtitle would.
+  */
+  const lineCue = activeCue ? (studyCue ?? activeCue) : (playerPaused ? studyCue : null);
+  const lineText = lineCue === studyCue ? plainText : (lineCue ? stripAssCueText(lineCue.text) : '');
+  const secondaryBlurred = preferences.secondaryBlur === true && !translationRevealed;
+  const lineMined = !!lineCue && minedCueKeys.has(minedCueKey(lineCue));
   const noCuesNow = !activeCue && allCues.length === 0 && !externalSubtitlePending;
   const [noSubtitlesSettled, setNoSubtitlesSettled] = React.useState(false);
   /** Dual subtitles on, but neither a track nor the translator can supply a second line. */
@@ -3160,6 +3489,9 @@ export default function VideoCoreStudyOverlay({
         // fallback (Noto Sans SC was measured drawing Japanese text, 2026-09-23).
         lang={studyLang}
         data-study-active-cue={activeCue ? 'present' : 'none'}
+        // The line being studied when nothing is audible (the gap after a line, an auto-pause).
+        data-study-cue-lingering={!activeCue && lineCue ? 'true' : undefined}
+        data-study-cue-mined={lineMined ? 'true' : undefined}
         data-cue-index={activeCue?.index}
         data-cue-track={activeCue?.trackNumber}
         data-cue-start-ms={activeCue?.startMs}
@@ -3174,7 +3506,15 @@ export default function VideoCoreStudyOverlay({
         data-study-cue-position={preferences.subtitleAtTop ? 'top' : 'bottom'}
         style={subtitlePlacementStyle(preferences) as React.CSSProperties}
       >
-        {activeCue && preferences.primarySubs && !preferences.subtitlesHidden && (!preferences.dictationMode || dictationRevealed) ? (
+        {lineMined && preferences.primarySubs && !preferences.subtitlesHidden && (
+          <span
+            className="study-cue-mined"
+            role="img"
+            aria-label={t('studyLoop.lookup.mined')}
+            title={t('studyLoop.lookup.mined')}
+          />
+        )}
+        {lineCue && preferences.primarySubs && !listeningHidden && !preferences.subtitlesHidden && (!preferences.dictationMode || dictationRevealed) ? (
           <SubtitleCueLine
             /*
               `sa-palette` carries the category hues from sentenceAnalysis.css so
@@ -3184,10 +3524,10 @@ export default function VideoCoreStudyOverlay({
               box and the shadowing controls, and boxing all of that in one black
               rectangle is not what a subtitle background is.
             */
-            className="study-cue-text sa-palette"
+            className={`study-cue-text sa-palette${preferences.primaryBlur ? ' study-cue-blur' : ''}`}
             style={cueBoxStyle(preferences, 'primary', studyLangTag(studyLang, getChineseScript()))}
-            text={annotated ? annotated.sentence : plainText}
-            annotations={annotated?.annotations}
+            text={lineCue === studyCue && annotated ? annotated.sentence : lineText}
+            annotations={lineCue === studyCue ? annotated?.annotations : undefined}
             selectedAnnotation={selectedAnnotation}
             onSelectAnnotation={setSelectedAnnotation}
             furigana={preferences.furigana}
@@ -3199,6 +3539,8 @@ export default function VideoCoreStudyOverlay({
               noteLookupPointerDown(event);
             }}
             onMouseUp={handleLookupMouseUp}
+            onMouseMove={preferences.hoverLookup !== 'off' ? handleLookupHover : undefined}
+            onWordActivate={openLookup}
           />
         ) : preferences.subtitlesHidden && activeCue ? (
           /* Said once, then faded (the same CSS as the no-subtitles notice), so a stray V
@@ -3230,9 +3572,15 @@ export default function VideoCoreStudyOverlay({
 
         {preferences.dualSubs && !preferences.subtitlesHidden && secondaryText && (
           <p
-            className="study-cue-secondary"
+            className={`study-cue-secondary${secondaryBlurred ? ' study-cue-blur' : ''}`}
             lang={preferences.secondarySubLang}
             style={cueBoxStyle(preferences, 'secondary')}
+            data-study-secondary-blur={secondaryBlurred ? 'true' : undefined}
+            // Focusable while blurred, so the reveal is not mouse-only (focus unblurs it).
+            tabIndex={secondaryBlurred ? 0 : undefined}
+            title={secondaryBlurred
+              ? t('studyLoop.player.revealHint', { key: shortcutKeysFor('video.revealTranslation') || 'T' })
+              : undefined}
           >
             {secondaryText}
           </p>
@@ -3437,11 +3785,11 @@ export default function VideoCoreStudyOverlay({
       <StudyBottomBar
         barRef={dockRef}
         hasCues={allCues.length > 0}
-        hasActiveCue={!!activeCue}
+        hasActiveCue={!!studyCue}
         subtitleLoading={externalSubtitlePending}
         onImportSubtitleFile={(file) => void importSubtitleFile(file)}
         onPrevCue={() => jumpCue(-1)}
-        onReplayCue={() => replayCue(activeCue)}
+        onReplayCue={() => replayCue(studyCue)}
         onNextCue={() => jumpCue(1)}
         video={video}
         preferences={preferences}
@@ -3458,7 +3806,7 @@ export default function VideoCoreStudyOverlay({
         onExportSubtitles={allCues.length > 0 ? exportSubtitles : undefined}
         shortcutKeysFor={shortcutKeysFor}
         pauseOnLookup={pauseOnLookup}
-        setPauseOnLookup={setPauseOnLookup}
+        setPauseOnLookup={(value) => updatePreference('pauseOnLookup', value)}
         onTranslateLine={() => void translateCue()}
         translationBusy={translationBusy}
         onMineCurrentLine={mineCurrentLine}
@@ -3495,11 +3843,12 @@ export default function VideoCoreStudyOverlay({
         }}
         whisperLanguage={whisperLanguage}
         onWhisperLanguageChange={(language) => {
+          // This file's transcription language only. It used to rewrite the app-wide study
+          // language as a side effect of picking what a Whisper run should listen for.
           setWhisperLanguage(language);
-          setStudyLang(language);
         }}
         whisperBusy={whisperBusy}
-        whisperCanGenerate={!!manager && !!playbackInfo?.localFile?.path}
+        whisperCanGenerate={!!manager && !!(localFilePath || playbackInfo?.localFile?.path)}
         whisperState={whisperState}
         whisperMessage={whisperMessage}
         whisperError={whisperError}
@@ -3531,7 +3880,12 @@ export default function VideoCoreStudyOverlay({
           // by the card editor, the AI workspace or the mining queue, and reading one
           // block's preference would put the popup under any of the others.
           rightInsetPx={workspace.layout.hasRightDock ? rightDockInsetPx() : 0}
-          onClose={() => setPopup(null)}
+          onMine={() => mineLine({ target: { surface: popup.query } })}
+          onClose={() => {
+            // Hovering the same word again (modifier held) reopens it.
+            hoverQueryRef.current = '';
+            setPopup(null);
+          }}
         />
       )}
     </StudyDetachContext.Provider>

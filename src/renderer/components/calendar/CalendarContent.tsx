@@ -39,8 +39,12 @@ import {
 } from '../../calendar';
 import { loadDesktopPrefs, onDesktopPrefsChanged } from '../../desktopPrefs';
 import { useT } from '../../i18n';
-import { getStreakRestDates, onStatsChanged } from '../../stats';
+import { formatDuration, getMediaActivityByDay, getStreakRestDates, getStudyDaysByKey, onStatsChanged } from '../../stats';
+import { loadDeck, onDeckChanged } from '../../flashcardDeck';
+import { localDueForecast } from '../../../shared/reviewForecast';
+import { calendarStudyDay, dueByDate } from '../../../shared/studyActivityHeatmap';
 import { LANG_TAGS } from '../../../shared/i18n/core';
+import { mediaActivitySummary } from './calendarMediaActivity';
 
 export type ViewMode = 'month' | 'week' | 'day' | 'agenda';
 
@@ -585,6 +589,9 @@ export function CalendarNav({ state, actions }: { state: CalendarState; actions?
  *
  * The double-click is KEPT. This adds a route, it does not replace one.
  */
+/** Days of the deck's schedule the month grid reads: six weeks, every day a grid can show. */
+const CALENDAR_DUE_DAYS = 42;
+
 function MonthGrid({ state }: { state: CalendarState }) {
   const { t, lang } = useT();
   const { cursor, today, monthCells, occsByDay, openNew, openEdit } = state;
@@ -597,6 +604,19 @@ function MonthGrid({ state }: { state: CalendarState }) {
   const [statsVersion, setStatsVersion] = useState(0);
   useEffect(() => onStatsChanged(() => setStatsVersion((v) => v + 1)), []);
   const restDates = useMemo(() => getStreakRestDates(), [monthCells, statsVersion]);
+  // Video study per day (watch time, lines mined / studied in the player): one read per change.
+  const mediaByDay = useMemo(() => getMediaActivityByDay(), [statsVersion]);
+  // Study minutes and reviews per past day; reviews due per coming day, from the deck's own
+  // schedule (six weeks covers every day a month grid can show).
+  const studyByDay = useMemo(() => getStudyDaysByKey(), [statsVersion]);
+  const [deckVersion, setDeckVersion] = useState(0);
+  useEffect(() => onDeckChanged(() => setDeckVersion((v) => v + 1)), []);
+  const todayKey = toKey(today);
+  const dueByDay = useMemo(
+    () => dueByDate(localDueForecast(loadDeck(), CALENDAR_DUE_DAYS), new Date()),
+    // `deckVersion` and `todayKey` are the change signals.
+    [deckVersion, todayKey],
+  );
   // The cursor's own day when it is on screen, else the first cell: a grid whose
   // active descendant is a day from the month you navigated away from reads as
   // broken, and `aria-activedescendant` pointing at a missing id announces nothing.
@@ -668,6 +688,13 @@ function MonthGrid({ state }: { state: CalendarState }) {
             const isToday = key === toKey(today);
             const dayEvents = occsByDay.get(key) ?? [];
             const isRest = restDates.has(key);
+            const media = mediaActivitySummary(mediaByDay[key], t, lang, formatDuration);
+            const study = calendarStudyDay(key, studyByDay[key], dueByDay, today);
+            const studyDone = study && (study.minutes > 0 || study.reviews > 0) ? study : null;
+            const studyLong = [
+              studyDone ? t('studyLoop2.calendar.studyLong', { minutes: studyDone.minutes, reviews: studyDone.reviews }) : '',
+              study && study.due > 0 ? t('studyLoop2.calendar.dueLong', { count: study.due }) : '',
+            ].filter(Boolean).join(', ');
             return (
               <div
                 key={col}
@@ -677,7 +704,7 @@ function MonthGrid({ state }: { state: CalendarState }) {
                 // The date, spelled out, plus the count — "3" alone is not a label.
                 aria-label={`${d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}${
                   dayEvents.length ? `, ${t('calendar.moreCount', { count: dayEvents.length })}` : ''
-                }${isRest ? `, ${t('calendar.restDay')}` : ''}`}
+                }${isRest ? `, ${t('calendar.restDay')}` : ''}${media ? `, ${media}` : ''}${studyLong ? `, ${studyLong}` : ''}`}
                 className={`cal-month-cell ${inMonth ? '' : 'out'} ${isToday ? 'today' : ''}${
                   isRest ? ' rest' : ''}${
                   key === currentKey ? ' is-active' : ''
@@ -688,7 +715,20 @@ function MonthGrid({ state }: { state: CalendarState }) {
                 <div className="cal-month-daynum">
                   {d.getDate()}
                   {isRest && <span className="cal-rest-tag">{t('calendar.restDay')}</span>}
+                  {media && <span className="cal-media-tag" title={media} aria-hidden="true" />}
                 </div>
+                {study && (
+                  <div className="cal-study-line muted" title={studyLong} aria-hidden="true">
+                    {studyDone && (
+                      <span className="cal-study-done">
+                        {t('studyLoop2.calendar.studyShort', { minutes: studyDone.minutes, reviews: studyDone.reviews })}
+                      </span>
+                    )}
+                    {study.due > 0 && (
+                      <span className="cal-study-due">{t('studyLoop2.calendar.dueShort', { count: study.due })}</span>
+                    )}
+                  </div>
+                )}
                 <div className="cal-month-events">
                   {dayEvents.slice(0, 3).map((ev) => (
                     <EventChip key={`${ev.id}-${ev.occurrenceDate}`} ev={ev} onClick={() => openEdit(ev)} />
@@ -705,6 +745,22 @@ function MonthGrid({ state }: { state: CalendarState }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/** The day view's line about that day's video study; nothing on a day without any. */
+function DayMediaNote({ dayKey }: { dayKey: string }) {
+  const { t, lang } = useT();
+  const [statsVersion, setStatsVersion] = useState(0);
+  useEffect(() => onStatsChanged(() => setStatsVersion((v) => v + 1)), []);
+  const activity = useMemo(() => getMediaActivityByDay()[dayKey], [dayKey, statsVersion]);
+  const summary = mediaActivitySummary(activity, t, lang, formatDuration);
+  if (!summary) return null;
+  return (
+    <p className="muted cal-media-note">
+      <span className="cal-media-tag" aria-hidden="true" />
+      {summary}
+    </p>
   );
 }
 
@@ -758,6 +814,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
     const dayList = occsByDay.get(toKey(cursor)) ?? [];
     return (
       <div className="cal-day-list">
+        <DayMediaNote dayKey={toKey(cursor)} />
         {dayList.length === 0 && <p className="muted">{t('calendar.noEventsToday')}</p>}
         {dayList.map((ev) => (
           <button type="button" key={`${ev.id}-${ev.occurrenceDate}`} className="cal-day-row" style={{ borderLeftColor: ev.color }} onClick={() => openEdit(ev)}>

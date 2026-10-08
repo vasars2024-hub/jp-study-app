@@ -821,6 +821,8 @@ export default function MiniShell({
               <button
                 type="button"
                 className="mini-ico-btn"
+                aria-label={t('common.close')}
+                title={t('common.close')}
                 onClick={() => {
                   setPanelOpen(false);
                   setAddOpen(false);

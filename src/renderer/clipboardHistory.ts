@@ -4,8 +4,10 @@
 // localStorage-cache + IndexedDB-mirror pattern as flashcardDeck.ts.
 
 import { IDB_KEYS, LS_KEYS, mirrorToIdb } from './storage/storage';
-import { addDeckCardsTracked, type FlashcardSource } from './flashcardDeck';
-import { enrichNewCards } from './flashcardAutoEnrich';
+import type { FlashcardSource } from './flashcardDeck';
+import { mineToStudy, type MineToStudyInput } from './studyMining';
+import { studyLangOfText } from '../shared/studyLang';
+import { getStudyLang } from './studyEnvironment';
 
 export type ClipboardEntryType =
   | 'text'
@@ -248,22 +250,36 @@ export function clearOnExitIfConfigured(): void {
 
 /** Send clipboard entries into the existing Flashcard Collection (no duplicate storage). */
 export function sendEntriesToFlashcards(entries: ClipboardEntry[], source: FlashcardSource = 'import'): void {
-  // Fire and forget: the clipboard panel stays responsive while the one OS
-  // voice device works through whatever the preference covers.
-  void enrichNewCards(addDeckCardsTracked(
-    entries.map((e) => ({
-      word: e.dictMeta?.expression ?? e.text.slice(0, 120),
+  // Fire and forget: the clipboard panel stays responsive. Each entry goes
+  // through mineToStudy, so a copy sent twice finds its card instead of adding
+  // another; mineToStudy also runs the user's auto-enrich preference.
+  void (async () => {
+    for (const input of clipboardStudyInputs(entries, source)) {
+      await mineToStudy(input).catch(() => undefined);
+    }
+  })();
+}
+
+/** The study cards a set of clipboard entries becomes (one per entry). */
+export function clipboardStudyInputs(entries: ClipboardEntry[], source: FlashcardSource = 'import'): MineToStudyInput[] {
+  return entries.map((e) => {
+    const word = e.dictMeta?.expression ?? e.text.slice(0, 120);
+    // Plain clipboard copies also need their full text when the word preview
+    // is shortened, otherwise sending a passage to the deck loses its ending.
+    const sentence = e.type === 'sentence' || e.type === 'paragraph' || (!e.dictMeta && e.text.length > 120)
+      ? e.text
+      : undefined;
+    return {
+      word,
       reading: e.dictMeta?.reading ?? '',
       meaning: e.dictMeta?.meaning ?? '',
-      // Plain clipboard copies also need their full text when the word preview
-      // is shortened, otherwise sending a passage to the deck loses its ending.
-      sentence: e.type === 'sentence' || e.type === 'paragraph' || (!e.dictMeta && e.text.length > 120)
-        ? e.text
-        : undefined,
+      sentence,
       source,
-      bookTitle: e.readerMeta?.book,
-    })),
-  ));
+      ...(e.readerMeta?.book ? { sourceTitle: e.readerMeta.book } : {}),
+      studyLang: studyLangOfText(`${word} ${sentence ?? ''}`, getStudyLang()),
+      notify: false,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

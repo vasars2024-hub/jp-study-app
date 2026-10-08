@@ -1981,5 +1981,206 @@
   },
   "cmd_wheel_more_desc": {
     "message": "Open the secondary action list (OCR, media, page tools)."
+  },
+  "bg_stopRecordingFirst": {
+    "message": "Stop the recording first, then save it."
+  },
+  "bg_recUnsupported": {
+    "message": "This version of Chrome cannot record tabs."
+  },
+  "bg_recNeedsGesture": {
+    "message": "Start the recording from the Gum toolbar button or its shortcut — Chrome only lets an extension record a tab you invoked it on."
+  },
+  "bg_recFailed": {
+    "message": "The recording could not start."
+  },
+  "bg_recStopped": {
+    "message": "Recording stopped — sending it to Gum."
+  },
+  "bg_recStarted": {
+    "message": "Recording this tab…"
+  },
+  "bg_recSaved": {
+    "message": "Recording saved in Gum."
+  },
+  "menu_recordTab": {
+    "message": "Record this tab"
+  },
+  "manifestCmd_recordTab": {
+    "message": "Start or stop recording the tab"
+  },
+  "cmd_capture_video_record_label": {
+    "message": "Record tab"
+  },
+  "cmd_capture_video_record_short": {
+    "message": "Rec tab"
+  },
+  "cmd_capture_video_record_desc": {
+    "message": "Record this tab (picture and sound) into Gum."
+  },
+  "cmd_capture_audio_tab_label": {
+    "message": "Record tab audio"
+  },
+  "cmd_capture_audio_tab_short": {
+    "message": "Tab audio"
+  },
+  "cmd_capture_audio_tab_desc": {
+    "message": "Record only the sound of this tab into Gum."
+  },
+  "content_rpSaveEntry": {
+    "message": "Save this entry"
+  },
+  "content_ocrSelectHint": {
+    "message": "Drag a box around the text · Esc cancels"
+  },
+  "content_rpStrokes": {
+    "message": "$1 strokes"
+  },
+  "content_rpParts": {
+    "message": "parts: $1"
+  },
+  "popup_recTab": {
+    "message": "Record tab"
+  },
+  "popup_recAudio": {
+    "message": "Record tab audio"
+  },
+  "popup_recStop": {
+    "message": "Stop recording"
+  },
+  "popup_recStopFor": {
+    "message": "Stop recording ($1)"
+  },
+  "popup_recWaiting": {
+    "message": "$1 MB waiting"
+  },
+  "popup_recFailed": {
+    "message": "failed ($1 MB)"
+  },
+  "popup_recUpload": {
+    "message": "Upload now"
+  },
+  "popup_recDiscard": {
+    "message": "Discard"
+  },
+  "popup_recFailedStart": {
+    "message": "The recording could not start."
+  },
+  "popup_recStartedVideo": {
+    "message": "Recording this tab — open this popup again to stop."
+  },
+  "popup_recStartedAudio": {
+    "message": "Recording this tab’s sound — open this popup again to stop."
+  },
+  "popup_recStoppedUploading": {
+    "message": "Stopped — sending to Gum."
+  },
+  "opt_connTokenRejected": {
+    "message": "Gum is running but rejects this token"
+  },
+  "opt_popupTheme": {
+    "message": "Colours"
+  },
+  "opt_popupThemeAuto": {
+    "message": "Follow the page"
+  },
+  "opt_popupThemeLight": {
+    "message": "Light"
+  },
+  "opt_popupThemeDark": {
+    "message": "Dark"
+  },
+  "opt_popupAutoAudio": {
+    "message": "Play the word’s audio when the popup opens"
+  },
+  "opt_offlineCache": {
+    "message": "Keep recent lookups for when Gum is closed"
+  },
+  "opt_offlineCacheSub": {
+    "message": "Up to 20,000 words, stored only in this browser."
+  },
+  "opt_recHeading": {
+    "message": "Tab recording"
+  },
+  "opt_recMax": {
+    "message": "Stop a recording after (minutes)"
+  },
+  "opt_recAutoCrop": {
+    "message": "On a page with a video, record just the video"
+  },
+  "opt_recTranscribe": {
+    "message": "Transcribe finished recordings in Gum"
+  },
+  "content_recArea": {
+    "message": "Recording the selected area…"
+  },
+  "popup_recArea": {
+    "message": "Record area"
+  },
+  "opt_furigana": {
+    "message": "Furigana over new and learning words"
+  },
+  "opt_furiganaSub": {
+    "message": "Shown while word status colouring is on. Adds ruby text to the page."
+  },
+  "opt_allFrames": {
+    "message": "Also work inside embedded frames"
+  },
+  "opt_allFramesSub": {
+    "message": "Hover lookups in iframes such as embedded readers and comment widgets. Reload open tabs to apply."
+  },
+  "bg_errAppWindowClosed": {
+    "message": "Gum is running but its window is closed. Open the Gum window and try again."
+  },
+  "bg_errTimeout": {
+    "message": "Gum took too long to answer. Try again in a moment."
+  },
+  "bg_errBadRequest": {
+    "message": "Gum could not read that request. Update the extension and Gum to matching versions."
+  },
+  "bg_errTooLarge": {
+    "message": "That is too large to send to Gum in one piece."
+  },
+  "bg_errAnkiUnreachable": {
+    "message": "Gum could not reach Anki. Start Anki with AnkiConnect, then try again."
+  },
+  "popup_recMic": {
+    "message": "Record microphone"
+  },
+  "popup_recStartedMic": {
+    "message": "Recording the microphone."
+  },
+  "popup_recSaveDisk": {
+    "message": "Save to disk"
+  },
+  "popup_recSaveDiskTitle": {
+    "message": "Save this recording as a .webm file. Chrome asks once for permission to download files."
+  },
+  "popup_recSaveDiskDenied": {
+    "message": "Saving to disk needs the download permission. The recording is still waiting to upload."
+  },
+  "popup_recSaveDiskStarted": {
+    "message": "Saving the recording."
+  },
+  "popup_recSaveDiskFailed": {
+    "message": "Could not save the recording to disk."
+  },
+  "bg_micGrantNeeded": {
+    "message": "Allow the microphone on the page that just opened, then start the recording again."
+  },
+  "bg_recSaveNeedsPermission": {
+    "message": "Saving to disk needs the download permission."
+  },
+  "bg_recSaveMissing": {
+    "message": "This recording has no data left in the browser to save."
+  },
+  "opt_micGranted": {
+    "message": "Microphone allowed. Start the microphone recording again from the toolbar."
+  },
+  "opt_micDenied": {
+    "message": "The microphone was not allowed. Allow it in Chrome's site settings for this extension to record your voice."
+  },
+  "bg_recSaveInApp": {
+    "message": "Part of this recording is already in Gum, so the browser no longer has the whole file. Open it in Gum instead."
   }
 }

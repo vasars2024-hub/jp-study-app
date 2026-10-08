@@ -15,7 +15,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { extractVideoClip } from '../videoClipExtract';
+import { extractAudioClip, extractVideoClip, extractVideoFrame } from '../videoClipExtract';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -130,12 +130,63 @@ describe('extractVideoClip against real ffmpeg', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.base64).toBeUndefined();
-    expect(result.error).toMatch(/no longer where/i);
+    // A code, not an English sentence: main has no locale (studyLoop.mine.error.*).
+    expect(result.error).toBe('file-missing');
   });
 
   it('reports a streaming source rather than pretending to cut it', async () => {
     const result = await extractVideoClip({ filePath: '', startSec: 1, endSec: 2 });
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/no local file/i);
+    expect(result.error).toBe('no-local-file');
   });
+
+  it('keeps the audio track that was asked for', async () => {
+    const result = await extractVideoClip({
+      filePath: sourceFile, startSec: 1, endSec: 2, audioStreamOrdinal: 1,
+    });
+    expect(result.ok).toBe(true);
+    const clipFile = path.join(workDir, 'clip-second-track.mp4');
+    fs.writeFileSync(clipFile, Buffer.from(result.base64 ?? '', 'base64'));
+    const report = await identify(clipFile);
+    expect(report.match(/Stream #0:\d+.*Audio:/g) ?? []).toHaveLength(1);
+  }, 120_000);
+});
+
+describe('extractAudioClip against real ffmpeg', () => {
+  it('cuts padded cue audio as mp3 from the chosen stream', async () => {
+    const result = await extractAudioClip({
+      filePath: sourceFile, startSec: 2, endSec: 3, audioStreamOrdinal: 1,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.ok).toBe(true);
+    expect(result.mimeType).toBe('audio/mpeg');
+    // 0.25 s before + 1 s + 0.35 s after.
+    expect(result.durationSec).toBeCloseTo(1.6, 5);
+    expect(result.bytes ?? 0).toBeGreaterThan(1000);
+  }, 120_000);
+
+  it('falls back to the first stream when the chosen one does not exist', async () => {
+    const result = await extractAudioClip({
+      filePath: sourceFile, startSec: 2, endSec: 3, audioStreamOrdinal: 7,
+    });
+    expect(result.ok).toBe(true);
+  }, 120_000);
+
+  it('reports a missing file as a code', async () => {
+    const result = await extractAudioClip({
+      filePath: path.join(workDir, 'gone.mkv'), startSec: 1, endSec: 2,
+    });
+    expect(result).toMatchObject({ ok: false, error: 'file-missing' });
+  });
+});
+
+describe('extractVideoFrame against real ffmpeg', () => {
+  it('grabs one jpeg frame', async () => {
+    const result = await extractVideoFrame({ filePath: sourceFile, atSec: 3 });
+    expect(result.ok).toBe(true);
+    expect(result.mimeType).toBe('image/jpeg');
+    const bytes = Buffer.from(result.base64 ?? '', 'base64');
+    expect(bytes[0]).toBe(0xff);
+    expect(bytes[1]).toBe(0xd8);
+  }, 120_000);
 });

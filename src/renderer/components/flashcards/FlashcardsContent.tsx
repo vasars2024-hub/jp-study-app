@@ -143,7 +143,15 @@ import {
 } from '../../deckLevelEstimate';
 import { takeHandoffJson } from '../../pendingHandoff';
 import { FLASHCARDS_FOCUS_EVENT, onOpenIntent, takeFlashcardsFocus } from '../../openIntents';
-import { openMediaWorkspace, reachMediaWorkspace } from '../../mediaWorkspaceBridge';
+import {
+  cardMayHaveScene,
+  cardScene,
+  indexMiningHistory,
+  isLocalMediaPath,
+  openSceneAt,
+  readMiningHistory,
+  resolveCardScene,
+} from '../../sceneRoundTrip';
 import { srsIntervalLabel } from '../../srsIntervalLabel';
 
 export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
@@ -303,6 +311,10 @@ export interface FlashcardsState {
   dismissLeechNote: () => void;
   editLeechMeaning: () => Promise<void>;
   playCurrentInVideo: () => Promise<void>;
+  /** Whether a deck card has a local video and a cue time to go back to. */
+  cardHasScene: (cardId: string) => boolean;
+  /** Open the adopted player at a deck card's line (deck list rows). */
+  playCardInVideo: (cardId: string) => Promise<void>;
   audioBusy: boolean;
   audioCancelling: boolean;
   audioError: string;
@@ -627,6 +639,26 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const cards = deck.filter((card) => card.source === 'dictionary' && saved.some((w) => w.word === card.word));
     return reviewDueOnly ? dueDeckCards(cards) : cards;
   }, [deck, saved, reviewDueOnly]);
+
+  /**
+   * Which cards can go back to their scene. The mining history is re-read whenever the
+   * deck changes — a player mine writes both — and is the fallback for player-mined cards
+   * from before cards carried a `sourceRef`. One pass per deck change, not per row.
+   */
+  const miningHistoryIndex = useMemo(
+    () => indexMiningHistory(readMiningHistory()),
+    // `deck` is the change signal, not an input.
+    [deck],
+  );
+  const sceneCardIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const card of deck) {
+      if (!isLocalMediaPath(card.sourceUrl) && card.source !== 'media') continue;
+      if (cardMayHaveScene(card, miningHistoryIndex)) ids.add(card.id);
+    }
+    return ids;
+  }, [deck, miningHistoryIndex]);
+  const cardHasScene = useCallback((cardId: string) => sceneCardIds.has(cardId), [sceneCardIds]);
 
   function deckToReviewCards(cards: DeckFlashcard[]): ReviewCard[] {
     return planFlashcardReview(cards.map((c) => ({
@@ -957,22 +989,45 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     await cardAudio.play(dataUrl).catch(() => setAudioError(t('flash.audioPlaybackFailed')));
   }
 
-  /** Open the player on the moment this line was said, with a short run-up. */
+  /**
+   * Open the adopted player on the moment a card's line was said, with the app-wide
+   * run-up (`sceneRoundTrip.ts`). In review the reason an open could not happen goes
+   * under the card; from the deck list it is a toast, since a row has no status line.
+   */
+  async function playCardInVideo(cardId: string, where: 'review' | 'list' = 'list'): Promise<void> {
+    const notify = where === 'review' ? setVideoNote : undefined;
+    const deckCard = deck.find((candidate) => candidate.id === cardId);
+    let scene = deckCard ? await resolveCardScene(deckCard, miningHistoryIndex) : null;
+    if (!scene && !deckCard) {
+      // A review card the deck no longer holds still carries its own file and cue.
+      const session = sessionCards.find((candidate) => candidate.id === cardId);
+      if (session && isLocalMediaPath(session.sourceUrl) && typeof session.cueStartSec === 'number') {
+        scene = cardScene({
+          id: session.id,
+          word: session.word,
+          sentence: session.sentence,
+          sourceUrl: session.sourceUrl,
+          sourceRef: { mediaId: session.sourceUrl, cueStartSec: session.cueStartSec },
+          addedAt: 0,
+          source: 'subtitle',
+        });
+      }
+    }
+    if (!scene) {
+      const message = t('studyLoop.scene.noScene');
+      if (notify) notify(message);
+      else window.dispatchEvent(new CustomEvent('os:toast', { detail: { message, kind: 'muted' } }));
+      return;
+    }
+    cardAudio.stop();
+    const reach = await openSceneAt(scene, notify);
+    if (reach === 'ready' && where === 'review') setVideoNote('');
+  }
+
   async function playCurrentInVideo(): Promise<void> {
     const card = sessionCards[reviewIndex];
-    if (!card?.sourceUrl || card.cueStartSec == null) return;
-    cardAudio.stop();
-    const reach = await reachMediaWorkspace();
-    if (reach === 'no-host') {
-      setVideoNote(t('media.study.noWorkspaceHere'));
-      return;
-    }
-    if (reach === 'unavailable') {
-      setVideoNote(t('media.study.playerUnavailable'));
-      return;
-    }
-    setVideoNote('');
-    openMediaWorkspace({ localFilePath: card.sourceUrl, startAtSec: Math.max(0, card.cueStartSec - 0.3) });
+    if (!card) return;
+    await playCardInVideo(card.id, 'review');
   }
 
   async function addAudioToCurrent(): Promise<void> {
@@ -1368,6 +1423,8 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     dismissLeechNote: () => setLeechNote(''),
     editLeechMeaning,
     playCurrentInVideo,
+    cardHasScene,
+    playCardInVideo: (cardId: string) => playCardInVideo(cardId, 'list'),
     audioBusy,
     audioCancelling,
     audioError,
@@ -1778,7 +1835,8 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               )}
               <span className="flash-meaning">{current.meaning || t('flash.noMeaningSaved')}</span>
               {current.imagePath && <CardStill path={current.imagePath} />}
-              {current.sourceUrl && current.cueStartSec != null && !/^https?:/i.test(current.sourceUrl) && (
+              {(state.cardHasScene(current.id)
+                || (isLocalMediaPath(current.sourceUrl) && current.cueStartSec != null)) && (
                 <button
                   type="button"
                   className="btn small flash-play-in-video"
@@ -2810,6 +2868,18 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                 {card.folder && <span className="flash-row-folder muted">{card.folder}</span>}
                               </div>
                               <div className="flash-row-actions">
+                                {state.cardHasScene(card.id) && (
+                                  <button
+                                    type="button"
+                                    className="flash-row-x flash-row-play"
+                                    data-flash-action="row-play-in-video"
+                                    title={t('studyLoop.replayNamed', { term: card.word })}
+                                    aria-label={t('studyLoop.replayNamed', { term: card.word })}
+                                    onClick={() => void state.playCardInVideo(card.id)}
+                                  >
+                                    <Icon name="video" size={14} />
+                                  </button>
+                                )}
                                 <FlashcardFileMenu
                                   open={fileMenu === card.id}
                                   folders={folders}
@@ -2889,6 +2959,11 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
           onMoveFolder={(folder) => {
             state.setDeck(setBookGroupFolder(deckMenuGroup.bookId, deckMenuGroup.bookTitle, folder));
             state.setDeckMenuGroup(null);
+          }}
+          onRename={() => {
+            const { bookId, bookTitle } = deckMenuGroup;
+            state.setDeckMenuGroup(null);
+            void state.renameBookDeck(bookId, bookTitle);
           }}
           onDelete={() => {
             state.removeBookDeck(deckMenuGroup.bookId, deckMenuGroup.bookTitle);

@@ -37,10 +37,17 @@
  * The status is asked for rather than inferred from the DOM: `mediaWorkspaceHostIsMounted()`
  * races this component's own first render, since the host mounts in the same commit.
  */
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useT } from '../i18n';
 import { useMediaWorkspaceAvailability } from '../mediaWorkspaceAvailability';
 import { openMediaWorkspace } from '../mediaWorkspaceBridge';
+import {
+  mediaWorkspaceSectionState,
+  mediaWorkspaceSidecarLabelKey,
+  useMediaWorkspaceOverlayOpen,
+} from '../mediaWorkspaceSectionState';
+import { mediaWorkspaceHostExists } from '../../shared/mediaWorkspace';
+import { useSeanimeStatus } from '../../media/useSeanimeConnection';
 import type { MediaCenterTab } from './MediaCenterView';
 
 const MediaCenterView = lazy(() => import('./MediaCenterView'));
@@ -58,6 +65,12 @@ export default function MediaWorkspaceSectionView({
   // same answer. See `mediaWorkspaceAvailability.ts` for why it asks main rather than the
   // DOM, and why an IPC failure resolves to `unavailable`.
   const availability = useMediaWorkspaceAvailability();
+  // The live server kind and whether the overlay is actually on screen. Without these the
+  // section said "open in front of this window" for a closed overlay and a stopped server
+  // alike — see `mediaWorkspaceSectionState.ts`.
+  const status = useSeanimeStatus();
+  const open = useMediaWorkspaceOverlayOpen();
+  const [startRequested, setStartRequested] = useState(false);
 
   // `pending` renders nothing on purpose. Showing the legacy view while the status
   // resolves flashes the surface this change exists to retire, and on a fast resolve that
@@ -75,16 +88,68 @@ export default function MediaWorkspaceSectionView({
     );
   }
 
+  const state = mediaWorkspaceSectionState({
+    availability,
+    hostExists: mediaWorkspaceHostExists(),
+    open,
+    serverKind: status?.kind ?? null,
+  });
+  const serverLine = status
+    ? t('mediaWorkspace.serverState', { status: t(mediaWorkspaceSidecarLabelKey(status.kind)) })
+    : null;
+
+  let text: string;
+  let action: 'open' | 'start' | null = null;
+  switch (state) {
+    case 'open':
+      text = t('mediaWorkspace.section.open');
+      break;
+    case 'no-host':
+      text = t('mediaWorkspace.section.noHost');
+      break;
+    case 'starting':
+      text = serverLine ?? t('mediaWorkspace.connectingServer');
+      action = 'open';
+      break;
+    case 'needs-server':
+      text = serverLine ?? t('mediaWorkspace.notRunning');
+      action = startRequested ? null : 'start';
+      break;
+    default:
+      text = t('mediaWorkspace.section.closed');
+      action = 'open';
+  }
+
   return (
-    <div className="media-workspace-section">
-      <p className="media-workspace-section-text">{t('mediaWorkspace.section.open')}</p>
-      <button
-        type="button"
-        className="media-workspace-section-button"
-        onClick={() => openMediaWorkspace()}
-      >
-        {t('mediaWorkspace.section.reopen')}
-      </button>
+    <div className="media-workspace-section" data-media-workspace-section={state}>
+      <p className="media-workspace-section-text" role="status">
+        {state === 'needs-server' && startRequested ? t('mediaWorkspace.connectingServer') : text}
+      </p>
+      {action === 'open' && (
+        <button
+          type="button"
+          className="media-workspace-section-button"
+          onClick={() => openMediaWorkspace()}
+        >
+          {t('mediaWorkspace.section.open.action')}
+        </button>
+      )}
+      {action === 'start' && (
+        <button
+          type="button"
+          className="media-workspace-section-button"
+          onClick={() => {
+            // The status push from main moves the section on (to `starting`, then
+            // `closed` with the open action). A failed start lands back on `failed`.
+            setStartRequested(true);
+            void window.api.seanimeStart()
+              .catch(() => undefined)
+              .finally(() => setStartRequested(false));
+          }}
+        >
+          {t('mediaWorkspace.startServer')}
+        </button>
+      )}
     </div>
   );
 }

@@ -31,6 +31,20 @@ afterAll(() => {
   fs.rmSync(testRoot, { recursive: true, force: true });
 });
 
+/**
+ * The synthesis cases need a Japanese SAPI voice. A Windows install without the
+ * Japanese speech pack (Settings > Time & language > Speech) is a missing
+ * machine feature, not a product failure, so they are skipped there.
+ */
+let japaneseVoiceProbe: Promise<boolean> | null = null;
+function japaneseVoiceInstalled(): Promise<boolean> {
+  japaneseVoiceProbe ??= listFlashcardVoices(true)
+    .then((inventory) => inventory.voices.some((voice) => voice.language === 'ja'))
+    .catch(() => false);
+  return japaneseVoiceProbe;
+}
+const hasJapaneseVoice = process.platform === 'win32';
+
 describe('flashcard audio safety', () => {
   it('maps every application language to an offline voice culture', () => {
     expect(cultureForLanguage('ja')).toBe('ja-JP');
@@ -46,7 +60,8 @@ describe('flashcard audio safety', () => {
     expect(isManagedFlashcardAudioPath('C:/profile/flashcard-audio/../secrets.txt', root)).toBe(false);
   });
 
-  it.runIf(process.platform === 'win32')('generates Japanese speech with an installed offline voice', async () => {
+  it.runIf(hasJapaneseVoice)('generates Japanese speech with an installed offline voice', async (ctx) => {
+    if (!(await japaneseVoiceInstalled())) return ctx.skip();
     const result = await synthesizeFlashcardAudio('今日はいい天気ですね。', 'ja');
     expect(result.ok, result.error).toBe(true);
     expect(result.path && fs.statSync(result.path).size).toBeGreaterThan(1_000);
@@ -75,7 +90,8 @@ describe('flashcard audio safety', () => {
     }
   }, 60_000);
 
-  it.runIf(process.platform === 'win32')('falls back within the language and discloses it', async () => {
+  it.runIf(hasJapaneseVoice)('falls back within the language and discloses it', async (ctx) => {
+    if (!(await japaneseVoiceInstalled())) return ctx.skip();
     // The negative control for the whole voice preference: a saved voice that is
     // not installed must still produce Japanese audio, and must not report the
     // result as the user's own choice.
@@ -90,7 +106,8 @@ describe('flashcard audio safety', () => {
     expect(japanese.map((voice) => voice.name)).toContain(result.voice);
   }, 60_000);
 
-  it.runIf(process.platform === 'win32')('cancels an in-flight offline synthesis process', async () => {
+  it.runIf(hasJapaneseVoice)('cancels an in-flight offline synthesis process', async (ctx) => {
+    if (!(await japaneseVoiceInstalled())) return ctx.skip();
     const requestId = `cancel-${Date.now()}`;
     const pending = synthesizeFlashcardAudio(
       `これはキャンセルできる長い音声です。${'まだ続きます。'.repeat(180)}`,

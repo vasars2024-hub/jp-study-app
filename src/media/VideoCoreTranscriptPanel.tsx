@@ -3,9 +3,12 @@ import type { VideoCoreActiveCue } from '@/app/(main)/_features/video-core/video
 import { isTypesettingCueText, stripAssCueText } from '../shared/videoCoreStudy';
 import { profileForLanguage, resolveProfileMatch } from '../shared/profileRules';
 import { posCategoryClass } from '../shared/posCategory';
+import { minedCueKey } from '../shared/videoCoreMining';
+import { tokenKnownClass } from '../renderer/components/SubtitleCueLine';
 import { getTokenizer, tokenizeSync, type JpToken } from '../renderer/tokenizer';
 import { translate } from '../renderer/translator';
 import { useT } from '../renderer/i18n';
+import type { WordLookupHit } from '../renderer/wordLookup';
 import type { StudyLang } from '../renderer/studyEnvironment';
 import { fetchReadingAid } from '../renderer/readingAid';
 import { useStudyLanguage } from '../renderer/useStudyLanguage';
@@ -104,6 +107,17 @@ interface Props {
    * evidence that turns it back into a decision the user can check.
    */
   trackNotice?: string;
+  /** Colour words by known / learning / new, as the subtitle line does. */
+  knownHighlight?: boolean;
+  /** `minedCueKey` of every line already mined from this video (a stable Set). */
+  minedCueKeys?: ReadonlySet<string>;
+  /** Mine one row's line (the one-key mine, for a line that is not playing). */
+  onMineCue?: (cue: VideoCoreActiveCue) => void;
+  /**
+   * Open the dictionary on a word of a row, as the subtitle line's click does. Opt-in:
+   * without it a row is one seek button, as before.
+   */
+  onWordLookup?: (hit: WordLookupHit, cue: VideoCoreActiveCue) => void;
 }
 
 /** Rows tokenized per frame. Small enough that no single frame is felt. */
@@ -196,6 +210,40 @@ interface RowProps {
   onSeek: (cue: VideoCoreActiveCue) => void;
   onTranslate: (cue: VideoCoreActiveCue, text: string) => void;
   translateLabel: string;
+  /** This line is already a card (mining history). */
+  mined: boolean;
+  /** Colour words by how well the learner knows them, as the subtitle line does. */
+  knownHighlight: boolean;
+  onMine?: (cue: VideoCoreActiveCue) => void;
+  mineLabel: string;
+  minedLabel: string;
+  /** Open the dictionary on one word of this row (click, Enter or Space on the word). */
+  onWordLookup?: (hit: WordLookupHit, cue: VideoCoreActiveCue) => void;
+  /** Accessible name of the timestamp's seek button when words are their own stops. */
+  seekLabel: string;
+}
+
+/** A word worth a keyboard stop and a lookup: it carries a letter or a digit. */
+export function isTranscriptWord(surface: string): boolean {
+  return /[\p{L}\p{N}]/u.test(surface);
+}
+
+const WORD_STEP: Readonly<Record<string, number>> = {
+  ArrowRight: 1,
+  ArrowLeft: -1,
+  Home: Number.NEGATIVE_INFINITY,
+  End: Number.POSITIVE_INFINITY,
+};
+
+/**
+ * Click or keyboard on a transcript word: the lookup hit the subtitle line would build
+ * for the same word (`SubtitleCueLine`'s `onWordActivate`), with the row as context.
+ */
+export function transcriptWordHit(element: HTMLElement, context: string): WordLookupHit | null {
+  const query = element.getAttribute('data-transcript-word') ?? '';
+  if (!query) return null;
+  const rect = element.getBoundingClientRect();
+  return { query, x: rect.left, y: rect.bottom, top: rect.top, context };
 }
 
 const TranscriptRow = React.memo(function TranscriptRow({
@@ -212,42 +260,131 @@ const TranscriptRow = React.memo(function TranscriptRow({
   onSeek,
   onTranslate,
   translateLabel,
+  mined,
+  knownHighlight,
+  onMine,
+  mineLabel,
+  minedLabel,
+  onWordLookup,
+  seekLabel,
 }: RowProps) {
+  /*
+    With a lookup, each word is its own stop and the timestamp alone seeks: words inside a
+    seek button would be interactive elements nested in a button, which neither a pointer
+    nor a keyboard can reach reliably. One tab stop per row (its first word); the arrows
+    move along the row, as they do on the subtitle line.
+  */
+  const lookup = typeof onWordLookup === 'function';
+  let wordCount = 0;
+  const wordProps = (surface: string): Record<string, unknown> => {
+    if (!lookup || !isTranscriptWord(surface)) return {};
+    const index = wordCount++;
+    return {
+      role: 'button',
+      tabIndex: index === 0 ? 0 : -1,
+      'data-transcript-word': surface,
+      'data-word-index': index,
+    };
+  };
+  const lineContent = parts
+    ? parts.map((part, i) => (part.wordLike
+      ? <span key={`${i}-${part.text}`} className="study-transcript-token" {...wordProps(part.text)}>{part.text}</span>
+      : <React.Fragment key={`${i}-${part.text}`}>{part.text}</React.Fragment>))
+    : tokens
+    ? tokens.map((token, i) => (
+      <span
+        key={`${i}-${token.surface}`}
+        className={`study-transcript-token ${posCategoryClass(token.pos, token.posDetail)} ${tokenKnownClass(token, knownHighlight)}`}
+        {...wordProps(token.surface)}
+      >
+        {token.surface}
+      </span>
+    ))
+    : text;
+
+  const activateWord = (target: EventTarget | null): boolean => {
+    const word = (target as HTMLElement | null)?.closest?.('[data-transcript-word]') as HTMLElement | null;
+    if (!word || !onWordLookup) return false;
+    const hit = transcriptWordHit(word, text);
+    if (!hit) return false;
+    onWordLookup(hit, cue);
+    return true;
+  };
+
+  const handleWordKeyDown = (event: React.KeyboardEvent<HTMLSpanElement>): void => {
+    const from = (event.target as HTMLElement).closest?.('[data-transcript-word]') as HTMLElement | null;
+    if (!from) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      event.stopPropagation();
+      activateWord(from);
+      return;
+    }
+    const step = WORD_STEP[event.key];
+    if (step === undefined) return;
+    const words = [...event.currentTarget.querySelectorAll<HTMLElement>('[data-transcript-word]')];
+    const current = Number(from.getAttribute('data-word-index'));
+    const next = step === Number.NEGATIVE_INFINITY
+      ? 0
+      : step === Number.POSITIVE_INFINITY
+        ? words.length - 1
+        : Math.max(0, Math.min(words.length - 1, current + step));
+    // Handled here, so the player's own Arrow / Home / End bindings do not also seek.
+    event.preventDefault();
+    event.stopPropagation();
+    words[next]?.focus();
+  };
+
   return (
     <li
       className={`study-transcript-row${active ? ' is-active' : ''}`}
       data-cue-index={cue.index}
       data-active={active ? 'true' : 'false'}
       data-distance={distance}
+      data-mined={mined ? 'true' : undefined}
       // Announced as the current line rather than merely styled as it: a screen reader
       // following along has no access to the size and opacity that carry this visually.
       aria-current={active ? 'true' : undefined}
     >
-      <button
-        type="button"
-        className="study-transcript-seek"
-        onClick={() => onSeek(cue)}
-      >
-        <span className="study-transcript-time">{timestamp(cue.startMs)}</span>
-        <span className="study-transcript-text" lang={langTag}>
-          {/* Plain text until this row has been tokenized — the colour arrives a
-              frame later rather than the line arriving a frame later. */}
-          {parts
-            ? parts.map((part, i) => (part.wordLike
-              ? <span key={`${i}-${part.text}`} className="study-transcript-token">{part.text}</span>
-              : <React.Fragment key={`${i}-${part.text}`}>{part.text}</React.Fragment>))
-            : tokens
-            ? tokens.map((token, i) => (
-              <span
-                key={`${i}-${token.surface}`}
-                className={`study-transcript-token ${posCategoryClass(token.pos, token.posDetail)}`}
-              >
-                {token.surface}
-              </span>
-            ))
-            : text}
-        </span>
-      </button>
+      {lookup ? (
+        <div className="study-transcript-seek" data-transcript-lookup="">
+          <button
+            type="button"
+            className="study-transcript-time"
+            aria-label={`${seekLabel} ${timestamp(cue.startMs)}`}
+            onClick={() => onSeek(cue)}
+          >
+            {timestamp(cue.startMs)}
+          </button>
+          {/* A click on a word looks it up; a click between words still seeks, as the
+              whole line did before words were their own stops. */}
+          <span
+            className="study-transcript-text"
+            lang={langTag}
+            // Owns its click lookup: the global dictionary must not open a second popup.
+            data-dict-owner=""
+            onClick={(event) => {
+              if (!activateWord(event.target)) onSeek(cue);
+            }}
+            onKeyDown={handleWordKeyDown}
+          >
+            {lineContent}
+          </span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="study-transcript-seek"
+          onClick={() => onSeek(cue)}
+        >
+          <span className="study-transcript-time">{timestamp(cue.startMs)}</span>
+          <span className="study-transcript-text" lang={langTag}>
+            {/* Plain text until this row has been tokenized — the colour arrives a
+                frame later rather than the line arriving a frame later. */}
+            {lineContent}
+          </span>
+        </button>
+      )}
       {/* Only when it says something the line does not already: an all-kana cue
           would otherwise render twice, identically. Distant rows drop it — a reading
           gloss on a line nobody is looking at is the noise this redesign is removing. */}
@@ -275,6 +412,19 @@ const TranscriptRow = React.memo(function TranscriptRow({
           {translateLabel}
         </button>
       )}
+      {onMine && (
+        // Same reveal rule as Translate (active row, hover, focus); a mined line keeps a
+        // visible marker instead, so the rail shows at a glance what is already a card.
+        <button
+          type="button"
+          className={`study-transcript-mine${mined ? ' is-mined' : ''}`}
+          data-study-action="transcript-mine"
+          aria-label={`${mined ? minedLabel : mineLabel}: ${text}`}
+          onClick={() => onMine(cue)}
+        >
+          {mined ? minedLabel : mineLabel}
+        </button>
+      )}
     </li>
   );
 });
@@ -287,6 +437,10 @@ export default function VideoCoreTranscriptPanel({
   onClose,
   trackLabel,
   trackNotice = '',
+  knownHighlight = false,
+  minedCueKeys,
+  onMineCue,
+  onWordLookup,
 }: Props) {
   const { t } = useT();
   const [query, setQuery] = React.useState('');
@@ -556,6 +710,9 @@ export default function VideoCoreTranscriptPanel({
   );
 
   const translateLabel = t('mediaWorkspace.study.transcriptTranslate');
+  const mineLabel = t('studyLoop.lookup.mine');
+  const minedLabel = t('studyLoop.lookup.mined');
+  const seekLabel = t('studyLoop2.transcript.seekTo');
   const destination = useMiningDestination(lang);
 
   return (
@@ -683,6 +840,13 @@ export default function VideoCoreTranscriptPanel({
               onSeek={onSeek}
               onTranslate={handleTranslate}
               translateLabel={translateLabel}
+              mined={minedCueKeys?.has(minedCueKey(row.cue)) ?? false}
+              knownHighlight={knownHighlight}
+              onMine={onMineCue}
+              mineLabel={mineLabel}
+              minedLabel={minedLabel}
+              onWordLookup={onWordLookup}
+              seekLabel={seekLabel}
             />
           ))}
         </ol>

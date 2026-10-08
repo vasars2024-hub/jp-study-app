@@ -1067,6 +1067,22 @@
   color: var(--status-error);
 }
 
+/* A settings number that failed validation is unsaved, and looks it. */
+.scr-input.is-invalid {
+  border-color: var(--status-error);
+}
+
+.scr-field-num:has(.scr-field-error),
+.scr-field-range:has(.scr-field-error) {
+  flex-wrap: wrap;
+}
+
+.scr-field-error {
+  flex-basis: 100%;
+  color: var(--status-error);
+  font-size: var(--font-size-xs);
+}
+
 .scr-export-options {
   display: flex;
   flex-wrap: wrap;

@@ -103,6 +103,19 @@ describe('adding media in bulk', () => {
     const items = (await handlers.get('media:addPaths')?.({}, files)) as unknown[];
     expect(items).toHaveLength(TRACKS);
   });
+
+  // A torrent client, the OS watcher and a drop spell the same file differently
+  // (separators; case on Windows/macOS). That used to make a second library item.
+  it.skipIf(process.platform === 'linux')('finds an item by a differently spelled path instead of duplicating it', async () => {
+    const original = files[3];
+    const respelled = original.replace(/\\/g, '/').toUpperCase();
+    const before = (await handlers.get('media:addPaths')?.({}, [original])) as Array<{ id: string; path: string }>;
+    const after = (await handlers.get('media:addPaths')?.({}, [respelled])) as Array<{ id: string; path: string }>;
+    expect(after).toHaveLength(before.length);
+    expect(after.filter((item) => item.path.toLowerCase().replace(/\\/g, '/') === respelled.toLowerCase())).toEqual([
+      expect.objectContaining({ path: original }),
+    ]);
+  });
 });
 
 describe('metadata sweep writes', () => {

@@ -20,6 +20,7 @@ import {
   type ScraperSettingsProfile,
 } from '../../../shared/scraperSettings';
 import { SCRAPER_LOG_MESSAGE } from '../../../shared/scraperLogMessages';
+import { ipcErrorText } from '../../../shared/ipcErrorText';
 
 /** `t()` under a name that does not collide with the `t` loop variables in these pages. */
 export function tr(key: string, vars?: TVars): string {
@@ -107,4 +108,53 @@ export function localizeScraperMessage(message: string): string {
     return t(`scrApp.r2.msg.sidecar.${state}`);
   }
   return message;
+}
+
+/**
+ * The engine's fixed failure sentences (`main/scraper/engine.ts`), matched the
+ * same way as above: main keeps writing English, the renderer shows the ones it
+ * recognises in the UI language and passes anything else through unchanged.
+ */
+const ENGINE_ERRORS: ReadonlyArray<readonly [RegExp, (m: RegExpExecArray) => string]> = [
+  [/^(.+) answered (\d{3})\.$/, (m) => t('scraperFix.ui.err.httpStatus', { target: m[1], status: m[2] })],
+  [/^The rule for (.+) matched nothing on (.+)\.$/, (m) => t('scraperFix.ui.err.ruleNoMatch', { host: m[1], url: m[2] })],
+  [/^(\d+) episode\(s\) failed validation\.$/, (m) => t('scraperFix.ui.err.validationFailed', { count: m[1] })],
+  [/^There is nothing to search for\.$/, () => t('scraperFix.ui.err.nothingToSearch')],
+  [/^Nothing in the catalogue matches "(.*)"\.$/, (m) => t('scraperFix.ui.err.noCatalogueMatch', { query: m[1] })],
+  [/^(\S+) acquisition is not connected to a catalogue provider yet\.$/, (m) => t('scraperFix.ui.err.contentType', { type: m[1] })],
+  [/^Seanime auto-downloader is disabled\.$/, () => t('scraperFix.ui.err.autoDownloaderOff')],
+];
+
+const NOTE_RULE_CHECKS = 'Some rule checks did not pass.';
+const NOTE_MISSING = /Missing episode numbers?: ([\d, ]+?)(?:, \+(\d+) more)?\./;
+
+/**
+ * A job summary's `note`, which main composes from fixed English sentences
+ * (`engine.ts`, `missingEpisodesNote`). Known sentences are translated in
+ * place; anything else is kept as written.
+ */
+export function localizeScraperJobNote(note: string): string {
+  let text = note.replace(NOTE_RULE_CHECKS, () => t('scraperFix.ui.note.ruleChecks'));
+  text = text.replace(NOTE_MISSING, (_all, list: string, more?: string) =>
+    more
+      ? t('scraperFix.ui.note.missingMore', { list, more })
+      : t('scraperFix.ui.note.missing', { list }));
+  return text;
+}
+
+/**
+ * Any scraper failure as one line a user can read: Electron's
+ * "Error invoking remote method '...': Error: " wrapper is stripped first (it
+ * names an IPC channel, which nobody can act on), then known engine sentences
+ * are translated. A job's `error` event carries a plain string and goes through
+ * the same path.
+ */
+export function scraperErrorText(error: unknown): string {
+  if (error === null || error === undefined || error === '') return t('scraperFix.ui.err.unknown');
+  const text = ipcErrorText(error);
+  for (const [pattern, render] of ENGINE_ERRORS) {
+    const match = pattern.exec(text);
+    if (match) return render(match);
+  }
+  return text === 'Unknown error' ? t('scraperFix.ui.err.unknown') : localizeScraperMessage(text);
 }

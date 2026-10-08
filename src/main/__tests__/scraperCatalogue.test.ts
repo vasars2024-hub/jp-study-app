@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
-  app: { getPath: () => process.cwd(), getAppMetrics: () => [] },
+  app: { getPath: () => `${process.env.TEMP ?? process.env.TMPDIR ?? '/tmp'}/gum-vitest-userdata`, getAppMetrics: () => [] },
   ipcMain: { handle: () => undefined },
 }));
 
@@ -223,6 +223,25 @@ describe('catalogueEpisodes', () => {
     expect(episodes[0].titleJa).toBe('冒険の終わり');
     expect(episodes[0].airDate).toBe('2023-09-29');
     expect(episodes[1].filler).toBe(true);
+  });
+
+  it('reports a failed later page instead of silently truncating the list', async () => {
+    const [work] = await searchCatalogue('frieren', 'test');
+    routes.jikanEpisodePages = [
+      JSON.stringify({ data: [{ mal_id: 1, title: 'One' }], pagination: { has_next_page: true } }),
+      '<html>502 Bad Gateway</html>',
+    ];
+    const failed: number[] = [];
+    const episodes = await catalogueEpisodes(work, 'test', undefined, (page) => failed.push(page));
+    expect(episodes.map((e) => e.number)).toEqual([1]);
+    expect(failed).toEqual([2]);
+  });
+
+  it('does not report an ordinary last page as incomplete', async () => {
+    const [work] = await searchCatalogue('frieren', 'test');
+    const failed: number[] = [];
+    await catalogueEpisodes(work, 'test', undefined, (page) => failed.push(page));
+    expect(failed).toEqual([]);
   });
 
   it('builds an AniList list from the airing schedule without another request', async () => {

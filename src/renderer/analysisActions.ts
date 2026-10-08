@@ -11,7 +11,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { appendNotebookEvent } from './notebookTimeline';
-import { mineToStudy, requestStudyInput } from './studyMining';
+import { mineToStudy, requestStudyInput, type MineToStudyInput } from './studyMining';
+import type { MineNoteRequest } from '../shared/anki';
 import {
   buildAnalysisMineRequest,
   buildSentenceMineRequest,
@@ -105,6 +106,51 @@ export interface AnalysisActionsOpts {
   sourceLabel?: string;
   /** The analysis currently on screen, for the auto-run pass. */
   result?: SentenceAnalysisResult | null;
+  /**
+   * Where a mined card came from, when the host knows more than "an analysis".
+   *
+   * The player's grammar panel passes the playing file and line here, so a span mined
+   * from it is a `subtitle` card routed like the mining panel's — same deck rules, same
+   * "Play in video" — instead of an `analysis` card that has forgotten the video. Absent
+   * everywhere else, which keeps the reader and the Lens exactly as they were.
+   */
+  mineProvenance?: AnalysisMineProvenance | null;
+}
+
+/** See `AnalysisActionsOpts.mineProvenance`. */
+export interface AnalysisMineProvenance {
+  /** Card source and Anki route source. */
+  source: 'subtitle';
+  sourceTitle?: string;
+  sourceUrl?: string;
+  sourceId?: string;
+  folder?: string;
+  sourceRef?: MineToStudyInput['sourceRef'];
+}
+
+/** The card fields and the Anki route for one mine, with or without a known origin. */
+function withProvenance(
+  request: MineNoteRequest,
+  provenance: AnalysisMineProvenance | null | undefined,
+  lang: string,
+  sourceLabel: string | undefined,
+): MineToStudyInput {
+  if (!provenance) {
+    return requestStudyInput(request, 'analysis', {
+      sourceTitle: sourceLabel || undefined,
+      studyLang: lang as MineToStudyInput['studyLang'],
+    });
+  }
+  const { source, ...origin } = provenance;
+  return requestStudyInput(
+    { ...request, route: { ...(request.route ?? {}), source } },
+    source,
+    {
+      ...origin,
+      sourceTitle: origin.sourceTitle || sourceLabel || undefined,
+      studyLang: lang as MineToStudyInput['studyLang'],
+    },
+  );
 }
 
 /**
@@ -122,7 +168,7 @@ export function useAnalysisActions(opts: AnalysisActionsOpts): AnalysisActionsAp
   const [snapshotState, setSnapshotState] = useState<ActionState>('idle');
   const autoDoneRef = useRef<string>('');
 
-  const { lang, uiLang, source, sourceLabel, result } = opts;
+  const { lang, uiLang, source, sourceLabel, result, mineProvenance } = opts;
 
   const mine = useCallback(
     (annotation: SentenceAnnotation, analysis: SentenceAnalysisResult) => {
@@ -131,10 +177,11 @@ export function useAnalysisActions(opts: AnalysisActionsOpts): AnalysisActionsAp
         try {
           // The card lands in the local deck first; Anki joins it now or when
           // it next opens. A closed Anki used to be an error and a lost card.
-          const mined = await mineToStudy(requestStudyInput(
+          const mined = await mineToStudy(withProvenance(
             buildAnalysisMineRequest(annotation, analysis, prefs, { lang, uiLang }),
-            'analysis',
-            { sourceTitle: sourceLabel || undefined, studyLang: lang },
+            mineProvenance,
+            lang,
+            sourceLabel,
           ));
           // A duplicate is a success from the reader's point of view: the card
           // they wanted exists, which is the only thing they asked for.
@@ -144,7 +191,7 @@ export function useAnalysisActions(opts: AnalysisActionsOpts): AnalysisActionsAp
         }
       })();
     },
-    [prefs, lang, uiLang, sourceLabel],
+    [prefs, lang, uiLang, sourceLabel, mineProvenance],
   );
 
   const saveSentence = useCallback(
@@ -152,10 +199,11 @@ export function useAnalysisActions(opts: AnalysisActionsOpts): AnalysisActionsAp
       setSaveState('busy');
       void (async () => {
         try {
-          const mined = await mineToStudy(requestStudyInput(
+          const mined = await mineToStudy(withProvenance(
             buildSentenceMineRequest(analysis, prefs, { lang, uiLang }),
-            'analysis',
-            { sourceTitle: sourceLabel || undefined, studyLang: lang },
+            mineProvenance,
+            lang,
+            sourceLabel,
           ));
           setSaveState(mined.anki === 'failed' ? 'error' : 'done');
         } catch {
@@ -163,7 +211,7 @@ export function useAnalysisActions(opts: AnalysisActionsOpts): AnalysisActionsAp
         }
       })();
     },
-    [prefs, lang, uiLang, sourceLabel],
+    [prefs, lang, uiLang, sourceLabel, mineProvenance],
   );
 
   const snapshot = useCallback(

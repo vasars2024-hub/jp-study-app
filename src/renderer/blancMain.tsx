@@ -38,6 +38,7 @@ import { installNotificationCapture } from './notificationStore';
 import { clearOnExitIfConfigured } from './clipboardHistory';
 import { markLockscreenUnlocked, shouldShowLockscreen } from './lockscreenSettings';
 import { initAgentOperationalState } from './agentOperationalClient';
+import { awaitStartupRestore } from './startupRestore';
 
 // Blanc's own tokens + the base stylesheet its panels inherit from. Study OS's
 // theme packs (aero, wired, materials, environment, city) are deliberately absent.
@@ -180,15 +181,25 @@ if (container) {
     // either — the same restore Study OS's entry runs. Without it a Blanc-only
     // session whose localStorage cache was lost would write the empty cache
     // over the durable deck on its first change.
-    await import('./levelLists')
-      .then(({ restoreLevelListsFromIdb }) => restoreLevelListsFromIdb())
-      .catch((err) => console.warn('[level-lists] startup restore skipped:', err));
-    await Promise.all([
-      import('./flashcardDeck').then(({ restoreDeckFromIdb }) => restoreDeckFromIdb()),
-      import('./knownWords').then(({ restoreKnowledgeFromIdb }) => restoreKnowledgeFromIdb()),
-      // Both swallow their own read errors; a failure here only means the
-      // localStorage cache keeps serving, exactly as before.
-    ]).catch(() => undefined);
+    const restores = (async () => {
+      await import('./levelLists')
+        .then(({ restoreLevelListsFromIdb }) => restoreLevelListsFromIdb())
+        .catch((err) => console.warn('[level-lists] startup restore skipped:', err));
+      await Promise.all([
+        import('./flashcardDeck').then(({ restoreDeckFromIdb }) => restoreDeckFromIdb()),
+        import('./knownWords').then(({ restoreKnowledgeFromIdb }) => restoreKnowledgeFromIdb()),
+        // Both swallow their own read errors; a failure here only means the
+        // localStorage cache keeps serving, exactly as before.
+      ]).catch(() => undefined);
+    })();
+    // A stalled IndexedDB must not leave Blanc blank: render on the
+    // localStorage cache after STARTUP_RESTORE_TIMEOUT_MS and let the restore
+    // finish in the background. The deck and knowledge restores re-read the
+    // cache after their IndexedDB read (the deck also tracks cards created while
+    // restoring), so a late finish does not clobber edits made after render;
+    // level lists snapshot the cache first, so a list edited in that window
+    // could lose to a late restore — accepted, it needs a >4 s IndexedDB stall.
+    await awaitStartupRestore(restores, { label: 'blanc' });
     createRoot(container).render(
       withStrictMode(
         <AppErrorBoundary>

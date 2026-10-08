@@ -32,6 +32,7 @@ import {
   imageKindText,
   localizeScraperMessage,
   logLevelText,
+  scraperErrorText,
   streamHealthText,
   tr,
   unitDays,
@@ -502,7 +503,7 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
       });
       if (report.sent > 0) setSelected(new Set());
     } catch (error) {
-      setNotice({ text: sxs('transfer.failed', error instanceof Error ? error.message : String(error)), bad: true });
+      setNotice({ text: sxs('transfer.failed', scraperErrorText(error)), bad: true });
     } finally {
       setSending(false);
     }

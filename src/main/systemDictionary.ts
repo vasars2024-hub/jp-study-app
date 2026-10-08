@@ -374,11 +374,39 @@ export function companionMenuItems(): MenuItemConstructorOptions[] {
     });
 }
 
+/**
+ * App-shell rows (Open Blanc, Record a region, Keep running in the tray…) that
+ * main.ts adds to this one tray instead of creating a second icon.
+ */
+let appTrayItems: (() => Electron.MenuItemConstructorOptions[]) | null = null;
+
+function appTrayRows(): Electron.MenuItemConstructorOptions[] {
+  if (!appTrayItems) return [];
+  try {
+    return appTrayItems();
+  } catch (err) {
+    console.error('[systemDictionary] app tray rows failed', err);
+    return [];
+  }
+}
+
+export function setAppTrayItems(provider: (() => Electron.MenuItemConstructorOptions[]) | null): void {
+  appTrayItems = provider;
+  refreshTrayMenu();
+}
+
+/** Rebuild the tray menu (an app-shell row's state changed). */
+export function refreshAppTray(): void {
+  refreshTrayMenu();
+}
+
 function refreshTrayMenu(): void {
   if (!tray) return;
   const chord = getGlobalCommandChord(LOOKUP_ID);
   const menu = Menu.buildFromTemplate([
     { label: mt('companion.tray.title'), submenu: companionMenuItems() },
+    // The Region Recorder (main/regionRecorder.ts), through its global command.
+    { label: mt('recorder.tray.record'), click: () => { runGlobalCommand('recorder.region'); } },
     { type: 'separator' },
     {
       label: mt('companion.tray.enableLookup'),
@@ -389,6 +417,7 @@ function refreshTrayMenu(): void {
     { label: mt('companion.tray.shortcuts'), click: () => openShortcutSettings() },
     { type: 'separator' },
     { label: mt('companion.tray.open'), click: () => runGlobalCommand('app.focus') || focusMainWindow() },
+    ...appTrayRows(),
     { label: mt('companion.tray.quit'), click: () => app.quit() },
   ]);
   tray.setContextMenu(menu);
@@ -427,6 +456,11 @@ function ensureTray(): void {
   // A left click used to send Ctrl+C — to the taskbar, which had focus by then.
   // It opens the companion menu instead, which is where every action lives.
   tray.on('click', () => tray?.popUpContextMenu());
+  // Double-click opens Gum, as every Windows tray app does (and the only way
+  // back to a window hidden by "Keep running in the tray").
+  tray.on('double-click', () => {
+    if (!runGlobalCommand('app.focus')) focusMainWindow();
+  });
   refreshTrayMenu();
 }
 

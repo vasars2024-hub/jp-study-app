@@ -96,12 +96,33 @@ export function buildInboxMetaBase(opts: {
   };
 }
 
+/**
+ * Compare two strings in time that depends only on their lengths, never on
+ * where they first differ.
+ *
+ * `===` returns at the first mismatching character, which lets a caller who can
+ * time requests recover a secret one character at a time. Pure JS rather than
+ * `crypto.timingSafeEqual` because this module is also bundled into the
+ * renderer (see the header), where `node:crypto` does not exist. Every position
+ * up to the longer length is visited, and a length mismatch is folded into the
+ * same accumulator instead of returning early.
+ */
+export function constantTimeEqual(a: string, b: string): boolean {
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    // Past the end, charCodeAt is NaN and `| 0` turns it into 0 without a branch.
+    diff |= (a.charCodeAt(i) | 0) ^ (b.charCodeAt(i) | 0);
+  }
+  return diff === 0;
+}
+
 /** True when Authorization header carries the expected bearer token. */
 export function checkBearerToken(header: string | undefined, token: string): boolean {
   if (!token || !header) return false;
   const m = /^Bearer\s+(.+)$/i.exec(header.trim());
   if (!m) return false;
-  return m[1].trim() === token;
+  return constantTimeEqual(m[1].trim(), token);
 }
 
 /** Allow chrome-extension:// origins (and missing Origin on same-machine tools). */

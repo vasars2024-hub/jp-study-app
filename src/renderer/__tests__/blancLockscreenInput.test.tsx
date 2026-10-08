@@ -62,16 +62,20 @@ describe('Blanc lockscreen PIN entry', () => {
     expect(filledDots()).toBe(1);
   });
 
-  it('unlocks with the right PIN typed into the field', () => {
+  it('unlocks with the right PIN typed into the field', async () => {
     const onUnlocked = vi.fn();
     act(() => root.render(createElement(BlancLockscreen, { onUnlocked })));
     const input = container.querySelector('input') as HTMLInputElement;
     for (const digit of '1234') typeIntoField(input, digit);
     expect(verify).toHaveBeenCalledWith('1234');
+    // Verification is async now (main checks the scrypt hash).
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(onUnlocked).toHaveBeenCalledTimes(1);
   });
 
-  it('still takes digits from the keyboard when focus is not in the field', () => {
+  it('still takes digits from the keyboard when focus is not in the field', async () => {
     vi.useFakeTimers();
     try {
       const onUnlocked = vi.fn();
@@ -84,6 +88,9 @@ describe('Blanc lockscreen PIN entry', () => {
       }
       expect(filledDots()).toBe(4);
       act(() => vi.advanceTimersByTime(100));
+      await act(async () => {
+        await Promise.resolve();
+      });
       expect(onUnlocked).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();

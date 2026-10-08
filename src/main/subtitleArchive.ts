@@ -34,6 +34,7 @@ import { Worker } from 'node:worker_threads';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { decodeSubtitleBytes } from '../shared/subtitleDecode';
 
 /**
  * Archive containers this module can open.
@@ -172,8 +173,10 @@ const WORKER_SOURCE = [
   '    for (const entry of wanted) {',
   '      try {',
   "        const at = '/out/' + entry.name.split(String.fromCharCode(92)).join('/');",
-  "        const text = sz.FS.readFile(at, { encoding: 'utf8' });",
-  '        files.push({ name: entry.name, sizeBytes: entry.size, text: text });',
+  // Raw bytes, not utf8: the encoding (Shift_JIS, UTF-16, ...) is detected on
+  // the main side, where the shared decoder can be imported.
+  '        const bytes = sz.FS.readFile(at);',
+  '        files.push({ name: entry.name, sizeBytes: entry.size, bytes: bytes });',
   '      } catch (error) {',
   // One unreadable member never fails the release: the same policy the loose
   // path already applies to a truncated file on disk.
@@ -273,6 +276,19 @@ export async function extractSubtitlesFromArchive(
   return raw;
 }
 
+/** The worker posts each member's raw bytes; turn them into text here. */
+function decodeWorkerFiles(message: ArchiveExtractOutcome): ArchiveExtractOutcome {
+  if (!message.ok) return message;
+  return {
+    ...message,
+    files: message.files.map((file) => {
+      const raw = file as ExtractedArchiveEntry & { bytes?: unknown };
+      if (!(raw.bytes instanceof Uint8Array)) return file;
+      return { name: raw.name, sizeBytes: raw.sizeBytes, text: decodeSubtitleBytes(raw.bytes).text };
+    }),
+  };
+}
+
 /** One worker, one archive, one message. Terminated on every exit path. */
 function runArchiveWorker(
   workerData: Record<string, unknown>,
@@ -291,7 +307,7 @@ function runArchiveWorker(
     const timer = setTimeout(() => {
       finish({ ok: false, reason: 'Extracting the archive took too long and was stopped.' });
     }, timeoutMs);
-    worker.on('message', (message: ArchiveExtractOutcome) => finish(message));
+    worker.on('message', (message: ArchiveExtractOutcome) => finish(decodeWorkerFiles(message)));
     worker.on('error', (error: Error) => {
       finish({ ok: false, reason: `The archive could not be extracted: ${error.message}` });
     });

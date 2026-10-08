@@ -208,6 +208,10 @@ export default function NotificationCenter() {
                           setOpen(false);
                           return;
                         }
+                        if (n.clientAction === 'restart-to-update') {
+                          void window.api.appUpdateRestart?.();
+                          return;
+                        }
                         if (n.actionUrl) void window.api.openExternal(n.actionUrl);
                       }}
                     >
@@ -217,7 +221,9 @@ export default function NotificationCenter() {
                           ? t('calendar.reminder.open')
                           : n.clientAction === 'open-shortcuts'
                             ? t('shortcut.notice.refused.open')
-                            : t('notifications.openLink')}
+                            : n.clientAction === 'restart-to-update'
+                              ? t('install.update.restart')
+                              : t('notifications.openLink')}
                     </button>
                   </div>
                 ) : null}

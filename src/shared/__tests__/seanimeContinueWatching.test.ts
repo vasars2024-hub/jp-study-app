@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { WATCH_FINISHED_FRACTION } from '../watchFinished';
 import {
-  CONTINUE_WATCHING_FINISHED_TAIL_SEC,
   CONTINUE_WATCHING_MIN_POSITION_SEC,
   CONTINUE_WATCHING_REWIND_SEC,
   continueWatchingPathFromKey,
@@ -104,18 +104,16 @@ describe('seanimeContinueWatching', () => {
     expect(entry?.percent).toBeCloseTo(0.25, 5);
   });
 
-  it('drops a file watched to within the finished tail, and keeps one just before it', () => {
+  it('drops a file the shared finished rule calls finished, and keeps one just before it', () => {
     const duration = 1200;
+    // 1080 / 1200 is exactly WATCH_FINISHED_FRACTION (0.9) — `shared/watchFinished.ts`.
+    const finishedAt = duration * WATCH_FINISHED_FRACTION;
     expect(seanimeContinueWatching({
-      resumePositions: [
-        resume('file:c:/media/ep1.mkv', duration - CONTINUE_WATCHING_FINISHED_TAIL_SEC, 5000),
-      ],
+      resumePositions: [resume('file:c:/media/ep1.mkv', 1080, 5000)],
       mediaItems: [media({ path: 'C:/Media/Ep1.mkv', durationSec: duration })],
     })).toEqual([]);
     expect(seanimeContinueWatching({
-      resumePositions: [
-        resume('file:c:/media/ep1.mkv', duration - CONTINUE_WATCHING_FINISHED_TAIL_SEC - 1, 5000),
-      ],
+      resumePositions: [resume('file:c:/media/ep1.mkv', Math.floor(finishedAt) - 1, 5000)],
       mediaItems: [media({ path: 'C:/Media/Ep1.mkv', durationSec: duration })],
     })).toHaveLength(1);
   });

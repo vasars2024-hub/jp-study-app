@@ -29,6 +29,8 @@ const WINDOW_MS = 60_000;
 
 export interface ScraperSafetyPolicy {
   respectRobotsTxt: boolean;
+  /** Crawls may reach loopback / private addresses (the SSRF guard is off). */
+  allowPrivateNetwork?: boolean;
   crawlDelayMs: number;
   maxRequestsPerMinute: number;
   domainRateLimits: Record<string, number>;
@@ -44,6 +46,7 @@ export function safetyPolicyFrom(safety: ScraperSafetySettings): ScraperSafetyPo
   }
   return {
     respectRobotsTxt: safety.respectRobotsTxt,
+    allowPrivateNetwork: safety.allowPrivateNetwork === true,
     crawlDelayMs: Math.max(0, safety.crawlDelayMs),
     maxRequestsPerMinute: Math.max(0, safety.maxRequestsPerMinute),
     domainRateLimits,

@@ -703,8 +703,27 @@ export const COMMAND_CATALOG: AppCommand[] = [
   // unbound row a user binds beats a default chosen to fill a column.
   { id: 'video.subEarlierLarge', label: 'Subtitle earlier (−500 ms)', category: 'Video', defaultKeys: '' },
   { id: 'video.subLaterLarge', label: 'Subtitle later (+500 ms)', category: 'Video', defaultKeys: '' },
-  { id: 'video.toggleAutoPause', label: 'Toggle auto-pause', category: 'Video', defaultKeys: '' },
-  { id: 'video.toggleLoop', label: 'Toggle line loop', category: 'Video', defaultKeys: '' },
+  // The study loop's own keys. The adopted map (playerKeymap.ts) takes A B D E F H I J K M N P
+  // Q Z and both brackets; with R W S V above, C G L O T U X Y are the letters it leaves free
+  // (G is Flashcards' "Got it", and defaults are unique app-wide) — so the comments that said
+  // none are free were wrong, and these five are bound. `deletedPlayerDependents.test.ts`,
+  // `playerKeymap.test.ts` and `osShortcutDefaults.test.ts` fail on any collision.
+  { id: 'video.toggleAutoPause', label: 'Toggle auto-pause', category: 'Video', defaultKeys: 'U' },
+  { id: 'video.toggleLoop', label: 'Toggle line loop', category: 'Video', defaultKeys: 'L' },
+  {
+    id: 'video.abLoopCycle',
+    label: 'A-B loop: set A, set B, clear',
+    category: 'Video',
+    defaultKeys: 'X',
+    note: 'First press marks A, second marks B and starts the loop, third clears it.',
+  },
+  {
+    id: 'video.revealTranslation',
+    label: 'Reveal the translation of this line',
+    category: 'Video',
+    defaultKeys: 'T',
+    note: 'Unblurs the second line for the current line, or translates the line when no second line is shown.',
+  },
   // Subtitle display, on Shift chords. The adopted player ignores every modified key
   // (`handleKeyboardShortcuts` returns on any of Ctrl/Shift/Alt/Meta), so Shift+letter and
   // Shift+Arrow are free of its keymap by construction, and no other catalog row uses them.
@@ -716,15 +735,14 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'video.subPositionUp', label: 'Move subtitles up', category: 'Video', defaultKeys: 'Shift+ArrowUp' },
   { id: 'video.subPositionDown', label: 'Move subtitles down', category: 'Video', defaultKeys: 'Shift+ArrowDown' },
   { id: 'video.subDelayReset', label: 'Reset subtitle delay', category: 'Video', defaultKeys: '' },
-  // Mining and seeking. Unbound by default for the same reason as the rows above:
-  // every free single letter belongs to the adopted player's own keymap, and a
-  // default that collides is worse than one the user binds deliberately.
+  // Mining is C (for card): one key makes the whole card. Seeking stays unbound — the
+  // player's own A/D and arrows already seek.
   {
     id: 'video.mineCurrentLine',
     label: 'Mine the current subtitle line',
     category: 'Video',
-    defaultKeys: '',
-    note: 'Sends the line playing right now to Anki, with whatever the mining panel has armed.',
+    defaultKeys: 'C',
+    note: 'Makes a card from the line just heard: the word you looked up (or the first unknown word), the sentence, a screenshot and the line audio.',
   },
   // System audio and live captions (main/systemAudioCapture.ts). System-wide on
   // purpose: the audio being mined plays in another app — a browser, a game, a
@@ -771,6 +789,32 @@ export const COMMAND_CATALOG: AppCommand[] = [
     global: true,
     note: 'System-wide. Unbound by default so capture is never switched on by a stray key; bind it here if you want one.',
   },
+  // Region Recorder (main/regionRecorder.ts). System-wide like the captions rows:
+  // what is being recorded is usually another app. Ctrl+Alt+Shift+R is app.restart, so E.
+  {
+    id: 'recorder.region',
+    label: 'Record a region of the screen',
+    category: 'Immersion',
+    defaultKeys: 'Ctrl+Alt+Shift+E',
+    global: true,
+    note: 'System-wide. Draw a box to record it as a video; press again to stop. The recording is imported, transcribed and opened in the player.',
+  },
+  {
+    id: 'recorder.repeatRegion',
+    label: 'Record the last region again',
+    category: 'Immersion',
+    defaultKeys: '',
+    global: true,
+    note: 'System-wide. Starts recording the same box as last time without drawing it.',
+  },
+  {
+    id: 'recorder.stop',
+    label: 'Stop the screen recording',
+    category: 'Immersion',
+    defaultKeys: '',
+    global: true,
+    note: 'System-wide. Stops the running recording and starts turning it into a video.',
+  },
   {
     id: 'video.seekBack',
     label: 'Rewind',
@@ -789,9 +833,8 @@ export const COMMAND_CATALOG: AppCommand[] = [
   // a view registers: the point is that it works from anywhere, including from
   // inside the full-screen media workspace, where the palette's Continue-watching
   // group is out of reach because that group is search-mode only.
-  // Unbound by default — every free single letter here belongs to the adopted
-  // player's own keymap, and a chord that collides is worse than one you bind
-  // yourself in Settings.
+  // Unbound by default: it works from every view, where a bare letter would fire while
+  // typing-free surfaces (a reader, a game) expect it for themselves.
   {
     id: 'video.resumeLast',
     label: 'Resume last episode',
@@ -800,9 +843,9 @@ export const COMMAND_CATALOG: AppCommand[] = [
     note: 'Reopens the most recently watched file at the second you stopped. Needs the media server enabled.',
   },
   /*
-    Liquid Study Workspace. All unbound by default, for the reason the rows above give:
-    every free single letter belongs to the adopted player's own keymap, and a default
-    that collides is worse than one the user binds deliberately.
+    Liquid Study Workspace. All unbound by default: the few letters the adopted player
+    leaves free (O Y) are kept for study actions, and a default that collides is worse
+    than one the user binds deliberately.
 
     They are registered by `VideoCoreStudyOverlay` while a video is open, so they are
     live exactly when they mean something — the same ownership rule the `video.*` rows
@@ -1355,9 +1398,28 @@ function layoutIndependentKey(e: Pick<KeyboardEvent, 'key' | 'code'>): string {
   return k;
 }
 
-/** Chord from a keyboard event, or null if modifier-only or part of an IME composition. */
+/**
+ * AltGr typing a character. Windows delivers AltGr as Ctrl+Alt, so on a
+ * Polish layout "ż" (AltGr+Z) would otherwise fire the Ctrl+Alt+Z shortcut
+ * and "ś" Ctrl+Alt+S. When AltGraph is held and the key produced a character
+ * (or a dead key), it is text, not a chord. Named keys (arrows, F-keys) stay
+ * eligible since AltGr never types anything with them.
+ */
+export function isAltGraphTextEvent(e: Pick<KeyboardEvent, 'key'> & { getModifierState?: (k: string) => boolean }): boolean {
+  let altGraph = false;
+  try {
+    altGraph = typeof e.getModifierState === 'function' && e.getModifierState('AltGraph') === true;
+  } catch {
+    altGraph = false;
+  }
+  if (!altGraph) return false;
+  return e.key.length === 1 || e.key === 'Dead';
+}
+
+/** Chord from a keyboard event, or null if modifier-only, AltGr text, or part of an IME composition. */
 export function chordFromEvent(e: KeyboardEvent): string | null {
   if (isImeCompositionEvent(e)) return null;
+  if (isAltGraphTextEvent(e)) return null;
   const k = layoutIndependentKey(e);
   if (isModifierOnlyKey(k)) return null;
   const label = k.length === 1 ? (k === ' ' ? 'Space' : k.toUpperCase()) : k;

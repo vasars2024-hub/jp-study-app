@@ -203,7 +203,9 @@ export function isAbsolutePathLike(value: string): boolean {
  * the same path slightly differently.
  */
 export function ingestPathKey(value: string, caseInsensitive = true): string {
-  let key = value.trim().replace(/\\/g, '/').replace(/\/{2,}/g, (m, offset: number) => (offset === 0 ? '//' : '/'));
+  // NFC: macOS hands back decomposed names (`か` + U+3099 for `が`), so the same
+  // Japanese file name otherwise keys two ways depending on who reported it.
+  let key = value.trim().normalize('NFC').replace(/\\/g, '/').replace(/\/{2,}/g, (m, offset: number) => (offset === 0 ? '//' : '/'));
   if (key.length > 1 && key.endsWith('/') && !/^[a-zA-Z]:\/$/.test(key)) key = key.replace(/\/+$/, '');
   return caseInsensitive ? key.toLowerCase() : key;
 }
@@ -326,9 +328,12 @@ export function infoHashFromMagnet(magnet: string): string {
 }
 
 export function normalizeInfoHash(value: unknown): string {
-  return typeof value === 'string' && /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(value.trim())
-    ? value.trim().toLowerCase()
-    : '';
+  if (typeof value !== 'string') return '';
+  const text = value.trim();
+  if (/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(text)) return text.toLowerCase();
+  // A 32-character base32 v1 hash (some magnets and feeds carry that form) is the
+  // same torrent qBittorrent reports in hex, so it keys the same way.
+  return /^[A-Za-z2-7]{32}$/.test(text) ? base32ToHex(text) : '';
 }
 
 /** The tag every torrent this app hands to qBittorrent carries. */
@@ -598,7 +603,8 @@ export function metadataOverrideFor(
 // The renderer event
 // ---------------------------------------------------------------------------
 
-export type MediaIngestSource = 'watch-folder' | 'qbittorrent' | 'download' | 'acquired';
+/** `recording`: a Region Recorder MP4 (main/regionRecorder.ts). */
+export type MediaIngestSource = 'watch-folder' | 'qbittorrent' | 'download' | 'acquired' | 'recording';
 
 export interface MediaIngestedItemSummary {
   id: string;
@@ -834,6 +840,8 @@ export interface MediaIngestState {
     status: MediaIngestQbitStatus;
     /** Epoch ms of the last successful poll. */
     lastCheckedAt: number | null;
+    /** Finished torrents whose files were not found on this machine yet (being retried). */
+    unresolved?: number;
   };
 }
 

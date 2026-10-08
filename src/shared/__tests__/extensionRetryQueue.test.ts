@@ -41,7 +41,8 @@ const APP_DOWN: Responder = () => 'network-error';
 /** The app answers everything happily. */
 const APP_UP: Responder = () => ({ status: 200, json: { ok: true } });
 
-const MAX_QUEUE = 40;
+/** background.js MAX_QUEUE: saves are never evicted; past it a new save is refused. */
+const MAX_QUEUE = 200;
 
 interface SaveResult {
   ok?: boolean;
@@ -216,30 +217,27 @@ describe('retry queue — the toolbar badge', () => {
       .filter((c) => c.api === 'action.setBadgeBackgroundColor')
       .map((c) => (c.args[0] as { color: string }).color);
     // MV3 loses the colour with the service worker, so it is re-set alongside
-    // every text write rather than once at install.
-    expect(colours).toEqual(['#946300']);
-    expect(h.badgeHistory()).toEqual(['1']);
+    // every text write rather than once at install. The first pair is the boot
+    // repaint (fixed 2026-10-08: the badge used to be restored only on install).
+    expect(colours.every((c) => c === '#946300')).toBe(true);
+    expect(h.badgeHistory()).toEqual(['', '1']);
   });
 
   it('never abbreviates: a full queue reads as the number, not "40+"', async () => {
     const h = bootBackground({ responder: APP_DOWN });
     h.setQueue(Array.from({ length: MAX_QUEUE - 1 }, (_, i) => ({ kind: 'mine', payload: { text: `old ${i}` } })));
     await saveWord(h, 'newest');
-    expect(h.badgeText()).toBe('40');
+    expect(h.badgeText()).toBe(String(MAX_QUEUE));
   });
 
-  it('AUDIT: a flush of an already-empty queue leaves a stale badge alone', async () => {
+  it('a flush of an already-empty queue corrects a stale badge', async () => {
     const h = bootBackground({ responder: APP_UP });
-    await saveWord(h, 'one'); // succeeds, so nothing is queued and no badge is set
-    expect(h.badgeText()).toBe(null);
-
-    // Plant the situation a crashed write would leave: badge says 2, queue is
-    // empty. flushQueue() returns early on an empty queue *before* it reaches
-    // updateBadge, so the count on the toolbar is never corrected.
+    await saveWord(h, 'one'); // succeeds, so nothing is queued
+    // Fixed 2026-10-08: flushQueue used to return before writing the badge on an
+    // empty queue, so a count left by a crashed write was never corrected.
+    await h.chrome.action.setBadgeText({ text: '2' } as never);
     await h.send({ type: 'flush' });
-    expect(h.badgeText()).toBe(null);
-    // Correcting this would be one line (move the early return below the badge
-    // write) but it changes when the badge is written, so it is left alone.
+    expect(h.badgeText()).toBe('');
   });
 
   it('AUDIT: the badge is only restored on install, never on a worker wake', () => {
@@ -337,41 +335,59 @@ describe('retry queue — ordering', () => {
 /* ================================ the cap ================================ */
 
 describe('retry queue — what a full queue discards', () => {
-  it('caps at MAX_QUEUE and drops the OLDEST save, keeping the newest', async () => {
+  it('never evicts a queued save: a full queue refuses the NEW save out loud', async () => {
     const h = bootBackground({ responder: APP_DOWN });
-    for (let i = 0; i < MAX_QUEUE + 5; i++) await saveWord(h, `save ${i}`);
-
+    // Fixed 2026-10-08. The queue used to drop its oldest save to make room, and
+    // every one of those saves had been answered "Queued — will sync". Now the
+    // saves already promised stay, and the one that does not fit says so.
+    h.setQueue(Array.from({ length: MAX_QUEUE }, (_, i) => ({ kind: 'mine', payload: { text: `old ${i}` } })));
+    const res = await saveWord(h, 'one too many');
+    expect(res.ok).toBe(false);
+    expect(res.queued).toBeUndefined();
     const queue = h.queue();
     expect(queue).toHaveLength(MAX_QUEUE);
-    // This is the product statement: an offline session longer than 40 saves
-    // loses its beginning, not its end. The newest save is always kept, so the
-    // thing the user just did is never the thing that is silently dropped.
-    expect(queue[0].payload.text).toBe('save 5');
-    expect(queue[queue.length - 1].payload.text).toBe(`save ${MAX_QUEUE + 4}`);
-    expect(h.badgeText()).toBe(String(MAX_QUEUE));
+    expect(queue[0].payload.text).toBe('old 0');
   });
 
-  it('trims an over-long queue left by an older build down to the cap', async () => {
+  it('keeps every item of an over-long queue left by an older build', async () => {
     const h = bootBackground({ responder: APP_DOWN });
     h.setQueue(Array.from({ length: 60 }, (_, i) => ({ kind: 'mine', payload: { text: `old ${i}` } })));
     await saveWord(h, 'new');
     const queue = h.queue();
-    expect(queue).toHaveLength(MAX_QUEUE);
-    expect(queue[0].payload.text).toBe('old 21');
+    expect(queue).toHaveLength(61);
+    expect(queue[0].payload.text).toBe('old 0');
     expect(queue[queue.length - 1].payload.text).toBe('new');
   });
 
-  it('AUDIT: the drop is silent — nothing tells the user 5 saves were lost', async () => {
+  it('a save made while a flush is in flight is neither lost nor sent twice', async () => {
     const h = bootBackground({ responder: APP_DOWN });
-    const results: SaveResult[] = [];
-    for (let i = 0; i < MAX_QUEUE + 5; i++) results.push(await saveWord(h, `save ${i}`));
-    // Every one of the 45 saves was answered "Queued — will sync when Gum
-    // is open", including the five whose payloads no longer exist.
-    expect(results.every((r) => r.queued === true)).toBe(true);
-    expect(new Set(results.map((r) => h.shared.formatSaveResultMessage(r).split('“')[0]))).toEqual(
-      new Set(['Queued ']),
-    );
-    expect(h.queue()).toHaveLength(MAX_QUEUE);
+    for (const text of ['a', 'b']) await saveWord(h, text);
+    // The app comes back slowly: the flush is still waiting on its first POST
+    // when the user saves again (and the app is down for that save).
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let calls = 0;
+    h.respond(() => {
+      calls += 1;
+      return { status: 200, json: { ok: true } };
+    });
+    const realFetch = (h.sandbox as unknown as { fetch: (...a: unknown[]) => Promise<unknown> }).fetch;
+    (h.sandbox as unknown as { fetch: unknown }).fetch = async (...a: unknown[]) => {
+      await gate;
+      return realFetch(...a);
+    };
+    const flushing = h.send({ type: 'flush' });
+    const second = h.send({ type: 'flush' }); // overlapping flush joins the first
+    // Enqueue directly while the flush is mid-flight (the save itself would hit the gate too).
+    await new Promise((r) => setTimeout(r, 0));
+    const queueNow = h.queue();
+    h.setQueue([...queueNow, { id: 'late', kind: 'mine', payload: { text: 'late' }, at: Date.now() } as never]);
+    release();
+    await Promise.all([flushing, second]);
+    expect(calls).toBe(2); // a and b once each, not twice
+    expect(h.queue().map((q) => q.payload.text)).toEqual(['late']);
   });
 
   it('does not trim while flushing, so a failing flush cannot shrink the queue', async () => {
@@ -559,24 +575,22 @@ describe('retry queue — the kinds it knows how to replay', () => {
     );
   });
 
-  it('three of the ten declared kinds are only reachable from an older build', () => {
+  it('four of the ten declared kinds are only reachable from an older build', () => {
     const produced = producedQueueKinds();
     expect(produced).toEqual([
       'audio-save',
       'capture',
       'clipboard',
       'download',
-      'immersion',
       'manga-import',
       'mine',
     ]);
-    // inbox / playlist / video have endpoints but no enqueue() call anywhere.
-    // They are only reachable by a queue persisted by an older build, which is
-    // exactly why they are kept — deleting them would turn those stored items
-    // into the silent drop tested above. Pinned so the list cannot grow by
-    // accident and so a new enqueue kind without an endpoint fails here.
+    // inbox / playlist / video have endpoints but no enqueue() call anywhere,
+    // and since 2026-10-08 reading time has its own merged store
+    // (jpStudyImmersionQueue), so `immersion` items only exist in a queue an
+    // older build left. They are kept so those stored items still replay.
     const orphans = declaredQueueKinds().filter((k) => !produced.includes(k));
-    expect(orphans).toEqual(['inbox', 'playlist', 'video']);
+    expect(orphans).toEqual(['inbox', 'playlist', 'video', 'immersion']);
     expect(produced.filter((k) => !declaredQueueKinds().includes(k))).toEqual([]);
   });
 });
@@ -651,23 +665,21 @@ describe('retry queue — which failures queue and which just fail', () => {
     expect(h.queue().map((q) => q.kind)).toEqual(['clipboard']);
   });
 
-  it('queues a video download AND still surfaces the error to the user', async () => {
+  it('queues a video download and answers queued, not failed', async () => {
     const h = bootBackground({
       responder: APP_DOWN,
       tab: { id: 7, windowId: 1, url: 'https://www.youtube.com/watch?v=abcdefghijk', title: 'A video', active: true },
       seed: { jpStudySettings: { version: 2, youtubeMode: 'download' } },
     });
     const res = (await h.send({ type: 'run-command', command: 'media.download' })) as SaveResult;
-    // Unlike a save, download re-throws after enqueueing: the user sees the
-    // offline error *and* the request is queued. Both halves are intentional
-    // (a download is long-running, so silence would be worse), but it means
-    // the toast says failure while the queue says it will happen.
-    expect(res.ok).toBe(false);
-    expect(res.error).toBe('Gum is not running — open the app, then retry.');
+    // Fixed 2026-10-08: it used to re-throw after enqueueing, so the toast said
+    // "failed" for a download that then ran.
+    expect(res.ok).toBe(true);
+    expect(res.queued).toBe(true);
     expect(h.queue().map((q) => q.kind)).toEqual(['download']);
   });
 
-  it('queues a stored recording and re-throws, same as download', async () => {
+  it('queues a stored recording and answers queued', async () => {
     const h = bootBackground({
       responder: APP_DOWN,
       onTabMessage: (msg) =>
@@ -676,9 +688,11 @@ describe('retry queue — which failures queue and which just fail', () => {
           : { ok: true },
     });
     const res = (await h.send({ type: 'run-command', command: 'capture.audio.save' })) as SaveResult;
-    expect(res.ok).toBe(false);
-    expect(res.error).toBe('Gum is not running — open the app, then retry.');
+    expect(res.ok).toBe(true);
+    expect(res.queued).toBe(true);
     expect(h.queue().map((q) => q.kind)).toEqual(['audio-save']);
+    // The clip is cleared once queued, so a second Save cannot make a duplicate card.
+    expect(h.sentToTab.map((s) => s.type)).toContain('jp-clear-audio-clipboard');
   });
 
   it('immersion logging queues only a genuine offline failure', async () => {
@@ -690,7 +704,11 @@ describe('retry queue — which failures queue and which just fail', () => {
       chars: 900,
     })) as SaveResult;
     expect(queued).toEqual({ ok: true, queued: true });
-    expect(h.queue().map((q) => q.kind)).toEqual(['immersion']);
+    // Reading time never enters the save queue (it used to evict real saves).
+    expect(h.queue()).toEqual([]);
+    expect(h.chrome.storage.local.data.jpStudyImmersionQueue).toEqual([
+      expect.objectContaining({ url: 'https://example.com/a', seconds: 60 }),
+    ]);
 
     // A 500 from a running app is not queued — it is reported. This is the
     // only enqueue site in the file that checks `err.offline` first, and it is
@@ -703,7 +721,21 @@ describe('retry queue — which failures queue and which just fail', () => {
       chars: 900,
     })) as SaveResult;
     expect(failed).toEqual({ ok: false, error: 'Database is locked' });
-    expect(h.queue()).toHaveLength(1);
+    expect(h.queue()).toHaveLength(0);
+  });
+
+  it('merges reading time per page instead of queueing one heartbeat per minute', async () => {
+    const h = bootBackground({ responder: APP_DOWN });
+    for (let i = 0; i < 5; i++) {
+      await h.send({ type: 'immersion-visit', url: 'https://example.com/a', seconds: 60, chars: 900 });
+    }
+    const store = h.chrome.storage.local.data.jpStudyImmersionQueue as Array<{ seconds: number }>;
+    expect(store).toHaveLength(1);
+    expect(store[0].seconds).toBe(300);
+    h.respond(APP_UP);
+    await h.send({ type: 'flush' });
+    expect(h.fetches.filter((f) => f.url.endsWith('/v1/immersion/visit') && f.method === 'POST').length).toBeGreaterThan(0);
+    expect(h.chrome.storage.local.data.jpStudyImmersionQueue).toEqual([]);
   });
 
   it('a lookup is never queued — a stale answer is worth nothing', async () => {

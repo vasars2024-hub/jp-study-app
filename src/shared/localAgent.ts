@@ -54,6 +54,8 @@ export type AgentToolOperationId =
   | 'study.export-anki'
   | 'study.resume-session'
   | 'study.open-context'
+  | 'study.stats-summary'
+  | 'study.known-words'
   | 'dictionary.lookup'
   | 'dictionary.explain-grammar'
   | 'dictionary.analyze-sentence'
@@ -173,6 +175,16 @@ const ARGUMENT_HINTS: Partial<Record<AgentToolOperationId, Readonly<Record<strin
     presetId: 'Preset id from flashcard.list-card-presets. Defaults to the saved preset.',
     formatId: 'Format id from flashcard.list-card-presets. Defaults to the saved format.',
   },
+  'study.known-words': {
+    word: 'A word to look up (any inflection; it is reduced to its dictionary form). Omit for counts only.',
+  },
+  'calendar.create-reminder': {
+    reminder: "When to notify: 'at' (default), '5m', '15m', '30m', '1h', '1d' before, or 'none'.",
+    startTime: 'HH:MM local time. Without it the reminder is all-day.',
+  },
+  'calendar.schedule-session': {
+    reminder: "Optional notification: 'at', '5m', '15m', '30m', '1h', '1d' before. Default 'none'.",
+  },
 };
 
 const operation = (
@@ -252,6 +264,8 @@ export const AGENT_TOOL_OPERATIONS: readonly AgentToolOperationDefinition[] = [
   operation('study.export-anki', 'study', 'Export Study cards to Anki', 'full-automation', 'external-connection'),
   operation('study.resume-session', 'study', 'Resume a Study session', 'limited-actions'),
   operation('study.open-context', 'study', 'Open the media Study context', 'limited-actions'),
+  operation('study.stats-summary', 'study', 'Read study statistics', 'read-only'),
+  operation('study.known-words', 'study', 'Read known-word counts or one word\'s level', 'read-only'),
   operation('dictionary.lookup', 'dictionary', 'Look up a word', 'read-only'),
   operation('dictionary.explain-grammar', 'dictionary', 'Explain grammar', 'read-only'),
   operation('dictionary.analyze-sentence', 'dictionary', 'Analyze a sentence', 'read-only'),

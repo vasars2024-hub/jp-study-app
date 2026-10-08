@@ -45,15 +45,17 @@ export default function LockscreenPage() {
       flash(t('settings.lock.msg.mismatch'));
       return;
     }
-    const next = setLockscreenPin(pinDraft);
-    if (!next) {
-      flash(t('settings.lock.msg.saveFail'));
-      return;
-    }
-    setPinDraft('');
-    setPinConfirm('');
-    setHasPin(true);
-    flash(t('settings.lock.msg.saved'));
+    // Hashed in main (scrypt), so saving is async.
+    void setLockscreenPin(pinDraft).then((next) => {
+      if (!next) {
+        flash(t('settings.lock.msg.saveFail'));
+        return;
+      }
+      setPinDraft('');
+      setPinConfirm('');
+      setHasPin(true);
+      flash(t('settings.lock.msg.saved'));
+    });
   };
 
   const toggleEnabled = (on: boolean) => {

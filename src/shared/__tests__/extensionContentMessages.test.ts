@@ -32,6 +32,14 @@ function deliver(msg: Record<string, unknown>): void {
 
 const flush = () => new Promise((r) => setTimeout(r, 20));
 
+/** The popup sits in a closed shadow root; the debug-only test hook reaches it. */
+function pq(selector: string): Element | null {
+  const hooks = (globalThis as unknown as { __jpStudyTestHooks?: { popup(): HTMLElement | null } }).__jpStudyTestHooks;
+  const el = hooks?.popup();
+  if (!el) return null;
+  return el.matches(selector) ? el : el.querySelector(selector);
+}
+
 beforeAll(() => {
   Object.assign(globalThis, {
     chrome: {
@@ -55,6 +63,7 @@ beforeAll(() => {
     },
   });
   Object.defineProperty(window.navigator, 'language', { value: 'ja-JP', configurable: true });
+  (globalThis as unknown as Record<string, unknown>).__JP_STUDY_TEST__ = true;
   run('shared.js');
   run('settings.js');
   run('content.js');
@@ -95,18 +104,18 @@ describe('content script — messages in the page and UI language', () => {
   });
 
   it('names a refused or missing microphone in the UI language', async () => {
-    const fail = (name: string) => {
-      Object.defineProperty(window.navigator, 'mediaDevices', {
-        configurable: true,
-        value: { getUserMedia: async () => { throw new DOMException('Permission denied', name); } },
-      });
+    // The clip is recorded by the worker's offscreen document now (round 2);
+    // the worker answers with a code, and the page names it in the UI language
+    // whatever English the error carries.
+    const fail = (code: string) => {
+      reply = (msg) => (msg.type === 'mic-clip' ? { ok: false, code, error: 'Permission denied' } : { ok: true });
     };
     const toast = () => document.getElementById('jp-study-toast')?.querySelector('.jp-toast-text')?.textContent ?? '';
-    fail('NotAllowedError');
+    fail('mic_permission');
     deliver({ type: 'jp-record-toggle' });
     await flush();
-    expect(toast()).toBe(ja.getMessage('content_micDenied'));
-    fail('NotFoundError');
+    expect(toast()).toBe(ja.getMessage('bg_micGrantNeeded'));
+    fail('mic_unavailable');
     deliver({ type: 'jp-record-toggle' });
     await flush();
     expect(toast()).toBe(ja.getMessage('content_micUnavailable'));
@@ -120,9 +129,9 @@ describe('content script — messages in the page and UI language', () => {
     sent.length = 0;
     reply = () => ({ ok: true, entries: [] });
     deliver({ type: 'jp-lookup-selection', text: '学习' });
-    for (let i = 0; i < 20 && !sent.some((m) => m.type === 'lookup'); i++) await flush();
-    expect(sent.filter((m) => m.type === 'lookup').map((m) => m.lang)).toContain('zh');
-    expect(sent.filter((m) => m.type === 'lookup').map((m) => m.lang)).not.toContain('ja');
+    for (let i = 0; i < 20 && !sent.some((m) => m.type === 'scan'); i++) await flush();
+    expect(sent.filter((m) => m.type === 'scan').map((m) => m.lang)).toContain('zh');
+    expect(sent.filter((m) => m.type === 'scan').map((m) => m.lang)).not.toContain('ja');
     badge.dataset.lang = '';
     document.documentElement.lang = '';
   });
@@ -130,26 +139,31 @@ describe('content script — messages in the page and UI language', () => {
   it('heads the popup with the word the dictionary matched, not the whole scan window', async () => {
     document.documentElement.lang = 'zh-CN';
     // The app's Chinese lookup segments the window itself: 学习中文 is answered with 学习.
+    // The app's scan answers with the longest real word at the window's start.
     reply = (msg) =>
-      msg.type === 'lookup'
-        ? { ok: true, entries: String(msg.query).startsWith('学习') ? [{ word: '学习', reading: 'xué xí', meanings: ['to study'] }] : [] }
+      msg.type === 'scan'
+        ? String(msg.text).startsWith('学习')
+          ? { ok: true, matched: '学习', entries: [{ word: '学习', reading: 'xué xí', meanings: ['to study'], via: 'exact' }] }
+          : { ok: true, matched: '', entries: [] }
         : { ok: true };
     deliver({ type: 'jp-lookup-selection', text: '学习中文' });
-    for (let i = 0; i < 20 && !document.querySelector('#jp-study-popup.open .rp-entry-word'); i++) await flush();
-    expect(document.querySelector('#jp-study-popup .rp-term')?.textContent).toBe('学习');
+    for (let i = 0; i < 20 && !pq('.open .rp-entry-word'); i++) await flush();
+    expect(pq('.rp-term')?.textContent).toBe('学习');
     document.documentElement.lang = '';
   });
 
   it('marks Chinese and Russian study text with its own lang, not ja', async () => {
     document.documentElement.lang = 'zh-CN';
     reply = (msg) =>
-      msg.type === 'lookup'
-        ? { ok: true, entries: String(msg.query) === '学习' ? [{ word: '学习', reading: 'xuéxí', meanings: ['to study'] }] : [] }
+      msg.type === 'scan'
+        ? String(msg.text) === '学习'
+          ? { ok: true, matched: '学习', entries: [{ word: '学习', reading: 'xuéxí', meanings: ['to study'] }] }
+          : { ok: true, matched: '', entries: [] }
         : { ok: true };
     deliver({ type: 'jp-lookup-selection', text: '学习' });
-    for (let i = 0; i < 20 && !document.querySelector('#jp-study-popup .rp-entry-word'); i++) await flush();
-    expect(document.querySelector('#jp-study-popup .rp-term')?.getAttribute('lang')).toBe('zh-cn');
-    expect(document.querySelector('#jp-study-popup .rp-entry-word')?.getAttribute('lang')).toBe('zh-cn');
+    for (let i = 0; i < 20 && !pq('.rp-entry-word'); i++) await flush();
+    expect(pq('.rp-term')?.getAttribute('lang')).toBe('zh-cn');
+    expect(pq('.rp-entry-word')?.getAttribute('lang')).toBe('zh-cn');
 
     deliver({ type: 'jp-show-ocr', result: { ok: true, text: '我喜欢学习', lang: 'zh', engine: 'web' } });
     expect(document.querySelector('.jp-ocr-body')?.getAttribute('lang')).toBe('zh-cn');

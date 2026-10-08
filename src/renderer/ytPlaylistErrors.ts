@@ -1,4 +1,6 @@
-type Translate = (key: string, vars?: Record<string, string | number>) => string;
+import { youtubeErrorMessage } from '../shared/youtubeErrors';
+
+type Translate =(key: string, vars?: Record<string, string | number>) => string;
 
 const refusalKeys: Record<string, string> = {
   'Not a valid YouTube playlist URL (missing list=…).': 'yt.refusal.invalidPlaylistUrl',
@@ -17,5 +19,8 @@ export function localizeYtPlaylistError(error: string, t: Translate): string {
   if (key) return t(key);
   const exitCode = /^yt-dlp exited with code (-?\d+)$/.exec(error);
   if (exitCode) return t('yt.refusal.ytDlpExit', { code: exitCode[1] });
+  // yt-dlp's own English stderr (private video, rate limit, network...).
+  const known = youtubeErrorMessage(error);
+  if (known) return t(known.key, known.vars);
   return t('yt.refusal.providerError', { detail: error });
 }

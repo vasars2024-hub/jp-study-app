@@ -20,7 +20,7 @@ import {
 } from '../../shared/scraperSettings';
 
 vi.mock('electron', () => ({
-  app: { getPath: () => process.cwd(), getAppMetrics: () => [] },
+  app: { getPath: () => `${process.env.TEMP ?? process.env.TMPDIR ?? '/tmp'}/gum-vitest-userdata`, getAppMetrics: () => [] },
   ipcMain: { handle: () => undefined },
 }));
 
@@ -142,6 +142,8 @@ function settings(patch: (s: ScraperSettings) => void = () => undefined): Scrape
   value.safety.crawlDelayMs = 0;
   value.safety.maxRequestsPerMinute = 0;
   value.safety.respectRobotsTxt = false;
+  // The servers below listen on 127.0.0.1, which the SSRF guard refuses by default.
+  value.safety.allowPrivateNetwork = true;
   patch(value);
   return value;
 }

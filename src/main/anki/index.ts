@@ -7,7 +7,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app, BrowserWindow, clipboard, ipcMain } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, nativeImage } from 'electron';
 import {
   ANKI_COLLECTION_UNAVAILABLE_MSG,
   APP_TAG,
@@ -17,6 +17,9 @@ import {
   formatExamplePairs,
   hasFieldTemplates,
   mediaFilenamesFromAnkiMarkup,
+  MINE_TERM_REQUIRED_MSG,
+  MINE_UNKNOWN_PROFILE_PREFIX,
+  mineTemplatesMismatchMessage,
   renderFieldTemplate,
   resolveMiningTemplates,
   type DeleteMinedNotesResult,
@@ -24,6 +27,7 @@ import {
   type NoteStylingPushResult,
   type ExampleCountLang,
   type IntervalSnapshot,
+  type MineMediaWarning,
   type MineNoteRequest,
   type MineNoteResult,
   type MiningValues,
@@ -110,25 +114,93 @@ async function storeImageFromClipboard(): Promise<string> {
   }
 }
 
-async function storeSuppliedImage(req: MineNoteRequest): Promise<string> {
+/** Largest screenshot sent to Anki as-is; anything bigger is re-encoded first. */
+const SUPPLIED_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Re-encode an oversized screenshot as a downscaled JPEG instead of dropping it (a 4K
+ * lossless frame is easily past the cap). Widths and qualities step down until it fits;
+ * null only when the bytes are not a picture nativeImage can decode at all.
+ */
+function shrinkSuppliedImage(data: Buffer): Buffer | null {
+  try {
+    const image = nativeImage.createFromBuffer(data);
+    if (image.isEmpty()) return null;
+    const { width } = image.getSize();
+    for (const [maxWidth, quality] of [[1280, 85], [1280, 70], [960, 65], [720, 55]] as const) {
+      const scaled = width > maxWidth ? image.resize({ width: maxWidth, quality: 'good' }) : image;
+      const jpeg = scaled.toJPEG(quality);
+      if (jpeg.length && jpeg.length <= SUPPLIED_IMAGE_MAX_BYTES) return jpeg;
+    }
+  } catch {
+    /* not decodable */
+  }
+  return null;
+}
+
+async function storeSuppliedImage(
+  req: MineNoteRequest,
+  warnings: MineMediaWarning[] = [],
+): Promise<string> {
   if (typeof req.imageBase64 === 'string' && req.imageBase64.trim()) {
     try {
-      const base64 = req.imageBase64.trim();
-      const data = Buffer.from(base64, 'base64');
-      if (!data.length || data.length > 2 * 1024 * 1024) return '';
+      let base64 = req.imageBase64.trim();
+      let data = Buffer.from(base64, 'base64');
+      if (!data.length) {
+        warnings.push('image-failed');
+        return '';
+      }
       const requestedExtension = path.extname(req.imageFilename ?? '').toLowerCase();
-      const extension = requestedExtension === '.png' || requestedExtension === '.webp'
+      let extension = requestedExtension === '.png' || requestedExtension === '.webp'
         ? requestedExtension
         : '.jpg';
+      if (data.length > SUPPLIED_IMAGE_MAX_BYTES) {
+        const shrunk = shrinkSuppliedImage(data);
+        if (!shrunk) {
+          warnings.push('image-too-large');
+          return '';
+        }
+        data = shrunk;
+        base64 = shrunk.toString('base64');
+        extension = '.jpg';
+      }
       const hash = crypto.createHash('md5').update(data).digest('hex').slice(0, 12);
       const filename = `jsa-vn-${hash}${extension}`;
       await invoke('storeMediaFile', { filename, data: base64 });
       return `<img src="${filename}">`;
     } catch {
+      warnings.push('image-failed');
       return '';
     }
   }
   return req.imageHtml?.trim() ?? '';
+}
+
+/** A mined clip's Anki media name: the caller's when it is a plain safe name, else a hash. */
+function suppliedClipFilename(req: MineNoteRequest, data: string): string {
+  const requested = path.basename(typeof req.clipFilename === 'string' ? req.clipFilename.trim() : '');
+  if (/^[A-Za-z0-9._-]{1,120}\.(?:mp4|webm)$/i.test(requested)) return requested;
+  return `jp-clip-${crypto.createHash('md5').update(data).digest('hex').slice(0, 12)}.mp4`;
+}
+
+/**
+ * Store the scene clip and return `[sound:…]` markup — the tag Anki desktop plays video
+ * with (it dispatches on the file extension). '' when no clip was supplied.
+ */
+async function storeSuppliedClip(
+  req: MineNoteRequest,
+  warnings: MineMediaWarning[] = [],
+): Promise<string> {
+  const data = typeof req.clipBase64 === 'string' ? req.clipBase64.trim() : '';
+  if (!data) return '';
+  try {
+    const filename = suppliedClipFilename(req, data);
+    await invoke('storeMediaFile', { filename, data });
+    return `[sound:${filename}]`;
+  } catch {
+    warnings.push('clip-failed');
+    return '';
+  }
 }
 
 /** The card's language for its word audio: the route's, else the text's script. */
@@ -158,6 +230,7 @@ async function gatherMiningValues(
   req: MineNoteRequest,
   content: Partial<Record<CardContent, string>>,
   fieldTemplates?: Record<string, string>,
+  warnings: MineMediaWarning[] = [],
 ): Promise<MiningValues> {
   const esc = (v?: string): string => (v && v.trim() ? escapeForAnki(v.trim()) : '');
   const cloze = computeCloze(content.sentence ?? '', req.surface, content.term, content.reading);
@@ -190,6 +263,7 @@ async function gatherMiningValues(
     frequency: escapeForAnki(getFrequency(term, reading)),
     audio: '',
     image: '', // markup, set below (already Anki-safe)
+    clip: '', // markup, set below: the scene as `[sound:…mp4]`
   };
 
   const mergedFrequencies = {
@@ -229,8 +303,11 @@ async function gatherMiningValues(
   if (req.captureClipboardImage) {
     values.image = await storeImageFromClipboard();
   } else if (req.imageBase64?.trim() || req.imageHtml?.trim()) {
-    values.image = await storeSuppliedImage(req);
+    values.image = await storeSuppliedImage(req, warnings);
   }
+  // `{clip}` was advertised by MINING_VARS and sent by the player, and nothing read it:
+  // the panel said "attached" and the note never got the file.
+  values.clip = await storeSuppliedClip(req, warnings);
 
   if (req.fetchAudio && term) {
     // JapanesePod101's word audio is Japanese only. A Chinese or Russian card
@@ -251,6 +328,7 @@ async function gatherMiningValues(
       values.audio = `[sound:${filename}]`;
     } catch {
       values.audio = '';
+      warnings.push('audio-failed');
     }
   }
 
@@ -331,7 +409,7 @@ async function validateSortField(
 async function attachUnreferencedMedia(
   fields: Record<string, string>,
   modelName: string,
-  media: { image?: string; audio?: string },
+  media: { image?: string; audio?: string; clip?: string },
 ): Promise<Record<string, string>> {
   const names = (await invoke('modelFieldNames', { modelName })) ?? [];
   return appendUnreferencedMediaToFields(fields, names, media);
@@ -410,7 +488,9 @@ function resolveMineTarget(req: Pick<
 export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
   const resolved = resolveMineTarget(req);
   if (!resolved) {
-    return { ok: false, error: `Unknown profile: ${String(req?.profileId)}` };
+    // English for surfaces that print it; `translateAnkiReason` maps it to
+    // `studyLoop.mine.error.unknownProfile` for the ones that translate.
+    return { ok: false, error: `${MINE_UNKNOWN_PROFILE_PREFIX}${String(req?.profileId)}` };
   }
   const {
     profile,
@@ -421,8 +501,9 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
     requestedDeck,
   } = resolved;
   const term = typeof req?.term === 'string' ? req.term.trim() : '';
-  if (!term) return { ok: false, error: 'term is required' };
+  if (!term) return { ok: false, error: MINE_TERM_REQUIRED_MSG };
   let storedMediaFilenames: string[] = [];
+  const mediaWarnings: MineMediaWarning[] = [];
 
   // Stamped onto success results so callers can show where the card actually went.
   const meta = {
@@ -456,7 +537,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       };
       let prebuiltImage = '';
       if (req.imageBase64?.trim() || req.imageHtml?.trim()) {
-        prebuiltImage = await storeSuppliedImage(req);
+        prebuiltImage = await storeSuppliedImage(req, mediaWarnings);
         if (prebuiltImage && model.fieldMap.image) {
           fields[model.fieldMap.image] = prebuiltImage;
         }
@@ -492,6 +573,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
         noteId,
         ...meta,
         ...(storedMediaFilenames.length ? { mediaFilenames: storedMediaFilenames } : {}),
+        ...(mediaWarnings.length ? { mediaWarnings: [...new Set(mediaWarnings)] } : {}),
       };
     }
 
@@ -509,7 +591,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
         Boolean(req.useExampleFallback),
         profile.anki.exampleFallbackTemplates,
       );
-      const values = await gatherMiningValues(req, content, activeTemplates);
+      const values = await gatherMiningValues(req, content, activeTemplates, mediaWarnings);
       const realFields = new Set(
         (await invoke('modelFieldNames', { modelName: profile.anki.modelName })) ?? [],
       );
@@ -521,7 +603,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       if (!Object.keys(fields).length) {
         return {
           ok: false,
-          error: `None of the saved field templates match the fields of "${profile.anki.modelName}".`,
+          error: mineTemplatesMismatchMessage(profile.anki.modelName),
         };
       }
       const sortError = await validateSortField(
@@ -537,8 +619,9 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       fields = await attachUnreferencedMedia(fields, profile.anki.modelName, {
         image: values.image,
         audio: values.audio,
+        clip: values.clip,
       });
-      storedMediaFilenames = mediaFilenamesFromAnkiMarkup(values.image, values.audio);
+      storedMediaFilenames = mediaFilenamesFromAnkiMarkup(values.image, values.audio, values.clip ?? '');
     } else {
       // Automatic mode (unchanged): role mapper places each blueprint slot.
       // Deduped, order-preserving role list from the blueprint.
@@ -570,7 +653,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       if (req.captureClipboardImage) {
         autoImage = await storeImageFromClipboard();
       } else if (req.imageBase64?.trim() || req.imageHtml?.trim()) {
-        autoImage = await storeSuppliedImage(req);
+        autoImage = await storeSuppliedImage(req, mediaWarnings);
       }
       if (autoImage && model.fieldMap.image) {
         const imageField = model.fieldMap.image;
@@ -595,9 +678,13 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
           }
           // No audio role on this model: attachUnreferencedMedia below places it.
         } catch {
-          /* Anki media upload failed — note still saves without audio */
+          // Anki media upload failed — note still saves without audio, and says so.
+          mediaWarnings.push('audio-failed');
         }
       }
+      // The scene clip has no blueprint role; attachUnreferencedMedia places it (a
+      // clip/video-named field, else beside the sentence).
+      const autoClip = await storeSuppliedClip(req, mediaWarnings);
 
       if (!Object.keys(fields).length) {
         return { ok: false, error: model.error ?? `Model "${model.modelName}" has no usable fields.` };
@@ -614,8 +701,9 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       fields = await attachUnreferencedMedia(fields, profile.anki.modelName, {
         image: autoImage,
         audio: autoAudio,
+        clip: autoClip,
       });
-      storedMediaFilenames = mediaFilenamesFromAnkiMarkup(autoImage, autoAudio);
+      storedMediaFilenames = mediaFilenamesFromAnkiMarkup(autoImage, autoAudio, autoClip);
     }
 
     // Tagging policy (5.3): applied by the gateway, never by callers.
@@ -638,6 +726,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       noteId,
       ...meta,
       ...(storedMediaFilenames.length ? { mediaFilenames: storedMediaFilenames } : {}),
+      ...(mediaWarnings.length ? { mediaWarnings: [...new Set(mediaWarnings)] } : {}),
     };
   } catch (err) {
     // duplicate -> 'duplicate' (A-3), transport -> ANKI_UNREACHABLE_MSG (A-2),
@@ -819,7 +908,9 @@ export async function deleteMinedNotes(
       .map((filename) => String(filename).trim())
       .filter((filename) =>
         /^jsa-vn-[a-f0-9]{12}\.(?:jpe?g|png|webp)$/i.test(filename)
-        || /^jp-video-cue-\d+-\d+-\d+\.webm$/i.test(filename)),
+        || /^jp-video-cue-\d+-\d+-\d+\.(?:webm|ogg|mp3)$/i.test(filename)
+        // Mined scene clips (`videoClipFilename` or the gateway's hash fallback).
+        || /^jp-clip-[A-Za-z0-9-]+\.mp4$/i.test(filename)),
   )];
   try {
     await invoke('deleteNotes', { notes: ids });

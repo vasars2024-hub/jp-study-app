@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron';
+import { app, autoUpdater, BrowserWindow, ipcMain } from 'electron';
 import {
   classifyRelease,
   compareVersions,
@@ -12,6 +12,9 @@ import {
   type ReleaseStatus,
 } from '../shared/release';
 import { readInstalledExtensionVersion } from './extensionInstall';
+import { logDiagnostic } from './errorLog';
+import { markAppQuitting } from './appLifecycle';
+import { createAppUpdateController, detectInstallKind } from './squirrelUpdater';
 
 interface GitHubLatestPayload {
   tag_name?: string;
@@ -120,4 +123,21 @@ export function registerReleaseIpc(): void {
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('release:check', () => fetchLatestRelease());
   ipcMain.handle('release:status', () => getReleaseStatus());
+
+  // An installed (Squirrel) copy also downloads the update itself and offers
+  // "Restart to update"; the portable zip keeps only the check-and-notify above.
+  const updates = createAppUpdateController({
+    install: detectInstallKind(process.execPath, app.isPackaged),
+    updater: autoUpdater,
+    broadcast: (status) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send('appUpdate:changed', status);
+      }
+    },
+    log: (message) => logDiagnostic('warn', 'update', 'squirrel', message),
+    markQuitting: markAppQuitting,
+  });
+  ipcMain.handle('appUpdate:status', () => updates.status());
+  ipcMain.handle('appUpdate:restart', () => updates.restart());
+  updates.start();
 }

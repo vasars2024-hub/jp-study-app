@@ -37,6 +37,7 @@ import {
   extractEmbeddedSubtitle,
   extractEmbeddedSubtitleAss,
   findSidecarSubtitles,
+  sidecarNameMatchesStem,
   listAudioStreamLanguages,
   listEmbeddedSubtitleStreams,
   normalizeStreamLanguage,
@@ -77,7 +78,8 @@ export function videoForSubtitle(subtitlePath: string): string | null {
   const candidates = entries
     .filter((entry) => VIDEO_EXT.has(extOf(entry)))
     .map((entry) => ({ entry, stem: path.basename(entry, path.extname(entry)).toLowerCase() }))
-    .filter(({ stem }) => stem && name.startsWith(stem))
+    // Stem then `.`/`_`: `Show - 010.ja.srt` is not `Show - 01.mkv`'s.
+    .filter(({ stem }) => stem && sidecarNameMatchesStem(name, stem))
     .sort((a, b) => b.stem.length - a.stem.length);
   return candidates[0] ? path.join(dir, candidates[0].entry) : null;
 }

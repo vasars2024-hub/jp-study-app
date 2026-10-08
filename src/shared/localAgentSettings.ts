@@ -2,6 +2,10 @@ import { AGENT_HISTORY_TURN_CEILING } from './agentWorkspace';
 import type { AgentPermissionLevel } from './localAgent';
 import type { AgentMemoryCategory, AgentMemoryEntry } from './localAgentMemory';
 import type { LocalAgentModelMode } from './localAgentModels';
+import {
+  normalizeAgentCloudShareStudyData,
+  type AgentCloudShareStudyData,
+} from './agentCloudStudyDataGate';
 
 export type LocalAgentBackend = 'local-gguf' | 'disabled';
 export type LocalAgentAcceleration = 'auto' | 'cpu' | 'gpu';
@@ -63,6 +67,12 @@ export interface LocalAgentSettings {
    * explicit consent for each request that would disclose them.
    */
   excludeSensitiveContext: boolean;
+  /**
+   * Whether the cloud planner may be offered the tools that read study
+   * statistics, known words and library titles. `unset` (not yet answered)
+   * behaves as `local-only`.
+   */
+  agentCloudShareStudyData: AgentCloudShareStudyData;
   privacyMode: boolean;
   debugMode: boolean;
 }
@@ -86,6 +96,7 @@ export const DEFAULT_LOCAL_AGENT_SETTINGS: LocalAgentSettings = {
   memoryScope: [...LOCAL_AGENT_MEMORY_CATEGORIES],
   chatHistory: 'full',
   excludeSensitiveContext: true,
+  agentCloudShareStudyData: 'unset',
   privacyMode: true,
   debugMode: false,
 };
@@ -175,6 +186,7 @@ export function normalizeLocalAgentSettings(input: unknown): LocalAgentSettings 
     // Absent means private. A pre-setting document must not silently make
     // sensitive material eligible for a cloud request after an upgrade.
     excludeSensitiveContext: raw.excludeSensitiveContext !== false,
+    agentCloudShareStudyData: normalizeAgentCloudShareStudyData(raw.agentCloudShareStudyData),
     privacyMode: raw.privacyMode !== false,
     debugMode: raw.debugMode === true,
   };

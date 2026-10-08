@@ -59,6 +59,15 @@ describe('subtitles beside a library video', () => {
     expect(subs[0].source).toBe('subtitles');
   });
 
+  it('episode 010\'s subtitle is not listed as episode 01\'s sidecar (P7 stem boundary)', () => {
+    const video = write('anime/Show - 01.mkv', 'v');
+    const ja = write('anime/Show - 01.ja.srt', '1');
+    write('anime/Show - 010.ja.srt', '1');
+    write('media.json', JSON.stringify({ items: [{ id: 'v1', title: 'Show 01', path: video, kind: 'video' }] }));
+    const subs = buildFilesIndex({ userDataPath: root }).items.filter((item) => item.kind === 'subtitle');
+    expect(subs.map((item) => (item.location.store === 'file' ? item.location.path : ''))).toEqual([ja]);
+  });
+
   it('a video folder that cannot be read contributes nothing rather than failing the index', () => {
     write('media.json', JSON.stringify({ items: [{ id: 'v1', title: 'Gone', path: path.join(root, 'missing', 'Gone.mkv'), kind: 'video' }] }));
     const index = buildFilesIndex({ userDataPath: root });

@@ -215,6 +215,12 @@ export async function probeSource(
   entry: ScraperSourceEntry,
   timeoutMs = 15_000,
   requestedPath?: string,
+  /**
+   * The SSRF guard: refuse a loopback/private/link-local target. The IPC
+   * handler sets it from the profile's `safety.allowPrivateNetwork` (on unless
+   * the profile allows private networks); direct callers opt in.
+   */
+  blockPrivateNetwork = false,
 ): Promise<SourceStatus> {
   const catalogue = SOURCE_CATALOGUE.find((item) => item.id === entry.id);
   // A caller-supplied path is only a path — never a scheme or another host.
@@ -233,14 +239,20 @@ export async function probeSource(
   // self-hosted indexer on the LAN speaks http, and reporting it "offline"
   // because it has no certificate would be wrong. Only a connection-level
   // failure falls through — any HTTP status, including 4xx, is an answer.
-  for (const scheme of ['https', 'http'] as const) {
+  // A torrent index entry may keep the scheme the user typed
+  // (`http://192.168.1.5:9117`); that scheme is then the only one tried.
+  const typed = /^(https?):\/\/(.+?)\/*$/i.exec(entry.host);
+  const hostOnly = typed ? typed[2] : entry.host;
+  const schemes = typed ? [typed[1].toLowerCase()] : ['https', 'http'];
+  for (const scheme of schemes) {
     try {
-      const response = await scraperRequest(`${scheme}://${entry.host}${path}`, {
+      const response = await scraperRequest(`${scheme}://${hostOnly}${path}`, {
         timeoutMs,
         // 64 KB is plenty to recognise a challenge page and keeps a probe from
         // pulling a whole feed.
         maxBytes: 64 * 1024,
         correlationId: `probe:${entry.id}`,
+        blockPrivateNetwork,
       });
       status = response.status;
       body = response.body;

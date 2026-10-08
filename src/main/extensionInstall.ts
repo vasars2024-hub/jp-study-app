@@ -15,9 +15,13 @@ import manifestJson from './chrome-extension/manifest.json?raw';
 import backgroundJs from './chrome-extension/background.js?raw';
 import popupHtml from './chrome-extension/popup.html?raw';
 import popupJs from './chrome-extension/popup.js?raw';
+import popupCssJs from './chrome-extension/popup-css.js?raw';
 import sharedJs from './chrome-extension/shared.js?raw';
 import contentJs from './chrome-extension/content.js?raw';
 import contentCss from './chrome-extension/content.css?raw';
+import idbJs from './chrome-extension/idb.js?raw';
+import offscreenHtml from './chrome-extension/offscreen.html?raw';
+import offscreenJs from './chrome-extension/offscreen.js?raw';
 import optionsHtml from './chrome-extension/options.html?raw';
 import optionsJs from './chrome-extension/options.js?raw';
 import settingsJs from './chrome-extension/settings.js?raw';
@@ -34,9 +38,13 @@ const BUNDLED_FILES = [
   'background.js',
   'popup.html',
   'popup.js',
+  'popup-css.js',
   'shared.js',
   'content.js',
   'content.css',
+  'idb.js',
+  'offscreen.html',
+  'offscreen.js',
   'options.html',
   'options.js',
   'settings.js',
@@ -55,9 +63,13 @@ const BUNDLED: Record<(typeof BUNDLED_FILES)[number], string> = {
   'background.js': backgroundJs,
   'popup.html': popupHtml,
   'popup.js': popupJs,
+  'popup-css.js': popupCssJs,
   'shared.js': sharedJs,
   'content.js': contentJs,
   'content.css': contentCss,
+  'idb.js': idbJs,
+  'offscreen.html': offscreenHtml,
+  'offscreen.js': offscreenJs,
   'options.html': optionsHtml,
   'options.js': optionsJs,
   'settings.js': settingsJs,

@@ -9,7 +9,8 @@ import {
   savePracticeFilters,
   type PracticeFilters,
 } from '../../data/grammar/practiceFilters';
-import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
+import { createDeckFolder } from '../../flashcardDeck';
+import { exportGrammarPointsToAnki, mineGrammarPoints } from '../../studyMiningRoutes';
 import {
   applyFamiliarity,
   loadFamiliarity,
@@ -21,7 +22,6 @@ import { useT } from '../../i18n';
 import VirtualList from '../VirtualList';
 import GrammarFilterPanel from './GrammarFilterPanel';
 import GrammarTestModal from './GrammarTestModal';
-import { normalizeStudyLang } from '../../../shared/studyLang';
 
 const FOLDER = 'Grammar';
 
@@ -113,42 +113,17 @@ export default function GrammarPracticePanel({
   function addToDeck() {
     if (!selectedPoints.length) return;
     createDeckFolder(FOLDER);
-    addDeckCards(
-      selectedPoints.map((p) => ({
-        word: p.title,
-        reading: '',
-        meaning: p.meaning,
-        sentence: p.examples[0]?.jp,
-        front: p.title,
-        back: `${p.meaning}${p.structure ? `\n${p.structure}` : ''}`,
-        source: 'import' as const,
-        folder: FOLDER,
-      })),
-    );
-    setStatus(t('grammar.practice.status.addedToDeck', { count: selectedPoints.length }));
+    const count = selectedPoints.length;
+    void mineGrammarPoints(selectedPoints, FOLDER)
+      .then(() => setStatus(t('grammar.practice.status.addedToDeck', { count })));
   }
 
   async function exportAnki() {
     if (!selectedPoints.length || busy) return;
     setBusy(true);
-    let ok = 0;
-    let fail = 0;
     try {
-      for (const p of selectedPoints) {
-        try {
-          const res = await window.api.ankiMineNote({
-            route: { source: 'other', cardKind: 'word', language: normalizeStudyLang(p.lang) },
-            term: p.title,
-            meaning: p.meaning,
-            sentence: p.examples[0]?.jp,
-            translation: p.structure,
-          });
-          if (res.ok || res.error === 'duplicate') ok += 1;
-          else fail += 1;
-        } catch {
-          fail += 1;
-        }
-      }
+      createDeckFolder(FOLDER);
+      const { ok, fail } = await exportGrammarPointsToAnki(selectedPoints, FOLDER);
       setStatus(t('grammar.practice.status.ankiExport', { ok, fail }));
     } finally {
       setBusy(false);

@@ -53,8 +53,15 @@ import { registerYoutubeDiscoveryIpc } from './youtubeDiscovery';
 import { logDiagnostic } from './errorLog';
 import { killProcessTree } from './processTree';
 import { readJsonDetailedSync, writeFileAtomicSync, writeJsonAtomicSync } from './atomicJson';
+import { youtubeErrorMessage } from '../shared/youtubeErrors';
 
 const DEFAULT_AUTO_UPDATE_HOURS = 12;
+
+/** yt-dlp's raw English stderr, as a message in the UI language. */
+function ytError(raw: string): string {
+  const message = youtubeErrorMessage(raw);
+  return message ? mt(message.key, message.vars) : raw;
+}
 
 function storePath(): string {
   return path.join(app.getPath('userData'), YOUTUBE_PLAYLIST_STORE_FILE);
@@ -336,7 +343,7 @@ async function fetchPlaylist(url: string): Promise<PlaylistFetch | { error: stri
     '5000',
     channel ? channel.fetchUrl : url.trim(),
   ]);
-  if (!result.ok) return { error: result.error };
+  if (!result.ok) return { error: ytError(result.error) };
   const mapped = mapFlatEntries(result.data);
   if (!channel) return { listId: playlistId as string, url: url.trim(), mapped };
 
@@ -536,7 +543,13 @@ async function downloadOneVideo(
     detectAutoCaptions: true,
   });
   if ('error' in result) {
-    return { ok: false, error: result.error, ...(result.errorKey === 'cancelled' ? { aborted: true } : {}) };
+    return {
+      ok: false,
+      // A keyed refusal (cancel, audio language) is already the app's own text;
+      // anything else is yt-dlp's raw English stderr.
+      error: result.errorKey ? result.error : ytError(result.error),
+      ...(result.errorKey === 'cancelled' ? { aborted: true } : {}),
+    };
   }
   commitStore((fresh) => {
     const target = fresh.videos.find((v) => v.id === videoId);
@@ -680,12 +693,12 @@ export async function fetchSubsOnly(
     };
     options.signal?.addEventListener('abort', onAbort, { once: true });
     proc.stderr?.on('data', (d: Buffer) => (err += d.toString()));
-    proc.on('error', (e) => finish({ ok: false, error: e.message }));
+    proc.on('error', (e) => finish({ ok: false, error: ytError(e.message) }));
     proc.on('close', (code) => {
       if (settled) return;
       if (code !== 0) {
         const last = err.trim().split('\n').pop()?.trim();
-        finish({ ok: false, error: last || `yt-dlp exited with code ${code}` });
+        finish({ ok: false, error: ytError(last || `yt-dlp exited with code ${code}`) });
         return;
       }
       const files = fs.existsSync(outDir)

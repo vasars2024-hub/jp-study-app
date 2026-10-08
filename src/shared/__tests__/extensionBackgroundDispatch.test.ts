@@ -439,7 +439,11 @@ describe('background service worker — every command still routes', () => {
     const fresh = bootWorker();
     fresh.chrome.tabs.sendMessage = (() => Promise.reject(new Error('no receiver'))) as never;
     await sendBackgroundMessage(fresh.chrome, { type: 'run-command', command: 'reader.theme' });
-    expect(fresh.injected[0].files).toEqual(['shared.js', 'settings.js', 'content.js']);
+    // First a probe (is content.js already there?), then the files, once.
+    expect(fresh.injected[0]).toMatchObject({ hasFunc: true });
+    const fileInjections = fresh.injected.filter((i) => i.files);
+    expect(fileInjections).toHaveLength(1);
+    expect(fileInjections[0].files).toEqual(['shared.js', 'settings.js', 'popup-css.js', 'content.js']);
   });
 });
 

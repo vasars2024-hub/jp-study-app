@@ -127,6 +127,7 @@ export interface ListenerRegistry {
   onMessage: Array<(msg: unknown, sender: unknown, sendResponse: (r: unknown) => void) => unknown>;
   onCommand: Array<(command: string) => unknown>;
   onInstalled: Array<() => unknown>;
+  onStartup?: Array<() => unknown>;
   onAlarm: Array<(alarm: { name: string }) => unknown>;
   onContextMenuClicked: Array<(info: unknown, tab: unknown) => unknown>;
 }
@@ -142,6 +143,8 @@ export interface ChromeStub {
   runtime: Record<string, unknown>;
   action: Record<string, (...args: never[]) => unknown>;
   alarms: Record<string, unknown>;
+  tabCapture: Record<string, unknown>;
+  offscreen: Record<string, unknown>;
   contextMenus: Record<string, unknown>;
   commands: Record<string, unknown>;
   i18n: I18nStub;
@@ -160,10 +163,12 @@ export function createChromeStub(seed: Record<string, unknown> = {}): ChromeStub
       return Promise.resolve(result);
     };
   };
+  const registered: Array<Record<string, unknown>> = [];
   const listeners: ListenerRegistry = {
     onMessage: [],
     onCommand: [],
     onInstalled: [],
+    onStartup: [],
     onAlarm: [],
     onContextMenuClicked: [],
   };
@@ -191,18 +196,58 @@ export function createChromeStub(seed: Record<string, unknown> = {}): ChromeStub
     scripting: {
       executeScript: record('scripting.executeScript', [{ result: null }]),
       insertCSS: record('scripting.insertCSS', undefined),
+      // Dynamic content-script registry (background.js syncContentScriptRegistration).
+      getRegisteredContentScripts: (...args: unknown[]) => {
+        calls.push({ api: 'scripting.getRegisteredContentScripts', args });
+        const ids = ((args[0] as { ids?: string[] } | undefined)?.ids ?? null) as string[] | null;
+        return Promise.resolve(
+          JSON.parse(JSON.stringify(registered.filter((s) => !ids || ids.includes(String(s.id))))),
+        );
+      },
+      registerContentScripts: (...args: unknown[]) => {
+        calls.push({ api: 'scripting.registerContentScripts', args });
+        for (const s of args[0] as Array<Record<string, unknown>>) {
+          if (registered.some((r) => r.id === s.id)) return Promise.reject(new Error(`Duplicate script ID '${s.id}'`));
+          registered.push(JSON.parse(JSON.stringify(s)));
+        }
+        return Promise.resolve();
+      },
+      updateContentScripts: (...args: unknown[]) => {
+        calls.push({ api: 'scripting.updateContentScripts', args });
+        for (const s of args[0] as Array<Record<string, unknown>>) {
+          const i = registered.findIndex((r) => r.id === s.id);
+          if (i >= 0) registered[i] = { ...registered[i], ...JSON.parse(JSON.stringify(s)) };
+        }
+        return Promise.resolve();
+      },
     },
     runtime: {
+      id: 'testtesttest',
       lastError: undefined,
       getURL: (p: string) => `chrome-extension://testtesttest/${p}`,
-      sendMessage: record('runtime.sendMessage', undefined),
+      // The offscreen recorder answers its start/stop messages; everything else
+      // (no listener in the test) resolves with nothing, as Chrome does.
+      sendMessage: (...args: unknown[]) => {
+        calls.push({ api: 'runtime.sendMessage', args });
+        const msg = args[0] as { target?: string; type?: string } | undefined;
+        return Promise.resolve(msg?.target === 'offscreen' ? { ok: true, mimeType: 'video/webm' } : undefined);
+      },
+      getContexts: record('runtime.getContexts', [] as unknown[]),
       openOptionsPage: record('runtime.openOptionsPage', undefined),
       onMessage: { addListener: (fn: ListenerRegistry['onMessage'][number]) => listeners.onMessage.push(fn) },
       onInstalled: { addListener: (fn: () => unknown) => listeners.onInstalled.push(fn) },
+      onStartup: { addListener: (fn: () => unknown) => listeners.onStartup?.push(fn) },
     },
     action: {
       setBadgeText: record('action.setBadgeText', undefined),
       setBadgeBackgroundColor: record('action.setBadgeBackgroundColor', undefined),
+    },
+    tabCapture: {
+      getMediaStreamId: record('tabCapture.getMediaStreamId', 'stream-id'),
+    },
+    offscreen: {
+      createDocument: record('offscreen.createDocument', undefined),
+      closeDocument: record('offscreen.closeDocument', undefined),
     },
     alarms: {
       create: record('alarms.create', undefined),
@@ -396,14 +441,21 @@ export function evalInSandbox<T>(sandbox: ExtensionSandbox, expression: string):
 export function evaluateBackground(sandbox: ExtensionSandbox): void {
   const filePath = path.join(EXTENSION_DIR, 'background.js');
   const source = readFileSync(filePath, 'utf8');
-  const sideEffectImports = source.match(/^import '\.\/(?:shared|settings)\.js';$/gm) ?? [];
-  if (sideEffectImports.length !== 2) {
+  const sideEffectImports = source.match(/^import '\.\/(?:shared|settings|idb)\.js';$/gm) ?? [];
+  const allImports = source.match(/^import /gm) ?? [];
+  if (sideEffectImports.length !== allImports.length || !/^import '\.\/shared\.js';$/m.test(source)) {
     throw new Error(
-      `extension/background.js: expected exactly 2 side-effect imports, found ${sideEffectImports.length}. ` +
+      `extension/background.js: expected only side-effect imports of shared/settings/idb, found ${allImports.length}. ` +
         'If it now imports something with bindings, this harness needs updating.',
     );
   }
-  const body = source.replace(/^import '\.\/(?:shared|settings)\.js';$/gm, '');
+  // idb.js publishes globalThis.jpStudyIdb; with no IndexedDB in the sandbox it
+  // falls back to its in-memory store, which is what the tests exercise.
+  if (/^import '\.\/idb\.js';$/m.test(source) && !(sandbox as Record<string, unknown>).jpStudyIdb) {
+    const idbPath = path.join(EXTENSION_DIR, 'idb.js');
+    vm.runInContext(readFileSync(idbPath, 'utf8'), sandbox, { filename: idbPath });
+  }
+  const body = source.replace(/^import '\.\/(?:shared|settings|idb)\.js';$/gm, '');
   vm.runInContext(`(function () {\n${body}\n})();`, sandbox, { filename: filePath });
 }
 
@@ -475,7 +527,7 @@ export interface BackgroundHarness {
   sentToTab: Array<{ tabId: number; type: string; msg: Record<string, unknown> }>;
   /** Swap the fetch behaviour mid-test (app goes down, token expires, …). */
   respond(fn: Responder): void;
-  send(msg: unknown): Promise<unknown>;
+  send(msg: unknown, sender?: unknown): Promise<unknown>;
   /** The retry queue as it sits in storage right now. */
   queue(): QueuedItem[];
   /** Plant a queue, the way an older build or an earlier session would have. */
@@ -545,7 +597,7 @@ export function bootBackground(options: BootOptions = {}): BackgroundHarness {
 
   const sandbox = loadExtensionSandbox({
     chrome: chromeStub,
-    globals: { fetch: fetchStub, ...(options.globals ?? {}) },
+    globals: { fetch: fetchStub, __JP_STUDY_TEST__: true, ...(options.globals ?? {}) },
   });
   evaluateBackground(sandbox);
 
@@ -563,7 +615,7 @@ export function bootBackground(options: BootOptions = {}): BackgroundHarness {
     respond: (fn: Responder) => {
       responder = fn;
     },
-    send: (msg: unknown) => sendBackgroundMessage(chromeStub, msg),
+    send: (msg: unknown, sender?: unknown) => sendBackgroundMessage(chromeStub, msg, sender),
     queue: () => (chromeStub.storage.local.data[RETRY_QUEUE_KEY] as QueuedItem[]) ?? [],
     setQueue: (items: QueuedItem[]) => {
       chromeStub.storage.local.data[RETRY_QUEUE_KEY] = JSON.parse(JSON.stringify(items));
@@ -577,12 +629,23 @@ export function bootBackground(options: BootOptions = {}): BackgroundHarness {
 }
 
 /** Send a message through background.js's `chrome.runtime.onMessage` listener. */
-export function sendBackgroundMessage(chromeStub: ChromeStub, msg: unknown): Promise<unknown> {
+/** The sender of a message from one of the extension's own pages (the toolbar popup). */
+export const POPUP_SENDER = { id: 'testtesttest', url: 'chrome-extension://testtesttest/popup.html' };
+/** The sender of a message from a content script in a tab. */
+export function contentSender(tab: Record<string, unknown> = DEFAULT_TAB): Record<string, unknown> {
+  return { id: 'testtesttest', url: String(tab.url ?? ''), tab, frameId: 0 };
+}
+
+export function sendBackgroundMessage(
+  chromeStub: ChromeStub,
+  msg: unknown,
+  sender: unknown = POPUP_SENDER,
+): Promise<unknown> {
   const listener = chromeStub.listeners.onMessage[0];
   if (!listener) throw new Error('background.js registered no onMessage listener');
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`no response for ${JSON.stringify(msg)}`)), 5000);
-    const keepAlive = listener(msg, {}, (response: unknown) => {
+    const keepAlive = listener(msg, sender, (response: unknown) => {
       clearTimeout(timer);
       resolve(response);
     });

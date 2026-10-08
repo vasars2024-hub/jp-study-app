@@ -209,8 +209,11 @@ describe('scraperRequest', () => {
 });
 
 describe('probeHttp', () => {
+  // The test server is on 127.0.0.1, which the Inspector refuses by default.
+  const LOCAL = { allowPrivateNetwork: true };
+
   it('projects a successful request onto the inspector shape', async () => {
-    const result = await probeHttp({ method: 'get', url: `${base}/ok`, headers: {} });
+    const result = await probeHttp({ method: 'get', url: `${base}/ok`, headers: {} }, LOCAL);
     expect(result.status).toBe(200);
     expect(result.statusText).toBe('OK');
     expect(result.sizeBytes).toBeGreaterThan(0);
@@ -229,14 +232,14 @@ describe('probeHttp', () => {
   });
 
   it('keeps a non-2xx response as a result, with its body', async () => {
-    const result = await probeHttp({ method: 'GET', url: `${base}/boom`, headers: {} });
+    const result = await probeHttp({ method: 'GET', url: `${base}/boom`, headers: {} }, LOCAL);
     expect(result.status).toBe(500);
     expect(result.body).toBe('kaboom');
   });
 
   it('logs the request and response without the query secret', async () => {
     resetScraperLogs();
-    await probeHttp({ method: 'GET', url: `${base}/ok?token=hunter2`, headers: {} });
+    await probeHttp({ method: 'GET', url: `${base}/ok?token=hunter2`, headers: {} }, LOCAL);
     const text = recentScraperLogs().map((l) => l.message).join('\n');
     expect(text).toContain('GET');
     expect(text).not.toContain('hunter2');

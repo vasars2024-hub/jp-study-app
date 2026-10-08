@@ -209,6 +209,8 @@ export default function AppearancePage() {
               key={th.id}
               type="button"
               className={`os-theme-swatch ${!look.autoTheme && theme === th.id ? 'active' : ''}`}
+              // The active swatch was marked by colour alone.
+              aria-pressed={!look.autoTheme && theme === th.id}
               onClick={() => chooseTheme(th.id)}
               title={themeLabel(th.id, th.label)}
               disabled={look.autoTheme}
@@ -239,6 +241,9 @@ export default function AppearancePage() {
               className={`os-accent ${look.accentMode === 'preset' && look.accentPreset === a.id ? 'active' : ''}`}
               style={{ background: a.accent }}
               title={accentLabel(a.id, a.label)}
+              // Colour-only buttons: `title` is not an accessible name, so they announced as "button".
+              aria-label={accentLabel(a.id, a.label)}
+              aria-pressed={look.accentMode === 'preset' && look.accentPreset === a.id}
               onClick={() => patchLook({ accentMode: 'preset', accentPreset: a.id })}
             />
           ))}
@@ -250,6 +255,7 @@ export default function AppearancePage() {
             value={look.customAccent}
             onChange={(e) => patchLook({ accentMode: 'custom', customAccent: e.target.value })}
             title={t('settings.appearance.accent.customTitle')}
+            aria-label={t('settings.appearance.accent.customTitle')}
           />
           <button type="button" {...seg(look.accentMode === 'custom')} onClick={() => patchLook({ accentMode: 'custom' })}>
             {t('settings.appearance.accent.useCustom')}

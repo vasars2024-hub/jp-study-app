@@ -66,7 +66,8 @@ import {
   type FusionTrackMeta,
 } from '../shared/subtitleFusionMeta';
 import { cuesToSrt } from '../shared/subtitlesExport';
-import { extractAudioPcm } from './media';
+import { extractAudioPcm, extractAudioPcmRange } from './media';
+import { probeRecording } from './recordingFinalize';
 import { estimateSubtitleOffset } from './subtitleSync';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
 import { arbitrateFusionDecisions } from './subtitleFusionArbiter';
@@ -90,6 +91,12 @@ const CHUNK_SECONDS = 30;
 const SAMPLE_RATE = 16_000;
 /** Generous: a slow CPU model on a 30 s slice is still well inside this. */
 const CHUNK_TIMEOUT_MS = 120_000;
+/** A timed-out slice is asked for this many more times before the job fails. */
+const CHUNK_TIMEOUT_RETRIES = 2;
+/** Files longer than this are decoded window by window. */
+const LONG_AUDIO_SECONDS = 20 * 60;
+/** One decode window: a whole number of chunks. */
+const AUDIO_WINDOW_SECONDS = 10 * 60;
 /** One at a time — Whisper is already saturating the machine. */
 const MAX_CONCURRENT = 1;
 
@@ -313,10 +320,25 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
     }
 
     emit('extracting-audio', 0);
-    const pcmBuffer = await extractAudioPcm(item.path);
-    const samples = new Float32Array(pcmBuffer);
     const perChunk = CHUNK_SECONDS * SAMPLE_RATE;
-    total = Math.max(1, Math.ceil(samples.length / perChunk));
+    // A long file (a two-hour screen recording is ~460 MB of float PCM) is
+    // decoded ten minutes at a time instead of held whole in memory.
+    let durationSec = Number(item.durationSec) || 0;
+    // Only a sizeable file is worth an ffmpeg probe for its length.
+    if (!durationSec && (fs.statSync(item.path, { throwIfNoEntry: false })?.size ?? 0) > 50 * 1024 * 1024) {
+      try {
+        durationSec = (await probeRecording(item.path)).durationSec ?? 0;
+      } catch {
+        durationSec = 0;
+      }
+    }
+    const windowed = durationSec > LONG_AUDIO_SECONDS;
+    let samples = windowed ? new Float32Array(0) : new Float32Array(await extractAudioPcm(item.path));
+    let windowStart = 0;
+    total = windowed
+      ? Math.max(1, Math.ceil(durationSec / CHUNK_SECONDS))
+      : Math.max(1, Math.ceil(samples.length / perChunk));
+    const chunksPerWindow = AUDIO_WINDOW_SECONDS / CHUNK_SECONDS;
 
     const texts: string[] = [];
     const timedCues: TranscriptionCue[] = [];
@@ -325,18 +347,33 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         emit('cancelled', i);
         return { ok: false, error: 'cancelled' };
       }
+      if (windowed && i % chunksPerWindow === 0) {
+        windowStart = i;
+        samples = new Float32Array(await extractAudioPcmRange(item.path, i * CHUNK_SECONDS, AUDIO_WINDOW_SECONDS));
+      }
       emit('transcribing', i);
-      const slice = samples.subarray(i * perChunk, Math.min((i + 1) * perChunk, samples.length));
+      const offset = (i - windowStart) * perChunk;
+      const slice = samples.subarray(offset, Math.min(offset + perChunk, samples.length));
       // A trailing sliver of audio carries no words worth a round trip.
       if (slice.length < SAMPLE_RATE / 2) {
         texts.push('');
         continue;
       }
-      const reply = await requestChunk(slice, job.lang);
+      let reply = await requestChunk(slice, job.lang);
+      // A slice that timed out is asked for again rather than written down as
+      // silence: an empty slice in the middle of a transcript reads as "nothing
+      // was said" when the model was only slow (or still loading).
+      for (let retry = 0; !reply.ok && reply.error === 'timeout' && retry < CHUNK_TIMEOUT_RETRIES; retry += 1) {
+        if (cancelled.has(job.mediaId)) break;
+        reply = await requestChunk(slice, job.lang);
+      }
       if (!reply.ok) {
         // `no-window` is not the file's fault — the job goes back to the queue
         // rather than counting as a failed attempt against this media.
         if (reply.error === 'no-window') throw new Error('no-window');
+        // Still timing out: fail the job (the queue retries it) instead of
+        // finishing a transcript with a silent hole in it.
+        if (reply.error === 'timeout') throw new Error('chunk-timeout');
         texts.push('');
         continue;
       }

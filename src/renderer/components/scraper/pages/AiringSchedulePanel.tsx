@@ -22,6 +22,7 @@ import Icon from '../../Icons';
 import { useT } from '../../../i18n';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { AnimeScheduleResponse, ScheduleRow } from '../../../../shared/animeSchedule';
+import { scraperErrorText } from '../localize';
 
 const DAY_SECONDS = 86_400;
 /** Ceiling per read. Each entry costs one paced index request in main. */
@@ -66,7 +67,7 @@ export default function AiringSchedulePanel() {
     } catch (error) {
       // A rejected invoke is not the same as a schedule the catalogue could not
       // serve — that one arrives as `scheduleError` on a resolved response.
-      setFailure(error instanceof Error ? error.message : String(error));
+      setFailure(scraperErrorText(error));
       setData(null);
     } finally {
       setLoading(false);

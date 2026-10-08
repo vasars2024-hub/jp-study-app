@@ -19,6 +19,7 @@ import {
 import { loadScraperSettingsDocument, onScraperSettingsChanged } from '../../../scraperSettingsStore';
 import { sx, sxn, sxNumber, sxs, sxss, type ScraperTextKey } from '../strings';
 import { FIXTURE_HTML } from '../data/fixtures';
+import { scraperErrorText } from '../localize';
 
 function ToolHead({ page, title, subtitle }: { page: string; title: string; subtitle: string }) {
   return (
@@ -49,7 +50,7 @@ export function SelectorTesterPage() {
       setError('');
     } catch (reason) {
       setMatches([]);
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(scraperErrorText(reason));
     }
   };
 

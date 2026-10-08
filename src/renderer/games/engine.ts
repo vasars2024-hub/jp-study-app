@@ -612,13 +612,16 @@ export function buildGameRound(
         reading: word.reading,
         mineMeaning: word.meaning,
         answer: word.meaning,
-        acceptable: [word.meaning],
+        // "cat; feline" — either sense is a right answer, not only the whole gloss.
+        acceptable: meaningAlternatives(word.meaning),
         inputLang: sourceLang,
       };
     }
   }
-  if (gameId === 'word-match' && ownVocab.length >= 4) {
-    const pairs = shuffled(ownVocab, seed)
+  if (gameId === 'word-match' && distinctMeanings(ownVocab).length >= 4) {
+    // Two words sharing a meaning made a board with two identical right-hand
+    // tiles, where a correct pairing could be marked wrong.
+    const pairs = shuffled(distinctMeanings(ownVocab), seed)
       .slice(0, 4)
       .map((v) => ({ jp: v.word, reading: v.reading, meaning: v.meaning }));
     return {
@@ -804,9 +807,37 @@ export function buildGameRound(
     reading: sentence.reading || undefined,
     mineMeaning: meaning,
     answer: meaning,
-    acceptable: [meaning],
+    acceptable: meaningAlternatives(meaning),
     inputLang: sourceLang,
   };
+}
+
+/**
+ * Every sense of a gloss as its own acceptable answer: "to eat; to live on (e.g.
+ * a salary)" accepts "to eat", "to live on" and the whole string. Parenthetical
+ * notes are dropped from each sense.
+ */
+export function meaningAlternatives(meaning: string): string[] {
+  const whole = (meaning ?? '').trim();
+  if (!whole) return [whole];
+  const senses = whole
+    .split(/[;；,，/／、]|\s+\|\s+/)
+    .map((s) => s.replace(/[(（][^)）]*[)）]/g, '').replace(/\s+/g, ' ').trim())
+    .filter((s) => s.length > 0);
+  return [...new Set([whole, ...senses])];
+}
+
+/** Vocabulary with each meaning kept once (case- and space-insensitive). */
+function distinctMeanings<T extends { meaning: string }>(vocab: readonly T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const v of vocab) {
+    const key = (v.meaning ?? '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out;
 }
 
 /**
