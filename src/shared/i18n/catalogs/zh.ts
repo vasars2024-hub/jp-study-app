@@ -14001,4 +14001,7 @@ export const zh: Catalog = {
   'fix3.agent.studyData.toggle': '学习统计和已知词仅保留在本地',
   'fix3.agent.studyData.localNote': '学习统计、已知词和书库标题绝不会发送给云端规划器。如需使用，请通过离线模型提问。',
   'fix3.agent.studyData.allowNote': '云端规划器可以在计划中使用读取你的学习统计、已知词和书库标题的工具。',
+  // ---- Known words: hand a hand-set level back to automatic grading ----
+  'final.knownWords.resetAuto': '恢复自动',
+  'final.knownWords.resetAutoTitle': '此等级是你手动设置的。重置后，Anki 同步和复习可以再次更新它。',
 };

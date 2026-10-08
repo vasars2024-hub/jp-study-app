@@ -24,7 +24,9 @@ import {
   resolveCredentialPresence,
   type VaultAnswer,
 } from '../data/credentialPresence';
-import { sx, sx2, sx3, sxn, sxs, type ScraperTextKey } from '../strings';
+import {
+  sx, sx2, sx3, sxAcquisitionMessage, sxn, sxQbitMessage, sxs, type ScraperTextKey,
+} from '../strings';
 import TransferRemoveConfirm from '../TransferRemoveConfirm';
 import { errorText, qbitActionNotice, qbitListFailureKey, type ActionNotice } from '../data/qbitActions';
 import { t } from '../../../i18n';
@@ -455,7 +457,7 @@ export default function TorrentManagerPage() {
             {qbit.basePath}
           </span>
           {status?.version && <Pill tone="outline">v{status.version}</Pill>}
-          {status && <span className="scr-muted">{status.message}</span>}
+          {status && <span className="scr-muted">{sxQbitMessage(status)}</span>}
           {status?.authMode && (
             <Pill tone="outline">
               {sx(status.authMode === 'apiKey' ? 'torrent.authViaApiKey' : 'torrent.authViaPassword')}
@@ -621,7 +623,7 @@ export default function TorrentManagerPage() {
 
         {backendNotice && (
           <div className="scr-send-report" role="status">
-            <b>{backendNotice.message}</b>
+            <b>{sxAcquisitionMessage(backendNotice)}</b>
             {backendNotice.simulation.length ? (
               <ul>
                 {backendNotice.simulation.slice(0, 8).map((row) => (

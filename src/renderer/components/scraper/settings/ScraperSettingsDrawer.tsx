@@ -25,7 +25,7 @@ import {
 } from './fields';
 import { useScraper } from '../ScraperContext';
 import { SCRAPER_SETTINGS_DRAWER_ID } from '../drawerId';
-import { sx, sxs } from '../strings';
+import { sx, sxQbitMessage, sxs } from '../strings';
 import { profileDescription, profileName } from '../localize';
 import { useScraperPort } from '../data/scraperPort';
 import { useT } from '../../../i18n';
@@ -149,7 +149,7 @@ export default function ScraperSettingsDrawer() {
       const via = report.authMode
         ? ` · ${sx(report.authMode === 'apiKey' ? 'torrent.authViaApiKey' : 'torrent.authViaPassword')}`
         : '';
-      setNote(sxs('set.qbitTestResult', `${report.message}${version}${timing}${via}`));
+      setNote(sxs('set.qbitTestResult', `${sxQbitMessage(report)}${version}${timing}${via}`));
     } catch {
       setNote(sx('set.qbitTestFailed'));
     }

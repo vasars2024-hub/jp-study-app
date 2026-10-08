@@ -14902,4 +14902,7 @@ export const en: Catalog = {
   'fix3.agent.studyData.toggle': 'Keep stats and known words local-only',
   'fix3.agent.studyData.localNote': 'Study statistics, known words and library titles never go to a cloud planner. Ask with an offline model to use them.',
   'fix3.agent.studyData.allowNote': 'A cloud planner may plan the tools that read your study statistics, known words and library titles.',
+  // ---- Known words: hand a hand-set level back to automatic grading ----
+  'final.knownWords.resetAuto': 'Reset to automatic',
+  'final.knownWords.resetAutoTitle': 'You set this level by hand. Reset it so Anki syncs and reviews can update it again.',
 };

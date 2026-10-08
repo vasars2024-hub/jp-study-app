@@ -315,10 +315,33 @@ export interface ExportRecord {
   note: string;
 }
 
+/**
+ * Language-neutral codes for `QbitStatusReport.message`. Main still fills
+ * `message` in English (logs, tests, older renderers); the renderer translates
+ * the code under `scraperFix.qbit.<code>` and falls back to `message` when a
+ * report carries no code (transport errors, API-key format problems).
+ */
+export type QbitMessageCode =
+  | 'disabled'
+  | 'noUsername'
+  | 'noPassword'
+  | 'banned'
+  | 'credentialsRejected'
+  | 'apiKeyRejected'
+  | 'loginStatus'
+  | 'noSessionCookie'
+  | 'versionStatus'
+  | 'connected'
+  | 'connectedNoSwarm';
+
 export interface QbitStatusReport {
   status: 'not-configured' | 'connected' | 'unauthorized' | 'unreachable' | 'unknown';
   version: string;
   message: string;
+  /** See `QbitMessageCode`. Optional so stored reports stay valid. */
+  messageCode?: QbitMessageCode;
+  /** Interpolation values for `messageCode` (`{status}`, `{address}`). */
+  messageVars?: Record<string, string | number>;
   latencyMs: number;
   /**
    * qBittorrent's own `connection_status` — `connected`, `firewalled` or

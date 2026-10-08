@@ -4,7 +4,9 @@ import PitchAccentContour from './lexicon/PitchAccentContour';
 import { cachedPitch, fetchPitch } from '../pitchLookupCache';
 import type { DictEntry } from '../../shared/types';
 import type { PitchLookup } from '../../shared/pitchAccent';
-import { getLevel, setLevel, WK_LEVELS, type WkLevel } from '../knownWords';
+import {
+  clearManualLevel, getLevel, isManualLevel, setLevel, WK_LEVELS, type WkLevel,
+} from '../knownWords';
 import { KNOWLEDGE_LEVEL_KEYS, KNOWLEDGE_LEVEL_SHORT_KEYS } from './lexicon/WordKnowledge';
 import { lemmaOf } from '../tokenizer';
 import { gradeKeyFor } from '../studyTokens';
@@ -155,6 +157,9 @@ export default function DictionaryPopup({
   // Resolve the word to its dictionary form for knowledge grading (JP only).
   const [lemma, setLemma] = useState('');
   const [level, setLvl] = useState<WkLevel>(0);
+  // Whether the level was set by hand, which is what keeps Anki syncs and
+  // reviews from changing it — and what "Reset to automatic" undoes.
+  const [manual, setManual] = useState(false);
   useEffect(() => {
     let dead = false;
     if (lang !== 'ja') {
@@ -163,12 +168,14 @@ export default function DictionaryPopup({
       const key = gradeKeyFor(query, lang);
       setLemma(key);
       setLvl(getLevel(key));
+      setManual(isManualLevel(key));
       return;
     }
     lemmaOf(query).then((lm) => {
       if (dead) return;
       setLemma(lm);
       setLvl(getLevel(lm));
+      setManual(isManualLevel(lm));
     });
     return () => {
       dead = true;
@@ -179,6 +186,14 @@ export default function DictionaryPopup({
     const key = lemma || query;
     setLevel(key, n);
     setLvl(n);
+    setManual(true);
+  };
+
+  const resetToAutomatic = () => {
+    const key = lemma || query;
+    clearManualLevel(key);
+    setLvl(getLevel(key));
+    setManual(false);
   };
 
   /**
@@ -280,6 +295,16 @@ export default function DictionaryPopup({
             {t(KNOWLEDGE_LEVEL_SHORT_KEYS[i])}
           </button>
         ))}
+        {manual && (
+          <button
+            type="button"
+            className="wk-grade-btn wk-grade-reset"
+            title={t('final.knownWords.resetAutoTitle')}
+            onClick={resetToAutomatic}
+          >
+            {t('final.knownWords.resetAuto')}
+          </button>
+        )}
       </div>
       <DictionaryResults
         query={query}

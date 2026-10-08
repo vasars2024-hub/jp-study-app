@@ -14,6 +14,7 @@
 import { createHash } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
 import type {
+  QbitMessageCode,
   QbitSendReport,
   QbitStatusReport,
   QbitTransferRow,
@@ -320,6 +321,9 @@ interface LoginResult {
   status: QbitStatusReport['status'];
   message: string;
   latencyMs: number;
+  /** Language-neutral code for `message`; the renderer translates it. */
+  messageCode?: QbitMessageCode;
+  messageVars?: Record<string, string | number>;
 }
 
 /**
@@ -423,6 +427,7 @@ async function attemptLogin(config: ScraperQbittorrentSettings, password: string
         cookie: '',
         status: 'unauthorized',
         message: 'qBittorrent banned this client after too many failed logins.',
+        messageCode: 'banned',
         latencyMs,
       };
     }
@@ -436,6 +441,7 @@ async function attemptLogin(config: ScraperQbittorrentSettings, password: string
         cookie: '',
         status: 'unauthorized',
         message: 'The username or password was rejected.',
+        messageCode: 'credentialsRejected',
         latencyMs,
       };
     }
@@ -458,6 +464,8 @@ async function attemptLogin(config: ScraperQbittorrentSettings, password: string
         cookie: '',
         status: 'unreachable',
         message: `qBittorrent answered ${response.status} to the login.`,
+        messageCode: 'loginStatus',
+        messageVars: { status: response.status },
         latencyMs,
       };
     }
@@ -469,6 +477,7 @@ async function attemptLogin(config: ScraperQbittorrentSettings, password: string
         cookie: '',
         status: 'unauthorized',
         message: 'The username or password was rejected.',
+        messageCode: 'credentialsRejected',
         latencyMs,
       };
     }
@@ -482,6 +491,7 @@ async function attemptLogin(config: ScraperQbittorrentSettings, password: string
         cookie: '',
         status: 'unknown',
         message: 'Login succeeded but qBittorrent set no session cookie.',
+        messageCode: 'noSessionCookie',
         latencyMs,
       };
     }
@@ -557,6 +567,7 @@ async function authed(
             cookie: '',
             status: 'unauthorized',
             message: 'qBittorrent rejected the API key.',
+            messageCode: 'apiKeyRejected',
             latencyMs: 0,
           },
         };
@@ -640,6 +651,7 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
       status: 'not-configured',
       version: '',
       message: 'Sending to qBittorrent is turned off.',
+      messageCode: 'disabled',
       latencyMs: 0,
     };
   }
@@ -649,12 +661,15 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
   // password mode. Asking for one in key mode was the fastest way to make a
   // working key look broken.
   let credentialProblem = '';
+  let credentialCode: QbitMessageCode | undefined;
   if (mode === 'apiKey') {
     credentialProblem = apiKeyProblem(await resolveApiKey(input));
   } else if (!config.username) {
     credentialProblem = 'No username is set.';
+    credentialCode = 'noUsername';
   } else if (!(await resolvePassword(input))) {
     credentialProblem = 'No password is stored for this account.';
+    credentialCode = 'noPassword';
   }
   if (credentialProblem) {
     // Reachability first: a missing password is not the problem to report
@@ -662,7 +677,14 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
     const unreachable = await qbitUnreachableReason(config);
     return unreachable
       ? { status: 'unreachable', version: '', message: unreachable, latencyMs: 0, authMode: mode }
-      : { status: 'unauthorized', version: '', message: credentialProblem, latencyMs: 0, authMode: mode };
+      : {
+        status: 'unauthorized',
+        version: '',
+        message: credentialProblem,
+        ...(credentialCode ? { messageCode: credentialCode } : {}),
+        latencyMs: 0,
+        authMode: mode,
+      };
   }
 
   const started = Date.now();
@@ -679,6 +701,8 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
       status: version.error.status,
       version: '',
       message: version.error.message,
+      ...(version.error.messageCode ? { messageCode: version.error.messageCode } : {}),
+      ...(version.error.messageVars ? { messageVars: version.error.messageVars } : {}),
       latencyMs,
       authMode: mode,
     };
@@ -691,6 +715,8 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
       status: version.status === 401 || version.status === 403 ? 'unauthorized' : 'unreachable',
       version: '',
       message: `qBittorrent answered ${version.status} to the version request.`,
+      messageCode: 'versionStatus',
+      messageVars: { status: version.status },
       latencyMs,
       authMode: mode,
     };
@@ -708,6 +734,8 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
     message: connection === 'disconnected'
       ? `Connected to ${config.host}:${config.port}, but qBittorrent is not connected to any swarm.`
       : `Connected to ${config.host}:${config.port}.`,
+    messageCode: connection === 'disconnected' ? 'connectedNoSwarm' : 'connected',
+    messageVars: { address: `${config.host}:${config.port}` },
     latencyMs,
     connection,
     authMode: mode,

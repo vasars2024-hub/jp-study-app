@@ -106,6 +106,30 @@ describe('manual flag', () => {
     expect(kw.setInferredLevel('空', 0)).toBe(2);
     expect(kw.getLevel('空')).toBe(0);
   });
+
+  it('clearManualLevel hands a hand-set level back to the sync', async () => {
+    const kw = await load();
+    kw.setLevel('鳥', 1);
+    expect(kw.bulkSetFromAnki({ 鳥: 3 })).toBe(0);
+    expect(kw.clearManualLevel('鳥')).toBe(true);
+    expect(kw.isManualLevel('鳥')).toBe(false);
+    // The level stays until evidence arrives...
+    expect(kw.getLevel('鳥')).toBe(1);
+    // ...and the next sync may now move it.
+    expect(kw.bulkSetFromAnki({ 鳥: 3 })).toBe(1);
+    expect(kw.getLevel('鳥')).toBe(3);
+  });
+
+  it('clearManualLevel drops a manual "New" entirely and is a no-op on automatic words', async () => {
+    const kw = await load();
+    kw.setLevel('犬', 0);
+    expect(kw.clearManualLevel('犬')).toBe(true);
+    expect(kw.isManualLevel('犬')).toBe(false);
+    expect(kw.setInferredLevel('犬', 2)).toBe(0);
+    expect(kw.clearManualLevel('犬')).toBe(false);
+    expect(kw.clearManualLevel('')).toBe(false);
+    expect(kw.getLevel('犬')).toBe(2);
+  });
 });
 
 describe('Anki sync merge', () => {

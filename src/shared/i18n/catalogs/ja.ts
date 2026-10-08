@@ -14139,4 +14139,7 @@ export const ja: Catalog = {
   'fix3.agent.studyData.toggle': '統計と既知語をローカルのみに保つ',
   'fix3.agent.studyData.localNote': '学習統計・既知語・ライブラリのタイトルはクラウドのプランナーに送られません。使うにはオフラインモデルで依頼してください。',
   'fix3.agent.studyData.allowNote': 'クラウドのプランナーが、学習統計・既知語・ライブラリのタイトルを読むツールを計画に使えます。',
+  // ---- Known words: hand a hand-set level back to automatic grading ----
+  'final.knownWords.resetAuto': '自動に戻す',
+  'final.knownWords.resetAutoTitle': 'このレベルは手動で設定されています。リセットすると、Anki の同期や復習で再び更新されるようになります。',
 };

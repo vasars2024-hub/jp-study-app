@@ -15,6 +15,7 @@ import type { AnkiStatus } from '../../../shared/types';
 import { useT } from '../../i18n';
 import { getStudyLang, onStudyLangChanged, setStudyLang } from '../../studyEnvironment';
 import { getActiveProfile } from '../../profileState';
+import { ankiOwnsScheduling, setAnkiOwnsScheduling } from '../../ankiSchedulingOwner';
 
 interface ExtensionState {
   running: boolean;
@@ -35,6 +36,8 @@ export function BlancStudySettings({ onOpenDeck }: { onOpenDeck: () => void }) {
   const [version, setVersion] = useState('');
   const [checking, setChecking] = useState(false);
   const [note, setNote] = useState('');
+  // The same "Anki owns scheduling" store the Settings app's card writes.
+  const [ankiOwns, setAnkiOwns] = useState(ankiOwnsScheduling);
 
   useEffect(() => onStudyLangChanged(setStudyLangState), []);
 
@@ -107,6 +110,18 @@ export function BlancStudySettings({ onOpenDeck }: { onOpenDeck: () => void }) {
         {profileDeck && <span>{t('blanc.refine.study.ankiDeck', { deck: profileDeck })}</span>}
         <button type="button" onClick={onOpenDeck}>{t('blanc.refine.study.ankiOpen')}</button>
       </div>
+
+      <label title={t('polish.ankiOwns.hint')}>
+        <input
+          type="checkbox"
+          checked={ankiOwns}
+          onChange={(event) => {
+            setAnkiOwnsScheduling(event.target.checked);
+            setAnkiOwns(event.target.checked);
+          }}
+        />
+        {t('polish.ankiOwns.toggle')}
+      </label>
 
       <div className="blanc-status-row">
         <span>

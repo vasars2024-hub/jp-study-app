@@ -229,6 +229,24 @@ export function isManualLevel(word: string): boolean {
 }
 
 /**
+ * Hand a word back to automatic grading: drop the manual flag so the next Anki
+ * sync or local review may set its level again. The current level stays until
+ * that evidence arrives; a hand-picked "New" has nothing to keep, so its entry
+ * goes. Returns true when something changed.
+ */
+export function clearManualLevel(word: string): boolean {
+  if (!word) return false;
+  const d = db();
+  const current = d[word];
+  if (!current?.m) return false;
+  if (!current.l) delete d[word];
+  else d[word] = { l: current.l };
+  persist();
+  emit([word]);
+  return true;
+}
+
+/**
  * Set a level inferred from evidence (a local flashcard review), never from the
  * user's own hand. A word graded manually is left alone, exactly as the Anki
  * sync leaves it. Returns the previous level when something changed, so the

@@ -18,6 +18,7 @@ import type {
 import type {
   AcquisitionAction,
   AcquisitionActionResult,
+  AcquisitionMessageCode,
   AcquisitionAutoDownloaderItem,
   AcquisitionAutoDownloaderRule,
   AcquisitionBackendSnapshot,
@@ -267,10 +268,21 @@ function actionResult(
   return { ok, message, accepted, simulation };
 }
 
+/** Attach the language-neutral code the renderer translates. */
+function coded(
+  result: AcquisitionActionResult,
+  messageCode: AcquisitionMessageCode,
+  messageVars?: Record<string, string | number>,
+): AcquisitionActionResult {
+  return { ...result, messageCode, ...(messageVars ? { messageVars } : {}) };
+}
+
+const AUTO_DOWNLOADER_DISABLED = 'Seanime auto-downloader is disabled.';
+
 async function assertAutoDownloaderEnabled(): Promise<void> {
   const status = await seanimeApi<Status>(STATUS_ROUTE);
   if (!status.settings?.autoDownloader?.enabled) {
-    throw new Error('Seanime auto-downloader is disabled.');
+    throw new Error(AUTO_DOWNLOADER_DISABLED);
   }
 }
 
@@ -281,9 +293,9 @@ export async function runSeanimeAcquisitionAction(
     if (action.kind === 'run-auto-downloader') {
       await assertAutoDownloaderEnabled();
       const started = await seanimeApi<boolean>(AUTO_RUN_ROUTE, { method: 'POST' });
-      const result = actionResult(Boolean(started), started
+      const result = coded(actionResult(Boolean(started), started
         ? 'Seanime auto-downloader started.'
-        : 'Seanime did not start the auto-downloader.');
+        : 'Seanime did not start the auto-downloader.'), started ? 'autoStarted' : 'autoNotStarted');
       scraperLog(result.ok ? 'info' : 'warn', 'seanime-acquisition', result.message);
       return result;
     }
@@ -298,24 +310,24 @@ export async function runSeanimeAcquisitionAction(
         body: { ruleIds },
       });
       const simulation = rows.map(simulationRow);
-      const result = actionResult(
+      const result = coded(actionResult(
         true,
         `Simulation found ${simulation.length} candidate(s).`,
         simulation.length,
         simulation,
-      );
+      ), 'simulated', { count: simulation.length });
       scraperLog('info', 'seanime-acquisition', result.message);
       return result;
     }
 
     if (action.kind === 'download-queued-item') {
       if (!Number.isSafeInteger(action.itemId) || action.itemId <= 0) {
-        return actionResult(false, 'Invalid queued item id.');
+        return coded(actionResult(false, 'Invalid queued item id.'), 'invalidItem');
       }
       const items = await seanimeApi<Models_AutoDownloaderItem[]>(AUTO_ITEMS_ROUTE);
       const item = items.find((candidate) => candidate.id === action.itemId);
-      if (!item) return actionResult(false, 'Queued item no longer exists.');
-      if (!item.magnet) return actionResult(false, 'Queued item has no magnet.');
+      if (!item) return coded(actionResult(false, 'Queued item no longer exists.'), 'itemGone');
+      if (!item.magnet) return coded(actionResult(false, 'Queued item has no magnet.'), 'itemNoMagnet');
       const added = await seanimeApi<boolean>(AUTO_RULE_MAGNET_ROUTE, {
         method: 'POST',
         body: {
@@ -342,9 +354,10 @@ export async function runSeanimeAcquisitionAction(
           },
         });
       }
-      const result = actionResult(Boolean(added), added
+      const result = coded(actionResult(Boolean(added), added
         ? `Queued episode ${item.episode} sent to Seanime's torrent client.`
-        : 'Seanime rejected the queued item.', added ? 1 : 0);
+        : 'Seanime rejected the queued item.', added ? 1 : 0),
+      added ? 'queuedSent' : 'queuedRejected', added ? { episode: item.episode } : undefined);
       scraperLog(result.ok ? 'info' : 'warn', 'seanime-acquisition', result.message);
       return result;
     }
@@ -353,7 +366,7 @@ export async function runSeanimeAcquisitionAction(
     const rows = action.torrents
       .filter((row) => wanted.has(row.id) && row.magnet.startsWith('magnet:?'))
       .slice(0, MAX_ACTION_TORRENTS);
-    if (!rows.length) return actionResult(false, 'No usable selected magnets.');
+    if (!rows.length) return coded(actionResult(false, 'No usable selected magnets.'), 'noMagnets');
     const destination = action.destination.trim().slice(0, 1_024);
     const route = action.target === 'debrid' ? DEBRID_TORRENTS_ROUTE : TORRENT_DOWNLOAD_ROUTE;
     const body = action.target === 'debrid'
@@ -379,18 +392,22 @@ export async function runSeanimeAcquisitionAction(
         destination: destination || undefined,
       });
     }
-    const result = actionResult(
+    const result = coded(actionResult(
       Boolean(accepted),
       accepted
         ? `${rows.length} torrent(s) sent to Seanime ${action.target === 'debrid' ? 'debrid' : 'torrent client'}.`
         : 'Seanime rejected the torrent request.',
       accepted ? rows.length : 0,
-    );
+    ), accepted
+      ? (action.target === 'debrid' ? 'sentDebrid' : 'sentTorrentClient')
+      : 'torrentsRejected', accepted ? { count: rows.length } : undefined);
     scraperLog(result.ok ? 'info' : 'warn', 'seanime-acquisition', result.message);
     return result;
   } catch (error) {
     const message = errorMessage(error);
     scraperLog('error', 'seanime-acquisition', message);
-    return actionResult(false, message);
+    return message === AUTO_DOWNLOADER_DISABLED
+      ? coded(actionResult(false, message), 'autoDisabled')
+      : actionResult(false, message);
   }
 }

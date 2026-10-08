@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import Icon from '../Icons';
 import { useT } from '../../i18n';
-import { getLevel, setLevel, WK_LEVELS, type WkLevel } from '../../knownWords';
+import {
+  clearManualLevel, getLevel, isManualLevel, setLevel, WK_LEVELS, type WkLevel,
+} from '../../knownWords';
 import { KNOWLEDGE_LEVEL_KEYS, KNOWLEDGE_LEVEL_SHORT_KEYS } from '../lexicon/WordKnowledge';
 import { lemmaOf, type JpToken } from '../../tokenizer';
 import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../../tts';
@@ -272,6 +274,7 @@ function GlanceBody({
   const { t } = useT();
   const [result, setResult] = useState<DictResult | null>(null);
   const [level, setLvl] = useState<WkLevel>(0);
+  const [manual, setManual] = useState(false);
   const [lemma, setLemma] = useState('');
   const [mine, setMine] = useState<MineState>('idle');
 
@@ -295,12 +298,14 @@ function GlanceBody({
     if (lang !== 'ja') {
       setLemma(query);
       setLvl(getLevel(query));
+      setManual(isManualLevel(query));
       return;
     }
     lemmaOf(query).then((lm) => {
       if (dead) return;
       setLemma(lm);
       setLvl(getLevel(lm));
+      setManual(isManualLevel(lm));
     });
     return () => {
       dead = true;
@@ -310,6 +315,14 @@ function GlanceBody({
   const grade = (n: WkLevel) => {
     setLevel(lemma || query, n);
     setLvl(n);
+    setManual(true);
+  };
+
+  const resetToAutomatic = () => {
+    const key = lemma || query;
+    clearManualLevel(key);
+    setLvl(getLevel(key));
+    setManual(false);
   };
 
   const entry = result?.entries?.[0] ?? null;
@@ -391,6 +404,16 @@ function GlanceBody({
             {t(KNOWLEDGE_LEVEL_SHORT_KEYS[i])}
           </button>
         ))}
+        {manual && (
+          <button
+            type="button"
+            className="wk-grade-btn wk-grade-reset"
+            title={t('final.knownWords.resetAutoTitle')}
+            onClick={resetToAutomatic}
+          >
+            {t('final.knownWords.resetAuto')}
+          </button>
+        )}
       </div>
 
       {!result && <div className="lens-reader-looking">{t('lens.reader.looking')}</div>}

@@ -934,6 +934,34 @@ export function sxs(key: ScraperTextKey, value: string): string {
   return typeof entry === 'function' ? (entry as (s: string) => string)(value) : entry;
 }
 
+/**
+ * The text of a qBittorrent test report in the UI language. Main sends a
+ * language-neutral `messageCode`; a report without one (transport errors,
+ * older stored reports) keeps main's own `message`.
+ */
+export function sxQbitMessage(report: CodedMessage): string {
+  return sxCodedMessage('scraperFix.qbit.', report);
+}
+
+/** Same for a Seanime acquisition action result (`scraperFix.acq.<code>`). */
+export function sxAcquisitionMessage(result: CodedMessage): string {
+  return sxCodedMessage('scraperFix.acq.', result);
+}
+
+interface CodedMessage {
+  message: string;
+  messageCode?: string;
+  messageVars?: Record<string, string | number>;
+}
+
+function sxCodedMessage(prefix: string, report: CodedMessage): string {
+  if (!report.messageCode) return report.message;
+  const key = prefix + report.messageCode;
+  if (SHARED_EN[key] === undefined) return report.message;
+  const lang = getUiLang();
+  return translate(key, report.messageVars, { lang, catalog: catalogFor(lang), fallback: SHARED_EN });
+}
+
 /** Resolve a two-argument entry. */
 export function sx2(key: ScraperTextKey, a: number, b: number): string {
   const migrated = shared(key, { a, b, count: b });

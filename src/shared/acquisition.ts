@@ -171,9 +171,33 @@ export type AcquisitionAction =
       ingest?: import('./mediaIngest').ScraperIngestHandoff;
     };
 
+/**
+ * Language-neutral codes for `AcquisitionActionResult.message`. The renderer
+ * translates them under `scraperFix.acq.<code>`; a result without a code
+ * (sidecar/transport errors) keeps main's English `message`.
+ */
+export type AcquisitionMessageCode =
+  | 'autoStarted'
+  | 'autoNotStarted'
+  | 'autoDisabled'
+  | 'simulated'
+  | 'invalidItem'
+  | 'itemGone'
+  | 'itemNoMagnet'
+  | 'queuedSent'
+  | 'queuedRejected'
+  | 'noMagnets'
+  | 'sentTorrentClient'
+  | 'sentDebrid'
+  | 'torrentsRejected';
+
 export interface AcquisitionActionResult {
   ok: boolean;
   message: string;
+  /** See `AcquisitionMessageCode`. Optional so older results stay valid. */
+  messageCode?: AcquisitionMessageCode;
+  /** Interpolation values for `messageCode` (`{count}`, `{episode}`). */
+  messageVars?: Record<string, string | number>;
   accepted: number;
   simulation: AcquisitionSimulationRow[];
 }

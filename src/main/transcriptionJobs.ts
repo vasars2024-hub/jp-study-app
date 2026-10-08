@@ -45,6 +45,7 @@ import {
 } from '../shared/subtitleStorage';
 import type { MediaItem } from '../shared/types';
 import { parseSubtitles } from '../shared/subtitleCues';
+import { decodeSubtitleBytes } from '../shared/subtitleDecode';
 import { shiftCues } from '../shared/subtitleSync';
 import {
   decideFusedWindows,
@@ -667,7 +668,7 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
     }
     let raw: string;
     try {
-      raw = fs.readFileSync(subtitleFilePath(source), 'utf-8');
+      raw = decodeSubtitleBytes(fs.readFileSync(subtitleFilePath(source))).text;
     } catch {
       emit('error', 0, { error: 'source-unreadable' });
       return { ok: false, error: 'source-unreadable' };
@@ -1094,7 +1095,7 @@ export function transcriptionArtifactStatus(mediaId: string): {
   if (!record) return { cueCount: null, active, queuedAt };
   try {
     return {
-      cueCount: parseSubtitles(fs.readFileSync(subtitleFilePath(record), 'utf-8')).length,
+      cueCount: parseSubtitles(decodeSubtitleBytes(fs.readFileSync(subtitleFilePath(record))).text).length,
       active,
       queuedAt,
     };
