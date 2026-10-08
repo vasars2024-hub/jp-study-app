@@ -1,6 +1,14 @@
 import { sanitizeThemeOverrides, type BlancThemeOverrides } from './blancTheme';
 import { sanitizeCustomCss } from './blancCustomCss';
 import { TOOLBOX_MODULES, type ToolboxModuleId } from './toolboxRegistry';
+import { BLANC_ONLY_TOOL_IDS, type BlancOnlyToolId } from './blancTools';
+
+/**
+ * Any tool the Blanc launcher can show: a registry module or a Blanc-only tool.
+ * Hidden, order and the default tool apply to every tool the user can see, so
+ * they take this; enable/disable and favourites stay registry ids.
+ */
+export type ToolboxToolId = ToolboxModuleId | BlancOnlyToolId;
 
 export type ToolboxSettingsCategory =
   | 'general'
@@ -18,7 +26,7 @@ export type ToolboxTabPosition = 'top' | 'bottom';
 export interface ToolboxSettings {
   version: 1;
   enabled: boolean;
-  defaultTool: ToolboxModuleId;
+  defaultTool: ToolboxToolId;
   restoreLastTool: boolean;
   restoreTabs: boolean;
   rememberSidebarState: boolean;
@@ -37,7 +45,7 @@ export interface ToolboxSettings {
   tabPosition: ToolboxTabPosition;
   showTabIcons: boolean;
   enabledTools: ToolboxModuleId[];
-  hiddenTools: ToolboxModuleId[];
+  hiddenTools: ToolboxToolId[];
   favoriteTools: ToolboxModuleId[];
   /**
    * User's preferred tool order for the launcher rail.
@@ -49,7 +57,7 @@ export interface ToolboxSettings {
    * saved array, and a naive "render the saved order" would drop it from the UI
    * entirely. Empty (the default) means pure registry order.
    */
-  toolOrder: ToolboxModuleId[];
+  toolOrder: ToolboxToolId[];
   /**
    * Order of the launcher category sections. Same partial-preference rule as
    * toolOrder, and same reason: a category added later must still render.
@@ -102,10 +110,14 @@ const READY_MODULE_IDS = TOOLBOX_MODULES
   .filter((module) => module.status === 'ready' && module.appearsInBlanc)
   .map((module) => module.id);
 
+/** Every id a launcher-wide preference may name (hidden, order, default tool). */
+const LAUNCHER_TOOL_IDS: ToolboxToolId[] = [...READY_MODULE_IDS, ...BLANC_ONLY_TOOL_IDS];
+
 export const DEFAULT_TOOLBOX_SETTINGS: ToolboxSettings = {
   version: 1,
   enabled: true,
-  defaultTool: 'calculator',
+  // Study first: Blanc is the fast way into the study app, not a calculator.
+  defaultTool: 'dictionary',
   restoreLastTool: true,
   restoreTabs: true,
   rememberSidebarState: true,
@@ -143,7 +155,7 @@ export const DEFAULT_TOOLBOX_SETTINGS: ToolboxSettings = {
 
 export const TOOLBOX_SETTING_DEFINITIONS: ToolboxSettingDefinition[] = [
   setting('enabled', 'general', 'boolean', 'Enable or disable the Toolbox shell.', ['enable', 'disable', 'toolbox']),
-  setting('defaultTool', 'general', 'select', 'Tool opened when Toolbox does not restore the previous tool.', ['default', 'startup', 'tool'], READY_MODULE_IDS),
+  setting('defaultTool', 'general', 'select', 'Tool opened when Toolbox does not restore the previous tool.', ['default', 'startup', 'tool'], LAUNCHER_TOOL_IDS),
   setting('restoreLastTool', 'general', 'boolean', 'Restore the last active tool on launch.', ['restore', 'last', 'startup']),
   setting('restoreTabs', 'general', 'boolean', 'Restore open Toolbox tabs between sessions.', ['tabs', 'restore']),
   setting('rememberSidebarState', 'general', 'boolean', 'Remember whether the tool launcher was collapsed.', ['sidebar', 'launcher']),
@@ -217,12 +229,14 @@ export function sanitizeToolboxSettings(input: unknown): ToolboxSettings {
     }
   }
   next.version = 1;
-  const ready = new Set(READY_MODULE_IDS);
-  next.defaultTool = ready.has(next.defaultTool) ? next.defaultTool : DEFAULT_TOOLBOX_SETTINGS.defaultTool;
+  const launcher = new Set<string>(LAUNCHER_TOOL_IDS);
+  next.defaultTool = launcher.has(next.defaultTool) ? next.defaultTool : DEFAULT_TOOLBOX_SETTINGS.defaultTool;
   next.enabledTools = sanitizeModuleList(next.enabledTools, READY_MODULE_IDS);
-  next.hiddenTools = sanitizeModuleList(next.hiddenTools, READY_MODULE_IDS).filter((id) => id !== 'calculator');
+  // Any tool can be hidden. The calculator used to be exempt, which made its
+  // "hide" checkbox a lie and kept a generic utility pinned in a study launcher.
+  next.hiddenTools = sanitizeModuleList(next.hiddenTools, LAUNCHER_TOOL_IDS);
   next.favoriteTools = sanitizeModuleList(next.favoriteTools, READY_MODULE_IDS);
-  next.toolOrder = sanitizeModuleList(next.toolOrder, READY_MODULE_IDS);
+  next.toolOrder = sanitizeModuleList(next.toolOrder, LAUNCHER_TOOL_IDS);
   next.categoryOrder = sanitizeStringList(next.categoryOrder);
   next.themePreset = typeof next.themePreset === 'string' && next.themePreset ? next.themePreset : 'default';
   next.themeOverrides = sanitizeThemeOverrides(next.themeOverrides);
@@ -233,16 +247,15 @@ export function sanitizeToolboxSettings(input: unknown): ToolboxSettings {
   if (!['compact', 'comfortable', 'spacious'].includes(next.density)) next.density = DEFAULT_TOOLBOX_SETTINGS.density;
   if (!['list', 'compact-list', 'grid', 'categorized-grid'].includes(next.launcherStyle)) next.launcherStyle = DEFAULT_TOOLBOX_SETTINGS.launcherStyle;
   if (!['top', 'bottom'].includes(next.tabPosition)) next.tabPosition = DEFAULT_TOOLBOX_SETTINGS.tabPosition;
-  if (!next.enabledTools.includes('calculator')) next.enabledTools = ['calculator', ...next.enabledTools];
   return next;
 }
 
-function sanitizeModuleList(value: unknown, allowed: readonly ToolboxModuleId[]): ToolboxModuleId[] {
+function sanitizeModuleList<T extends string>(value: unknown, allowed: readonly T[]): T[] {
   if (!Array.isArray(value)) return [];
-  const allowedSet = new Set(allowed);
-  return value.filter((id, index): id is ToolboxModuleId =>
+  const allowedSet = new Set<string>(allowed);
+  return value.filter((id, index): id is T =>
     typeof id === 'string' &&
-    allowedSet.has(id as ToolboxModuleId) &&
+    allowedSet.has(id) &&
     value.indexOf(id) === index,
   );
 }

@@ -49,7 +49,8 @@ export type ParticlePresetId =
   | 'dust'
   | 'leaves'
   | 'stars'
-  | 'magic';
+  | 'magic'
+  | 'bubbles';
 
 // ---- Weather (Phase 3 · M3) ----
 export type WeatherKind = 'clear' | 'rain' | 'snow' | 'fog' | 'clouds';

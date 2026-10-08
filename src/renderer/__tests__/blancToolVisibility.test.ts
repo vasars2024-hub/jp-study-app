@@ -87,11 +87,20 @@ describe('a registry-governed tool still obeys the user settings', () => {
     expect(isToolLaunchable('calculator', notShown, true)).toBe(false);
   });
 
-  it('never hides a Blanc-only tool through hiddenTools', () => {
-    // Not a hypothetical guard: a stale saved list could still carry the id.
-    // It cannot mean anything, so it must not act.
+  it('hides a Blanc-only tool the user hid, like any other tool', () => {
+    // Reversed deliberately (2026-10 refinement pass). `hiddenTools` used to be
+    // registry-only, so a Blanc-only id in it "could not mean anything" and was
+    // ignored — which left 13 tools impossible to hide. The settings schema now
+    // stores Blanc-only ids for hide/order/default (shared/blancTools.ts), so
+    // the user's choice must act.
     const settings = { ...defaults, hiddenTools: ['discover'] };
-    expect(isToolLaunchable('discover', settings, false)).toBe(true);
+    expect(isToolLaunchable('discover', settings, false)).toBe(false);
+    expect(isToolLaunchable('discover', { ...settings, showHiddenToolsInSearch: true }, true)).toBe(true);
+  });
+
+  it('still lists a Blanc-only tool that is not in enabledTools', () => {
+    // The original defect stays fixed: enable/disable is registry-only.
+    expect(isToolLaunchable('discover', { ...defaults, enabledTools: [] }, false)).toBe(true);
   });
 });
 

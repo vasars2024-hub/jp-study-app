@@ -2,7 +2,7 @@
  * SecretAeroTrigger — the hidden discovery (Phase 1 · M3).
  * -----------------------------------------------------------------------------
  * Renders a near-invisible corner "button" (revealed as a faint glint on hover)
- * that toggles the secret Frutiger Aero theme on click. Typing "aero"
+ * that toggles the secret Frutiger Aero theme on double-click. Typing "aero"
  * anywhere outside a text field toggles it too — an Easter egg. This is the
  * ONLY way into Aero: it is never listed in the theme picker.
  *
@@ -45,7 +45,13 @@ function isAeroMaterialsActive(): boolean {
   return document.documentElement.getAttribute('data-materials') === 'aero';
 }
 
-/** Pin the activator to the visible desktop corner (4:3 frame in Aero, above taskbar otherwise). */
+/**
+ * Pin the activator to the visible desktop corner, ABOVE the taskbar in every
+ * shell. In Aero the desk is a 4:3 frame scaled by `--os-viewport-scale`, so the
+ * taskbar height is converted to screen pixels with the frame's own scale. It
+ * used to sit flush with the frame's bottom-right corner at the maximum z-index,
+ * i.e. on top of Show Desktop and the clock: one click on Show Desktop left Aero.
+ */
 function useTriggerPlacement(): CSSProperties {
   const [style, setStyle] = useState<CSSProperties>(() => ({
     width: TRIGGER_SIZE,
@@ -61,10 +67,13 @@ function useTriggerPlacement(): CSSProperties {
         const frame = document.querySelector('.os-viewport-frame') as HTMLElement | null;
         if (frame) {
           const rect = frame.getBoundingClientRect();
+          // offsetWidth is the unscaled layout width; the rect is post-transform.
+          const scale = frame.offsetWidth > 0 ? rect.width / frame.offsetWidth : 1;
+          const taskbarPx = readTaskbarHeight() * (Number.isFinite(scale) && scale > 0 ? scale : 1);
           setStyle({
             width: size,
             height: size,
-            top: Math.max(0, rect.bottom - size),
+            top: Math.max(0, rect.bottom - taskbarPx - size),
             left: Math.max(0, rect.right - size),
             right: 'auto',
             bottom: 'auto',
@@ -192,7 +201,9 @@ export default function SecretAeroTrigger() {
         tabIndex={-1}
         aria-hidden="true"
         title=""
-        onClick={toggle}
+        // Double-click, as documented: a stray single click on an invisible
+        // max-z corner target must never switch the whole OS.
+        onDoubleClick={toggle}
       />
       {flash && (
         <div className="aero-secret-flash" role="status" aria-live="polite">

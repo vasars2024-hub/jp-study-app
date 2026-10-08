@@ -160,6 +160,83 @@ export function renderOrthographicFrame(
   return out;
 }
 
+/**
+ * Per-pixel inverse projection, computed ONCE for a fixed tilt.
+ *
+ * For a constant tilt the inverse orthographic gives each disk pixel a latitude
+ * and a longitude OFFSET from the central meridian that never change as the
+ * globe spins — only the offset's origin moves. So a spin frame is a texture
+ * lookup per pixel (no trig at all), cheap enough to run every animation frame
+ * at any rotation angle. That is what lets the boot globe turn smoothly instead
+ * of stepping through 36 pre-baked 10° frames.
+ */
+export interface GlobeLookup {
+  size: number;
+  /** Disk pixel indices (into a size×size image) that land on the sphere. */
+  pixels: Int32Array;
+  /** Texture row per disk pixel. */
+  row: Int32Array;
+  /** Longitude offset from the central meridian, in degrees, per disk pixel. */
+  lonOffset: Float32Array;
+  /** 0–1 limb shading per disk pixel. */
+  limb: Float32Array;
+}
+
+export function buildGlobeLookup(size: number, tiltDeg: number): GlobeLookup {
+  const tex = getLandPixels();
+  const R = (size - 1) / 2;
+  const pixels: number[] = [];
+  const row: number[] = [];
+  const lonOffset: number[] = [];
+  const limb: number[] = [];
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const nx = (px - R) / R;
+      const ny = (R - py) / R;
+      const ll = inverseOrthographic(nx, ny, 0, tiltDeg);
+      if (!ll) continue;
+      const v = Math.min(tex.height - 1, Math.max(0, (((90 - ll.lat) / 180) * tex.height) | 0));
+      pixels.push(py * size + px);
+      row.push(v);
+      lonOffset.push(ll.lon);
+      limb.push(Math.sqrt(Math.max(0, 1 - (nx * nx + ny * ny))));
+    }
+  }
+  return {
+    size,
+    pixels: Int32Array.from(pixels),
+    row: Int32Array.from(row),
+    lonOffset: Float32Array.from(lonOffset),
+    limb: Float32Array.from(limb),
+  };
+}
+
+/** Paint the land for one central longitude into `out` (cleared first). */
+export function paintGlobeLand(lookup: GlobeLookup, centralLonDeg: number, out: ImageData): void {
+  const tex = getLandPixels();
+  const tw = tex.width;
+  const texData = tex.data;
+  const px = out.data;
+  px.fill(0);
+  const scale = tw / 360;
+  const { pixels, row, lonOffset, limb } = lookup;
+  for (let k = 0; k < pixels.length; k++) {
+    let lon = lonOffset[k] + centralLonDeg + 180;
+    lon -= Math.floor(lon / 360) * 360;
+    const ui = Math.min(tw - 1, (lon * scale) | 0);
+    const ti = (row[k] * tw + ui) * 4;
+    const a = texData[ti + 3];
+    if (a < 16) continue;
+    const l = limb[k];
+    const shade = 0.55 + 0.45 * l;
+    const i = pixels[k] * 4;
+    px[i] = (158 * shade) | 0;
+    px[i + 1] = (255 * shade) | 0;
+    px[i + 2] = (79 * shade) | 0;
+    px[i + 3] = Math.min(255, (a * (0.72 + 0.28 * l)) | 0);
+  }
+}
+
 export const AERO_GLOBE_FRAME_COUNT = 36;
 export const AERO_GLOBE_TILT_DEG = 14;
 export const AERO_GLOBE_FRAME_SIZE = 192;

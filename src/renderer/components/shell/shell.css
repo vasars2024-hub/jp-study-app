@@ -228,10 +228,20 @@ html.reduce-motion .os-tray-overflow-btn svg {
   justify-content: center;
   overflow: hidden;
   background: #071f3a;
-  animation: aero-boot-in 360ms ease both;
+  /* Boot-local motion tokens. The one-shot transitions use the shared
+     --dur-* / --ease-* scale; the ambient loops are slower than anything on
+     that scale, so they are named here once instead of repeated as literals. */
+  --boot-loop-drift: 7s;
+  --boot-loop-tide: 4.8s;
+  --boot-loop-swell: 3.2s;
+  --boot-loop-pulse: 2.2s;
+  --boot-loop-orbit: 4.6s;
+  --boot-loop-float: 3.4s;
+  --boot-progress-run: 2.1s;
+  animation: aero-boot-in var(--dur-slow, 380ms) var(--ease-standard, ease) both;
   isolation: isolate;
 }
-.os-aero-boot.out { animation: aero-boot-out 720ms var(--ease-glass, ease) both; }
+.os-aero-boot.out { animation: aero-boot-out var(--dur-xslow, 640ms) var(--ease-glass, ease) both; }
 @keyframes aero-boot-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes aero-boot-out { from { opacity: 1; } to { opacity: 0; } }
 
@@ -264,7 +274,7 @@ html.reduce-motion .os-tray-overflow-btn svg {
     radial-gradient(24% 42% at 78% 42%, rgba(255,255,255,0.42), transparent 72%);
   filter: blur(10px);
   opacity: 0.78;
-  animation: aero-boot-clouds 7s ease-in-out infinite alternate;
+  animation: aero-boot-clouds var(--boot-loop-drift) var(--ease-standard) infinite alternate;
 }
 .os-aero-boot-horizon {
   top: auto;
@@ -280,7 +290,7 @@ html.reduce-motion .os-tray-overflow-btn svg {
     repeating-linear-gradient(172deg, rgba(255,255,255,0.2) 0 2px, transparent 2px 22px),
     linear-gradient(180deg, rgba(59,203,222,0.7), rgba(6,75,116,0.86));
   clip-path: polygon(0 10%, 100% 0, 100% 100%, 0 100%);
-  animation: aero-boot-water 4.8s ease-in-out infinite alternate;
+  animation: aero-boot-water var(--boot-loop-tide) var(--ease-standard) infinite alternate;
 }
 .os-aero-boot-shore {
   top: 70%;
@@ -311,7 +321,7 @@ html.reduce-motion .os-tray-overflow-btn svg {
     radial-gradient(50% 56% at 50% 0%, rgba(255, 255, 255, 0.58), transparent 68%);
   filter: blur(12px);
   opacity: 0.86;
-  animation: aero-boot-aurora 3.2s ease-in-out infinite alternate;
+  animation: aero-boot-aurora var(--boot-loop-swell) var(--ease-standard) infinite alternate;
 }
 @keyframes aero-boot-aurora {
   from { transform: translate3d(-2%, 0, 0) scale(1); opacity: 0.75; }
@@ -326,6 +336,14 @@ html.reduce-motion .os-tray-overflow-btn svg {
 .os-aero-boot.phase-safe-fallback {
   background: #d9f2fb;
 }
+/* The scene and aurora layers sit inside this isolated stacking context, above
+   the root's own background — so the pale safe-fallback colour above was never
+   visible: the full sky scene painted over it. Safe fallback means "effects
+   bypassed", so drop the decorative layers and let the plain colour show. */
+.os-aero-boot.phase-safe-fallback .os-aero-boot-scene,
+.os-aero-boot.phase-safe-fallback .os-aero-boot-aurora {
+  display: none;
+}
 .os-aero-boot.phase-sleeping .os-aero-boot-scene,
 .os-aero-boot.phase-shutting-down .os-aero-boot-scene {
   filter: saturate(0.64) brightness(0.58);
@@ -339,7 +357,7 @@ html.reduce-motion .os-tray-overflow-btn svg {
   filter: blur(22px) saturate(0.5);
 }
 .os-aero-boot.phase-waking .os-aero-boot-aurora {
-  animation-duration: 1.8s;
+  animation-duration: calc(var(--boot-loop-swell) * 0.56);
 }
 .os-aero-boot.phase-shutting-down .os-aero-boot-orb,
 .os-aero-boot.phase-sleeping .os-aero-boot-orb {
@@ -348,7 +366,7 @@ html.reduce-motion .os-tray-overflow-btn svg {
 .os-aero-boot.phase-shutting-down .os-aero-boot-rings span,
 .os-aero-boot.phase-sleeping .os-aero-boot-rings span {
   opacity: 0.32;
-  animation-duration: 4.4s;
+  animation-duration: calc(var(--boot-loop-pulse) * 2);
 }
 .os-aero-boot-inner {
   position: relative;
@@ -421,19 +439,21 @@ html.reduce-motion .os-tray-overflow-btn svg {
     0 0 12px rgba(205, 255, 239, 0.42),
     0 0 34px rgba(96, 255, 168, 0.34),
     inset 0 0 18px rgba(205, 255, 247, 0.22);
-  animation: aero-boot-ring 2.2s ease-in-out infinite, aero-boot-ring-spin 4.6s linear infinite;
+  animation:
+    aero-boot-ring var(--boot-loop-pulse) var(--ease-standard) infinite,
+    aero-boot-ring-spin var(--boot-loop-orbit) linear infinite;
 }
 .os-aero-boot-rings span:nth-child(2) {
   width: 520px;
   height: 154px;
-  animation-delay: 240ms;
+  animation-delay: var(--dur-normal);
   opacity: 0.72;
   z-index: -1;
 }
 .os-aero-boot-rings span:nth-child(3) {
   width: 590px;
   height: 202px;
-  animation-delay: 520ms;
+  animation-delay: calc(var(--dur-normal) * 2);
   opacity: 0.52;
   z-index: -1;
 }
@@ -456,7 +476,7 @@ html.reduce-motion .os-tray-overflow-btn svg {
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
     inset -46px -28px 54px rgba(2, 22, 96, 0.58),
     inset 24px 14px 30px rgba(213, 255, 177, 0.22);
-  animation: aero-boot-emblem 2.2s ease-in-out infinite alternate;
+  animation: aero-boot-emblem var(--boot-loop-pulse) var(--ease-standard) infinite alternate;
 }
 .os-aero-boot-orb::before {
   content: '';
@@ -478,7 +498,6 @@ html.reduce-motion .os-tray-overflow-btn svg {
   pointer-events: none;
 }
 .os-aero-boot-globe-land,
-.os-aero-boot-globe-graticule,
 .os-aero-boot-globe-shine {
   position: absolute;
   inset: 0;
@@ -492,33 +511,11 @@ html.reduce-motion .os-tray-overflow-btn svg {
   filter:
     drop-shadow(0 0 3px rgba(235,255,155,0.88))
     drop-shadow(0 0 9px rgba(69,255,127,0.48));
-  transition: opacity 280ms ease;
+  transition: opacity var(--dur-slow) var(--ease-standard);
 }
+/* The graticule is stroked onto the same canvas as the land (AeroBootGlobe). */
 .os-aero-boot-globe-land.ready {
-  opacity: 0.9;
-}
-.os-aero-boot-globe-graticule {
-  z-index: 3;
-  overflow: visible;
-}
-.os-aero-boot-globe-limb,
-.os-aero-boot-globe-parallel,
-.os-aero-boot-globe-meridian {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.os-aero-boot-globe-limb {
-  stroke: rgba(220, 255, 245, 0.42);
-  stroke-width: 1.1;
-}
-.os-aero-boot-globe-parallel {
-  stroke: rgba(213, 255, 239, 0.38);
-  stroke-width: 0.7;
-}
-.os-aero-boot-globe-meridian {
-  stroke: rgba(210, 255, 235, 0.48);
-  stroke-width: 0.75;
+  opacity: 0.92;
 }
 .os-aero-boot-globe-shine {
   z-index: 5;
@@ -545,24 +542,24 @@ html.reduce-motion .os-tray-overflow-btn svg {
   line-height: 1;
   mix-blend-mode: screen;
   opacity: 0.58;
-  animation: aero-boot-webmark 2.4s ease-in-out infinite alternate;
+  animation: aero-boot-webmark calc(var(--boot-loop-pulse) * 1.1) var(--ease-standard) infinite alternate;
 }
 .os-aero-boot-bubbles {
   inset: 0;
 }
 .os-aero-boot-bubbles span {
-  width: 7px;
-  height: 7px;
-  border: 1px solid rgba(234,255,252,0.74);
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(234,255,252,0.7);
   border-radius: 50%;
-  background: rgba(255,255,255,0.16);
-  box-shadow: 0 0 10px rgba(183,255,248,0.5);
-  animation: aero-boot-bubble 3.4s ease-in-out infinite;
+  background: radial-gradient(circle at 32% 28%, #fff 0 14%, rgba(255,255,255,0.2) 38%, rgba(94,190,230,0.16) 68%, rgba(255,255,255,0.6) 100%);
+  box-shadow: 0 0 10px rgba(183,255,248,0.45);
+  animation: aero-boot-bubble var(--boot-loop-float) var(--ease-standard) infinite;
 }
 .os-aero-boot-bubbles span:nth-child(1) { left: 20px; top: 66px; }
-.os-aero-boot-bubbles span:nth-child(2) { right: 22px; top: 72px; animation-delay: 420ms; }
-.os-aero-boot-bubbles span:nth-child(3) { left: 38px; top: 18px; width: 5px; height: 5px; animation-delay: 760ms; }
-.os-aero-boot-bubbles span:nth-child(4) { right: 42px; top: 24px; width: 5px; height: 5px; animation-delay: 1120ms; }
+.os-aero-boot-bubbles span:nth-child(2) { right: 22px; top: 72px; width: 18px; height: 18px; animation-delay: calc(var(--dur-slow) * 1.1); }
+.os-aero-boot-bubbles span:nth-child(3) { left: 38px; top: 18px; width: 9px; height: 9px; animation-delay: calc(var(--dur-xslow) * 1.2); }
+.os-aero-boot-bubbles span:nth-child(4) { right: 42px; top: 24px; width: 10px; height: 10px; animation-delay: calc(var(--dur-xslow) * 1.75); }
 @keyframes aero-boot-ring {
   0%, 100% { opacity: 0.34; }
   45% { opacity: 0.94; }
@@ -576,8 +573,8 @@ html.reduce-motion .os-tray-overflow-btn svg {
   to { transform: translateY(-3px); }
 }
 @keyframes aero-boot-webmark {
-  from { opacity: 0.5; filter: blur(0.4px); }
-  to { opacity: 0.82; filter: blur(1.1px); }
+  from { opacity: 0.5; }
+  to { opacity: 0.82; }
 }
 @keyframes aero-boot-bubble {
   0%, 100% { transform: translateY(8px); opacity: 0.26; }
@@ -616,29 +613,60 @@ html.reduce-motion .os-tray-overflow-btn svg {
   font-size: 0.86rem;
   letter-spacing: 0;
 }
-.os-aero-boot-steps {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
-  width: min(260px, 80%);
+/* Vista-style boot strip: a dark rounded trough with three glossy green
+   segments gliding through it. Motion is one transform on the run wrapper,
+   which is exactly as wide as the trough, so translateX(100%) carries the
+   segments fully out the right end. */
+.os-aero-boot-progress {
+  position: relative;
+  width: min(212px, 70%);
+  height: 15px;
   margin: 20px auto 0;
-}
-.os-aero-boot-steps span {
-  height: 5px;
-  border-radius: 2px;
-  background: rgba(10, 78, 105, 0.18);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.62);
-}
-.os-aero-boot-steps span.done,
-.os-aero-boot-steps span.active {
-  background:
-    linear-gradient(90deg, rgba(153,233,125,0.94), rgba(48,215,204,0.96)),
-    #35d2c5;
-}
-.os-aero-boot-steps span.active {
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.72);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #0b0f12 0%, #1d2327 52%, #121619 100%);
   box-shadow:
-    0 0 12px rgba(53,210,197,0.56),
-    inset 0 1px 0 rgba(255,255,255,0.74);
+    0 0 0 1px rgba(255, 255, 255, 0.34),
+    inset 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.os-aero-boot-progress-run {
+  position: absolute;
+  inset: 2px 0;
+  display: flex;
+  gap: 2px;
+  animation: aero-boot-progress var(--boot-progress-run) linear infinite;
+  will-change: transform;
+}
+.os-aero-boot-progress-run i {
+  flex: 0 0 9px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #e9ffd8 0%, #9df25f 30%, #33b51d 55%, #1f8a12 78%, #67d23c 100%);
+  box-shadow:
+    0 0 6px rgba(122, 255, 96, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+@keyframes aero-boot-progress {
+  from { transform: translateX(-36px); }
+  to { transform: translateX(100%); }
+}
+
+/* After the reveal starts, a short white bloom washes into the desktop —
+   the overlay's own fade carries it away. Opacity + scale only. */
+.os-aero-boot-bloom {
+  position: absolute;
+  inset: -10%;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(60% 55% at 50% 48%, #ffffff 0%, rgba(240, 252, 255, 0.92) 45%, rgba(214, 244, 255, 0) 100%);
+  opacity: 0;
+  transform: scale(0.82);
+  animation: aero-boot-bloom var(--dur-xslow) var(--ease-glass) both;
+}
+@keyframes aero-boot-bloom {
+  0% { opacity: 0; transform: scale(0.82); }
+  38% { opacity: 0.88; }
+  100% { opacity: 0; transform: scale(1.12); }
 }
 .os-aero-boot-welcome {
   display: inline-grid;
@@ -759,11 +787,39 @@ html.reduce-motion .os-tray-overflow-btn svg {
 html.reduce-motion .os-aero-boot *,
 html.reduce-motion .os-aero-boot *::before,
 html.reduce-motion .os-aero-boot *::after,
+html[data-display-anim='none'] .os-aero-boot *,
+html[data-perf='battery'] .os-aero-boot *,
+html[data-aero-safe-mode='on'] .os-aero-boot *,
 .os-aero-boot.reduced *,
 .os-aero-boot.reduced *::before,
 .os-aero-boot.reduced *::after {
   animation: none !important;
   transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .os-aero-boot *,
+  .os-aero-boot *::before,
+  .os-aero-boot *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+/* With its motion stopped the strip would freeze off-screen; park the three
+   segments in the trough's centre as a static "working" mark instead. */
+html.reduce-motion .os-aero-boot-progress-run,
+html[data-display-anim='none'] .os-aero-boot-progress-run,
+html[data-perf='battery'] .os-aero-boot-progress-run,
+html[data-aero-safe-mode='on'] .os-aero-boot-progress-run,
+.os-aero-boot.reduced .os-aero-boot-progress-run {
+  transform: translateX(calc(50% - 16px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .os-aero-boot-progress-run { transform: translateX(calc(50% - 16px)); }
+}
+html.reduce-motion .os-aero-boot-bloom,
+html[data-display-anim='none'] .os-aero-boot-bloom,
+.os-aero-boot.reduced .os-aero-boot-bloom {
+  display: none;
 }
 @media (max-width: 700px) {
   .os-aero-boot-inner {

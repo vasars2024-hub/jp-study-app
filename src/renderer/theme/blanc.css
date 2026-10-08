@@ -5,6 +5,12 @@
 @import './blanc-library.css';
 @import './blanc-files.css';
 @import './blanc-agent.css';
+/* Collapsible sections, the launcher groups, the low-memory indicators. */
+@import './blanc-refine.css';
+/* Blanc mechanics: Flow, Capture inbox, warm tools and the RAM chip. Here, not
+   in blancMain.tsx, because Study OS's in-window Blanc (App.tsx) mounts the
+   same shell and loads only this sheet. */
+@import './blanc-mechanics.css';
 /* Last: re-skins reused Study OS classes into Blanc's sharp, flat language.
    Must import after the per-stream files so its resets win ties. */
 @import './blanc-native.css';

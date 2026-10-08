@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
+import {
+  BLANC_VERBS,
+  parseBlancVerb,
+  verbActionKey,
+  verbArgKey,
+  verbDescriptionKey,
+  verbSyntax,
+  type BlancVerbId,
+} from './blancVerbs';
 
 export interface BlancMasterSearchTool {
   id: string;
@@ -35,9 +44,25 @@ export interface BlancMasterSearchContent {
   language?: 'ja' | 'zh' | 'ru';
 }
 
+/**
+ * A command verb row (`d 猫`, `r`, `?`). `fill` makes the row complete the
+ * query instead of running (the `?` list); otherwise Enter runs the verb.
+ */
+export interface BlancMasterVerbResult {
+  kind: 'verb';
+  id: string;
+  verb: BlancVerbId;
+  arg: string;
+  title: string;
+  detail: string;
+  category: string;
+  fill?: string;
+}
+
 export type BlancMasterSearchResult =
   | { kind: 'tool'; id: string; title: string; detail: string; category: string }
   | { kind: 'command'; id: string; title: string; detail: string; category: string; shortcut?: string }
+  | BlancMasterVerbResult
   | BlancMasterSearchContent;
 
 export interface BlancMasterSearchResponse {
@@ -155,6 +180,11 @@ interface BlancMasterSearchProps {
   onOpenTool: (id: string) => void;
   onRunCommand: (id: string) => void;
   onOpenContent?: (result: BlancMasterSearchContent) => void;
+  /**
+   * Runs a command verb (`d 猫`, `r`, …). Verbs are recognised only when this
+   * is given, so a host without verbs keeps plain search.
+   */
+  onRunVerb?: (verb: BlancVerbId, arg: string) => void;
 }
 
 export default function BlancMasterSearch({
@@ -166,8 +196,9 @@ export default function BlancMasterSearch({
   onOpenTool,
   onRunCommand,
   onOpenContent,
+  onRunVerb,
 }: BlancMasterSearchProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -176,6 +207,63 @@ export default function BlancMasterSearch({
     () => searchBlancMasterIndex(query, tools, commands, content),
     [commands, content, query, tools],
   );
+  const parsedVerb = useMemo(() => (onRunVerb ? parseBlancVerb(query) : null), [onRunVerb, query]);
+  // Any query can be looked up directly — the one thing the retired Context
+  // Search tool did that the index alone could not (a word never saved or
+  // looked up before). It rides the dictionary-entry path the shell already
+  // routes to the Dictionary tool.
+  const trimmedQuery = query.trim();
+  const results = useMemo<BlancMasterSearchResult[]>(() => {
+    const verbGroup = t('blanc.mech.verb.group');
+    const argLabel = (verb: BlancVerbId): string => {
+      const key = verbArgKey(verb);
+      return key ? t(key) : '';
+    };
+    if (parsedVerb?.verb === '?') {
+      // The verb list: choosing one writes its letter, ready for the argument.
+      return BLANC_VERBS.filter((def) => def.id !== '?').map((def) => ({
+        kind: 'verb' as const,
+        id: `verb-help:${def.id}`,
+        verb: def.id,
+        arg: '',
+        title: verbSyntax(def.id, def.takesArg ? argLabel(def.id) : ''),
+        detail: t(verbDescriptionKey(def.id)),
+        category: verbGroup,
+        fill: def.takesArg ? `${def.id} ` : def.id,
+      }));
+    }
+    if (parsedVerb?.ready) {
+      const row: BlancMasterVerbResult = {
+        kind: 'verb',
+        id: `verb:${parsedVerb.verb}`,
+        verb: parsedVerb.verb,
+        arg: parsedVerb.arg,
+        title: t(verbActionKey(parsedVerb.verb, Boolean(parsedVerb.arg)), { arg: parsedVerb.arg }),
+        detail: t(verbDescriptionKey(parsedVerb.verb)),
+        category: verbGroup,
+      };
+      // `o` and `g` show what their argument matches, so the row is never a
+      // blind jump; the other verbs act on the text itself.
+      if (parsedVerb.verb === 'o') {
+        return [row, ...searchBlancMasterIndex(parsedVerb.arg, tools, [], [], 12).results];
+      }
+      if (parsedVerb.verb === 'g') {
+        const points = content.filter((item) => item.kind === 'grammar-point');
+        return [row, ...searchBlancMasterIndex(parsedVerb.arg, [], [], points, 12).results];
+      }
+      if (parsedVerb.arg) return [row];
+      return [row, ...response.results];
+    }
+    if (!trimmedQuery) return response.results;
+    const lookup: BlancMasterSearchContent = {
+      kind: 'dictionary-entry',
+      id: `lookup:${trimmedQuery}`,
+      title: trimmedQuery,
+      detail: t('blanc.refine.search.lookUp'),
+      category: t('blanc.masterSearch.group.dictionary'),
+    };
+    return [...response.results, lookup];
+  }, [response.results, trimmedQuery, parsedVerb, tools, content, lang]);
 
   useEffect(() => {
     if (!open) return;
@@ -192,12 +280,28 @@ export default function BlancMasterSearch({
   }, [open]);
 
   useEffect(() => {
-    setSelectedIndex((current) => Math.min(current, Math.max(0, response.results.length - 1)));
-  }, [response.results.length]);
+    setSelectedIndex((current) => Math.min(current, Math.max(0, results.length - 1)));
+  }, [results.length]);
+
+  // Keyboard selection keeps the active option on screen in a long list.
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`blanc-master-result-${selectedIndex}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [open, selectedIndex]);
 
   if (!open) return null;
 
   const activate = (result: BlancMasterSearchResult): void => {
+    if (result.kind === 'verb') {
+      if (result.fill !== undefined) {
+        setQuery(result.fill);
+        setSelectedIndex(0);
+        inputRef.current?.focus();
+        return;
+      }
+      onRunVerb?.(result.verb, result.arg);
+      return;
+    }
     if (result.kind === 'tool') onOpenTool(result.id);
     else if (result.kind === 'command') onRunCommand(result.id);
     else onOpenContent?.(result);
@@ -206,18 +310,20 @@ export default function BlancMasterSearch({
   const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      if (response.results.length) setSelectedIndex((current) => (current + 1) % response.results.length);
+      if (results.length) setSelectedIndex((current) => (current + 1) % results.length);
       return;
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      if (response.results.length) {
-        setSelectedIndex((current) => (current - 1 + response.results.length) % response.results.length);
+      if (results.length) {
+        setSelectedIndex((current) => (current - 1 + results.length) % results.length);
       }
       return;
     }
     if (event.key === 'Enter') {
-      const selected = response.results[selectedIndex];
+      // Enter confirms an IME conversion first; it must not open a result yet.
+      if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+      const selected = results[selectedIndex];
       if (selected) {
         event.preventDefault();
         activate(selected);
@@ -226,6 +332,7 @@ export default function BlancMasterSearch({
   };
 
   const groups = [
+    { kind: 'verb' as const, label: t('blanc.mech.verb.group') },
     { kind: 'tool' as const, label: t('blanc.masterSearch.group.tools') },
     { kind: 'command' as const, label: t('blanc.masterSearch.group.commands') },
     { kind: 'shortcut' as const, label: t('blanc.masterSearch.group.appDrawer') },
@@ -267,29 +374,54 @@ export default function BlancMasterSearch({
             onKeyDown={onInputKeyDown}
             placeholder={t('blanc.masterSearch.placeholder')}
             aria-label={t('blanc.masterSearch.dialog')}
+            // The field drives a listbox it never leaves (focus stays here and
+            // the active option is announced through aria-activedescendant).
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-autocomplete="list"
             aria-controls="blanc-master-search-results"
-            aria-activedescendant={response.results[selectedIndex] ? `blanc-master-result-${selectedIndex}` : undefined}
+            aria-activedescendant={results[selectedIndex] ? `blanc-master-result-${selectedIndex}` : undefined}
+            aria-describedby={onRunVerb ? 'blanc-master-verb-hint' : undefined}
           />
-          <span className="blanc-master-search-count">
-            {response.total}{response.truncated ? ` · showing ${response.results.length}` : ''}
+          <span className="blanc-master-search-count" aria-live="polite">
+            {response.truncated
+              ? t('blanc.refine.search.countTruncated', { total: response.total, shown: response.results.length })
+              : t('blanc.refine.search.count', { count: response.total })}
           </span>
         </div>
         <div className="blanc-master-search-hints">{t('blanc.masterSearch.hints')}</div>
-        <div id="blanc-master-search-results" className="blanc-master-search-results" role="listbox">
-          {response.results.length ? groups.map((group) => {
-            const groupResults = response.results
+        {onRunVerb && (
+          <div className="blanc-master-search-hints blanc-master-verbs" id="blanc-master-verb-hint">
+            {parsedVerb && !parsedVerb.ready
+              ? t('blanc.mech.verb.needsArg', {
+                syntax: verbSyntax(parsedVerb.verb, t(verbArgKey(parsedVerb.verb) ?? 'blanc.mech.verb.arg.t')),
+                desc: t(verbDescriptionKey(parsedVerb.verb)),
+              })
+              : t('blanc.mech.verb.hint')}
+          </div>
+        )}
+        <div
+          id="blanc-master-search-results"
+          className="blanc-master-search-results"
+          role="listbox"
+          aria-label={t('blanc.masterSearch.dialog')}
+        >
+          {results.length ? groups.map((group) => {
+            const groupResults = results
               .map((result, index) => ({ result, index }))
               .filter(({ result }) => result.kind === group.kind);
             if (!groupResults.length) return null;
+            const labelId = `blanc-master-group-${group.kind}`;
             return (
-              <div className="blanc-master-search-group" key={group.kind}>
-                <div className="blanc-master-search-group-label">{group.label}</div>
+              <div className="blanc-master-search-group" key={group.kind} role="group" aria-labelledby={labelId}>
+                <div className="blanc-master-search-group-label" id={labelId}>{group.label}</div>
                 {groupResults.map(({ result, index }) => (
                   <button
                     id={`blanc-master-result-${index}`}
                     key={`${result.kind}-${result.id}`}
                     type="button"
                     role="option"
+                    tabIndex={-1}
                     aria-selected={index === selectedIndex}
                     className={index === selectedIndex ? 'is-selected' : ''}
                     onMouseEnter={() => setSelectedIndex(index)}

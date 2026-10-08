@@ -68,6 +68,7 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   immersion: 'blanc.tool.immersion',
   visualizer: 'blanc.tool.visualizer',
   'local-agent': 'blanc.tool.localAgent',
+  'visual-novels': 'blanc.tool.visualNovels',
 };
 
 /** The catalog key for a tool's name, or undefined for an id this table does not know. */

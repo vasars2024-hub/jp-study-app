@@ -243,7 +243,12 @@ export function makeSession(
   };
 }
 
-export function GameArena() {
+/**
+ * `includeSecretArcade={false}` keeps the discovered Aero/Wired arcade games
+ * (and their themed chrome) out of a host that must stay neutral — Blanc.
+ * Study OS omits the prop and is unchanged.
+ */
+export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?: boolean } = {}) {
   const { t, lang } = useT();
   const [settings, setSettings] = useState(loadGameArenaSettings);
   const { lang: studyLang, tag: studyTag } = useStudyLanguage();
@@ -255,8 +260,10 @@ export function GameArena() {
   const [selected, setSelected] = useState<GameId>('sentence-builder');
   const [session, setSession] = useState<Session | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [wiredUnlocked, setWiredUnlocked] = useState(hasDiscoveredWired);
-  const [aeroUnlocked, setAeroUnlocked] = useState(hasDiscoveredAero);
+  const [wiredDiscovered, setWiredUnlocked] = useState(hasDiscoveredWired);
+  const [aeroDiscovered, setAeroUnlocked] = useState(hasDiscoveredAero);
+  const wiredUnlocked = includeSecretArcade && wiredDiscovered;
+  const aeroUnlocked = includeSecretArcade && aeroDiscovered;
   const [arcadeTheme, setArcadeTheme] = useState<ArcadeTheme>(() =>
     preferredArcadeTheme(hasDiscoveredWired(), hasDiscoveredAero()),
   );

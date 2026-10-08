@@ -11,6 +11,8 @@ import { syncPillarboxWallImage } from '../pillarboxSettings';
 
 interface LayerStyle {
   key: string;
+  /** Preset id, stamped as `data-wall` so a theme can add live layers to one wall. */
+  wallId?: string;
   css?: string;
   animated?: boolean;
   imageUrl?: string | null;
@@ -24,6 +26,7 @@ function itemToLayer(item: WallpaperItem, reason: string): LayerStyle {
     const p = getWallPreset(item.ref);
     return {
       key: wallItemKey(item),
+      wallId: p.id,
       css: p.css,
       animated: !!p.animated,
       label: item.label ?? p.label,
@@ -271,6 +274,7 @@ export default function WallpaperStage({
           <div
             key={`slot-${i}-${layer.key}`}
             className={`os-wall-layer${on ? ' on' : ''}${layer.animated && on ? ' wall-animated' : ''}`}
+            data-wall={layer.wallId}
             style={style}
           >
             {layer.videoUrl && on && (

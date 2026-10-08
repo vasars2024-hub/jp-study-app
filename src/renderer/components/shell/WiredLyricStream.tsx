@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type JSX } from 'react';
 import * as player from '../../playerBus';
 import * as audio from '../../audioBus';
 import {
@@ -11,7 +11,8 @@ import {
 } from '../../lyricTransmission';
 
 const BAR_COUNT = 26;
-const DUP_COLORS = ['cyan', 'amber', 'magenta'] as const;
+/** Channel-split ghosts use the two signal colours only — the palette is locked. */
+const DUP_COLORS = ['cyan', 'amber'] as const;
 
 interface WiredLyricStreamProps {
   text: string;
@@ -56,13 +57,25 @@ export default function WiredLyricStream({
   const boostRef = useRef(0);
   const freqScratch = useRef(new Uint8Array(2048));
 
-  const intensity = motionLevel === 'off' || reducedMotion ? 0 : motionLevel === 'reduced' ? 0.4 : 1;
+  // Reduced motion (OS or in-app) and motion "off" get no conveyor at all: the
+  // line is parked centred and simply replaced on the next cue. The previous
+  // build still slid it 240vw per cue at 60fps under both settings.
+  const isStatic = motionLevel === 'off' || reducedMotion;
+  const intensity = isStatic ? 0 : motionLevel === 'reduced' ? 0.4 : 1;
   const script: LineScript = useMemo(() => buildLineScript(text, intensity), [text, intensity]);
   const chars = useMemo(() => [...text], [text]);
-  const showBars = motionLevel !== 'off';
+  const showBars = !isStatic;
 
   useEffect(() => {
-    const duration = Math.max(0.4, cueEnd - cueStart) * (intensity === 0 ? 1.5 : 1);
+    if (isStatic) {
+      // Still feed the analysis rail once per line — it is data, not motion.
+      const id = window.setTimeout(() => {
+        onMetadata();
+        onArchive(script.fragment);
+      }, 400);
+      return () => window.clearTimeout(id);
+    }
+    const duration = Math.max(0.4, cueEnd - cueStart);
     let raf = 0;
 
     const loop = () => {
@@ -207,7 +220,7 @@ export default function WiredLyricStream({
   }
 
   return (
-    <div ref={lineRef} className="wlyric-line">
+    <div ref={lineRef} className={isStatic ? 'wlyric-line is-static is-clear' : 'wlyric-line'}>
       {showBars && (
         <span className="wlyric-bars" aria-hidden="true">
           {Array.from({ length: BAR_COUNT }, (_, b) => (

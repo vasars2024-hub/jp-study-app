@@ -28,6 +28,14 @@
 :root[data-perf='battery'] {
   --glass-tint: color-mix(in srgb, var(--panel) 92%, transparent);
   --glass-tint-strong: var(--panel);
+  /* "No blur" for every surface that reads the scale, not only the selector
+     list below — the tier promised it and only the list honoured it. */
+  --glass-blur: 0px;
+  --blur-sm: 0px;
+  --blur-md: 0px;
+  --blur-lg: 0px;
+  --blur-xl: 0px;
+  --blur-max: 0px;
 }
 :root[data-perf='battery'] .mat-glass,
 :root[data-perf='battery'] .mat-frosted,

@@ -35,17 +35,21 @@ describe('Blanc Mode settings', () => {
     expect(sanitizeBlancModeSettings({ lastTab: 'music' }).lastTab).toBe('media');
   });
 
+  it('migrates the retired Blocks tab to the Toolbox, where the game now lives', () => {
+    expect(sanitizeBlancModeSettings({ lastTab: 'blocks' }).lastTab).toBe('tools');
+  });
+
   it('merges patches through the same sanitizer', () => {
     expect(
       mergeBlancModeSettings(
         { enabled: true, darkMode: false, advanced: false, lastTab: 'read' },
-        { darkMode: true, lastTab: 'blocks' },
+        { darkMode: true, lastTab: 'stats' },
       ),
     ).toEqual({
       enabled: true,
       darkMode: true,
       advanced: false,
-      lastTab: 'blocks',
+      lastTab: 'stats',
     });
   });
 });

@@ -70,8 +70,10 @@ export function isToolLaunchable(
   searching: boolean,
 ): boolean {
   if (isDeveloperOnlyTool(id)) return settings.developerTools === true;
-  if (!isRegistryGovernedTool(id)) return true;
-  if (!settings.enabledTools.includes(id)) return false;
+  // Enable/disable is registry-only (a Blanc-only tool has no "not ready"
+  // state); HIDING applies to every tool. `hiddenTools` accepts Blanc-only ids
+  // since the 2026-10 refinement pass — before it, 13 tools could not be hidden.
+  if (isRegistryGovernedTool(id) && !settings.enabledTools.includes(id)) return false;
   if (settings.hiddenTools.includes(id) && !(searching && settings.showHiddenToolsInSearch)) {
     return false;
   }

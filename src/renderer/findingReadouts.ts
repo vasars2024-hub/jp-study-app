@@ -318,8 +318,15 @@ export function toggleSummonedCompanion(theme: SummonTheme): boolean {
  * so the browser animates it on the compositor and React never re-runs.
  *
  * The element should read `--fx` / `--fy` (both 0..1, defaulting to 0.5).
+ *
+ * `quantum` (optional) snaps the position to a grid of that size, and the
+ * variables are only rewritten when the snapped value actually changes. A
+ * custom property set on the overlay ROOT invalidates style for its whole
+ * subtree, so writing it on every frame of a mouse move cost a full-overlay
+ * recalc per frame; Wired passes 1/48, which also gives the instruments a
+ * stepped, mechanical track instead of a smooth glide.
  */
-export function usePointerParallax<T extends HTMLElement>(enabled: boolean) {
+export function usePointerParallax<T extends HTMLElement>(enabled: boolean, quantum = 0) {
   const ref = useRef<T | null>(null);
 
   useEffect(() => {
@@ -329,19 +336,27 @@ export function usePointerParallax<T extends HTMLElement>(enabled: boolean) {
 
     let frame = 0;
     let pending: { x: number; y: number } | null = null;
+    let lastX = '';
+    let lastY = '';
 
     const flush = (): void => {
       frame = 0;
       if (!pending || !ref.current) return;
-      ref.current.style.setProperty('--fx', pending.x.toFixed(4));
-      ref.current.style.setProperty('--fy', pending.y.toFixed(4));
+      const x = pending.x.toFixed(4);
+      const y = pending.y.toFixed(4);
+      if (x !== lastX) ref.current.style.setProperty('--fx', x);
+      if (y !== lastY) ref.current.style.setProperty('--fy', y);
+      lastX = x;
+      lastY = y;
       pending = null;
     };
 
+    const snap = (v: number): number => (quantum > 0 ? Math.round(v / quantum) * quantum : v);
+
     const onMove = (event: MouseEvent): void => {
       pending = {
-        x: Math.min(1, Math.max(0, event.clientX / Math.max(1, window.innerWidth))),
-        y: Math.min(1, Math.max(0, event.clientY / Math.max(1, window.innerHeight))),
+        x: snap(Math.min(1, Math.max(0, event.clientX / Math.max(1, window.innerWidth)))),
+        y: snap(Math.min(1, Math.max(0, event.clientY / Math.max(1, window.innerHeight)))),
       };
       // Coalesce to one write per frame; mousemove fires far faster than paint.
       if (!frame) frame = window.requestAnimationFrame(flush);
@@ -352,7 +367,7 @@ export function usePointerParallax<T extends HTMLElement>(enabled: boolean) {
       window.removeEventListener('mousemove', onMove);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [enabled]);
+  }, [enabled, quantum]);
 
   return ref;
 }

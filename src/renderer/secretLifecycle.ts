@@ -17,12 +17,39 @@ export type SecretLifecyclePhase =
 
 export type SecretLifecycleReason = 'entry' | 'restart' | 'sleep' | 'wake' | 'shutdown' | 'fallback';
 
+/**
+ * Lifecycle status lines. The state carries the i18n KEY (`messageKey`) so the
+ * overlays translate at render time — the strings used to be raw English and
+ * were read aloud as the boot overlay's accessible name in every language.
+ * `message` keeps the English text for consumers that still print it verbatim.
+ */
+const LIFECYCLE_MESSAGES = {
+  'aero.lifecycle.active': 'Secret OS active',
+  'aero.lifecycle.inactive': 'Secret OS inactive',
+  'aero.lifecycle.preparing': 'Preparing Secret Gum',
+  'aero.lifecycle.restarting': 'Restarting Secret Gum',
+  'aero.lifecycle.forming': 'Forming the Aero desktop',
+  'aero.lifecycle.welcome': 'Welcome to Secret Gum',
+  'aero.lifecycle.revealing': 'Revealing the Aero desktop',
+  'aero.lifecycle.safeFallback': 'Safe fallback',
+  'aero.lifecycle.sleeping': 'Secret OS sleeping',
+  'aero.lifecycle.waking': 'Restoring Secret OS',
+  'aero.lifecycle.shuttingDown': 'Shutting down Secret OS',
+  'aero.lifecycle.restoringDesktop': 'Restoring desktop',
+  'aero.lifecycle.revealingDesktop': 'Revealing desktop',
+} as const;
+
+export type SecretLifecycleMessageKey = keyof typeof LIFECYCLE_MESSAGES;
+
 export interface SecretLifecycleState {
   phase: SecretLifecyclePhase;
   reason: SecretLifecycleReason;
   reducedMotion: boolean;
   muted: boolean;
   canSkip: boolean;
+  /** i18n key for the status line; translate with `t(messageKey)`. */
+  messageKey: SecretLifecycleMessageKey;
+  /** English rendering of `messageKey`, kept for verbatim consumers. */
   message: string;
   sequenceId: number;
   startedAt: number;
@@ -89,7 +116,8 @@ function initialState(): SecretLifecycleState {
     reducedMotion: prefersReducedMotion(),
     muted: readMuted(),
     canSkip: false,
-    message: isAeroActive() ? 'Secret OS active' : 'Secret OS inactive',
+    messageKey: isAeroActive() ? 'aero.lifecycle.active' : 'aero.lifecycle.inactive',
+    message: LIFECYCLE_MESSAGES[isAeroActive() ? 'aero.lifecycle.active' : 'aero.lifecycle.inactive'],
     sequenceId,
     startedAt: Date.now(),
   };
@@ -110,9 +138,12 @@ function after(ms: number, fn: () => void): void {
 }
 
 function publish(patch: Partial<SecretLifecycleState>): void {
+  const messageKey = patch.messageKey ?? state.messageKey;
   state = {
     ...state,
     ...patch,
+    messageKey,
+    message: LIFECYCLE_MESSAGES[messageKey],
     muted: patch.muted ?? readMuted(),
     reducedMotion: patch.reducedMotion ?? prefersReducedMotion(),
   };
@@ -139,14 +170,14 @@ function beginEntry(reason: SecretLifecycleReason = 'entry'): void {
     phase: 'preboot',
     reason,
     canSkip: false,
-    message: reason === 'restart' ? 'Restarting Secret Gum' : 'Preparing Secret Gum',
+    messageKey: reason === 'restart' ? 'aero.lifecycle.restarting' : 'aero.lifecycle.preparing',
     sequenceId: id,
     startedAt: Date.now(),
   });
 
   after(bootAt, () => {
     if (state.sequenceId !== id) return;
-    publish({ phase: 'boot', canSkip: true, message: 'Forming the Aero desktop' });
+    publish({ phase: 'boot', canSkip: true, messageKey: 'aero.lifecycle.forming' });
   });
   after(soundAt, () => {
     if (state.sequenceId !== id) return;
@@ -154,21 +185,24 @@ function beginEntry(reason: SecretLifecycleReason = 'entry'): void {
   });
   after(welcomeAt, () => {
     if (state.sequenceId !== id) return;
-    publish({ phase: 'welcome', canSkip: true, message: 'Welcome to Secret Gum' });
+    publish({ phase: 'welcome', canSkip: true, messageKey: 'aero.lifecycle.welcome' });
   });
   after(revealAt, () => {
     if (state.sequenceId !== id) return;
-    publish({ phase: 'reveal', canSkip: false, message: 'Revealing the corrected Aero desktop' });
+    publish({ phase: 'reveal', canSkip: false, messageKey: 'aero.lifecycle.revealing' });
   });
   after(activeAt, () => {
     if (state.sequenceId !== id) return;
-    publish({ phase: 'active', canSkip: false, message: 'Secret OS active' });
+    publish({ phase: 'active', canSkip: false, messageKey: 'aero.lifecycle.active' });
   });
   after(fallbackAt, () => {
-    if (state.sequenceId !== id) return;
-    publish({ phase: 'safe-fallback', reason: 'fallback', canSkip: true, message: 'Safe fallback' });
+    // A watchdog, not a scheduled step: only fire if the sequence is still
+    // stuck. Checking the id alone re-showed the "Safe fallback" splash ~5s
+    // after every boot that simply ran to completion.
+    if (state.sequenceId !== id || state.phase === 'active') return;
+    publish({ phase: 'safe-fallback', reason: 'fallback', canSkip: true, messageKey: 'aero.lifecycle.safeFallback' });
     after(reducedMotion ? 260 : 900, () => {
-      if (state.sequenceId === id) publish({ phase: 'active', canSkip: false, message: 'Secret OS active' });
+      if (state.sequenceId === id) publish({ phase: 'active', canSkip: false, messageKey: 'aero.lifecycle.active' });
     });
   });
 }
@@ -181,7 +215,7 @@ function beginSleep(): void {
     phase: 'sleeping',
     reason: 'sleep',
     canSkip: false,
-    message: 'Secret OS sleeping',
+    messageKey: 'aero.lifecycle.sleeping',
     sequenceId,
     startedAt: Date.now(),
   });
@@ -196,12 +230,12 @@ function beginWake(): void {
     phase: 'waking',
     reason: 'wake',
     canSkip: true,
-    message: 'Restoring Secret OS',
+    messageKey: 'aero.lifecycle.waking',
     sequenceId: id,
     startedAt: Date.now(),
   });
   after(reducedMotion ? 220 : 650, () => {
-    if (state.sequenceId === id) publish({ phase: 'active', canSkip: false, message: 'Secret OS active' });
+    if (state.sequenceId === id) publish({ phase: 'active', canSkip: false, messageKey: 'aero.lifecycle.active' });
   });
 }
 
@@ -214,13 +248,13 @@ function beginShutdown(): void {
     phase: 'shutting-down',
     reason: 'shutdown',
     canSkip: false,
-    message: 'Shutting down Secret OS',
+    messageKey: 'aero.lifecycle.shuttingDown',
     sequenceId: id,
     startedAt: Date.now(),
   });
   window.dispatchEvent(new CustomEvent(SHUTDOWN_SOUND_EVENT));
   after(reducedMotion ? 260 : 980, () => {
-    if (state.sequenceId === id) publish({ phase: 'inactive', canSkip: false, message: 'Secret OS inactive' });
+    if (state.sequenceId === id) publish({ phase: 'inactive', canSkip: false, messageKey: 'aero.lifecycle.inactive' });
   });
 }
 
@@ -235,11 +269,11 @@ export function installSecretLifecycle(): void {
   window.addEventListener(SECRET_SHUTDOWN_EVENT, beginShutdown);
   onThemeChanged((id) => {
     if (id === AERO_THEME_ID && state.phase === 'inactive') {
-      publish({ phase: 'active', reason: 'entry', canSkip: false, message: 'Secret OS active' });
+      publish({ phase: 'active', reason: 'entry', canSkip: false, messageKey: 'aero.lifecycle.active' });
     }
     if (id !== AERO_THEME_ID && state.phase !== 'inactive' && state.phase !== 'shutting-down') {
       clearTimers();
-      publish({ phase: 'inactive', canSkip: false, message: 'Secret OS inactive' });
+      publish({ phase: 'inactive', canSkip: false, messageKey: 'aero.lifecycle.inactive' });
     }
   });
   if (
@@ -289,11 +323,11 @@ export function skipSecretLifecycle(): void {
   publish({
     phase: 'reveal',
     canSkip: false,
-    message: state.reason === 'wake' ? 'Restoring desktop' : 'Revealing desktop',
+    messageKey: state.reason === 'wake' ? 'aero.lifecycle.restoringDesktop' : 'aero.lifecycle.revealingDesktop',
     sequenceId: id,
   });
   after(reducedMotion ? 160 : 360, () => {
-    if (state.sequenceId === id) publish({ phase: 'active', canSkip: false, message: 'Secret OS active' });
+    if (state.sequenceId === id) publish({ phase: 'active', canSkip: false, messageKey: 'aero.lifecycle.active' });
   });
 }
 

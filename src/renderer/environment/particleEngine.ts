@@ -13,7 +13,8 @@ export type ParticlePresetId =
   | 'dust'
   | 'leaves'
   | 'stars'
-  | 'magic';
+  | 'magic'
+  | 'bubbles';
 
 export interface ParticlePresetMeta {
   id: ParticlePresetId;
@@ -30,7 +31,15 @@ export const PARTICLE_PRESETS: ParticlePresetMeta[] = [
   { id: 'leaves', label: 'Leaves', suggestTags: ['autumn', 'forest'] },
   { id: 'stars', label: 'Stars', suggestTags: ['night'] },
   { id: 'magic', label: 'Magic motes', suggestTags: ['evening', 'night', 'aurora'] },
+  { id: 'bubbles', label: 'Bubbles', suggestTags: ['aero', 'water'] },
 ];
+
+/**
+ * Bubbles are big, glossy and slow, so they never take more than this share of
+ * the particle budget (which already scales with the performance tier and the
+ * adaptive quality budget). The rest goes to the presets beside them.
+ */
+const BUBBLE_SHARE = 0.3;
 
 export interface Particle {
   kind: ParticlePresetId;
@@ -48,8 +57,10 @@ export interface Particle {
   blink?: number;
   /** Firefly duty: how long the light stays on (0–1 of cycle). */
   duty?: number;
-  /** Settled snowflake resting on the pile (drawn with pile, no fall). */
+  /** Settled snowflake resting on the pile (drawn with pile, no fall). Bubbles: popping. */
   settled?: boolean;
+  /** Bubbles: the height (px from top) at which this bubble pops. */
+  popAt?: number;
 }
 
 /** Horizontal snow pile samples (column heights in px). */
@@ -180,7 +191,12 @@ function meltSnow(field: SnowAccumulation, dt: number, rate: number): void {
   }
 }
 
-function spawnOne(kind: ParticlePresetId, w: number, h: number, night: boolean): Particle {
+/**
+ * `aqua`: the presets include bubbles, so magic motes take the water palette
+ * (cyan / sea-green) instead of their violet-pink — a sky of pink sparks over
+ * Aero bubbles reads as two unrelated effects.
+ */
+function spawnOne(kind: ParticlePresetId, w: number, h: number, night: boolean, aqua = false): Particle {
   switch (kind) {
     case 'rain':
       return {
@@ -274,9 +290,32 @@ function spawnOne(kind: ParticlePresetId, w: number, h: number, night: boolean):
         life: 1,
         maxLife: rand(3, 7),
         phase: rand(0, Math.PI * 2),
-        hue: rand(280, 330),
+        hue: aqua ? rand(150, 200) : rand(280, 330),
         a: rand(0.55, 0.95),
       };
+    case 'bubbles': {
+      // Glossy bubbles rise from below the desk with a sine wobble and pop
+      // somewhere in the upper third. Bigger bubbles rise a little faster.
+      const r = rand(4, 13);
+      return {
+        kind,
+        x: rand(0, w),
+        y: h + r + rand(0, h * 0.6),
+        vx: 0,
+        vy: -rand(18, 34) * (0.75 + r / 26),
+        r,
+        life: 1,
+        maxLife: 1e6,
+        phase: rand(0, Math.PI * 2),
+        // Wobble frequency (Hz) and amplitude (px/s).
+        duty: rand(0.25, 0.6),
+        blink: rand(6, 16),
+        hue: rand(186, 204),
+        a: rand(0.6, 0.92),
+        settled: false,
+        popAt: rand(h * 0.03, h * 0.34),
+      };
+    }
     case 'fireflies':
     default:
       // Real fireflies: lower half of desk, slow drift, bright intermittent blink.
@@ -328,9 +367,18 @@ export function ensurePopulation(particles: Particle[], cfg: ParticleSimConfig):
     }
   }
   const targetFlying = cfg.maxParticles;
+  const bubbleCap = Math.max(3, Math.round(cfg.maxParticles * (cfg.presets.length > 1 ? BUBBLE_SHARE : 0.45)));
+  let bubbles = 0;
+  for (const p of particles) if (p.kind === 'bubbles') bubbles++;
   while (flying < targetFlying) {
-    const kind = cfg.presets[Math.floor(Math.random() * cfg.presets.length)];
-    particles.push(spawnOne(kind, cfg.width, cfg.height, cfg.nightBoost));
+    let kind = cfg.presets[Math.floor(Math.random() * cfg.presets.length)];
+    if (kind === 'bubbles' && bubbles >= bubbleCap) {
+      const others = cfg.presets.filter((k) => k !== 'bubbles');
+      if (!others.length) break;
+      kind = others[Math.floor(Math.random() * others.length)];
+    }
+    if (kind === 'bubbles') bubbles++;
+    particles.push(spawnOne(kind, cfg.width, cfg.height, cfg.nightBoost, cfg.presets.includes('bubbles')));
     flying++;
   }
   const hardCap = cfg.maxParticles + settledCap;
@@ -462,10 +510,28 @@ export function stepParticles(
         p.x += (p.vx + Math.sin(p.phase) * 8) * dt;
         p.y += p.vy * dt;
         if (p.life <= 0 || p.y < -20) {
-          Object.assign(p, spawnOne('magic', w, h, cfg.nightBoost));
+          Object.assign(p, spawnOne('magic', w, h, cfg.nightBoost, cfg.presets.includes('bubbles')));
         }
         wrap(p, w, h);
         break;
+      case 'bubbles': {
+        if (p.settled) {
+          // Popping: a quarter-second burst, then a fresh bubble below the desk.
+          p.life -= dt / 0.26;
+          if (p.life <= 0) Object.assign(p, spawnOne('bubbles', w, h, cfg.nightBoost));
+          break;
+        }
+        p.life = 1;
+        p.y += p.vy * dt;
+        p.x += Math.cos(p.phase * (p.duty ?? 0.4) * Math.PI * 2) * (p.blink ?? 10) * dt;
+        if (p.x < -40) p.x = w + 40;
+        if (p.x > w + 40) p.x = -40;
+        if (p.y < (p.popAt ?? 0)) {
+          p.settled = true;
+          p.life = 1;
+        }
+        break;
+      }
       case 'fireflies':
       default: {
         // Drift + occasional dart (more firefly-like than smooth orbit)
@@ -576,6 +642,12 @@ export function drawParticles(
       g.moveTo(p.x, p.y);
       g.lineTo(p.x + p.vx * 0.018, p.y + 14 + R * 5);
       g.stroke();
+      continue;
+    }
+
+    if (p.kind === 'bubbles') {
+      g.globalCompositeOperation = 'source-over';
+      drawBubble(g, p, R, Math.min(1, p.a * (0.7 + cfg.intensity * 0.4)), simpleGlow);
       continue;
     }
 
@@ -694,6 +766,66 @@ export function drawParticles(
   }
 
   g.globalCompositeOperation = 'source-over';
+}
+
+/**
+ * A glossy bubble: faint tinted body, bright rim, an off-centre specular
+ * highlight and a small counter-glint. Popping bubbles swell into a fading
+ * ring. Low/medium quality skips the gradients (rim + glint only).
+ */
+function drawBubble(g: CanvasRenderingContext2D, p: Particle, radius: number, alpha: number, simple: boolean): void {
+  if (p.settled) {
+    const k = Math.max(0, p.life);
+    if (k <= 0) return;
+    const r = radius * (1 + (1 - k) * 0.7);
+    g.strokeStyle = `rgba(255, 255, 255, ${alpha * k * 0.8})`;
+    g.lineWidth = Math.max(0.6, radius * 0.06 * k);
+    g.setLineDash([radius * 0.35, radius * 0.25]);
+    g.beginPath();
+    g.arc(p.x, p.y, r, 0, Math.PI * 2);
+    g.stroke();
+    g.setLineDash([]);
+    return;
+  }
+  const R = Math.max(1.5, radius);
+  if (!simple) {
+    const body = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+    body.addColorStop(0, `hsla(${p.hue}, 80%, 92%, ${alpha * 0.05})`);
+    body.addColorStop(0.68, `hsla(${p.hue}, 80%, 80%, ${alpha * 0.12})`);
+    body.addColorStop(0.9, `hsla(${p.hue}, 85%, 88%, ${alpha * 0.38})`);
+    body.addColorStop(1, `hsla(${p.hue}, 90%, 96%, 0)`);
+    g.fillStyle = body;
+    g.beginPath();
+    g.arc(p.x, p.y, R, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.6})`;
+  g.lineWidth = Math.max(0.7, R * 0.07);
+  g.beginPath();
+  g.arc(p.x, p.y, R * 0.96, 0, Math.PI * 2);
+  g.stroke();
+  const hx = p.x - R * 0.36;
+  const hy = p.y - R * 0.4;
+  const hr = R * 0.36;
+  if (simple) {
+    g.fillStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
+    g.beginPath();
+    g.arc(hx, hy, hr * 0.55, 0, Math.PI * 2);
+    g.fill();
+    return;
+  }
+  const spec = g.createRadialGradient(hx, hy, 0, hx, hy, hr);
+  spec.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.95})`);
+  spec.addColorStop(0.45, `rgba(255, 255, 255, ${alpha * 0.45})`);
+  spec.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  g.fillStyle = spec;
+  g.beginPath();
+  g.arc(hx, hy, hr, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = `rgba(255, 255, 255, ${alpha * 0.3})`;
+  g.beginPath();
+  g.arc(p.x + R * 0.38, p.y + R * 0.42, R * 0.12, 0, Math.PI * 2);
+  g.fill();
 }
 
 function hasMass(snow: SnowAccumulation): boolean {

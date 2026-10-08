@@ -26,7 +26,8 @@ export const FRUTIGER_AERO_THEME: Theme = {
     sounds: AERO_PROOF_SOUND_PACK_ID,
     icons: AERO_ICON_PACK_ID,
   },
-  swatch: { bg: '#bfe6ff', text: '#123a52', border: '#a9d4ef' },
+  // The real palette (frutiger-aero.css): --bg, --text, --border.
+  swatch: { bg: '#9ed8f2', text: '#123143', border: '#90afba' },
 };
 
 let registered = false;

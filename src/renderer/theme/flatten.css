@@ -138,21 +138,48 @@
 /* MATERIAL — the Aero glass window frame itself. The one surface here where a
    user can still see their own desktop through the chrome of every window. */
 :root[data-materials='aero'][data-lq-flat][data-app-border='aero-glass'] .fwin:not(.fwin-note) {
+  /* The Windows 6 frame (aero-shell.css, "frame styles"): its gloss band over the
+     frame tint, which frutiger-aero.css re-declares opaque under data-lq-flat. */
   background:
-    linear-gradient(
-      180deg,
-      rgba(214, 247, 255, 0.76) 0%,
-      rgba(94, 189, 245, 0.56) 18%,
-      rgba(16, 123, 219, 0.42) 54%,
-      rgba(9, 70, 159, 0.56) 100%
-    ),
-    linear-gradient(
-      color-mix(in srgb, var(--shell-glass-strong) 76%, rgba(19, 113, 210, 0.48)),
-      color-mix(in srgb, var(--shell-glass-strong) 76%, rgba(19, 113, 210, 0.48))
-    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.46) 0, rgba(255, 255, 255, 0.14) 30px, rgba(255, 255, 255, 0.04) 31px, rgba(255, 255, 255, 0.1) 100%),
+    linear-gradient(var(--aero-frame-tint-inactive), var(--aero-frame-tint-inactive)),
     var(--lq-flat-base);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+:root[data-materials='aero'][data-lq-flat][data-app-border='aero-glass'] .fwin.focused:not(.fwin-note) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0, rgba(255, 255, 255, 0.16) 30px, rgba(255, 255, 255, 0.05) 31px, rgba(255, 255, 255, 0.12) 100%),
+    linear-gradient(var(--aero-frame-tint), var(--aero-frame-tint)),
+    var(--lq-flat-base);
+}
+
+/* MATERIAL — mini mode, the frameless garden window and its controls, under
+   Aero. The generic rules further down composite DARK slabs (rgba(23,22,29) /
+   rgba(8,10,18)), which in Aero painted near-black panels into a light shell the
+   moment battery, transparency Off or safe mode flattened it. `--mini-surface`
+   is not declared by Aero at all, so `.mini-frame` follows `--mini-glass`. */
+:root[data-materials='aero'][data-lq-flat] .mini-shell {
+  --mini-surface: var(--mini-glass);
+}
+:root[data-materials='aero'][data-lq-flat] .mini-frame,
+:root[data-materials='aero'][data-lq-flat] .mini-panel,
+:root[data-materials='aero'][data-lq-flat] .mini-toast {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.12)),
+    linear-gradient(var(--aero-chrome-glass-strong), var(--aero-chrome-glass-strong)),
+    var(--lq-flat-base);
+}
+:root[data-materials='aero'][data-lq-flat] .fwin.fwin-frameless {
+  background:
+    linear-gradient(var(--aero-chrome-glass-strong), var(--aero-chrome-glass-strong)),
+    var(--lq-flat-base);
+}
+:root[data-materials='aero'][data-lq-flat] .fwin-frameless-controls {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.2)),
+    linear-gradient(var(--aero-chrome-glass), var(--aero-chrome-glass)),
+    var(--lq-flat-base);
 }
 
 /* =============================================================================

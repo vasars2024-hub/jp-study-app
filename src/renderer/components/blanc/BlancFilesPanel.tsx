@@ -155,7 +155,9 @@ export function BlancFilesPanel() {
       return;
     }
     setOpenState({ status: 'routing' });
-    const plans = await window.api?.fileDropClassify?.([selected.location.path]);
+    // A rejected classify (main busy, file vanished) settles as "no plan" —
+    // the refusal path below — rather than leaving the panel on "routing".
+    const plans = await Promise.resolve(window.api?.fileDropClassify?.([selected.location.path])).catch(() => null);
     // A missing plan is NOT downgraded to the kind table: for a file the router
     // is the authority, and guessing from the extension is what sniffing exists
     // to avoid. `filesOpenDecision(item, null)` refuses here.

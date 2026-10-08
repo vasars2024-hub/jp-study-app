@@ -1,17 +1,54 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Activity, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { LibraryItem } from '../../../shared/types';
+import {
+  BLANC_TRIM_EVENT,
+  FlowStatusChip,
+  InboxChip,
+  RamChip,
+  captureToInbox,
+  useBlancMechSettings,
+  useBlancMechanicsHotkeys,
+  useWarmTools,
+} from './BlancMechanicsChrome';
+import { leaveToolbox, toolboxUnmounted, touchWarmTool, unloadWarmTool } from './blancWarmTools';
+import { saveBlancMechSettings } from './blancMechSettings';
+import {
+  BLANC_OPEN_FLOW_EVENT,
+  BLANC_OPEN_INBOX_EVENT,
+  BLANC_QUICK_NOTES_EVENT,
+} from './blancMechBus';
+import { detectCaptureKind } from './blancCaptureInbox';
+import type { BlancVerbId } from './blancVerbs';
 import type { CollectedToolsStore } from '../../../shared/collectedTools';
 import {
   BLANC_TABS,
   type BlancTabId,
 } from '../../../shared/blancMode';
 import { AUTOMATION_BUILDER } from '../../../shared/automationBuilder';
-import { getToolboxModule, listBlancToolboxModules, listToolboxModules, type ToolboxModuleId } from '../../../shared/toolboxRegistry';
+import { getToolboxModule, listToolboxModules, type ToolboxModuleId } from '../../../shared/toolboxRegistry';
+import type { BlancOnlyToolId } from '../../../shared/blancTools';
+import type { AppMemoryReport, AppProcessMemory, AppProcessRole } from '../../../shared/appMemory';
 import { isRegistryGovernedTool, isToolLaunchable, mergeFavoriteTools } from './blancToolVisibility';
 import { isDeveloperOnlyTool, useBlancDeveloperTools } from './blancDeveloperTools';
 import { blancToolLabel, blancToolLabelKey } from './blancToolLabels';
 import { markSectionOpenHandled } from '../../sectionSurface';
+import { ensureStudyOsCompat, studyOsCompatLoaded } from '../../blancStudyOsCompat';
 import { BlancToolErrorBoundary } from './BlancToolErrorBoundary';
+import {
+  focusTimerActive,
+  focusTimerSeconds,
+  getFocusTimer,
+  pauseFocusTimer,
+  recordFocusTimerLap,
+  resetFocusTimer,
+  setFocusTimerFinishHandler,
+  setFocusTimerMinutes,
+  setFocusTimerMode,
+  setFocusTimerNotify,
+  subscribeFocusTimer,
+  toggleFocusTimer,
+  type FocusTimerState,
+} from './blancFocusTimer';
 import {
   TOOLBOX_UNITS,
   calculateToolboxExpression,
@@ -23,12 +60,16 @@ import type { ToolboxFileSearchResult } from '../../../shared/toolboxFileSearch'
 import { LANG_LABELS, LANG_TAGS, UI_LANGS, type UiLang } from '../../../shared/i18n/core';
 import Icon, { type IconName } from '../Icons';
 import VirtualList from '../VirtualList';
+import { retryableLazy } from '../../retryableLazy';
+import { useVisibleInterval } from '../../useVisibleInterval';
+import { writeLocalStorage } from '../../localStorageWrite';
 import FocusMusicBar from '../FocusMusicBar';
 import ClipboardHistoryPanel from '../ClipboardHistoryPanel';
-import BlancMasterSearch from './BlancMasterSearch';
+import BlancMasterSearch, { searchBlancMasterIndex } from './BlancMasterSearch';
 import {
-  BLANC_DICTIONARY_QUERY_EVENT,
-  BLANC_MASTER_SETTINGS,
+  blancMasterSettings,
+  requestBlancDictionaryQuery,
+  requestBlancTranslate,
   appDrawerMasterContent,
   blancMasterSourceLabels,
   deckCardMasterContent,
@@ -51,7 +92,7 @@ import {
   type BlancMemorySettings,
   type BlancModeSettings,
 } from '../../blancMode';
-import { getUiLang, setUiLang, useT } from '../../i18n';
+import { getUiLang, setUiLang, t as translate, useT } from '../../i18n';
 import { commandLabel, commandNote } from '../../commandI18n';
 import {
   exportCurrentToolboxSettings,
@@ -75,7 +116,6 @@ import {
   presetById,
 } from '../../../shared/blancTheme';
 import {
-  TOOLBOX_SETTING_DEFINITIONS,
   moveToolInOrder,
   orderToolIds,
   type ToolboxSettings,
@@ -97,7 +137,7 @@ import {
   setBinding,
   type BindingRow,
 } from '../../keyboardShortcuts';
-import { clearLockscreenPin, hasLockscreenPin, loadLockscreen, saveLockscreen, setLockscreenPin, verifyLockscreenPin } from '../../lockscreenSettings';
+import { clearLockscreenPin, hasLockscreenPin, loadLockscreen, saveLockscreen, setLockscreenPin } from '../../lockscreenSettings';
 import { getActiveProfile } from '../../profileState';
 import { loadSaved, type SavedWord } from '../../savedWords';
 import { loadLookupHistory, type LookupHistoryEntry } from '../../lookupHistory';
@@ -113,120 +153,144 @@ import {
   type DeckFlashcard,
 } from '../../flashcardDeck';
 import { ProfileSwitcher } from '../ProfileSwitcher';
-import {
-  BatchConverterPanel,
-  BlancModelsPanel,
-  BlancYoutubePanel,
-  ContextSearchPanel,
-  DifficultyAnalyzerPanel,
-  FrequencyExplorerPanel,
-  ImmersionTrackerPanel,
-  KanjiInspectorPanel,
-  LocalAgentPanel,
-  NotificationCenterPanel,
-  SubtitleImporterPanel,
-} from './BlancReadyToolPanels';
+import { BlancStudySettings } from './BlancStudySettings';
+
+// Every BlancReadyToolPanels export is lazy. That module reaches the agent tool
+// registry, and through it `mediaStudyOrchestrator` and the whole grammar data
+// set (~2 MB built) — a static import here put all of it, plus the Study OS
+// stylesheet it pulls, into Blanc's startup. `blancBootGraph.test.ts` guards it.
+const readyPanels = () => import('./BlancReadyToolPanels');
+const BatchConverterPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.BatchConverterPanel })));
+const BlancModelsPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.BlancModelsPanel })));
+const BlancYoutubePanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.BlancYoutubePanel })));
+const DifficultyAnalyzerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.DifficultyAnalyzerPanel })));
+const FrequencyExplorerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.FrequencyExplorerPanel })));
+const ImmersionTrackerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.ImmersionTrackerPanel })));
+const KanjiInspectorPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.KanjiInspectorPanel })));
+const LocalAgentPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.LocalAgentPanel })));
+const NotificationCenterPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.NotificationCenterPanel })));
+const SubtitleImporterPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.SubtitleImporterPanel })));
 
 // Pillar 1: these five were static imports, so the Blanc window paid for both
 // readers and both mining panels before it painted. Every heavy view is lazy now.
-const MangaReader = lazy(() => import('../../views/MangaReader'));
-const NovelReader = lazy(() => import('../../views/NovelReader'));
-const EpubMiningPanel = lazy(() => import('../EpubMiningPanel'));
-const EpubMiningSimplePanel = lazy(() => import('../EpubMiningSimplePanel'));
+const MangaReader = retryableLazy(withStudyOsCompat(() => import('../../views/MangaReader')));
+const NovelReader = retryableLazy(withStudyOsCompat(() => import('../../views/NovelReader')));
+const EpubMiningPanel = retryableLazy(withStudyOsCompat(() => import('../EpubMiningPanel')));
+const EpubMiningSimplePanel = retryableLazy(withStudyOsCompat(() => import('../EpubMiningSimplePanel')));
 
-// Owned by the Media & Cards work stream — see BlancMediaPanels.tsx. The shell
-// imports these two names and nothing else from that file, so that stream can
-// rebuild both panels Blanc-native without editing BlancShell.
-const BlancMediaPanel = lazy(() =>
+/**
+ * A lazy loader for a panel that renders Study OS class names. The Study OS
+ * class-name sheet (`studyos-compat.css`, ~500 KB) is fetched alongside the
+ * panel's chunk and the panel renders only once both are in, so it never
+ * paints unstyled and a Blanc session that opens only Blanc-native tools never
+ * fetches the sheet. Panels that render only `blanc-*` classes do not use this.
+ */
+function withStudyOsCompat<T>(load: () => Promise<T>): () => Promise<T> {
+  return () => Promise.all([load(), ensureStudyOsCompat()]).then(([module]) => module);
+}
+
+// One module per panel (each lazy chunk carries only its own content stack).
+// Pillar 0: Blanc-native panels composing shared `*Content` components, never
+// Study OS `*View`s.
+const BlancMediaPanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancMediaPanels').then((m) => ({ default: m.BlancMediaPanel })),
-);
-const BlancFlashcardsPanel = lazy(() =>
-  import('./BlancMediaPanels').then((m) => ({ default: m.BlancFlashcardsPanel })),
-);
-// Pillar 0: Blanc-native panels, not Study OS `*View`s. See BlancStudyPanels.tsx.
-const BlancStatisticsPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancStatisticsPanel })),
-);
-const BlancAnkiPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancAnkiPanel })),
-);
-const BlancNotebookPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancNotebookPanel })),
-);
-const BlancTranslatePanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancTranslatePanel })),
-);
-const BlancMusicPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancMusicPanel })),
-);
-const BlancDictionaryPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancDictionaryPanel })),
-);
-const BlancGrammarPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancGrammarPanel })),
-);
-const BlancClipboardPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancClipboardPanel })),
-);
-const BlancResourcesPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancResourcesPanel })),
-);
-const BlancCalendarPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancCalendarPanel })),
-);
-const BlancReadingFinderPanel = lazy(() =>
-  import('./BlancStudyPanels').then((m) => ({ default: m.BlancReadingFinderPanel })),
-);
+));
+const BlancFlashcardsPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancFlashcardsPanel').then((m) => ({ default: m.BlancFlashcardsPanel })),
+));
+const BlancStatisticsPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancStatisticsPanel').then((m) => ({ default: m.BlancStatisticsPanel })),
+));
+const BlancAnkiPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancAnkiPanel').then((m) => ({ default: m.BlancAnkiPanel })),
+));
+const BlancNotebookPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancNotebookPanel').then((m) => ({ default: m.BlancNotebookPanel })),
+));
+const BlancTranslatePanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancTranslatePanel').then((m) => ({ default: m.BlancTranslatePanel })),
+));
+const BlancMusicPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancMusicPanel').then((m) => ({ default: m.BlancMusicPanel })),
+));
+const BlancDictionaryPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancDictionaryPanels').then((m) => ({ default: m.BlancDictionaryPanel })),
+));
+const BlancGrammarPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancGrammarPanel').then((m) => ({ default: m.BlancGrammarPanel })),
+));
+const BlancClipboardPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancDictionaryPanels').then((m) => ({ default: m.BlancClipboardPanel })),
+));
+const BlancResourcesPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancResourcesPanel').then((m) => ({ default: m.BlancResourcesPanel })),
+));
+const BlancCalendarPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancCalendarPanel').then((m) => ({ default: m.BlancCalendarPanel })),
+));
+const BlancReadingFinderPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancReadingFinderPanel').then((m) => ({ default: m.BlancReadingFinderPanel })),
+));
 
-// Owned by the Library & Arcade work stream — see BlancLibraryPanels.tsx. All
-// four surfaces are new Blanc-only tool ids registered below.
-const BlancNovelsPanel = lazy(() =>
-  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancNovelsPanel })),
-);
-const BlancFilesPanel = lazy(() =>
+const BlancNovelsPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancNovelsPanel').then((m) => ({ default: m.BlancNovelsPanel })),
+));
+const BlancFilesPanel = retryableLazy(() =>
   import('./BlancFilesPanel').then((m) => ({ default: m.BlancFilesPanel })),
 );
-const BlancCentralAgentPanel = lazy(() =>
+const BlancCentralAgentPanel = retryableLazy(() =>
   import('./BlancCentralAgentPanel').then((m) => ({ default: m.BlancCentralAgentPanel })),
 );
-const BlancDiscoverPanel = lazy(() =>
-  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancDiscoverPanel })),
-);
-const BlancGamesPanel = lazy(() =>
-  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancGamesPanel })),
-);
-const BlancImmersionPanel = lazy(() =>
-  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancImmersionPanel })),
-);
-const BlancVisualizerPanel = lazy(() =>
-  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancVisualizerPanel })),
-);
+const BlancDiscoverPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancDiscoverPanel').then((m) => ({ default: m.BlancDiscoverPanel })),
+));
+const BlancGamesPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancGamesPanel').then((m) => ({ default: m.BlancGamesPanel })),
+));
+const BlancImmersionPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancImmersionPanel').then((m) => ({ default: m.BlancImmersionPanel })),
+));
+const BlancVisualizerPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancVisualizerPanel').then((m) => ({ default: m.BlancVisualizerPanel })),
+));
+const BlancVisualNovelsPanel = retryableLazy(withStudyOsCompat(() =>
+  import('./BlancVisualNovelsPanel').then((m) => ({ default: m.BlancVisualNovelsPanel })),
+));
 
 // Study-native toolbox track — see BlancStudyNativePanels.tsx.
-const BlancFuriganaPanel = lazy(() =>
+const BlancFuriganaPanel = retryableLazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancFuriganaPanel })),
 );
-const BlancCounterPanel = lazy(() =>
+const BlancCounterPanel = retryableLazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancCounterPanel })),
 );
-const BlancConjugationPanel = lazy(() =>
+const BlancConjugationPanel = retryableLazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancConjugationPanel })),
 );
-const BlancForecastPanel = lazy(() =>
+const BlancForecastPanel = retryableLazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancForecastPanel })),
 );
-const BlancPitchPanel = lazy(() =>
+const BlancPitchPanel = retryableLazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancPitchPanel })),
 );
-const BlancConsolePanel = lazy(() =>
+const BlancConsolePanel = retryableLazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancConsolePanel })),
 );
-const BlancAudioMinePanel = lazy(() =>
+// Its cue lines are the shared `SubtitleCueLine`, styled by the Study OS sheet.
+const BlancAudioMinePanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancAudioMinePanel })),
-);
+));
 
 // Pillar 3 — App Drawer. Supersedes workspace-launcher (retired below).
-const BlancAppDrawerPanel = lazy(() => import('./BlancAppDrawerPanel'));
+const BlancAppDrawerPanel = retryableLazy(() => import('./BlancAppDrawerPanel'));
+
+// Blanc mechanics overlays: lazy, so a session that never runs a Flow or opens
+// the inbox never pays for them (blancBootGraph.test.ts).
+const BlancFlowRunner = retryableLazy(() => import('./BlancFlowRunner'));
+const BlancCaptureInboxDialog = retryableLazy(() => import('./BlancCaptureInboxPanel'));
+const BlancMechanicsSettings = retryableLazy(() =>
+  import('./BlancMechanicsSettings').then((m) => ({ default: m.BlancMechanicsSettings })),
+);
 
 // Labels are catalog KEYS, resolved with t() at render (module-level tables
 // cannot call useT()).
@@ -238,7 +302,6 @@ const TAB_META: Record<BlancTabId, { labelKey: string; icon: IconName }> = {
   media: { labelKey: 'blanc.shell.tab.media', icon: 'player' },
   stats: { labelKey: 'blanc.shell.tab.stats', icon: 'stats' },
   tools: { labelKey: 'blanc.shell.tab.toolbox', icon: 'wrench' },
-  blocks: { labelKey: 'blanc.shell.tab.blocks', icon: 'app' },
   settings: { labelKey: 'blanc.shell.tab.settings', icon: 'settings' },
 };
 
@@ -287,6 +350,11 @@ export default function BlancShell({
   // Which tool an out-of-toolbox deep link asked for. `key` is what re-triggers
   // it, so asking for the same tool twice still reopens it.
   const [toolRequest, setToolRequest] = useState<{ id: BlancToolId; key: number } | null>(null);
+  // Blanc mechanics: the Flow run and the Capture inbox are overlays (lazy
+  // chunks); the warm-tool budget decides whether the toolbox stays mounted.
+  const [flowOpen, setFlowOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const warmTools = useWarmTools();
   const clock = useMinuteClock();
   const masterCommandShortcuts = useMemo(
     () => new Map(getBindings().map((binding) => [binding.id, binding.keys])),
@@ -295,9 +363,9 @@ export default function BlancShell({
   const masterSourceLabels = useMemo(() => blancMasterSourceLabels(t), [lang, t]);
   const masterContent = useMemo(
     () => [
-      ...appDrawerMasterContent(masterDrawer.tools, masterDrawer.folders),
-      ...BLANC_MASTER_SETTINGS,
-      ...savedWordMasterContent(masterSavedWords),
+      ...appDrawerMasterContent(masterDrawer.tools, masterDrawer.folders, masterSourceLabels.unfiled),
+      ...blancMasterSettings(t),
+      ...savedWordMasterContent(masterSavedWords, t('blanc.masterSearch.group.savedWords')),
       ...deckCardMasterContent(masterDeckCards, masterSourceLabels),
       ...dictionaryEntryMasterContent(masterDictionaryEntries, masterSourceLabels),
       ...grammarPointMasterContent(masterGrammarPoints, masterSourceLabels),
@@ -312,16 +380,84 @@ export default function BlancShell({
       masterLibraryItems,
       masterSavedWords,
       masterSourceLabels,
+      lang,
     ],
   );
 
   useEffect(() => {
     // The renderer's index.html title ("Gum") would otherwise override
     // the BrowserWindow title, making the side window indistinguishable.
-    document.title = 'Blanc Toolbox';
-  }, []);
+    // In the UI language: it is the window's name in the taskbar and Alt+Tab.
+    document.title = t('blanc.refine.windowTitle');
+  }, [lang]);
   useEffect(() => onBlancModeChanged(setSettings), []);
   useEffect(() => onBlancMemoryChanged(setMemory), []);
+  useEffect(() => {
+    const openFlow = (): void => setFlowOpen(true);
+    const openInbox = (): void => setInboxOpen(true);
+    // Trim: the Master search corpora are released with the palette already;
+    // this makes sure nothing is left referenced if it was open meanwhile.
+    const onTrim = (): void => {
+      setMasterSearchOpen(false);
+      setMasterSavedWords([]);
+      setMasterDeckCards([]);
+      setMasterDictionaryEntries([]);
+      setMasterGrammarPoints([]);
+      setMasterLibraryItems([]);
+      setMasterDrawer({ version: 1, tools: [], folders: [] });
+    };
+    window.addEventListener(BLANC_OPEN_FLOW_EVENT, openFlow);
+    window.addEventListener(BLANC_OPEN_INBOX_EVENT, openInbox);
+    window.addEventListener(BLANC_TRIM_EVENT, onTrim);
+    return () => {
+      window.removeEventListener(BLANC_OPEN_FLOW_EVENT, openFlow);
+      window.removeEventListener(BLANC_OPEN_INBOX_EVENT, openInbox);
+      window.removeEventListener(BLANC_TRIM_EVENT, onTrim);
+    };
+  }, []);
+  // F = Flow (not over a book: readers bind letters), Ctrl+Shift+X = capture.
+  useBlancMechanicsHotkeys({ flowEnabled: !book, onFlow: () => setFlowOpen(true) });
+  // "Restore reader on launch" (Settings > Memory) had no consumer. The book
+  // open when Blanc last closed is remembered here and reopened at mount.
+  const [restoreBookId] = useState<string | null>(() => {
+    if (initialBook || !loadBlancMemory().restoreReaderOnLaunch) return null;
+    try {
+      return window.localStorage.getItem(BLANC_LAST_BOOK_KEY);
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (!restoreBookId) return undefined;
+    let alive = true;
+    void window.api.listLibrary()
+      .then((items) => {
+        const item = items.find((candidate) => candidate.id === restoreBookId);
+        if (alive && item) setBook((current) => current ?? item);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [restoreBookId]);
+  const bookTracked = useRef(false);
+  useEffect(() => {
+    // The first run is the mount, before any restore landed: no book yet is
+    // not the user closing one, so it must not erase what is being restored.
+    const firstRun = !bookTracked.current;
+    bookTracked.current = true;
+    try {
+      if (book) writeLocalStorage(BLANC_LAST_BOOK_KEY, book.id);
+      // Closing the reader (or leaving it for a tab) means "not reading now".
+      else if (!firstRun) window.localStorage.removeItem(BLANC_LAST_BOOK_KEY);
+    } catch {
+      /* storage unavailable: restoring is best effort */
+    }
+  }, [book]);
+  // The Memory section's scratchpad duplicated Quick Notes; its text moves there once.
+  useEffect(() => {
+    migrateScratchpadToQuickNotes();
+  }, []);
   useEffect(() => () => {
     if (deferredNavFrame.current !== null) window.cancelAnimationFrame(deferredNavFrame.current);
   }, []);
@@ -344,13 +480,114 @@ export default function BlancShell({
       const command = (event as CustomEvent<string>).detail;
       if (command === 'toolbox.search' || command === 'toolbox.commandPalette') {
         setMasterSearchOpen(true);
+        return;
+      }
+      // Alt+1..9: the user's first nine launcher tools, read at the keypress so
+      // a reorder or a hidden tool applies immediately.
+      const slot = typeof command === 'string' ? /^toolbox\.openSlot([1-9])$/.exec(command) : null;
+      if (slot) {
+        const target = launcherToolOrder(blancToolsRef.current, loadToolboxSettings())[Number(slot[1]) - 1];
+        if (target) requestToolRef.current(target.id);
       }
     };
     window.addEventListener('toolbox:command', onToolboxCommand);
     return () => window.removeEventListener('toolbox:command', onToolboxCommand);
   }, []);
   useEffect(() => {
-    if (!masterSearchOpen) return;
+    // The focus timer lives outside its panel (blancFocusTimer.ts), so its
+    // shortcuts and its completion notice are the shell's: they work, and the
+    // notice fires, whichever tool is open.
+    setFocusTimerFinishHandler(() => {
+      window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: translate('blanc.tb.timerDone'), kind: 'ok' } }));
+    });
+    const offStart = registerCommandHandler('focusTimer.startPause', () => {
+      toggleFocusTimer();
+      return true;
+    });
+    const offReset = registerCommandHandler('focusTimer.reset', () => {
+      resetFocusTimer();
+      return true;
+    });
+    return () => {
+      setFocusTimerFinishHandler(null);
+      offStart();
+      offReset();
+    };
+  }, []);
+  useEffect(() => {
+    // The clipboard history overlay renders Study OS class names. Its open event
+    // is held (capture phase, so the panel never sees it early) until the sheet
+    // has loaded, then re-sent — it never paints unstyled, and a session that
+    // never opens it never fetches the sheet.
+    const onClipboardOpen = (event: Event): void => {
+      if (studyOsCompatLoaded()) return;
+      event.stopImmediatePropagation();
+      const resend = (): void => {
+        window.dispatchEvent(new CustomEvent('clipboard:open', { detail: (event as CustomEvent).detail }));
+      };
+      void ensureStudyOsCompat().then(resend, resend);
+    };
+    window.addEventListener('clipboard:open', onClipboardOpen, true);
+    return () => window.removeEventListener('clipboard:open', onClipboardOpen, true);
+  }, []);
+  useEffect(() => {
+    // Blanc's claim on the shared section bus. Dictionary links, novels mining,
+    // game-arena settings links, context results and `nav.settings` all
+    // dispatch `os:open`, and only Study OS's desktop and Mini listened — so in
+    // Blanc every one of them was a dead button, and the sections Blanc DOES
+    // have opened a full Study OS pop-out instead. A separate listener from
+    // `onOpenTool` below, which keeps its own pinned contract.
+    const onSectionOpen = (event: Event): void => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (typeof detail !== 'string' || !detail) return;
+      const route = BLANC_SECTION_ROUTES[detail];
+      if (!route) {
+        // Not a surface Blanc has. A cancelable sender (`openSectionSurface`)
+        // falls back to a pop-out itself; a plain one expects a host, so give
+        // it the same pop-out rather than nothing.
+        // Main validates the section and ignores anything that is not one.
+        if (!event.cancelable) {
+          void window.api.popOut(detail as Parameters<typeof window.api.popOut>[0]).catch(() => undefined);
+        }
+        return;
+      }
+      if ('tab' in route) chooseTab(route.tab);
+      else requestToolRef.current(route.tool);
+      markSectionOpenHandled(event);
+    };
+    // `nav.palette`, `nav.search` and `toolbox.commandPalette` all ask for the
+    // palette; in Blanc that is Master search.
+    const onPaletteOpen = (): void => setMasterSearchOpen(true);
+    // Retired tool ids that a saved shortcut, pin or App Drawer entry can still
+    // name. `context-search` became Master search, which reaches the same
+    // sources plus a direct dictionary lookup.
+    const onRetiredTool = (event: Event): void => {
+      if ((event as CustomEvent<unknown>).detail !== 'context-search') return;
+      setMasterSearchOpen(true);
+      markSectionOpenHandled(event);
+    };
+    window.addEventListener('os:open', onSectionOpen);
+    window.addEventListener('palette:open', onPaletteOpen);
+    window.addEventListener('toolbox:open-tool', onRetiredTool);
+    return () => {
+      window.removeEventListener('os:open', onSectionOpen);
+      window.removeEventListener('palette:open', onPaletteOpen);
+      window.removeEventListener('toolbox:open-tool', onRetiredTool);
+    };
+  }, [memory.rememberLastTab]);
+  useEffect(() => {
+    if (!masterSearchOpen) {
+      // Release the corpora when the palette closes: the grammar set, the whole
+      // deck and the library list otherwise stay referenced (and resident) for
+      // the rest of the session after one search.
+      setMasterSavedWords([]);
+      setMasterDeckCards([]);
+      setMasterDictionaryEntries([]);
+      setMasterGrammarPoints([]);
+      setMasterLibraryItems([]);
+      setMasterDrawer({ version: 1, tools: [], folders: [] });
+      return;
+    }
     let current = true;
     setMasterSavedWords(loadSaved());
     setMasterDeckCards(loadDeck());
@@ -391,7 +628,6 @@ export default function BlancShell({
         statistics: 'stats',
         'epub-mining': 'mine',
         'anki-deck': 'deck',
-        'mono-blocks': 'blocks',
       };
       const direct = directTabs[feature];
       if (direct) {
@@ -432,6 +668,17 @@ export default function BlancShell({
     if (memory.rememberLastTab) setSettings(setBlancLastTab(next));
   };
 
+  /** Open a toolbox tool from anywhere in the shell, as a keyed request prop. */
+  const requestTool = (id: BlancToolId): void => {
+    chooseTab('tools');
+    setToolRequest((previous) => ({ id, key: (previous?.key ?? 0) + 1 }));
+  };
+  // The listeners below register once; they reach the latest render through these.
+  const requestToolRef = useRef(requestTool);
+  requestToolRef.current = requestTool;
+  const blancToolsRef = useRef(blancTools);
+  blancToolsRef.current = blancTools;
+
   const chooseNavTab = (next: BlancTabId): void => {
     if (deferredNavFrame.current !== null) {
       window.cancelAnimationFrame(deferredNavFrame.current);
@@ -448,6 +695,75 @@ export default function BlancShell({
       deferredNavFrame.current = null;
       chooseTab(next);
     });
+  };
+
+  // The toolbox stays mounted (hidden, effects paused) while another tab or a
+  // book is on screen, as long as the memory budget keeps tools warm; Trim or a
+  // budget of 0 releases it. That is what makes coming back instant.
+  const toolsVisible = !book && tab === 'tools';
+  const keepToolboxMounted = toolsVisible || warmTools.toolboxRetained;
+  useEffect(() => {
+    if (!keepToolboxMounted) toolboxUnmounted();
+  }, [keepToolboxMounted]);
+
+  const mechToast = (message: string, kind: 'ok' | 'error' = 'ok'): void => {
+    window.dispatchEvent(new CustomEvent('os:toast', { detail: { message, kind } }));
+  };
+
+  /** Master search command verbs (`d 猫`, `t …`, `m …`, `r`, `g …`, `n …`, `o …`, `c`, `i`). */
+  const runVerb = (verb: BlancVerbId, arg: string): void => {
+    setMasterSearchOpen(false);
+    if (verb === 'd') {
+      requestBlancDictionaryQuery(arg);
+      requestTool('dictionary');
+    } else if (verb === 't') {
+      requestBlancTranslate(arg);
+      requestTool('translate');
+    } else if (verb === 'm') {
+      // The ordinary mining path: a local card first, toasted by mineToStudy.
+      const word = detectCaptureKind(arg) === 'word';
+      void import('../../studyMining')
+        .then(({ mineToStudy }) => mineToStudy({
+          word: arg,
+          sentence: word ? undefined : arg,
+          source: word ? 'dictionary' : 'analysis',
+          studyKind: word ? 'vocabulary' : 'sentence',
+          studyLang: studyLangOfText(arg, getStudyLang()),
+        }))
+        .catch(() => mechToast(t('blanc.mech.verb.m.failed'), 'error'));
+    } else if (verb === 'r') {
+      setFlowOpen(true);
+    } else if (verb === 'g') {
+      const loaded = masterGrammarPoints;
+      const labels = masterSourceLabels;
+      const pick = (points: readonly NormalizedGrammarPoint[]): void => {
+        const hit = searchBlancMasterIndex(arg, [], [], grammarPointMasterContent(points, labels), 1).results[0];
+        if (hit) setMasterGrammarRequest((previous) => ({ id: hit.id, key: (previous?.key ?? 0) + 1 }));
+        else mechToast(t('blanc.mech.verb.g.none', { arg }), 'error');
+        requestTool('grammar');
+      };
+      if (loaded.length) pick(loaded);
+      else void import('../../data/grammar').then(({ GRAMMAR }) => pick(GRAMMAR)).catch(() => requestTool('grammar'));
+    } else if (verb === 'n') {
+      try {
+        const current = window.localStorage.getItem(BLANC_QUICK_NOTES_KEY) ?? '';
+        const next = current.trim() ? `${current.replace(/\s+$/, '')}\n${arg}` : arg;
+        if (writeLocalStorage(BLANC_QUICK_NOTES_KEY, next)) {
+          window.dispatchEvent(new CustomEvent(BLANC_QUICK_NOTES_EVENT));
+          mechToast(t('blanc.mech.verb.n.done'));
+        }
+      } catch {
+        /* storage unavailable: writeLocalStorage already reported it */
+      }
+    } else if (verb === 'o') {
+      const hit = searchBlancMasterIndex(arg, blancTools, [], [], 1).results[0];
+      if (hit && isBlancToolId(hit.id)) requestTool(hit.id);
+      else mechToast(t('blanc.mech.verb.o.none', { arg }), 'error');
+    } else if (verb === 'c') {
+      void captureToInbox(arg || undefined);
+    } else if (verb === 'i') {
+      setInboxOpen(true);
+    }
   };
 
   const title = book ? t('blanc.shell.reader') : t(TAB_META[tab].labelKey);
@@ -516,6 +832,21 @@ export default function BlancShell({
           <time className="blanc-clock">
             {clock.toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' })}
           </time>
+          <FocusTimerChip onOpen={() => requestTool('focus-timer')} />
+          <FlowStatusChip overlayOpen={flowOpen} onOpen={() => setFlowOpen(true)} />
+          <InboxChip onOpen={() => setInboxOpen(true)} />
+          <RamChip activeTool={warmTools.active} />
+          {/* Blanc mechanics: one keyboard run through the day's work (F). */}
+          <button
+            type="button"
+            className="blanc-mech-flow-btn"
+            title={t('blanc.mech.flow.startTitle')}
+            aria-keyshortcuts="F"
+            onClick={() => setFlowOpen(true)}
+          >
+            <Icon name="skip-forward" size={14} />
+            <span>{t('blanc.mech.flow.button')}</span>
+          </button>
           {/* Blanc's one cross-tool capability (6b488974) and its dominant way in, so it stays
               in the bar rather than one click inside the drawer: a Ctrl+F affordance that has
               to be uncovered first is not an affordance. `primary` is the declaration the
@@ -565,6 +896,29 @@ export default function BlancShell({
         </header>
 
         <section className={`blanc-content${book ? ' is-reader' : ''}`}>
+          {/* The toolbox, kept mounted while the memory budget holds warm tools:
+              hidden in an <Activity> (state kept, effects paused) when another
+              tab or a book is on screen, released by Trim or a budget of 0. */}
+          {keepToolboxMounted && (
+            <Activity mode={toolsVisible ? 'visible' : 'hidden'}>
+              <BlancToolErrorBoundary key="tab:tools" toolId="tools" label={t(TAB_META.tools.labelKey)}>
+                <Suspense fallback={<div className="blanc-loading">{t('blanc.shell.loading')}</div>}>
+                  <BlancToolsPanel
+                    onOpenBook={setBook}
+                    grammarRequest={masterGrammarRequest}
+                    toolRequest={toolRequest}
+                    visible={toolsVisible}
+                  />
+                </Suspense>
+              </BlancToolErrorBoundary>
+            </Activity>
+          )}
+          {/* Read, Mine, Deck, Cards, Media, Stats and Settings get the same
+              per-surface crash guard the toolbox tools have: a tab that throws
+              (or whose chunk fails to load) loses only itself, and "Try again"
+              re-imports a failed chunk. Keyed so switching tabs starts fresh. */}
+          {!toolsVisible && (
+          <BlancToolErrorBoundary key={book ? `book:${book.id}` : `tab:${tab}`} toolId={book ? 'reader' : tab} label={title}>
           <Suspense fallback={<div className="blanc-loading">{t('blanc.shell.loading')}</div>}>
           {book?.kind === 'manga' ? (
             <MangaReader item={book} onClose={() => setBook(null)} />
@@ -582,18 +936,12 @@ export default function BlancShell({
             <BlancMediaPanel />
           ) : tab === 'stats' ? (
             <BlancStatisticsPanel />
-          ) : tab === 'tools' ? (
-            <BlancToolsPanel
-              onOpenBook={setBook}
-              grammarRequest={masterGrammarRequest}
-              toolRequest={toolRequest}
-            />
-          ) : tab === 'blocks' ? (
-            <MonoBlocks />
-          ) : (
+          ) : tab === 'tools' ? null : (
             <BlancSettingsPanel settings={settings} onPatch={setSettings} />
           )}
           </Suspense>
+          </BlancToolErrorBoundary>
+          )}
         </section>
       </main>
       {workspaceFull && (
@@ -627,14 +975,14 @@ export default function BlancShell({
           shortcut: masterCommandShortcuts.get(command.id) ?? command.defaultShortcut,
         }))}
         onClose={() => setMasterSearchOpen(false)}
+        onRunVerb={runVerb}
         onOpenTool={(id) => {
-          if (!BLANC_TOOL_IDS.includes(id as BlancToolId)) return;
+          if (!isBlancToolId(id)) return;
           setMasterSearchOpen(false);
-          setBook(null);
-          chooseTab('tools');
-          window.requestAnimationFrame(() => {
-            window.dispatchEvent(new CustomEvent('toolbox:select-tool', { detail: id }));
-          });
+          // Through the same keyed request a deep link uses, not a deferred
+          // `toolbox:select-tool`: the toolbox may not be mounted yet, and its
+          // listener registers after paint (measured 6.3 ms after the frame).
+          requestTool(id);
         }}
         onRunCommand={(id) => {
           setMasterSearchOpen(false);
@@ -654,10 +1002,10 @@ export default function BlancShell({
             void window.api.launchTarget(shortcut.url).then((failure) => {
               if (failure) {
                 window.dispatchEvent(new CustomEvent('os:toast', {
-                  detail: { message: failure, kind: 'error' },
+                  detail: { message: t('blanc.refine.error.detail', { detail: failure }), kind: 'error' },
                 }));
               }
-            });
+            }).catch(() => undefined);
             return;
           }
           if (result.kind === 'setting') {
@@ -687,26 +1035,33 @@ export default function BlancShell({
           }
           if (result.kind === 'grammar-point') {
             setMasterGrammarRequest((previous) => ({ id: result.id, key: (previous?.key ?? 0) + 1 }));
-            chooseTab('tools');
-            window.requestAnimationFrame(() => {
-              window.dispatchEvent(new CustomEvent('toolbox:select-tool', { detail: 'grammar' }));
-            });
+            requestTool('grammar');
             return;
           }
           if (result.kind === 'dictionary-entry' && result.language) {
             setStudyLang(result.language);
           }
-          chooseTab('tools');
-          window.requestAnimationFrame(() => {
-            window.dispatchEvent(new CustomEvent('toolbox:select-tool', { detail: 'dictionary' }));
-            window.requestAnimationFrame(() => {
-              const query = result.kind === 'dictionary-entry' ? result.title : result.id;
-              window.dispatchEvent(new CustomEvent(BLANC_DICTIONARY_QUERY_EVENT, { detail: query }));
-            });
-          });
+          // Held as state for a Dictionary panel that has not mounted yet, and
+          // announced for one that has — no animation-frame race either way.
+          requestBlancDictionaryQuery(result.kind === 'dictionary-entry' ? result.title : result.id);
+          requestTool('dictionary');
         }}
       />
       <ClipboardHistoryPanel />
+      {flowOpen && (
+        <BlancToolErrorBoundary key="mech:flow" toolId="flow" label={t('blanc.mech.flow.title')}>
+          <Suspense fallback={null}>
+            <BlancFlowRunner onClose={() => setFlowOpen(false)} onOpenBook={setBook} />
+          </Suspense>
+        </BlancToolErrorBoundary>
+      )}
+      {inboxOpen && (
+        <BlancToolErrorBoundary key="mech:inbox" toolId="capture-inbox" label={t('blanc.mech.inbox.titleShort')}>
+          <Suspense fallback={null}>
+            <BlancCaptureInboxDialog onClose={() => setInboxOpen(false)} />
+          </Suspense>
+        </BlancToolErrorBoundary>
+      )}
     </div>
   );
 }
@@ -936,12 +1291,28 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
 
   useEffect(() => onDeckChanged(() => setCards(loadDeck())), []);
   useEffect(() => {
-    void window.api.ankiStatus().then((next) => {
-      setConnected(!!next.connected);
-      setDecks(next.decks ?? []);
-      if (!deck && next.decks?.[0]) setDeck(next.decks[0]);
-    });
-  }, [deck]);
+    // Asked once per visit, not on every deck change (picking a deck re-queried
+    // AnkiConnect each time), and not at all when the advanced Anki panel is
+    // shown instead. A rejected IPC reads as "not connected", not as an
+    // unhandled rejection.
+    if (advanced) return undefined;
+    let alive = true;
+    void window.api.ankiStatus()
+      .then((next) => {
+        if (!alive) return;
+        setConnected(!!next.connected);
+        setDecks(next.decks ?? []);
+        setDeck((current) => current || next.decks?.[0] || '');
+      })
+      .catch(() => {
+        if (!alive) return;
+        setConnected(false);
+        setDecks([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [advanced]);
 
   if (advanced) return <BlancAnkiPanel />;
 
@@ -1122,12 +1493,10 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
 
 
 /**
- * Blanc-only tool ids — surfaces Blanc has that the shared toolbox registry
- * does not model. `coverage` established this pattern; Pillar 2 ports reuse it
- * rather than adding entries to `TOOLBOX_MODULES`, which Study OS also reads.
+ * Blanc-only tool ids (shared/blancTools.ts) — surfaces Blanc has that the
+ * shared toolbox registry does not model — plus the registry modules Blanc
+ * renders itself.
  */
-type BlancOnlyToolId = 'coverage' | 'agent' | 'files' | 'notebook' | 'translate' | 'music' | 'novels' | 'discover' | 'games' | 'immersion' | 'visualizer' | 'local-agent';
-
 type BlancToolId =
   | BlancOnlyToolId
   | Extract<
@@ -1154,7 +1523,6 @@ type BlancToolId =
   | 'immersion-tracker'
   | 'frequency-explorer'
   | 'subtitle-importer'
-  | 'context-search'
   | 'kanji-inspector'
   | 'youtube-library'
   | 'furigana'
@@ -1164,6 +1532,7 @@ type BlancToolId =
   | 'pitch-accent'
   | 'dev-console'
   | 'audio-mine'
+  | 'mono-blocks'
 >;
 
 
@@ -1185,51 +1554,63 @@ function readComputedToken(token: string): string {
   return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`;
 }
 
+/**
+ * Every Blanc tool, in default launcher order: study first (the default tool is
+ * the dictionary), then reading and watching, then mining and review, then the
+ * general utilities. `context-search` is retired — Master search (Ctrl+K)
+ * reaches the same commands, saved words, deck cards and grammar points, plus a
+ * direct dictionary lookup.
+ */
 const BLANC_TOOL_IDS: BlancToolId[] = [
-  'agent',
-  'files',
-  'furigana',
-  'counter-reader',
-  'conjugation-drill',
-  'review-forecast',
-  'pitch-accent',
-  'dev-console',
-  'audio-mine',
-  'local-agent',
-  'coverage',
-  'notebook',
+  // Study
+  'dictionary',
+  'grammar',
   'translate',
-  'music',
-  'novels',
-  'discover',
-  'games',
-  'immersion',
-  'visualizer',
   'clipboard',
-  'automation-builder',
+  'furigana',
+  'pitch-accent',
+  'conjugation-drill',
+  'counter-reader',
+  'kanji-inspector',
+  'frequency-explorer',
+  'difficulty-analyzer',
+  'notebook',
+  // Read & watch
+  'novels',
+  'visual-novels',
+  'reading-finder',
+  'immersion',
+  'discover',
+  'youtube-library',
+  'music',
+  'visualizer',
+  'resources',
+  'immersion-tracker',
+  // Mine & review
+  'audio-mine',
+  'subtitle-importer',
+  'review-forecast',
+  'games',
+  'mono-blocks',
+  // Utilities
+  'quick-notes',
+  'focus-timer',
+  'calendar',
+  'files',
+  'file-search',
+  'app-drawer',
   'calculator',
   'unit-converter',
-  'focus-timer',
-  'system-monitor',
-  'quick-notes',
-  'file-search',
   'hash-checker',
   'image-converter',
   'batch-converter',
-  'app-drawer',
-  'dictionary',
-  'grammar',
-  'reading-finder',
-  'resources',
-  'calendar',
+  'system-monitor',
   'notification-center',
-  'difficulty-analyzer',
-  'immersion-tracker',
-  'frequency-explorer',
-  'subtitle-importer',
-  'context-search',
-  'kanji-inspector',
-  'youtube-library',
+  'agent',
+  'local-agent',
+  'automation-builder',
+  'dev-console',
+  'coverage',
 ];
 
 const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
@@ -1248,6 +1629,7 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   translate: 'globe',
   music: 'music',
   novels: 'library',
+  'visual-novels': 'library',
   discover: 'sparkle',
   games: 'dice',
   immersion: 'globe',
@@ -1274,12 +1656,12 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   'immersion-tracker': 'globe',
   'frequency-explorer': 'dictionary',
   'subtitle-importer': 'caption',
-  'context-search': 'search',
   'kanji-inspector': 'scan',
   'youtube-library': 'player',
+  'mono-blocks': 'app',
 };
 
-type BlancToolCategory = 'quick' | 'productivity' | 'system' | 'language';
+type BlancToolCategory = 'study' | 'read-watch' | 'mine-review' | 'utilities';
 
 interface BlancToolEntry {
   id: BlancToolId;
@@ -1291,78 +1673,124 @@ interface BlancToolEntry {
 }
 
 const TOOL_CATEGORY_LABEL_KEYS: Record<BlancToolCategory, string> = {
-  quick: 'blanc.shell.category.quick',
-  productivity: 'blanc.shell.category.productivity',
-  system: 'blanc.shell.category.system',
-  language: 'blanc.shell.category.language',
+  study: 'blanc.refine.category.study',
+  'read-watch': 'blanc.refine.category.readWatch',
+  'mine-review': 'blanc.refine.category.mineReview',
+  utilities: 'blanc.refine.category.utilities',
 };
 
-const TOOL_CATEGORY_ORDER: BlancToolCategory[] = ['quick', 'productivity', 'system', 'language'];
+const TOOL_CATEGORY_ORDER: BlancToolCategory[] = ['study', 'read-watch', 'mine-review', 'utilities'];
+
+/** Launcher group per tool. Names and descriptions are catalog keys (blancToolLabels.ts). */
+const TOOL_CATEGORY: Record<BlancToolId, BlancToolCategory> = {
+  dictionary: 'study',
+  grammar: 'study',
+  translate: 'study',
+  clipboard: 'study',
+  furigana: 'study',
+  'pitch-accent': 'study',
+  'conjugation-drill': 'study',
+  'counter-reader': 'study',
+  'kanji-inspector': 'study',
+  'frequency-explorer': 'study',
+  'difficulty-analyzer': 'study',
+  notebook: 'study',
+  novels: 'read-watch',
+  'visual-novels': 'read-watch',
+  'reading-finder': 'read-watch',
+  immersion: 'read-watch',
+  discover: 'read-watch',
+  'youtube-library': 'read-watch',
+  music: 'read-watch',
+  visualizer: 'read-watch',
+  resources: 'read-watch',
+  'immersion-tracker': 'read-watch',
+  'audio-mine': 'mine-review',
+  'subtitle-importer': 'mine-review',
+  'review-forecast': 'mine-review',
+  games: 'mine-review',
+  'mono-blocks': 'mine-review',
+  'quick-notes': 'utilities',
+  'focus-timer': 'utilities',
+  calendar: 'utilities',
+  files: 'utilities',
+  'file-search': 'utilities',
+  'app-drawer': 'utilities',
+  calculator: 'utilities',
+  'unit-converter': 'utilities',
+  'hash-checker': 'utilities',
+  'image-converter': 'utilities',
+  'batch-converter': 'utilities',
+  'system-monitor': 'utilities',
+  'notification-center': 'utilities',
+  agent: 'utilities',
+  'local-agent': 'utilities',
+  'automation-builder': 'utilities',
+  'dev-console': 'utilities',
+  coverage: 'utilities',
+};
 
 /**
- * Category and default shortcut per tool. The name and description are catalog
- * keys (`blanc.tool.<id>` / `blanc.tool.<id>.desc`, see blancToolLabels.ts),
- * resolved at render by `useBlancTools()`.
+ * Where a Study OS section id lands in Blanc (`os:open`). Tab ids take a whole
+ * tab; everything else opens a toolbox tool. Ids that are not here are not
+ * Blanc surfaces, and the event is left for the caller's pop-out fallback.
  */
-const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; shortcut?: string }> = {
-  furigana: { category: 'language' },
-  'counter-reader': { category: 'language' },
-  'dev-console': { category: 'system' },
-  'pitch-accent': { category: 'language' },
-  'audio-mine': { category: 'language' },
-  'review-forecast': { category: 'language' },
-  'conjugation-drill': { category: 'language' },
-  coverage: { category: 'system' },
-  agent: { category: 'system' },
-  files: { category: 'system' },
-  notebook: { category: 'language' },
-  translate: { category: 'language' },
-  music: { category: 'language' },
-  novels: { category: 'language' },
-  discover: { category: 'language' },
-  games: { category: 'language' },
-  immersion: { category: 'language' },
-  visualizer: { category: 'productivity' },
-  'local-agent': { category: 'system' },
-  calculator: { category: 'quick', shortcut: 'Alt+1' },
-  'unit-converter': { category: 'quick', shortcut: 'Alt+2' },
-  'hash-checker': { category: 'quick', shortcut: 'Alt+3' },
-  'image-converter': { category: 'quick', shortcut: 'Alt+4' },
-  'batch-converter': { category: 'quick' },
-  'focus-timer': { category: 'productivity', shortcut: 'Alt+5' },
-  'quick-notes': { category: 'productivity', shortcut: 'Alt+6' },
-  clipboard: { category: 'productivity', shortcut: 'Alt+7' },
-  calendar: { category: 'productivity' },
-  'system-monitor': { category: 'system', shortcut: 'Alt+8' },
-  'file-search': { category: 'system', shortcut: 'Alt+9' },
-  'automation-builder': { category: 'system' },
-  'app-drawer': { category: 'system' },
-  dictionary: { category: 'language' },
-  grammar: { category: 'language' },
-  'reading-finder': { category: 'language' },
-  resources: { category: 'language' },
-  'notification-center': { category: 'system' },
-  'difficulty-analyzer': { category: 'language' },
-  'immersion-tracker': { category: 'language' },
-  'frequency-explorer': { category: 'language' },
-  'subtitle-importer': { category: 'language' },
-  'context-search': { category: 'language' },
-  'kanji-inspector': { category: 'language' },
-  'youtube-library': { category: 'language' },
+type BlancSectionRoute = { tab: BlancTabId } | { tool: BlancToolId };
+const BLANC_SECTION_ROUTES: Record<string, BlancSectionRoute> = {
+  library: { tab: 'read' },
+  read: { tab: 'read' },
+  stats: { tab: 'stats' },
+  statistics: { tab: 'stats' },
+  player: { tab: 'media' },
+  video: { tab: 'media' },
+  media: { tab: 'media' },
+  anki: { tab: 'deck' },
+  'anki-deck': { tab: 'deck' },
+  deck: { tab: 'deck' },
+  flashcards: { tab: 'flashcards' },
+  'epub-mining': { tab: 'mine' },
+  mining: { tab: 'mine' },
+  settings: { tab: 'settings' },
+  toolbox: { tab: 'tools' },
+  reading: { tool: 'reading-finder' },
+  'reading-finder': { tool: 'reading-finder' },
+  youtube: { tool: 'youtube-library' },
+  'youtube-library': { tool: 'youtube-library' },
+  note: { tool: 'quick-notes' },
+  notes: { tool: 'quick-notes' },
+  'quick-notes': { tool: 'quick-notes' },
+  notebook: { tool: 'notebook' },
+  scraper: { tool: 'discover' },
+  discover: { tool: 'discover' },
+  dictionary: { tool: 'dictionary' },
+  grammar: { tool: 'grammar' },
+  translate: { tool: 'translate' },
+  music: { tool: 'music' },
+  calendar: { tool: 'calendar' },
+  resources: { tool: 'resources' },
+  clipboard: { tool: 'clipboard' },
+  games: { tool: 'games' },
+  'mono-blocks': { tool: 'mono-blocks' },
+  blocks: { tool: 'mono-blocks' },
+  immersion: { tool: 'immersion' },
+  visualizer: { tool: 'visualizer' },
+  files: { tool: 'files' },
+  novels: { tool: 'novels' },
+  visualnovels: { tool: 'visual-novels' },
+  'visual-novels': { tool: 'visual-novels' },
+  agent: { tool: 'agent' },
 };
 
 interface BlancToolDef {
   id: BlancToolId;
   icon: IconName;
   category: BlancToolCategory;
-  shortcut?: string;
 }
 
 const BLANC_TOOL_DEFS: BlancToolDef[] = BLANC_TOOL_IDS.map((id) => ({
   id,
   icon: BLANC_TOOL_ICONS[id],
-  category: TOOL_DESCRIPTIONS[id].category,
-  shortcut: TOOL_DESCRIPTIONS[id].shortcut,
+  category: TOOL_CATEGORY[id],
 }));
 
 /** Blanc's tools with their name and description in the active UI language. */
@@ -1377,6 +1805,34 @@ function useBlancTools(): BlancToolEntry[] {
         description: t(`${blancToolLabelKey(def.id) ?? def.id}.desc`),
       })),
     [lang, developerTools],
+  );
+}
+
+/** The tool Blanc opens when nothing else says which: study first. */
+const DEFAULT_BLANC_TOOL: BlancToolId = 'dictionary';
+
+function isBlancToolId(value: unknown): value is BlancToolId {
+  return typeof value === 'string' && BLANC_TOOL_IDS.includes(value as BlancToolId);
+}
+
+/** How many launcher positions Alt+1..9 (`toolbox.openSlotN`) reach. */
+const LAUNCHER_SLOTS = 9;
+
+/**
+ * The launcher's browse order — exactly what the rail shows with no query:
+ * visible tools only, grouped by the user's section order, the user's tool
+ * order within each group. Alt+1..9 open the first nine of THIS list, so the
+ * shortcuts follow whatever the user arranged rather than nine fixed utilities.
+ */
+function launcherToolOrder(tools: readonly BlancToolEntry[], settings: ToolboxSettings): BlancToolEntry[] {
+  const visible = tools.filter((item) => isToolLaunchable(item.id, settings, false));
+  const byId = new Map(visible.map((item) => [item.id, item]));
+  const ordered = orderToolIds(visible.map((item) => item.id), settings.toolOrder).flatMap((id) => {
+    const item = byId.get(id);
+    return item ? [item] : [];
+  });
+  return orderToolIds(TOOL_CATEGORY_ORDER, settings.categoryOrder).flatMap((category) =>
+    ordered.filter((item) => item.category === category),
   );
 }
 
@@ -1468,23 +1924,56 @@ function renderBlancTool(
   if (tool === 'immersion-tracker') return <ImmersionTrackerPanel />;
   if (tool === 'frequency-explorer') return <FrequencyExplorerPanel />;
   if (tool === 'subtitle-importer') return <SubtitleImporterPanel />;
-  if (tool === 'context-search') return <ContextSearchPanel />;
   if (tool === 'kanji-inspector') return <KanjiInspectorPanel />;
   if (tool === 'youtube-library') return <BlancYoutubePanel />;
+  if (tool === 'mono-blocks') return <MonoBlocks />;
+  if (tool === 'visual-novels') return <BlancVisualNovelsPanel />;
   return <BlancCalendarPanel />;
+}
+
+/**
+ * One loaded tool: its own crash boundary (keyed on the tool, so a failure
+ * never follows you to the next one) OUTSIDE its Suspense — a lazy chunk that
+ * fails to load throws while the boundary's child renders, and a boundary
+ * nested under the fallback would never see it.
+ */
+function BlancToolSlot({
+  tool,
+  label,
+  onOpenBook,
+  grammarRequest,
+}: {
+  tool: BlancToolId;
+  label: string;
+  onOpenBook: (item: LibraryItem) => void;
+  grammarRequest: { id: string; key: number } | null;
+}) {
+  const { t } = useT();
+  return (
+    <BlancToolErrorBoundary key={tool} toolId={tool} label={label}>
+      <Suspense fallback={<div className="blanc-loading">{t('blanc.tb.loading')}</div>}>
+        {renderBlancTool(tool, onOpenBook, grammarRequest)}
+      </Suspense>
+    </BlancToolErrorBoundary>
+  );
 }
 
 function BlancToolsPanel({
   onOpenBook,
   grammarRequest,
   toolRequest,
+  visible = true,
 }: {
   onOpenBook: (item: LibraryItem) => void;
   grammarRequest: { id: string; key: number } | null;
   toolRequest: { id: BlancToolId; key: number } | null;
+  /** False while the shell keeps the toolbox mounted behind another tab. */
+  visible?: boolean;
 }) {
   const { t } = useT();
   const blancTools = useBlancTools();
+  const mechSettings = useBlancMechSettings();
+  const warm = useWarmTools();
   const [toolboxSettings, setToolboxSettings] = useState<ToolboxSettings>(() => loadToolboxSettings());
   const [query, setQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(() => loadToolboxSettings().sidebarExpanded);
@@ -1492,18 +1981,20 @@ function BlancToolsPanel({
     readFavorites(loadToolboxSettings().favoriteTools),
   );
   const [recent, setRecent] = useState<BlancToolId[]>(() => readToolList(BLANC_RECENT_TOOLS_KEY));
+  // The tool to land on when nothing more specific applies: the user's default
+  // tool (any Blanc tool, not only registry modules), else the dictionary.
+  const fallbackTool = (): BlancToolId => {
+    const configured = loadToolboxSettings().defaultTool;
+    return isBlancToolId(configured) ? configured : DEFAULT_BLANC_TOOL;
+  };
   const [tool, setTool] = useState<BlancToolId>(() => {
     try {
       const savedSettings = loadToolboxSettings();
-      if (!savedSettings.restoreLastTool) {
-        return BLANC_TOOL_IDS.includes(savedSettings.defaultTool as BlancToolId)
-          ? (savedSettings.defaultTool as BlancToolId)
-          : 'calculator';
-      }
-      const saved = window.localStorage.getItem(BLANC_LAST_TOOL_KEY) as BlancToolId | null;
-      return saved && BLANC_TOOL_IDS.includes(saved) ? saved : 'calculator';
+      if (!savedSettings.restoreLastTool) return fallbackTool();
+      const saved = window.localStorage.getItem(BLANC_LAST_TOOL_KEY);
+      return isBlancToolId(saved) ? saved : fallbackTool();
     } catch {
-      return 'calculator';
+      return DEFAULT_BLANC_TOOL;
     }
   });
   const [openTabs, setOpenTabs] = useState<BlancToolId[]>(() => {
@@ -1511,10 +2002,10 @@ function BlancToolsPanel({
       if (!loadToolboxSettings().restoreTabs) return [];
       const savedTabs = readToolList(BLANC_OPEN_TABS_KEY);
       if (savedTabs.length) return savedTabs.slice(-6);
-      const saved = window.localStorage.getItem(BLANC_LAST_TOOL_KEY) as BlancToolId | null;
-      return [saved && BLANC_TOOL_IDS.includes(saved) ? saved : 'calculator'];
+      const saved = window.localStorage.getItem(BLANC_LAST_TOOL_KEY);
+      return [isBlancToolId(saved) ? saved : fallbackTool()];
     } catch {
-      return ['calculator'];
+      return [DEFAULT_BLANC_TOOL];
     }
   });
   const normalizedQuery = query.trim().toLowerCase();
@@ -1557,6 +2048,16 @@ function BlancToolsPanel({
   // as tools: a category the user never moved keeps its default slot, so adding
   // one to TOOL_CATEGORY_ORDER later does not require touching saved settings.
   const orderedCategories = orderToolIds(TOOL_CATEGORY_ORDER, toolboxSettings.categoryOrder);
+  // Alt+N labels, from the same list the slot commands open.
+  const slotLabels = useMemo(() => {
+    const labels = new Map<BlancToolId, string>();
+    const bindings = new Map(getBindings().map((row) => [row.id, row.keys]));
+    launcherToolOrder(blancTools, toolboxSettings).slice(0, LAUNCHER_SLOTS).forEach((item, index) => {
+      const keys = bindings.get(`toolbox.openSlot${index + 1}`);
+      if (keys) labels.set(item.id, formatKeysDisplay(keys));
+    });
+    return labels;
+  }, [blancTools, toolboxSettings]);
   const commandBindings = useMemo(() => {
     const map = new Map<string, string>();
     for (const row of getBindings()) map.set(row.id, row.keys);
@@ -1601,16 +2102,49 @@ function BlancToolsPanel({
   // which would reopen the requested tool forever and pin the user to it.
   const toolRequestKey = toolRequest?.key ?? null;
   const toolRequestId = toolRequest?.id ?? null;
+  // The panel can stay mounted behind another tab (memory budget), and its
+  // effects re-run each time it is shown again: a request is applied once.
+  const appliedToolRequest = useRef<number | null>(null);
   useEffect(() => {
-    if (toolRequestKey === null || !toolRequestId) return;
+    if (toolRequestKey === null || !toolRequestId || appliedToolRequest.current === toolRequestKey) return;
+    appliedToolRequest.current = toolRequestKey;
     chooseTool(toolRequestId);
   }, [toolRequestKey, toolRequestId]);
 
+  // Memory budget: the tool on screen is touched (most recent first); tools
+  // past the warm window unload. Re-applied when the budget settings change.
+  const pendingUnload = useRef<BlancToolId[]>([]);
+  useEffect(() => {
+    if (!visible) return undefined;
+    touchWarmTool(tool);
+    for (const id of pendingUnload.current.splice(0)) unloadWarmTool(id);
+    return () => leaveToolbox();
+  }, [tool, visible, mechSettings.warmToolLimit, mechSettings.keepWarm]);
+  // Loaded = rendered. The tool on screen always is; hidden tools stay mounted
+  // only while the budget keeps them. Stable (launcher) order, so a switch
+  // never moves a mounted tool's DOM — an iframe would reload if it moved.
+  const mountedTools = useMemo(() => {
+    const ids = new Set<string>(warm.loaded);
+    if (visible) ids.add(tool);
+    return BLANC_TOOL_IDS.filter((id) => ids.has(id));
+  }, [warm.loaded, tool, visible]);
+  const keepWarmPinned = mechSettings.keepWarm.includes(tool);
+  const toggleKeepWarm = (): void => {
+    saveBlancMechSettings({
+      keepWarm: keepWarmPinned
+        ? mechSettings.keepWarm.filter((id) => id !== tool)
+        : [...mechSettings.keepWarm, tool],
+    });
+  };
+
   const closeToolTab = (closing: BlancToolId): void => {
+    // Closing a tab means done with it: unload it rather than keep it warm.
+    if (closing === tool) pendingUnload.current.push(closing);
+    else unloadWarmTool(closing);
     setOpenTabs((current) => {
       const nextTabs = current.filter((id) => id !== closing);
       if (closing === tool) {
-        const fallback = nextTabs[nextTabs.length - 1] ?? 'calculator';
+        const fallback = nextTabs[nextTabs.length - 1] ?? fallbackTool();
         setTool(fallback);
         try {
           window.localStorage.setItem(BLANC_LAST_TOOL_KEY, fallback);
@@ -1619,7 +2153,7 @@ function BlancToolsPanel({
         }
         return nextTabs.length ? nextTabs : [fallback];
       }
-      return nextTabs.length ? nextTabs : ['calculator'];
+      return nextTabs.length ? nextTabs : [fallbackTool()];
     });
   };
 
@@ -1654,7 +2188,8 @@ function BlancToolsPanel({
     };
     const onCommand = (event: Event): void => {
       const id = (event as CustomEvent<string>).detail;
-      if (id === 'toolbox.search') onFocusSearch();
+      // `toolbox.search` is the shell's: it opens Master search. Focusing the
+      // launcher field as well made one Ctrl+F do two things at once.
       if (id === 'toolbox.focusSidebar') document.querySelector<HTMLButtonElement>('.blanc-tool-launch')?.focus();
       if (id === 'toolbox.openRecent') document.querySelector<HTMLButtonElement>('.blanc-tool-recent button')?.focus();
       if (id === 'toolbox.openFavorites') document.querySelector<HTMLButtonElement>('.blanc-tool-strip button')?.focus();
@@ -1692,38 +2227,38 @@ function BlancToolsPanel({
       {openTabs.map((id) => {
         const item = blancTools.find((candidate) => candidate.id === id);
         if (!item) return null;
+        // The close control is a real button BESIDE the tab, not a
+        // `span role="button"` nested inside it: interactive content inside a
+        // <button> is invalid and screen readers flatten it into the tab name.
+        // Delete on a focused tab closes it as well.
         return (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tool === id}
-            className={tool === id ? 'active' : ''}
-            title={tip(t('blanc.tb.switchTo', { name: item.label }))}
-            onClick={() => chooseTool(id)}
-          >
-            {toolboxSettings.showTabIcons && <Icon name={item.icon} size={13} />}
-            <span>{item.label}</span>
-            <span
-              role="button"
-              tabIndex={0}
-              className="blanc-tab-close"
-              title={tip(t('blanc.tb.closeTab', { name: item.label }))}
-              aria-label={t('blanc.tb.closeTab', { name: item.label })}
-              onClick={(event) => {
-                event.stopPropagation();
-                closeToolTab(id);
-              }}
+          <div key={id} role="presentation" className="blanc-tool-tab">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tool === id}
+              className={tool === id ? 'active' : ''}
+              title={tip(t('blanc.tb.switchTo', { name: item.label }))}
+              onClick={() => chooseTool(id)}
               onKeyDown={(event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
+                if (event.key !== 'Delete') return;
                 event.preventDefault();
-                event.stopPropagation();
                 closeToolTab(id);
               }}
             >
-              x
-            </span>
-          </button>
+              {toolboxSettings.showTabIcons && <Icon name={item.icon} size={13} />}
+              <span>{item.label}</span>
+            </button>
+            <button
+              type="button"
+              className="blanc-tab-close"
+              title={tip(t('blanc.tb.closeTab', { name: item.label }))}
+              aria-label={t('blanc.tb.closeTab', { name: item.label })}
+              onClick={() => closeToolTab(id)}
+            >
+              ×
+            </button>
+          </div>
         );
       })}
     </div>
@@ -1768,10 +2303,14 @@ function BlancToolsPanel({
             aria-label={t('blanc.tb.searchAria')}
           />
         </label>
+        {/* Icon-only buttons carry an aria-label: `title` is dropped when
+            tooltips are off, which left them with no accessible name. */}
         <button
           type="button"
           className="blanc-icon-btn"
           title={tip(sidebarOpen ? t('blanc.tb.collapseLauncher') : t('blanc.tb.expandLauncher'))}
+          aria-label={sidebarOpen ? t('blanc.tb.collapseLauncher') : t('blanc.tb.expandLauncher')}
+          aria-expanded={sidebarOpen}
           onClick={() => setSidebar(!sidebarOpen)}
         >
           <Icon name="settings" size={15} />
@@ -1791,6 +2330,8 @@ function BlancToolsPanel({
                     type="button"
                     className={tool === id ? 'active' : ''}
                     title={tip(t('blanc.tb.favorite', { name: item.label }))}
+                    aria-label={t('blanc.tb.favorite', { name: item.label })}
+                    aria-pressed={tool === id}
                     onClick={() => chooseTool(id)}
                   >
                     <Icon name={item.icon} size={15} />
@@ -1834,6 +2375,7 @@ function BlancToolsPanel({
                     type="button"
                     className={`blanc-tool-launch${tool === item.id ? ' active' : ''}`}
                     title={tip(`${item.label}: ${item.description}`)}
+                    aria-current={tool === item.id ? 'true' : undefined}
                     onClick={() => chooseTool(item.id)}
                   >
                     <Icon name={item.icon} size={16} />
@@ -1841,7 +2383,12 @@ function BlancToolsPanel({
                       <strong>{item.label}</strong>
                       {toolboxSettings.showToolDescriptions && <small>{item.description}</small>}
                     </span>
-                    {item.shortcut && <kbd>{item.shortcut}</kbd>}
+                    {item.id !== tool && mountedTools.includes(item.id) && (
+                      <span className="blanc-warm-dot" title={t('blanc.mech.warm.warm')}>
+                        <span className="sr-only">{t('blanc.mech.warm.loadedSr')}</span>
+                      </span>
+                    )}
+                    {!normalizedQuery && slotLabels.get(item.id) && <kbd>{slotLabels.get(item.id)}</kbd>}
                   </button>
                 ))}
               </section>
@@ -1889,10 +2436,26 @@ function BlancToolsPanel({
                 type="button"
                 className={`blanc-icon-btn${favorites.includes(activeTool.id) ? ' active' : ''}`}
                 title={tip(t(favorites.includes(activeTool.id) ? 'blanc.tb.unpin' : 'blanc.tb.pin', { name: activeTool.label }))}
+                aria-label={t(favorites.includes(activeTool.id) ? 'blanc.tb.unpin' : 'blanc.tb.pin', { name: activeTool.label })}
+                aria-pressed={favorites.includes(activeTool.id)}
                 onClick={() => toggleFavorite(activeTool.id)}
               >
                 <Icon name="bookmark" size={15} />
               </button>
+              {/* Memory budget: keep this tool loaded whatever the warm window says. */}
+              <button
+                type="button"
+                className={`blanc-icon-btn${keepWarmPinned ? ' active' : ''}`}
+                title={tip(t(keepWarmPinned ? 'blanc.mech.warm.unpinNamed' : 'blanc.mech.warm.pinNamed', { name: activeTool.label }))}
+                aria-label={t(keepWarmPinned ? 'blanc.mech.warm.unpinNamed' : 'blanc.mech.warm.pinNamed', { name: activeTool.label })}
+                aria-pressed={keepWarmPinned}
+                onClick={toggleKeepWarm}
+              >
+                <Icon name="pin" size={15} />
+              </button>
+              <span className="blanc-warm-count" aria-live="polite">
+                {t('blanc.mech.warm.count', { count: mountedTools.length })}
+              </span>
             </div>
           </header>
           {toolboxSettings.openToolsInTabs && toolboxSettings.tabPosition === 'top' && tabStrip}
@@ -1905,12 +2468,21 @@ function BlancToolsPanel({
               OUTSIDE `Suspense` on purpose — a lazy chunk that fails to load
               throws during render of the boundary's child, and a boundary
               nested under the fallback would never see it.
+
+              Each loaded tool has its own boundary inside an <Activity>: the one
+              on screen is visible, warm ones are hidden (state and DOM kept,
+              effects torn down until shown again). Unloaded tools are not here.
             */}
-            <BlancToolErrorBoundary key={tool} toolId={tool} label={activeTool.label}>
-              <Suspense fallback={<div className="blanc-loading">{t('blanc.tb.loading')}</div>}>
-                {renderBlancTool(tool, onOpenBook, grammarRequest)}
-              </Suspense>
-            </BlancToolErrorBoundary>
+            {mountedTools.map((id) => (
+              <Activity key={id} mode={id === tool && visible ? 'visible' : 'hidden'}>
+                <BlancToolSlot
+                  tool={id}
+                  label={blancTools.find((item) => item.id === id)?.label ?? id}
+                  onOpenBook={onOpenBook}
+                  grammarRequest={grammarRequest}
+                />
+              </Activity>
+            ))}
           </div>
           {toolboxSettings.openToolsInTabs && toolboxSettings.tabPosition === 'bottom' && tabStrip}
         </section>
@@ -1929,46 +2501,45 @@ function ToolboxCoveragePanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Feature Coverage</legend>
-        <p className="blanc-note">
-          Not every requested toolbox feature is fully implemented yet. This table shows what is already real in Blanc, what is experimental, and what is still planned for shared service or GitHub/OSS adapter work.
-        </p>
+        <legend>{t('blanc.refine.coverage.legend')}</legend>
+        <p className="blanc-note">{t('blanc.refine.coverage.note')}</p>
         <div className="blanc-status-row">
-          <span>Ready: {ready}</span>
-          <span>Experimental: {experimental}</span>
-          <span>Adapter needed: {adapterNeeded}</span>
-          <span>Total tracked: {modules.length}</span>
+          <span>{t('blanc.refine.coverage.ready', { count: ready })}</span>
+          <span>{t('blanc.refine.coverage.experimental', { count: experimental })}</span>
+          <span>{t('blanc.refine.coverage.adapterNeeded', { count: adapterNeeded })}</span>
+          <span>{t('blanc.refine.coverage.total', { count: modules.length })}</span>
         </div>
       </fieldset>
       <fieldset>
-        <legend>Modules</legend>
+        <legend>{t('blanc.refine.coverage.modules')}</legend>
         <div className="blanc-table-scroll">
           <table className="blanc-coverage-table">
             <thead>
               <tr>
-                <th>Feature</th>
-                <th>Status</th>
+                <th>{t('blanc.refine.coverage.col.feature')}</th>
+                <th>{t('blanc.refine.coverage.col.status')}</th>
                 <th>{t('blanc.settings.col.category')}</th>
-                <th>Blanc</th>
-                <th>Normal OS</th>
-                <th>Side</th>
-                <th>Shortcut</th>
-                <th>Automation</th>
-                <th>Adapter</th>
+                <th>{t('blanc.refine.coverage.col.blanc')}</th>
+                <th>{t('blanc.refine.coverage.col.studyOs')}</th>
+                <th>{t('blanc.refine.coverage.col.side')}</th>
+                <th>{t('blanc.refine.coverage.col.shortcut')}</th>
+                <th>{t('blanc.refine.coverage.col.automation')}</th>
+                <th>{t('blanc.refine.coverage.col.adapter')}</th>
               </tr>
             </thead>
             <tbody>
               {modules.map((module) => (
                 <tr key={module.id}>
-                  <td>{module.label}</td>
-                  <td><span className={`blanc-status ${module.status}`}>{module.status}</span></td>
-                  <td>{module.category}</td>
-                  <td>{module.appearsInBlanc ? 'Yes' : 'Later'}</td>
-                  <td>{module.appearsInNormalOs ? 'Yes' : 'Later'}</td>
-                  <td>{module.launchContexts.includes('side-agent') ? 'Yes' : '-'}</td>
-                  <td>{module.supportsGlobalShortcut ? 'Yes' : '-'}</td>
-                  <td>{module.supportsAutomation ? 'Yes' : '-'}</td>
-                  <td>{module.externalAdapter.strategy}</td>
+                  <td>{blancToolLabel(t, module.id)}</td>
+                  <td><span className={`blanc-status ${module.status}`}>{moduleStatusLabel(module.status, t)}</span></td>
+                  <td>{t(`blanc.tb.modcat.${module.category}`)}</td>
+                  <td>{module.appearsInBlanc ? t('blanc.refine.coverage.yes') : t('blanc.refine.coverage.later')}</td>
+                  <td>{module.appearsInNormalOs ? t('blanc.refine.coverage.yes') : t('blanc.refine.coverage.later')}</td>
+                  <td>{module.launchContexts.includes('side-agent') ? t('blanc.refine.coverage.yes') : '-'}</td>
+                  <td>{module.supportsGlobalShortcut ? t('blanc.refine.coverage.yes') : '-'}</td>
+                  <td>{module.supportsAutomation ? t('blanc.refine.coverage.yes') : '-'}</td>
+                  {/* The adapter strategy is an identifier (built-in, existing-service …), kept verbatim. */}
+                  <td><code>{module.externalAdapter.strategy}</code></td>
                 </tr>
               ))}
             </tbody>
@@ -2037,11 +2608,10 @@ function unitLabel(id: string, fallback: string, t: TFn): string {
   return out === key ? fallback : out;
 }
 
-/** A Toolbox setting's name, from the same keys its checkbox uses; the id if it has none. */
-function settingLabel(id: string, t: TFn): string {
-  const key = `blanc.settings.toggle.${id}`;
+/** `t(key)`, or the given English when the catalogue has no such key (module data added later). */
+function keyOr(t: TFn, key: string, fallback: string): string {
   const out = t(key);
-  return out === key ? id : out;
+  return out === key ? fallback : out;
 }
 
 const MODULE_STATUS_KEYS: Record<string, string> = {
@@ -2094,7 +2664,10 @@ function UnitConverterPanel() {
         </div>
         <div className="blanc-result-box">
           {result.ok && typeof result.value === 'number'
-            ? `${formatToolboxNumber(result.value)} ${to}`
+            ? t('blanc.refine.unitResult', {
+              value: formatToolboxNumber(result.value),
+              unit: unitLabel(to, TOOLBOX_UNITS[to].label, t),
+            })
             : toolboxErrorText(result.error, t)}
         </div>
         <p className="blanc-note">{t('blanc.tb.unitNote')}</p>
@@ -2110,92 +2683,85 @@ function formatTimerSeconds(total: number): string {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
+/**
+ * The focus timer's live state, re-rendering once a second only while it runs
+ * and the window is visible (a hidden window has nothing to repaint; the
+ * deadline keeps the time exact regardless).
+ */
+function useFocusTimer(): FocusTimerState {
+  const [timer, setTimer] = useState<FocusTimerState>(() => getFocusTimer());
+  const [, setTick] = useState(0);
+  useEffect(() => subscribeFocusTimer(setTimer), []);
+  useEffect(() => {
+    if (!timer.running) return undefined;
+    let id: number | null = null;
+    const start = (): void => {
+      if (id === null && !document.hidden) id = window.setInterval(() => setTick((n) => n + 1), 1000);
+    };
+    const stop = (): void => {
+      if (id !== null) window.clearInterval(id);
+      id = null;
+    };
+    const onVisibility = (): void => {
+      if (document.hidden) stop();
+      else {
+        setTick((n) => n + 1);
+        start();
+      }
+    };
+    start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [timer.running]);
+  return timer;
+}
+
+/** The running/paused focus timer in the top bar, so it is visible from any tool. */
+function FocusTimerChip({ onOpen }: { onOpen: () => void }) {
+  const { t } = useT();
+  const timer = useFocusTimer();
+  if (!focusTimerActive(timer)) return null;
+  const time = formatTimerSeconds(focusTimerSeconds(timer));
+  return (
+    <button
+      type="button"
+      className={`blanc-timer-chip${timer.running ? '' : ' is-paused'}`}
+      onClick={onOpen}
+      aria-label={t(timer.running ? 'blanc.refine.timerChipRunning' : 'blanc.refine.timerChipPaused', { time })}
+      title={t(timer.running ? 'blanc.refine.timerChipRunning' : 'blanc.refine.timerChipPaused', { time })}
+    >
+      <Icon name="calendar" size={13} />
+      <time>{time}</time>
+    </button>
+  );
+}
+
 function FocusTimerPanel() {
   const { t } = useT();
-  const [mode, setMode] = useState<'countdown' | 'stopwatch'>('countdown');
-  const [minutes, setMinutes] = useState(25);
-  const [seconds, setSeconds] = useState(25 * 60);
-  const [running, setRunning] = useState(false);
-  const [laps, setLaps] = useState<number[]>([]);
-  const [soundOn, setSoundOn] = useState(true);
-
-  useEffect(() => {
-    if (!running) return undefined;
-    const id = window.setInterval(() => {
-      setSeconds((current) => {
-        if (mode === 'stopwatch') return current + 1;
-        if (current <= 1) {
-          setRunning(false);
-          if (soundOn) {
-            try {
-              window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('blanc.tb.timerDone'), kind: 'ok' } }));
-            } catch {
-              /* ignore */
-            }
-          }
-          return 0;
-        }
-        return current - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [mode, running, soundOn]);
-
-  const reset = (): void => {
-    setRunning(false);
-    setSeconds(mode === 'countdown' ? minutes * 60 : 0);
-    setLaps([]);
-  };
-
-  const switchMode = (next: 'countdown' | 'stopwatch'): void => {
-    setMode(next);
-    setRunning(false);
-    setSeconds(next === 'countdown' ? minutes * 60 : 0);
-    setLaps([]);
-  };
-
-  const setPreset = (next: number): void => {
-    setMinutes(next);
-    setRunning(false);
-    setSeconds(next * 60);
-    setLaps([]);
-  };
-
-  const recordLap = (): void => {
-    setLaps((current) => [seconds, ...current].slice(0, 8));
-  };
-
-  useEffect(() => {
-    const offStart = registerCommandHandler('focusTimer.startPause', () => {
-      setRunning((current) => !current);
-      return true;
-    });
-    const offReset = registerCommandHandler('focusTimer.reset', () => {
-      reset();
-      return true;
-    });
-    return () => {
-      offStart();
-      offReset();
-    };
-  }, [mode, minutes]);
+  const timer = useFocusTimer();
+  const { mode, minutes, running, laps, notify } = timer;
+  const seconds = focusTimerSeconds(timer);
 
   return (
     <div className="blanc-focus-workspace">
       <section className="blanc-focus-main">
         <div className="blanc-segmented" role="group" aria-label={t('blanc.tb.timerMode')}>
-          <button type="button" className={mode === 'countdown' ? 'active' : ''} onClick={() => switchMode('countdown')} title={t('blanc.tb.countdown')}>{t('blanc.tb.countdown')}</button>
-          <button type="button" className={mode === 'stopwatch' ? 'active' : ''} onClick={() => switchMode('stopwatch')} title={t('blanc.tb.stopwatch')}>{t('blanc.tb.stopwatch')}</button>
+          <button type="button" className={mode === 'countdown' ? 'active' : ''} aria-pressed={mode === 'countdown'} onClick={() => setFocusTimerMode('countdown')} title={t('blanc.tb.countdown')}>{t('blanc.tb.countdown')}</button>
+          <button type="button" className={mode === 'stopwatch' ? 'active' : ''} aria-pressed={mode === 'stopwatch'} onClick={() => setFocusTimerMode('stopwatch')} title={t('blanc.tb.stopwatch')}>{t('blanc.tb.stopwatch')}</button>
         </div>
-        <div className="blanc-timer-display">{formatTimerSeconds(seconds)}</div>
+        <div className="blanc-timer-display" role="timer" aria-live="off">{formatTimerSeconds(seconds)}</div>
         <div className="blanc-focus-actions">
-          <button type="button" className="blanc-primary-action" onClick={() => setRunning((current) => !current)} title={running ? t('blanc.tb.pauseTimer') : t('blanc.tb.startTimer')}>
+          <button type="button" className="blanc-primary-action" onClick={toggleFocusTimer} title={running ? t('blanc.tb.pauseTimer') : t('blanc.tb.startTimer')}>
             {running ? t('blanc.tb.pause') : t('blanc.tb.start')}
           </button>
-          <button type="button" onClick={reset} title={t('blanc.tb.resetTimer')}>{t('blanc.tb.reset')}</button>
-          <button type="button" onClick={recordLap} title={t('blanc.tb.recordLap')}>{t('blanc.tb.lap')}</button>
+          <button type="button" onClick={resetFocusTimer} title={t('blanc.tb.resetTimer')}>{t('blanc.tb.reset')}</button>
+          <button type="button" onClick={recordFocusTimerLap} title={t('blanc.tb.recordLap')}>{t('blanc.tb.lap')}</button>
         </div>
         <p className="blanc-note">{t('blanc.tb.timerKeys', { startPause: 'Ctrl+Shift+Space', reset: 'Ctrl+Shift+Backspace' })}</p>
+        <p className="blanc-note">{t('blanc.refine.timerKeepsRunning')}</p>
       </section>
 
       <aside className="blanc-focus-side">
@@ -2203,7 +2769,19 @@ function FocusTimerPanel() {
           <h3>{t('blanc.tb.presets')}</h3>
           <div className="blanc-preset-grid">
             {[5, 15, 25, 45].map((preset) => (
-              <button key={preset} type="button" className={minutes === preset && mode === 'countdown' ? 'active' : ''} onClick={() => setPreset(preset)} title={t('blanc.tb.presetTitle', { count: preset })}>
+              <button
+                key={preset}
+                type="button"
+                className={minutes === preset && mode === 'countdown' ? 'active' : ''}
+                aria-pressed={minutes === preset && mode === 'countdown'}
+                onClick={() => {
+                  if (mode !== 'countdown') setFocusTimerMode('countdown');
+                  if (getFocusTimer().running) pauseFocusTimer();
+                  setFocusTimerMinutes(preset);
+                  resetFocusTimer();
+                }}
+                title={t('blanc.tb.presetTitle', { count: preset })}
+              >
                 {t('blanc.tb.presetLabel', { count: preset })}
               </button>
             ))}
@@ -2216,11 +2794,7 @@ function FocusTimerPanel() {
                 min={1}
                 max={240}
                 value={minutes}
-                onChange={(event) => {
-                  const next = Math.max(1, Math.min(240, Number(event.target.value) || 1));
-                  setMinutes(next);
-                  if (!running) setSeconds(next * 60);
-                }}
+                onChange={(event) => setFocusTimerMinutes(Number(event.target.value) || 1)}
               />
             </label>
           )}
@@ -2228,7 +2802,7 @@ function FocusTimerPanel() {
         <section>
           <h3>{t('blanc.tb.options')}</h3>
           <label className="blanc-check">
-            <input type="checkbox" checked={soundOn} onChange={(event) => setSoundOn(event.target.checked)} />
+            <input type="checkbox" checked={notify} onChange={(event) => setFocusTimerNotify(event.target.checked)} />
             <span>{t('blanc.tb.completionNotice')}</span>
           </label>
         </section>
@@ -2269,14 +2843,15 @@ function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
-function formatUptime(seconds: number): string {
+function formatUptime(seconds: number, t: TFn): string {
   const safe = Math.max(0, Math.floor(seconds));
   const days = Math.floor(safe / 86400);
   const hours = Math.floor((safe % 86400) / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  // The unit letters were English ("3d 4h 5m") in every UI language.
+  if (days > 0) return t('blanc.refine.uptime.dhm', { d: days, h: hours, m: minutes });
+  if (hours > 0) return t('blanc.refine.uptime.hm', { h: hours, m: minutes });
+  return t('blanc.refine.uptime.m', { m: minutes });
 }
 
 function BlancMeter({
@@ -2305,6 +2880,7 @@ function SystemMonitorPanel() {
   const { t } = useT();
   const [metrics, setMetrics] = useState<BlancSystemMetrics | null>(null);
   const [storage, setStorage] = useState<BlancStorageEstimate | null>(null);
+  const [appMemory, setAppMemory] = useState<AppMemoryReport | null>(null);
   const [status, setStatus] = useState(() => t('blanc.tb.metricsLoading'));
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -2315,6 +2891,11 @@ function SystemMonitorPanel() {
     } catch {
       setMetrics(null);
       setStatus(t('blanc.tb.metricsUnavailable'));
+    }
+    try {
+      setAppMemory(await window.api.appMemoryMetrics());
+    } catch {
+      setAppMemory(null);
     }
     try {
       const estimate = await navigator.storage?.estimate?.();
@@ -2330,9 +2911,10 @@ function SystemMonitorPanel() {
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 3000);
-    return () => window.clearInterval(timer);
   }, [refresh]);
+  // Polls only while the window is visible: a monitor that burns CPU in a
+  // minimised window measures itself.
+  useVisibleInterval(() => void refresh(), 3000);
 
   const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
   useEffect(() => {
@@ -2405,18 +2987,117 @@ function SystemMonitorPanel() {
         )}
         <div className="blanc-status-row">
           {metrics && <span>{t('blanc.tb.platform', { name: metrics.platform })}</span>}
-          {metrics && <span>{t('blanc.tb.uptime', { time: formatUptime(metrics.uptime) })}</span>}
+          {metrics && <span>{t('blanc.tb.uptime', { time: formatUptime(metrics.uptime, t) })}</span>}
           <span>{status}</span>
         </div>
         <div className="blanc-row-actions">
           <button type="button" onClick={() => void refresh()}>{t('blanc.tb.refresh')}</button>
         </div>
       </fieldset>
+      <AppMemoryReadout report={appMemory} />
     </div>
   );
 }
 
+const APP_PROCESS_ROLE_KEYS: Record<AppProcessRole, string> = {
+  'study-os': 'blanc.refine.memory.role.studyOs',
+  blanc: 'blanc.refine.memory.role.blanc',
+  popout: 'blanc.refine.memory.role.popout',
+  window: 'blanc.refine.memory.role.window',
+  browser: 'blanc.refine.memory.role.browser',
+  gpu: 'blanc.refine.memory.role.gpu',
+  utility: 'blanc.refine.memory.role.utility',
+  other: 'blanc.refine.memory.role.other',
+};
+
+/**
+ * What THIS app is using, per process (Electron's `app.getAppMetrics()`), with
+ * each renderer named by the window it draws — so "is Blanc actually lighter?"
+ * has an answer on screen rather than in Task Manager.
+ */
+function AppMemoryReadout({ report }: { report: AppMemoryReport | null }) {
+  const { t, lang } = useT();
+  // Memory reads in whole megabytes (one decimal above a gigabyte), in the UI
+  // language's number format — the generic byte formatter printed 9 decimals.
+  const formatMemory = (bytes: number): string => {
+    const nf = new Intl.NumberFormat(LANG_TAGS[lang], { maximumFractionDigits: bytes >= 1024 ** 3 ? 1 : 0 });
+    return bytes >= 1024 ** 3 ? `${nf.format(bytes / 1024 ** 3)} GB` : `${nf.format(bytes / 1024 ** 2)} MB`;
+  };
+  const blanc = report?.processes.filter((p) => p.role === 'blanc') ?? [];
+  const studyOs = report?.processes.filter((p) => p.role === 'study-os' || p.role === 'popout') ?? [];
+  const sum = (rows: AppProcessMemory[]): number => rows.reduce((total, row) => total + row.workingSetBytes, 0);
+  return (
+    <fieldset>
+      <legend>{t('blanc.refine.memory.legend')}</legend>
+      {!report ? (
+        <p className="blanc-note">{t('blanc.refine.memory.unavailable')}</p>
+      ) : (
+        <>
+          <div className="blanc-status-row">
+            <span>{t('blanc.refine.memory.total', { size: formatMemory(report.totalWorkingSetBytes) })}</span>
+            {blanc.length > 0 && <span>{t('blanc.refine.memory.blancWindow', { size: formatMemory(sum(blanc)) })}</span>}
+            <span>
+              {studyOs.length > 0
+                ? t('blanc.refine.memory.studyOsWindow', { size: formatMemory(sum(studyOs)) })
+                : t('blanc.refine.memory.studyOsClosed')}
+            </span>
+          </div>
+          <div className="blanc-table-scroll">
+            <table className="blanc-memory-table">
+              <thead>
+                <tr>
+                  <th>{t('blanc.refine.memory.colProcess')}</th>
+                  <th className="num">{t('blanc.refine.memory.colMemory')}</th>
+                  <th className="num">{t('blanc.refine.memory.colCpu')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.processes.map((process) => (
+                  <tr key={process.pid}>
+                    <td>
+                      {t(APP_PROCESS_ROLE_KEYS[process.role])}
+                      {(process.role === 'window' || process.role === 'popout') && process.label ? ` · ${process.label}` : ''}
+                    </td>
+                    <td className="num">{formatMemory(process.workingSetBytes)}</td>
+                    <td className="num">{`${formatToolboxNumber(Math.round(process.cpuPercent * 10) / 10)}%`}</td>
+                  </tr>
+                ))}
+                <tr className="is-total">
+                  <td>{t('blanc.refine.memory.allProcesses')}</td>
+                  <td className="num">{formatMemory(report.totalWorkingSetBytes)}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="blanc-note">{t('blanc.refine.memory.note')}</p>
+        </>
+      )}
+    </fieldset>
+  );
+}
+
 const BLANC_QUICK_NOTES_KEY = 'jp-study.blanc.quickNotes';
+/** The book open when Blanc last closed ("Restore reader on launch"). */
+const BLANC_LAST_BOOK_KEY = 'jp-study.blanc.lastBook';
+
+/**
+ * Settings > Memory had a "scratchpad" textarea that duplicated Quick Notes.
+ * Its text is appended to Quick Notes once and the scratchpad emptied, so
+ * nothing the user wrote is lost when the duplicate goes.
+ */
+function migrateScratchpadToQuickNotes(): void {
+  const scratchpad = loadBlancMemory().scratchpad.trim();
+  if (!scratchpad) return;
+  try {
+    const notes = window.localStorage.getItem(BLANC_QUICK_NOTES_KEY) ?? '';
+    const merged = notes.trim() ? `${notes.replace(/\s+$/, '')}\n\n${scratchpad}` : scratchpad;
+    // Cleared only once the merged text is safely written.
+    if (writeLocalStorage(BLANC_QUICK_NOTES_KEY, merged)) saveBlancMemory({ scratchpad: '' });
+  } catch {
+    /* storage unavailable: leave the scratchpad where it is */
+  }
+}
 
 function QuickNotesPanel() {
   const { t } = useT();
@@ -2443,6 +3124,20 @@ function QuickNotesPanel() {
     save('');
     return true;
   }), []);
+  // The `n` verb appends from Master search; a warm (kept-mounted) panel must
+  // pick that up, or its next keystroke would write the old text back over it.
+  useEffect(() => {
+    const reload = (): void => {
+      try {
+        setNotes(window.localStorage.getItem(BLANC_QUICK_NOTES_KEY) ?? '');
+      } catch {
+        /* storage unavailable */
+      }
+    };
+    reload();
+    window.addEventListener(BLANC_QUICK_NOTES_EVENT, reload);
+    return () => window.removeEventListener(BLANC_QUICK_NOTES_EVENT, reload);
+  }, []);
 
   return (
     <div className="blanc-tool-detail">
@@ -2452,6 +3147,7 @@ function QuickNotesPanel() {
         <textarea
           rows={12}
           value={notes}
+          aria-label={t('blanc.tb.quickNotes')}
           placeholder={t('blanc.tb.quickNotesPlaceholder')}
           onChange={(event) => save(event.target.value)}
         />
@@ -2519,7 +3215,9 @@ function FileSearchPanel() {
         maxScanned: 30_000,
       });
       if (!response.ok) {
-        setStatus(response.error ?? t('blanc.tb.searchFailed'));
+        // Main's reason is English and technical; it is kept as the detail of
+        // a translated sentence rather than shown bare.
+        setStatus(response.error ? t('blanc.refine.error.detail', { detail: response.error }) : t('blanc.tb.searchFailed'));
         return;
       }
       setResults(response.results ?? []);
@@ -2541,7 +3239,7 @@ function FileSearchPanel() {
 
   const openPath = async (filePath: string): Promise<void> => {
     const error = await window.api.launchTarget(filePath);
-    setStatus(error ?? t('blanc.tb.opened'));
+    setStatus(error ? t('blanc.refine.error.detail', { detail: error }) : t('blanc.tb.opened'));
   };
 
   return (
@@ -2759,7 +3457,7 @@ function ImageConverterPanel() {
       canvas.width = image.naturalWidth;
       canvas.height = image.naturalHeight;
       const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas unavailable.');
+      if (!ctx) throw new Error(t('blanc.refine.image.canvasUnavailable'));
       if (format === 'image/jpeg') {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2768,7 +3466,7 @@ function ImageConverterPanel() {
       const blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob(resolve, format, format === 'image/png' ? undefined : quality);
       });
-      if (!blob) throw new Error('Conversion failed.');
+      if (!blob) throw new Error(t('blanc.tb.convertFailed'));
       if (outputUrl) URL.revokeObjectURL(outputUrl);
       setOutputUrl(URL.createObjectURL(blob));
       setOutputSize(blob.size);
@@ -2872,7 +3570,7 @@ function AutomationBuilderPanel() {
         ? result.pid
           ? t('blanc.tb.ab.launchedPid', { pid: result.pid, key: AUTOMATION_BUILDER.stopKey })
           : t('blanc.tb.ab.launched', { key: AUTOMATION_BUILDER.stopKey })
-        : result.error ?? t('blanc.tb.ab.launchFailed'),
+        : result.error ? t('blanc.refine.error.detail', { detail: result.error }) : t('blanc.tb.ab.launchFailed'),
     );
   }, [t]);
 
@@ -2977,7 +3675,6 @@ function BlancSettingsPanel({
   const [memory, setMemory] = useState<BlancMemorySettings>(() => loadBlancMemory());
   const [toolboxSettings, setToolboxSettings] = useState<ToolboxSettings>(() => loadToolboxSettings());
   const [themeHistoryCount, setThemeHistoryCount] = useState(() => loadBlancThemeHistory().length);
-  const [settingsQuery, setSettingsQuery] = useState('');
   const [settingsImport, setSettingsImport] = useState('');
   const [settingsMsg, setSettingsMsg] = useState('');
   // Draft for the custom-CSS textarea, committed on Apply rather than per
@@ -2988,6 +3685,19 @@ function BlancSettingsPanel({
   useEffect(() => onBlancMemoryChanged(setMemory), []);
   useEffect(() => onToolboxSettingsChanged(setToolboxSettings), []);
   useEffect(() => setCssDraft(toolboxSettings.customCss), [toolboxSettings.customCss]);
+  // The launch preference lives in main (it is read before any window exists).
+  const [launchPrefs, setLaunchPrefs] = useState<{ blancOnly: boolean } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void window.api.blancGetLaunchPrefs?.()
+      .then((prefs) => {
+        if (alive) setLaunchPrefs(prefs);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const patchMemory = (patch: Partial<BlancMemorySettings>): void => {
     setMemory(saveBlancMemory(patch));
@@ -3001,11 +3711,9 @@ function BlancSettingsPanel({
     setToolboxSettings(saveToolboxSettings(patch));
   };
 
+  // Every tool can be switched off — the calculator included (it used to be
+  // locked on, a generic utility the user could not remove from a study launcher).
   const toggleTool = (id: ToolboxModuleId, enabled: boolean): void => {
-    if (id === 'calculator' && !enabled) {
-      setSettingsMsg(t('blanc.settings.calculatorLocked'));
-      return;
-    }
     const next = enabled
       ? [...toolboxSettings.enabledTools, id]
       : toolboxSettings.enabledTools.filter((toolId) => toolId !== id);
@@ -3049,10 +3757,10 @@ function BlancSettingsPanel({
   // screen-reader-operable, and a pointer-only reorder would make this the one
   // Blanc setting you cannot change without a mouse. Drag is worth adding on
   // top later; it is not worth having instead.
-  const orderableTools = orderToolIds(
-    blancTools.map((item) => item.id).filter((id): id is ToolboxModuleId =>
-      id !== 'coverage' && toolboxSettings.enabledTools.includes(id as ToolboxModuleId),
-    ),
+  // Every tool the launcher can show is orderable — Blanc-only tools included,
+  // which the settings schema could not store before (shared/blancTools.ts).
+  const orderableTools: BlancToolId[] = orderToolIds(
+    blancTools.map((item) => item.id).filter((id) => isToolLaunchable(id, toolboxSettings, false)),
     toolboxSettings.toolOrder,
   );
 
@@ -3067,7 +3775,7 @@ function BlancSettingsPanel({
     });
   };
 
-  const moveTool = (id: ToolboxModuleId, delta: -1 | 1): void => {
+  const moveTool = (id: BlancToolId, delta: -1 | 1): void => {
     patchToolbox({ toolOrder: moveToolInOrder(orderableTools, id, delta, toolboxSettings.toolOrder) });
   };
 
@@ -3083,15 +3791,6 @@ function BlancSettingsPanel({
     setToolboxSettings(resetToolboxSettingsCategory(category));
     setSettingsMsg(t('blanc.settings.resetCategoryDone', { category: t(`blanc.settings.category.${category}`) }));
   };
-
-  const visibleDefinitions = TOOLBOX_SETTING_DEFINITIONS.filter((definition) => {
-    const query = settingsQuery.trim().toLowerCase();
-    if (!query) return true;
-    return [definition.id, definition.category, definition.description, ...definition.keywords]
-      .join(' ')
-      .toLowerCase()
-      .includes(query);
-  });
 
   const savePin = (): void => {
     const next = setLockscreenPin(pin);
@@ -3138,10 +3837,20 @@ function BlancSettingsPanel({
         </label>
       </fieldset>
 
+      <BlancStudySettings
+        onOpenDeck={() => window.dispatchEvent(new CustomEvent('blanc:select-tab', { detail: 'deck' }))}
+      />
+
+      <Suspense fallback={<div className="blanc-loading">{t('blanc.shell.loading')}</div>}>
+        <BlancMechanicsSettings />
+      </Suspense>
+
       <fieldset data-blanc-setting="models" tabIndex={-1}>
         <legend>{t('blanc.settings.models')}</legend>
         <p className="blanc-note">{t('blanc.settings.modelsDesc')}</p>
-        <BlancModelsPanel />
+        <Suspense fallback={<div className="blanc-loading">{t('blanc.shell.loading')}</div>}>
+          <BlancModelsPanel />
+        </Suspense>
       </fieldset>
 
       <fieldset data-blanc-setting="memory" tabIndex={-1}>
@@ -3157,6 +3866,7 @@ function BlancSettingsPanel({
           />
           <span>{t('blanc.settings.rememberLastTab')}</span>
         </label>
+        {/* Reopens the last book on launch — BlancShell reads it at mount. */}
         <label className="blanc-check">
           <input
             type="checkbox"
@@ -3165,25 +3875,11 @@ function BlancSettingsPanel({
           />
           <span>{t('blanc.settings.restoreReader')}</span>
         </label>
-        <label className="blanc-range-row">
-          <span>{t('blanc.settings.reviewLimit')}</span>
-          <input
-            type="number"
-            min={5}
-            max={200}
-            value={memory.localReviewLimit}
-            onChange={(event) => patchMemory({ localReviewLimit: Number(event.target.value) })}
-          />
-        </label>
-        <label>
-          {t('blanc.settings.scratchpad')}
-          <textarea
-            rows={4}
-            value={memory.scratchpad}
-            placeholder={t('blanc.settings.scratchpadPlaceholder')}
-            onChange={(event) => patchMemory({ scratchpad: event.target.value })}
-          />
-        </label>
+        {/* "Local review limit" is gone: nothing read it (review sessions are
+            sized by the Cards tab's own settings), and a setting with no
+            consumer is a lie. The scratchpad merged into Quick Notes, which it
+            duplicated; its text was carried over the first time Blanc opened. */}
+        <p className="blanc-note">{t('blanc.refine.memory.notesMoved')}</p>
         <button type="button" onClick={() => setMemory(resetBlancMemory())}>
           {t('blanc.settings.resetMemory')}
         </button>
@@ -3197,6 +3893,7 @@ function BlancSettingsPanel({
             inputMode="numeric"
             maxLength={4}
             value={pin}
+            aria-label={pinSet ? t('blanc.settings.changePin') : t('blanc.settings.newPin')}
             placeholder={pinSet ? t('blanc.settings.changePin') : t('blanc.settings.newPin')}
             onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
           />
@@ -3224,13 +3921,11 @@ function BlancSettingsPanel({
 
       <fieldset data-blanc-setting="control-center" tabIndex={-1}>
         <legend>{t('blanc.settings.controlCenter')}</legend>
+        {/* The settings-search box and the "setting definitions" table it
+            filtered are gone: the table repeated the controls on this page in
+            English developer prose. Master search (Ctrl+K) finds every
+            section of this page. */}
         <div className="blanc-settings-toolbar">
-          <input
-            value={settingsQuery}
-            onChange={(event) => setSettingsQuery(event.target.value)}
-            placeholder={t('blanc.settings.searchSettings')}
-            aria-label={t('blanc.settings.searchSettings')}
-          />
           <button
             type="button"
             onClick={async () => {
@@ -3270,6 +3965,7 @@ function BlancSettingsPanel({
           rows={3}
           value={settingsImport}
           onChange={(event) => setSettingsImport(event.target.value)}
+          aria-label={t('blanc.settings.import')}
           placeholder={t('blanc.settings.importPlaceholder')}
         />
         {settingsMsg && <p className="blanc-note">{settingsMsg}</p>}
@@ -3287,11 +3983,14 @@ function BlancSettingsPanel({
             {t('blanc.settings.defaultTool')}
             <select
               value={toolboxSettings.defaultTool}
-              onChange={(event) => patchToolbox({ defaultTool: event.target.value as ToolboxModuleId })}
+              onChange={(event) => {
+                if (isBlancToolId(event.target.value)) patchToolbox({ defaultTool: event.target.value });
+              }}
             >
-              {listBlancToolboxModules().map((module) => (
-                <option key={module.id} value={module.id}>
-                  {blancToolLabel(t, module.id)}
+              {/* Every Blanc tool, not only the registry's modules. */}
+              {blancTools.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
                 </option>
               ))}
             </select>
@@ -3377,30 +4076,6 @@ function BlancSettingsPanel({
             </button>
           ))}
         </div>
-
-        <details>
-          <summary>{t('blanc.settings.definitions', { count: visibleDefinitions.length })}</summary>
-          <div className="blanc-table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t('blanc.settings.col.setting')}</th>
-                  <th>{t('blanc.tb.colCategory')}</th>
-                  <th>{t('blanc.settings.col.description')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDefinitions.map((definition) => (
-                  <tr key={definition.id}>
-                    <td>{settingLabel(definition.id, t)}</td>
-                    <td>{t(`blanc.settings.category.${definition.category}`)}</td>
-                    <td>{definition.description}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
       </fieldset>
 
       <fieldset data-blanc-setting="theme" tabIndex={-1}>
@@ -3410,16 +4085,19 @@ function BlancSettingsPanel({
             <button
               key={preset.id}
               type="button"
-              title={preset.description}
+              title={keyOr(t, `blanc.refine.theme.preset.${preset.id}.desc`, preset.description)}
+              aria-pressed={toolboxSettings.themePreset === preset.id}
               className={toolboxSettings.themePreset === preset.id ? 'active' : ''}
               onClick={() => setThemePreset(preset.id)}
             >
-              {preset.label}
+              {keyOr(t, `blanc.refine.theme.preset.${preset.id}`, preset.label)}
             </button>
           ))}
         </div>
         <p className="blanc-note">
-          {presetById(toolboxSettings.themePreset)?.description ?? t('blanc.tb.customPalette')}
+          {presetById(toolboxSettings.themePreset)
+            ? keyOr(t, `blanc.refine.theme.preset.${toolboxSettings.themePreset}.desc`, presetById(toolboxSettings.themePreset)?.description ?? '')
+            : t('blanc.tb.customPalette')}
         </p>
 
         <div className="blanc-theme-grid">
@@ -3438,9 +4116,9 @@ function BlancSettingsPanel({
                   type="color"
                   value={shown}
                   onChange={(event) => setThemeToken(token.id, event.target.value)}
-                  aria-label={token.label}
+                  aria-label={keyOr(t, `blanc.refine.theme.token.${token.id}`, token.label)}
                 />
-                <span className="blanc-theme-label">{token.label}</span>
+                <span className="blanc-theme-label">{keyOr(t, `blanc.refine.theme.token.${token.id}`, token.label)}</span>
                 {overridden ? (
                   <button type="button" onClick={() => clearThemeToken(token.id)} title={t('blanc.tb.resetColour')} aria-label={t('blanc.tb.resetColour')}>
                     ×
@@ -3633,40 +4311,50 @@ function BlancSettingsPanel({
 
       <fieldset data-blanc-setting="tool-visibility" tabIndex={-1}>
         <legend>{t('blanc.settings.toolVisibility')}</legend>
+        <p className="blanc-note">{t('blanc.refine.visibilityNote')}</p>
         <div className="blanc-tool-management">
-          {listBlancToolboxModules().map((module) => (
-            <div key={module.id} className="blanc-tool-management-row">
-              <div>
-                <strong>{blancToolLabel(t, module.id)}</strong>
-                <span>{t(`blanc.tb.modcat.${module.category}`)} · {moduleStatusLabel(module.status, t)}</span>
+          {/* Every Blanc tool. Registry modules can be switched off entirely
+              (Enabled); every tool — Blanc-only ones included — can be hidden
+              from the launcher and still reached through search when the user
+              asks for that. Nothing is locked: the calculator used to be. */}
+          {blancTools.map((item) => {
+            const module = getToolboxModule(item.id as ToolboxModuleId);
+            const hidden = toolboxSettings.hiddenTools.includes(item.id);
+            return (
+              <div key={item.id} className="blanc-tool-management-row">
+                <div>
+                  <strong>{item.label}</strong>
+                  <span>
+                    {t(TOOL_CATEGORY_LABEL_KEYS[item.category])}
+                    {module ? ` · ${moduleStatusLabel(module.status, t)}` : ''}
+                  </span>
+                </div>
+                {module && (
+                  <label className="blanc-check">
+                    <input
+                      type="checkbox"
+                      checked={toolboxSettings.enabledTools.includes(module.id)}
+                      onChange={(event) => toggleTool(module.id, event.target.checked)}
+                    />
+                    <span>{t('blanc.settings.toolEnabled')}</span>
+                  </label>
+                )}
+                <label className="blanc-check">
+                  <input
+                    type="checkbox"
+                    checked={hidden}
+                    onChange={(event) => {
+                      const hiddenTools = event.target.checked
+                        ? [...toolboxSettings.hiddenTools, item.id]
+                        : toolboxSettings.hiddenTools.filter((id) => id !== item.id);
+                      patchToolbox({ hiddenTools });
+                    }}
+                  />
+                  <span>{t('blanc.settings.toolHidden')}</span>
+                </label>
               </div>
-              <label className="blanc-check">
-                <input
-                  type="checkbox"
-                  checked={toolboxSettings.enabledTools.includes(module.id)}
-                  // The calculator cannot be switched off (the Toolbox would be empty);
-                  // it used to look switchable and simply stayed checked.
-                  disabled={module.id === 'calculator'}
-                  title={module.id === 'calculator' ? t('blanc.settings.calculatorLocked') : undefined}
-                  onChange={(event) => toggleTool(module.id, event.target.checked)}
-                />
-                <span>{t('blanc.settings.toolEnabled')}</span>
-              </label>
-              <label className="blanc-check">
-                <input
-                  type="checkbox"
-                  checked={toolboxSettings.hiddenTools.includes(module.id)}
-                  onChange={(event) => {
-                    const hiddenTools = event.target.checked
-                      ? [...toolboxSettings.hiddenTools, module.id]
-                      : toolboxSettings.hiddenTools.filter((id) => id !== module.id);
-                    patchToolbox({ hiddenTools });
-                  }}
-                />
-                <span>{t('blanc.settings.toolHidden')}</span>
-              </label>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </fieldset>
 
@@ -3675,9 +4363,29 @@ function BlancSettingsPanel({
       <fieldset data-blanc-setting="mode" tabIndex={-1}>
         <legend>{t('blanc.settings.mode')}</legend>
         <p className="blanc-note">{t('blanc.settings.modeNote')}</p>
-        <button type="button" onClick={() => void setBlancModeEnabled(false)}>
-          {t('blanc.settings.exitBlanc')}
-        </button>
+        <label className="blanc-check">
+          <input
+            type="checkbox"
+            checked={launchPrefs?.blancOnly === true}
+            disabled={launchPrefs === null}
+            onChange={(event) => {
+              const blancOnly = event.target.checked;
+              void window.api.blancSetLaunchPrefs({ blancOnly })
+                .then(setLaunchPrefs)
+                .catch(() => setSettingsMsg(t('blanc.refine.mode.launchSaveFailed')));
+            }}
+          />
+          <span>{t('blanc.refine.mode.blancOnly')}</span>
+        </label>
+        <p className="blanc-note">{t('blanc.refine.mode.blancOnlyNote')}</p>
+        <div className="blanc-row-actions">
+          <button type="button" onClick={() => void window.api.blancOpenStudyOs().catch(() => undefined)}>
+            {t('blanc.refine.mode.openStudyOs')}
+          </button>
+          <button type="button" onClick={() => void setBlancModeEnabled(false)}>
+            {t('blanc.settings.exitBlanc')}
+          </button>
+        </div>
       </fieldset>
     </div>
   );
@@ -3685,6 +4393,7 @@ function BlancSettingsPanel({
 
 function ToolboxShortcutSettingsPanel() {
   const { t } = useT();
+  const developerTools = useBlancDeveloperTools();
   const [bindings, setBindings] = useState<BindingRow[]>(() =>
     getBindings().filter((row) => TOOLBOX_SHORTCUT_COMMANDS.some((command) => command.id === row.id)),
   );
@@ -3815,9 +4524,11 @@ function ToolboxShortcutSettingsPanel() {
           return (
             <div key={row.id} className={`blanc-shortcut-row${row.conflictsWith.length ? ' conflict' : ''}`}>
               <div>
-                <strong>{row.label}</strong>
-                <span>{row.id} / {meta?.scope ?? 'toolbox'}</span>
-                {row.note && <small>{row.note}</small>}
+                {/* Translated through the commands catalogue, like the launcher's
+                    command results; the raw id/scope line is developer detail. */}
+                <strong>{commandLabel(row.id, row.label, t)}</strong>
+                {developerTools && <span>{row.id} / {meta?.scope ?? 'toolbox'}</span>}
+                {row.note && <small>{commandNote(row.id, meta?.description ?? row.note, t) ?? row.note}</small>}
                 {row.conflictsWith.length > 0 && (
                   <small>{t('blanc.shortcuts.conflictsWith', { commands: row.conflictsWith.join(', ') })}</small>
                 )}
@@ -3844,73 +4555,8 @@ function ToolboxShortcutSettingsPanel() {
   );
 }
 
-export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
-  const { t } = useT();
-  const [digits, setDigits] = useState('');
-  const [error, setError] = useState('');
-  const now = useMinuteClock();
-
-  const submit = (pin: string): void => {
-    if (pin.length !== 4) return;
-    if (!verifyLockscreenPin(pin)) {
-      setDigits('');
-      setError(t('blanc.tb.wrongPin'));
-      return;
-    }
-    onUnlocked();
-  };
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (/^\d$/.test(event.key)) {
-        setDigits((prev) => {
-          const next = (prev + event.key).slice(0, 4);
-          if (next.length === 4) window.setTimeout(() => submit(next), 40);
-          return next;
-        });
-      } else if (event.key === 'Backspace' || event.key === 'Delete') {
-        setDigits((prev) => prev.slice(0, -1));
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  return (
-    <div className="blanc-lock">
-      <section className="blanc-lock-box" role="dialog" aria-modal="true" aria-label={t('blanc.tb.lockscreen')}>
-        <time className="blanc-lock-time">
-          {now.toLocaleTimeString(LANG_TAGS[getUiLang()], { hour: '2-digit', minute: '2-digit' })}
-        </time>
-        <div className="blanc-lock-date">
-          {now.toLocaleDateString(LANG_TAGS[getUiLang()], { weekday: 'long', month: 'long', day: 'numeric' })}
-        </div>
-        <label>
-          {t('blanc.tb.pinLabel')}
-          <input
-            autoFocus
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            value={digits}
-            onChange={(event) => {
-              const next = event.target.value.replace(/\D/g, '').slice(0, 4);
-              setDigits(next);
-              setError('');
-              if (next.length === 4) submit(next);
-            }}
-          />
-        </label>
-        <div className="blanc-lock-dots" aria-hidden>
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={i < digits.length ? 'filled' : ''} />
-          ))}
-        </div>
-        {error && <p className="blanc-error">{error}</p>}
-      </section>
-    </div>
-  );
-}
+// The lockscreen lives in its own module; re-exported for the entry that imports it from here.
+export { BlancLockscreen } from './BlancLockscreen';
 
 type MonoColor = 'black';
 type MonoShape = 'i' | 'o' | 't' | 's' | 'z' | 'j' | 'l';
@@ -4005,8 +4651,19 @@ function MonoBlocks() {
   const rotateLatch = useRef(false);
   const dropLatch = useRef(false);
 
+  // Paused while the window is hidden or unfocused: the game ticks every 62 ms,
+  // which is real CPU for a background window, and pieces should not fall
+  // while the player is elsewhere.
+  const [paused, setPaused] = useState(() => typeof document !== 'undefined' && document.hidden);
+
   useEffect(() => {
+    const editable = (target: EventTarget | null): boolean =>
+      target instanceof HTMLElement &&
+      Boolean(target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]'));
     const down = (event: KeyboardEvent): void => {
+      // Typing elsewhere (Master search, a settings field) must keep its
+      // arrows, letters and spaces: only keys aimed at the page drive the game.
+      if (editable(event.target)) return;
       const key = event.code === 'Space' ? ' ' : event.key;
       if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'w', 'W', 'x', 'X', 'z', 'Z', ' '].includes(key)) {
         event.preventDefault();
@@ -4017,16 +4674,34 @@ function MonoBlocks() {
       const key = event.code === 'Space' ? ' ' : event.key;
       keys.current.delete(key);
     };
+    const onBlur = (): void => {
+      keys.current.clear();
+      setPaused(true);
+    };
+    const onFocus = (): void => setPaused(document.hidden);
+    const onVisibility = (): void => {
+      keys.current.clear();
+      setPaused(document.hidden || !document.hasFocus());
+    };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
       keys.current.clear();
     };
   }, []);
 
   useEffect(() => {
+    // No interval at all once the game is over or paused (it used to keep
+    // ticking after game over, forever).
+    if (state.over || paused) return undefined;
     const timer = window.setInterval(() => {
       setState((current) => {
         if (current.over) return current;
@@ -4098,7 +4773,7 @@ function MonoBlocks() {
       });
     }, 62);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [state.over, paused]);
 
   const cells = useMemo(() => {
     const overlay = new Set<number>();
@@ -4127,6 +4802,7 @@ function MonoBlocks() {
         ))}
       </div>
       <p className="blanc-note">{t('blanc.tb.blocksKeys')}</p>
+      {paused && !state.over && <p className="blanc-note" role="status">{t('blanc.refine.blocksPaused')}</p>}
       {state.over && <p className="blanc-error">{t('blanc.tb.gameOver')}</p>}
     </div>
   );

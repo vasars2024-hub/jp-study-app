@@ -89,6 +89,7 @@ import {
   mainWindowOptions,
   registerWindowChromeIpc,
 } from './main/windowChrome';
+import { broadcastStudyOsAlive, loadBlancLaunchPrefs, registerBlancLaunchIpc } from './main/blancLaunch';
 import { guardWindowToWorkArea, MAIN_WINDOW_MIN_SIZE, minimumSizeAt } from './main/windowBounds';
 import { installAppMenu } from './main/appMenu';
 import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
@@ -706,6 +707,21 @@ function afterFirstPaint(task: () => void): void {
   if (firstPaintDone) setTimeout(task, 0);
   else afterFirstPaintQueue.push(task);
 }
+/**
+ * True when launch opened only Blanc ("Start in Blanc only", blancLaunch.ts):
+ * the Study OS window is then created on demand, and the work that normally
+ * waits for its first paint (secondary desktops) runs when it finally appears.
+ */
+let studyOsDeferredAtLaunch = false;
+
+/** A window running the Study OS renderer — the main window or any pop-out. */
+function isStudyOsAlive(): boolean {
+  if (mainWindow && !mainWindow.isDestroyed()) return true;
+  for (const win of popoutWindows.values()) {
+    if (!win.isDestroyed()) return true;
+  }
+  return false;
+}
 /** Floating Mini craft widget — frameless, transparent, always-on-top. */
 let miniWidgetWindow: BrowserWindow | null = null;
 /** Compact Blanc Toolbox side window — parallel to the full Study OS. */
@@ -853,11 +869,19 @@ const createWindow = (restore?: {
   guardWindowToWorkArea(mainWindow, MAIN_WINDOW_MIN_SIZE);
 
   if (restore?.maximized) mainWindow.maximize();
+  // Blanc hands its background jobs back the moment a Study OS window exists.
+  broadcastStudyOsAlive(true);
   mainWindow.once('ready-to-show', () => {
     if (mainWindow && !mainWindow.isDestroyed() && restore?.visible !== false) {
       mainWindow.show();
     }
     runAfterFirstPaint();
+    // Launched Blanc-only: the desktops sync that first paint normally runs
+    // was skipped for want of a main window; run it now that there is one.
+    if (studyOsDeferredAtLaunch) {
+      studyOsDeferredAtLaunch = false;
+      syncDesktopWindows();
+    }
   });
 
   // Companion host is skipTaskbar; tear it down when the real main window closes
@@ -878,6 +902,7 @@ const createWindow = (restore?: {
     // survive the window that was feeding it, or it sits there showing a dead episode.
     closeAllStudyBlockWindows();
     stopBuddyScheduler();
+    broadcastStudyOsAlive(isStudyOsAlive());
   });
 
   attachNavGuards(mainWindow);
@@ -1009,9 +1034,15 @@ function createBlancWindow(size?: { width?: number; height?: number }): void {
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      // BlancShell never mounts ImmersionView (the only <webview> consumer) — no
-      // guest-page capability needed here.
-      backgroundThrottling: false,
+      // Blanc's Immersion tool mounts the Immersion browser's live <webview>
+      // (BlancImmersionPanel → ImmersionContent), exactly like the main window
+      // and pop-outs; `attachNavGuards` below applies the same guest hardening
+      // (`will-attach-webview` strips node integration and pins the preload).
+      webviewTag: true,
+      // Background throttling stays ON (the default). It used to be disabled,
+      // which kept every timer at full rate while Blanc was minimised and —
+      // because it also pins the Page Visibility API to "visible" — defeated
+      // every `document.hidden` guard (clipboard monitor, visualizer, polls).
     },
   });
 
@@ -1021,6 +1052,9 @@ function createBlancWindow(size?: { width?: number; height?: number }): void {
 
   win.once('ready-to-show', () => {
     if (!win.isDestroyed()) win.show();
+    // Under "Start in Blanc only" this is the first window to paint, so the
+    // deferred boot work (extension server, dictionaries…) starts here.
+    runAfterFirstPaint();
   });
   win.on('close', () => {
     if (!win.isDestroyed()) saveBlancSize(win);
@@ -1048,6 +1082,10 @@ function registerBlancIpc(): void {
     },
   );
   ipcMain.handle('blanc:close', (): { ok: boolean } => {
+    // "Exit Blanc" means "go back to Study OS", not "quit the app": when Blanc
+    // is the only window (Study OS closed, or a Blanc-only launch), open
+    // Study OS first so closing Blanc does not trip `window-all-closed`.
+    if (!isStudyOsAlive()) createWindow();
     closeBlancWindow();
     return { ok: true };
   });
@@ -1447,6 +1485,9 @@ function broadcastPopoutState(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send('popout:changed', sections);
   }
+  // A pop-out runs the Study OS renderer, background jobs included, so its
+  // opening or closing changes whether Blanc must run them (blancLaunch.ts).
+  broadcastStudyOsAlive(isStudyOsAlive());
 }
 
 // Open one app in a genuine, borderless second window. It's the same renderer
@@ -1903,6 +1944,27 @@ app.whenReady().then(async () => {
   // popup dictionary, the Reading Lens, the companion).
   registerGlobalCommandsIpc();
   registerBlancIpc();
+  registerBlancLaunchIpc({
+    isStudyOsAlive,
+    openStudyOs: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    },
+    describeWindow: (win) => ({
+      role:
+        win === mainWindow
+          ? 'study-os'
+          : win === blancWindow
+            ? 'blanc'
+            : [...popoutWindows.values()].includes(win)
+              ? 'popout'
+              : 'window',
+      title: win.getTitle(),
+    }),
+  });
   registerMiniWidgetIpc();
   registerLockscreenIpc();
   registerPlayerSyncIpc();
@@ -1959,7 +2021,15 @@ app.whenReady().then(async () => {
     attachNavGuards,
     isDevServer: isDevServer(),
   });
-  createWindow();
+  // "Start in Blanc only (lowest memory)" — off by default (blancLaunch.ts).
+  // Study OS is then created on demand by the existing focus/toggle/extension
+  // paths, Blanc's "Open Study OS" and its Exit.
+  if (loadBlancLaunchPrefs().blancOnly) {
+    studyOsDeferredAtLaunch = true;
+    createBlancWindow();
+  } else {
+    createWindow();
+  }
   // Fallback: a hidden start or a failed load never fires ready-to-show.
   setTimeout(runAfterFirstPaint, 8000);
   // Cold-start `--open=library` (etc.): main boots for services, then open the pop-out.
@@ -1968,7 +2038,8 @@ app.whenReady().then(async () => {
   afterFirstPaint(() => {
     // Assignments are seeded from `screen`, which is only live now. Run once the
     // main window exists, so its own display is excluded from the secondaries.
-    syncDesktopWindows();
+    // (A Blanc-only launch has no main window yet; createWindow runs it later.)
+    if (mainWindow && !mainWindow.isDestroyed()) syncDesktopWindows();
     startExtensionServer();
     // System-wide popup dictionary: registers its global hotkey + tray if enabled.
     startSystemDictionary();

@@ -25,7 +25,24 @@
   -webkit-backdrop-filter: none !important;
 }
 
+/* The three selectors above are a short list; every other glass surface reads
+   the blur scale, so safe mode zeroes the scale too (the same ladder perf.css
+   uses for transparency Off). Without this the taskbar, Start, widgets and
+   every token-driven panel kept their blur in "safe" mode. */
+:root[data-materials='aero'][data-aero-safe-mode='on'] {
+  --glass-blur: 0px;
+  --blur-sm: 0px;
+  --blur-md: 0px;
+  --blur-lg: 0px;
+  --blur-xl: 0px;
+  --blur-max: 0px;
+}
+
+/* Rendered by Settings > Motion in whichever theme is open, so it reads the
+   palette's own warning ink (`--warning-text` is defined for every palette);
+   `--warn` never existed, so it always fell back to a fixed amber that is
+   2.2:1 on the light palettes. */
 .aero-recovery-warning {
-  color: var(--warn, #d97706);
+  color: var(--warning-text);
   font-weight: 600;
 }

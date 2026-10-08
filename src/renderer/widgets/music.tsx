@@ -31,7 +31,7 @@ export function MiniPlayer() {
       <div className="wgt-player-title" title={st.current?.title}>
         {st.current?.title ?? t('widgets.miniPlayer.nothingPlaying')}
       </div>
-      {wired && <WiredOscilloscope className="wgt-player-osc" />}
+      {wired && <WiredOscilloscope className="wgt-player-osc" fluid />}
       <div className="wgt-player-times">
         <span>{fmt(st.time)}</span>
         <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${pct}%` }} /></div>

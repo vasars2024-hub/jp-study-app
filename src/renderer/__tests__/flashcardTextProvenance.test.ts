@@ -15,7 +15,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const SRC = resolve(__dirname, '../..');
-const APP = resolve(SRC, 'renderer/App.tsx');
+// The transcript-card handler moved out of App.tsx into the installer both
+// Study OS and Blanc run (studyBackgroundJobs.ts); the assertions follow it.
+const APP = resolve(SRC, 'renderer/studyBackgroundJobs.ts');
 const DECK = resolve(SRC, 'renderer/flashcardDeck.ts');
 const FLASHCARDS = resolve(SRC, 'renderer/components/flashcards/FlashcardsContent.tsx');
 

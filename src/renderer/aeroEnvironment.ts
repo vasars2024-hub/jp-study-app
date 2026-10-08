@@ -21,7 +21,13 @@ const AERO_RESTORE_THEME_KEY = 'jp-aero-restore-theme-v1';
 
 export const SECRET_AERO_PLAYLIST_ID = 'secret-aero-default-wallpaper';
 const SECRET_AERO_DEFAULT_RULE_ID = 'secret-aero-default';
-const SECRET_AERO_DEFAULT_ITEM_ID = 'secret-midday';
+const SECRET_AERO_DEFAULT_ITEM_ID = 'secret-harmony-aurora';
+/**
+ * Item ids of the playlist an earlier build seeded (two plain walls). A saved
+ * playlist that is still exactly that seed was never edited, so it is upgraded
+ * to the Aero scenery; anything else is the owner's and is left alone.
+ */
+const LEGACY_SEED_ITEM_IDS = ['secret-midday', 'secret-snow'];
 
 /** Pins Secret OS to its first wall; `fromHour === toHour` matches all day. */
 function buildSecretAeroDefaultRule(): RotationRule {
@@ -34,8 +40,10 @@ function buildSecretAeroDefaultRule(): RotationRule {
 }
 
 /**
- * Secret OS starts on the built-in light walls. The five illustrated Aero scenes
- * it used to seed were removed; nothing bundled replaces them.
+ * Secret OS starts on its own CSS scenery (wallCatalog.ts): Harmony Aurora is
+ * pinned, Bubble Lagoon and Green Hills sit beside it, and Midday stays as the
+ * plain light fallback. (The five illustrated scenes an older build seeded were
+ * removed and stay retired; these are new presets under new ids.)
  */
 export function buildSecretAeroWallpaperPlaylist(): WallpaperPlaylist {
   return {
@@ -44,10 +52,17 @@ export function buildSecretAeroWallpaperPlaylist(): WallpaperPlaylist {
     transition: 'crossfade',
     transitionMs: 900,
     items: [
-      { id: SECRET_AERO_DEFAULT_ITEM_ID, kind: 'preset', ref: 'midday', label: 'Midday', tags: ['secret', 'day'], durationSec: 0 },
-      { id: 'secret-snow', kind: 'preset', ref: 'snow', label: 'Snow', tags: ['secret', 'day'], durationSec: 0 },
+      { id: SECRET_AERO_DEFAULT_ITEM_ID, kind: 'preset', ref: 'harmony-aurora', label: 'Harmony Aurora', tags: ['secret', 'day'], durationSec: 0 },
+      { id: 'secret-bubble-lagoon', kind: 'preset', ref: 'bubble-lagoon', label: 'Bubble Lagoon', tags: ['secret', 'day'], durationSec: 0 },
+      { id: 'secret-green-hills', kind: 'preset', ref: 'green-hills', label: 'Green Hills', tags: ['secret', 'day'], durationSec: 0 },
+      { id: 'secret-midday', kind: 'preset', ref: 'midday', label: 'Midday', tags: ['secret', 'day'], durationSec: 0 },
     ],
   };
+}
+
+function isUneditedLegacySeed(playlist: WallpaperPlaylist): boolean {
+  const ids = playlist.items.map((item) => item.id);
+  return ids.length === LEGACY_SEED_ITEM_IDS.length && ids.every((id, i) => id === LEGACY_SEED_ITEM_IDS[i]);
 }
 
 /**
@@ -62,7 +77,7 @@ export function refreshSecretWallpaperRefs(env: EnvironmentSettings): Environmen
   const clean = stripRetiredWalls(env.playlists ?? [], env.rules ?? []);
   const playlists = [...clean.playlists];
   const idx = playlists.findIndex((p) => p.id === SECRET_AERO_PLAYLIST_ID);
-  const seeded = idx < 0 || playlists[idx].items.length === 0;
+  const seeded = idx < 0 || playlists[idx].items.length === 0 || isUneditedLegacySeed(playlists[idx]);
   if (idx < 0) playlists.push(buildSecretAeroWallpaperPlaylist());
   else if (seeded) playlists[idx] = buildSecretAeroWallpaperPlaylist();
   const secret = playlists.find((p) => p.id === SECRET_AERO_PLAYLIST_ID);
@@ -70,8 +85,16 @@ export function refreshSecretWallpaperRefs(env: EnvironmentSettings): Environmen
   const existing = clean.rules.find((rule) => rule.id === SECRET_AERO_DEFAULT_RULE_ID);
   const pin = seeded ? buildSecretAeroDefaultRule() : existing;
   const pinStillValid = !!pin && !!secret?.items.some((item) => item.id === pin.itemId);
+  // The same "unedited seed" rule for the particles: a snapshot still carrying
+  // the old Floating Islands dust + magic gets the Aero bubbles instead.
+  const legacyParticles =
+    env.environmentPresetId === 'floating-islands' &&
+    env.particlePresets?.length === 2 &&
+    env.particlePresets[0] === 'dust' &&
+    env.particlePresets[1] === 'magic';
   return {
     ...env,
+    ...(legacyParticles ? { particlePresets: ['bubbles', 'magic'] as EnvironmentSettings['particlePresets'] } : {}),
     playlists,
     rules: pinStillValid && pin ? [pin, ...otherRules] : otherRules,
   };
@@ -81,6 +104,8 @@ export function secretAeroEnvironmentPatch(): Partial<EnvironmentSettings> {
   return {
     enabled: true,
     ...(presetPatch('floating-islands') ?? {}),
+    // Glossy rising bubbles with a few magic motes, not dust — the Aero air.
+    particlePresets: ['bubbles', 'magic'],
     companionsEnabled: true,
     companionTypes: ['aero-assistant'],
     companionReactivity: 'playful',

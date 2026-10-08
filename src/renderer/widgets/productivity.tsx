@@ -10,6 +10,7 @@ import {
   type EventOccurrence,
 } from '../calendar';
 import { useT } from '../i18n';
+import { useWiredMaterials } from '../components/ui/AppChrome';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import { timerElapsedMs, timerRemainingMs, useWidgetTimer } from './timerStore';
 
@@ -39,6 +40,7 @@ export function DigitalClock({ settings, size }: WidgetProps) {
 
 // ---------- Analog clock ----------
 export function AnalogClock({ size }: WidgetProps) {
+  const wired = useWiredMaterials();
   const now = useNow(1000);
   const s = now.getSeconds();
   const m = now.getMinutes();
@@ -60,10 +62,24 @@ export function AnalogClock({ size }: WidgetProps) {
       />
     );
   };
+  // WIRED "Radar Clock": range rings and a sweeping wedge under the hands.
+  // The wedge's rotation is CSS (stepped, idle/motion/reduced-motion gated in
+  // wired-widgets.css); nothing here re-renders faster than the 1s clock.
+  const sweepR = r - 2;
+  const wedge = `M${cx} ${cy} L${cx} ${cy - sweepR} A${sweepR} ${sweepR} 0 0 1 ${cx + sweepR * Math.sin(Math.PI / 6)} ${cy - sweepR * Math.cos(Math.PI / 6)} Z`;
   return (
     <div className="wgt wgt-clock-analog">
       <svg viewBox={`0 0 ${cx + r + 10} ${cy + r + 10}`} width="100%" height="100%">
         <circle className="wgt-analog-face" cx={cx} cy={cy} r={r} />
+        {wired && (
+          <g className="wgt-radar" aria-hidden="true">
+            <circle className="wgt-radar-ring" cx={cx} cy={cy} r={r * 0.33} />
+            <circle className="wgt-radar-ring" cx={cx} cy={cy} r={r * 0.66} />
+            <line className="wgt-radar-axis" x1={cx - r} y1={cy} x2={cx + r} y2={cy} />
+            <line className="wgt-radar-axis" x1={cx} y1={cy - r} x2={cx} y2={cy + r} />
+            <path className="wgt-radar-sweep" d={wedge} style={{ transformOrigin: `${cx}px ${cy}px` }} />
+          </g>
+        )}
         {Array.from({ length: 12 }, (_, i) => {
           const a = ((i * 30 - 90) * Math.PI) / 180;
           return (
@@ -189,8 +205,11 @@ export function Pomodoro({ settings, setSettings, instanceId }: WidgetProps) {
   const { state, now } = timer;
   const left = timerRemainingMs(state, now);
   const pct = state.durationMs > 0 ? 1 - left / state.durationMs : 0;
+  // Theme-neutral state hooks; only Wired paints them (relay blink on the
+  // final ten seconds, amber past 80%).
+  const final = state.running && left > 0 && left <= 10_000;
   return (
-    <div className="wgt wgt-pomo">
+    <div className="wgt wgt-pomo" data-final={final ? 'true' : undefined} data-late={pct >= 0.8 ? 'true' : undefined}>
       <div className="wgt-pomo-mode">{state.phase === 'work' ? t('widgets.pomodoro.focus') : t('widgets.pomodoro.break')}</div>
       <div className="wgt-pomo-time">{mmss(left)}</div>
       <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${pct * 100}%` }} /></div>
@@ -236,8 +255,11 @@ export function Countdown({ settings, setSettings, instanceId }: WidgetProps) {
   const timer = useWidgetTimer(instanceId, 'countdown', minutes * 60_000);
   const left = timerRemainingMs(timer.state, timer.now);
   const done = timer.state.finishedAt !== null;
+  // Arming states, theme-neutral; Wired paints `warn` amber (< 1h) and
+  // `critical` in the danger red (< 60s) — the one sanctioned red on a widget.
+  const urgency = done ? undefined : left < 60_000 ? 'critical' : left < 3_600_000 ? 'warn' : undefined;
   return (
-    <div className="wgt wgt-countdown">
+    <div className="wgt wgt-countdown" data-urgency={urgency}>
       <div className={`wgt-pomo-time ${done ? 'wgt-flash' : ''}`}>{mmss(left)}</div>
       <div className="wgt-row">
         <button className="wgt-btn" onClick={() => (timer.state.running ? timer.pause() : timer.start())}>{timer.state.running ? t('common.pause') : t('common.start')}</button>

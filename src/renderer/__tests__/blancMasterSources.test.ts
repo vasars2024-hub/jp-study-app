@@ -76,6 +76,8 @@ describe('Blanc Master Search source adapters', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toEqual([
       'interface',
+      // The compact Study OS essentials section (2026-10 refinement pass).
+      'study',
       'models',
       'memory',
       'lockscreen',
@@ -86,6 +88,8 @@ describe('Blanc Master Search source adapters', () => {
       'tool-visibility',
       'shortcuts',
       'mode',
+      // Blanc mechanics: warm tools, RAM budget, Flow and Capture inbox.
+      'mechanics',
     ]);
   });
 

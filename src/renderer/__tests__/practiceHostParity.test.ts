@@ -53,7 +53,8 @@ describe('practice mode host parity', () => {
   });
 
   it('reaches Blanc through the shared overview, not a second implementation', () => {
-    const blanc = read('components/blanc/BlancMediaPanels.tsx');
+    // Blanc's Cards tab has its own module since the per-panel chunk split.
+    const blanc = read('components/blanc/BlancFlashcardsPanel.tsx');
     expect(blanc).toContain('FlashcardDeckOverview');
     expect(blanc).toContain('<FlashcardDeckOverview state={state} />');
     // If this ever fails, Blanc has grown its own body and the four modes, the

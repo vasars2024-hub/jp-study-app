@@ -34,7 +34,12 @@ export default function WiredLyricPreview({
     return new Map(plan.map((f) => [f.index, f]));
   }, [text, intensity]);
 
+  const isStatic = intensity === 0;
+
   useEffect(() => {
+    // No conveyor under reduced motion / motion off (the parent normally does
+    // not mount the back lane then at all; this is the belt to that brace).
+    if (isStatic) return undefined;
     const duration = Math.max(0.4, cueEnd - cueStart);
     let raf = 0;
     const loop = () => {
@@ -54,7 +59,7 @@ export default function WiredLyricPreview({
   }, []);
 
   return (
-    <div ref={lineRef} className="wlyric-back-line" aria-hidden="true">
+    <div ref={lineRef} className={isStatic ? 'wlyric-back-line is-static' : 'wlyric-back-line'} aria-hidden="true">
       <span className="wlyric-back-inner">
         {chars.map((ch, i) => {
           if (ch === ' ') return ' ';

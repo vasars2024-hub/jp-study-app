@@ -1,0 +1,120 @@
+/**
+ * Blanc's launch preference and its view of Study OS.
+ *
+ * "Start in Blanc only (lowest memory)": main normally opens the full Study OS
+ * window at launch, and Blanc (when enabled) opens beside it — so the cheap
+ * toolbox never actually ran alone. With this preference on, main opens only
+ * the Blanc window; Study OS is created on demand by the paths that already
+ * recreate it (focus/toggle, the extension's "open in app", "Open Study OS").
+ * It lives in userData so main can read it before any renderer exists, the
+ * same way `window-chrome.json` is read.
+ *
+ * Blanc also needs to know whether a Study OS renderer is alive: the background
+ * jobs (extension mining, transcription, reminders…) run in exactly one place,
+ * and Blanc takes them over only while there is no Study OS window.
+ */
+import path from 'node:path';
+import { app, BrowserWindow, ipcMain } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { summarizeAppMemory, type AppMemoryReport, type AppProcessMemory, type AppProcessRole } from '../shared/appMemory';
+
+export interface BlancLaunchPrefs {
+  /** Open only the Blanc window at launch; Study OS on demand. Off by default. */
+  blancOnly: boolean;
+}
+
+const FILE_NAME = 'blanc-launch.json';
+
+function prefsPath(): string {
+  return path.join(app.getPath('userData'), FILE_NAME);
+}
+
+export function loadBlancLaunchPrefs(): BlancLaunchPrefs {
+  try {
+    const parsed = readJsonSync<{ blancOnly?: unknown }>(prefsPath(), {}, {
+      validate: (v) => typeof v === 'object' && v !== null,
+    });
+    return { blancOnly: parsed.blancOnly === true };
+  } catch {
+    return { blancOnly: false };
+  }
+}
+
+function saveBlancLaunchPrefs(prefs: BlancLaunchPrefs): BlancLaunchPrefs {
+  try {
+    writeJsonAtomicSync(prefsPath(), { blancOnly: prefs.blancOnly }, { space: 0 });
+  } catch {
+    /* best effort: the default (off) is always safe */
+  }
+  return prefs;
+}
+
+export interface BlancLaunchDeps {
+  /** True while a window running the Study OS renderer (main or a pop-out) is open. */
+  isStudyOsAlive: () => boolean;
+  /** Show Study OS, creating its window when there is none. */
+  openStudyOs: () => void;
+  /** Which window a renderer process draws, for the memory readout. */
+  describeWindow: (win: BrowserWindow) => { role: AppProcessRole; title: string };
+}
+
+/** Tell every renderer whether a Study OS window is alive (Blanc listens). */
+export function broadcastStudyOsAlive(alive: boolean): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('blanc:study-os-alive', alive);
+  }
+}
+
+function processRole(type: string): AppProcessRole {
+  if (type === 'Browser') return 'browser';
+  if (type === 'GPU') return 'gpu';
+  if (type === 'Utility') return 'utility';
+  return 'other';
+}
+
+export function collectAppMemory(describeWindow: BlancLaunchDeps['describeWindow']): AppMemoryReport {
+  const windowsByPid = new Map<number, { role: AppProcessRole; title: string }>();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue;
+    try {
+      const pid = win.webContents.getOSProcessId();
+      if (pid > 0 && !windowsByPid.has(pid)) windowsByPid.set(pid, describeWindow(win));
+    } catch {
+      /* a window mid-teardown */
+    }
+  }
+  const processes: AppProcessMemory[] = app.getAppMetrics().map((metric) => {
+    const win = windowsByPid.get(metric.pid);
+    const memory = metric.memory as { workingSetSize?: number; privateBytes?: number } | undefined;
+    return {
+      pid: metric.pid,
+      role: win ? win.role : processRole(metric.type),
+      label: win ? win.title : (metric.name || metric.serviceName || metric.type),
+      // Electron reports kilobytes.
+      workingSetBytes: Math.max(0, (memory?.workingSetSize ?? 0) * 1024),
+      ...(typeof memory?.privateBytes === 'number' ? { privateBytes: memory.privateBytes * 1024 } : {}),
+      cpuPercent: Math.max(0, metric.cpu?.percentCPUUsage ?? 0),
+    };
+  });
+  return summarizeAppMemory(processes);
+}
+
+export function registerBlancLaunchIpc(deps: BlancLaunchDeps): void {
+  ipcMain.handle('blanc:getLaunchPrefs', (): BlancLaunchPrefs => loadBlancLaunchPrefs());
+  ipcMain.handle('blanc:setLaunchPrefs', (_event, patch: unknown): BlancLaunchPrefs => {
+    const current = loadBlancLaunchPrefs();
+    const next: BlancLaunchPrefs = {
+      blancOnly:
+        patch && typeof patch === 'object' && typeof (patch as { blancOnly?: unknown }).blancOnly === 'boolean'
+          ? (patch as { blancOnly: boolean }).blancOnly
+          : current.blancOnly,
+    };
+    return saveBlancLaunchPrefs(next);
+  });
+  ipcMain.handle('blanc:studyOsAlive', (): boolean => deps.isStudyOsAlive());
+  ipcMain.handle('blanc:openStudyOs', (): { ok: boolean } => {
+    deps.openStudyOs();
+    return { ok: true };
+  });
+  ipcMain.handle('app:memoryMetrics', (): AppMemoryReport => collectAppMemory(deps.describeWindow));
+}

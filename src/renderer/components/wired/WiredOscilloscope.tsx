@@ -3,8 +3,13 @@
  * surfaces (Music now-playing strip, mini audio deck widget). Draws a
  * synthesized Lissajous/sine composite driven by wall-clock time while
  * playback runs — deterministic and cheap, no Web Audio tap. Idle shows a
- * flat trace with an occasional blip. Renders one static frame under
- * prefers-reduced-motion, and steps at ~24fps otherwise (CRTs don't tween).
+ * flat trace with an occasional blip. Steps at ~24fps (CRTs don't tween).
+ *
+ * Stands still (one static frame) under OS reduced motion, the in-app
+ * `html.reduce-motion` control, Wired motion "off" and Wired idle animations
+ * "off"; re-evaluates live when any of those flip. Pauses while the document
+ * is hidden. `fluid` makes the canvas track its container's width (the
+ * mini-player widget) instead of the fixed 96px default.
  */
 import { useEffect, useRef } from 'react';
 import { getState, subscribe } from '../../playerBus';
@@ -26,18 +31,32 @@ function traceY(p: number, t: number, playing: boolean): number {
   return H / 2 - blip;
 }
 
-export default function WiredOscilloscope({ className }: { className?: string }) {
+function motionAllowed(): boolean {
+  if (typeof window === 'undefined') return false;
+  const root = document.documentElement;
+  if (root.classList.contains('reduce-motion')) return false;
+  if (root.dataset.wiredMotion === 'off' || root.dataset.wiredIdle === 'off') return false;
+  return !(typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+export default function WiredOscilloscope({ className, fluid = false }: { className?: string; fluid?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
+    if (!canvas) return undefined;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
+    if (!ctx) return undefined;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    let width = W;
+
+    const size = () => {
+      width = fluid ? Math.max(48, Math.round(canvas.clientWidth || W)) : W;
+      canvas.width = width * dpr;
+      canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    size();
 
     let playing = getState().playing;
     const unsub = subscribe((s) => {
@@ -45,13 +64,13 @@ export default function WiredOscilloscope({ className }: { className?: string })
     });
 
     const paint = (t: number) => {
-      ctx.clearRect(0, 0, W, H);
+      ctx.clearRect(0, 0, width, H);
       ctx.strokeStyle = 'rgba(109, 241, 255, 0.14)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, H / 2 + 0.5);
-      ctx.lineTo(W, H / 2 + 0.5);
-      for (let gx = 12; gx < W; gx += 12) {
+      ctx.lineTo(width, H / 2 + 0.5);
+      for (let gx = 12; gx < width; gx += 12) {
         ctx.moveTo(gx + 0.5, 0);
         ctx.lineTo(gx + 0.5, H);
       }
@@ -61,21 +80,14 @@ export default function WiredOscilloscope({ className }: { className?: string })
       ctx.shadowColor = 'rgba(109, 241, 255, 0.5)';
       ctx.shadowBlur = 3;
       ctx.beginPath();
-      for (let x = 0; x <= W; x += 2) {
-        const y = traceY(x / W, t, playing);
+      for (let x = 0; x <= width; x += 2) {
+        const y = traceY(x / width, t, playing);
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
     };
-
-    const reduced =
-      typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) {
-      paint(1.2);
-      return unsub;
-    }
 
     let raf = 0;
     let last = 0;
@@ -85,18 +97,51 @@ export default function WiredOscilloscope({ className }: { className?: string })
       last = now;
       paint(now / 1000);
     };
-    raf = requestAnimationFrame(loop);
+
+    const start = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      if (!motionAllowed() || document.visibilityState === 'hidden') {
+        paint(1.2);
+        return;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    start();
+
+    // Re-evaluate when the gates change: OS preference, the in-app class and
+    // the Wired data-* attributes on <html>, and tab visibility.
+    const mq = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    mq?.addEventListener?.('change', start);
+    const obs = new MutationObserver(start);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-wired-motion', 'data-wired-idle'],
+    });
+    document.addEventListener('visibilitychange', start);
+    const ro = fluid && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          size();
+          if (!raf) paint(1.2);
+        })
+      : null;
+    ro?.observe(canvas);
+
     return () => {
       cancelAnimationFrame(raf);
       unsub();
+      mq?.removeEventListener?.('change', start);
+      obs.disconnect();
+      document.removeEventListener('visibilitychange', start);
+      ro?.disconnect();
     };
-  }, []);
+  }, [fluid]);
 
   return (
     <canvas
       ref={canvasRef}
       className={['wired-osc', className].filter(Boolean).join(' ')}
-      style={{ width: W, height: H }}
+      style={fluid ? { height: H } : { width: W, height: H }}
       aria-hidden="true"
     />
   );

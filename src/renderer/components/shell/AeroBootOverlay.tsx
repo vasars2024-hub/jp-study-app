@@ -75,15 +75,6 @@ function phaseKickerKey(phase: SecretLifecyclePhase): string {
   }
 }
 
-function bootStepState(phase: SecretLifecyclePhase, step: SecretLifecyclePhase): string {
-  const phaseIndex = BOOT_ORDER.indexOf(phase);
-  const stepIndex = BOOT_ORDER.indexOf(step);
-  if (phaseIndex < 0 || stepIndex < 0) return '';
-  if (stepIndex < phaseIndex) return 'done';
-  if (stepIndex === phaseIndex) return 'active';
-  return '';
-}
-
 function primaryControlKey(phase: SecretLifecyclePhase): string {
   if (phase === 'welcome') return 'aero.boot.enterDesktop';
   if (phase === 'waking') return 'aero.boot.restoreNow';
@@ -150,7 +141,7 @@ export default function AeroBootOverlay() {
       className={classes}
       role="status"
       aria-live="polite"
-      aria-label={lifecycle.message}
+      aria-label={t(lifecycle.messageKey)}
     >
       <div className="os-aero-boot-scene" aria-hidden="true">
         <div className="os-aero-boot-sky" />
@@ -160,6 +151,7 @@ export default function AeroBootOverlay() {
         <div className="os-aero-boot-shore" />
       </div>
       <div className="os-aero-boot-aurora" aria-hidden="true" />
+      {phase === 'reveal' && <div className="os-aero-boot-bloom" aria-hidden="true" />}
       <div className="os-aero-boot-inner">
         <div className="os-aero-boot-emblem" aria-hidden="true">
           <div className="os-aero-boot-rings">
@@ -183,10 +175,15 @@ export default function AeroBootOverlay() {
         <div className="os-aero-boot-edition">{t('aero.boot.edition')}</div>
         <div className="os-aero-boot-sub">{t(phaseSubKey(phase))}</div>
         {showBootSteps && !isSystemClose && (
-          <div className="os-aero-boot-steps" aria-hidden="true">
-            {BOOT_ORDER.map((step) => (
-              <span key={step} className={bootStepState(phase, step)} />
-            ))}
+          /* Vista-style boot strip: three glossy green segments gliding through
+             a dark trough. Indeterminate on purpose — the phases are not equal
+             lengths, so a filling bar would lie about progress. */
+          <div className="os-aero-boot-progress" aria-hidden="true">
+            <span className="os-aero-boot-progress-run">
+              <i />
+              <i />
+              <i />
+            </span>
           </div>
         )}
         {phase === 'welcome' && (

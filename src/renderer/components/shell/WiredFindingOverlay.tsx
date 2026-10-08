@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { useAppMaterialSet } from '../ui';
 import * as player from '../../playerBus';
+import type { MediaItem } from '../../../shared/types';
 import { useLiveLyrics } from '../../liveLyrics';
 import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../../wiredDiscovery';
 import {
@@ -14,6 +15,7 @@ import type { VerdictAction } from '../../findingModules';
 import {
   loadWiredArchiveSettings,
   onWiredArchiveSettingsChanged,
+  type WiredArchiveSettings,
   type WiredFindingFeature,
 } from '../../terminalModeSettings';
 import guidePortraitUrl from '../../assets/companions/guide-portrait.png';
@@ -41,7 +43,7 @@ function maskLine(text: string): string {
   return `${parts.slice(0, -1).join(' ')} ____`;
 }
 
-const MATRIX_GLYPHS = 'あいうえおかきくけこさしすせそたちつてとなにぬねのまみむめもやゆよらりるれろわをん';
+const KANA_GLYPHS = 'あいうえおかきくけこさしすせそたちつてとなにぬねのまみむめもやゆよらりるれろわをん';
 
 function glitchText(text: string, seed: number): string {
   const src = cleanLine(text);
@@ -50,7 +52,7 @@ function glitchText(text: string, seed: number): string {
     .map((ch, i) => {
       if (/\s/.test(ch)) return ch;
       const n = seed + i * 13;
-      if (n % 17 === 0) return MATRIX_GLYPHS[n % MATRIX_GLYPHS.length];
+      if (n % 17 === 0) return KANA_GLYPHS[n % KANA_GLYPHS.length];
       if (n % 29 === 0) return '・';
       if (n % 43 === 0) return '█';
       return ch;
@@ -61,7 +63,7 @@ function glitchText(text: string, seed: number): string {
 function kanaFlow(seed: number, length = 64): string {
   let out = '';
   for (let i = 0; i < length; i++) {
-    out += MATRIX_GLYPHS[(seed + i * 11) % MATRIX_GLYPHS.length];
+    out += KANA_GLYPHS[(seed + i * 11) % KANA_GLYPHS.length];
     if (i % 6 === 5) out += ' ';
   }
   return out;
@@ -76,12 +78,8 @@ const RADAR_NODES = [
 ];
 
 /**
- * Geometry for the ambient layers.
- *
- * Computed once and never regenerated. The previous version rebuilt these on a
- * 180ms tick, which restarted every CSS animation mid-flight — the particles
- * stuttered in place instead of drifting, and the whole overlay re-rendered
- * five times a second. Motion belongs to CSS; the DOM here is static.
+ * Geometry for the ambient layers. Computed once and never regenerated —
+ * motion belongs to CSS; the DOM here is static.
  */
 const PARTICLES = Array.from({ length: 26 }, (_, i) => {
   const seed = (i * 73 + 19) % 1000;
@@ -94,68 +92,172 @@ const PARTICLES = Array.from({ length: 26 }, (_, i) => {
   };
 });
 
-const MATRIX_COLUMNS = Array.from({ length: 10 }, (_, i) => ({
+const KANA_COLUMNS = Array.from({ length: 10 }, (_, i) => ({
   id: i,
   left: 4 + i * 8.8,
-  delay: i * 0.22,
+  delay: i * 0.9,
   duration: 14 + (i % 3) * 2.4,
   text: kanaFlow(i * 13, 72),
 }));
 
-/** Fiction codes for the MAGI units — content-neutral, deliberately literal. */
-const MAGI_UNIT_CODES = {
-  balthasar: 'BALTHASAR-2',
-  melchior: 'MELCHIOR-1',
-  casper: 'CASPER-3',
+/**
+ * Fiction codes for the three arbitration units — content-neutral, literal.
+ * (Feature id `magiVote` is a stored setting and keeps its old name.)
+ */
+const ARBITER_UNIT_CODES = {
+  balthasar: 'ARB-02',
+  melchior: 'ARB-01',
+  casper: 'ARB-03',
 } as const;
 
 /** Synthetic per-line window for untimed (plain) lyrics, so the transmission
  *  still travels continuously instead of sitting frozen mid-screen. */
 const LYRIC_BUCKET_SECONDS = 6.4;
 
+/** How long a rail entry stays on the analysis rail before it self-expires. */
+const RAIL_ENTRY_MS = 9000;
+
+function readReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    document.documentElement.classList.contains('reduce-motion') ||
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+  );
+}
+
+/** OS preference + in-app Display control, live. */
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(readReducedMotion);
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const update = () => setReduced(readReducedMotion());
+    mq?.addEventListener?.('change', update);
+    const obs = new MutationObserver(update);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => {
+      mq?.removeEventListener?.('change', update);
+      obs.disconnect();
+    };
+  }, []);
+  return reduced;
+}
+
+/**
+ * Mounted under every theme, by design: the lyric lookup it performs is one of
+ * the ways the archive gets discovered (`useLiveLyrics` → `markWiredDiscovered`).
+ *
+ * It used to subscribe to the full player state here, so the whole overlay
+ * tree re-rendered on every playback tick even with the overlay switched off
+ * and the theme not Wired. The shell now keeps only `current` + `duration`
+ * (which change per track, not per tick) and runs a headless probe for the
+ * lookup; the per-tick subscription lives inside the live overlay, which only
+ * mounts when the overlay is actually on.
+ */
 export default function WiredFindingOverlay() {
-  const { t, lang } = useT();
   const material = useAppMaterialSet();
   const wired = material === 'wired';
   const [discovered, setDiscovered] = useState(hasDiscoveredWired);
-  const [wiredSettings, setWiredSettings] = useState(() => loadWiredArchiveSettings());
+  const [settings, setSettings] = useState(() => loadWiredArchiveSettings());
+  const [track, setTrack] = useState(() => {
+    const s = player.getState();
+    return { current: s.current, duration: s.duration };
+  });
+
+  useEffect(() => onWiredDiscoveryChanged(setDiscovered), []);
+  useEffect(() => onWiredArchiveSettingsChanged(setSettings), []);
+
+  const enabled = wired && discovered && settings.findingOverlayEnabled;
+
+  useEffect(() => {
+    if (enabled) return undefined;
+    return player.subscribe((s) => {
+      setTrack((prev) =>
+        prev.current === s.current && prev.duration === s.duration ? prev : { current: s.current, duration: s.duration },
+      );
+    });
+  }, [enabled]);
+
+  if (!enabled) return <LyricDiscoveryProbe current={track.current} duration={track.duration} />;
+  return <LiveFindingOverlay settings={settings} />;
+}
+
+/** Headless: performs the lyric lookup (and therefore discovery), renders nothing. */
+function LyricDiscoveryProbe({ current, duration }: { current: MediaItem | null; duration: number }) {
+  useLiveLyrics(current, duration, 0);
+  return null;
+}
+
+/** The broadcast crawl owns its own glitch tick, so it never re-renders the overlay. */
+function BroadcastTicker({ sourceLine, vocabCount, idle }: { sourceLine: string; vocabCount: number; idle: boolean }) {
+  const { t } = useT();
+  const [seed, setSeed] = useState(0);
+  useEffect(() => {
+    if (!idle) return undefined;
+    const tick = window.setInterval(() => setSeed((n) => n + 1), 320);
+    return () => window.clearInterval(tick);
+  }, [idle]);
+  return (
+    <section className="wired-found-ticker" aria-hidden="true">
+      <div className="wired-found-ticker-track">
+        {[0, 1].map((rep) => (
+          <span key={rep} className="wired-found-ticker-group">
+            <span>{glitchText(t('wired.found.ticker.link'), seed + 21)}</span>
+            <span>{glitchText(t('wired.found.ticker.node'), seed + 22)}</span>
+            <span>{glitchText(sourceLine || t('wired.found.ticker.idle', { count: vocabCount }), seed + 23)}</span>
+            <span>{glitchText(t('wired.found.ticker.feed'), seed + 24)}</span>
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LiveFindingOverlay({ settings: wiredSettings }: { settings: WiredArchiveSettings }) {
+  const { t, lang } = useT();
   const [state, setState] = useState(player.getState);
   const [terminal, setTerminal] = useState<string[]>([]);
   const [answer, setAnswer] = useState('');
-  const [glitchSeed, setGlitchSeed] = useState(0);
   const [summoned, setSummoned] = useState(false);
   const [vkPick, setVkPick] = useState<number | null>(null);
   const [ghostOpen, setGhostOpen] = useState(false);
   const [railEntries, setRailEntries] = useState<{ id: number; text: string; kind: 'semantic' | 'metadata' }[]>([]);
   const railIdRef = useRef(0);
+  const railTimers = useRef(new Set<number>());
   const metaCursorRef = useRef(0);
+  const reducedMotion = useReducedMotion();
 
-  useEffect(() => onWiredDiscoveryChanged(setDiscovered), []);
-  useEffect(() => onWiredArchiveSettingsChanged(setWiredSettings), []);
   useEffect(() => player.subscribe(setState), []);
 
   const live = useLiveLyrics(state.current, state.duration, state.time);
 
-  // The overlay itself no longer waits on lyrics. Only the two lyric-driven
-  // modules do — the eye, the radar and the study instruments have nothing to
-  // do with music, and gating them behind a synced track made most of the
-  // feature set unreachable.
-  const enabled = wired && discovered && wiredSettings.findingOverlayEnabled;
+  // The overlay itself no longer waits on lyrics. Only the lyric-driven
+  // modules do — the eye, the scope and the study instruments have nothing to
+  // do with music.
   const hasLyrics = live.lyrics.kind === 'synced' || live.lyrics.kind === 'plain';
   const featureOn = useCallback(
     (id: WiredFindingFeature) => wiredSettings.findingFeatures.includes(id),
     [wiredSettings.findingFeatures],
   );
 
-  const idle = wiredSettings.idleAnimations && wiredSettings.motionLevel !== 'off';
-  const readouts = useFindingReadouts(enabled);
-  const parallaxRef = usePointerParallax<HTMLDivElement>(enabled);
+  const idle = wiredSettings.idleAnimations && wiredSettings.motionLevel !== 'off' && !reducedMotion;
+  const readouts = useFindingReadouts(true);
+  const tracksPointer = featureOn('surveillanceEye') || featureOn('networkRadar');
+  const parallaxRef = usePointerParallax<HTMLDivElement>(tracksPointer, 1 / 48);
 
   useEffect(() => {
     setTerminal([t('wired.found.term.scan'), t('wired.found.term.waiting')]);
   }, [lang, t]);
 
-  useEffect(() => setSummoned(isSummonPresent('wired')), [enabled]);
+  useEffect(() => setSummoned(isSummonPresent('wired')), []);
+
+  // Rail timers die with the overlay — they used to fire setState after unmount.
+  useEffect(() => {
+    const timers = railTimers.current;
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      timers.clear();
+    };
+  }, []);
 
   const lines = useMemo(() => {
     if (live.lyrics.kind === 'synced') {
@@ -170,17 +272,8 @@ export default function WiredFindingOverlay() {
     return { current: '', all: [] as string[] };
   }, [live.activeIndex, live.lyrics]);
 
-  const reducedMotion = useMemo(
-    () =>
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
-    [],
-  );
-
   // The line currently being transmitted. Synced lyrics use their real cue
-  // window; plain (untimed) lyrics get a synthetic clock (see
-  // LYRIC_BUCKET_SECONDS) so the stream still travels continuously instead
-  // of sitting frozen mid-screen.
+  // window; plain (untimed) lyrics get a synthetic clock.
   const lyricLine = useMemo(() => {
     if (live.lyrics.kind === 'synced' && live.activeIndex >= 0) {
       const cue = live.lyrics.cues[live.activeIndex];
@@ -207,10 +300,8 @@ export default function WiredFindingOverlay() {
     };
   }, [live.lyrics, live.activeIndex, state.time]);
 
-  // The "back lane" conveyor: the line arriving NEXT, mirrored and small,
-  // bound to the exact same time window as the current front line. It always
-  // reaches the far edge right as the front line finishes exiting — what was
-  // small and backwards back here is what shows up big and readable next.
+  // The "back lane": the line arriving NEXT, mirrored and small, bound to the
+  // same time window as the current front line.
   const nextLyricLine = useMemo(() => {
     if (!lyricLine) return null;
     if (live.lyrics.kind === 'synced' && live.activeIndex >= 0) {
@@ -230,15 +321,16 @@ export default function WiredFindingOverlay() {
     return text ? { text, start: lyricLine.start, end: lyricLine.end } : null;
   }, [lyricLine, live.lyrics, live.activeIndex, state.time]);
 
-  // Rail entries self-expire — the analysis rail should read as a live feed,
-  // not an ever-growing log.
+  // Rail entries self-expire — the analysis rail reads as a live feed.
   const pushRail = useCallback((text: string, kind: 'semantic' | 'metadata') => {
     railIdRef.current += 1;
     const id = railIdRef.current;
     setRailEntries((prev) => [...prev.slice(-5), { id, text, kind }]);
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
+      railTimers.current.delete(timer);
       setRailEntries((prev) => prev.filter((e) => e.id !== id));
-    }, 9000);
+    }, RAIL_ENTRY_MS);
+    railTimers.current.add(timer);
   }, []);
   const handleLyricArchive = useCallback((fragment: string) => pushRail(fragment, 'semantic'), [pushRail]);
   const handleLyricMetadata = useCallback(() => {
@@ -252,19 +344,10 @@ export default function WiredFindingOverlay() {
   }, []);
 
   useEffect(() => {
-    if (!enabled || !state.current) return;
+    if (!state.current) return;
     setAnswer('');
     pushTerminal(`> ${t('wired.found.term.tune')} ${cleanLine(state.current.title ?? state.current.fileName ?? '')}`);
-  }, [enabled, pushTerminal, state.current, t]);
-
-  // The glitch tick drives text distortion only. It is deliberately separate
-  // from any input state: the old version listed `answer` alongside the
-  // interval, so every keystroke tore the timer down and rebuilt it.
-  useEffect(() => {
-    if (!enabled || !idle) return undefined;
-    const tick = window.setInterval(() => setGlitchSeed((n) => n + 1), 320);
-    return () => window.clearInterval(tick);
-  }, [enabled, idle]);
+  }, [pushTerminal, state.current, t]);
 
   const guideText = lines.current ? maskLine(lines.current) : t('wired.found.guideFallback');
   const sourceLine = lines.current || lines.all[0] || '';
@@ -288,6 +371,13 @@ export default function WiredFindingOverlay() {
   );
 
   const challenge = readouts.challenge;
+  // A new subject (reroll OR the deck changing under us) starts unanswered.
+  const challengeKey = challenge ? `${challenge.word}:${challenge.choices.join('|')}` : '';
+  useEffect(() => setVkPick(null), [challengeKey]);
+  // A new intercepted term starts encrypted.
+  const interceptedKey = readouts.intercepted ? `${readouts.intercepted.word}:${readouts.intercepted.meaning}` : '';
+  useEffect(() => setGhostOpen(false), [interceptedKey]);
+
   const onVkPick = useCallback(
     (index: number) => {
       if (!challenge || vkPick !== null) return;
@@ -312,20 +402,20 @@ export default function WiredFindingOverlay() {
     featureOn('bebopBounty') ||
     featureOn('wiredShimeji');
 
-  if (!enabled) return null;
+  const motionLevel = wiredSettings.motionLevel;
 
   return (
     <div className="wired-found-overlay" ref={parallaxRef}>
       {featureOn('particleAtmosphere') && idle && (
         <div className="wired-found-matrix" aria-hidden="true">
-          {MATRIX_COLUMNS.map((col) => (
+          {KANA_COLUMNS.map((col) => (
             <div
               key={col.id}
               className="wired-found-matrix-col"
               style={{
                 left: `${col.left}%`,
-                animationDelay: `${col.delay}s`,
-                animationDuration: `${col.duration}s`,
+                animationDelay: `${col.delay}s, ${col.delay}s`,
+                animationDuration: `${col.duration}s, ${col.duration}s`,
               }}
             >
               {col.text}
@@ -336,13 +426,13 @@ export default function WiredFindingOverlay() {
 
       {featureOn('lyricRibbon') && hasLyrics && lyricLine && (
         <div className="wlyric-stage" aria-hidden="true">
-          {nextLyricLine && (
+          {nextLyricLine && motionLevel !== 'off' && !reducedMotion && (
             <WiredLyricPreview
               key={lyricLine.key}
               text={nextLyricLine.text}
               cueStart={nextLyricLine.start}
               cueEnd={nextLyricLine.end}
-              motionLevel={wiredSettings.motionLevel}
+              motionLevel={motionLevel}
               reducedMotion={reducedMotion}
             />
           )}
@@ -351,7 +441,7 @@ export default function WiredFindingOverlay() {
             text={lyricLine.text}
             cueStart={lyricLine.start}
             cueEnd={lyricLine.end}
-            motionLevel={wiredSettings.motionLevel}
+            motionLevel={motionLevel}
             reducedMotion={reducedMotion}
             onArchive={handleLyricArchive}
             onMetadata={handleLyricMetadata}
@@ -403,9 +493,7 @@ export default function WiredFindingOverlay() {
             <strong>{t('wired.found.guideTitle')}</strong>
             <span>{guideText}</span>
           </div>
-          {/* Typing is captured by this input alone. The previous build listened
-              on `window`, swallowing Enter/Backspace and every printable key
-              across the entire app while the overlay was open. */}
+          {/* Typing is captured by this input alone — never by a window listener. */}
           <form
             className="wired-found-guide-input"
             onSubmit={(e) => {
@@ -489,7 +577,7 @@ export default function WiredFindingOverlay() {
 
       {protocolsOn && (
         <section className="wired-found-protocols" aria-label={t('wired.found.ariaProtocols')}>
-          {/* MAGI deliberation — three units read three different signals from
+          {/* Triad arbitration — three units read three different signals from
               the real session (backlog, deck growth, fatigue) and vote. */}
           {featureOn('magiVote') && (
             <article className="wired-found-protocol wired-found-magi">
@@ -509,7 +597,7 @@ export default function WiredFindingOverlay() {
                     key={unit.id}
                     className={unit.vote === readouts.verdict.consensus ? 'is-agree' : 'is-dissent'}
                   >
-                    <b>{MAGI_UNIT_CODES[unit.id]}</b>
+                    <b>{ARBITER_UNIT_CODES[unit.id]}</b>
                     <i>{verdictLabel(unit.vote)}</i>
                   </li>
                 ))}
@@ -517,8 +605,7 @@ export default function WiredFindingOverlay() {
             </article>
           )}
 
-          {/* Voight-Kampff — a reading test on the user's own kanji. The
-              interrogation framing is the joke; the question is real. */}
+          {/* Recall probe — a reading test on the user's own kanji. */}
           {featureOn('voightKampff') && (
             <article className="wired-found-protocol wired-found-vk">
               <header>
@@ -568,7 +655,7 @@ export default function WiredFindingOverlay() {
             </article>
           )}
 
-          {/* Capsule sync — today's study time against a 30-minute target. */}
+          {/* Carrier load — today's study time against a 30-minute target. */}
           {featureOn('akiraCapsule') && (
             <article className="wired-found-protocol wired-found-capsule" data-band={readouts.gauge.band}>
               <header>
@@ -611,7 +698,7 @@ export default function WiredFindingOverlay() {
             </article>
           )}
 
-          {/* Bounty board — the user's genuinely weakest words, priced. */}
+          {/* Corrupted sectors — the user's genuinely weakest words, ranked. */}
           {featureOn('bebopBounty') && (
             <article className="wired-found-protocol wired-found-bounty">
               <header>
@@ -633,7 +720,7 @@ export default function WiredFindingOverlay() {
             </article>
           )}
 
-          {/* Summon — drives the real companion layer, not a dead flag. */}
+          {/* Navi summon — drives the real companion layer, not a dead flag. */}
           {featureOn('wiredShimeji') && (
             <article className="wired-found-protocol wired-found-summon">
               <header>
@@ -648,23 +735,7 @@ export default function WiredFindingOverlay() {
       )}
 
       {featureOn('broadcastTicker') && (
-        <section className="wired-found-ticker" aria-hidden="true">
-          <div className="wired-found-ticker-track">
-            {[0, 1].map((rep) => (
-              <span key={rep} className="wired-found-ticker-group">
-                <span>{glitchText(t('wired.found.ticker.link'), glitchSeed + 21)}</span>
-                <span>{glitchText(t('wired.found.ticker.node'), glitchSeed + 22)}</span>
-                <span>
-                  {glitchText(
-                    sourceLine || t('wired.found.ticker.idle', { count: readouts.vocab.length }),
-                    glitchSeed + 23,
-                  )}
-                </span>
-                <span>{glitchText(t('wired.found.ticker.feed'), glitchSeed + 24)}</span>
-              </span>
-            ))}
-          </div>
-        </section>
+        <BroadcastTicker sourceLine={sourceLine} vocabCount={readouts.vocab.length} idle={idle} />
       )}
     </div>
   );

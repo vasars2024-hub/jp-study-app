@@ -782,6 +782,12 @@ declare global {
       blancIsOpen(): Promise<boolean>;
       blancSetFullScreen(on: boolean): Promise<{ ok: boolean }>;
       blancSetGlobalShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;
+      blancGetLaunchPrefs(): Promise<{ blancOnly: boolean }>;
+      blancSetLaunchPrefs(patch: { blancOnly?: boolean }): Promise<{ blancOnly: boolean }>;
+      blancStudyOsAlive(): Promise<boolean>;
+      onStudyOsAlive(cb: (alive: boolean) => void): () => void;
+      blancOpenStudyOs(): Promise<{ ok: boolean }>;
+      appMemoryMetrics(): Promise<import('../shared/appMemory').AppMemoryReport>;
       appToggle(): Promise<{ ok: boolean }>;
       appSetToggleShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;
       appSetRestartShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;

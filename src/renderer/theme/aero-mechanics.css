@@ -1,0 +1,1172 @@
+/* =============================================================================
+   Aero study mechanics — Memory Defragmenter, Vocabulary Update, Welcome
+   Center, balloon tips, the study screensaver and the two study gadgets.
+   (components/shell/aeroMech/*, widgets/aeroStudyGadgets.tsx)
+
+   Motion is transform / opacity only and is switched off by reduce-motion,
+   display animations off, Battery Saver and Aero safe mode at the end of the
+   file. Original art: no product marks, only the era's materials.
+   ============================================================================= */
+
+/* ------------------------------------------------------------ the window */
+.aero-mech-win {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  padding: 0 7px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  color: #10283a;
+  font-family: var(--font-body, 'Segoe UI', sans-serif);
+  font-size: 12.5px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0, rgba(255, 255, 255, 0.18) 30px, rgba(255, 255, 255, 0.06) 31px, rgba(255, 255, 255, 0.12) 100%),
+    rgba(150, 196, 226, 0.62);
+  box-shadow:
+    0 0 0 1px rgba(8, 36, 60, 0.42),
+    0 14px 38px rgba(0, 20, 40, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 18px rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(var(--glass-blur, 10px)) saturate(1.35);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 10px)) saturate(1.35);
+  will-change: transform;
+  animation: aero-mech-win-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.aero-mech-win.is-front {
+  z-index: 150000;
+  box-shadow:
+    0 0 0 1px rgba(8, 36, 60, 0.5),
+    0 0 18px rgba(110, 196, 255, 0.35),
+    0 18px 46px rgba(0, 20, 40, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 18px rgba(255, 255, 255, 0.3);
+}
+.aero-mech-win:not(.is-front) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0, rgba(255, 255, 255, 0.12) 30px, rgba(255, 255, 255, 0.04) 31px, rgba(255, 255, 255, 0.08) 100%),
+    rgba(176, 200, 218, 0.62);
+}
+@keyframes aero-mech-win-in {
+  from { opacity: 0; scale: 0.94; }
+  to { opacity: 1; scale: 1; }
+}
+.aero-mech-win-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  flex: none;
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+.aero-mech-win-title {
+  flex: 1;
+  overflow: hidden;
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #08202f;
+  text-shadow: 0 0 9px rgba(255, 255, 255, 0.95), 0 0 2px rgba(255, 255, 255, 0.9);
+}
+.aero-mech-win-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 24px;
+  margin-top: -8px;
+  align-self: flex-start;
+  border: 1px solid rgba(70, 20, 10, 0.6);
+  border-top: 0;
+  border-radius: 0 0 5px 5px;
+  color: #ffffff;
+  background: linear-gradient(180deg, #e9a99a 0%, #d0705c 46%, #c2442a 50%, #d86a4a 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+}
+.aero-mech-win-close:hover {
+  background: linear-gradient(180deg, #f7c0ae 0%, #e88067 46%, #e0472a 50%, #f1844e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 0 10px rgba(255, 120, 70, 0.75);
+}
+.aero-mech-win-close:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+}
+.aero-mech-win-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid rgba(40, 80, 110, 0.5);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f8fb 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+/* Small glyphs (title bar, Start menu). */
+.aero-mech-glyph {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+.aero-mech-glyph.is-defrag {
+  background:
+    linear-gradient(90deg, #d23b2b 0 25%, #2f6fd6 25% 50%, #ffffff 50% 62%, #2f6fd6 62% 100%) top / 100% 30% no-repeat,
+    linear-gradient(90deg, #2f6fd6 0 40%, #3cb24b 40% 55%, #d23b2b 55% 70%, #2f6fd6 70% 100%) center / 100% 30% no-repeat,
+    linear-gradient(90deg, #2f6fd6 0 70%, #ffffff 70% 100%) bottom / 100% 30% no-repeat,
+    #cfdbe4;
+  box-shadow: inset 0 0 0 1px rgba(20, 50, 80, 0.45);
+}
+.aero-mech-glyph.is-update,
+.aero-mech-shield {
+  border-radius: 3px 3px 50% 50% / 3px 3px 60% 60%;
+  background:
+    radial-gradient(70% 50% at 50% 18%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, #ffd34e, #e0a000);
+  box-shadow: inset 0 0 0 1px rgba(110, 70, 0, 0.5);
+}
+.aero-mech-glyph.is-welcome {
+  border-radius: 50%;
+  background:
+    radial-gradient(60% 45% at 50% 25%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(circle at 50% 70%, #6fe0ff, #0a6db4 70%);
+  box-shadow: 0 0 0 1px rgba(0, 50, 90, 0.5);
+}
+
+/* ------------------------------------------------------- shared controls */
+.aero-mech-btn {
+  min-width: 74px;
+  height: 24px;
+  padding: 0 12px;
+  border: 1px solid #707070;
+  border-radius: 3px;
+  color: #0b1b28;
+  font: inherit;
+  font-size: 12px;
+  background: linear-gradient(180deg, #f2f2f2 0%, #ebebeb 48%, #dddddd 50%, #cfcfcf 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+.aero-mech-btn:hover:not(:disabled) {
+  border-color: #3c7fb1;
+  background: linear-gradient(180deg, #eaf6fd 0%, #d9f0fc 48%, #bee6fd 50%, #a7d9f5 100%);
+}
+.aero-mech-btn:active:not(:disabled) {
+  border-color: #2c628b;
+  background: linear-gradient(180deg, #e5f4fc 0%, #c4e5f6 48%, #98d1ef 50%, #68b3db 100%);
+}
+.aero-mech-btn.is-default {
+  border-color: #3c7fb1;
+  box-shadow: inset 0 0 0 1px rgba(160, 220, 255, 0.95);
+}
+.aero-mech-btn:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -4px;
+}
+.aero-mech-btn:disabled {
+  color: #8a8a8a;
+  border-color: #adb2b5;
+  background: #f4f4f4;
+  cursor: default;
+}
+.aero-mech-link {
+  display: block;
+  padding: 2px 0;
+  border: 0;
+  color: #0b5fb0;
+  font: inherit;
+  text-align: start;
+  background: none;
+  cursor: pointer;
+}
+.aero-mech-link:hover:not(:disabled) {
+  color: #2b8ae0;
+  text-decoration: underline;
+}
+.aero-mech-link:disabled {
+  color: #7e8b95;
+  cursor: default;
+}
+.aero-mech-link.is-quiet {
+  color: #35627f;
+}
+.aero-mech-muted {
+  color: #5a6f80;
+}
+.aero-mech-check {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+}
+.aero-mech-check input {
+  margin: 2px 0 0;
+}
+.aero-mech-progress {
+  position: relative;
+  height: 15px;
+  overflow: hidden;
+  border: 1px solid #8c9aa6;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #f5f5f5, #dfe3e6);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.aero-mech-progress > i {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.1) 48%, rgba(0, 0, 0, 0.04) 52%, rgba(255, 255, 255, 0.25) 100%),
+    linear-gradient(90deg, #12b02a, #49d35c);
+  transition: transform 0.35s ease-out;
+}
+/* The sheen that runs along a Vista progress bar. */
+.aero-mech-progress > i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+  animation: aero-mech-sheen 2.2s linear infinite;
+}
+@keyframes aero-mech-sheen {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(260%); }
+}
+.aero-mech-progress.is-marquee > i {
+  width: 30%;
+  right: auto;
+  animation: aero-mech-marquee 1.6s linear infinite;
+}
+@keyframes aero-mech-marquee {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(360%); }
+}
+.aero-mech-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+}
+.aero-mech-total {
+  margin-inline-end: auto;
+  color: #3d5466;
+}
+.aero-mech-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.aero-mech-hero p {
+  margin: 0;
+  line-height: 1.45;
+  color: #24394a;
+}
+.aero-mech-hero-icon.is-defrag {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 5px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #e9f2f8, #b7cad8);
+  box-shadow: inset 0 0 0 1px rgba(30, 60, 90, 0.4), 0 2px 5px rgba(0, 0, 0, 0.18);
+}
+.aero-mech-hero-icon.is-defrag i {
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5a9cf0, #1f5fbf);
+}
+.aero-mech-hero-icon.is-defrag i:nth-child(2) { background: linear-gradient(180deg, #ff7a63, #c42c19); }
+.aero-mech-hero-icon.is-defrag i:nth-child(3) { background: linear-gradient(180deg, #ffffff, #d7e2ea); }
+
+/* ------------------------------------------------- Memory Defragmenter */
+.aero-mech-defrag {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 12px 14px;
+}
+.aero-mech-volumes {
+  width: 100%;
+  border: 1px solid #c2cfd8;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+.aero-mech-volumes th {
+  padding: 3px 8px;
+  border-right: 1px solid #dde4ea;
+  color: #4a5f70;
+  font-weight: 400;
+  text-align: start;
+  background: linear-gradient(180deg, #ffffff, #f1f5f8);
+  border-bottom: 1px solid #d5dde3;
+}
+.aero-mech-volumes td {
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.aero-mech-volumes tbody tr {
+  cursor: default;
+}
+.aero-mech-volumes tbody tr:hover td {
+  background: linear-gradient(180deg, #f2f9fe, #e3f2fc);
+}
+.aero-mech-volumes tbody tr.is-selected td {
+  background: linear-gradient(180deg, #dcebfc, #c1dcfa);
+}
+.aero-mech-drive {
+  display: inline-block;
+  width: 16px;
+  height: 11px;
+  margin-inline-end: 6px;
+  vertical-align: -1px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #e8eef2 0 60%, #9aa7b1 60% 100%);
+  box-shadow: inset 0 0 0 1px rgba(40, 60, 80, 0.45);
+}
+.aero-mech-map-wrap {
+  margin-top: 12px;
+}
+.aero-mech-map-label {
+  margin-bottom: 4px;
+  color: #1d4f7b;
+}
+.aero-mech-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8px, 1fr));
+  grid-auto-rows: 14px;
+  gap: 1px;
+  min-height: 120px;
+  max-height: 190px;
+  overflow: hidden;
+  padding: 3px;
+  border: 1px solid #8ea2b1;
+  background: #f8fafb;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.aero-mech-map.is-blank .aero-mech-block {
+  opacity: 0.18;
+  filter: grayscale(1);
+}
+.aero-mech-map-empty {
+  grid-column: 1 / -1;
+  align-self: center;
+  color: #5a6f80;
+  text-align: center;
+}
+.aero-mech-block {
+  display: block;
+  min-width: 6px;
+  border-radius: 1px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.3s ease, opacity 0.2s ease;
+}
+.aero-mech-block.is-overdue { background: linear-gradient(180deg, #ff6d57, #b81d0c); }
+.aero-mech-block.is-due { background: linear-gradient(180deg, #ff9c8a, #e04a35); }
+.aero-mech-block.is-learning { background: linear-gradient(180deg, #ffe48a, #e0a700); }
+.aero-mech-block.is-young { background: linear-gradient(180deg, #9fd0ff, #4f97e6); }
+.aero-mech-block.is-mature { background: linear-gradient(180deg, #5b8ff0, #1c4fb6); }
+.aero-mech-block.is-leech { background: linear-gradient(180deg, #7fe08d, #1f9a35); }
+.aero-mech-block.is-new { background: #ffffff; }
+.aero-mech-block.is-unscanned {
+  opacity: 0.12;
+  filter: grayscale(1);
+}
+.aero-mech-block.is-written {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 0 0 1px rgba(20, 70, 140, 0.25);
+}
+.aero-mech-block.is-fresh {
+  animation: aero-mech-write 0.6s ease-out;
+}
+@keyframes aero-mech-write {
+  0% { transform: scale(1.9); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.aero-mech-block.is-reading {
+  background: linear-gradient(180deg, #b8ff7a, #39b51a);
+  animation: aero-mech-read 0.8s ease-in-out infinite alternate;
+}
+@keyframes aero-mech-read {
+  from { opacity: 1; }
+  to { opacity: 0.45; }
+}
+.aero-mech-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  color: #33495a;
+  font-size: 11.5px;
+}
+.aero-mech-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.aero-mech-legend .aero-mech-block {
+  width: 10px;
+  height: 10px;
+}
+.aero-mech-legend b {
+  font-weight: 600;
+  color: #10283a;
+}
+.aero-mech-status {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  color: #10283a;
+}
+.aero-mech-status small {
+  color: #4a6274;
+}
+
+/* The card a mechanic is asking about. */
+.aero-mech-card {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid #b7c9d6;
+  border-radius: 6px;
+  outline: none;
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, #f6fbfe, #e3eef6);
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 3px rgba(0, 30, 60, 0.12);
+}
+.aero-mech-card:focus-visible {
+  box-shadow: 0 0 0 2px rgba(60, 140, 220, 0.6);
+}
+.aero-mech-card-face {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-height: 70px;
+  text-align: center;
+}
+.aero-mech-card-word {
+  font-size: 30px;
+  line-height: 1.2;
+  color: #0b2235;
+}
+.aero-mech-card-back {
+  display: grid;
+  gap: 3px;
+  animation: aero-mech-fade 0.25s ease-out;
+}
+@keyframes aero-mech-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.aero-mech-card-reading {
+  font-size: 16px;
+  color: #1b5a8c;
+}
+.aero-mech-card-meaning {
+  font-size: 14px;
+  color: #10283a;
+}
+.aero-mech-card-sentence {
+  max-width: 56ch;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #4a6274;
+}
+.aero-mech-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.aero-mech-grade {
+  display: grid;
+  min-width: 82px;
+  height: 36px;
+  line-height: 1.1;
+}
+.aero-mech-grade small {
+  color: #4a6274;
+  font-size: 10.5px;
+}
+.aero-mech-grade.is-again span { color: #b0240f; }
+.aero-mech-grade.is-easy span { color: #1c6e22; }
+
+/* -------------------------------------------------- Vocabulary Update */
+.aero-mech-update {
+  display: grid;
+  grid-template-columns: 172px 1fr;
+  min-height: 100%;
+}
+.aero-mech-update-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 12px;
+  background: linear-gradient(180deg, #e9f2f9, #cfe2f1);
+  border-inline-end: 1px solid #c3d4e1;
+}
+.aero-mech-update-side-foot {
+  display: grid;
+  gap: 2px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid rgba(80, 120, 150, 0.25);
+  color: #4a6274;
+  font-size: 11.5px;
+}
+.aero-mech-update-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 14px 18px;
+}
+.aero-mech-update-main h2,
+.aero-mech-welcome h2 {
+  margin: 0 0 10px;
+  color: #1e3287;
+  font-size: 17px;
+  font-weight: 400;
+}
+.aero-mech-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #bfcbd4;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #ffffff, #f1f4f6);
+}
+.aero-mech-banner > div {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+.aero-mech-banner strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.aero-mech-banner p {
+  margin: 0;
+}
+.aero-mech-banner.is-warn {
+  border-color: #e3c56a;
+  background: linear-gradient(180deg, #fffbea, #fdf0c4);
+}
+.aero-mech-banner.is-ok {
+  border-color: #9fd59b;
+  background: linear-gradient(180deg, #f5fff3, #e1f6dc);
+}
+.aero-mech-shield {
+  display: block;
+  flex: none;
+  width: 34px;
+  height: 40px;
+}
+.aero-mech-shield.is-green {
+  background:
+    radial-gradient(70% 50% at 50% 18%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, #67d65a, #1f8f19);
+  box-shadow: inset 0 0 0 1px rgba(10, 70, 0, 0.5);
+}
+.aero-mech-shield.is-blue {
+  background:
+    radial-gradient(70% 50% at 50% 18%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, #6bb8ff, #155fb8);
+  box-shadow: inset 0 0 0 1px rgba(0, 40, 90, 0.5);
+}
+.aero-mech-note {
+  color: #2f6a2a;
+}
+.aero-mech-update-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 5px 14px;
+  margin: 14px 0 0;
+  color: #33495a;
+}
+.aero-mech-update-facts dt {
+  color: #5a6f80;
+}
+.aero-mech-update-facts dd {
+  margin: 0;
+}
+.aero-mech-install-line {
+  margin-bottom: 6px;
+}
+.aero-mech-update-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: 340px;
+  overflow: auto;
+  border: 1px solid #c2cfd8;
+}
+.aero-mech-update-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.aero-mech-update-table th {
+  padding: 4px 8px;
+  color: #4a5f70;
+  font-weight: 400;
+  text-align: start;
+  background: linear-gradient(180deg, #ffffff, #eef3f7);
+  border-bottom: 1px solid #d5dde3;
+}
+.aero-mech-update-table td {
+  padding: 4px 8px;
+  vertical-align: top;
+  border-bottom: 1px solid #edf1f4;
+}
+.aero-mech-update-table tr.is-selected td {
+  background: #eef6fd;
+}
+.aero-mech-update-group th {
+  color: #1e3287;
+  font-weight: 600;
+  background: #f4f8fb;
+}
+.aero-mech-update-table .aero-mech-check span {
+  display: grid;
+  gap: 1px;
+}
+.aero-mech-update-table .aero-mech-check b {
+  font-size: 14px;
+  font-weight: 400;
+}
+.aero-mech-update-table .aero-mech-check em {
+  color: #1b5a8c;
+  font-style: normal;
+}
+.aero-mech-update-table small {
+  color: #6a7f8f;
+}
+.aero-mech-update-meaning {
+  color: #24394a;
+}
+.aero-mech-update-size {
+  color: #5a6f80;
+  white-space: nowrap;
+  text-align: end;
+}
+.aero-mech-update-table td.is-ok {
+  color: #2a7d23;
+}
+
+/* --------------------------------------------------- Welcome Center */
+.aero-mech-welcome {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 0 0 10px;
+}
+.aero-mech-welcome-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(140, 220, 255, 0.55), rgba(140, 220, 255, 0) 60%),
+    linear-gradient(180deg, #f3faff, #dcecf8);
+  border-bottom: 1px solid #c3d6e4;
+}
+.aero-mech-welcome-head h2 {
+  margin: 0;
+}
+.aero-mech-welcome-head p {
+  margin: 2px 0 0;
+  color: #3d5466;
+}
+.aero-mech-welcome-orb {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background:
+    radial-gradient(60% 42% at 50% 22%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(circle at 50% 72%, #8ff0ff, #0a77c4 66%, #064a86);
+  box-shadow: 0 0 0 1px rgba(0, 50, 90, 0.5), 0 4px 12px rgba(0, 90, 160, 0.35);
+}
+.aero-mech-welcome-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 18px 6px;
+}
+.aero-mech-tile {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #c7d6e2;
+  border-radius: 6px;
+  color: #10283a;
+  font: inherit;
+  text-align: start;
+  background: linear-gradient(180deg, #ffffff, #eef4f9);
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+button.aero-mech-tile {
+  cursor: pointer;
+}
+button.aero-mech-tile:hover:not(:disabled) {
+  border-color: #7db4e0;
+  background: linear-gradient(180deg, #f4faff, #dcedfb);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 8px rgba(110, 190, 255, 0.4);
+}
+button.aero-mech-tile:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.aero-mech-tile b {
+  font-size: 24px;
+  font-weight: 300;
+  color: #1e3287;
+}
+.aero-mech-tile small {
+  color: #5a6f80;
+}
+.aero-mech-welcome-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 18px;
+  padding: 8px 18px;
+}
+.aero-mech-welcome-foot {
+  margin-top: auto;
+  padding: 8px 18px 0;
+  border-top: 1px solid #e1e8ee;
+}
+
+/* ------------------------------------------------------ Start entries */
+.aero-mech-start-entry {
+  position: relative;
+}
+.aero-mech-start-badge {
+  margin-inline-start: auto;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  background: linear-gradient(180deg, #ff7f6a, #c7301a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.aero-mech-start-badge.is-warn {
+  color: #3a2600;
+  background: linear-gradient(180deg, #ffe07a, #e0a400);
+}
+
+/* -------------------------------------------------------- balloon tip */
+.aero-mech-balloon {
+  position: absolute;
+  right: 18px;
+  z-index: 200002;
+  width: 300px;
+  padding: 9px 11px 10px;
+  border: 1px solid rgba(70, 80, 90, 0.75);
+  border-radius: 7px;
+  color: #10202c;
+  font-family: var(--font-body, 'Segoe UI', sans-serif);
+  font-size: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f6fa 100%);
+  box-shadow: 0 6px 20px rgba(0, 20, 40, 0.35), inset 0 1px 0 #ffffff;
+  animation: aero-mech-balloon-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.aero-mech-balloon::after {
+  content: '';
+  position: absolute;
+  right: 54px;
+  bottom: -10px;
+  width: 16px;
+  height: 16px;
+  border-right: 1px solid rgba(70, 80, 90, 0.75);
+  border-bottom: 1px solid rgba(70, 80, 90, 0.75);
+  background: #f1f6fa;
+  transform: skewX(28deg) rotate(45deg);
+  transform-origin: center;
+}
+@keyframes aero-mech-balloon-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.aero-mech-balloon-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.aero-mech-balloon-head strong {
+  flex: 1;
+  font-weight: 600;
+}
+.aero-mech-balloon-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.aero-mech-balloon-icon.is-info {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 30%, #ffffff 0 1.6px, transparent 2px),
+    linear-gradient(#ffffff, #ffffff) 50% 72% / 2px 6px no-repeat,
+    radial-gradient(60% 45% at 50% 20%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, #4ea6ff, #0d5bc0);
+  box-shadow: 0 0 0 1px rgba(0, 40, 100, 0.45);
+}
+.aero-mech-balloon-icon.is-shield {
+  border-radius: 3px 3px 50% 50% / 3px 3px 60% 60%;
+  background:
+    radial-gradient(70% 50% at 50% 18%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, #ffd34e, #e0a000);
+  box-shadow: inset 0 0 0 1px rgba(110, 70, 0, 0.5);
+}
+.aero-mech-balloon-close {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #4a5a66;
+  background: none;
+  cursor: pointer;
+}
+.aero-mech-balloon-close:hover {
+  border-color: #b4c0c8;
+  background: linear-gradient(180deg, #ffffff, #e5ecf1);
+}
+.aero-mech-balloon-body {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  background: none;
+}
+.aero-mech-balloon-body.is-link {
+  cursor: pointer;
+}
+.aero-mech-balloon-body.is-link:hover {
+  color: #0b5fb0;
+  text-decoration: underline;
+}
+.aero-mech-balloon-word {
+  font-size: 20px;
+  color: #0b2235;
+}
+.aero-mech-balloon-reading {
+  color: #1b5a8c;
+}
+.aero-mech-balloon-meaning {
+  color: #24394a;
+}
+.aero-mech-balloon-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* -------------------------------------------------------- screensaver */
+.aero-mech-saver {
+  position: fixed;
+  inset: 0;
+  z-index: 2147481000;
+  overflow: hidden;
+  color: #ffffff;
+  font-family: var(--font-body, 'Segoe UI', sans-serif);
+  background:
+    radial-gradient(120% 90% at 20% 10%, #1b7fb8 0%, rgba(27, 127, 184, 0) 55%),
+    radial-gradient(100% 80% at 90% 100%, #0d9a8a 0%, rgba(13, 154, 138, 0) 60%),
+    linear-gradient(180deg, #06243f 0%, #041526 100%);
+  cursor: default;
+  animation: aero-mech-fade 0.6s ease-out;
+}
+.aero-mech-saver-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.aero-mech-saver-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  color: rgba(220, 240, 255, 0.55);
+  font-size: 12px;
+  text-align: center;
+  pointer-events: none;
+}
+.aero-mech-saver-slide {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 320px;
+  padding: 28px 40px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 14px;
+  text-align: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.06) 48%, rgba(255, 255, 255, 0.02) 52%, rgba(255, 255, 255, 0.1) 100%),
+    rgba(10, 60, 100, 0.45);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transform: translate(-50%, -50%);
+}
+.aero-mech-saver-word {
+  font-size: 54px;
+  line-height: 1.1;
+  text-shadow: 0 2px 12px rgba(0, 40, 80, 0.7);
+}
+.aero-mech-saver-reading {
+  font-size: 22px;
+  color: #c8ecff;
+}
+.aero-mech-saver-meaning {
+  max-width: 40ch;
+  font-size: 18px;
+}
+
+/* ------------------------------------------------------------ gadgets */
+.aero-meter {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+}
+.aero-meter-hit {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+.aero-meter-hit:focus-visible {
+  outline: 2px solid rgba(110, 190, 255, 0.9);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+.aero-meter-dial {
+  position: relative;
+  display: block;
+}
+.aero-meter-dial svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.aero-meter-rim {
+  fill: #c9d3da;
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 1;
+}
+.aero-meter-tick {
+  stroke: #d8f2ff;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.aero-meter-tick.is-hot {
+  stroke: #ff6a52;
+}
+.is-health .aero-meter-tick.is-hot {
+  stroke: #7cf08a;
+}
+.aero-meter-needle {
+  stroke: #ff3b1f;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  transform-origin: 50px 50px;
+  transform-box: view-box;
+  transition: transform 0.8s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.is-health .aero-meter-needle {
+  stroke: #4fe0ff;
+}
+.aero-meter-hub {
+  fill: #e6eef3;
+  stroke: rgba(0, 0, 0, 0.5);
+}
+.aero-meter-gloss {
+  fill: rgba(255, 255, 255, 0.16);
+}
+.aero-meter-readout {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22%;
+  color: #7cf08a;
+  font: 600 13px/1 Consolas, 'Lucida Console', monospace;
+  text-align: center;
+  text-shadow: 0 0 4px rgba(124, 240, 138, 0.7);
+  pointer-events: none;
+}
+.is-health .aero-meter-readout {
+  font-size: 11px;
+}
+.aero-meter-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  color: inherit;
+  font-size: 10.5px;
+  text-align: center;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.aero-slides {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.aero-slides-frame {
+  display: grid;
+  flex: 1;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  min-height: 0;
+  padding: 6px 4px 22px;
+  text-align: center;
+  animation: aero-mech-fade 0.5s ease-out;
+}
+.aero-slides-word {
+  font-size: 24px;
+  line-height: 1.15;
+}
+.aero-slides-reading {
+  font-size: 13px;
+  opacity: 0.8;
+}
+.aero-slides-sentence {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.9;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.aero-slides-meaning {
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+.aero-slides-controls {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  display: flex;
+  gap: 2px;
+  padding: 2px 4px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 0.2s ease;
+}
+.aero-slides:hover .aero-slides-controls,
+.aero-slides:focus-within .aero-slides-controls {
+  opacity: 1;
+}
+.aero-slides-controls button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  color: #ffffff;
+  background: none;
+  cursor: pointer;
+}
+.aero-slides-controls button:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+:root[data-materials='aero'] .aero-gadget.blur .aero-meter-label {
+  color: #12324a;
+}
+:root[data-materials='aero'] .aero-gadget.blur .aero-slides-reading {
+  color: #1b5a8c;
+  opacity: 1;
+}
+
+/* ---------------------------------------------------- stillness gates */
+html.reduce-motion .aero-mech-win,
+html.reduce-motion .aero-mech-balloon,
+html.reduce-motion .aero-mech-saver,
+html.reduce-motion .aero-mech-card-back,
+html.reduce-motion .aero-mech-block,
+html.reduce-motion .aero-mech-progress > i,
+html.reduce-motion .aero-mech-progress > i::after,
+html.reduce-motion .aero-slides-frame,
+html.reduce-motion .aero-meter-needle,
+html[data-display-anim='none'] .aero-mech-win,
+html[data-display-anim='none'] .aero-mech-balloon,
+html[data-display-anim='none'] .aero-mech-saver,
+html[data-display-anim='none'] .aero-mech-card-back,
+html[data-display-anim='none'] .aero-mech-block,
+html[data-display-anim='none'] .aero-mech-progress > i,
+html[data-display-anim='none'] .aero-mech-progress > i::after,
+html[data-display-anim='none'] .aero-slides-frame,
+html[data-display-anim='none'] .aero-meter-needle,
+html[data-perf='battery'] .aero-mech-progress > i::after,
+html[data-perf='battery'] .aero-mech-block,
+html[data-perf='battery'] .aero-slides-frame,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .aero-mech-progress > i::after,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .aero-mech-block,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .aero-mech-win {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .aero-mech-win,
+  .aero-mech-balloon,
+  .aero-mech-saver,
+  .aero-mech-card-back,
+  .aero-mech-block,
+  .aero-mech-progress > i,
+  .aero-mech-progress > i::after,
+  .aero-slides-frame,
+  .aero-meter-needle {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+/* The marquee is the only sign a check is running, so it is kept but slowed. */
+html.reduce-motion .aero-mech-progress.is-marquee > i,
+html[data-display-anim='none'] .aero-mech-progress.is-marquee > i {
+  animation: none !important;
+  width: 100%;
+  opacity: 0.6;
+}
+:root[data-lq-flat] .aero-mech-win,
+html[data-display-transparency='off'] .aero-mech-win {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: #a9c8de;
+}

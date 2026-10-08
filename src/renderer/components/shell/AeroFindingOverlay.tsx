@@ -83,7 +83,10 @@ export default function AeroFindingOverlay() {
   const currentCue = live.lyrics.kind === 'synced' && live.activeIndex >= 0 ? cues[live.activeIndex] ?? null : null;
   const nextCue = live.lyrics.kind === 'synced' && live.activeIndex >= 0 ? cues[live.activeIndex + 1] ?? null : null;
   const plainLine = live.lyrics.kind === 'plain' ? live.lyrics.lines[0] ?? '' : '';
-  const lineText = cleanLine(currentCue?.text ?? plainLine ?? t('aero.found.ready'));
+  // `||`, not `??`: an empty plain line or cue is a string, and `??` let it
+  // through, so the ribbon and ticker showed a blank pill instead of the
+  // "ready" line.
+  const lineText = cleanLine(currentCue?.text || plainLine || t('aero.found.ready'));
   const duration = currentCue ? Math.max(1.1, (nextCue?.start ?? state.duration) - currentCue.start) : 6;
   const progress = currentCue ? Math.min(1, Math.max(0, (state.time - currentCue.start) / duration)) : 0.45;
   const x = currentCue ? `${112 - progress * 224}vw` : '0vw';
@@ -97,6 +100,9 @@ export default function AeroFindingOverlay() {
   }, [pushLine, t]);
 
   const challenge = readouts.challenge;
+  // A fresh challenge (reroll, or the readouts refreshing on their own) must
+  // start unanswered; the old pick otherwise revealed the new answer at once.
+  useEffect(() => setWizardPick(null), [challenge]);
   const onWizardPick = useCallback(
     (index: number) => {
       if (!challenge || wizardPick !== null) return;
@@ -331,11 +337,18 @@ export default function AeroFindingOverlay() {
 
       {featureOn('desktopTicker') && (
         <section className="aero-found-ticker" aria-hidden="true">
+          {/* The strip scrolls by -50% of its own width, so it carries its
+              content twice: the second copy is in place when the loop wraps,
+              instead of the whole line jumping back. */}
           <div>
-            <span>{t('aero.found.ticker.wmp')}</span>
-            <span>{t('aero.found.ticker.msn')}</span>
-            <span>{t('aero.found.ticker.vista')}</span>
-            <span>{lineText}</span>
+            {[0, 1].map((copy) => (
+              <span key={copy} className="aero-found-ticker-run">
+                <span>{t('aero.found.ticker.wmp')}</span>
+                <span>{t('aero.found.ticker.msn')}</span>
+                <span>{t('aero.found.ticker.vista')}</span>
+                <span>{lineText}</span>
+              </span>
+            ))}
           </div>
         </section>
       )}

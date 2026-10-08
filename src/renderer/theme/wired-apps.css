@@ -81,6 +81,8 @@
 :root[data-materials='wired'] .view-head h2,
 :root[data-materials='wired'] .view-head h3 {
   color: #e9feff;
+  /* Phosphor glow belongs to headings and codes, not body copy. */
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.34);
 }
 
 :root[data-materials='wired'] .view-head::before {
@@ -123,8 +125,7 @@
 
 :root[data-materials='wired'] .dict-hint,
 :root[data-materials='wired'] .dict-result,
-:root[data-materials='wired'] .dict-card,
-:root[data-materials='wired'] .dict-results article {
+:root[data-materials='wired'] .dict-entry {
   border-radius: 0;
   background: rgba(2, 18, 27, 0.78);
   border: 1px solid rgba(109, 241, 255, 0.18);
@@ -173,22 +174,18 @@
   content: 'MEM / MEMORY SYNC / SRS BRIDGE';
 }
 
+/* (Aero-only `.aero-gram-panel` / `.flash-deck-card` and the four-button
+   `.flash-review-actions` labels were removed: Wired renders the classic trees,
+   where none of those classes exist.) */
 :root[data-materials='wired'] .flash-card,
-:root[data-materials='wired'] .flash-deck-card,
 :root[data-materials='wired'] .anki-card,
 :root[data-materials='wired'] .gram-card,
 :root[data-materials='wired'] .gram-detail,
-:root[data-materials='wired'] .aero-gram-panel,
 :root[data-materials='wired'] .aero-flash-panel {
   border-radius: 0;
   background: rgba(2, 18, 27, 0.82);
   border: 1px solid rgba(109, 241, 255, 0.2);
 }
-
-:root[data-materials='wired'] .flash-review-actions button:nth-child(1)::before { content: 'FAIL / RESYNC '; }
-:root[data-materials='wired'] .flash-review-actions button:nth-child(2)::before { content: 'HARD / UNSTABLE '; }
-:root[data-materials='wired'] .flash-review-actions button:nth-child(3)::before { content: 'GOOD / STORED '; }
-:root[data-materials='wired'] .flash-review-actions button:nth-child(4)::before { content: 'EASY / STABLE '; }
 
 /* Classic flash tree has two verdict buttons. */
 :root[data-materials='wired'] .flash-actions .flash-again::before { content: 'FAIL / RESYNC '; }
@@ -211,7 +208,6 @@
 }
 
 :root[data-materials='wired'] .library-card,
-:root[data-materials='wired'] .novel-card,
 :root[data-materials='wired'] .resource-card,
 :root[data-materials='wired'] .res-card {
   border-radius: 0;
@@ -839,8 +835,12 @@
   margin-bottom: 8px;
 }
 
+/* The hex-dump watermark marks sealed packets only: flashcards and the Anki
+   view's own cards. `.anki-card` is ALSO the generic panel class for a dozen
+   unrelated surfaces (deck action menu, CSV editor, EPUB mining steps), and
+   giving all of them `overflow: hidden` clipped their dropdowns. */
 :root[data-materials='wired'] .flash-card::after,
-:root[data-materials='wired'] .anki-card::after {
+:root[data-materials='wired'] .anki-view .anki-card::after {
   content: '3F 2A 91 C4 00 6D 1F D8 FB FF 02 07 0D E9 FE FF 6D F1 FF B1 3B DF 27 32 3F 2A 91 C4 00 6D 1F D8';
   position: absolute;
   inset: auto 6px 4px 6px;
@@ -852,9 +852,8 @@
   pointer-events: none;
 }
 
-:root[data-materials='wired'] .anki-card {
+:root[data-materials='wired'] .anki-view .anki-card {
   position: relative;
-  overflow: hidden;
 }
 
 :root[data-materials='wired'] .flash-card.is-decrypt .flash-answer {
@@ -1046,45 +1045,50 @@
   animation: wm-phosphor-settle 0.32s steps(3) both;
 }
 
-/* §5.1 — SIG-VID: CRT monitor + tape shelf --------------------------------- */
-:root[data-materials='wired'] .media-stage {
+/* §5.1 — SIG-VID: CRT monitor + tape shelf ---------------------------------
+   Re-pointed at the markup that actually renders. `.media-stage`,
+   `.media-subbar` and `.media-thumb` were from a Media view that the Media
+   Center replaced; the stage is `.mc-video-stage`, the timecode lives in
+   `.mc-player-progress`, and library art is `.medialib-card__art`. */
+:root[data-materials='wired'] .mc-video-stage {
   position: relative;
-  border: 8px solid rgba(1, 12, 18, 0.96);
+  border: 6px solid rgba(1, 12, 18, 0.96);
   outline: 1px solid rgba(109, 241, 255, 0.3);
   box-shadow: inset 0 0 34px rgba(0, 0, 0, 0.66), inset 0 0 18px rgba(109, 241, 255, 0.07);
 }
 
-:root[data-materials='wired'] .media-stage.is-acquiring::after {
-  content: 'SIGNAL ACQUISITION';
+/* Bezel corner brackets. */
+:root[data-materials='wired'] .mc-video-stage::before {
+  content: '';
   position: absolute;
-  inset: 0;
+  inset: 6px;
   z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--wired-amber);
-  font-size: 11px;
-  letter-spacing: 0.24em;
-  background:
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 3px),
-    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.05) 0 2px, transparent 2px 5px),
-    rgba(0, 7, 11, 0.72);
   pointer-events: none;
+  background:
+    linear-gradient(#6df1ff, #6df1ff) 0 0 / 14px 1px no-repeat,
+    linear-gradient(#6df1ff, #6df1ff) 0 0 / 1px 14px no-repeat,
+    linear-gradient(#6df1ff, #6df1ff) 100% 0 / 14px 1px no-repeat,
+    linear-gradient(#6df1ff, #6df1ff) 100% 0 / 1px 14px no-repeat,
+    linear-gradient(#6df1ff, #6df1ff) 0 100% / 14px 1px no-repeat,
+    linear-gradient(#6df1ff, #6df1ff) 0 100% / 1px 14px no-repeat,
+    linear-gradient(#6df1ff, #6df1ff) 100% 100% / 14px 1px no-repeat,
+    linear-gradient(#6df1ff, #6df1ff) 100% 100% / 1px 14px no-repeat;
+  opacity: 0.5;
 }
 
-:root[data-materials='wired'] .media-subbar {
-  font-variant-numeric: tabular-nums;
+/* Timecode strip: tabular mono digits, amber. */
+:root[data-materials='wired'] .mc-player-progress {
+  color: rgba(255, 177, 59, 0.82);
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
-:root[data-materials='wired'] .media-subbar::before {
-  content: 'TC ';
-  color: var(--wired-amber);
-}
-
+/* Tape-label art: desaturated, cyan-tinted. */
 :root[data-materials='wired'] .media-card img,
-:root[data-materials='wired'] .media-card .media-thumb {
-  filter: saturate(0.4) sepia(0.2) hue-rotate(150deg);
+:root[data-materials='wired'] .media-card-thumb img,
+:root[data-materials='wired'] .mc-media-tile .medialib-card__art img,
+:root[data-materials='wired'] .mc-player-thumb img {
+  filter: saturate(0.4) sepia(0.2) hue-rotate(150deg) brightness(0.92);
 }
 
 :root[data-materials='wired'] .media-lib-folders {
@@ -1106,18 +1110,20 @@
     var(--wired-cyan);
 }
 
-/* §5.3 — LEX: database records --------------------------------------------- */
-:root[data-materials='wired'] .dict-results {
+/* §5.3 — LEX: database records ---------------------------------------------
+   Real markup is `div.dict-entry` inside `.dict-entries` (DictionaryResults);
+   the old `.dict-results article` selectors matched nothing. */
+:root[data-materials='wired'] .dict-entries {
   counter-reset: wired-lex;
 }
 
-:root[data-materials='wired'] .dict-results article {
+:root[data-materials='wired'] .dict-results .dict-entry {
   position: relative;
-  padding-left: 52px;
+  padding-left: 58px;
   animation: wm-scan-reveal 0.16s steps(4) both;
 }
 
-:root[data-materials='wired'] .dict-results article::before {
+:root[data-materials='wired'] .dict-results .dict-entry::before {
   counter-increment: wired-lex;
   content: 'LEX-' counter(wired-lex, decimal-leading-zero);
   position: absolute;
@@ -1129,17 +1135,17 @@
   font-family: var(--font-mono);
 }
 
-:root[data-materials='wired'] .dict-results article:nth-child(2) { animation-delay: 40ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(3) { animation-delay: 80ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(4) { animation-delay: 120ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(5) { animation-delay: 160ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(6) { animation-delay: 200ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(7) { animation-delay: 240ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(8) { animation-delay: 280ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(9) { animation-delay: 320ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(10) { animation-delay: 360ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(11) { animation-delay: 400ms; }
-:root[data-materials='wired'] .dict-results article:nth-child(12) { animation-delay: 440ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(2) { animation-delay: 40ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(3) { animation-delay: 80ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(4) { animation-delay: 120ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(5) { animation-delay: 160ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(6) { animation-delay: 200ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(7) { animation-delay: 240ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(8) { animation-delay: 280ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(9) { animation-delay: 320ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(10) { animation-delay: 360ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(11) { animation-delay: 400ms; }
+:root[data-materials='wired'] .dict-results .dict-entry:nth-child(12) { animation-delay: 440ms; }
 
 :root[data-materials='wired'] .dict-hint::after {
   content: ' ▌';
@@ -1147,22 +1153,38 @@
   animation: wm-cursor-blink 1.2s steps(1) infinite;
 }
 
-/* §5.6 — SYN: diagnostic registers ----------------------------------------- */
-:root[data-materials='wired'] .gram-view {
-  counter-reset: wired-syn;
+/* §5.6 — SYN: diagnostic registers -----------------------------------------
+   The register rows are `.gram-x-row` (SYN-### gutter further down, in the
+   GrammarX block); the old `.gram-item` / `.gram-view` counters matched
+   nothing. The guides list (`.guide-item`) gets its own GDE-## index. */
+:root[data-materials='wired'] .guide-list,
+:root[data-materials='wired'] .gram-list {
+  counter-reset: wired-gde;
 }
 
-:root[data-materials='wired'] .gram-item {
+:root[data-materials='wired'] .guide-item {
+  position: relative;
   border-radius: 0;
   font-family: var(--font-mono);
 }
 
-:root[data-materials='wired'] .gram-item::before {
-  counter-increment: wired-syn;
-  content: 'SYN-' counter(wired-syn, decimal-leading-zero) ' ';
+:root[data-materials='wired'] .guide-item::before {
+  counter-increment: wired-gde;
+  content: 'GDE-' counter(wired-gde, decimal-leading-zero);
+  flex: none;
+  min-width: 46px;
   color: rgba(109, 241, 255, 0.45);
   font-size: 9px;
   letter-spacing: 0.08em;
+}
+
+:root[data-materials='wired'] .guide-item.active {
+  border-left: 2px solid #ffb13b;
+  background: rgba(255, 177, 59, 0.08);
+}
+
+:root[data-materials='wired'] .guide-item.active::before {
+  color: #ffb13b;
 }
 
 :root[data-materials='wired'] .gram-badge {
@@ -1185,9 +1207,29 @@
   border-bottom: 1px solid rgba(109, 241, 255, 0.08);
 }
 
-:root[data-materials='wired'] .gram-detail > section:nth-child(1) { animation: wm-scan-reveal 0.18s steps(4) both; }
-:root[data-materials='wired'] .gram-detail > section:nth-child(2) { animation: wm-scan-reveal 0.18s steps(4) 90ms both; }
-:root[data-materials='wired'] .gram-detail > section:nth-child(3) { animation: wm-scan-reveal 0.18s steps(4) 180ms both; }
+/* Technical report sections scan in top to bottom (real markup:
+   `article.guide-article > header + section.guide-section…`). */
+:root[data-materials='wired'] .guide-article > .guide-article-head { animation: wm-scan-reveal 0.18s steps(4) both; }
+:root[data-materials='wired'] .guide-article > .guide-section:nth-child(2) { animation: wm-scan-reveal 0.18s steps(4) 90ms both; }
+:root[data-materials='wired'] .guide-article > .guide-section:nth-child(3) { animation: wm-scan-reveal 0.18s steps(4) 180ms both; }
+:root[data-materials='wired'] .guide-article > .guide-section:nth-child(n + 4) { animation: wm-scan-reveal 0.18s steps(4) 270ms both; }
+
+:root[data-materials='wired'] .guide-article h2 {
+  color: #e9feff;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.34);
+}
+
+:root[data-materials='wired'] .guide-section h3 {
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.18);
+  color: rgba(255, 241, 183, 0.86);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
 
 :root[data-materials='wired'] .gram-ex-jp {
   position: relative;
@@ -1540,32 +1582,8 @@
   letter-spacing: 0.12em;
 }
 
-/* Sticky note: field note / monitor tape ----------------------------------- */
-:root[data-materials='wired'] .fwin-note {
-  border: 1px solid rgba(255, 177, 59, 0.56);
-  background:
-    repeating-linear-gradient(0deg, rgba(255, 177, 59, 0.05) 0 1px, transparent 1px 4px),
-    linear-gradient(180deg, rgba(255, 177, 59, 0.2), rgba(255, 177, 59, 0.1)),
-    rgba(24, 16, 2, 0.92);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.46), 0 0 18px rgba(255, 177, 59, 0.14);
-}
-
-:root[data-materials='wired'] .fwin-note .fwin-bar,
-:root[data-materials='wired'] .fwin-note .fwin-drag-strip {
-  background: rgba(255, 177, 59, 0.16);
-  border-bottom: 1px solid rgba(255, 177, 59, 0.34);
-}
-
-:root[data-materials='wired'] .fwin-note .fwin-title {
-  color: #fff1b7 !important;
-}
-
-:root[data-materials='wired'] .fwin-note .fwin-body-note,
-:root[data-materials='wired'] .fwin-note .desk-note-text {
-  color: #fff1b7;
-  background: transparent;
-  font-family: var(--font-mono);
-}
+/* Sticky note colours live in wired-shell.css ("Field notes") — one owner, so
+   the bar, body and caret can never disagree again. */
 
 /* ---------------------------------------------------------------------------
    Squared geometry — WIRED ARCHIVE
@@ -1588,8 +1606,11 @@
 /* Instrument hardware stays round: lamps, dots, dials and avatars are physical
    parts, not panels, and flattening them breaks the fiction rather than serving
    it. Listed explicitly so the blanket rule above can stay simple — enumerating
-   panel suffixes instead always misses the next view someone adds. */
-:root[data-materials='wired'] .fwin-body :where(
+   panel suffixes instead always misses the next view someone adds.
+   `:is()`, not `:where()`: `:where` contributes zero specificity, so this
+   (0,3,0) list lost to the blanket square rule above ((0,3,0) plus the
+   `:not(svg)` argument) and every lamp, dot and avatar came out square. */
+:root[data-materials='wired'] .fwin-body :is(
   [class*='-dot'],
   [class*='-lamp'],
   [class*='-avatar'],
@@ -1804,4 +1825,205 @@
   font-size: 9px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+/* ===========================================================================
+   SIG-LIB / SIG-VID / AUD-DAT — Media Center in the archive palette
+   ===========================================================================
+   The Media Center (Library, Video, Music, Study) owns its palette as `--mc-*`
+   tokens on `.mc-root` (views/mediaCenter.css), and Wired never remapped them,
+   so four of the archive's modules painted crimson-on-graphite inside a cyan
+   terminal. The whole token set is re-sourced here — kept in this sheet rather
+   than in mediaCenter.css so the Media Center's own light/high-contrast blocks
+   and its ink ratchet (mediaCenterThemeInk.test.ts) are untouched. (0,3,0)
+   beats the `.mc-root` defaults (0,1,0) regardless of sheet order.
+
+   Ink values are measured against the dark plates they sit on: #d8fbff on
+   rgb(2,13,20) is 16.9:1, #8fc3cc 9.6:1, #77a8b2 7.1:1 — all clear 4.5. */
+:root[data-materials='wired'] .mc-app-chrome,
+:root[data-materials='wired'] .mc-root {
+  --mc-bg: #02070d;
+  --mc-sidebar: #020b12;
+  --mc-surface: #04121a;
+  --mc-surface-2: #061a24;
+  --mc-surface-3: #08202c;
+  --mc-line: rgba(109, 241, 255, 0.12);
+  --mc-line-strong: rgba(109, 241, 255, 0.28);
+  --mc-text: #d8fbff;
+  --mc-muted: #8fc3cc;
+  --mc-dim: #77a8b2;
+  --mc-tile-ink: #d8fbff;
+  --mc-accent: #6df1ff;
+  --mc-accent-2: #b9fbff;
+  --mc-accent-soft: rgba(109, 241, 255, 0.12);
+  --mc-green: #6df1ff;
+  --mc-ok: #6df1ff;
+  --mc-warn: #ffb13b;
+  --mc-danger: #df2732;
+  --mc-radius: 0px;
+  --mc-glass-sidebar: rgba(1, 10, 16, 0.97);
+  --mc-glass-sidebar-blur: none;
+  --mc-glass-topbar: rgba(1, 12, 18, 0.95);
+  --mc-glass-topbar-blur: none;
+  --mc-glass-player: rgba(0, 8, 13, 0.97);
+  --mc-glass-player-blur: none;
+  --mc-nav-ink: #8fc3cc;
+  --mc-nav-hover-ink: #e9feff;
+  --mc-nav-active-sub-ink: #d8fbff;
+  --mc-nav-badge-bg: rgba(109, 241, 255, 0.1);
+  --mc-nav-badge-text: #b9fbff;
+  --mc-nav-active-ink: #e9feff;
+  --mc-ring-ink: #e9feff;
+  --mc-crumb-ink: #b9fbff;
+  --mc-hero-ink: #e9feff;
+  --mc-title-ink: #e9feff;
+  --mc-row-ink: #d8fbff;
+  --mc-inset-glass: rgba(0, 8, 13, 0.6);
+  --mc-inset-glass-soft: rgba(0, 8, 13, 0.5);
+  --mc-album-ink: #e9feff;
+  --mc-btn-ink: #d8fbff;
+  --mc-panel-glass: rgba(2, 16, 24, 0.92);
+  --mc-panel-glass-mid: rgba(2, 16, 24, 0.9);
+  --mc-panel-glass-soft: rgba(2, 16, 24, 0.88);
+  --mc-stage-plate:
+    radial-gradient(circle at 50% 36%, rgba(109, 241, 255, 0.08), transparent 26%),
+    linear-gradient(145deg, rgba(1, 12, 18, 0.94), rgba(0, 5, 9, 0.98));
+  --mc-stage-ink: #d8fbff;
+  --mc-stage-ink-muted: #77a8b2;
+  font-family: var(--font-mono);
+}
+
+/* The study orchestrator carries its own crimson accent set. */
+:root[data-materials='wired'] .study-orchestrator {
+  --study-accent: #6df1ff;
+  --study-accent-strong: #b9fbff;
+  --study-panel: rgba(2, 16, 24, 0.94);
+  --study-line: rgba(109, 241, 255, 0.14);
+}
+
+/* Rules that wrote the crimson as literals, re-pointed one by one. */
+:root[data-materials='wired'] .mc-brand-mark {
+  background: #6df1ff;
+  color: #02070d;
+}
+
+:root[data-materials='wired'] .mc-nav button.is-active,
+:root[data-materials='wired'] .mc-settings-link.is-active {
+  border-color: rgba(109, 241, 255, 0.4);
+  background: linear-gradient(90deg, rgba(109, 241, 255, 0.18), rgba(109, 241, 255, 0.04));
+}
+
+:root[data-materials='wired'] .mc-nav button.is-active::before,
+:root[data-materials='wired'] .mc-settings-link.is-active::before {
+  background: #ffb13b;
+  box-shadow: 0 0 8px rgba(255, 177, 59, 0.5);
+}
+
+:root[data-materials='wired'] .mc-seanime-link {
+  border-color: rgba(109, 241, 255, 0.18);
+  background: rgba(109, 241, 255, 0.05);
+}
+
+:root[data-materials='wired'] .mc-storage-ring {
+  border-color: rgba(109, 241, 255, 0.6);
+}
+
+:root[data-materials='wired'] .mc-global-search:focus-within,
+:root[data-materials='wired'] .mc-subtitle-provider-key input:focus {
+  border-color: rgba(109, 241, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.2);
+}
+
+:root[data-materials='wired'] .mc-button-primary,
+:root[data-materials='wired'] .mc-button-primary:hover {
+  color: #02070d;
+  border-color: #6df1ff;
+  background: #6df1ff;
+  box-shadow: 0 0 12px rgba(109, 241, 255, 0.3);
+}
+
+:root[data-materials='wired'] .mc-button-primary:hover {
+  background: #b9fbff;
+}
+
+:root[data-materials='wired'] .mc-hero-art-empty,
+:root[data-materials='wired'] .mc-album-stage,
+:root[data-materials='wired'] .mc-study-hero {
+  background-image: none;
+}
+
+:root[data-materials='wired'] .mc-stat-icon,
+:root[data-materials='wired'] .mc-video-empty > span,
+:root[data-materials='wired'] .mc-study-hero,
+:root[data-materials='wired'] .mc-study-page > .media-study-mode {
+  border-color: rgba(109, 241, 255, 0.2);
+}
+
+:root[data-materials='wired'] .mc-media-tile:hover .medialib-card__art,
+:root[data-materials='wired'] .mc-media-tile.is-active .medialib-card__art,
+:root[data-materials='wired'] .mc-discover-posters > button:hover .mc-discover-poster {
+  border-color: rgba(255, 177, 59, 0.7);
+}
+
+:root[data-materials='wired'] .mc-study-ring {
+  border-right-color: rgba(255, 177, 59, 0.6);
+}
+
+:root[data-materials='wired'] .mc-toggle input:focus-visible + i {
+  box-shadow: 0 0 0 1px #ffb13b;
+}
+
+:root[data-materials='wired'] .mc-source-dot.is-warning {
+  background: #ffb13b;
+  box-shadow: 0 0 7px rgba(255, 177, 59, 0.4);
+}
+
+:root[data-materials='wired'] .mc-source-dot.is-error {
+  background: #df2732;
+  box-shadow: 0 0 7px rgba(223, 39, 50, 0.4);
+}
+
+:root[data-materials='wired'] .study-station.is-complete .study-station-node {
+  background: rgba(109, 241, 255, 0.3);
+  border-color: #6df1ff;
+}
+
+/* AUD-DAT transport: hardware keys, the play key is the lit amber one. */
+:root[data-materials='wired'] .mc-player-transport button,
+:root[data-materials='wired'] .mc-player-volume button {
+  border-radius: 0;
+  color: rgba(109, 241, 255, 0.8);
+  border: 1px solid rgba(109, 241, 255, 0.22);
+}
+
+:root[data-materials='wired'] .mc-player-transport button:hover,
+:root[data-materials='wired'] .mc-player-volume button:hover,
+:root[data-materials='wired'] .mc-player-transport button.is-active {
+  color: #02070d;
+  background: #6df1ff;
+}
+
+:root[data-materials='wired'] .mc-player-transport .mc-player-play {
+  color: #160a00;
+  background: #ffb13b;
+  border-color: #ffb13b;
+}
+
+/* The music oscilloscope in the Music now-playing strip (Wired only). */
+:root[data-materials='wired'] .music-nowplaying .music-osc {
+  display: block;
+  margin: 6px 0 2px;
+}
+
+/* Motion gates for the report/register reveals above. */
+:root[data-materials='wired'][data-wired-motion='off'] .guide-article > *,
+:root[data-materials='wired'].reduce-motion .guide-article > *,
+:root[data-materials='wired'].reduce-motion .dict-results .dict-entry {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='wired'] .guide-article > * {
+    animation: none;
+  }
 }

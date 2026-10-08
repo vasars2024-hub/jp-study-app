@@ -56,6 +56,8 @@ import {
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../../wordLookup';
 import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
+import { useWiredMaterials } from '../ui/AppChrome';
+import WiredOscilloscope from '../wired/WiredOscilloscope';
 import { useMusicMining } from './useMusicMining';
 import {
   musicCueReplaySec,
@@ -1263,9 +1265,10 @@ export function MusicControls({
   );
 }
 
-/** Now-playing strip with album art. */
+/** Now-playing strip with album art (+ the AUD-DAT oscilloscope under Wired). */
 export function MusicNowPlaying({ state }: { state: MusicState }) {
   const { ps, currentMeta, art } = state;
+  const wired = useWiredMaterials();
   if (!ps.current || !currentMeta) return null;
 
   return (
@@ -1277,6 +1280,7 @@ export function MusicNowPlaying({ state }: { state: MusicState }) {
       )}
       {currentMeta.artist ? `${currentMeta.artist} — ` : ''}
       {currentMeta.title}
+      {wired && <WiredOscilloscope className="music-osc" />}
     </div>
   );
 }

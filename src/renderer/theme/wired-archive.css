@@ -16,13 +16,18 @@
   --grid-line: rgba(109, 241, 255, 0.14);
   --chrome: #030d14;
   --chrome-elevated: #071823;
-  --font-body: 'JetBrains Mono', 'IBM Plex Mono', Consolas, 'Yu Gothic UI', Meiryo, ui-monospace, monospace;
-  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', Consolas, 'Yu Gothic UI', Meiryo, ui-monospace, monospace;
+  /* Mono stack. JetBrains Mono / IBM Plex Mono are not bundled (no OFL font
+     package is shipped in this repo), so the stack is ordered for what a
+     Windows / macOS / Linux machine actually has: Cascadia Mono (Win 11 /
+     Terminal), Consolas (every Windows), SF Mono / Menlo (macOS), DejaVu /
+     Liberation Mono (Linux) — with the Japanese gothic faces before the generic
+     fallback so kana and kanji never drop to a proportional serif. */
+  --font-body: 'JetBrains Mono', 'IBM Plex Mono', 'Cascadia Mono', Consolas, 'SF Mono', Menlo, 'DejaVu Sans Mono', 'Liberation Mono', 'BIZ UDGothic', 'MS Gothic', 'Yu Gothic UI', Meiryo, 'Noto Sans Mono CJK JP', ui-monospace, monospace;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Cascadia Mono', Consolas, 'SF Mono', Menlo, 'DejaVu Sans Mono', 'Liberation Mono', 'BIZ UDGothic', 'MS Gothic', 'Yu Gothic UI', Meiryo, 'Noto Sans Mono CJK JP', ui-monospace, monospace;
   --wired-black: #02070d;
   --wired-blue: #061d2b;
   --wired-cyan: #6df1ff;
   --wired-cyan-dim: rgba(109, 241, 255, 0.42);
-  --wired-teal: #57d6c9;
   --wired-amber: #ffb13b;
   --wired-red: #df2732;
   --wired-steel: #385765;
@@ -30,9 +35,18 @@
   --wired-glass-strong: rgba(6, 28, 39, 0.94);
   --wired-line: rgba(109, 241, 255, 0.26);
   --wired-glow: 0 0 12px rgba(109, 241, 255, 0.34);
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
+  /* The whole radius ladder, not three rungs of it. Only sm/md/lg used to be
+     remapped, so `--radius-xs` stayed at the base 4px — LARGER than Wired's
+     own sm — and every Liquid surface keyed on xs (liquid-tokens.css Wired
+     block) came out rounder than the rest of the archive. Pill and the large
+     rungs went to 12–999px for dialogs, chips and switches. Square, all of it. */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
+  --radius-pill: 0px;
   --taskbar-h: 52px;
 }
 
@@ -110,16 +124,128 @@
   opacity: 0.24;
 }
 
+/* Tube edge falloff only. The red/blue chromatic fringes that used to sit at
+   the left/right edges were off-palette (red is reserved for danger). */
 .wired-boot-vignette {
   background:
     radial-gradient(ellipse at center, transparent 48%, rgba(0, 0, 0, 0.78) 100%),
-    linear-gradient(90deg, rgba(255, 0, 0, 0.035), transparent 18%, transparent 82%, rgba(0, 180, 255, 0.04));
+    linear-gradient(90deg, rgba(109, 241, 255, 0.035), transparent 16%, transparent 84%, rgba(109, 241, 255, 0.035));
+}
+
+/* CRT power-on: a bright horizontal line that opens into the picture
+   (scaleY .003 → 1 in 6 hard steps, 240ms), then the beam goes dark. */
+.wired-boot-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  pointer-events: none;
+  background: #e9feff;
+  box-shadow: 0 0 18px #6df1ff, 0 0 42px rgba(109, 241, 255, 0.6);
+  opacity: 0;
+  z-index: 2;
+}
+
+.wired-boot.phase-preboot .wired-boot-beam {
+  animation: wb-beam 420ms steps(4) both;
+}
+
+.wired-boot-panel {
+  transform-origin: 50% 50%;
+  animation: wb-power-on 240ms steps(6) 120ms both;
+}
+
+@keyframes wb-beam {
+  0% { opacity: 1; transform: scaleX(0.02); }
+  40% { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+
+@keyframes wb-power-on {
+  0% { transform: scaleY(0.003); filter: brightness(3); }
+  60% { transform: scaleY(1); filter: brightness(1.8); }
+  100% { transform: scaleY(1); filter: none; }
+}
+
+/* POST line: memory count-up. */
+.wired-boot-post {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  margin: 12px 18px 0;
+  color: rgba(216, 251, 255, 0.72);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wired-boot-mem {
+  color: #e9feff;
+  letter-spacing: 0.08em;
+}
+
+.wired-boot-mem-ok {
+  color: rgba(109, 241, 255, 0.4);
+}
+
+.wired-boot-mem-ok.is-ok {
+  color: var(--wired-amber);
+}
+
+/* Layer descent: LAYER:01 … LAYER:09 stamped one after another. */
+.wired-boot-layers {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+  margin: 10px 18px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.wired-boot-layers li {
+  padding: 3px 0;
+  text-align: center;
+  color: rgba(109, 241, 255, 0.22);
+  border: 1px solid rgba(109, 241, 255, 0.14);
+  animation: wb-layer-lit 1ms steps(1) both;
+  animation-delay: calc(700ms + var(--wb-layer, 0) * 260ms);
+}
+
+.wired-boot-layers li:last-child {
+  --wb-lit-ink: #160a00;
+  --wb-lit-bg: #ffb13b;
+}
+
+@keyframes wb-layer-lit {
+  to {
+    color: var(--wb-lit-ink, #02070d);
+    background: var(--wb-lit-bg, rgba(109, 241, 255, 0.85));
+    border-color: var(--wb-lit-bg, #6df1ff);
+  }
+}
+
+/* Outside the boot phases the descent is already complete. */
+.wired-boot:not(.phase-preboot):not(.phase-boot) .wired-boot-layers li {
+  animation: none;
+  color: #02070d;
+  background: rgba(109, 241, 255, 0.85);
+  border-color: #6df1ff;
+}
+
+.wired-boot:not(.phase-preboot):not(.phase-boot) .wired-boot-layers li:last-child {
+  color: #160a00;
+  background: #ffb13b;
+  border-color: #ffb13b;
 }
 
 .wired-boot-panel {
   position: relative;
   width: min(880px, calc(100vw - 48px));
-  min-height: 560px;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
   border: 1px solid rgba(109, 241, 255, 0.42);
   background:
     linear-gradient(180deg, rgba(109, 241, 255, 0.08), transparent 32%),
@@ -139,8 +265,8 @@
 }
 
 .wired-boot-map {
-  height: 220px;
-  margin: 18px;
+  height: min(170px, 22vh);
+  margin: 12px 18px;
   border: 1px solid rgba(109, 241, 255, 0.18);
   background:
     linear-gradient(rgba(109, 241, 255, 0.08) 1px, transparent 1px),
@@ -165,7 +291,7 @@
 
 .wired-boot-route {
   stroke-dasharray: 9 9;
-  animation: wired-route 1.2s linear infinite;
+  animation: wired-route 1.2s steps(12) infinite;
 }
 
 .wired-boot-route.route-b {
@@ -339,11 +465,24 @@
   min-height: 20px;
 }
 
+/* A wrong code is attention, not an emergency: amber for the first two
+   failures, the danger red only from the third on (spec §7; Lockscreen.tsx
+   stamps `is-error-hard` once failCount >= 3). It used to go red on the first
+   typo. */
 .lockscreen-wired.is-error .lockscreen-wired-status {
-  color: #ffd2d4;
+  color: #fff1b7;
 }
 
 .lockscreen-wired.is-error .lockscreen-wired-panel {
+  border-color: rgba(255, 177, 59, 0.72);
+  box-shadow: 0 0 32px rgba(255, 177, 59, 0.24);
+}
+
+.lockscreen-wired.is-error-hard .lockscreen-wired-status {
+  color: #ffd2d4;
+}
+
+.lockscreen-wired.is-error-hard .lockscreen-wired-panel {
   border-color: rgba(223, 39, 50, 0.72);
   box-shadow: 0 0 32px rgba(223, 39, 50, 0.28);
 }
@@ -369,11 +508,29 @@
   .wired-boot-noise,
   .lockscreen-wired-noise,
   .wired-boot-route,
-  .wired-boot-lines li {
+  .wired-boot-lines li,
+  .wired-boot-beam,
+  .wired-boot-panel,
+  .wired-boot-layers li {
     animation: none !important;
   }
   .wired-boot-lines li {
     opacity: 1;
     transform: none;
   }
+  .wired-boot-layers li {
+    color: #02070d;
+    background: rgba(109, 241, 255, 0.85);
+  }
+}
+
+.wired-boot.reduced .wired-boot-beam,
+.wired-boot.reduced .wired-boot-panel,
+.wired-boot.reduced .wired-boot-layers li {
+  animation: none;
+}
+
+.wired-boot.reduced .wired-boot-layers li {
+  color: #02070d;
+  background: rgba(109, 241, 255, 0.85);
 }

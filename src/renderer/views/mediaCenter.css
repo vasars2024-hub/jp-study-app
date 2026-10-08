@@ -6783,7 +6783,12 @@
    The six-palette list is the same one `styles.css` uses for `--accent-text`, and
    `accentTextToken.test.ts` is the guard: a new palette declaring
    `color-scheme: light` must appear in BOTH lists or it silently reinherits the
-   dark chrome. */
+   dark chrome.
+
+   Aero (`data-materials='aero'`, a light theme) joins this list too: Video,
+   Music and Library used to open as the dark red default inside the Aero shell.
+   Its own glass refinements follow in the next block. */
+:root[data-materials='aero'] :is(.mc-root, .mc-app-chrome),
 :root[data-theme='classic-light'] .mc-root,
 :root[data-theme='classic-light'] .mc-app-chrome,
 :root[data-theme='soft-sepia'] .mc-root,
@@ -6862,6 +6867,34 @@
     radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 26%),
     linear-gradient(145deg, var(--panel), var(--panel-2));
   --mc-tile-ink: var(--text);
+}
+
+/* Aero: the light remap above, re-expressed as Windows 6 media software — a pale
+   glass navigation pane, a light command-bar top strip, white panels, aqua
+   accent, and the transport bar as frosted glass. Blur reads the --blur-* scale,
+   so battery / transparency Off / safe mode all reach it. Ink tokens stay those
+   of the light list (dark ocean ink on white). */
+:root[data-materials='aero'] :is(.mc-root, .mc-app-chrome) {
+  --mc-bg: #f2f8fc;
+  --mc-sidebar: #eaf3fa;
+  --mc-surface: #ffffff;
+  --mc-surface-2: #f4f9fd;
+  --mc-surface-3: #e7f1f9;
+  --mc-line: #d3e2ee;
+  --mc-line-strong: #a7c4da;
+  --mc-accent: var(--accent);
+  --mc-accent-2: var(--accent-text);
+  --mc-accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --mc-radius: 5px;
+  --mc-glass-sidebar: linear-gradient(180deg, rgba(248, 252, 255, 0.94), rgba(226, 239, 248, 0.94));
+  --mc-glass-sidebar-blur: blur(var(--blur-md));
+  --mc-glass-topbar: linear-gradient(180deg, rgba(252, 254, 255, 0.92) 0, rgba(238, 244, 250, 0.92) 46%, rgba(225, 235, 246, 0.92) 50%, rgba(234, 241, 249, 0.92) 100%);
+  --mc-glass-topbar-blur: blur(var(--blur-md));
+  --mc-glass-player: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0, rgba(232, 241, 249, 0.92) 48%, rgba(214, 229, 243, 0.92) 52%, rgba(228, 238, 248, 0.92) 100%);
+  --mc-glass-player-blur: blur(var(--blur-md));
+  --mc-stage-plate:
+    radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 30%),
+    linear-gradient(145deg, #ffffff, #e9f3fa);
 }
 
 /* High contrast is the one theme that must not blur or tint anything: the

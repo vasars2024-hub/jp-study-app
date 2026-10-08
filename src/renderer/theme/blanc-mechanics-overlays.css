@@ -1,0 +1,318 @@
+/* Blanc mechanics overlays (Flow, Capture inbox). Imported by the lazy
+   BlancFlowRunner / BlancCaptureInboxPanel chunks, so a session that never opens
+   them never downloads this sheet. Blanc tokens only. */
+
+/* ── Overlays (Flow, Capture inbox) ─────────────────────────────────── */
+
+.blanc-root .blanc-mech-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: start center;
+  padding: clamp(24px, 8vh, 96px) 16px 16px;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.blanc-root .blanc-mech-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-lg, 14px);
+  background: var(--blanc-panel);
+  color: var(--blanc-text);
+  box-shadow: var(--blanc-shadow);
+}
+
+.blanc-root .blanc-mech-dialog:focus {
+  outline: none;
+}
+
+.blanc-root .blanc-mech-dialog:focus-visible {
+  outline: 2px solid var(--blanc-accent);
+  outline-offset: 2px;
+}
+
+.blanc-root .blanc-mech-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.blanc-root .blanc-mech-dialog-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+}
+
+.blanc-root .blanc-mech-keys {
+  margin: 0;
+  color: var(--blanc-faint, var(--blanc-muted));
+  font-size: 11px;
+}
+
+/* Flow */
+
+.blanc-root .blanc-flow-clock {
+  color: var(--blanc-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.blanc-root .blanc-flow-stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.blanc-root .blanc-flow-stages li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-sm, 8px);
+  color: var(--blanc-muted);
+  font-size: 12px;
+}
+
+.blanc-root .blanc-flow-stages li.is-current {
+  border-color: var(--blanc-border-strong);
+  background: var(--blanc-active);
+  color: var(--blanc-text);
+  font-weight: 600;
+}
+
+.blanc-root .blanc-flow-stages li.is-empty {
+  opacity: 0.55;
+}
+
+.blanc-root .blanc-flow-stage-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.blanc-root .blanc-flow-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.blanc-root .blanc-flow-lead {
+  margin: 0;
+  color: var(--blanc-text);
+}
+
+.blanc-root .blanc-flow-progress {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: var(--blanc-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.blanc-root .blanc-flow-progress progress {
+  width: 100%;
+  height: 4px;
+}
+
+.blanc-root .blanc-flow-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 140px;
+  padding: 18px;
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-md, 10px);
+  background: var(--blanc-panel-soft, var(--blanc-bg));
+  text-align: center;
+}
+
+.blanc-root .blanc-flow-front {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.blanc-root .blanc-flow-back {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--blanc-border);
+}
+
+.blanc-root .blanc-flow-back p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.blanc-root .blanc-flow-reading {
+  color: var(--blanc-muted);
+  font-size: 15px;
+}
+
+.blanc-root .blanc-flow-meaning {
+  font-size: 16px;
+}
+
+.blanc-root .blanc-flow-sentence {
+  color: var(--blanc-muted);
+  font-size: 14px;
+}
+
+.blanc-root .blanc-flow-grades {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.blanc-root .blanc-flow-grades button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+}
+
+.blanc-root .blanc-flow-grades button.is-again {
+  color: var(--blanc-danger);
+}
+
+.blanc-root .blanc-flow-grades button.is-easy {
+  color: var(--blanc-success);
+}
+
+.blanc-root .blanc-mech-dialog kbd {
+  padding: 0 5px;
+  border: 1px solid var(--blanc-border-strong);
+  border-radius: 4px;
+  color: var(--blanc-muted);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.blanc-root .blanc-flow .blanc-segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.blanc-root .blanc-flow-report {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-sm, 8px);
+  background: var(--blanc-panel-soft, var(--blanc-bg));
+  color: var(--blanc-text);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+/* Capture inbox */
+
+.blanc-root .blanc-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.blanc-root .blanc-capture:focus {
+  outline: none;
+}
+
+.blanc-root .blanc-capture-list {
+  display: flex;
+  flex-direction: column;
+  max-height: min(360px, 50vh);
+  overflow: auto;
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-sm, 8px);
+}
+
+.blanc-root .blanc-capture-list:focus-visible {
+  outline: 2px solid var(--blanc-accent);
+  outline-offset: 2px;
+}
+
+.blanc-root .blanc-capture-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'kind text time'
+    'kind gloss gloss';
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--blanc-border);
+  cursor: default;
+}
+
+.blanc-root .blanc-capture-item:last-child {
+  border-bottom: 0;
+}
+
+.blanc-root .blanc-capture-item.is-selected {
+  background: var(--blanc-active);
+  box-shadow: inset 2px 0 0 var(--blanc-accent);
+}
+
+.blanc-root .blanc-capture-kind {
+  grid-area: kind;
+  color: var(--blanc-faint, var(--blanc-muted));
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.blanc-root .blanc-capture-text {
+  grid-area: text;
+  overflow-wrap: anywhere;
+}
+
+.blanc-root .blanc-capture-gloss {
+  grid-area: gloss;
+  color: var(--blanc-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.blanc-root .blanc-capture-time {
+  grid-area: time;
+  color: var(--blanc-faint, var(--blanc-muted));
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.blanc-root .blanc-capture-edit {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+}
+
+.blanc-root .blanc-capture-edit label {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .blanc-root .blanc-flow-stages,
+  .blanc-root .blanc-flow-grades {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -71,6 +71,10 @@ import './multiMonitor.css';
 // Aero desktop-shell glass (Phase 2 · M1) — scoped to [data-materials='aero'],
 // loaded after shell.css so Aero flyout/palette corrections win over base shell styles.
 import './theme/aero-shell.css';
+// Aero "Windows 6" experience layer: logon screen, gadgets, Flip 3D, live walls.
+import './theme/aero-vista.css';
+// Aero study mechanics: Memory Defragmenter, Vocabulary Update, balloons, screensaver, study gadgets.
+import './theme/aero-mechanics.css';
 import './theme/wired-shell.css';
 // WIRED ARCHIVE shared motion library (bespoke spec §1–§2) — wm-* keyframes
 // and the window-lifecycle visuals; loaded after wired-shell.css so its
@@ -82,6 +86,13 @@ import './theme/wired-widgets.css';
 // loaded after ui.css so the density/material overrides win. Default apps unchanged.
 import './theme/aero-apps.css';
 import './theme/wired-apps.css';
+// WIRED ARCHIVE "NAVI SHELL" pass — shared CRT glass, module-plate window
+// chrome, data-rail taskbar, cursors, SYSTEM PROMPT dialogs. After wired-apps
+// so its shell-level rules win; every rule is scoped to [data-materials='wired'].
+import './theme/wired-navi.css';
+// WIRED study mechanics — TTY / signal decrypt / intercept consoles, layer
+// descent (tray badge, crossing transmission, wallpaper depth stages).
+import './theme/wired-mechanics.css';
 import './theme/blanc.css';
 // Living-desktop weather overlays (Phase 3 · M3) + atmosphere polish (M5/M6).
 import './environment/weather.css';

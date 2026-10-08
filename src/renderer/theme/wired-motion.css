@@ -129,8 +129,9 @@
   visibility: hidden;
 }
 
+/* Translated: WiredWallpaper publishes `--wn-unmounting` from the catalog. */
 :root[data-materials='wired'] .fwin-anim-closing .fwin-wired-status::before {
-  content: 'UNMOUNTING…';
+  content: var(--wn-unmounting, 'UNMOUNTING\2026');
   color: var(--wired-amber);
 }
 
@@ -312,15 +313,25 @@
   --wm-edge: rgba(223, 39, 50, 0.8);
 }
 
+/* The flash STARTS bright and hands back to the toast's own shadow. It ended
+   at `box-shadow: none` with fill `both`, so every toast permanently lost its
+   drop shadow after arriving; `backwards` only holds the first frame through
+   the (zero) delay and then lets the element's own value through. */
 @keyframes wm-edge-flash {
   0% { box-shadow: 0 0 0 1px var(--wm-edge, rgba(109, 241, 255, 0.8)), 0 0 16px var(--wm-edge, rgba(109, 241, 255, 0.5)); }
-  100% { box-shadow: none; }
 }
 
+:root[data-materials='wired'] .ui-toast {
+  animation-fill-mode: both, backwards;
+}
+
+/* Typed-in title: one line, and an ellipsis when it does not fit instead of
+   a hard clip mid-glyph. */
 :root[data-materials='wired'] .ui-toast__title {
   display: inline-block;
   overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
   max-width: 100%;
   vertical-align: bottom;
   animation: wm-type-in 0.24s steps(12) both;
@@ -491,12 +502,11 @@
   :root[data-materials='wired'] .stats-section,
   :root[data-materials='wired'] .stats-cards .stats-card:first-child .stats-card-val,
   :root[data-materials='wired'] .immersion-stage.is-settle,
-  :root[data-materials='wired'] .dict-results article,
+  :root[data-materials='wired'] .dict-results .dict-entry,
   :root[data-materials='wired'] .dict-hint::after,
   :root[data-materials='wired'] .tr-output > .muted::after,
-  :root[data-materials='wired'] .gram-detail > section:nth-child(1),
-  :root[data-materials='wired'] .gram-detail > section:nth-child(2),
-  :root[data-materials='wired'] .gram-detail > section:nth-child(3) {
+  :root[data-materials='wired'] .guide-article > .guide-article-head,
+  :root[data-materials='wired'] .guide-article > .guide-section {
     animation: none;
   }
 
@@ -551,7 +561,7 @@
 :root[data-materials='wired'][data-wired-motion='off'] .flash-card.is-resync,
 :root[data-materials='wired'][data-wired-motion='off'] .stats-bar-fill,
 :root[data-materials='wired'][data-wired-motion='off'] .stats-section,
-:root[data-materials='wired'][data-wired-motion='off'] .dict-results article,
+:root[data-materials='wired'][data-wired-motion='off'] .dict-results .dict-entry,
 :root[data-materials='wired'][data-wired-motion='off'] .immersion-stage.is-settle,
 :root[data-materials='wired'][data-wired-motion='off'] .widget-frame.widget-anim-mounting,
 :root[data-materials='wired'][data-wired-motion='off'] .widget-frame.widget-anim-mounting .widget-title {

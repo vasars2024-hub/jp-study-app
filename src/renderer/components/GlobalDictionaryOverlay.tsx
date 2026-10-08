@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import DictionaryPopup from './DictionaryPopup';
-import SentenceTranslatePopup from './SentenceTranslatePopup';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   clearLookupHighlight,
   isLookupClick,
@@ -19,6 +17,29 @@ import {
 } from '../globalLookupSettings';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { t } from '../i18n';
+
+// The overlay mounts at every shell's root, but a popup is only needed once the
+// user actually looks something up — loading both on first use keeps them (and
+// the dictionary/translation UI they pull) out of every window's startup.
+//
+// A shell whose base stylesheet does not already carry the popups' rules (Blanc
+// loads Study OS's class-name sheet on demand) registers a loader here; the
+// popup then renders only once both its code and its styles are in.
+interface Loader<T> {
+  (): Promise<T>;
+}
+let popupStyleLoader: Loader<unknown> | null = null;
+export function setPopupStyleLoader(load: Loader<unknown> | null): void {
+  popupStyleLoader = load;
+}
+function withPopupStyles<T>(load: Loader<T>): Loader<T> {
+  return () =>
+    Promise.all([load(), popupStyleLoader ? popupStyleLoader().catch(() => undefined) : undefined]).then(
+      ([module]) => module,
+    );
+}
+const DictionaryPopup = lazy(withPopupStyles(() => import('./DictionaryPopup')));
+const SentenceTranslatePopup = lazy(withPopupStyles(() => import('./SentenceTranslatePopup')));
 
 /**
  * Module-level `t` (not `useT`) resolves against the live language on every
@@ -223,15 +244,21 @@ export default function GlobalDictionaryOverlay() {
 
   if (!popup) return null;
   if (popup.kind === 'translate') {
-    return <SentenceTranslatePopup text={popup.query} onClose={close} />;
+    return (
+      <Suspense fallback={null}>
+        <SentenceTranslatePopup text={popup.query} onClose={close} />
+      </Suspense>
+    );
   }
   return (
-    <DictionaryPopup
-      query={popup.query}
-      x={popup.x}
-      y={popup.y}
-      context={popup.context}
-      onClose={close}
-    />
+    <Suspense fallback={null}>
+      <DictionaryPopup
+        query={popup.query}
+        x={popup.x}
+        y={popup.y}
+        context={popup.context}
+        onClose={close}
+      />
+    </Suspense>
   );
 }

@@ -28,7 +28,7 @@
  * bound it, send it, and see honestly what it cost and what came back.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import {
   emptyAgentWorkspaceState,
@@ -46,7 +46,7 @@ import {
   updateAgentWorkspace,
 } from '../../agentWorkspaceClient';
 import type { AgentWorkspaceFailureCode } from '../../../shared/agentWorkspaceBridge';
-import { executeAgentPrompt } from '../../agentExecutionClient';
+import { cancelAgentPrompt, executeAgentPrompt } from '../../agentExecutionClient';
 import {
   AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
   AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,
@@ -115,6 +115,20 @@ export function BlancCentralAgentPanel() {
   const [maxInputChars, setMaxInputChars] = useState(AGENT_EXECUTION_DEFAULT_INPUT_BUDGET);
   const [maxOutputTokens, setMaxOutputTokens] = useState(AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET);
   const [running, setRunning] = useState(false);
+  // The request in flight, so Cancel — and leaving the tool — can stop it.
+  const activeRequest = useRef<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // Leaving the tool cancels the run instead of letting it finish (and
+      // spend) for a panel nobody is looking at.
+      const requestId = activeRequest.current;
+      activeRequest.current = null;
+      if (requestId) void cancelAgentPrompt(requestId);
+    };
+  }, []);
   const [streamedText, setStreamedText] = useState('');
   const [failure, setFailure] = useState<AgentExecutionFailureCode | null>(null);
   const [planFailure, setPlanFailure] = useState<string | null>(null);
@@ -250,9 +264,13 @@ export function BlancCentralAgentPanel() {
     setRunning(true);
     setStreamedText('');
     setFailure(null);
+    activeRequest.current = requestId;
     const result = await executeAgentPrompt(request, (streamEvent) => {
-      setStreamedText((current) => current + streamEvent.text);
+      if (mounted.current) setStreamedText((current) => current + streamEvent.text);
     });
+    if (activeRequest.current === requestId) activeRequest.current = null;
+    // Left the tool while it ran (the unmount cancelled it): nothing to update.
+    if (!mounted.current) return;
     if (result.ok) {
       setState(result.state);
       setDraft('');
@@ -266,6 +284,11 @@ export function BlancCentralAgentPanel() {
     setRunning(false);
     setStreamedText('');
   }, [allowLocalFallback, maxInputChars, maxOutputTokens, overBudget, prompt, running, selected, target]);
+
+  const cancel = useCallback((): void => {
+    const requestId = activeRequest.current;
+    if (requestId) void cancelAgentPrompt(requestId);
+  }, []);
 
   const messages = selected ? selected.messages.slice(-VISIBLE_MESSAGE_LIMIT) : [];
 
@@ -413,6 +436,13 @@ export function BlancCentralAgentPanel() {
         >
           {t('agent.execute.send')}
         </button>
+        {/* A running request can be stopped; it used to run to the end (and
+            keep spending a cloud budget) with no way out but waiting. */}
+        {running ? (
+          <button type="button" onClick={cancel}>
+            {t('agent.execute.cancel')}
+          </button>
+        ) : null}
         {/*
           Every reason the button is off is stated. A disabled control whose only
           account of itself is being grey is the defect this repo keeps finding.

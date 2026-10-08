@@ -25,86 +25,10 @@
   display: none;
 }
 
-/* ---------- Taskbar: a glass slab with a bright top edge ------------------ */
-:root[data-materials='aero'] .os-taskbar {
-  background:
-    var(--shell-sheen),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.34), rgba(168, 193, 204, 0.22)),
-    var(--shell-glass-strong);
-  border-top: 1px solid rgba(255, 255, 255, 0.86);
-  box-shadow:
-    0 -10px 30px rgba(17, 50, 65, 0.2),
-    inset 0 1px 0 var(--glass-highlight),
-    inset 0 -1px 0 rgba(18, 49, 67, 0.16);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.45);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.45);
-}
-
-/* Start orb → glossy aqua button */
-:root[data-materials='aero'] .os-start-btn {
-  background: linear-gradient(to bottom, var(--sheen), color-mix(in srgb, var(--accent) 70%, #fff)) padding-box,
-    var(--accent) border-box;
-  border: 1px solid color-mix(in srgb, var(--accent) 60%, #fff);
-  box-shadow: var(--elevation-2), inset 0 1px 0 var(--glass-highlight);
-}
-:root[data-materials='aero'] .os-start-btn:hover {
-  background: linear-gradient(to bottom, var(--sheen-strong), var(--accent));
-  filter: brightness(1.05);
-}
-
-/* Tray + running-window + desktop-switch buttons → glass chips */
-:root[data-materials='aero'] .os-tray-btn,
-:root[data-materials='aero'] .os-task-win,
-:root[data-materials='aero'] .os-desktop-switch {
-  background: color-mix(in srgb, var(--shell-glass) 78%, transparent);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 78%, rgba(18, 49, 67, 0.18));
-  border-radius: var(--radius-md);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
-  transition: background-color var(--dur-fast) var(--ease-standard), filter var(--dur-fast) var(--ease-standard);
-}
-:root[data-materials='aero'] .os-tray-btn:hover,
-:root[data-materials='aero'] .os-task-win:hover,
-:root[data-materials='aero'] .os-desktop-switch:hover {
-  background: var(--glass-tint-strong);
-  filter: brightness(1.05);
-}
-:root[data-materials='aero'] .os-task-win.active,
-:root[data-materials='aero'] .os-desktop-switch.active {
-  color: #ffffff;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.34), transparent 42%),
-    linear-gradient(to bottom, color-mix(in srgb, var(--accent) 74%, #ffffff), var(--accent));
-  border-color: color-mix(in srgb, var(--accent) 70%, #ffffff);
-}
-:root[data-materials='aero'] .os-clock { color: var(--text); }
-
-/* ---------- Start menu: a floating glass panel --------------------------- */
-:root[data-materials='aero'] .os-start {
-  background:
-    var(--shell-sheen),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(0, 184, 208, 0.08)),
-    var(--shell-glass-strong);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 72%, rgba(18, 49, 67, 0.22));
-  box-shadow:
-    0 24px 64px rgba(10, 29, 39, 0.34),
-    0 0 0 1px rgba(255, 255, 255, 0.46) inset,
-    inset 0 1px 0 var(--glass-highlight);
-  backdrop-filter: blur(var(--blur-xl)) saturate(1.25);
-  -webkit-backdrop-filter: blur(var(--blur-xl)) saturate(1.25);
-}
-:root[data-materials='aero'] .os-start-backdrop {
-  background: color-mix(in srgb, var(--bg) 28%, transparent);
-}
-:root[data-materials='aero'] .os-start-tile {
-  background: color-mix(in srgb, var(--shell-work-surface) 72%, transparent);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 70%, rgba(18, 49, 67, 0.16));
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
-  transition: background-color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
-}
-:root[data-materials='aero'] .os-start-tile:hover {
-  background: var(--glass-tint-strong);
-  transform: translateY(-1px);
-}
+/* The taskbar, Start menu and window chrome each live in ONE section further
+   down ("Windows 6 taskbar", "Windows 6 Start menu", "Windows 6 window
+   chrome"). The first-generation frosted taskbar/Start passes that used to sit
+   here were overridden by later passes and never painted; they are gone. */
 
 .aero-found-overlay {
   position: absolute;
@@ -113,7 +37,7 @@
   pointer-events: none;
   overflow: hidden;
   color: #123047;
-  font-family: 'Tahoma', 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', var(--font-body);
 }
 
 .aero-found-bubbles {
@@ -124,9 +48,11 @@
 
 .aero-found-bubbles span {
   position: absolute;
-  border-radius: 3px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(94, 190, 230, 0.42));
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.44);
+  /* Glossy soap bubbles (were 3px-radius squares): an off-centre specular
+     highlight, a clear body and a bright rim. */
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #fff 0 14%, rgba(255, 255, 255, 0.2) 38%, rgba(94, 190, 230, 0.16) 68%, rgba(255, 255, 255, 0.6) 100%);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.55);
   animation: aeroFoundBubble 5.8s ease-out infinite;
 }
 
@@ -201,8 +127,7 @@
 
 .aero-found-assistant,
 .aero-found-security,
-.aero-found-network,
-.aero-found-gadgets button {
+.aero-found-network {
   border: 1px solid rgba(86, 139, 188, 0.34);
   border-radius: 7px;
   background:
@@ -265,8 +190,8 @@
 
 .aero-found-security {
   position: absolute;
-  right: 22px;
-  top: 92px;
+  right: 268px;
+  top: 18px;
   display: grid;
   gap: 7px;
   justify-items: center;
@@ -290,8 +215,8 @@
 
 .aero-found-network {
   position: absolute;
-  right: 186px;
-  top: 112px;
+  right: 268px;
+  top: 150px;
   display: grid;
   gap: 6px;
   width: 210px;
@@ -310,44 +235,26 @@
     linear-gradient(90deg, transparent 18%, rgba(44, 118, 172, 0.45) 19% 21%, transparent 22% 48%, rgba(44, 118, 172, 0.45) 49% 51%, transparent 52%);
 }
 
+/* The gadget column is a Sidebar on the RIGHT edge, the way Windows 6 docked it.
+   It used to sit at left:18/top:86 with pointer-events on the whole column,
+   over the first column of desktop icons: their clicks landed on an empty part
+   of the overlay. The column itself is now click-through; only the gadgets
+   catch the pointer. */
 .aero-found-gadgets {
   position: absolute;
-  left: 18px;
-  top: 86px;
+  right: 14px;
+  top: 14px;
   display: grid;
+  align-content: start;
   gap: 7px;
-  width: min(250px, calc(100vw - 36px));
-  pointer-events: auto;
-}
-
-.aero-found-gadgets button {
-  position: relative;
-  display: grid;
-  gap: 3px;
-  min-height: 42px;
-  padding: 8px 10px;
-  color: #17324a;
-  text-align: left;
-  font-size: 11px;
-  cursor: pointer;
+  width: min(236px, calc(100vw - 36px));
+  max-height: calc(100% - var(--taskbar-h, 40px) - 120px);
   overflow: hidden;
+  pointer-events: none;
 }
 
-.aero-found-gadgets button span,
-.aero-found-gadgets button b {
-  color: #527087;
-  font-size: 10px;
-  font-weight: 400;
-}
-
-.aero-found-gadgets button.is-meter > span {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #74c971, #4ca4e8);
-  transform-origin: left center;
+.aero-found-gadgets > * {
+  pointer-events: auto;
 }
 
 /* ---------------------------------------------------------------------------
@@ -553,7 +460,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .aero-found-bubbles,
-  .aero-found-bubbles span {
+  .aero-found-bubbles span,
+  .aero-found-lyric.is-pop span {
     animation: none;
   }
 
@@ -561,6 +469,25 @@
   .aero-found-lyric > div {
     animation: none;
   }
+}
+
+/* The in-app motion switches, which the OS query above does not see: the
+   legacy `.reduce-motion` class, Display > Animations = None, and the battery
+   tier all stop the decorative loops too. */
+html.reduce-motion .aero-found-bubbles span,
+html.reduce-motion .aero-found-lyric.is-pop span,
+html.reduce-motion .aero-found-ticker > div,
+html[data-display-anim='none'] .aero-found-bubbles span,
+html[data-display-anim='none'] .aero-found-lyric.is-pop span,
+html[data-display-anim='none'] .aero-found-ticker > div,
+html[data-perf='battery'] .aero-found-bubbles span,
+html[data-perf='battery'] .aero-found-ticker > div {
+  animation: none;
+}
+html.reduce-motion .aero-found-bubbles,
+html[data-display-anim='none'] .aero-found-bubbles,
+html[data-perf='battery'] .aero-found-bubbles {
+  display: none;
 }
 
 .aero-found-ticker {
@@ -576,15 +503,21 @@
   opacity: 0.62;
 }
 
-.aero-found-ticker div {
+/* Two identical runs; -50% moves exactly one run, so the wrap is seamless.
+   No padding or gap on the strip itself, or -50% would not equal one run. */
+.aero-found-ticker > div {
   display: flex;
-  gap: 42px;
   width: max-content;
-  padding: 4px 18px;
   color: #17324a;
   font-size: 11px;
   white-space: nowrap;
   animation: aeroFoundTicker 18s linear infinite;
+}
+
+.aero-found-ticker-run {
+  display: flex;
+  gap: 42px;
+  padding: 4px 42px 4px 0;
 }
 
 @keyframes aeroFoundBubble {
@@ -594,9 +527,9 @@
 }
 
 @keyframes aeroFoundPop {
-  0% { filter: brightness(1); transform: scale(1); }
-  45% { filter: brightness(1.26); transform: scale(1.035); }
-  100% { filter: brightness(1); transform: scale(1); }
+  0% { transform: scale(1); }
+  45% { transform: scale(1.035); }
+  100% { transform: scale(1); }
 }
 
 @keyframes aeroFoundTicker {
@@ -604,29 +537,35 @@
   to { transform: translateX(-50%); }
 }
 
-/* ---------- Floating windows: glass with a sheened titlebar --------------- */
+/* ---------- Windows 6 window chrome: the base every frame style shares ------
+   The per-style frames (aero-glass by default) are at the end of this file.
+   Two corrections against the old base:
+     - no `filter` on an unfocused window. Any filter makes the window the
+       containing block for position:fixed descendants, so its menus and
+       popovers anchored to the wrong box, and it greyed the user's content;
+     - ONE focus halo, `--aero-frame-active` (aqua). Focused windows used to
+       mix a green `--accent-2` ring with an aqua glow. */
 :root[data-materials='aero'] .fwin {
   background:
     linear-gradient(to bottom, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.06) 46%),
     var(--shell-glass-inactive);
   border: 1px solid var(--aero-frame-inactive, var(--glass-border));
   box-shadow:
-    0 14px 34px rgba(10, 29, 39, 0.22),
+    0 10px 28px rgba(0, 10, 25, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.62);
-  backdrop-filter: blur(var(--blur-lg)) saturate(1.08);
-  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.08);
-  filter: saturate(0.82) brightness(0.985);
+  backdrop-filter: blur(var(--blur-lg)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.3);
+  filter: none;
 }
 :root[data-materials='aero'] .fwin.focused {
   background:
     linear-gradient(to bottom, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.12) 48%),
     var(--shell-glass-strong);
-  border-color: var(--aero-frame-active, var(--accent-2));
+  border-color: rgba(8, 28, 48, 0.7);
   box-shadow:
-    0 28px 72px rgba(10, 29, 39, 0.42),
-    0 0 0 1px rgba(255, 255, 255, 0.72) inset,
-    0 0 0 1px color-mix(in srgb, var(--accent-2) 28%, transparent),
-    0 0 24px color-mix(in srgb, var(--accent-2) 24%, transparent);
+    0 16px 44px rgba(0, 10, 25, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset,
+    0 0 16px color-mix(in srgb, var(--aero-frame-active) 70%, transparent);
   filter: none;
 }
 :root[data-materials='aero'] .fwin-bar,
@@ -637,20 +576,146 @@
 }
 :root[data-materials='aero'] .fwin.focused .fwin-bar,
 :root[data-materials='aero'] .fwin.focused .fwin-drag-strip {
-  background:
-    var(--shell-sheen),
-    linear-gradient(to right, color-mix(in srgb, var(--accent-2) 22%, var(--shell-glass-strong)), var(--shell-glass-strong) 64%);
-  border-bottom-color: color-mix(in srgb, var(--accent-2) 32%, var(--glass-border));
+  background: var(--shell-sheen), var(--shell-glass-strong);
+  border-bottom-color: color-mix(in srgb, var(--aero-frame-active) 40%, var(--glass-border));
   color: var(--text);
 }
-/* Keep app content legible: the body is near-opaque frosted glass. */
+/* Work surfaces stay solid: the client area is the app, not glass. */
 :root[data-materials='aero'] .fwin-body,
 :root[data-materials='aero'] .fwin-body-flush {
   background: var(--shell-work-surface);
 }
 
-/* ---------- App border style variants (after Vista pass — see file end) --- */
+/* Caption buttons: ONE joined cluster hanging from the top edge, the Windows 6
+   idiom — a shared dark rim, glass faces, an aqua bloom on minimise/maximise
+   and a red one on a wider close. Applies to every frame style; sticky notes
+   keep their own bar. Height stays 24px (WCAG 2.5.8 floor), and the cluster
+   clips the `.lq-hit` pointer expanders so nothing hangs past the frame. */
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-btns {
+  display: inline-flex;
+  align-self: flex-start;
+  flex: none;
+  gap: 0;
+  margin: -1px 0 0 8px;
+  border: 1px solid rgba(8, 26, 46, 0.72);
+  border-top: 0;
+  border-radius: 0 0 5px 5px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 3px rgba(0, 10, 25, 0.22);
+}
+:root[data-materials='aero'] .fwin-b {
+  width: 32px;
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-btns .fwin-b {
+  width: 30px;
+  height: 24px;
+  margin: 0;
+  /* The UA button padding left 12px for the glyph; ⧉ and ◇ are wider. */
+  padding: 0;
+  border: 0;
+  border-left: 1px solid rgba(8, 26, 46, 0.5);
+  border-radius: 0;
+  /* Dark glyph with a white halo: a white glyph on these pale glass faces read
+     1.4-1.8:1 over a bright wallpaper. */
+  color: #14324d;
+  font-size: 13px;
+  line-height: 1;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.95), 0 1px 0 rgba(255, 255, 255, 0.7);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.62) 0,
+    rgba(255, 255, 255, 0.26) 45%,
+    rgba(40, 90, 140, 0.24) 50%,
+    rgba(255, 255, 255, 0.26) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-btns .fwin-b:first-child {
+  border-left: 0;
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note):not(.focused) .fwin-btns .fwin-b {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.46) 0,
+    rgba(255, 255, 255, 0.2) 45%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.16) 100%
+  );
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-btns .fwin-b:hover {
+  background:
+    radial-gradient(ellipse 70% 85% at 50% 100%, rgba(140, 236, 255, 0.95), rgba(60, 180, 235, 0.4) 60%, rgba(60, 180, 235, 0) 82%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(160, 220, 248, 0.5) 45%, rgba(20, 120, 200, 0.55) 50%, rgba(60, 170, 230, 0.6));
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-btns .fwin-b:active {
+  background: linear-gradient(180deg, rgba(120, 190, 230, 0.7), rgba(20, 100, 170, 0.75) 50%, rgba(10, 80, 150, 0.8) 51%, rgba(40, 140, 210, 0.75));
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-btns .fwin-close {
+  width: 46px;
+}
+:root[data-materials='aero'] .fwin.focused:not(.fwin-note) .fwin-btns .fwin-close {
+  background: linear-gradient(
+    180deg,
+    rgba(226, 140, 122, 0.96) 0,
+    rgba(196, 70, 48, 0.96) 45%,
+    rgba(160, 30, 12, 0.98) 50%,
+    rgba(188, 58, 36, 0.98) 100%
+  );
+  color: #ffffff;
+  text-shadow: 0 0 3px rgba(60, 0, 0, 0.9);
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-btns .fwin-close:hover {
+  background:
+    radial-gradient(ellipse 70% 85% at 50% 100%, rgba(255, 196, 150, 1), rgba(240, 80, 40, 0.55) 60%, rgba(240, 80, 40, 0) 82%),
+    linear-gradient(180deg, #ffcabb, #e8634c 45%, #c4200a 50%, #e24a2c);
+  color: #ffffff;
+  text-shadow: 0 0 3px rgba(60, 0, 0, 0.9);
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-btns .fwin-b:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 4px rgba(0, 54, 86, 0.92);
+}
 
+/* Window lifecycle motion. Open is TRANSFORM ONLY: an opacity keyframe here
+   left a window opened while the app was occluded invisible forever (the
+   compositor never advanced it; see `fwinIn` in styles.css), and the old Aero
+   `aero-fade ... both` on every `.fwin` mount was exactly that shape. Close and
+   minimise may fade: the window is removed when the phase timer ends either
+   way. Durations match DesktopShell's `winPhaseMs` for Aero. */
+:root[data-materials='aero'] .fwin.fwin-anim-opening {
+  animation: aero-win-open 240ms var(--ease-glass, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+}
+:root[data-materials='aero'] .fwin.fwin-anim-closing {
+  pointer-events: none;
+  animation: aero-win-close 200ms var(--ease-standard, ease) both;
+}
+:root[data-materials='aero'] .fwin.fwin-anim-minimizing {
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  animation: aero-win-minimize 200ms ease-in both;
+}
+@keyframes aero-win-open {
+  from { transform: scale(0.92); }
+  to { transform: scale(1); }
+}
+@keyframes aero-win-close {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.92); }
+}
+@keyframes aero-win-minimize {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(42%) scale(0.42); }
+}
+html.reduce-motion[data-materials='aero'] .fwin:is(.fwin-anim-opening, .fwin-anim-closing, .fwin-anim-minimizing),
+html[data-display-anim='none'][data-materials='aero'] .fwin:is(.fwin-anim-opening, .fwin-anim-closing, .fwin-anim-minimizing) {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='aero'] .fwin:is(.fwin-anim-opening, .fwin-anim-closing, .fwin-anim-minimizing) {
+    animation: none;
+  }
+}
 /* ---------- Mini mode Aero theme ------------------------------------------- */
 :root[data-materials='aero'] .mini-shell {
   --mini-glass: var(--shell-glass-strong);
@@ -717,6 +782,10 @@
   border-color: color-mix(in srgb, var(--accent) 44%, rgba(255, 255, 255, 0.62));
 }
 
+/* Glossy era plates. The family colours come from the `.app-*` rules in the
+   icon-family section below (one palette for desktop, taskbar and mini mode),
+   so a mini slot and its desktop icon are the same colour. The plate was a
+   matte mauve/olive/brown square with its gloss hidden. */
 :root[data-materials='aero'] .mini-slot-icon {
   position: relative;
   overflow: hidden;
@@ -725,75 +794,46 @@
   justify-content: center;
   width: calc(34px + 9px * var(--mini-scale, 1));
   height: calc(34px + 9px * var(--mini-scale, 1));
-  border-radius: calc(8px + 2px * var(--mini-scale, 1));
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  --icon-c1: #5a7a88;
-  --icon-c2: #3d5560;
-  --icon-c3: #c8d6dc;
-  color: #e8eef1;
-  background: color-mix(in srgb, var(--icon-c2) 72%, var(--panel));
-  box-shadow: none;
+  border-radius: calc(7px + 2px * var(--mini-scale, 1));
+  border: 1px solid color-mix(in srgb, var(--icon-c3, #22323d) 70%, transparent);
+  color: #ffffff;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, var(--icon-c1, #bcd4e4), var(--icon-c2, #4d6b80));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.18),
+    0 2px 5px rgba(10, 29, 39, 0.22);
 }
 
+/* The upper-half gloss band every Windows 6 icon plate carried. */
 :root[data-materials='aero'] .mini-slot-icon::after {
-  display: none;
+  content: '';
+  display: block;
+  position: absolute;
+  inset: 1px 1px 52% 1px;
+  border-radius: inherit;
+  border-bottom-left-radius: 40% 18%;
+  border-bottom-right-radius: 40% 18%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.08));
+  pointer-events: none;
 }
 
 :root[data-materials='aero'] .mini-slot svg {
   position: relative;
   z-index: 1;
-  color: #e8eef1;
+  color: #ffffff;
   stroke-width: 1.7;
-  filter: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
 }
 
+/* Dark ink with a soft white halo: the light label (#e8eef1) on the pale slot
+   measured ~1.2:1. */
 :root[data-materials='aero'] .mini-slot-label {
   font-size: calc(11px + 2px * var(--mini-scale, 1));
   font-weight: 500;
-  color: #e8eef1;
-  text-shadow: none;
-}
-
-/* Aero mini per-app muted plates */
-:root[data-materials='aero'] .mini-slot-icon.app-library,
-:root[data-materials='aero'] .mini-slot-icon.app-novels,
-:root[data-materials='aero'] .mini-slot-icon.app-immersion {
-  --icon-c1: #5f7a92;
-  --icon-c2: #3d5166;
-  --icon-c3: #c8d4e0;
-}
-:root[data-materials='aero'] .mini-slot-icon.app-dictionary,
-:root[data-materials='aero'] .mini-slot-icon.app-grammar,
-:root[data-materials='aero'] .mini-slot-icon.app-translate {
-  --icon-c1: #5f8a80;
-  --icon-c2: #3d5e58;
-  --icon-c3: #c8ddd8;
-}
-:root[data-materials='aero'] .mini-slot-icon.app-music,
-:root[data-materials='aero'] .mini-slot-icon.app-musicwidget,
-:root[data-materials='aero'] .mini-slot-icon.app-player {
-  --icon-c1: #8a6a72;
-  --icon-c2: #5c4048;
-  --icon-c3: #dcc8ce;
-}
-:root[data-materials='aero'] .mini-slot-icon.app-anki,
-:root[data-materials='aero'] .mini-slot-icon.app-flashcards {
-  --icon-c1: #8a7a5a;
-  --icon-c2: #5c5040;
-  --icon-c3: #ddd4c4;
-}
-:root[data-materials='aero'] .mini-slot-icon.app-calendar,
-:root[data-materials='aero'] .mini-slot-icon.app-stats,
-:root[data-materials='aero'] .mini-slot-icon.app-resources {
-  --icon-c1: #6e8460;
-  --icon-c2: #485840;
-  --icon-c3: #d0dcc8;
-}
-:root[data-materials='aero'] .mini-slot-icon.app-settings,
-:root[data-materials='aero'] .mini-slot-icon.app-clipboard {
-  --icon-c1: #6e7688;
-  --icon-c2: #484e5c;
-  --icon-c3: #d0d4dc;
+  color: var(--aero-sky-ink, #0d2c47);
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
 }
 
 :root[data-materials='aero'] .mini-panel {
@@ -842,238 +882,12 @@
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.2);
 }
 
-/* ---------- Lockscreen — Windows XP Welcome (Aero) -------------------------------- */
-:root[data-materials='aero'] .lockscreen-xp {
-  position: fixed;
-  inset: 0;
-  z-index: 999999;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: stretch;
-  padding: 0;
-  margin: 0;
-  background: #0058d0;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  color: #fff;
-  font-family: Tahoma, 'Segoe UI', var(--font-body), sans-serif;
-  overflow: hidden;
-}
+/* ---------- Lockscreen (Aero) -------------------------------------------------
+   The full-screen Aero logon screen (`.lockscreen-aero`) lives in
+   theme/aero-vista.css. Only the compact floating lock widget is styled here. */
 
-:root[data-materials='aero'] .lockscreen-xp::before {
-  display: none;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-left {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 32px 72px;
-  text-align: center;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-logo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: auto;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-emblem {
-  width: 120px;
-  height: 120px;
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239be15d'/%3E%3Cstop offset='1' stop-color='%2300d6c2'/%3E%3C/linearGradient%3E%3ClinearGradient id='r' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff5a72'/%3E%3Cstop offset='1' stop-color='%23b81830'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2358c8ff'/%3E%3Cstop offset='1' stop-color='%230078d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M60 14L98 36v48L60 106 22 84V36z' fill='%23003a8c'/%3E%3Cpath d='M60 14L98 36v24L60 58 22 36V36z' fill='url(%23b)'/%3E%3Cpath d='M60 58L98 60v24L60 106 22 84V60z' fill='url(%23g)'/%3E%3Cpath d='M60 14L98 36 60 58 22 36z' fill='url(%23r)'/%3E%3Cpath d='M60 22L88 38v44L60 98 32 82V38z' fill='none' stroke='%23ffffff' stroke-width='2.2' opacity='0.55'/%3E%3Cpath d='M60 44v32M42 54l18 10 18-10' stroke='%23ffffff' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.32));
-}
-
-:root[data-materials='aero'] .lockscreen-xp-wordmark {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-tag {
-  font-size: 15px;
-  font-weight: 400;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  opacity: 0.92;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-brand {
-  font-size: 42px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-ed {
-  display: inline-block;
-  margin-left: 3px;
-  font-size: 34px;
-  font-style: italic;
-  font-weight: 700;
-  color: #ff8c00;
-  vertical-align: baseline;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-hint {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-right {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 40px;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.06), transparent 48%);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-user {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: min(420px, 100%);
-  padding: 10px 14px 10px 10px;
-  border-radius: 999px 12px 12px 999px;
-  background: linear-gradient(90deg, #1b78e8 0%, #3ea0ff 42%, rgba(62, 160, 255, 0.15) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 2px 8px rgba(0, 0, 0, 0.18);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-user.is-error {
-  background: linear-gradient(90deg, #c0392b 0%, #e74c3c 42%, rgba(231, 76, 60, 0.15) 100%);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-user.is-shake {
-  animation: lock-xp-shake 0.42s ease;
-}
-
-@keyframes lock-xp-shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-6px); }
-  40% { transform: translateX(6px); }
-  60% { transform: translateX(-4px); }
-  80% { transform: translateX(4px); }
-}
-
-:root[data-materials='aero'] .lockscreen-xp-avatar {
-  flex: 0 0 auto;
-  width: 56px;
-  height: 56px;
-  border: 3px solid #fff;
-  border-radius: 4px;
-  box-shadow: 0 0 0 2px #ffd54a;
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect fill='%234caf50' width='64' height='64'/%3E%3Cellipse cx='32' cy='26' rx='14' ry='12' fill='%238bc34a'/%3E%3Cellipse cx='32' cy='48' rx='20' ry='14' fill='%2366bb6a'/%3E%3Ccircle cx='26' cy='24' r='3' fill='%23fff'/%3E%3Ccircle cx='38' cy='24' r='3' fill='%23fff'/%3E%3Ccircle cx='27' cy='24' r='1.5' fill='%23333'/%3E%3Ccircle cx='39' cy='24' r='1.5' fill='%23333'/%3E%3C/svg%3E")
-    center / cover no-repeat;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-user-body {
-  flex: 1;
-  min-width: 0;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-user-name {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-user-prompt {
-  margin-top: 2px;
-  font-size: 12px;
-  opacity: 0.92;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-pass-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-pass {
-  flex: 1;
-  min-width: 0;
-  height: 24px;
-  padding: 0 6px;
-  border: 1px solid #7eb6ea;
-  border-radius: 0;
-  background: #fff;
-  color: #000;
-  font: 13px Tahoma, 'Segoe UI', sans-serif;
-  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.12);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-pass:focus {
-  outline: 1px dotted #fff;
-  outline-offset: 1px;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-go {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid #3d7a1f;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #8fd356, #5cb531 48%, #3d9620);
-  color: #fff;
-  cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-go:hover:not(:disabled) {
-  filter: brightness(1.05);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-go:active:not(:disabled) {
-  background: linear-gradient(180deg, #6fbf3a, #4a9e22);
-}
-
-:root[data-materials='aero'] .lockscreen-xp-go:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-:root[data-materials='aero'] .lockscreen-xp-clock {
-  margin-top: 18px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-:root[data-materials='aero'] .lockscreen-xp.is-unlocking {
-  animation: lock-xp-out 0.56s ease forwards;
-}
-
-@keyframes lock-xp-out {
-  to {
-    opacity: 0;
-    transform: scale(1.02);
-  }
-}
-
-.reduce-motion :root[data-materials='aero'] .lockscreen-xp.is-unlocking,
-.reduce-motion :root[data-materials='aero'] .lockscreen-xp-user.is-shake {
-  animation: none;
-}
-
-/* Legacy compact lock widget styling (non-XP Aero paths) */
-:root[data-materials='aero'] .lockscreen:not(.lockscreen-xp) {
+/* Compact lock widget styling (the non-logon Aero path) */
+:root[data-materials='aero'] .lockscreen:not(.lockscreen-aero) {
   position: fixed;
   inset: 0;
   z-index: 999999;
@@ -1088,7 +902,7 @@
   justify-content: center;
 }
 
-:root[data-materials='aero'] .lockscreen:not(.lockscreen-xp)::before {
+:root[data-materials='aero'] .lockscreen:not(.lockscreen-aero)::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -1099,11 +913,13 @@
   z-index: -1;
 }
 
-:root[data-materials='aero'] .lockscreen:not(.lockscreen-xp) .lockscreen-widget {
+:root[data-materials='aero'] .lockscreen:not(.lockscreen-aero) .lockscreen-widget {
+  /* --mini-glass / --mini-sheen are declared on `.mini-shell` only, so here they
+     resolved to nothing and the widget painted fully transparent. */
   background:
-    var(--mini-sheen),
+    var(--shell-sheen),
     linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(0, 184, 208, 0.08)),
-    var(--mini-glass);
+    var(--shell-glass-strong);
   border: 1px solid color-mix(in srgb, var(--glass-border) 72%, rgba(18, 49, 67, 0.22));
   box-shadow:
     0 24px 64px rgba(10, 29, 39, 0.34),
@@ -1115,9 +931,9 @@
 
 :root[data-materials='aero'] .lockscreen-bar {
   background:
-    var(--mini-sheen),
+    var(--shell-sheen),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.12) 48%),
-    var(--mini-glass);
+    var(--shell-glass-strong);
   border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 66%, rgba(18, 49, 67, 0.18));
 }
 
@@ -1289,418 +1105,550 @@
   content: none;
 }
 
-:root[data-materials='aero'] .fwin-b {
-  /* The other Aero border styles fall back to the base 26px button, which the 32px `.lq-hit`
-     floor overhangs by 3px a side; see the aero-glass caption buttons below. */
-  width: 32px;
-}
-
-:root[data-materials='aero'] .fwin-b:hover {
-  background: color-mix(in srgb, var(--shell-glass-strong) 82%, var(--accent-2) 8%);
-}
-
-/* ---------- Desktop icons: readable labels on a bright sky ---------------- */
-:root[data-materials='aero'] .os-desk-icon-label {
-  background: color-mix(in srgb, var(--shell-glass-strong) 76%, transparent);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 58%, transparent);
-  border-radius: var(--radius-sm);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
-}
-
-/* ---------- Widget frames: follow the glass language --------------------- */
-:root[data-materials='aero'] .widget-frame {
-  background: var(--shell-glass);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 72%, rgba(18, 49, 67, 0.16));
-  box-shadow: 0 12px 32px rgba(10, 29, 39, 0.24), inset 0 1px 0 var(--glass-highlight);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
-}
-:root[data-materials='aero'] .widget-bar {
-  background: var(--shell-sheen), transparent;
-}
-
-/* ---------- Start menu opening animation (Phase 2 · M4) ------------------ */
-:root[data-materials='aero'] .os-start {
-  animation: aero-scale-in var(--dur-slow) var(--ease-glass) both;
-  transform-origin: bottom left;
-}
-
-/* ---------- Window open/restore motion (Phase 2 · M2) --------------------
-   Opacity only — never transform (the drag gesture owns transform). Runs on
-   mount/restore; collapses under reduced motion / Battery Saver (global rules).*/
-:root[data-materials='aero'] .fwin {
-  animation: aero-fade var(--dur-normal) var(--ease-glass) both;
-}
+/* ---------- Widget frames ---------------------------------------------------
+   Aero widgets are Sidebar-style gadgets; their one merged pass (frame, toolbar,
+   menu and `.wgt-*` content) lives in theme/aero-vista.css. */
 
 /* =============================================================================
-   Phase 4 · M3 — Narrow shell identity convergence
+   Windows 6 taskbar (Aero part A · E1)
    -----------------------------------------------------------------------------
-   Polish only (no shell rebuild): compact XP proportions, Vista-quality glass,
-   an ORIGINAL Study OS emblem (never the Windows logo), and denser Start / tray
-   / clock. Purely additive and still scoped to [data-materials='aero'], so the
-   default Study OS shell is untouched. All markup, behavior and JS unchanged.
-   ============================================================================= */
+   ONE pass. Three used to stack here — a frosted slab, an XP "Luna" bar with an
+   italic green start pill, and a density pass — and only the last ever painted,
+   so Aero read as XP. This is the Windows 7 superbar idiom, drawn from scratch:
 
-/* ---------- Start button: compact XP orb + original glass-leaf emblem ------
-   The default shell paints the `logo` glyph; under Aero we hide it and stamp an
-   original luminous glass-leaf mark (aqua→green, with a highlight vein). This
-   is a Study OS emblem, deliberately NOT the Windows flag. */
-:root[data-materials='aero'] .os-start-btn {
-  gap: 7px;
-  padding: 3px 14px 3px 9px;
-  border-radius: var(--radius-md);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-wide);
+     - smoked glass over the wallpaper, a bright top edge, a soft gloss band;
+     - a round glass ORB that breaks the top edge, carrying an ORIGINAL leaf and
+       bubble glyph (never a flag), with a glow that fades in on hover;
+     - icon-first task buttons whose colour glow follows the cursor (`--mx` is
+       written by AeroTaskbarFx, rAF-throttled) in the app's icon family colour;
+     - a glass Show Desktop sliver at the far right that peeks on hover.
+
+   Height stays `--taskbar-h` from Settings > Desktop (40/48/56). Window
+   maximise/snap geometry in DesktopShell reads the same table, so a CSS-only
+   height here would leave a strip between maximised windows and the bar — the
+   old `--taskbar-h: 34px` overrides never applied for that reason (the root's
+   inline value always won) and are gone. Every size below derives from it.
+   ============================================================================= */
+:root[data-materials='aero'] .os-taskbar {
+  gap: 2px;
+  padding: 0 0 0 4px;
+  /* The orb overhangs the top edge; the task strip still scrolls on its own. */
+  overflow: visible;
+  color: #ffffff;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.2) 0,
+      rgba(255, 255, 255, 0.08) 46%,
+      rgba(255, 255, 255, 0.01) 52%,
+      rgba(255, 255, 255, 0.05) 100%
+    ),
+    var(--aero-smoke);
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 -1px 0 rgba(0, 20, 40, 0.35),
+    0 -6px 18px rgba(0, 20, 40, 0.16);
+  backdrop-filter: blur(var(--blur-lg)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.6);
 }
-:root[data-materials='aero'] .os-start-btn > svg { display: none; }
-:root[data-materials='aero'] .os-start-btn::before {
-  content: '';
-  width: 20px;
-  height: 20px;
+
+/* ---- Start orb -------------------------------------------------------------- */
+:root[data-materials='aero'] .os-taskbar .os-start-btn {
+  --orb: calc(var(--taskbar-h, 48px) + 6px);
+  position: relative;
   flex: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='l' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239be15d'/%3E%3Cstop offset='1' stop-color='%2300d6c2'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M4 20C4 10 12 3 20 4c1 12-8 18-16 16z' fill='url(%23l)'/%3E%3Cpath d='M7 18C11 14 15 9 18 6' stroke='%23ffffff' stroke-width='1.4' fill='none' stroke-linecap='round' opacity='0.75'/%3E%3C/svg%3E");
+  align-self: flex-end;
+  width: var(--orb);
+  min-width: 0;
+  height: var(--orb);
+  margin: 0 6px 0 2px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+  border: 1px solid rgba(4, 30, 52, 0.85);
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 0;
+  font-style: normal;
+  letter-spacing: 0;
+  text-shadow: none;
+  background:
+    radial-gradient(62% 40% at 50% 20%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.18) 72%, rgba(255, 255, 255, 0) 74%),
+    radial-gradient(70% 50% at 50% 100%, rgba(150, 255, 226, 0.8), rgba(150, 255, 226, 0) 72%),
+    radial-gradient(circle at 50% 46%, #36bde4 0, #157aa6 46%, #0b4269 76%, #062843 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.34),
+    inset 0 -3px 6px rgba(0, 40, 60, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.45);
+  filter: none;
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+/* The accessible name stays: the visible "start" word goes, the span is kept
+   for assistive tech (visually hidden, not display:none). */
+:root[data-materials='aero'] .os-taskbar .os-start-btn > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+:root[data-materials='aero'] .os-taskbar .os-start-btn > svg {
+  display: none;
+}
+/* Original emblem: a glass leaf with a vein and two rising bubbles. */
+:root[data-materials='aero'] .os-taskbar .os-start-btn::before {
+  content: '';
+  position: relative;
+  z-index: 1;
+  width: 54%;
+  height: 54%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='1' stop-color='%23cdf7ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M6 25C5 14 13 6 26 5c1 13-7 21-20 20z' fill='url(%23g)' stroke='%23084466' stroke-opacity='.35' stroke-width='.8'/%3E%3Cpath d='M8.5 23.5C13 18 17.5 13 23 8.5' stroke='%2318a3c9' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3Cpath d='M13 17.8l-1.6-4.2M17.4 13.4l-.6-3.6M15.4 19.6l4.4-.6' stroke='%2318a3c9' stroke-width='1.1' fill='none' stroke-linecap='round' opacity='.8'/%3E%3Ccircle cx='7.5' cy='9' r='2.4' fill='none' stroke='%23ffffff' stroke-width='1.1'/%3E%3Ccircle cx='11.5' cy='4.6' r='1.4' fill='none' stroke='%23ffffff' stroke-width='.9'/%3E%3C/svg%3E");
   background-size: contain;
   background-repeat: no-repeat;
-  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--bg) 35%, transparent));
+  background-position: center;
+  filter: drop-shadow(0 1px 1px rgba(0, 30, 50, 0.6));
 }
-
-/* ---------- Taskbar: slightly taller slab, restrained hover bloom --------- */
-:root[data-materials='aero'] .os-taskbar {
-  gap: 4px;
-  padding: 0 7px;
-}
-:root[data-materials='aero'] .os-start-btn,
-:root[data-materials='aero'] .os-desktop-switch,
-:root[data-materials='aero'] .os-task-win,
-:root[data-materials='aero'] .os-tray-btn {
-  height: 30px;
-}
-:root[data-materials='aero'] .os-start-btn {
-  min-width: 88px;
-  justify-content: center;
-}
-:root[data-materials='aero'] .os-desktop-switch {
-  padding: 0 9px;
-  font-size: 11.5px;
-}
-:root[data-materials='aero'] .os-task-win {
-  max-width: 152px;
-  padding: 0 9px;
-  border-radius: 7px;
-  gap: 6px;
-}
-:root[data-materials='aero'] .os-tray {
-  gap: 4px;
-}
-:root[data-materials='aero'] .os-tray-btn {
-  width: 30px;
-  padding: 0;
-}
-:root[data-materials='aero'] .os-clock {
-  min-width: 60px;
-}
-:root[data-materials='aero'][data-taskbar-size='compact'] .os-start-btn,
-:root[data-materials='aero'][data-taskbar-size='compact'] .os-desktop-switch,
-:root[data-materials='aero'][data-taskbar-size='compact'] .os-task-win,
-:root[data-materials='aero'][data-taskbar-size='compact'] .os-tray-btn {
-  height: 26px;
-}
-:root[data-materials='aero'][data-taskbar-size='large'] .os-start-btn,
-:root[data-materials='aero'][data-taskbar-size='large'] .os-desktop-switch,
-:root[data-materials='aero'][data-taskbar-size='large'] .os-task-win,
-:root[data-materials='aero'][data-taskbar-size='large'] .os-tray-btn {
-  height: 34px;
-}
-:root[data-materials='aero'] .os-task-win {
-  font-weight: var(--font-weight-medium);
-  transition: background-color var(--dur-fast) var(--ease-standard),
-    box-shadow var(--dur-normal) var(--ease-glass), filter var(--dur-fast) var(--ease-standard);
-}
-:root[data-materials='aero'] .os-task-win:hover {
-  box-shadow: inset 0 1px 0 var(--glass-highlight),
-    0 0 10px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-:root[data-materials='aero'] .os-task-win.active {
-  box-shadow: inset 0 1px 0 var(--glass-highlight),
-    0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
-}
-/* WCAG 1.4.11 — the active task had no CRISP boundary here, only that 1px top highlight and a
-   BLURRED 12px glow, so a pixel sample found nothing but the taskbar's own gradient:
-   rgb(14,59,151) on rgb(23,79,183) -> 1.36:1 (measured 2026-08-03).
-   The accent underline that marks active tasks on the dark themes is scoped
-   `:where(html:not([data-materials='aero']))` in shell.css:911 and therefore EXCLUDES aero —
-   the same exclusion that hid the .gram-level-btn fix. This is aero's copy.
-   WHITE, not --state-indicator: this taskbar is a DARK surface inside a light theme, and the dark
-   teal reads 1.17:1 on it. White against the gradient's bottom, where a bottom-anchored bar
-   actually sits, is 10.17:1.
-   Note the strict "weakest adjacent colour" metric may still flag it: white against the gradient's
-   TOP stop is 2.96:1, so no flat colour clears 3:1 across the whole span. bestPairRatio is the
-   reading that reflects what a user sees. */
-/* The ::after below is absolutely positioned, so its parent must establish a containing block.
-   shell.css:866 sets `position: relative` on .os-task-win — but under the SAME
-   `:where(html:not([data-materials='aero']))` guard as the underline, so aero inherits neither.
-   Without this the bar would anchor to .os-taskbar and `left: 50%` would centre it on the whole
-   taskbar instead of the button. */
-:root[data-materials='aero'] .os-taskbar .os-task-win,
-:root[data-materials='aero'] .os-taskbar .os-desktop-switch {
-  position: relative;
-}
-:root[data-materials='aero'] .os-taskbar .os-task-win.active::after,
-:root[data-materials='aero'] .os-taskbar .os-desktop-switch.active::after {
+/* The hover bloom: a light that fades in, never a colour swap. */
+:root[data-materials='aero'] .os-taskbar .os-start-btn::after {
   content: '';
   position: absolute;
-  left: 50%;
-  bottom: 3px;
-  width: 16px;
-  height: 2px;
-  border-radius: var(--radius-pill);
-  background: #ffffff;
-  transform: translateX(-50%);
+  inset: -3px;
+  z-index: 2;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 60%, rgba(160, 246, 255, 0.7), rgba(80, 200, 255, 0.22) 52%, rgba(80, 200, 255, 0) 70%);
+  opacity: 0;
   pointer-events: none;
+  transition: opacity var(--dur-normal) var(--ease-standard);
 }
-
-/* ---------- Tray + clock: compact, two-line, legible ---------------------- */
-:root[data-materials='aero'] .os-tray {
-  padding: 0 4px;
-  border-left: 1px solid color-mix(in srgb, var(--glass-border) 60%, transparent);
+:root[data-materials='aero'] .os-taskbar .os-start-btn:hover::after,
+:root[data-materials='aero'] .os-taskbar .os-start-btn.active::after {
+  opacity: 1;
 }
-:root[data-materials='aero'] .os-clock {
-  line-height: 1.12;
-  padding: 0 8px;
-  text-shadow: 0 1px 0 var(--glass-highlight);
-}
-:root[data-materials='aero'] .os-clock-date { color: color-mix(in srgb, var(--text) 72%, transparent); }
-
-/* ---------- XP-style image taskbar: blue glass bar, green Start ----------- */
-:root[data-materials='aero'] {
-  --taskbar-h: 34px;
-}
-
-:root[data-materials='aero'] .os-taskbar {
-  gap: 3px;
-  padding: 0 6px 0 8px;
-  color: #ffffff;
+:root[data-materials='aero'] .os-taskbar .os-start-btn:hover,
+:root[data-materials='aero'] .os-taskbar .os-start-btn.active {
+  /* Explicitly re-stated so no older (0,4,0) hover rule can whiten the orb. */
   background:
-    linear-gradient(to bottom, rgba(122, 201, 255, 0.95) 0 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(64, 151, 255, 0.92) 0%, rgba(32, 111, 232, 0.96) 34%, rgba(10, 82, 203, 0.98) 64%, rgba(5, 56, 158, 1) 100%);
-  border-top: 1px solid rgba(126, 205, 255, 0.9);
-  border-bottom: 1px solid #001b68;
+    radial-gradient(62% 40% at 50% 20%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.22) 72%, rgba(255, 255, 255, 0) 74%),
+    radial-gradient(70% 55% at 50% 100%, rgba(170, 255, 236, 0.95), rgba(170, 255, 236, 0) 74%),
+    radial-gradient(circle at 50% 46%, #46cbef 0, #1a88b6 46%, #0c4a74 76%, #062843 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -1px 0 rgba(0, 20, 95, 0.72),
-    0 -1px 8px rgba(0, 15, 80, 0.3);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-:root[data-materials='aero'] .os-start-btn {
-  min-width: 82px;
-  height: 28px;
-  padding: 0 16px 0 9px;
-  justify-content: flex-start;
-  gap: 6px;
-  color: #ffffff;
-  font-size: 12.5px;
-  font-weight: 700;
-  font-style: italic;
-  letter-spacing: 0;
-  text-shadow: 0 1px 1px rgba(0, 65, 14, 0.85);
-  border: 1px solid rgba(12, 91, 19, 0.82);
-  border-radius: 0 8px 8px 0;
-  background:
-    linear-gradient(to bottom, rgba(177, 255, 135, 0.92) 0%, rgba(55, 185, 48, 0.96) 34%, rgba(13, 132, 29, 1) 68%, rgba(9, 104, 20, 1) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.64),
-    inset -1px 0 0 rgba(0, 55, 14, 0.38),
-    1px 0 4px rgba(0, 20, 75, 0.35);
-}
-
-:root[data-materials='aero'] .os-start-btn:hover,
-:root[data-materials='aero'] .os-start-btn.active {
-  filter: brightness(1.08) saturate(1.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    inset 0 -1px 0 rgba(0, 50, 14, 0.48),
-    0 0 8px rgba(118, 255, 79, 0.42);
-}
-
-:root[data-materials='aero'] .os-start-btn::before {
-  width: 16px;
-  height: 16px;
-  filter: drop-shadow(0 1px 1px rgba(0, 55, 10, 0.75));
-}
-
-:root[data-materials='aero'] .os-desktop-switches,
-:root[data-materials='aero'] .os-task-wins {
-  gap: 2px;
-}
-
-:root[data-materials='aero'] .os-desktop-switch,
-:root[data-materials='aero'] .os-task-win {
-  height: 24px;
-  min-width: 92px;
-  max-width: 178px;
-  padding: 0 9px;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 11.5px;
-  font-weight: 500;
-  border-radius: 2px;
-  border: 1px solid rgba(10, 73, 180, 0.94);
-  background:
-    linear-gradient(to bottom, rgba(87, 166, 255, 0.9) 0%, rgba(48, 129, 242, 0.92) 48%, rgba(23, 94, 216, 0.96) 100%);
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.24),
-    inset -1px -1px 0 rgba(0, 31, 123, 0.5);
-  text-shadow: 0 1px 1px rgba(0, 25, 95, 0.82);
-}
-
-:root[data-materials='aero'] .os-desktop-switch:hover,
-:root[data-materials='aero'] .os-task-win:hover {
-  background:
-    linear-gradient(to bottom, rgba(114, 187, 255, 0.95) 0%, rgba(67, 145, 250, 0.96) 46%, rgba(26, 103, 225, 0.98) 100%);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+    inset 0 -3px 6px rgba(0, 40, 60, 0.4),
+    0 0 10px rgba(120, 220, 255, 0.55);
   filter: none;
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.34),
-    inset -1px -1px 0 rgba(0, 31, 123, 0.54);
+}
+:root[data-materials='aero'] .os-taskbar .os-start-btn:active {
+  transform: translateY(1px);
 }
 
-:root[data-materials='aero'] .os-desktop-switch.active,
-:root[data-materials='aero'] .os-task-win.active {
+/* ---- Virtual desktop switches: small glass pills -------------------------- */
+:root[data-materials='aero'] .os-taskbar .os-desktop-switches {
+  gap: 2px;
+  margin-right: 4px;
+}
+:root[data-materials='aero'] .os-taskbar .os-desktop-switch {
+  height: calc(var(--taskbar-h, 48px) - 16px);
+  min-width: 0;
+  max-width: 120px;
+  padding: 0 8px;
   color: #ffffff;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--aero-radius-sm, 3px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.16);
+  text-shadow: 0 0 5px rgba(0, 16, 32, 0.9);
+}
+:root[data-materials='aero'] .os-taskbar .os-desktop-switch:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+  border-color: rgba(255, 255, 255, 0.4);
+  filter: none;
+}
+:root[data-materials='aero'] .os-taskbar .os-desktop-switch.active {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.24));
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+/* ---- Task buttons: icon-first, glow follows the cursor --------------------- */
+:root[data-materials='aero'] .os-taskbar .os-task-wins {
+  gap: 3px;
+  align-self: stretch;
+  align-items: center;
+  padding: 0 2px;
+}
+:root[data-materials='aero'] .os-taskbar .os-task-win {
+  --btn-glow: var(--icon-c1, #7cc4ff);
+  position: relative;
+  width: calc(var(--taskbar-h, 48px) + 10px);
+  min-width: 0;
+  max-width: none;
+  height: calc(var(--taskbar-h, 48px) - 6px);
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 0;
+  font-weight: 400;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--aero-radius-md, 5px);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16) 0,
+    rgba(255, 255, 255, 0.06) 48%,
+    rgba(255, 255, 255, 0.01) 52%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 0 0 1px rgba(0, 0, 0, 0.2);
+  text-shadow: none;
+  filter: none;
+  transition: border-color var(--dur-fast) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard);
+}
+/* The label leaves the bar (the tooltip thumbnail carries it), but stays in the
+   accessibility tree for the foreign-desktop entries, which have no aria-label. */
+:root[data-materials='aero'] .os-taskbar .os-task-win > span:not(.os-task-close-slot):not(.os-task-monitor-badge) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+:root[data-materials='aero'] .os-taskbar .os-task-close-slot {
+  display: none;
+}
+:root[data-materials='aero'] .os-taskbar .os-task-win > svg {
+  position: relative;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+/* The colour glow: a pool of the app's own family colour rising from the
+   bottom edge, centred under the pointer. */
+:root[data-materials='aero'] .os-taskbar .os-task-win::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background:
-    linear-gradient(to bottom, rgba(38, 115, 235, 1) 0%, rgba(14, 86, 210, 1) 45%, rgba(8, 62, 166, 1) 100%);
-  border-color: rgba(2, 46, 148, 1);
-  box-shadow:
-    inset 1px 1px 2px rgba(0, 27, 95, 0.68),
-    inset -1px -1px 0 rgba(103, 170, 255, 0.3);
+    radial-gradient(
+      circle at var(--mx, 50%) 115%,
+      color-mix(in srgb, var(--btn-glow) 90%, transparent) 0,
+      color-mix(in srgb, var(--btn-glow) 34%, transparent) 46%,
+      transparent 76%
+    );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-normal) var(--ease-standard);
+}
+:root[data-materials='aero'] .os-taskbar .os-task-win:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3) 0,
+    rgba(255, 255, 255, 0.12) 48%,
+    rgba(255, 255, 255, 0.04) 52%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.24);
+}
+:root[data-materials='aero'] .os-taskbar .os-task-win:hover::before {
+  opacity: 1;
+}
+/* Active: the lit glass of the foreground window, a steady glow. */
+:root[data-materials='aero'] .os-taskbar .os-task-win.active {
+  border-color: rgba(255, 255, 255, 0.62);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.4) 0,
+    rgba(255, 255, 255, 0.18) 48%,
+    rgba(255, 255, 255, 0.08) 52%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 0 6px rgba(255, 255, 255, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+:root[data-materials='aero'] .os-taskbar .os-task-win.active::before {
+  opacity: 0.6;
+}
+:root[data-materials='aero'] .os-taskbar .os-task-win.active:hover::before {
+  opacity: 1;
+}
+/* Minimised: the plate recedes. */
+:root[data-materials='aero'] .os-taskbar .os-task-win.min {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+}
+:root[data-materials='aero'] .os-taskbar .os-task-win.min > svg {
+  opacity: 0.85;
+}
+/* Close lives where the era put it — on the hover thumbnail (AeroTaskbarFx),
+   in the entry's context menu, and on middle-click — not as an overlay that
+   would cover half of a 58px icon button. */
+:root[data-materials='aero'] .os-taskbar .os-task-item > .os-task-close {
+  display: none;
+}
+/* Windows on another monitor: the badge rides the button's corner. */
+:root[data-materials='aero'] .os-taskbar .os-task-monitor-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 2;
+  max-width: calc(100% - 4px);
+  overflow: hidden;
+  padding: 0 3px;
+  border-radius: var(--aero-radius-xs, 2px);
+  background: rgba(0, 20, 40, 0.7);
+  color: #ffffff;
+  font-size: 9px;
+  line-height: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-:root[data-materials='aero'] .os-task-win svg {
-  width: 15px;
-  height: 15px;
-  color: #d9efff;
-  filter: drop-shadow(0 1px 0 rgba(0, 20, 85, 0.7));
-}
-
-:root[data-materials='aero'] .os-tray {
+/* ---- Notification area + clock --------------------------------------------- */
+:root[data-materials='aero'] .os-taskbar .os-tray {
   align-self: stretch;
   gap: 1px;
-  padding: 0 4px 0 8px;
-  border-left: 1px solid rgba(91, 178, 255, 0.82);
-  background:
-    linear-gradient(to bottom, rgba(77, 189, 255, 0.9), rgba(19, 113, 218, 0.96) 58%, rgba(6, 81, 189, 1));
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.28);
+  margin-left: 4px;
+  padding: 0 0 0 6px;
+  border-left: 1px solid rgba(0, 0, 0, 0.28);
+  background: transparent;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.14);
 }
-
-:root[data-materials='aero'] .os-tray-btn {
-  width: 24px;
-  height: 24px;
-  color: #e7f6ff;
-  border: 0;
-  border-radius: 2px;
+:root[data-materials='aero'] .os-taskbar .os-tray-btn {
+  width: 28px;
+  height: calc(var(--taskbar-h, 48px) - 14px);
+  padding: 0;
+  color: #ffffff;
+  border: 1px solid transparent;
+  border-radius: var(--aero-radius-sm, 3px);
   background: transparent;
   box-shadow: none;
-}
-
-:root[data-materials='aero'] .os-tray-btn:hover,
-:root[data-materials='aero'] .os-tray-btn.active {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   filter: none;
 }
-
-:root[data-materials='aero'] .os-tray-btn svg {
-  width: 15px;
-  height: 15px;
+:root[data-materials='aero'] .os-taskbar .os-tray-btn svg {
+  width: 16px;
+  height: 16px;
   color: currentColor;
+  filter: drop-shadow(0 0 2px rgba(0, 16, 32, 0.8));
 }
-
-:root[data-materials='aero'] .os-clock {
-  min-width: 52px;
-  padding: 0 3px 0 5px;
+:root[data-materials='aero'] .os-taskbar .os-tray-btn:hover,
+:root[data-materials='aero'] .os-taskbar .os-tray-btn.active {
   color: #ffffff;
-  font-size: 10.5px;
-  line-height: 1.05;
-  text-shadow: 0 1px 1px rgba(0, 30, 102, 0.88);
+  border-color: rgba(255, 255, 255, 0.32);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  filter: none;
+}
+:root[data-materials='aero'] .os-taskbar .os-clock {
+  min-width: 62px;
+  padding: 0 8px;
+  color: #ffffff;
+  font-size: 11.5px;
+  line-height: 1.25;
+  text-align: center;
+  /* A dark glow, not a 1px drop: it holds on the lighter gloss band too. */
+  text-shadow: 0 0 6px rgba(0, 16, 32, 0.9), 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+:root[data-materials='aero'] .os-taskbar .os-clock-date {
+  color: #ffffff;
+  font-size: 11px;
 }
 
-:root[data-materials='aero'] .os-clock-date {
-  color: rgba(228, 246, 255, 0.92);
-  font-size: 9.5px;
+/* ---- Show Desktop: a glass sliver at the far right -------------------------- */
+:root[data-materials='aero'] .os-taskbar .os-show-desktop-btn {
+  align-self: stretch;
+  width: 15px;
+  height: auto;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.18));
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.24);
+}
+:root[data-materials='aero'] .os-taskbar .os-show-desktop-btn svg {
+  display: none;
+}
+:root[data-materials='aero'] .os-taskbar .os-show-desktop-btn:hover:not(:disabled),
+:root[data-materials='aero'] .os-taskbar .os-show-desktop-btn[aria-pressed='true'] {
+  border-color: rgba(0, 0, 0, 0.4);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.28) 50%, rgba(255, 255, 255, 0.4));
+}
+:root[data-materials='aero'] .os-taskbar .os-show-desktop-btn:disabled {
+  /* Nothing to minimise: the sliver stays visible, it simply does nothing. */
+  opacity: 1;
+  cursor: default;
 }
 
-:root[data-materials='aero'][data-taskbar-size='compact'] {
-  --taskbar-h: 30px;
+/* ---- Keyboard focus: a ring that reads on smoked glass ----------------------
+   shell.css's taskbar ring is scoped `:where(html:not([data-materials='aero']))`
+   and the fallback ring (the dark aqua --focus-ring-color) measured 1.17:1 on
+   this bar. White plus a dark inner band holds on both the gloss and the smoke.
+   Inset, because the task strip scrolls and would clip an outside ring. */
+:root[data-materials='aero'] .os-taskbar :is(.os-desktop-switch, .os-task-win, .os-tray-btn, .os-show-desktop-btn):focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px rgba(0, 54, 86, 0.92);
+}
+:root[data-materials='aero'] .os-taskbar .os-start-btn:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+    0 0 0 5px rgba(0, 54, 86, 0.92);
 }
 
-:root[data-materials='aero'][data-taskbar-size='large'] {
-  --taskbar-h: 40px;
+/* ---- Hover thumbnail (AeroTaskbarFx) ----------------------------------------
+   A glass card above the hovered task button: icon + title, a preview plate in
+   the app's colour, and a close button, the era's thumbnail idiom. Positioned in
+   the taskbar's own (unscaled) coordinates. */
+:root[data-materials='aero'] .aero-task-peek {
+  position: absolute;
+  z-index: var(--z-shell-chrome, 200000);
+  bottom: var(--peek-bottom, 56px);
+  left: var(--peek-x, 50%);
+  width: 190px;
+  padding: 6px 7px 8px;
+  border: 1px solid rgba(0, 18, 36, 0.7);
+  border-radius: var(--aero-radius-md, 5px);
+  color: #ffffff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.08) 42%, rgba(255, 255, 255, 0.02)),
+    var(--aero-smoke-strong);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 8px 24px rgba(0, 10, 25, 0.38);
+  backdrop-filter: blur(var(--blur-lg)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.5);
+  transform: translateX(-50%);
+  animation: aero-peek-in var(--dur-normal) var(--ease-glass) both;
 }
-
-:root[data-materials='aero'][data-taskbar-size='compact'] .os-start-btn,
-:root[data-materials='aero'][data-taskbar-size='compact'] .os-desktop-switch,
-:root[data-materials='aero'][data-taskbar-size='compact'] .os-task-win,
-:root[data-materials='aero'][data-taskbar-size='compact'] .os-tray-btn {
-  /* WCAG 2.5.8 target floor: 24px (was 22) in the 30px compact bar. */
+@keyframes aero-peek-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+:root[data-materials='aero'] .aero-task-peek-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+:root[data-materials='aero'] .aero-task-peek-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 6px rgba(0, 10, 25, 0.9);
+  white-space: nowrap;
+}
+:root[data-materials='aero'] .aero-task-peek-close {
+  flex: none;
+  width: 24px;
   height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--aero-radius-sm, 3px);
+  color: #ffffff;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+:root[data-materials='aero'] .aero-task-peek-close:hover {
+  border-color: rgba(80, 0, 0, 0.6);
+  background:
+    linear-gradient(180deg, rgba(255, 210, 196, 0.9), rgba(226, 82, 52, 0.95) 48%, rgba(186, 34, 14, 1) 52%, rgba(222, 76, 48, 1));
+}
+:root[data-materials='aero'] .aero-task-peek-thumb {
+  display: grid;
+  width: 100%;
+  height: 88px;
+  margin-top: 5px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--aero-radius-sm, 3px);
+  background:
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--peek-glow, #7cc4ff) 60%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+}
+:root[data-materials='aero'] .aero-task-peek-thumb:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+:root[data-materials='aero'] .aero-task-peek-thumb svg {
+  width: 48px;
+  height: 48px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+}
+:root[data-materials='aero'] .aero-task-peek-head svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 
-:root[data-materials='aero'][data-taskbar-size='large'] .os-start-btn {
-  height: 34px;
+/* Motion gates for everything above that moves. (Aero Peek's own rules sit
+   after the window chrome at the end of this file, which they must outrank.) */
+html.reduce-motion .os-taskbar .os-start-btn::after,
+html.reduce-motion .os-taskbar .os-task-win::before,
+html[data-display-anim='none'] .os-taskbar .os-start-btn::after,
+html[data-display-anim='none'] .os-taskbar .os-task-win::before {
+  transition: none;
+}
+html.reduce-motion .aero-task-peek,
+html[data-display-anim='none'] .aero-task-peek,
+html[data-perf='battery'] .aero-task-peek,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .aero-task-peek {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='aero'] .aero-task-peek {
+    animation: none;
+  }
 }
 
-:root[data-materials='aero'][data-taskbar-size='large'] .os-desktop-switch,
-:root[data-materials='aero'][data-taskbar-size='large'] .os-task-win,
-:root[data-materials='aero'][data-taskbar-size='large'] .os-tray-btn {
-  height: 30px;
-}
-
-/* ---------- Start menu: denser tiles, stronger integrated search ---------- */
-:root[data-materials='aero'] .os-start-title {
-  letter-spacing: var(--letter-spacing-wide);
-  text-shadow: 0 1px 0 var(--glass-highlight);
-}
-:root[data-materials='aero'] .os-start-search {
-  background: color-mix(in srgb, var(--panel) 60%, transparent);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--bg) 22%, transparent);
-}
-:root[data-materials='aero'] .os-start-app-ic {
-  box-shadow: none;
-}
-:root[data-materials='aero'] .os-start-app:hover .os-start-app-ic {
-  filter: brightness(1.06);
-}
-:root[data-materials='aero'] .os-start-foot-btn:hover {
-  background: var(--glass-tint-strong);
-  filter: brightness(1.05);
-}
-
-/* ---------- Desktop icon density: closer to a native desktop grid --------- */
+/* ---------- Desktop icons: Windows 6 grid ----------------------------------
+   Labels sit straight on the wallpaper, the way the era drew them — no pill.
+   The pill (#f8feff on a pale glass lozenge) measured ~1.2:1 and also painted
+   over the user's own Settings > Desktop > icon text colour. `auto` is now dark
+   ink with a white halo (the caption-glow recipe, legible on the bright Aero
+   walls); white / black / accent are honoured exactly as chosen. */
 :root[data-materials='aero'] .os-desk-icon {
   width: calc(var(--desk-icon-w) - 18px);
   gap: 3px;
   padding: 5px 3px 4px;
-  border-radius: 7px;
+  border-radius: var(--aero-radius-sm, 3px);
 }
+/* Explorer hot-track: a pale blue glass rectangle around icon and label. */
 :root[data-materials='aero'] .os-desk-icon:hover {
-  background: color-mix(in srgb, var(--glass-tint-strong) 40%, transparent);
-  border-color: color-mix(in srgb, var(--border) 70%, transparent);
-  box-shadow: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(196, 232, 252, 0.3));
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+:root[data-materials='aero'] .os-desk-icon:focus-visible {
+  background: linear-gradient(180deg, rgba(220, 240, 252, 0.6), rgba(160, 214, 244, 0.5));
+  border-color: var(--aero-selection-edge-strong, #3c95cf);
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 1px;
 }
 :root[data-materials='aero'] .os-desk-icon-img {
   width: 38px;
   height: 38px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--chrome-elevated) 88%, var(--panel));
-  border-color: var(--border);
-  box-shadow: none;
 }
 /* The pack icon IS the plate, so it fills the slot instead of floating inside
-   a 38px square at 21px. An <img> icon keeps the old inset — see the
-   `:has(> img)` rule below. */
+   a 38px square at 21px. An <img> icon keeps the old inset — see `:has(> img)`. */
 :root[data-materials='aero'] .os-desk-icon-img svg {
   width: 34px;
   height: 34px;
@@ -1711,241 +1659,272 @@
 }
 :root[data-materials='aero'] .os-desk-icon-label {
   max-width: calc(var(--desk-icon-w) - 24px);
-  padding: 1px 5px 2px;
-  font-size: 10.5px;
-  line-height: 1.12;
-  color: #f8feff;
-  text-shadow: 0 1px 2px rgba(5, 27, 39, 0.72);
+  padding: 1px 4px 2px;
+  font-size: 11px;
+  line-height: 1.15;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--aero-sky-ink, #0d2c47);
+  text-shadow:
+    0 0 3px rgba(255, 255, 255, 0.95),
+    0 0 7px rgba(255, 255, 255, 0.85);
+}
+:root[data-materials='aero'][data-icon-text='white'] .os-desk-icon-label {
+  color: #ffffff;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 6px rgba(0, 12, 24, 0.75);
+}
+:root[data-materials='aero'][data-icon-text='black'] .os-desk-icon-label {
+  color: #111111;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.95), 0 0 6px rgba(255, 255, 255, 0.8);
+}
+:root[data-materials='aero'][data-icon-text='accent'] .os-desk-icon-label {
+  color: var(--accent-text);
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.95), 0 0 6px rgba(255, 255, 255, 0.8);
 }
 
-/* ---------- Desktop icons: the icon pack draws the plate (Phase 5 · M7) ----
-   Phase 4.5 tinted a flat CSS square behind a monochrome line glyph, because
-   there was no icon pack yet. There is one now (theme/aeroIconPack.ts) and it
-   draws its own glass plate with the family gradient and sheen, so the
-   container must get out of the way — otherwise every icon wears two plates.
-   The per-app `--icon-c*` families below still drive the taskbar line glyphs,
-   which stay monochrome at 18px and under. */
+/* ---------- Icon plates: the icon pack draws the plate (Phase 5 · M7) -----
+   theme/aeroIconPack.ts draws its own glass plate with the family gradient and
+   sheen, so the container gets out of the way — otherwise every icon wears two
+   plates. */
 :root[data-materials='aero'] .os-desk-icon-img,
-:root[data-materials='aero'] .os-start-app-ic,
 :root[data-materials='aero'] .os-start-aero-ic {
-  --icon-c1: #5a7a88;
-  --icon-c2: #3d5560;
-  --icon-c3: #c8d6dc;
   position: relative;
   overflow: visible;
-  color: #e8eef1;
+  color: #ffffff;
   background: none;
   border-color: transparent;
   box-shadow: none;
 }
-
-/* Icons sit on wallpaper, so they carry their own contact shadow rather than
-   relying on a plate behind them. */
-:root[data-materials='aero'] .os-desk-icon-img > svg,
-:root[data-materials='aero'] .os-start-app-ic > svg,
-:root[data-materials='aero'] .os-start-aero-ic > svg {
-  filter: drop-shadow(0 1px 1.5px rgba(6, 26, 38, 0.42));
-}
-
-/* A user-supplied <img> icon has no plate of its own — keep one for it. */
-:root[data-materials='aero'] .os-desk-icon-img:has(> img) {
-  background: color-mix(in srgb, var(--icon-c2) 70%, var(--panel));
-  border-color: color-mix(in srgb, var(--border) 80%, transparent);
-  overflow: hidden;
-}
-
 :root[data-materials='aero'] .os-desk-icon-img::after,
-:root[data-materials='aero'] .os-start-app-ic::after,
 :root[data-materials='aero'] .os-start-aero-ic::after {
   display: none;
 }
-
 :root[data-materials='aero'] .os-desk-icon-img svg,
-:root[data-materials='aero'] .os-start-app-ic svg,
 :root[data-materials='aero'] .os-start-aero-ic svg {
   position: relative;
   z-index: 1;
-  filter: none;
+  /* Icons sit on wallpaper: they carry their own contact shadow. */
+  filter: drop-shadow(0 1px 1.5px rgba(6, 26, 38, 0.42));
+}
+/* A user-supplied <img> icon has no plate of its own — give it a glossy one. */
+:root[data-materials='aero'] .os-desk-icon-img:has(> img) {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--icon-c3, #22323d) 70%, transparent);
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, var(--icon-c1, #bcd4e4), var(--icon-c2, #4d6b80));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 5px rgba(10, 29, 39, 0.25);
 }
 
-:root[data-materials='aero'] .app-player,
-:root[data-materials='aero'] .app-media,
-:root[data-materials='aero'] .app-music,
-:root[data-materials='aero'] .app-musicwidget {
-  --icon-c1: #8a6a72;
-  --icon-c2: #5c4048;
-  --icon-c3: #dcc8ce;
+/* ---------- Icon families: one palette for desktop, taskbar and mini mode ---
+   The same families aeroIconPack.ts paints its plates with (top, bottom, edge),
+   so a taskbar glow, a mini slot and a desktop plate agree. These replaced the
+   matte mauve/olive/brown set, which had no gloss and read as disabled, and
+   the per-app taskbar glyph tints that fought the white taskbar ink. */
+:root[data-materials='aero'] :is(.app-player, .app-media, .app-music, .app-musicwidget, .app-visualizer) {
+  --icon-c1: #ff87a8;
+  --icon-c2: #c31447;
+  --icon-c3: #6d0c27;
+}
+:root[data-materials='aero'] :is(.app-dictionary, .app-grammar, .app-translate) {
+  --icon-c1: #66e0d2;
+  --icon-c2: #0a8b83;
+  --icon-c3: #04443f;
+}
+:root[data-materials='aero'] :is(.app-immersion, .app-library, .app-novels) {
+  --icon-c1: #7cc4ff;
+  --icon-c2: #1663c0;
+  --icon-c3: #0b3568;
+}
+:root[data-materials='aero'] :is(.app-anki, .app-flashcards) {
+  --icon-c1: #ffc275;
+  --icon-c2: #d8611f;
+  --icon-c3: #71300e;
+}
+:root[data-materials='aero'] :is(.app-calendar, .app-stats, .app-resources) {
+  --icon-c1: #b3e97f;
+  --icon-c2: #3f9130;
+  --icon-c3: #1f4d18;
+}
+:root[data-materials='aero'] :is(.app-games, .app-city) {
+  --icon-c1: #c3a4ff;
+  --icon-c2: #6b3fc4;
+  --icon-c3: #331b63;
+}
+:root[data-materials='aero'] :is(.app-settings, .app-clipboard, .action-addapp) {
+  --icon-c1: #bcd4e4;
+  --icon-c2: #4d6b80;
+  --icon-c3: #22323d;
 }
 
-:root[data-materials='aero'] .app-dictionary,
-:root[data-materials='aero'] .app-grammar,
-:root[data-materials='aero'] .app-translate {
-  --icon-c1: #5f8a80;
-  --icon-c2: #3d5e58;
-  --icon-c3: #c8ddd8;
-}
+/* =============================================================================
+   Windows 6 Start menu (Aero part A · E2)
+   -----------------------------------------------------------------------------
+   Two panes inside a smoked glass frame: a SOLID WHITE programs list on the
+   left, smoked glass on the right with white place links, the user picture
+   breaking the top edge above the right pane, the search field at the foot of
+   the left pane and the power cluster at the foot of the right one. The old
+   footer was a muddy brown (`--red-deep` mixed into green) and the power
+   buttons read an undeclared `--aero-teal`, so they painted transparent.
 
-:root[data-materials='aero'] .app-immersion,
-:root[data-materials='aero'] .app-library,
-:root[data-materials='aero'] .app-novels {
-  --icon-c1: #5f7a92;
-  --icon-c2: #3d5166;
-  --icon-c3: #c8d4e0;
-}
-
-:root[data-materials='aero'] .app-anki,
-:root[data-materials='aero'] .app-flashcards {
-  --icon-c1: #8a7a5a;
-  --icon-c2: #5c5040;
-  --icon-c3: #ddd4c4;
-}
-
-:root[data-materials='aero'] .app-calendar,
-:root[data-materials='aero'] .app-stats,
-:root[data-materials='aero'] .app-resources {
-  --icon-c1: #6e8460;
-  --icon-c2: #485840;
-  --icon-c3: #d0dcc8;
-}
-
-:root[data-materials='aero'] .app-settings,
-:root[data-materials='aero'] .app-visualizer,
-:root[data-materials='aero'] .app-city,
-:root[data-materials='aero'] .action-addapp {
-  --icon-c1: #6e7688;
-  --icon-c2: #484e5c;
-  --icon-c3: #d0d4dc;
-}
-
-:root[data-materials='aero'] .os-task-win svg,
-:root[data-materials='aero'] .os-tray-btn svg,
-:root[data-materials='aero'] .os-start-aero-tool svg,
-:root[data-materials='aero'] .os-start-aero-footer-btn svg {
-  filter: drop-shadow(0 1px 0 rgba(255,255,255,0.5));
-}
-
-:root[data-materials='aero'] .os-task-win.app-player svg,
-:root[data-materials='aero'] .os-task-win.app-media svg,
-:root[data-materials='aero'] .os-task-win.app-music svg,
-:root[data-materials='aero'] .os-task-win.app-musicwidget svg {
-  color: #d7265d;
-}
-
-:root[data-materials='aero'] .os-task-win.app-dictionary svg,
-:root[data-materials='aero'] .os-task-win.app-grammar svg,
-:root[data-materials='aero'] .os-task-win.app-translate svg {
-  color: #078f86;
-}
-
-:root[data-materials='aero'] .os-task-win.app-immersion svg,
-:root[data-materials='aero'] .os-task-win.app-library svg,
-:root[data-materials='aero'] .os-task-win.app-novels svg {
-  color: #2477cf;
-}
-
-:root[data-materials='aero'] .os-task-win.app-anki svg,
-:root[data-materials='aero'] .os-task-win.app-flashcards svg {
-  color: #e2683f;
-}
-
-:root[data-materials='aero'] .os-taskbar .os-task-win svg,
-:root[data-materials='aero'] .os-taskbar .os-tray-btn svg {
-  color: #e7f6ff;
-  filter: drop-shadow(0 1px 0 rgba(0, 20, 85, 0.7));
-}
-
-/* ---------- Reconstructed Aero Start: two-column desktop hub ------------- */
+   Built from the SAME markup Wired uses; nothing moves in the DOM, so the
+   StartPanel roving focus and every keyboard path are unchanged. The head is
+   an absolutely positioned overlay: its picture and title sit over the right
+   pane, its search button becomes the field at the bottom-left.
+   ============================================================================= */
 :root[data-materials='aero'] .os-start-legacy {
   display: none;
 }
+:root[data-materials='aero'] .os-start-backdrop {
+  background: transparent;
+}
 :root[data-materials='aero'] .os-start-aero-menu {
-  left: 8px;
-  bottom: calc(var(--taskbar-h, 48px) + 4px);
-  width: 508px;
-  max-width: calc(100% - 16px);
-  height: 610px;
-  max-height: calc(100% - var(--taskbar-h, 48px) - 16px);
+  --start-right-w: 226px;
+  left: 4px;
+  bottom: calc(var(--taskbar-h, 48px) + 6px);
+  width: 500px;
+  max-width: calc(100% - 8px);
+  height: 548px;
+  max-height: calc(100% - var(--taskbar-h, 48px) - 40px);
   padding: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border-radius: 8px 8px 6px 6px;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.04) 26%),
-    linear-gradient(135deg, rgba(0, 168, 200, 0.2), rgba(53, 168, 107, 0.12)),
-    var(--shell-glass-strong);
-}
-:root[data-materials='aero'] .os-start-aero-head {
-  min-height: 74px;
-  display: grid;
-  grid-template-columns: 50px 1fr 38px;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px 10px;
+  /* The user picture overhangs the top edge. */
+  overflow: visible;
+  border: 1px solid rgba(6, 24, 44, 0.9);
+  border-radius: 8px 8px 5px 5px;
   color: #ffffff;
   background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.34), transparent 46%),
-    linear-gradient(120deg, #007a94, var(--accent) 52%, var(--aero-aqua));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.08) 36px, rgba(255, 255, 255, 0.02) 60%, rgba(255, 255, 255, 0.08)),
+    var(--aero-start-smoke);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.58),
-    inset 0 -1px 0 rgba(9, 33, 45, 0.24);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 14px 40px rgba(0, 10, 25, 0.48);
+  backdrop-filter: blur(var(--blur-xl)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--blur-xl)) saturate(1.5);
+  animation: aero-scale-in var(--dur-normal) var(--ease-glass) both;
+  transform-origin: bottom left;
+}
+
+/* ---- Head overlay: picture + name over the right pane, search at bottom-left */
+:root[data-materials='aero'] .os-start-aero-head {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  color: #ffffff;
+  background: none;
+  box-shadow: none;
+  pointer-events: none;
 }
 :root[data-materials='aero'] .os-start-aero-avatar {
-  width: 46px;
-  height: 46px;
+  position: absolute;
+  top: -28px;
+  right: calc(var(--start-right-w) / 2 - 31px);
+  width: 62px;
+  height: 62px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
-  color: #ffffff;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.08) 48%),
-    linear-gradient(135deg, var(--aero-green), var(--aero-aqua));
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow:
-    0 4px 12px rgba(7, 45, 54, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
-}
-:root[data-materials='aero'] .os-start-aero-id {
-  min-width: 0;
-}
-:root[data-materials='aero'] .os-start-aero-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.1;
-  text-shadow: 0 1px 2px rgba(21, 26, 34, 0.35);
-}
-:root[data-materials='aero'] .os-start-aero-sub {
-  margin-top: 3px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.84);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-:root[data-materials='aero'] .os-start-aero-search {
-  width: 34px;
-  height: 30px;
-  display: grid;
-  place-items: center;
+  border: 0;
   border-radius: 6px;
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
-  cursor: pointer;
+  /* The picture: a bright sky with a bubble of light. */
+  background:
+    radial-gradient(circle at 30% 26%, rgba(255, 255, 255, 0.9) 0 7%, rgba(255, 255, 255, 0) 8%),
+    radial-gradient(120% 80% at 50% 110%, #6ed46a 0 34%, rgba(110, 212, 106, 0) 35%),
+    linear-gradient(180deg, #bdeeff 0, #4fb4e6 58%, #2a8cc9 100%);
+  /* The glossy frame: white bevel, dark rim, soft drop. */
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 0 4px #eef5fa,
+    0 0 0 5px rgba(20, 44, 66, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    0 6px 14px rgba(0, 10, 25, 0.55);
+}
+:root[data-materials='aero'] .os-start-aero-avatar svg {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 1px 2px rgba(0, 30, 60, 0.6));
+}
+:root[data-materials='aero'] .os-start-aero-id {
+  position: absolute;
+  top: 44px;
+  right: 6px;
+  width: calc(var(--start-right-w) - 12px);
+  min-width: 0;
+  text-align: center;
+}
+:root[data-materials='aero'] .os-start-aero-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 6px rgba(0, 10, 25, 0.9);
+  white-space: nowrap;
+}
+:root[data-materials='aero'] .os-start-aero-sub {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 5px rgba(0, 10, 25, 0.9);
+  white-space: nowrap;
+}
+/* The search field. Its label is the button's own translated `title`. */
+:root[data-materials='aero'] .os-start-aero-search {
+  position: absolute;
+  left: 9px;
+  bottom: 8px;
+  width: calc(100% - var(--start-right-w) - 20px);
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 7px 0 9px;
+  border: 1px solid #8eb0c8;
+  border-radius: var(--aero-radius-sm, 3px);
+  color: #4f6b7f;
+  background: linear-gradient(180deg, #f4f8fb, #ffffff 40%);
+  box-shadow: inset 0 1px 2px rgba(0, 30, 60, 0.18);
+  font-size: 12px;
+  font-style: italic;
+  cursor: text;
+  pointer-events: auto;
+}
+:root[data-materials='aero'] .os-start-aero-search::before {
+  content: attr(title);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-materials='aero'] .os-start-aero-search svg {
+  flex: none;
+  color: #2f6e98;
 }
 :root[data-materials='aero'] .os-start-aero-search:hover {
-  background: rgba(255, 255, 255, 0.25);
+  border-color: #5fa2d2;
+  background: #ffffff;
 }
+
+/* ---- The two panes ---------------------------------------------------------- */
 :root[data-materials='aero'] .os-start-aero-columns {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 196px;
-  background:
-    linear-gradient(to right, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.62) 59%, rgba(198, 224, 234, 0.78) 60%),
-    var(--shell-work-surface);
+  grid-template-columns: minmax(0, 1fr) var(--start-right-w);
+  margin: 9px 0 0 9px;
+  background: none;
 }
 :root[data-materials='aero'] .os-start-aero-main,
 :root[data-materials='aero'] .os-start-aero-side {
@@ -1953,54 +1932,93 @@
   min-height: 0;
   overflow: hidden;
 }
+/* Left: solid white, the one opaque work surface in the menu. */
 :root[data-materials='aero'] .os-start-aero-main {
-  padding: 10px 8px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 4px 4px;
+  border: 1px solid rgba(6, 24, 44, 0.75);
+  border-radius: var(--aero-radius-sm, 3px);
+  color: var(--text);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
 }
+/* Right: the smoked glass shows through; padded below the user picture. */
 :root[data-materials='aero'] .os-start-aero-side {
-  padding: 10px 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: inset 1px 0 0 rgba(18, 49, 67, 0.1);
+  display: flex;
+  flex-direction: column;
+  padding: 84px 6px 6px 8px;
+  border: 0;
+  box-shadow: none;
 }
 :root[data-materials='aero'] .os-start-aero-label {
-  margin: 4px 6px 6px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--muted) 82%, var(--text));
+  margin: 2px 6px 4px;
+  color: #4a6577;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-label {
+  margin: 8px 4px 3px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  text-shadow: 0 0 5px rgba(0, 10, 25, 0.9);
+}
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-label:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 :root[data-materials='aero'] .os-start-aero-programs,
 :root[data-materials='aero'] .os-start-aero-places,
 :root[data-materials='aero'] .os-start-aero-tools {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
 }
 :root[data-materials='aero'] .os-start-aero-programs {
-  max-height: calc(100% - 42px);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 :root[data-materials='aero'] .os-start-aero-places {
-  max-height: 285px;
+  max-height: 240px;
   overflow-y: auto;
 }
+
+/* ---- Rows --------------------------------------------------------------------- */
 :root[data-materials='aero'] .os-start-aero-row {
   position: relative;
   display: flex;
   align-items: stretch;
-  min-height: 48px;
-  border-radius: 5px;
+  min-height: 40px;
   border: 1px solid transparent;
+  border-radius: var(--aero-radius-sm, 3px);
+  background: transparent;
 }
 :root[data-materials='aero'] .os-start-aero-row.place {
-  min-height: 36px;
+  min-height: 28px;
 }
-:root[data-materials='aero'] .os-start-aero-row:hover,
-:root[data-materials='aero'] .os-start-aero-row.pinned {
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0.08)),
-    color-mix(in srgb, var(--aero-aqua) 14%, transparent);
-  border-color: color-mix(in srgb, var(--aero-aqua) 44%, rgba(255, 255, 255, 0.62));
+/* Hover is a hot-track rectangle. Pinned is NOT a fill (it used to be the same
+   fill as hover, so a pinned row looked permanently hovered); the pin button's
+   own `on` state carries it. */
+:root[data-materials='aero'] .os-start-aero-main .os-start-aero-row:hover {
+  border-color: var(--aero-hover-edge);
+  background: var(--aero-hover-fill);
+}
+:root[data-materials='aero'] .os-start-aero-main .os-start-aero-row:focus-within {
+  border-color: var(--aero-selection-edge);
+  background: var(--app-selection, var(--aero-hover-fill));
+}
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-row:hover,
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-row:focus-within,
+:root[data-materials='aero'] .os-start-aero-tool:hover,
+:root[data-materials='aero'] .os-start-aero-tool:focus-visible {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.04) 51%, rgba(255, 255, 255, 0.14));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 :root[data-materials='aero'] .os-start-aero-row.drag-source {
   opacity: 0.56;
@@ -2011,38 +2029,38 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 31px 5px 6px;
+  padding: 3px 31px 3px 5px;
   color: var(--text);
   background: transparent;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--aero-radius-sm, 3px);
   text-align: left;
   cursor: grab;
   user-select: none;
   -webkit-user-drag: element;
 }
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-app {
+  padding: 2px 6px;
+  color: #ffffff;
+}
 :root[data-materials='aero'] .os-start-aero-app:active {
   cursor: grabbing;
 }
 :root[data-materials='aero'] .os-start-aero-ic {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 7px;
-  color: var(--accent);
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.12) 46%),
-    var(--shell-work-surface);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 76%, rgba(18, 49, 67, 0.14));
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    0 1px 3px rgba(10, 29, 39, 0.16);
+  border-radius: 5px;
 }
-:root[data-materials='aero'] .os-start-aero-row.place .os-start-aero-ic,
-:root[data-materials='aero'] .os-start-aero-tool svg {
-  color: color-mix(in srgb, var(--accent-2) 76%, var(--text));
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-ic {
+  width: 20px;
+  height: 20px;
+}
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-ic svg {
+  width: 20px;
+  height: 20px;
 }
 :root[data-materials='aero'] .os-start-aero-copy {
   min-width: 0;
@@ -2051,42 +2069,42 @@
   gap: 1px;
 }
 :root[data-materials='aero'] .os-start-aero-name {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--text);
   overflow: hidden;
+  color: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-:root[data-materials='aero'] .os-start-aero-row.place .os-start-aero-name,
-:root[data-materials='aero'] .os-start-aero-tool {
-  font-size: 11.5px;
-  font-weight: 600;
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-name {
+  font-size: 12px;
+  font-weight: 400;
+  text-shadow: 0 0 5px rgba(0, 10, 25, 0.9);
 }
 :root[data-materials='aero'] .os-start-aero-hint {
-  font-size: 10.5px;
-  color: var(--muted);
   overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-:root[data-materials='aero'] .os-start-aero-row.place .os-start-aero-hint {
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-hint {
   display: none;
 }
 :root[data-materials='aero'] .os-start-aero-pin {
-  /* WCAG 2.5.8 target floor: 24px (was 22x22). */
+  /* WCAG 2.5.8 target floor: 24px. */
   position: absolute;
   top: 50%;
-  right: 5px;
+  right: 4px;
   width: 24px;
   height: 24px;
   display: grid;
   place-items: center;
   transform: translateY(-50%);
-  border-radius: 5px;
   border: 1px solid transparent;
+  border-radius: var(--aero-radius-sm, 3px);
   background: transparent;
-  color: color-mix(in srgb, var(--muted) 78%, transparent);
+  color: var(--muted);
   cursor: pointer;
   opacity: 0;
 }
@@ -2095,56 +2113,68 @@
 :root[data-materials='aero'] .os-start-aero-pin:focus-visible {
   opacity: 1;
 }
-:root[data-materials='aero'] .os-start-aero-pin:hover,
-:root[data-materials='aero'] .os-start-aero-pin.on {
-  color: #ffffff;
-  background: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 72%, #ffffff);
+:root[data-materials='aero'] .os-start-aero-pin:hover {
+  border-color: var(--aero-selection-edge);
+  background: linear-gradient(180deg, #ffffff, #dcefff);
+  color: var(--text);
 }
+:root[data-materials='aero'] .os-start-aero-pin.on {
+  color: var(--state-indicator);
+}
+:root[data-materials='aero'] .os-start-aero-side .os-start-aero-pin {
+  color: #ffffff;
+}
+
+/* "All Programs": the era's arrow row at the foot of the white pane. */
 :root[data-materials='aero'] .os-start-aero-all {
-  width: calc(100% - 6px);
+  width: 100%;
   height: 30px;
-  margin: 8px 3px 0;
+  margin: 4px 0 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 9px 0 11px;
-  border-radius: 5px;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 76%, transparent);
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.12)),
-    color-mix(in srgb, var(--aero-green) 12%, var(--shell-work-surface));
+  padding: 0 8px 0 10px;
+  border: 1px solid transparent;
+  border-top-color: #d5e3ec;
+  border-radius: 0 0 var(--aero-radius-sm, 3px) var(--aero-radius-sm, 3px);
+  background: transparent;
   color: var(--text);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 :root[data-materials='aero'] .os-start-aero-all:hover {
-  border-color: color-mix(in srgb, var(--aero-green) 56%, var(--glass-border));
-  filter: brightness(1.04);
+  border-color: var(--aero-hover-edge);
+  background: var(--aero-hover-fill);
+  filter: none;
 }
+:root[data-materials='aero'] .os-start-aero-all svg {
+  color: var(--aero-gel-green, #3fae38);
+}
+
+/* Right-pane tools: white links on smoke. */
 :root[data-materials='aero'] .os-start-aero-tools {
   padding-top: 1px;
 }
-:root[data-materials='aero'] .os-start-aero-tool,
-:root[data-materials='aero'] .os-start-aero-footer-btn,
-:root[data-materials='aero'] .os-start-aero-power {
+:root[data-materials='aero'] .os-start-aero-tool {
   display: flex;
   align-items: center;
   gap: 7px;
   min-width: 0;
-  height: 30px;
-  padding: 0 8px;
-  border-radius: 5px;
+  height: 28px;
+  padding: 0 6px;
   border: 1px solid transparent;
-  color: var(--text);
+  border-radius: var(--aero-radius-sm, 3px);
+  color: #ffffff;
   background: transparent;
+  font-size: 12px;
+  text-shadow: 0 0 5px rgba(0, 10, 25, 0.9);
   cursor: pointer;
 }
-:root[data-materials='aero'] .os-start-aero-tool:hover,
-:root[data-materials='aero'] .os-start-aero-footer-btn:hover {
-  background: color-mix(in srgb, var(--glass-tint-strong) 72%, transparent);
-  border-color: color-mix(in srgb, var(--glass-border) 58%, transparent);
+:root[data-materials='aero'] .os-start-aero-tool svg {
+  flex: none;
+  color: #ffffff;
+  filter: drop-shadow(0 0 2px rgba(0, 10, 25, 0.8));
 }
 :root[data-materials='aero'] .os-start-aero-tool span,
 :root[data-materials='aero'] .os-start-aero-footer-btn span {
@@ -2152,59 +2182,103 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---- Footer: glass, power cluster bottom-right ---------------------------- */
 :root[data-materials='aero'] .os-start-aero-footer {
+  flex: none;
   height: 42px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 9px;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.06)),
-    color-mix(in srgb, var(--red-deep) 54%, var(--accent-2));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  gap: 4px;
+  /* The left part of this row belongs to the search field (head overlay). */
+  padding: 0 7px 0 calc(100% - var(--start-right-w) + 2px);
+  background: transparent;
+  box-shadow: none;
 }
 :root[data-materials='aero'] .os-start-aero-footer-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--aero-radius-sm, 3px);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.24);
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
+  font-size: 12px;
+  text-shadow: 0 0 5px rgba(0, 10, 25, 0.9);
+  cursor: pointer;
+}
+:root[data-materials='aero'] .os-start-aero-footer-btn:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.08));
 }
 :root[data-materials='aero'] .os-start-aero-power-cluster {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
+  border: 1px solid rgba(0, 12, 24, 0.75);
+  border-radius: var(--aero-radius-sm, 3px);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
+  overflow: hidden;
 }
+/* Glossy gel buttons, joined like the era's power + lock pair. */
 :root[data-materials='aero'] .os-start-aero-power {
+  display: grid;
+  place-items: center;
   width: 30px;
-  justify-content: center;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid rgba(0, 12, 24, 0.55);
+  border-radius: 0;
   color: #ffffff;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.08)),
-    color-mix(in srgb, var(--aero-teal) 58%, var(--accent-2));
-  border-color: rgba(255, 255, 255, 0.36);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.18) 48%, rgba(0, 20, 40, 0.18) 52%, rgba(255, 255, 255, 0.16));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+}
+:root[data-materials='aero'] .os-start-aero-power:first-child {
+  border-left: 0;
+  /* Sleep: the aqua gel. */
+  background: linear-gradient(180deg, #b6f0ff 0, #49b9e6 46%, #1287c0 52%, #3aaedc 100%);
 }
 :root[data-materials='aero'] .os-start-aero-power.shutdown {
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.06)),
-    var(--red);
+  /* Shut down: the red gel — the one destructive control here. */
+  background: linear-gradient(180deg, #ffc4b5 0, #e2583a 46%, #b9230f 52%, #d9462a 100%);
+}
+:root[data-materials='aero'] .os-start-aero-power svg {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
 }
 :root[data-materials='aero'] .os-start-aero-power:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.12) saturate(1.1);
+}
+
+/* ---- Keyboard focus inside the menu (finding 7): white on the smoke, the dark
+   aqua ring on the white pane. */
+:root[data-materials='aero'] .os-start-aero-menu :is(button, [tabindex]):focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px rgba(0, 54, 86, 0.9);
+}
+:root[data-materials='aero'] .os-start-aero-main :is(button, [tabindex]):focus-visible,
+:root[data-materials='aero'] .os-start-aero-search:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+  box-shadow: none;
 }
 
 @media (max-width: 620px) {
   :root[data-materials='aero'] .os-start-aero-menu {
-    width: calc(100% - 16px);
-    height: min(610px, calc(100% - var(--taskbar-h, 48px) - 16px));
+    --start-right-w: 150px;
+    width: calc(100% - 8px);
+    height: min(548px, calc(100% - var(--taskbar-h, 48px) - 40px));
   }
-  :root[data-materials='aero'] .os-start-aero-columns {
-    grid-template-columns: 1fr;
-  }
-  :root[data-materials='aero'] .os-start-aero-side {
-    border-left: none;
-    border-top: 1px solid color-mix(in srgb, var(--glass-border) 60%, transparent);
-  }
+}
+html.reduce-motion[data-materials='aero'] .os-start-aero-menu,
+html[data-display-anim='none'][data-materials='aero'] .os-start-aero-menu {
+  animation: none;
 }
 
 /* ---------- Sticky notes (Phase 4 · M10) ----------------------------------
@@ -2257,52 +2331,24 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.84),
     inset 0 -1px 0 rgba(22, 64, 84, 0.12);
   color: var(--text);
-  backdrop-filter: blur(15px) saturate(1.18);
-  -webkit-backdrop-filter: blur(15px) saturate(1.18);
+  backdrop-filter: blur(var(--blur-md)) saturate(1.18);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(1.18);
 }
 
+/* A slim glass caption lip over the finder and clipboard panels. These used to
+   print 'Command Finder', 'Clipboard Viewer' and two footer hint lines from CSS
+   `content:`, i.e. English in every language and invisible to i18n. */
 :root[data-materials='aero'] .palette::before,
 :root[data-materials='aero'] .cbh-panel::before {
-  display: flex;
-  align-items: center;
-  height: 27px;
+  content: '';
+  display: block;
+  height: 7px;
   flex: 0 0 auto;
-  padding: 0 9px;
   border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 70%, rgba(18, 49, 67, 0.14));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(209, 229, 236, 0.7)),
     color-mix(in srgb, var(--glass-tint) 72%, #ffffff);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  color: color-mix(in srgb, var(--text) 88%, #17425f);
-  font-size: 12px;
-  font-weight: var(--font-weight-semibold);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
-}
-
-:root[data-materials='aero'] .palette::before {
-  content: 'Command Finder';
-}
-
-:root[data-materials='aero'] .cbh-panel::before {
-  content: 'Clipboard Viewer';
-}
-
-:root[data-materials='aero'] .palette::after,
-:root[data-materials='aero'] .cbh-panel::after {
-  flex: 0 0 auto;
-  padding: 3px 8px;
-  border-top: 1px solid color-mix(in srgb, var(--glass-border) 68%, rgba(18, 49, 67, 0.14));
-  background: color-mix(in srgb, var(--glass-tint) 68%, #ffffff);
-  color: var(--muted);
-  font-size: 10.5px;
-}
-
-:root[data-materials='aero'] .palette::after {
-  content: 'Enter opens | Esc closes | Arrow keys move';
-}
-
-:root[data-materials='aero'] .cbh-panel::after {
-  content: 'Local clipboard history | pinned entries stay when clearing';
 }
 
 :root[data-materials='aero'] .palette {
@@ -2337,7 +2383,7 @@
 :root[data-materials='aero'] .palette-input:focus-visible,
 :root[data-materials='aero'] .cbh-search:focus,
 :root[data-materials='aero'] .cbh-search:focus-visible {
-  outline: 1px solid #3399ff;
+  outline: 2px solid var(--focus-ring-color);
   outline-offset: 0;
   border-color: #3399ff;
   box-shadow: inset 0 1px 2px rgba(18, 49, 67, 0.18);
@@ -2576,7 +2622,7 @@
 }
 
 :root[data-materials='aero'] .os-flyout .ui-toggle input:focus-visible + .ui-toggle__track {
-  outline: 1px dotted #17425f;
+  outline: 2px solid var(--focus-ring-color);
   outline-offset: 1px;
 }
 
@@ -2626,13 +2672,13 @@
 }
 
 :root[data-materials='aero'] .os-flyout .ui-slider:focus-visible {
-  outline: 1px dotted #17425f;
+  outline: 2px solid var(--focus-ring-color);
   outline-offset: 2px;
   border-radius: 0;
 }
 
 :root[data-materials='aero'] .os-flyout .ui-select:focus-visible {
-  outline: 1px solid #3399ff;
+  outline: 2px solid var(--focus-ring-color);
   outline-offset: 0;
   border-color: #3399ff;
 }
@@ -2872,115 +2918,6 @@
   background: color-mix(in srgb, var(--glass-tint) 68%, #ffffff);
 }
 
-:root[data-materials='aero'] .widget-frame {
-  border-radius: 6px;
-  border-color: color-mix(in srgb, var(--glass-border) 74%, rgba(18, 49, 67, 0.18));
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.34), rgba(255,255,255,0.08)),
-    color-mix(in srgb, var(--panel) 72%, transparent);
-  box-shadow:
-    0 10px 24px rgba(10, 29, 39, 0.24),
-    inset 0 1px 0 rgba(255,255,255,0.72);
-}
-
-:root[data-materials='aero'] .widget-frame.focused {
-  border-color: color-mix(in srgb, var(--accent) 48%, var(--glass-border));
-  box-shadow:
-    0 12px 30px rgba(10, 29, 39, 0.28),
-    0 0 12px color-mix(in srgb, var(--accent) 20%, transparent),
-    inset 0 1px 0 rgba(255,255,255,0.78);
-}
-
-:root[data-materials='aero'] .widget-bar {
-  height: 25px;
-  padding: 0 3px 0 7px;
-  border-bottom-color: color-mix(in srgb, var(--glass-border) 66%, rgba(18,49,67,0.14));
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.68), rgba(210,230,237,0.62)),
-    color-mix(in srgb, var(--glass-tint) 70%, #ffffff);
-}
-
-:root[data-materials='aero'] .widget-frame:not(.focused) .widget-bar {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.46), rgba(215,229,235,0.42)),
-    color-mix(in srgb, var(--glass-tint) 48%, #ffffff);
-}
-
-:root[data-materials='aero'] .widget-title {
-  color: color-mix(in srgb, var(--text) 78%, var(--muted));
-  font-size: 10.5px;
-  letter-spacing: 0;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.62);
-}
-
-:root[data-materials='aero'] .widget-b,
-:root[data-materials='aero'] .widget-lock {
-  /* WCAG 2.5.8 target floor: 24px (was 20x19). */
-  width: 24px;
-  height: 24px;
-  border-radius: 3px;
-  font-size: 12px;
-}
-
-:root[data-materials='aero'] .widget-b:hover {
-  background: color-mix(in srgb, var(--panel) 68%, #ffffff);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
-}
-
-:root[data-materials='aero'] .widget-body {
-  padding: 7px 8px;
-  background: color-mix(in srgb, var(--panel) 74%, rgba(255,255,255,0.36));
-}
-
-:root[data-materials='aero'] .widget-menu {
-  top: 24px;
-  right: 3px;
-  min-width: 138px;
-  padding: 2px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--panel) 92%, #ffffff);
-  box-shadow: 0 10px 24px rgba(8, 30, 42, 0.32);
-}
-
-:root[data-materials='aero'] .widget-menu button {
-  min-height: 23px;
-  padding: 3px 7px;
-  border-radius: 2px;
-  font-size: 11.5px;
-}
-
-:root[data-materials='aero'] .widget-menu button:hover {
-  background: var(--app-selection, color-mix(in srgb, var(--accent) 24%, #ffffff));
-}
-
-:root[data-materials='aero'] .widget-resize {
-  width: 12px;
-  height: 12px;
-}
-
-:root[data-materials='aero'] .wgt {
-  gap: 5px;
-}
-
-:root[data-materials='aero'] .wgt-btn,
-:root[data-materials='aero'] .wgt-btn-icon {
-  border-radius: 3px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.58), rgba(231,242,246,0.5)),
-    color-mix(in srgb, var(--panel) 76%, #ffffff);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.74);
-}
-
-:root[data-materials='aero'] .wgt-btn {
-  padding: 3px 9px;
-  font-size: 11.5px;
-}
-
-:root[data-materials='aero'] .wgt-progress,
-:root[data-materials='aero'] .wgt-progress-fill {
-  border-radius: 2px;
-}
-
 @media (max-width: 760px) {
   :root[data-materials='aero'] .widget-card {
     grid-template-columns: minmax(140px, 1fr) auto;
@@ -3155,7 +3092,9 @@
 }
 
 :root[data-materials='aero'] .widget-card:hover {
-  background: linear-gradient(180deg, #ffe9f3, #efadc8);
+  /* Explorer hot-track, not the Study OS rose. */
+  background: var(--aero-hover-fill);
+  box-shadow: inset 0 0 0 1px var(--aero-hover-edge);
   color: #052b46;
 }
 
@@ -3223,10 +3162,10 @@
   min-height: 20px;
   margin: 0;
   padding: 2px 7px;
-  border: 1px solid #ff4f72;
+  border: 1px solid #2c7fb8;
   border-radius: 2px;
-  background: linear-gradient(180deg, #ffffff, #ffdfe8);
-  color: #ff4f72;
+  background: linear-gradient(180deg, #f2fbff 0, #c9ebfb 46%, #8fd2f3 52%, #b6e3f8 100%);
+  color: #0b3a5c;
   font: 11px Tahoma, "MS Sans Serif", sans-serif;
   box-shadow: none;
 }
@@ -3245,266 +3184,6 @@
   text-transform: none;
 }
 
-:root[data-materials='aero'] .widget-frame {
-  border: 1px solid rgba(0, 78, 190, 0.82);
-  border-radius: 4px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.78), rgba(228,246,255,0.58)),
-    rgba(210, 239, 255, 0.78);
-  box-shadow:
-    0 8px 18px rgba(0, 25, 78, 0.34),
-    inset 0 1px 0 rgba(255,255,255,0.9);
-  color: #102f46;
-  font-family: Tahoma, "MS Sans Serif", sans-serif;
-  backdrop-filter: blur(8px) saturate(1.22);
-  -webkit-backdrop-filter: blur(8px) saturate(1.22);
-}
-
-:root[data-materials='aero'] .widget-frame.focused {
-  border-color: #0058ef;
-  box-shadow:
-    0 10px 22px rgba(0, 25, 78, 0.4),
-    0 0 0 1px rgba(255,255,255,0.72) inset;
-}
-
-:root[data-materials='aero'] .widget-frame.blur {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.72), rgba(204,238,255,0.54)),
-    rgba(202, 235, 255, 0.7);
-}
-
-:root[data-materials='aero'] .widget-bar {
-  height: 24px;
-  padding: 0 3px 0 7px;
-  border-bottom: 1px solid #71a7cf;
-  background:
-    linear-gradient(180deg, rgba(93,191,255,0.96) 0%, rgba(17,125,233,0.96) 48%, rgba(0,77,196,0.98) 49%, rgba(0,112,238,0.96) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.7),
-    inset 0 -1px 0 rgba(0, 49, 137, 0.42);
-}
-
-:root[data-materials='aero'] .widget-frame:not(.focused) .widget-bar {
-  background:
-    linear-gradient(180deg, rgba(208,241,255,0.96) 0%, rgba(131,199,238,0.9) 50%, rgba(72,148,209,0.9) 100%);
-}
-
-:root[data-materials='aero'] .widget-title {
-  color: #ffffff;
-  font: 700 10.5px Tahoma, "MS Sans Serif", sans-serif;
-  letter-spacing: 0;
-  text-shadow: 1px 1px 0 rgba(0,31,96,0.72);
-}
-
-:root[data-materials='aero'] .widget-b,
-:root[data-materials='aero'] .widget-lock {
-  /* WCAG 2.5.8 target floor: 24px (was 18x17). */
-  width: 24px;
-  height: 24px;
-  border: 1px solid rgba(11, 79, 171, 0.74);
-  border-radius: 2px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.95), rgba(190,229,255,0.82) 48%, rgba(79,157,225,0.82));
-  color: #06407b;
-  font: 700 11px/1 Tahoma, "MS Sans Serif", sans-serif;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
-}
-
-:root[data-materials='aero'] .widget-b:hover {
-  background:
-    linear-gradient(180deg, #ffffff, #c8f0ff 50%, #5fb8f2);
-  color: #062d51;
-}
-
-:root[data-materials='aero'] .widget-body {
-  padding: 8px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.86), rgba(242,250,255,0.76)),
-    rgba(255,255,255,0.72);
-  color: #17425f;
-}
-
-:root[data-materials='aero'] .widget-menu {
-  top: 22px;
-  right: 3px;
-  min-width: 142px;
-  padding: 2px;
-  border: 1px solid #7aa5c6;
-  border-radius: 2px;
-  background: #ffffff;
-  box-shadow: 4px 6px 18px rgba(0,38,80,0.34);
-}
-
-:root[data-materials='aero'] .widget-menu button {
-  min-height: 22px;
-  padding: 3px 8px;
-  border-radius: 0;
-  color: #17425f;
-  font: 11px Tahoma, "MS Sans Serif", sans-serif;
-}
-
-:root[data-materials='aero'] .widget-menu button:hover {
-  background: linear-gradient(180deg, #c8e8ff, #7cc6ff);
-  color: #062d51;
-}
-
-:root[data-materials='aero'] .widget-resize {
-  width: 13px;
-  height: 13px;
-  background:
-    linear-gradient(135deg, transparent 0 45%, rgba(36,95,135,0.48) 46% 54%, transparent 55%),
-    linear-gradient(135deg, transparent 0 65%, rgba(36,95,135,0.56) 66% 74%, transparent 75%);
-}
-
-:root[data-materials='aero'] .wgt {
-  gap: 6px;
-  color: #17425f;
-  font-family: Tahoma, "MS Sans Serif", sans-serif;
-}
-
-:root[data-materials='aero'] .wgt-empty,
-:root[data-materials='aero'] .wgt-stat-label,
-:root[data-materials='aero'] .wgt-stat-sub,
-:root[data-materials='aero'] .wgt-clock-date,
-:root[data-materials='aero'] .wgt-card-desc,
-:root[data-materials='aero'] .wgt .muted {
-  color: #4b7082;
-}
-
-:root[data-materials='aero'] .wgt-btn,
-:root[data-materials='aero'] .wgt-btn-icon {
-  border: 1px solid #7aa5c6;
-  border-radius: 2px;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #e8f7ff 46%, #bddff6 100%);
-  color: #17425f;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
-  font-family: Tahoma, "MS Sans Serif", sans-serif;
-}
-
-:root[data-materials='aero'] .wgt-btn:hover,
-:root[data-materials='aero'] .wgt-btn-icon:hover {
-  border-color: #318bd1;
-  background: linear-gradient(180deg, #ffffff, #c8edff 50%, #83cdf8);
-}
-
-:root[data-materials='aero'] .wgt-btn.primary,
-:root[data-materials='aero'] .wgt-calc-key.eq {
-  border-color: #2b7fc1;
-  background:
-    linear-gradient(180deg, #f7fdff, #9fd9ff 46%, #1c80db);
-  color: #073866;
-}
-
-:root[data-materials='aero'] .wgt-btn.danger {
-  color: #d64040;
-}
-
-:root[data-materials='aero'] .wgt input,
-:root[data-materials='aero'] .wgt textarea,
-:root[data-materials='aero'] .wgt select,
-:root[data-materials='aero'] .wgt-calc-display {
-  border: 1px solid #7aa5c6;
-  border-radius: 2px;
-  background: #ffffff;
-  color: #17425f;
-  box-shadow: inset 1px 1px 2px rgba(35,84,118,0.18);
-  font-family: Tahoma, "MS Sans Serif", sans-serif;
-}
-
-:root[data-materials='aero'] .wgt-clock-time,
-:root[data-materials='aero'] .wgt-pomo-time,
-:root[data-materials='aero'] .wgt-stat-value {
-  color: #0c3f73;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.8);
-}
-
-:root[data-materials='aero'] .wgt-clock-digital {
-  border-radius: 3px;
-  background:
-    radial-gradient(circle at 50% -10%, rgba(255,255,255,0.88), transparent 44%),
-    linear-gradient(180deg, rgba(211,232,255,0.72), rgba(255,255,255,0.58));
-}
-
-:root[data-materials='aero'] .wgt-clock-analog svg {
-  max-width: 100%;
-  filter: drop-shadow(0 4px 5px rgba(0,0,0,0.28));
-}
-
-:root[data-materials='aero'] .wgt-clock-analog .wgt-analog-face {
-  fill: #eef8cb;
-  stroke: #42584f;
-}
-
-:root[data-materials='aero'] .wgt-analog-sec,
-:root[data-materials='aero'] .wgt-analog-pin {
-  stroke: #d22c2c;
-  fill: #d22c2c;
-}
-
-:root[data-materials='aero'] .wgt-progress,
-:root[data-materials='aero'] .wgt-sys-bar {
-  height: 8px;
-  border: 1px solid #89acc4;
-  border-radius: 2px;
-  background: #e7f1f7;
-  box-shadow: inset 1px 1px 2px rgba(35,84,118,0.18);
-}
-
-:root[data-materials='aero'] .wgt-progress-fill,
-:root[data-materials='aero'] .wgt-sys-bar span {
-  border-radius: 1px;
-  background:
-    linear-gradient(180deg, #bcf6ff, #35a6f1 52%, #0c70c9);
-}
-
-:root[data-materials='aero'] .wgt-cal-head {
-  min-height: 24px;
-  padding: 0 2px 4px;
-  color: #0c3f73;
-}
-
-:root[data-materials='aero'] .wgt-cal-grid {
-  gap: 1px;
-}
-
-:root[data-materials='aero'] .wgt-cal-day {
-  border-radius: 1px;
-  border: 1px solid transparent;
-  background: rgba(255,255,255,0.62);
-}
-
-:root[data-materials='aero'] .wgt-cal-day.today {
-  border-color: #0a62b8;
-  background: linear-gradient(180deg, #c9edff, #3aa5f2);
-  color: #052d56;
-}
-
-:root[data-materials='aero'] .wgt-todo-list li,
-:root[data-materials='aero'] .wgt-vocab-rows li,
-:root[data-materials='aero'] .wgt-recent-list li,
-:root[data-materials='aero'] .wgt-world-list li,
-:root[data-materials='aero'] .wgt-goals-list li,
-:root[data-materials='aero'] .wgt-habit-list li {
-  border-bottom: 1px solid rgba(122,165,198,0.38);
-  padding: 2px 0;
-}
-
-:root[data-materials='aero'] .wgt-world-time,
-:root[data-materials='aero'] .wgt-vocab-n,
-:root[data-materials='aero'] .wgt-goal-count {
-  color: #0c3f73;
-  font-weight: 700;
-}
-
-:root[data-materials='aero'] .wgt-sys-net.on {
-  color: #118044;
-}
-
-:root[data-materials='aero'] .wgt-sys-net.off {
-  color: #b32121;
-}
-
 /* =============================================================================
    Phase 4.75 M5 - Fringe shell surfaces
    ----------------------------------------------------------------------------- */
@@ -3519,8 +3198,8 @@
   box-shadow:
     0 10px 28px rgba(8,30,42,0.28),
     inset 0 1px 0 rgba(255,255,255,0.78);
-  backdrop-filter: blur(10px) saturate(1.12);
-  -webkit-backdrop-filter: blur(10px) saturate(1.12);
+  backdrop-filter: blur(var(--blur-sm)) saturate(1.12);
+  -webkit-backdrop-filter: blur(var(--blur-sm)) saturate(1.12);
   font-size: 11.5px;
 }
 
@@ -3580,107 +3259,116 @@
 }
 
 /* =============================================================================
-   Vista Explorer app window pass
-   ----------------------------------------------------------------------------- */
+   Windows 6 window chrome — frame styles (Aero part A · E3)
+   -----------------------------------------------------------------------------
+   `aero-glass` (the default) is the era's frame: a translucent tinted glass
+   border that shows the blurred wallpaper through it, diagonal glass streaks,
+   the caption drawn ON the frame with a soft white glow behind the title, and
+   a client area set into the glass with a dark rim and a white bevel. Inactive
+   frames are more transparent and lose the halo; a maximised window gets an
+   opaque frame, the way the era did. The old frame was a saturated blue
+   gradient with a two-colour glow and a sky wash painted into every client
+   area — work surfaces stay solid.
+   ============================================================================= */
 
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) {
-  padding: 5px 5px 6px;
+  padding: 0 6px 6px;
   border-radius: var(--app-border-radius, 8px);
   border-width: var(--app-border-width, 1px);
   border-style: solid;
-  border-color: rgba(119, 203, 255, 0.68);
+  border-color: rgba(10, 32, 56, 0.55);
   background:
-    linear-gradient(180deg, rgba(214, 247, 255, 0.76) 0%, rgba(94, 189, 245, 0.56) 18%, rgba(16, 123, 219, 0.42) 54%, rgba(9, 70, 159, 0.56) 100%),
-    color-mix(in srgb, var(--shell-glass-strong) 76%, rgba(19, 113, 210, 0.48));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.46) 0, rgba(255, 255, 255, 0.14) 30px, rgba(255, 255, 255, 0.04) 31px, rgba(255, 255, 255, 0.1) 100%),
+    linear-gradient(112deg, transparent 0 16%, rgba(255, 255, 255, 0.13) 16% 22%, transparent 22% 54%, rgba(255, 255, 255, 0.1) 54% 57%, transparent 57%),
+    var(--aero-frame-tint-inactive);
   box-shadow:
-    0 24px 64px rgba(0, 26, 75, 0.46),
-    0 0 0 1px rgba(255, 255, 255, 0.48) inset,
-    0 0 0 2px rgba(25, 90, 180, 0.22) inset,
-    0 0 22px rgba(68, 188, 255, 0.34);
-  backdrop-filter: blur(14px) saturate(1.38);
-  -webkit-backdrop-filter: blur(14px) saturate(1.38);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+    0 10px 30px rgba(0, 10, 25, 0.28);
+  backdrop-filter: blur(var(--blur-lg)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.5);
 }
 
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin.focused:not(.fwin-note) {
-  border-color: rgba(164, 226, 255, 0.88);
+  border-color: rgba(6, 24, 44, 0.78);
   background:
-    linear-gradient(180deg, rgba(236, 253, 255, 0.88) 0%, rgba(114, 207, 255, 0.68) 20%, rgba(25, 137, 229, 0.52) 58%, rgba(10, 80, 174, 0.64) 100%),
-    color-mix(in srgb, var(--shell-glass-strong) 82%, rgba(31, 131, 221, 0.48));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0, rgba(255, 255, 255, 0.16) 30px, rgba(255, 255, 255, 0.05) 31px, rgba(255, 255, 255, 0.12) 100%),
+    linear-gradient(112deg, transparent 0 16%, rgba(255, 255, 255, 0.16) 16% 22%, transparent 22% 54%, rgba(255, 255, 255, 0.12) 54% 57%, transparent 57%),
+    var(--aero-frame-tint);
   box-shadow:
-    0 28px 72px rgba(0, 24, 76, 0.52),
-    0 0 0 1px rgba(255, 255, 255, 0.68) inset,
-    0 0 0 2px rgba(52, 155, 240, 0.3) inset,
-    0 0 30px rgba(87, 205, 255, 0.46);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.58),
+    0 16px 44px rgba(0, 10, 25, 0.44),
+    0 0 16px color-mix(in srgb, var(--aero-frame-active) 75%, transparent);
 }
 
+/* Maximised: an opaque frame, no wallpaper through it. */
+:root[data-materials='aero'][data-app-border='aero-glass'] .fwin.fwin-max:not(.fwin-note) {
+  padding: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.1) 30px, rgba(255, 255, 255, 0) 31px),
+    var(--aero-frame-opaque-inactive);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-materials='aero'][data-app-border='aero-glass'] .fwin.fwin-max.focused:not(.fwin-note) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.12) 30px, rgba(255, 255, 255, 0) 31px),
+    var(--aero-frame-opaque);
+  box-shadow: none;
+}
+
+/* The caption sits on the glass itself. */
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-bar,
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-drag-strip {
   min-height: 30px;
-  padding: 0 5px 0 8px;
-  border-bottom: 1px solid rgba(124, 202, 245, 0.42);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(130, 210, 255, 0.2) 45%, rgba(21, 116, 210, 0.18));
-  color: #f8fdff;
-  text-shadow: 0 1px 2px rgba(0, 31, 92, 0.8);
+  padding: 0 0 0 4px;
+  border-bottom: 0;
+  background: transparent;
+  color: var(--aero-sky-ink);
+  text-shadow: none;
 }
 
-:root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-title {
+/* Vista caption text: dark ink on a soft white glow. White text on this pale
+   glass measured 2.57:1 (round-2 visual scan); the glow is what keeps the dark
+   ink legible over a dark wallpaper behind the frame. */
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-title {
+  font-family: 'Segoe UI', var(--font-body);
   font-size: 12px;
-  font-weight: 600;
-  /* Vista titles are dark ink with a white glow. White text on this pale sky
-     glass measured 2.57:1 (round-2 visual scan, every aero window). */
+  font-weight: 400;
+  /* = --aero-sky-ink, written out: visualContrastRound2.test.ts measures it. */
   color: #0d2c47;
+}
+:root[data-materials='aero'] .fwin:not(.fwin-note) .fwin-title-text {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.4) 45%, rgba(255, 255, 255, 0) 72%);
   text-shadow: 0 0 6px rgba(255, 255, 255, 0.95), 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
-:root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-b {
-  /* WCAG 2.5.8 target floor: 24px (was 24x20). 32 wide, not 24: every caption button
-     carries the `.lq-hit` pointer floor, a centred 32px `::after`, and inside a 22px client
-     box it hung 5px past each side: 240 of the 241 overflows the round-3 sweep counted in
-     Aero were these buttons, five per window. Vista's caption buttons are wider than tall
-     anyway, and its close button wider still (below). */
-  width: 32px;
-  height: 24px;
-  /* The UA button padding (1px 6px) left 12px for the glyph, and ⧉ / ◇ are
-     wider than that: they overflowed the 24px cap (scrollWidth 27). */
-  padding: 0;
-  line-height: 1;
-  border-radius: 0 0 3px 3px;
-  color: #f8fdff;
-  border: 1px solid rgba(42, 119, 190, 0.64);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(95, 175, 232, 0.42) 45%, rgba(20, 102, 196, 0.58));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.62),
-    0 1px 2px rgba(0, 31, 92, 0.24);
-}
-
-:root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-b:hover {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(115, 205, 255, 0.56) 48%, rgba(25, 126, 217, 0.7));
-}
-
-:root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-close {
-  width: 44px;
-  border-color: rgba(131, 38, 38, 0.72);
-  background:
-    linear-gradient(180deg, rgba(255, 230, 218, 0.85), rgba(230, 84, 61, 0.78) 48%, rgba(154, 33, 29, 0.9));
-}
-
+/* The client area, set into the glass: dark rim, white bevel, solid surface. */
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-body,
-:root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-body-flush,
-:root[data-materials='aero'] .popout-root {
-  border: 1px solid rgba(159, 205, 224, 0.88);
+:root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-body-flush {
+  border: 1px solid rgba(10, 32, 56, 0.55);
   border-radius: 2px;
-  background:
-    linear-gradient(180deg, rgba(223, 246, 254, 0.72), rgba(245, 252, 255, 0.96) 96px, #ffffff 96px);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.78) inset,
-    inset 0 1px 10px rgba(42, 145, 218, 0.16);
+  background: var(--shell-work-surface);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+:root[data-materials='aero'][data-app-border='aero-glass'] .fwin.fwin-max:not(.fwin-note) .fwin-body,
+:root[data-materials='aero'][data-app-border='aero-glass'] .fwin.fwin-max:not(.fwin-note) .fwin-body-flush {
+  border-width: 1px 0 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-materials='aero'] .popout-root {
+  border: 1px solid rgba(10, 32, 56, 0.45);
+  border-radius: 2px;
+  background: var(--shell-work-surface);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
 }
 
-/* ---------- App border style variants (must follow Vista pass) ------------- */
-
+/* ---------- The other frame styles (Settings > Appearance > Window border) --
+   Same caption cluster as above; their frames stay their own. One halo token
+   for every focused frame — no green `--accent-2` ring anywhere. */
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) {
   border-width: var(--app-border-width, 1px);
   border-radius: var(--app-border-radius, 8px);
@@ -3696,7 +3384,10 @@
   filter: none;
 }
 :root[data-materials='aero'][data-app-border='blurred-wall'] .fwin.focused:not(.fwin-note) {
-  border-color: color-mix(in srgb, var(--accent-2) 50%, var(--glass-border));
+  border-color: color-mix(in srgb, var(--aero-frame-active) 70%, var(--glass-border));
+  box-shadow:
+    0 16px 40px rgba(10, 29, 39, 0.3),
+    0 0 14px color-mix(in srgb, var(--aero-frame-active) 60%, transparent);
 }
 
 :root[data-materials='aero'][data-app-border='solid-accent'] .fwin:not(.fwin-note) {
@@ -3709,8 +3400,8 @@
   filter: none;
 }
 :root[data-materials='aero'][data-app-border='solid-accent'] .fwin.focused:not(.fwin-note) {
-  border-color: var(--accent-2);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 0 2px color-mix(in srgb, var(--accent-2) 30%, transparent);
+  border-color: var(--state-indicator);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 0 2px color-mix(in srgb, var(--aero-frame-active) 45%, transparent);
 }
 :root[data-materials='aero'][data-app-border='solid-accent'] .fwin:not(.fwin-note) .fwin-bar,
 :root[data-materials='aero'][data-app-border='solid-accent'] .fwin:not(.fwin-note) .fwin-drag-strip {
@@ -3720,9 +3411,10 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* "Classic" — a Windows 6 basic frame: opaque, pale, a crisp cobalt rim. */
 :root[data-materials='aero'][data-app-border='retro-xp'] .fwin:not(.fwin-note) {
   background: linear-gradient(to bottom, #e8f4fc, #d4e8f8);
-  border: var(--app-border-width, 2px) solid #0055a4;
+  border: var(--app-border-width, 2px) solid var(--aero-cobalt);
   border-radius: var(--app-border-radius, 4px);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -3730,15 +3422,23 @@
   filter: none;
 }
 :root[data-materials='aero'][data-app-border='retro-xp'] .fwin.focused:not(.fwin-note) {
-  border-color: #003366;
+  border-color: var(--aero-cobalt-deep);
   background: linear-gradient(to bottom, #f0f8ff, #e0eff8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 6px 18px rgba(0, 0, 0, 0.22);
 }
 :root[data-materials='aero'][data-app-border='retro-xp'] .fwin:not(.fwin-note) .fwin-bar,
 :root[data-materials='aero'][data-app-border='retro-xp'] .fwin:not(.fwin-note) .fwin-drag-strip {
-  background: linear-gradient(to bottom, #0055a4, #003366);
+  background: linear-gradient(to bottom, var(--aero-cobalt), var(--aero-cobalt-deep));
   color: #ffffff;
   text-shadow: none;
-  border-bottom: 1px solid #002244;
+  border-bottom: 1px solid #0b2a4d;
+}
+:root[data-materials='aero'][data-app-border='retro-xp'] .fwin:not(.fwin-note) .fwin-title {
+  color: #ffffff;
+}
+:root[data-materials='aero'][data-app-border='retro-xp'] .fwin:not(.fwin-note) .fwin-title-text {
+  background: none;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
 }
 
 :root[data-materials='aero'][data-app-border='minimal'] .fwin:not(.fwin-note) {
@@ -3751,7 +3451,7 @@
   filter: none;
 }
 :root[data-materials='aero'][data-app-border='minimal'] .fwin.focused:not(.fwin-note) {
-  border-color: var(--accent);
+  border-color: var(--state-indicator);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 :root[data-materials='aero'][data-app-border='minimal'] .fwin:not(.fwin-note) .fwin-bar,
@@ -3776,5 +3476,41 @@
   background:
     linear-gradient(to bottom, rgba(40, 55, 70, 0.9), rgba(30, 45, 60, 0.95)),
     var(--shell-glass-strong);
-  border-color: color-mix(in srgb, var(--accent-2) 60%, rgba(0, 0, 0, 0.5));
+  border-color: rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 16px 44px rgba(0, 0, 0, 0.45),
+    0 0 14px color-mix(in srgb, var(--aero-frame-active) 60%, transparent);
+}
+:root[data-materials='aero'][data-app-border='glass-dark'] .fwin:not(.fwin-note) .fwin-title {
+  color: #ffffff;
+}
+:root[data-materials='aero'][data-app-border='glass-dark'] .fwin:not(.fwin-note) .fwin-title-text {
+  background: none;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+}
+
+/* ---------- Aero Peek ---------------------------------------------------------
+   Hovering the Show Desktop sliver for half a second (AeroTaskbarFx adds
+   `.aero-peek`) turns every window into a glass outline so the desktop shows
+   through; leaving restores them, clicking still shows the desktop. The two
+   `:not()`s lift these past the frame rules above AND flatten.css's (0,6,0)
+   flat-frame rule, which loads later. */
+:root[data-materials='aero'] .os-desktop.aero-peek .fwin:not(.aero-peek-exempt):not(.aero-peek-exempt-2) {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 0 0 1px rgba(0, 30, 60, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-materials='aero'] .os-desktop .fwin:not(.aero-peek-exempt) > * {
+  transition: opacity var(--dur-normal) var(--ease-standard);
+}
+:root[data-materials='aero'] .os-desktop.aero-peek .fwin:not(.aero-peek-exempt) > * {
+  opacity: 0;
+}
+html.reduce-motion[data-materials='aero'] .os-desktop .fwin > *,
+html[data-display-anim='none'][data-materials='aero'] .os-desktop .fwin > * {
+  transition: none;
 }

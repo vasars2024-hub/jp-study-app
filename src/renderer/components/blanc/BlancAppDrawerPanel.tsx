@@ -27,7 +27,7 @@ import type {
   CollectedTool,
   CollectedToolKind,
 } from '../../../shared/collectedTools';
-import { readWorkspaces, WORKSPACE_LAUNCHER_KEY } from './BlancReadyToolPanels';
+import { readWorkspaces, WORKSPACE_LAUNCHER_KEY } from './blancWorkspaces';
 import { confirmRemoveCollectedTool } from '../../collectedToolsActions';
 
 const MIGRATED_FLAG_KEY = `${WORKSPACE_LAUNCHER_KEY}.migrated`;
@@ -40,19 +40,27 @@ const MIGRATED_FLAG_KEY = `${WORKSPACE_LAUNCHER_KEY}.migrated`;
  * (the store is shared with Resources' "My tools"); the drawer itself displays
  * the translated name via `blancToolLabel`. */
 const BLANC_ONLY_TOOL_LABELS: Record<string, string> = {
-  coverage: 'Coverage',
+  // Every Blanc-only tool a user can launch. `coverage` is a developer tool
+  // (hidden from learners) and is not offered; Central Agent, Files, Discover,
+  // Local AI Agent and Visual Novels were missing, so they could not be added.
+  agent: 'Agent',
+  files: 'Files',
   notebook: 'Notebook',
   translate: 'Translate',
   music: 'Music',
   novels: 'Novels',
+  'visual-novels': 'Visual Novels',
+  discover: 'Discover',
   games: 'Games',
   immersion: 'Immersion',
   visualizer: 'Visualizer',
+  'local-agent': 'Local AI Agent',
 };
 
 function pickableTools(): { id: string; label: string }[] {
   const fromRegistry = listBlancToolboxModules()
-    .filter((m) => m.id !== 'app-drawer')
+    // The drawer itself, and Context Search (retired into Master search).
+    .filter((m) => m.id !== 'app-drawer' && m.id !== 'context-search')
     .map((m) => ({ id: m.id, label: m.label }));
   const blancOnly = Object.entries(BLANC_ONLY_TOOL_LABELS).map(([id, label]) => ({ id, label }));
   return [...fromRegistry, ...blancOnly];
@@ -94,35 +102,52 @@ function useAppDrawer() {
   // One-time, non-destructive migration from workspace-launcher's
   // localStorage store into folders on this store.
   useEffect(() => {
+    // `cancelled` stops a migration still in flight from writing status into a
+    // panel the user already left; the try/catch turns a rejected IPC (or a
+    // storage error) into a message instead of an unhandled rejection. The
+    // flag is written only after a complete pass, so an interrupted migration
+    // simply runs again next time — `toolsAdd` de-duplicates by URL.
+    let cancelled = false;
     void (async () => {
-      if (window.localStorage.getItem(MIGRATED_FLAG_KEY)) {
-        await reload();
-        return;
-      }
-      const workspaces = readWorkspaces();
-      if (workspaces.length === 0) {
-        window.localStorage.setItem(MIGRATED_FLAG_KEY, '1');
-        await reload();
-        return;
-      }
-      for (const workspace of workspaces) {
-        const folderResult = await window.api.toolsAddFolder(workspace.name, null);
-        if (!folderResult?.ok || !folderResult.folder) continue;
-        for (const target of workspace.targets) {
-          const isLink = /^https?:\/\//i.test(target.target.trim());
-          await window.api.toolsAdd({
-            url: target.target,
-            name: target.label,
-            kind: isLink ? 'link' : 'app',
-            folderId: folderResult.folder.id,
-            source: 'app',
-          });
+      try {
+        if (window.localStorage.getItem(MIGRATED_FLAG_KEY)) {
+          await reload();
+          return;
         }
+        const workspaces = readWorkspaces();
+        if (workspaces.length === 0) {
+          window.localStorage.setItem(MIGRATED_FLAG_KEY, '1');
+          await reload();
+          return;
+        }
+        for (const workspace of workspaces) {
+          if (cancelled) return;
+          const folderResult = await window.api.toolsAddFolder(workspace.name, null);
+          if (!folderResult?.ok || !folderResult.folder) continue;
+          for (const target of workspace.targets) {
+            const isLink = /^https?:\/\//i.test(target.target.trim());
+            await window.api.toolsAdd({
+              url: target.target,
+              name: target.label,
+              kind: isLink ? 'link' : 'app',
+              folderId: folderResult.folder.id,
+              source: 'app',
+            });
+          }
+        }
+        window.localStorage.setItem(MIGRATED_FLAG_KEY, '1');
+        if (cancelled) return;
+        setStatus(t('blanc.drawer.status.migrated', { count: workspaces.length }));
+        await reload();
+      } catch (error) {
+        if (cancelled) return;
+        setStatus(t('blanc.refine.error.detail', { detail: error instanceof Error ? error.message : String(error) }));
+        await reload();
       }
-      window.localStorage.setItem(MIGRATED_FLAG_KEY, '1');
-      setStatus(t('blanc.drawer.status.migrated', { count: workspaces.length }));
-      await reload();
     })();
+    return () => {
+      cancelled = true;
+    };
     // Runs once per mount by design — this is a one-shot migration guarded by
     // MIGRATED_FLAG_KEY, not a live subscription.
   }, []);
@@ -313,20 +338,27 @@ function useAppDrawer() {
       setStatus(t('blanc.drawer.status.launching', { count: items.length }));
       const failures: string[] = [];
       let openedTool = false;
-      for (const item of items) {
-        // Blanc shows one active panel at a time — only the first 'tool'
-        // shortcut in the folder actually opens; later ones would just
-        // replace it, so they're skipped rather than silently thrashing
-        // the panel. Apps/files/links all launch independently and don't
-        // have this limitation.
-        if (item.kind === 'tool') {
-          if (openedTool) continue;
-          openedTool = true;
+      try {
+        for (const item of items) {
+          // Blanc shows one active panel at a time — only the first 'tool'
+          // shortcut in the folder actually opens; later ones would just
+          // replace it, so they're skipped rather than silently thrashing
+          // the panel. Apps/files/links all launch independently and don't
+          // have this limitation.
+          if (item.kind === 'tool') {
+            if (openedTool) continue;
+            openedTool = true;
+          }
+          // A rejected launch counts as that item's failure; it must not
+          // abandon the rest of the folder or leave the drawer stuck busy.
+          const failure = await launchItem(item).catch((error: unknown) =>
+            `${item.name}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          if (failure) failures.push(failure);
         }
-        const failure = await launchItem(item);
-        if (failure) failures.push(failure);
+      } finally {
+        setBusy(false);
       }
-      setBusy(false);
       const opened = items.length - failures.length;
       setStatus(
         failures.length

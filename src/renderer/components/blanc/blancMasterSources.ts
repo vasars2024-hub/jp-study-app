@@ -38,10 +38,62 @@ export function blancMasterSourceLabels(
 
 export const BLANC_DICTIONARY_QUERY_EVENT = 'blanc:dictionary-query';
 
+/**
+ * A dictionary query asked for from outside the Dictionary tool (Master search,
+ * a deep link). Held as state as well as announced: a mounted panel takes the
+ * event; a panel that mounts afterwards — the usual case, since the toolbox
+ * renders the tool only once it is chosen — takes it from here on mount. The
+ * old route re-dispatched on the next animation frame and lost the race
+ * whenever the panel registered its listener later than that.
+ */
+let pendingDictionaryQuery: string | null = null;
+
+export function requestBlancDictionaryQuery(query: string): void {
+  const trimmed = query.trim();
+  if (!trimmed) return;
+  pendingDictionaryQuery = trimmed;
+  window.dispatchEvent(new CustomEvent(BLANC_DICTIONARY_QUERY_EVENT, { detail: trimmed }));
+}
+
+/** The query waiting for a Dictionary panel, cleared as it is taken. */
+export function takePendingBlancDictionaryQuery(): string | null {
+  const query = pendingDictionaryQuery;
+  pendingDictionaryQuery = null;
+  return query;
+}
+
+export const BLANC_TRANSLATE_REQUEST_EVENT = 'blanc:translate-request';
+
+/**
+ * Text to translate asked for from outside the Translate tool (the `t` verb).
+ * Same hand-off as the dictionary query above: held for a panel that has not
+ * mounted yet, announced to one that has.
+ */
+let pendingTranslate: string | null = null;
+
+export function requestBlancTranslate(text: string): void {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  pendingTranslate = trimmed;
+  window.dispatchEvent(new CustomEvent(BLANC_TRANSLATE_REQUEST_EVENT, { detail: trimmed }));
+}
+
+export function takePendingBlancTranslate(): string | null {
+  const text = pendingTranslate;
+  pendingTranslate = null;
+  return text;
+}
+
+/**
+ * Every Blanc settings section Master search can jump to. The English here is
+ * the source text and stays searchable as keywords; what is SHOWN comes from
+ * `blancMasterSettings(t)` in the UI language.
+ */
 export const BLANC_MASTER_SETTINGS: BlancMasterSearchContent[] = [
   { kind: 'setting', id: 'interface', title: 'Interface', detail: 'Language, dark mode, and advanced controls', category: 'Settings' },
+  { kind: 'setting', id: 'study', title: 'Study settings', detail: 'Study language, Anki, dictionaries, extension, and updates', category: 'Settings' },
   { kind: 'setting', id: 'models', title: 'Models', detail: 'Local and remote model configuration', category: 'Settings' },
-  { kind: 'setting', id: 'memory', title: 'Memory', detail: 'Last tab, reader restore, review limit, and scratchpad', category: 'Settings' },
+  { kind: 'setting', id: 'memory', title: 'Memory', detail: 'Last tab and reopening the last book', category: 'Settings' },
   { kind: 'setting', id: 'lockscreen', title: 'Lockscreen', detail: 'PIN and lock requirements', category: 'Settings' },
   { kind: 'setting', id: 'control-center', title: 'Control Center', detail: 'Search, import, export, and reset toolbox settings', category: 'Settings' },
   { kind: 'setting', id: 'theme', title: 'Theme', detail: 'Preset and color token customization', category: 'Settings' },
@@ -49,14 +101,40 @@ export const BLANC_MASTER_SETTINGS: BlancMasterSearchContent[] = [
   { kind: 'setting', id: 'launcher-order', title: 'Launcher order', detail: 'Tool and category order', category: 'Settings' },
   { kind: 'setting', id: 'tool-visibility', title: 'Tool visibility', detail: 'Enabled and hidden toolbox modules', category: 'Settings' },
   { kind: 'setting', id: 'shortcuts', title: 'Keyboard shortcuts', detail: 'Toolbox command bindings and conflicts', category: 'Settings' },
-  { kind: 'setting', id: 'mode', title: 'Blanc mode', detail: 'Exit Blanc mode', category: 'Settings' },
+  { kind: 'setting', id: 'mode', title: 'Blanc mode', detail: 'Start in Blanc only, open Study OS, or exit Blanc', category: 'Settings' },
+  { kind: 'setting', id: 'mechanics', title: 'Speed & memory', detail: 'Warm tools, RAM budget, Flow sprint and Capture inbox', category: 'Settings' },
 ];
 
-function folderPath(folderId: string | null, folders: CollectedFolder[]): string {
-  if (!folderId) return 'Unfiled';
+/** Settings whose labels live outside `blanc.refine.setting.*`. */
+const SETTING_KEY_OVERRIDES: Record<string, string> = {
+  mechanics: 'blanc.mech.setting',
+};
+
+/** The settings index in the UI language; the English source stays a search keyword. */
+export function blancMasterSettings(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): BlancMasterSearchContent[] {
+  const category = t('blanc.masterSearch.group.settings');
+  return BLANC_MASTER_SETTINGS.map((setting) => {
+    const titleKey = SETTING_KEY_OVERRIDES[setting.id] ?? `blanc.refine.setting.${setting.id}`;
+    const detailKey = `${titleKey}.detail`;
+    const title = t(titleKey);
+    const detail = t(detailKey);
+    return {
+      ...setting,
+      title: title === titleKey ? setting.title : title,
+      detail: detail === detailKey ? setting.detail : detail,
+      category,
+      keywords: [setting.title, setting.detail],
+    };
+  });
+}
+
+function folderPath(folderId: string | null, folders: CollectedFolder[], unfiled = 'Unfiled'): string {
+  if (!folderId) return unfiled;
   const folderById = new Map(folders.map((folder) => [folder.id, folder]));
   const folder = folderById.get(folderId);
-  if (!folder) return 'Unfiled';
+  if (!folder) return unfiled;
   const parent = folder.parentFolderId ? folderById.get(folder.parentFolderId) : undefined;
   return parent ? `${parent.name} / ${folder.name}` : folder.name;
 }
@@ -64,9 +142,10 @@ function folderPath(folderId: string | null, folders: CollectedFolder[]): string
 export function appDrawerMasterContent(
   tools: CollectedTool[],
   folders: CollectedFolder[],
+  unfiled?: string,
 ): BlancMasterSearchContent[] {
   return tools.map((tool) => {
-    const location = folderPath(tool.folderId, folders);
+    const location = folderPath(tool.folderId, folders, unfiled);
     const tags = tool.tags ?? [];
     const note = tool.note?.trim();
     return {
@@ -80,13 +159,13 @@ export function appDrawerMasterContent(
   });
 }
 
-export function savedWordMasterContent(words: SavedWord[]): BlancMasterSearchContent[] {
+export function savedWordMasterContent(words: SavedWord[], category = 'Study word'): BlancMasterSearchContent[] {
   return words.map((word) => ({
     kind: 'saved-word',
     id: word.word,
     title: word.word,
     detail: [word.reading, word.meaning].filter(Boolean).join(' · '),
-    category: 'Study word',
+    category,
     keywords: [word.reading, word.meaning],
   }));
 }

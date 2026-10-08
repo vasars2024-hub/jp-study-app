@@ -78,6 +78,21 @@
   --success-text: color-mix(in srgb, var(--success) 30%, var(--text));
   --warning-text: color-mix(in srgb, var(--warning) 30%, var(--text));
   --danger-text: color-mix(in srgb, var(--danger) 30%, var(--text));
+  /* Accent AS TEXT — the same 30% / 24% recipe the six light palettes use in
+     styles.css. Aero inherited the dark default `var(--accent-2)`, i.e. a GREEN
+     for every accent-coloured reading, gloss and link. Mixing the aqua accent
+     toward the ocean ink lands ~5.6:1 on the pale sky glass. */
+  --accent-text: color-mix(in srgb, var(--accent) 30%, var(--text));
+  --accent-text-on-wash: color-mix(in srgb, var(--accent) 24%, var(--text));
+  /* JLPT level + grammar familiarity ink, copied from the light-palette block in
+     styles.css: the dark-theme literals read ~1.6:1 on Aero's white panels. */
+  --lv-n5-text: color-mix(in srgb, #2f8a5b 30%, var(--text));
+  --lv-n4-text: color-mix(in srgb, #4553d6 30%, var(--text));
+  --lv-n3-text: color-mix(in srgb, #7b3fc4 30%, var(--text));
+  --lv-n2-text: color-mix(in srgb, #b06c0a 30%, var(--text));
+  --lv-n1-text: color-mix(in srgb, #c0304a 30%, var(--text));
+  --gram-fam-1-text: color-mix(in srgb, #a86b00 30%, var(--text));
+  --gram-fam-2-text: color-mix(in srgb, #a86b00 30%, var(--text));
 
   /* ---- Controls — frosted white ---- */
   --control-bg: rgba(255, 255, 255, 0.84);
@@ -129,6 +144,72 @@
 
   /* ---- Friendly, slightly heavier display face ---- */
   --font-display: 'Segoe UI Semibold', 'Segoe UI', var(--font-body);
+
+  /* ---- Windows 6 palette extensions --------------------------------------
+     Era hues the shell and app grammar paint with. --aero-teal used to be read
+     by the Start menu power buttons without ever being declared, so they
+     painted transparent. */
+  --aero-cobalt: #1f5fa6;
+  --aero-cobalt-deep: #123f73;
+  --aero-teal: #0f8fa3;
+  --aero-gel-green: #3fae38;
+  --aero-sky-ink: #0d2c47;
+  /* One radius scale for the whole skin (was 0-3, 7-12px and pills, ad hoc). */
+  --aero-radius-xs: 2px;
+  --aero-radius-sm: 3px;
+  --aero-radius-md: 5px;
+  --aero-radius-lg: 8px;
+  /* Explorer hot-track / selection rectangles. Hover and selected are two
+     different states; five rules used to paint them identically. */
+  --aero-hover-fill: linear-gradient(180deg, #f5fbfe, #e6f3fb);
+  --aero-hover-edge: #b8dcf2;
+  --aero-selection-edge: #7cbde6;
+  --aero-selection-edge-strong: #3c95cf;
+  /* Smoked taskbar glass (Windows 7 "basic blue" smoke, original values). */
+  --aero-smoke: rgba(14, 42, 72, 0.66);
+  --aero-smoke-strong: rgba(14, 38, 64, 0.78);
+  /* Start menu right pane. */
+  --aero-start-smoke: rgba(20, 40, 60, 0.72);
+  /* Window frame glass (aero-glass border style). Inactive frames are more
+     transparent; maximised frames are opaque. */
+  --aero-frame-tint: rgba(104, 168, 210, 0.5);
+  --aero-frame-tint-inactive: rgba(176, 204, 222, 0.36);
+  --aero-frame-opaque: #7eaed0;
+  --aero-frame-opaque-inactive: #a9c3d5;
+}
+
+/* Danger is a real colour in Aero. tokens.css pins `--danger: initial` for the
+   two secret skins so legacy `var(--danger, #fallback)` call sites keep their
+   literal reds — but every BARE `var(--danger)` / `var(--danger-text)` (media
+   library, files, scraper, calendar, the danger buttons) then resolved to
+   nothing and destructive controls rendered as plain ones. Same element, one
+   step more specific than the tokens.css pin. */
+:root[data-theme='frutiger-aero'][data-materials='aero'] {
+  --danger: var(--red);
+  --status-error: var(--red);
+  --danger-weak: color-mix(in srgb, var(--red) 14%, transparent);
+}
+
+/* The Aero chrome-glass tokens are literals, so the transparency ladder in
+   perf.css (which grades --glass-tint and --blur-*) never reached them: battery,
+   transparency Off, GPU loss and safe mode all kept translucent Aero chrome.
+   `data-lq-flat` is the single attribute flatten.ts derives from all six of
+   those states. */
+:root[data-theme='frutiger-aero'][data-lq-flat] {
+  --aero-chrome-glass: #e4eff4;
+  --aero-chrome-glass-strong: #eef6f9;
+  --aero-chrome-glass-inactive: #dfe8ec;
+  --aero-smoke: #24496f;
+  --aero-smoke-strong: #1a3a5c;
+  --aero-start-smoke: #213d5a;
+  --aero-frame-tint: #8fb9d6;
+  --aero-frame-tint-inactive: #b9cfdd;
+  --glass-blur: 0px;
+  --blur-sm: 0px;
+  --blur-md: 0px;
+  --blur-lg: 0px;
+  --blur-xl: 0px;
+  --blur-max: 0px;
 }
 
 /* ---------------------------------------------------------------------------

@@ -86,7 +86,13 @@ describe('Blanc settings toggles', () => {
     expect(shell).toContain('onPatch(setBlancAdvanced(event.target.checked))');
   });
 
-  it('the calculator, which cannot be turned off, is shown as locked rather than stuck', () => {
-    expect(shell).toContain("disabled={module.id === 'calculator'}");
+  it('no tool is locked on — the calculator can be switched off and hidden like any other', () => {
+    // Reversed deliberately (2026-10 refinement pass). The calculator used to be
+    // the one tool that could not be turned off; the earlier fix showed it as
+    // locked rather than stuck. Blanc is study-first now (the default tool is
+    // the dictionary), so nothing is pinned into the launcher against the
+    // user's choice — and the sanitizer no longer forces it back on.
+    expect(shell).not.toContain("disabled={module.id === 'calculator'}");
+    expect(shell).not.toContain("id === 'calculator' && !enabled");
   });
 });

@@ -120,7 +120,16 @@ import {
 import { EnvironmentStack, SELECTABLE_WALL_PRESETS, loadEnvironment, onEnvironmentChanged } from '../environment';
 import BuddyToast from '../environment/BuddyToast';
 import AeroFindingOverlay from './shell/AeroFindingOverlay';
+import AeroTaskbarFx from './shell/AeroTaskbarFx';
+import AeroFlip from './shell/AeroFlip';
+import AeroMechanicsHost from './shell/aeroMech/AeroMechanicsHost';
+import AeroMechStartEntries from './shell/aeroMech/AeroMechStartEntries';
 import WiredFindingOverlay from './shell/WiredFindingOverlay';
+import WiredWallpaper from './shell/WiredWallpaper';
+import WiredMechanicsHost from './wired/WiredMechanicsHost';
+import WiredLayerBadge from './wired/WiredLayerBadge';
+import WiredStartEntries from './wired/WiredStartEntries';
+import { forgetWindowMount, formatUptime, useWiredSecond, windowMountedAt } from './shell/wiredClock';
 import { startCompanionOsBridge, stopCompanionOsBridge } from '../environment/companionOsBridge';
 import { startAchievementWatcher } from '../environment/achievements';
 import { loadPersonalization, onPersonalizationChanged } from '../osPersonalization';
@@ -311,54 +320,54 @@ const START_HINT_KEYS: Partial<Record<WinSection, string>> = {
 };
 
 /**
- * A module's WIRED caption: English flavour text, or — for a module whose
- * caption is translated (audit r2 #15) — the catalog keys alone. Not both: an
- * English copy beside the key is a second source that drifts from the catalog.
+ * A module's WIRED identity. The code (`SIG-VID`, `LEX`) is a content-neutral
+ * fiction id and stays literal; its caption — name, hint and the `ready` line
+ * the status strip prints — lives in the catalogs under
+ * `desktop.wired.<section>.{name,hint,ready}`, resolved at call time so a
+ * language switch reaches every window. Every section listed here must have all
+ * three keys in en/ja/zh/ru.
  */
-type WiredModuleMeta =
-  | { code: string; name: string; hint: string; ready: string }
-  | { code: string; nameKey: string; hintKey: string; readyKey: string };
-
-const WIRED_MODULES: Partial<Record<WinSection, WiredModuleMeta>> = {
-  player: { code: 'SIG-LIB', name: 'Signal Library', hint: 'Local media catalog', ready: 'LIB READY' },
-  scraper: { code: 'SCOUT', name: 'Catalogue Scout', hint: 'Remote index sweep', ready: 'INDEX ONLINE' },
-  video: { code: 'SIG-VID', name: 'Signal Archive', hint: 'Recovered field recordings', ready: 'SIGNAL READY' },
-  youtube: { code: 'YT-DIP', name: 'Playlist Tracker', hint: 'Immersion playlist sync', ready: 'LIST READY' },
-  music: { code: 'AUD-DAT', name: 'Audio Deck', hint: 'DAT catalog / ear calibration', ready: 'DECK LINKED' },
-  dictionary: { code: 'LEX', name: 'Lexeme Analyzer', hint: 'Corpus index / probe terminal', ready: 'INDEX READY' },
-  immersion: {
-    code: 'FEED',
-    nameKey: 'desktop.wired.immersion.name',
-    hintKey: 'desktop.wired.immersion.hint',
-    readyKey: 'desktop.wired.immersion.ready',
-  },
-  library: { code: 'ARCH', name: 'Archive Bay', hint: 'Mounted local files', ready: 'BAY MOUNTED' },
-  novels: { code: 'DOC', name: 'Classified Text', hint: 'Recovered documents', ready: 'TEXT VIEWER READY' },
-  reading: { code: 'FIND', name: 'Reading Locator', hint: 'Comprehension-matched web texts', ready: 'LOCATOR READY' },
-  translate: { code: 'TRN', name: 'Signal Translator', hint: 'Transmission decoder', ready: 'CHANNEL READY' },
-  grammar: { code: 'SYN', name: 'Syntax Diagnostics', hint: 'Parse and dependency unit', ready: 'ANALYZER READY' },
-  anki: { code: 'MEM', name: 'Memory Sync', hint: 'SRS implant bridge', ready: 'SYNC LINKED' },
-  flashcards: { code: 'SIM', name: 'Training Simulator', hint: 'Retention drill protocol', ready: 'SIM READY' },
-  stats: { code: 'TEL', name: 'Telemetry', hint: 'Operator performance matrix', ready: 'METRICS LIVE' },
-  calendar: { code: 'OPS', name: 'Schedule', hint: 'Operations planning grid', ready: 'OPS READY' },
-  resources: { code: 'LINK', name: 'Uplink Directory', hint: 'External relay nodes', ready: 'NODES LISTED' },
-  settings: { code: 'SYS', name: 'Service Panel', hint: 'Machine configuration', ready: 'SERVICE MODE' },
-  games: { code: 'DRILL', name: 'Training Lab', hint: 'Fast recall exercise bay', ready: 'DRILL READY' },
-  city: { code: 'CAP-50', name: 'Mooncap Garden', hint: 'EPUB growth habitat', ready: 'GARDEN AWAKE' },
-  musicwidget: { code: 'AUD-MINI', name: 'Mini Audio Deck', hint: 'Compact transport module', ready: 'AUDIO READY' },
-  visualizer: { code: 'OSC', name: 'Visualizer Scope', hint: 'Waveform monitor', ready: 'SCOPE READY' },
-  note: { code: 'NOTE', name: 'Field Note', hint: 'Monitor tape annotation', ready: 'NOTE OPEN' },
+const WIRED_MODULE_CODES: Partial<Record<WinSection, string>> = {
+  player: 'SIG-LIB',
+  scraper: 'SCOUT',
+  video: 'SIG-VID',
+  youtube: 'YT-DIP',
+  music: 'AUD-DAT',
+  dictionary: 'LEX',
+  immersion: 'FEED',
+  library: 'ARCH',
+  novels: 'DOC',
+  reading: 'FIND',
+  translate: 'TRN',
+  grammar: 'SYN',
+  anki: 'MEM',
+  flashcards: 'SIM',
+  stats: 'TEL',
+  calendar: 'OPS',
+  resources: 'LINK',
+  settings: 'SYS',
+  games: 'DRILL',
+  city: 'CAP-50',
+  musicwidget: 'AUD-MINI',
+  visualizer: 'OSC',
+  note: 'NOTE',
 };
 
 function wiredModule(section: WinSection): { code: string; name: string; hint: string; ready: string } {
-  const meta = WIRED_MODULES[section];
-  if (!meta) return { code: section.toUpperCase(), name: section, hint: 'Module route', ready: 'READY' };
-  if (!('nameKey' in meta)) return meta;
+  const code = WIRED_MODULE_CODES[section];
+  if (!code) {
+    return {
+      code: section.toUpperCase(),
+      name: section,
+      hint: translate('desktop.wired.fallback.hint'),
+      ready: translate('desktop.wired.fallback.ready'),
+    };
+  }
   return {
-    code: meta.code,
-    name: translate(meta.nameKey),
-    hint: translate(meta.hintKey),
-    ready: translate(meta.readyKey),
+    code,
+    name: translate(`desktop.wired.${section}.name`),
+    hint: translate(`desktop.wired.${section}.hint`),
+    ready: translate(`desktop.wired.${section}.ready`),
   };
 }
 
@@ -1746,8 +1755,23 @@ export default function DesktopShell({
       }, ms),
     );
   };
-  const winPhaseMs = (openPhase: boolean): number =>
-    !wired ? 0 : prefersReducedMotion() ? 80 : openPhase ? 620 : 360;
+  const winPhaseMs = (openPhase: boolean): number => {
+    if (wired) return prefersReducedMotion() ? 80 : openPhase ? 620 : 360;
+    // Aero: a short scale-in on open, a scale-and-fade on close/minimise
+    // (aero-shell.css, "Window lifecycle motion"). Any reduced-motion signal
+    // skips the phase entirely, so nothing waits on an animation that is off.
+    if (material === 'aero') {
+      const root = document.documentElement;
+      const still =
+        prefersReducedMotion() ||
+        root.classList.contains('reduce-motion') ||
+        root.dataset.displayAnim === 'none' ||
+        root.dataset.perf === 'battery' ||
+        root.dataset.aeroSafeMode === 'on';
+      return still ? 0 : openPhase ? 240 : 200;
+    }
+    return 0;
+  };
   useEffect(
     () => () => {
       winAnimTimers.current.forEach((timer) => clearTimeout(timer));
@@ -1820,10 +1844,11 @@ export default function DesktopShell({
   const removeWin = (id: string, opts?: { silent?: boolean }) => {
     const closing = winsRef.current.find((w) => w.id === id);
     queueFocusLeave(id);
+    forgetWindowMount(id);
     winOpeners.current.delete(id);
     if (!opts?.silent) window.dispatchEvent(new CustomEvent('shell:windowClose'));
     if (wired && closing && closing.section !== 'note') {
-      notify({ message: `MODULE ${wiredModule(closing.section).code} UNMOUNTED`, source: 'SHELL', silent: true });
+      notify({ message: translate('desktop.wired.log.unmounted', { code: wiredModule(closing.section).code }), source: 'SHELL', silent: true });
     }
     setWins((ws) => ws.filter((w) => w.id !== id));
     if (id.startsWith('note-')) {
@@ -1966,7 +1991,7 @@ export default function DesktopShell({
       const openMs = winPhaseMs(true);
       if (openMs > 0) beginWinAnim(section, 'opening', openMs);
       // §4 bulletin: passive log-only entry, never toasts or blinks the lamp.
-      if (wired) notify({ message: `MODULE ${wiredModule(section).code} MOUNTED`, source: 'SHELL', silent: true });
+      if (wired) notify({ message: translate('desktop.wired.log.mounted', { code: wiredModule(section).code }), source: 'SHELL', silent: true });
     }
     setWins((ws) => {
       const existing = ws.find((w) => w.section === section);
@@ -3191,14 +3216,10 @@ export default function DesktopShell({
       )}
 
       {wallDim > 0 && <div className="os-wall-dim" />}
-      {wired && (
-        <div className="wired-wall-atmosphere" aria-hidden="true">
-          <span className="wired-wall-kana">語 彙 文 法 記 憶 読 解 聴 解</span>
-          <span className="wired-wall-node node-a">NODE: STUDY-LOCAL</span>
-          <span className="wired-wall-node node-b">ARCHIVE / LINGUA</span>
-          <span className="wired-wall-node node-c">LINK STATUS: LISTENING</span>
-        </div>
-      )}
+      {wired && <WiredWallpaper />}
+      {/* WIRED study mechanics (layer descent, TTY, signal decrypt, intercepts).
+          Mounted only under Wired; unmount tears every listener down. */}
+      {wired && !secondary && <WiredMechanicsHost />}
 
       <WiredFindingOverlay />
       <AeroFindingOverlay />
@@ -3272,6 +3293,12 @@ export default function DesktopShell({
           onDuplicate={() => duplicateWidget(w.id)}
         />
       ))}
+
+      {/* WIRED: one shared CRT glass over every window and widget — scanlines,
+          grille, vignette and the rolling refresh band. Purely decorative and
+          pointer-transparent; sits under the Start panel, flyouts and taskbar
+          (see `.wired-crt` in wired-navi.css for the z-order and the gates). */}
+      {wired && <div className="wired-crt" aria-hidden="true" />}
 
       {galleryOpen && (
         <WidgetGallery
@@ -3592,6 +3619,10 @@ export default function DesktopShell({
                       <Icon name="help" size={17} />
                       <span>{t('desktop.startMenu.tour')}</span>
                     </button>
+                    {/* Aero study mechanics (Memory Defragmenter, Vocabulary Update, Welcome Center). */}
+                    {!wired && material === 'aero' && <AeroMechStartEntries onLaunch={() => setStartOpen(false)} />}
+                    {/* Wired study consoles (Signal decrypt, Navi terminal). */}
+                    {wired && <WiredStartEntries onPick={() => setStartOpen(false)} />}
                   </div>
                 </aside>
               </div>
@@ -3861,6 +3892,13 @@ export default function DesktopShell({
             );
           })}
         </div>
+        {/* WIRED data rail: packets crawling between the task slots and the
+            tray. CSS-only motion (transform, stepped), idle-gated. */}
+        {wired && (
+          <span className="wired-rail-ticker" aria-hidden="true">
+            <i />
+          </span>
+        )}
         <div className="os-tray">
           <button
             type="button"
@@ -3911,9 +3949,10 @@ export default function DesktopShell({
           <NotificationBell />
           {wired && <WiredTrayLamps />}
           {wired && <WiredGlobe />}
+          {wired && !secondary && <WiredLayerBadge />}
           <TaskbarClock
-            showSeconds={!!deskPrefs.clockSeconds}
-            hour12={clockHour12(deskPrefs.clock24h)}
+            showSeconds={wired || !!deskPrefs.clockSeconds}
+            hour12={wired ? false : clockHour12(deskPrefs.clock24h)}
             showDate={!!deskPrefs.clockShowDate}
           />
           <button
@@ -3935,6 +3974,8 @@ export default function DesktopShell({
           </button>
         </div>
       </div>
+      {/* Aero: cursor-following task glow, hover thumbnails and Aero Peek. */}
+      {material === 'aero' && taskbarMode !== 'none' && <AeroTaskbarFx taskbarRef={taskbarRef} />}
       {trayOverflowOpen && (
         <TrayOverflow
           onClose={() => {
@@ -3950,6 +3991,30 @@ export default function DesktopShell({
       <QuickSettings />
       <NotificationCenter />
       <AeroBootOverlay />
+      {/* Aero Flip 3D window switcher (Ctrl+Alt+Tab / Ctrl+Alt+Space). */}
+      {material === 'aero' && !secondary && (
+        <AeroFlip
+          cards={wins.map((w) => {
+            const app = APPS.find((a) => a.id === w.section);
+            return {
+              id: w.id,
+              section: w.section,
+              z: w.z,
+              min: w.min,
+              label: w.section === 'note' ? t('desktop.noteLabel')
+                : w.section === 'visualizer' ? t('settings.nav.visualizer')
+                  : w.section === 'musicwidget' ? t('settings.mini.app.musicwidget')
+                    : app ? t(app.labelKey) : w.section,
+              glyph: (w.section === 'note' ? 'note'
+                : w.section === 'visualizer' || w.section === 'musicwidget' ? 'music'
+                  : app?.glyph ?? 'app') as IconName,
+            };
+          })}
+          onPick={focus}
+        />
+      )}
+      {/* Aero study mechanics: Defragmenter / Update / Welcome windows, balloon tips, screensaver. */}
+      {material === 'aero' && !secondary && <AeroMechanicsHost taskbarRef={taskbarRef} />}
       <WiredArchiveBootOverlay />
       <WiredBreachOverlay />
       <ContextMenu
@@ -4045,6 +4110,24 @@ function WiredTrayLamps() {
           {t(hasError ? 'notifications.wired.unreadError' : 'notifications.wired.noUnreadError')}
         </span>
       </i>
+    </span>
+  );
+}
+
+/**
+ * WIRED window status readout: carrier meter + uptime + window id. Split out of
+ * `FloatingWindow` so the shared 1 Hz clock re-renders only this span, never the
+ * window subtree (see `wiredClock.ts`).
+ */
+function WiredWindowUptime({ id }: { id: string }) {
+  const now = useWiredSecond();
+  const since = windowMountedAt(id);
+  return (
+    <span className="fwin-wired-link">
+      <i className="fwin-wired-carrier" aria-hidden="true" />
+      <span>LINK</span>
+      <span className="fwin-wired-uptime">{formatUptime(now - since)}</span>
+      <span className="fwin-wired-id">{id.toUpperCase()}</span>
     </span>
   );
 }
@@ -4254,6 +4337,7 @@ const FloatingWindow = memo(function FloatingWindow({
   // Real apps (including Mooncap Garden and the music widget) can detach into their own OS window;
   // desktop-only trinkets (notes, the viz widget) cannot.
   const canPopOut = !isNote && !isVisualizer;
+  const wiredMeta = wired && !isGarden ? wiredModule(win.section) : null;
   const title = wired
     ? wiredModuleLabel(win.section)
     : isNote
@@ -4467,8 +4551,19 @@ const FloatingWindow = memo(function FloatingWindow({
         >
           <span className="fwin-title" style={noteInk}>
             <Icon name={glyph} size={15} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            <span className="fwin-title-text" id={titleId}>{title}</span>
+            {wiredMeta ? (
+              // WIRED module plate: the code reads as an inverted stamp, the name
+              // in mono beside it. Same accessible text as `title` ("CODE / Name").
+              <span className="fwin-title-text" id={titleId}>
+                <b className="fwin-wired-code">{wiredMeta.code}</b>
+                <span className="fwin-wired-sep"> / </span>
+                <span className="fwin-wired-name">{wiredMeta.name}</span>
+              </span>
+            ) : (
+              <span className="fwin-title-text" id={titleId}>{title}</span>
+            )}
           </span>
+          {wiredMeta && <i className="fwin-wired-meter" aria-hidden="true" />}
           <span className="fwin-btns">
             {/* `title` alone does not name these: a button's own text content
                 outranks it in the accessible-name computation, so a screen reader
@@ -4477,6 +4572,7 @@ const FloatingWindow = memo(function FloatingWindow({
             {canPopOut && (
               <button
                 className="fwin-b lq-hit"
+                data-cap="popout"
                 title={t('desktop.popOut')}
                 aria-label={t('desktop.popOut')}
                 onClick={onPopOut}
@@ -4487,6 +4583,7 @@ const FloatingWindow = memo(function FloatingWindow({
             {canGoLiquid && (
               <button
                 className={`fwin-b lq-hit fwin-b-liquid ${liquid ? 'is-liquid' : ''}`}
+                data-cap="liquid"
                 style={noteInk}
                 title={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
                 aria-label={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
@@ -4499,6 +4596,7 @@ const FloatingWindow = memo(function FloatingWindow({
             {!isNote && (
               <button
                 className="fwin-b lq-hit"
+                data-cap="min"
                 title={t('desktop.minimize')}
                 aria-label={t('desktop.minimize')}
                 onClick={onMinimize}
@@ -4521,6 +4619,7 @@ const FloatingWindow = memo(function FloatingWindow({
             {canMaximize && (
               <button
                 className="fwin-b lq-hit"
+                data-cap="max"
                 title={isMaximized ? t('desktop.restoreDown') : t('desktop.maximize')}
                 aria-label={isMaximized ? t('desktop.restoreDown') : t('desktop.maximize')}
                 aria-pressed={isMaximized}
@@ -4531,6 +4630,7 @@ const FloatingWindow = memo(function FloatingWindow({
             )}
             <button
               className="fwin-b lq-hit fwin-close"
+              data-cap="close"
               style={noteInk}
               aria-label={isNote ? t('desktop.deleteNote') : t('common.close')}
               title={isNote ? t('desktop.deleteNote') : t('common.close')}
@@ -4553,6 +4653,7 @@ const FloatingWindow = memo(function FloatingWindow({
             {canPopOut && (
               <button
                 className="fwin-b lq-hit"
+                data-cap="popout"
                 title={t('desktop.popOut')}
                 aria-label={t('desktop.popOut')}
                 onClick={onPopOut}
@@ -4619,8 +4720,8 @@ const FloatingWindow = memo(function FloatingWindow({
       </div>
       {wired && !isGarden && (
         <div className="fwin-wired-status">
-          <span>{wiredModule(win.section).ready}</span>
-          <span>WIN-ID {win.id.toUpperCase()}</span>
+          <span className="fwin-wired-ready">{wiredMeta?.ready ?? wiredModule(win.section).ready}</span>
+          <WiredWindowUptime id={win.id} />
         </div>
       )}
       {!isMaximized && (

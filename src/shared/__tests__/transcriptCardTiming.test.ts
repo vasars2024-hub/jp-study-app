@@ -17,7 +17,9 @@ import { segmentTranscriptSentences, transcriptTimingSource } from '../transcrip
 
 const SRC = resolve(__dirname, '../..');
 const JOBS = resolve(SRC, 'main/transcriptionJobs.ts');
-const APP = resolve(SRC, 'renderer/App.tsx');
+// The transcript-card handler moved out of App.tsx into the installer both
+// Study OS and Blanc run (studyBackgroundJobs.ts); the assertions follow it.
+const APP = resolve(SRC, 'renderer/studyBackgroundJobs.ts');
 const FLASHCARDS = resolve(SRC, 'renderer/components/flashcards/FlashcardsContent.tsx');
 
 /** Comments out first — this file's subject is discussed in prose in all three. */

@@ -24,8 +24,29 @@ describe('toolbox settings schema', () => {
     expect(settings.sidebarWidth).toBe(320);
     expect(settings.maxRecentTools).toBe(0);
     expect(settings.enabledTools).toEqual(['calculator']);
-    expect(settings.hiddenTools).toEqual(['dictionary']);
+    // The calculator is hideable like every other tool (it used to be exempt).
+    expect(settings.hiddenTools).toEqual(['calculator', 'dictionary']);
     expect(settings.density).toBe(DEFAULT_TOOLBOX_SETTINGS.density);
+  });
+
+  it('opens on the dictionary by default — Blanc is study-first', () => {
+    expect(DEFAULT_TOOLBOX_SETTINGS.defaultTool).toBe('dictionary');
+  });
+
+  it('lets launcher-wide preferences name Blanc-only tools, and only real ones', () => {
+    // Hidden, order and the default tool apply to EVERY tool the launcher
+    // shows. They used to be sanitised against the registry alone, so 13 Blanc
+    // tools could not be hidden, reordered or made the default.
+    const settings = sanitizeToolboxSettings({
+      defaultTool: 'novels',
+      hiddenTools: ['games', 'not-a-tool'],
+      toolOrder: ['visual-novels', 'dictionary', 'nope'],
+    });
+    expect(settings.defaultTool).toBe('novels');
+    expect(settings.hiddenTools).toEqual(['games']);
+    expect(settings.toolOrder).toEqual(['visual-novels', 'dictionary']);
+    // Enable/disable stays registry-only: a Blanc-only tool has no "not ready" state.
+    expect(sanitizeToolboxSettings({ enabledTools: ['games', 'calculator'] }).enabledTools).toEqual(['calculator']);
   });
 
   it('resets one section without resetting all settings', () => {

@@ -47,7 +47,8 @@ export interface WiredArchiveLifecycleState {
   reducedMotion: boolean;
   muted: boolean;
   canSkip: boolean;
-  message: string;
+  /** Catalog key (wired.lifecycle.*) — resolved with t() by whoever renders it. */
+  messageKey: string;
   sequenceId: number;
   startedAt: number;
 }
@@ -115,7 +116,7 @@ function initialState(): WiredArchiveLifecycleState {
     reducedMotion: prefersReducedMotion(),
     muted: readMuted(),
     canSkip: false,
-    message: isWiredTheme() ? 'WIRED ARCHIVE active' : 'WIRED ARCHIVE inactive',
+    messageKey: isWiredTheme() ? 'wired.lifecycle.active' : 'wired.lifecycle.inactive',
     sequenceId,
     startedAt: Date.now(),
   };
@@ -147,6 +148,37 @@ function publish(patch: Partial<WiredArchiveLifecycleState>): void {
   listeners.forEach((listener) => listener(state));
 }
 
+/**
+ * Rare one-shots under the hum — a relay closing somewhere in the rack, a
+ * crackle on the line — every 25–70 s while the ambient bed is playing. They
+ * ride the same gate as the bed (ambient setting, active phase, Wired theme),
+ * play in the `environment` category so Battery Saver and the category volume
+ * apply, and go through soundEngine like every other cue (mute respected).
+ */
+let oneShotTimer: number | null = null;
+
+function scheduleAmbientOneShot(): void {
+  if (oneShotTimer !== null || typeof window === 'undefined') return;
+  const delay = 25000 + Math.random() * 45000;
+  oneShotTimer = window.setTimeout(() => {
+    oneShotTimer = null;
+    if (!ambientHandle) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      scheduleAmbientOneShot();
+      return;
+    }
+    const cue = Math.random() < 0.6 ? 'relay-click' : 'line-crackle';
+    void soundEngine.play('environment', cue, { volume: 0.55 + Math.random() * 0.3 });
+    scheduleAmbientOneShot();
+  }, delay);
+}
+
+function cancelAmbientOneShot(): void {
+  if (oneShotTimer === null) return;
+  window.clearTimeout(oneShotTimer);
+  oneShotTimer = null;
+}
+
 function syncAmbient(): void {
   const shouldPlay =
     state.phase === 'active' &&
@@ -154,6 +186,7 @@ function syncAmbient(): void {
     loadWiredArchiveSettings().ambientEnabled &&
     document.documentElement.dataset.wiredAmbient !== 'off';
   if (!shouldPlay) {
+    cancelAmbientOneShot();
     ambientHandle?.fadeTo(0, 260);
     const handle = ambientHandle;
     ambientHandle = null;
@@ -170,6 +203,7 @@ function syncAmbient(): void {
     }
     ambientHandle = handle;
     handle.fadeTo(0.34, 800);
+    scheduleAmbientOneShot();
   });
 }
 
@@ -184,7 +218,7 @@ function beginEntry(reason: WiredArchiveReason = 'entry', forceBoot = false): vo
       phase: 'active',
       reason,
       canSkip: false,
-      message: 'WIRED ARCHIVE active',
+      messageKey: 'wired.lifecycle.active',
       sequenceId: id,
       startedAt: Date.now(),
     });
@@ -201,27 +235,27 @@ function beginEntry(reason: WiredArchiveReason = 'entry', forceBoot = false): vo
     phase: 'preboot',
     reason,
     canSkip: false,
-    message: reason === 'restart' ? 'Restarting WIRED ARCHIVE' : 'Performing subsystem handoff',
+    messageKey: reason === 'restart' ? 'wired.lifecycle.restarting' : 'wired.lifecycle.handoff',
     sequenceId: id,
     startedAt: Date.now(),
   });
 
   after(bootAt, () => {
-    if (state.sequenceId === id) publish({ phase: 'boot', canSkip: true, message: 'Mounting linguistic archive' });
+    if (state.sequenceId === id) publish({ phase: 'boot', canSkip: true, messageKey: 'wired.lifecycle.mounting' });
   });
   after(soundAt, () => {
     if (state.sequenceId === id) window.dispatchEvent(new CustomEvent(STARTUP_SOUND_EVENT));
   });
   after(warningAt, () => {
-    if (state.sequenceId === id) publish({ phase: 'warning', canSkip: true, message: 'UNREGISTERED TERMINAL' });
+    if (state.sequenceId === id) publish({ phase: 'warning', canSkip: true, messageKey: 'wired.lifecycle.unregistered' });
   });
   after(revealAt, () => {
-    if (state.sequenceId === id) publish({ phase: 'reveal', canSkip: false, message: 'Opening WIRED ARCHIVE' });
+    if (state.sequenceId === id) publish({ phase: 'reveal', canSkip: false, messageKey: 'wired.lifecycle.opening' });
   });
   after(activeAt, () => {
     if (state.sequenceId !== id) return;
     markWiredArchiveBootSeen();
-    publish({ phase: 'active', canSkip: false, message: 'WIRED ARCHIVE active' });
+    publish({ phase: 'active', canSkip: false, messageKey: 'wired.lifecycle.active' });
   });
 }
 
@@ -232,7 +266,7 @@ function beginSleep(): void {
     phase: 'sleeping',
     reason: 'sleep',
     canSkip: false,
-    message: 'WIRED ARCHIVE suspended',
+    messageKey: 'wired.lifecycle.suspended',
     sequenceId: ++sequenceId,
     startedAt: Date.now(),
   });
@@ -247,12 +281,12 @@ function beginWake(): void {
     phase: 'waking',
     reason: 'wake',
     canSkip: true,
-    message: 'Restoring archive link',
+    messageKey: 'wired.lifecycle.restoring',
     sequenceId: id,
     startedAt: Date.now(),
   });
   after(reducedMotion ? 160 : 620, () => {
-    if (state.sequenceId === id) publish({ phase: 'active', canSkip: false, message: 'WIRED ARCHIVE active' });
+    if (state.sequenceId === id) publish({ phase: 'active', canSkip: false, messageKey: 'wired.lifecycle.active' });
   });
 }
 
@@ -301,7 +335,7 @@ function beginShutdown(): void {
     phase: 'breach',
     reason: 'shutdown',
     canSkip: false,
-    message: 'ARCHIVE INTEGRITY COMPROMISED',
+    messageKey: 'wired.lifecycle.compromised',
     sequenceId: id,
     startedAt: Date.now(),
   });
@@ -313,7 +347,7 @@ export function resolveWiredExit(choice: WiredExitChoice): void {
   clearTimers();
 
   if (choice === 'stay') {
-    publish({ phase: 'active', reason: 'entry', canSkip: false, message: 'WIRED ARCHIVE active' });
+    publish({ phase: 'active', reason: 'entry', canSkip: false, messageKey: 'wired.lifecycle.active' });
     return;
   }
 
@@ -323,7 +357,7 @@ export function resolveWiredExit(choice: WiredExitChoice): void {
     phase: 'shutting-down',
     reason: 'shutdown',
     canSkip: false,
-    message: 'Unmounting WIRED ARCHIVE',
+    messageKey: 'wired.lifecycle.unmounting',
     sequenceId: id,
     startedAt: Date.now(),
   });
@@ -332,7 +366,7 @@ export function resolveWiredExit(choice: WiredExitChoice): void {
     if (state.sequenceId !== id) return;
     setTheme(choice === 'restore' ? loadWiredRestoreTheme() : AERO_THEME_ID);
     soundEngine.stopAll();
-    publish({ phase: 'inactive', canSkip: false, message: 'WIRED ARCHIVE inactive' });
+    publish({ phase: 'inactive', canSkip: false, messageKey: 'wired.lifecycle.inactive' });
   });
 }
 
@@ -362,7 +396,7 @@ export function installWiredArchiveLifecycle(): void {
   // Entering WIRED at runtime masked this, because that path goes through
   // `onThemeChanged` instead.
   if (state.phase === 'inactive' && isWiredTheme()) {
-    state = { ...state, phase: 'active', message: 'WIRED ARCHIVE active' };
+    state = { ...state, phase: 'active', messageKey: 'wired.lifecycle.active' };
   }
 
   syncDocumentLifecycle(state);
@@ -376,10 +410,10 @@ export function installWiredArchiveLifecycle(): void {
   onThemeChanged((id) => {
     if (id !== WIRED_ARCHIVE_THEME_ID && state.phase !== 'inactive' && state.phase !== 'shutting-down') {
       clearTimers();
-      publish({ phase: 'inactive', canSkip: false, message: 'WIRED ARCHIVE inactive' });
+      publish({ phase: 'inactive', canSkip: false, messageKey: 'wired.lifecycle.inactive' });
     }
     if (id === WIRED_ARCHIVE_THEME_ID && state.phase === 'inactive') {
-      publish({ phase: 'active', reason: 'entry', canSkip: false, message: 'WIRED ARCHIVE active' });
+      publish({ phase: 'active', reason: 'entry', canSkip: false, messageKey: 'wired.lifecycle.active' });
     }
   });
   if (loadThemeId() === WIRED_ARCHIVE_THEME_ID && shouldReplayWiredArchiveBoot()) {
@@ -402,7 +436,7 @@ export function skipWiredArchiveLifecycle(): void {
   if (!state.canSkip) return;
   clearTimers();
   markWiredArchiveBootSeen();
-  publish({ phase: 'active', canSkip: false, message: 'WIRED ARCHIVE active' });
+  publish({ phase: 'active', canSkip: false, messageKey: 'wired.lifecycle.active' });
 }
 
 export function requestWiredArchiveEntry(): void {

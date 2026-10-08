@@ -39,7 +39,10 @@
   width: 340px;
   max-width: calc(100vw - 28px);
   padding: 16px 18px;
-  background: var(--surface, #1b1b21);
+  /* `--surface` is not a token any palette declares, so the bubble was always the
+     dark fallback — under dark `--text` on the light palettes and Aero. `--panel`
+     is declared by every palette and pairs with its `--text`. */
+  background: var(--panel, #1b1b21);
   color: var(--text, #e8e8ef);
   border: 1px solid var(--control-border, #3a3a44);
   border-radius: var(--radius-lg, 12px);

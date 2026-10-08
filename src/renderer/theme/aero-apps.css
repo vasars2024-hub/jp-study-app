@@ -20,7 +20,6 @@
   --app-toolbar-h: 34px;
   --app-statusbar-h: 24px;
   --app-row-h: 26px;
-  --app-tree-indent: 14px;
   /* Aqua selection gradient shared by rows, tabs and open menu buttons. */
   --app-selection: linear-gradient(
     to bottom,
@@ -97,29 +96,69 @@
     linear-gradient(180deg, color-mix(in srgb, var(--text) 8%, transparent), transparent),
     var(--aero-special-panel);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 14%, transparent), 0 12px 28px color-mix(in srgb, var(--shadow-color, #000) 14%, transparent);
-  font-family: 'Tahoma', 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', var(--font-body);
 }
 
 :root[data-materials='aero'] .aero-settings-terminal {
-  --aero-special-accent: #3194cd;
-  --aero-special-panel: rgba(198, 226, 246, 0.68);
-  --aero-special-panel-2: #06131f;
-  --aero-special-border: rgba(86, 139, 188, 0.34);
+  --aero-special-accent: #2f86bd;
+  --aero-special-panel: rgba(214, 234, 248, 0.8);
+  /* Was #06131f: the command buttons mixed it 72% into their face under the dark
+     #17324a label, i.e. dark on dark. The buttons are light glass now. */
+  --aero-special-panel-2: #e6f1f9;
+  --aero-special-border: rgba(86, 139, 188, 0.45);
   --aero-special-text: #17324a;
   --aero-special-muted: #4f6b80;
+  font-family: 'Segoe UI', var(--font-body);
 }
 
+/* A console is dark in every theme — theme-invariant ink on a fixed slab, the
+   same argument as Media Center's video stage. It used to mix `--panel` 76% into
+   near-black and print `--text` on it, which on any LIGHT palette (Aero
+   included) was mid-grey ink on a mid-grey slab. */
 .aero-settings-terminal-screen {
   min-height: 86px;
   max-height: 128px;
   overflow: hidden;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--aero-special-accent) 36%, var(--border));
-  background: color-mix(in srgb, var(--panel) 76%, #06131f);
-  color: var(--text);
+  border-radius: 3px;
+  background: #0a1620;
+  color: #cde9f2;
   font-family: 'Lucida Console', Consolas, monospace;
   font-size: 11px;
   line-height: 1.45;
+}
+
+/* The Aero arcade cards had a modifier class and no rule. A glossy era card: a
+   white-to-sky plate, an aqua rim, the command printed as a console tag. */
+.special-game-card--aero {
+  border-color: color-mix(in srgb, #2f86bd 40%, var(--border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #ffffff 70%, var(--panel)), color-mix(in srgb, #cfe8f7 45%, var(--panel)));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 80%, transparent), 0 1px 3px rgba(20, 60, 90, 0.16);
+}
+.special-game-card--aero code,
+.special-collapse-toggle--aero code {
+  color: var(--accent-text);
+}
+:root[data-materials='aero'] .special-game-card--aero {
+  border-color: #8fb8d4;
+  border-radius: var(--aero-radius-md);
+  background: linear-gradient(180deg, #ffffff 0, #f1f8fd 48%, #e2f0fa 52%, #eef6fc 100%);
+}
+:root[data-materials='aero'] .special-game-card--aero:hover {
+  border-color: var(--aero-selection-edge-strong);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 8px rgba(60, 170, 230, 0.35);
+}
+:root[data-materials='aero'] .special-collapse-toggle--aero {
+  border-color: #8fb8d4;
+  border-radius: var(--aero-radius-md);
+  background: var(--vista-command-bar, linear-gradient(180deg, #fbfdff, #e1ebf6));
+  color: var(--vista-command-ink, var(--text));
+}
+:root[data-materials='aero'] .special-collapse-toggle--aero:hover {
+  border-color: var(--aero-hover-edge);
+  background: var(--aero-hover-fill);
 }
 
 .aero-settings-terminal-command,
@@ -782,11 +821,6 @@
   border-color: color-mix(in srgb, var(--red) 70%, #ffffff);
 }
 
-:root[data-materials='aero'] .aero-flash-file-menu {
-  top: calc(100% + 3px);
-  right: 26px;
-}
-
 :root[data-materials='aero'] .aero-flash-panel {
   margin-bottom: 8px;
   padding: 8px;
@@ -958,6 +992,14 @@
   background: color-mix(in srgb, var(--panel) 78%, #ffffff);
   box-shadow: inset 0 1px 2px color-mix(in srgb, var(--bg) 20%, transparent);
   color: var(--muted);
+}
+
+/* The address field is borderless inside its frame, so the FRAME carries the
+   focus ring (the field's own outline is off and nothing else showed focus). */
+:root[data-materials='aero'] .aero-immersion-url-form:focus-within {
+  border-color: var(--aero-selection-edge-strong);
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 1px;
 }
 
 :root[data-materials='aero'] .aero-immersion-url {
@@ -1188,96 +1230,6 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
-}
-
-:root[data-materials='aero'] .aero-immersion-rail-empty {
-  margin: 8px 4px;
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-  line-height: 1.45;
-}
-
-:root[data-materials='aero'] .aero-immersion-site-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-
-:root[data-materials='aero'] .aero-immersion-site-list li {
-  position: relative;
-}
-
-:root[data-materials='aero'] .aero-immersion-site {
-  width: 100%;
-  display: grid;
-  gap: 2px;
-  min-height: 46px;
-  padding: 6px 26px 6px 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-:root[data-materials='aero'] .aero-immersion-site:hover {
-  background: color-mix(in srgb, var(--panel) 62%, transparent);
-  border-color: color-mix(in srgb, var(--glass-border) 70%, transparent);
-}
-
-:root[data-materials='aero'] .aero-immersion-site-title,
-:root[data-materials='aero'] .aero-immersion-site-meta {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:root[data-materials='aero'] .aero-immersion-site-title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-}
-
-:root[data-materials='aero'] .aero-immersion-site-meta {
-  color: var(--muted);
-  font-size: 10.5px;
-}
-
-:root[data-materials='aero'] .aero-immersion-site-bar {
-  height: 3px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--border) 55%, transparent);
-}
-
-:root[data-materials='aero'] .aero-immersion-site-bar span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(to right, var(--accent), var(--accent-2));
-}
-
-:root[data-materials='aero'] .aero-immersion-site-remove {
-  position: absolute;
-  top: 5px;
-  right: 4px;
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-:root[data-materials='aero'] .aero-immersion-site-remove:hover {
-  color: #ffffff;
-  background: var(--red);
 }
 
 @media (max-width: 980px) {
@@ -1597,10 +1549,16 @@
   cursor: pointer;
 }
 
-:root[data-materials='aero'] .aero-cal-nav-row.active,
 :root[data-materials='aero'] .aero-cal-nav-row:hover {
+  background: var(--aero-hover-fill);
+  border-color: var(--aero-hover-edge);
+}
+
+/* Selected and hovered used to be the same fill, so the current row could not be
+   told from the one under the pointer. */
+:root[data-materials='aero'] .aero-cal-nav-row.active {
   background: var(--app-selection);
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
+  border-color: var(--aero-selection-edge);
 }
 
 :root[data-materials='aero'] .aero-cal-nav-row.urgent strong {
@@ -1647,293 +1605,6 @@
 :root[data-materials='aero'] .dict-view { padding: 8px 10px; }
 
 /* ---------- Music (Phase 4.75 M7): native media library + lyric deck ------- */
-:root[data-materials='aero'] .aero-music-chrome .ui-app-chrome__body {
-  min-height: 0;
-  overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.54), rgba(221,240,245,0.3)),
-    color-mix(in srgb, var(--panel) 88%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-music.music-view {
-  display: grid;
-  grid-template-columns: 272px minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(255,255,255,0.66), transparent 30%),
-    linear-gradient(135deg, rgba(232,253,244,0.64), rgba(203,232,243,0.88) 48%, rgba(247,252,246,0.9));
-}
-
-:root[data-materials='aero'] .aero-music .music-songlist {
-  min-width: 0;
-  padding: 0;
-  border-right: 1px solid color-mix(in srgb, var(--glass-border) 84%, #ffffff);
-  background:
-    linear-gradient(90deg, rgba(255,255,255,0.56), rgba(255,255,255,0.16)),
-    color-mix(in srgb, var(--app-nav-surface) 82%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-music .music-list-head {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 4px;
-  min-height: 34px;
-  padding: 4px 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 78%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.82), rgba(222,238,244,0.76)),
-    color-mix(in srgb, var(--chrome) 72%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-music .music-list-head h2 {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: color-mix(in srgb, var(--text) 86%, var(--muted));
-  font-size: var(--font-size-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:root[data-materials='aero'] .aero-music .music-liked-chip {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-xs);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.72), rgba(225,239,245,0.7)),
-    color-mix(in srgb, var(--panel) 72%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-music .music-liked-chip.on {
-  background: var(--app-selection);
-  color: color-mix(in srgb, var(--accent) 78%, var(--text));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
-}
-
-:root[data-materials='aero'] .aero-music .music-sort {
-  grid-column: 1 / -1;
-  min-height: 24px;
-  margin: 0;
-  padding: 3px 7px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel) 78%, #ffffff);
-  color: var(--text);
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-music .music-lib-actions {
-  grid-column: 1 / -1;
-  margin: 0;
-  padding: 2px;
-}
-
-:root[data-materials='aero'] .aero-music .music-search {
-  flex: none;
-  min-height: 28px;
-  margin: 5px 6px;
-  padding: 3px 7px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-xs);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.74), rgba(232,244,248,0.7)),
-    color-mix(in srgb, var(--panel) 82%, #ffffff);
-  box-shadow: inset 0 1px 2px rgba(50,83,96,0.12);
-  color: var(--muted);
-}
-
-:root[data-materials='aero'] .aero-music .music-search input {
-  color: var(--text);
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-music .music-vlist-wrap {
-  margin: 0 6px 6px;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 76%, transparent);
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel) 86%, #ffffff);
-  overflow: hidden;
-}
-
-:root[data-materials='aero'] .aero-music .music-row {
-  gap: 5px;
-  height: 100%;
-  padding-right: 7px;
-  border-radius: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
-  color: var(--text);
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-music .music-row:hover {
-  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
-}
-
-:root[data-materials='aero'] .aero-music .music-row.active {
-  background: var(--app-selection);
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 72%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-music .music-row-folder {
-  color: color-mix(in srgb, var(--text) 78%, var(--muted));
-  font-weight: var(--font-weight-semibold);
-}
-
-:root[data-materials='aero'] .aero-music .music-song-title {
-  font-size: var(--font-size-sm);
-}
-
-:root[data-materials='aero'] .aero-music .music-song-artist,
-:root[data-materials='aero'] .aero-music .music-row-folder-count {
-  color: var(--muted);
-  font-size: 10.5px;
-}
-
-:root[data-materials='aero'] .aero-music .music-empty {
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-music .music-yt {
-  flex: none;
-  margin: 0;
-  padding: 5px 6px;
-  border-top: 1px solid color-mix(in srgb, var(--glass-border) 78%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.66), rgba(223,238,244,0.7)),
-    color-mix(in srgb, var(--chrome) 60%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-music .music-yt-input {
-  min-height: 24px;
-  padding: 3px 7px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel) 82%, #ffffff);
-  color: var(--text);
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-music .music-main {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-left: 1px solid rgba(255,255,255,0.58);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04)),
-    #081016;
-}
-
-:root[data-materials='aero'] .aero-music .music-main::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 50% 8%, rgba(72,215,205,0.16), transparent 34%),
-    linear-gradient(90deg, rgba(255,255,255,0.04), transparent 18%, transparent 82%, rgba(255,255,255,0.03));
-}
-
-:root[data-materials='aero'] .aero-music .music-lyrics {
-  position: relative;
-  z-index: 1;
-  padding: 24px 34px 0;
-  background: transparent;
-}
-
-:root[data-materials='aero'] .aero-music .music-line {
-  max-width: 980px;
-  color: rgba(205,233,232,0.48);
-  font-size: clamp(20px, 2.5vw, 30px);
-  line-height: 1.5;
-  letter-spacing: 0;
-}
-
-:root[data-materials='aero'] .aero-music .music-line.past {
-  color: rgba(188,216,216,0.28);
-}
-
-:root[data-materials='aero'] .aero-music .music-line.active {
-  color: #e9fffb;
-  text-shadow:
-    0 0 12px rgba(81,218,206,0.54),
-    0 2px 10px rgba(0,0,0,0.58);
-}
-
-:root[data-materials='aero'] .aero-music .music-line.plain {
-  color: rgba(225,244,240,0.78);
-}
-
-:root[data-materials='aero'] .aero-music .music-hint {
-  color: rgba(216,238,238,0.68);
-}
-
-:root[data-materials='aero'] .aero-music .music-controls {
-  position: relative;
-  z-index: 2;
-  gap: 5px;
-  min-height: 40px;
-  padding: 5px 8px;
-  border-top: 1px solid rgba(201,241,239,0.24);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06)),
-    rgba(10, 24, 31, 0.86);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
-}
-
-:root[data-materials='aero'] .aero-music .music-controls .btn {
-  min-height: 25px;
-  padding: 3px 8px;
-  border-radius: var(--radius-xs);
-}
-
-:root[data-materials='aero'] .aero-music .music-play {
-  min-width: 38px;
-}
-
-:root[data-materials='aero'] .aero-music .music-time {
-  min-width: 38px;
-  color: rgba(224,244,244,0.74);
-  font-size: var(--font-size-xs);
-  text-align: center;
-}
-
-:root[data-materials='aero'] .aero-music .music-seek,
-:root[data-materials='aero'] .aero-music .music-volume {
-  accent-color: #50d8ce;
-}
-
-:root[data-materials='aero'] .aero-music .music-nowplaying {
-  position: relative;
-  z-index: 2;
-  min-height: 30px;
-  padding: 4px 9px 6px;
-  border-top: 1px solid rgba(201,241,239,0.16);
-  background: rgba(8, 18, 24, 0.82);
-  color: rgba(222,242,241,0.76);
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-music .music-now-art {
-  width: 24px;
-  height: 24px;
-  margin-right: 7px;
-  border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 3px;
-}
-
-@media (max-width: 980px) {
-  :root[data-materials='aero'] .aero-music.music-view {
-    grid-template-columns: 220px minmax(0, 1fr);
-  }
-  :root[data-materials='aero'] .aero-music .music-line {
-    font-size: 20px;
-  }
-}
 
 /* ---------- Phase 4.75 M8: contextual overlay corrections ------------------
    These popups and app-owned modals are opened from reconstructed apps but do
@@ -1943,9 +1614,7 @@
 :root[data-materials='aero'] .tr-popup,
 :root[data-materials='aero'] .lib-import,
 :root[data-materials='aero'] .cal-modal,
-:root[data-materials='aero'] .nov-modal,
 :root[data-materials='aero'] .set-modal,
-:root[data-materials='aero'] .csv-editor-modal,
 :root[data-materials='aero'] .focus-music-picker,
 :root[data-materials='aero'] .ocr-panel {
   border: 1px solid color-mix(in srgb, var(--glass-border) 84%, rgba(18,49,67,0.2));
@@ -2031,8 +1700,7 @@
 
 :root[data-materials='aero'] .lib-import-backdrop,
 :root[data-materials='aero'] .cal-modal-backdrop,
-:root[data-materials='aero'] .nov-modal-backdrop,
-:root[data-materials='aero'] .csv-editor-modal-backdrop {
+:root[data-materials='aero'] .nov-modal-backdrop {
   background: rgba(18, 38, 50, 0.32);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
@@ -2040,14 +1708,12 @@
 
 :root[data-materials='aero'] .lib-import,
 :root[data-materials='aero'] .cal-modal,
-:root[data-materials='aero'] .set-modal,
-:root[data-materials='aero'] .csv-editor-modal {
+:root[data-materials='aero'] .set-modal {
   padding: 9px 10px 10px;
 }
 
 :root[data-materials='aero'] .lib-import h3,
-:root[data-materials='aero'] .set-modal-title,
-:root[data-materials='aero'] .csv-editor-modal-title {
+:root[data-materials='aero'] .set-modal-title {
   display: flex;
   align-items: center;
   min-height: 27px;
@@ -2069,9 +1735,7 @@
 
 :root[data-materials='aero'] .lib-import-row,
 :root[data-materials='aero'] .lib-import-actions,
-:root[data-materials='aero'] .cal-modal-actions,
-:root[data-materials='aero'] .csv-editor-modal-actions,
-:root[data-materials='aero'] .csv-editor-import-actions {
+:root[data-materials='aero'] .cal-modal-actions {
   gap: 5px;
 }
 
@@ -2146,27 +1810,6 @@
   gap: 7px;
 }
 
-:root[data-materials='aero'] .nov-modal {
-  overflow: hidden;
-}
-
-:root[data-materials='aero'] .nov-modal-head {
-  min-height: 104px;
-  padding: 18px 36px 16px 18px;
-  border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 82%, transparent);
-  border-radius: 4px 4px 0 0;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.38);
-}
-
-:root[data-materials='aero'] .nov-modal-body {
-  padding: 10px 12px 12px;
-  background: color-mix(in srgb, var(--panel) 88%, #ffffff);
-}
-
-:root[data-materials='aero'] .nov-modal-title {
-  font-size: 22px;
-}
-
 :root[data-materials='aero'] .ocr-panel {
   top: 42px;
   width: min(360px, 42vw);
@@ -2232,143 +1875,10 @@
 }
 
 /* ---------- Media / Anki / Dictionary corrections (Phase 4.5 M10) ---------- */
-:root[data-materials='aero'] .aero-media-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-anki-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-dict-chrome .ui-app-chrome__body {
   min-height: 0;
   overflow: hidden;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  gap: 0;
-  padding: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0.08)),
-    color-mix(in srgb, var(--panel) 88%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-view > .view-head {
-  display: none;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-toolbar,
-:root[data-materials='aero'] .aero-media-chrome .media-yt,
-:root[data-materials='aero'] .aero-media-chrome .media-watch,
-:root[data-materials='aero'] .aero-media-chrome .media-lib-head,
-:root[data-materials='aero'] .aero-media-chrome .media-collapsible-head {
-  flex: none;
-  gap: 5px;
-  margin: 0;
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--glass-border);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.82), rgba(224,238,242,0.68)),
-    var(--aero-chrome-glass, var(--chrome));
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-toolbar {
-  flex-wrap: wrap;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-toolbar .btn,
-:root[data-materials='aero'] .aero-media-chrome .media-watch .btn,
-:root[data-materials='aero'] .aero-media-chrome .media-yt .btn {
-  min-height: 25px;
-  padding: 3px 8px;
-  border-radius: var(--radius-xs);
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-yt {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto auto;
-  align-items: center;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-yt-input {
-  min-height: 25px;
-  border-radius: var(--radius-xs);
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-gen,
-:root[data-materials='aero'] .aero-media-chrome .media-error,
-:root[data-materials='aero'] .aero-media-chrome .media-substatus {
-  flex: none;
-  margin: 0;
-  padding: 4px 7px;
-  border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 62%, transparent);
-  border-radius: 0;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-stage {
-  flex: 1 1 48%;
-  min-height: 220px;
-  margin: 0;
-  border-width: 0 0 1px;
-  border-radius: 0;
-  background: #070b10;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-video {
-  max-height: 100%;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-subbar {
-  border-radius: var(--radius-xs);
-  background: rgba(4, 12, 18, 0.82);
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-lib-head h2,
-:root[data-materials='aero'] .aero-media-chrome .media-lib-section .media-collapsible-title {
-  margin: 0;
-  font-size: var(--font-size-md);
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-lib-section {
-  flex: 1 1 34%;
-  min-height: 180px;
-  margin: 0;
-  overflow: hidden;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-lib-section .media-collapsible-body {
-  min-height: 0;
-  overflow: hidden;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-lib-panel {
-  flex: 1;
-  min-height: 0;
-  margin: 0;
-  border-width: 0;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--panel) 82%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-lib-body {
-  min-height: 0;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-lib-grid-wrap {
-  flex: 1;
-  height: auto;
-  max-height: none;
-  min-height: 160px;
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-card {
-  min-height: 88px;
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel) 86%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-media-chrome .media-card-thumb {
-  width: 56px;
 }
 
 :root[data-materials='aero'] .aero-anki-chrome .anki-view {
@@ -3072,10 +2582,14 @@
   cursor: pointer;
 }
 
-:root[data-materials='aero'] button.aero-library-row:hover,
+:root[data-materials='aero'] button.aero-library-row:hover {
+  background: var(--aero-hover-fill);
+  border-color: var(--aero-hover-edge);
+}
+
 :root[data-materials='aero'] button.aero-library-row.active {
   background: var(--app-selection);
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
+  border-color: var(--aero-selection-edge);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.74);
 }
 
@@ -3295,8 +2809,7 @@
 
 :root[data-materials='aero'] .aero-resources,
 :root[data-materials='aero'] .aero-stats,
-:root[data-materials='aero'] .aero-translate,
-:root[data-materials='aero'] .aero-novels {
+:root[data-materials='aero'] .aero-translate {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -3306,8 +2819,7 @@
 
 :root[data-materials='aero'] .aero-resources-toolbar,
 :root[data-materials='aero'] .aero-stats-toolbar,
-:root[data-materials='aero'] .aero-translate-toolbar,
-:root[data-materials='aero'] .aero-novels-toolbar {
+:root[data-materials='aero'] .aero-translate-toolbar {
   flex: none;
   min-height: 32px;
   overflow-x: auto;
@@ -3317,8 +2829,7 @@
 :root[data-materials='aero'] .aero-stat-command,
 :root[data-materials='aero'] .aero-translate-run,
 :root[data-materials='aero'] .aero-translate-swap,
-:root[data-materials='aero'] .aero-novels-command,
-:root[data-materials='aero'] .aero-novel-inspector-actions button {
+:root[data-materials='aero'] .aero-novels-command {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -3353,9 +2864,7 @@
 }
 
 :root[data-materials='aero'] .aero-resource-search,
-:root[data-materials='aero'] .aero-novels-search,
-:root[data-materials='aero'] .aero-translate-toolbar select,
-:root[data-materials='aero'] .aero-novels-toolbar select {
+:root[data-materials='aero'] .aero-translate-toolbar select {
   height: 24px;
   min-width: 132px;
   border: 1px solid var(--control-border);
@@ -3367,15 +2876,13 @@
   font-size: var(--font-size-xs);
 }
 
-:root[data-materials='aero'] .aero-resource-search,
-:root[data-materials='aero'] .aero-novels-search {
+:root[data-materials='aero'] .aero-resource-search {
   width: min(260px, 34vw);
   padding: 0 7px;
 }
 
 :root[data-materials='aero'] .aero-resources-workbench,
-:root[data-materials='aero'] .aero-stats-workbench,
-:root[data-materials='aero'] .aero-novels-workbench {
+:root[data-materials='aero'] .aero-stats-workbench {
   display: grid;
   flex: 1;
   min-height: 0;
@@ -3390,14 +2897,8 @@
   grid-template-columns: 184px minmax(360px, 1fr) 250px;
 }
 
-:root[data-materials='aero'] .aero-novels-workbench {
-  grid-template-columns: 164px minmax(380px, 1fr) 264px;
-}
-
 :root[data-materials='aero'] .aero-resources-tree,
 :root[data-materials='aero'] .aero-resources-inspector,
-:root[data-materials='aero'] .aero-novels-tree,
-:root[data-materials='aero'] .aero-novels-inspector,
 :root[data-materials='aero'] .aero-stats-summary,
 :root[data-materials='aero'] .aero-stats-knowledge {
   min-height: 0;
@@ -3410,14 +2911,12 @@
 }
 
 :root[data-materials='aero'] .aero-resources-inspector,
-:root[data-materials='aero'] .aero-novels-inspector,
 :root[data-materials='aero'] .aero-stats-knowledge {
   border-right: 0;
   border-left: 1px solid var(--glass-border);
 }
 
-:root[data-materials='aero'] .aero-resources-node,
-:root[data-materials='aero'] .aero-novels-tree button {
+:root[data-materials='aero'] .aero-resources-node {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3435,13 +2934,14 @@
   cursor: pointer;
 }
 
-:root[data-materials='aero'] .aero-resources-node:hover,
-:root[data-materials='aero'] .aero-resources-node.active,
-:root[data-materials='aero'] .aero-novels-tree button:hover,
-:root[data-materials='aero'] .aero-novels-tree button.active,
-:root[data-materials='aero'] .aero-novel-row.active {
+:root[data-materials='aero'] .aero-resources-node:hover {
+  background: var(--aero-hover-fill);
+  border-color: var(--aero-hover-edge);
+}
+
+:root[data-materials='aero'] .aero-resources-node.active {
   background: var(--app-selection);
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
+  border-color: var(--aero-selection-edge);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.74);
 }
 
@@ -3452,7 +2952,6 @@
 }
 
 :root[data-materials='aero'] .aero-resources-list,
-:root[data-materials='aero'] .aero-novels-list,
 :root[data-materials='aero'] .aero-stats-main {
   min-height: 0;
   overflow: auto;
@@ -3484,7 +2983,7 @@
   overflow: hidden;
   color: var(--muted);
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--font-weight-regular);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3497,8 +2996,7 @@
 }
 
 :root[data-materials='aero'] .aero-resource-row,
-:root[data-materials='aero'] .aero-stats-book-row,
-:root[data-materials='aero'] .aero-novel-row {
+:root[data-materials='aero'] .aero-stats-book-row {
   display: grid;
   align-items: center;
   gap: 8px;
@@ -3514,13 +3012,11 @@
   text-align: left;
 }
 
-:root[data-materials='aero'] button.aero-resource-row,
-:root[data-materials='aero'] button.aero-novel-row {
+:root[data-materials='aero'] button.aero-resource-row {
   cursor: pointer;
 }
 
-:root[data-materials='aero'] button.aero-resource-row:hover,
-:root[data-materials='aero'] button.aero-novel-row:hover {
+:root[data-materials='aero'] button.aero-resource-row:hover {
   background: var(--app-selection);
 }
 
@@ -3532,23 +3028,15 @@
   grid-template-columns: minmax(200px, 1fr) 100px 86px;
 }
 
-:root[data-materials='aero'] .aero-novel-row {
-  grid-template-columns: minmax(190px, 1fr) 140px 72px 96px 54px;
-  border: 1px solid transparent;
-  border-bottom-color: color-mix(in srgb, var(--border) 72%, transparent);
-}
-
 :root[data-materials='aero'] .aero-resource-row > span,
-:root[data-materials='aero'] .aero-stats-book-row > span,
-:root[data-materials='aero'] .aero-novel-row > span {
+:root[data-materials='aero'] .aero-stats-book-row > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 :root[data-materials='aero'] .aero-resource-row-head,
-:root[data-materials='aero'] .aero-stats-book-head,
-:root[data-materials='aero'] .aero-novel-row-head {
+:root[data-materials='aero'] .aero-stats-book-head {
   min-height: 24px;
   color: var(--muted);
   font-size: var(--font-size-xs);
@@ -3557,13 +3045,6 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,0.86), rgba(224,238,242,0.86)),
     var(--panel);
-}
-
-:root[data-materials='aero'] .aero-novel-row-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  border-color: var(--glass-border);
 }
 
 :root[data-materials='aero'] .aero-resource-name {
@@ -3579,14 +3060,12 @@
 }
 
 :root[data-materials='aero'] .aero-resources-inspector h2,
-:root[data-materials='aero'] .aero-novels-inspector h2,
 :root[data-materials='aero'] .aero-stats-summary h2 {
   margin: 2px 0 7px;
   font-size: var(--font-size-md);
 }
 
-:root[data-materials='aero'] .aero-resources-inspector p,
-:root[data-materials='aero'] .aero-novels-inspector p {
+:root[data-materials='aero'] .aero-resources-inspector p {
   margin: 0 0 8px;
   color: var(--muted);
   font-size: var(--font-size-sm);
@@ -3594,7 +3073,6 @@
 }
 
 :root[data-materials='aero'] .aero-resources-inspector dl,
-:root[data-materials='aero'] .aero-novels-inspector dl,
 :root[data-materials='aero'] .aero-stats-summary dl {
   display: grid;
   gap: 4px;
@@ -3606,7 +3084,6 @@
 }
 
 :root[data-materials='aero'] .aero-resources-inspector dl div,
-:root[data-materials='aero'] .aero-novels-inspector dl div,
 :root[data-materials='aero'] .aero-stats-summary dl div {
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);
@@ -3614,14 +3091,12 @@
 }
 
 :root[data-materials='aero'] .aero-resources-inspector dt,
-:root[data-materials='aero'] .aero-novels-inspector dt,
 :root[data-materials='aero'] .aero-stats-summary dt {
   color: var(--muted);
   font-size: var(--font-size-xs);
 }
 
 :root[data-materials='aero'] .aero-resources-inspector dd,
-:root[data-materials='aero'] .aero-novels-inspector dd,
 :root[data-materials='aero'] .aero-stats-summary dd {
   margin: 0;
   overflow: hidden;
@@ -3635,47 +3110,8 @@
   font-size: var(--font-size-xs);
 }
 
-:root[data-materials='aero'] .aero-stats-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 5px;
-  height: 168px;
-  padding: 10px 10px 6px;
-  border: 1px solid var(--glass-border);
-  border-top: 0;
-  background:
-    repeating-linear-gradient(to top, transparent 0 31px, rgba(72,112,132,0.1) 32px),
-    color-mix(in srgb, var(--panel) 82%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-stats-bar {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-  gap: 5px;
-}
-
-:root[data-materials='aero'] .aero-stats-bar span {
-  width: 72%;
-  min-height: 2px;
-  border: 1px solid color-mix(in srgb, var(--accent) 62%, #ffffff);
-  border-radius: 2px 2px 0 0;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.48), transparent),
-    color-mix(in srgb, var(--accent-2) 74%, var(--accent));
-}
-
-:root[data-materials='aero'] .aero-stats-bar b {
-  color: var(--muted);
-  font-size: var(--font-size-2xs);
-}
-
 :root[data-materials='aero'] .aero-stats-empty,
-:root[data-materials='aero'] .aero-resources-empty,
-:root[data-materials='aero'] .aero-novels-empty {
+:root[data-materials='aero'] .aero-resources-empty {
   display: grid;
   min-height: 90px;
   place-items: center;
@@ -3734,8 +3170,7 @@
   font-size: var(--font-size-xs);
 }
 
-:root[data-materials='aero'] .aero-translate-toolbar label,
-:root[data-materials='aero'] .aero-novels-toolbar label {
+:root[data-materials='aero'] .aero-translate-toolbar label {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -3798,6 +3233,13 @@
   background: color-mix(in srgb, var(--panel-2) 72%, #ffffff);
 }
 
+/* Borderless editing pane: the ring is drawn inside so the pane's edge does not
+   clip it. `outline: 0` above left keyboard users no focus indicator at all. */
+:root[data-materials='aero'] .aero-translate-textarea:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+
 :root[data-materials='aero'] .aero-translate-status {
   display: flex;
   align-items: center;
@@ -3810,54 +3252,14 @@
   font-size: var(--font-size-xs);
 }
 
+/* An error is the alarm colour, not the brand aqua it used to share with links. */
 :root[data-materials='aero'] .aero-translate-error {
-  color: var(--accent);
-}
-
-:root[data-materials='aero'] .aero-novels-tree-group {
-  display: grid;
-  gap: 2px;
-  margin-bottom: 10px;
-}
-
-:root[data-materials='aero'] .aero-novels-tree-group b {
-  padding: 2px 5px;
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-novel-cover {
-  display: grid;
-  min-height: 116px;
-  margin-bottom: 8px;
-  place-items: center;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 14px rgba(42,73,90,0.2);
-}
-
-:root[data-materials='aero'] .aero-novel-cover span {
-  color: #fff;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  text-align: center;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.48);
-}
-
-:root[data-materials='aero'] .aero-novel-inspector-actions {
-  display: grid;
-  gap: 5px;
-}
-
-:root[data-materials='aero'] .aero-novel-inspector-actions button {
-  justify-content: flex-start;
+  color: var(--danger-text);
 }
 
 @media (max-width: 980px) {
   :root[data-materials='aero'] .aero-resources-workbench,
-  :root[data-materials='aero'] .aero-stats-workbench,
-  :root[data-materials='aero'] .aero-novels-workbench {
+:root[data-materials='aero'] .aero-stats-workbench {
     grid-template-columns: 156px minmax(300px, 1fr);
   }
   :root[data-materials='aero'] .aero-resources-workbench {
@@ -3886,14 +3288,7 @@
   :root[data-materials='aero'] .aero-resource-row > span:nth-child(4) {
     display: none;
   }
-  :root[data-materials='aero'] .aero-novel-row {
-    grid-template-columns: minmax(180px, 1fr) 120px 84px;
-  }
-  :root[data-materials='aero'] .aero-novel-row > span:nth-child(3),
-  :root[data-materials='aero'] .aero-novel-row > span:nth-child(5) {
-    display: none;
-  }
-}
+    }
 
 /* ---------- Phase 4.75 M6: embedded utility subpanels -----------------------
    Remaining inner tools kept default Study OS card/pill habits after the major
@@ -4168,8 +3563,7 @@
   background: color-mix(in srgb, var(--panel-2) 28%, transparent);
 }
 
-:root[data-materials='aero'] .settings-panel.reader-settings,
-:root[data-materials='aero'] .settings-panel.bookmarks-panel {
+:root[data-materials='aero'] .settings-panel.reader-settings {
   gap: 6px;
   padding: 7px;
   border: 1px solid color-mix(in srgb, var(--glass-border) 88%, #ffffff);
@@ -4476,465 +3870,40 @@
 }
 
 /* =============================================================================
-   Phase 4.5 M1 - Grammar Explorer proof application
+   Windows 6 Explorer application pass
    -----------------------------------------------------------------------------
-   This is intentionally not a reskin of the default Grammar page. The Aero
-   branch renders a different native-software composition: menu/status chrome,
-   toolbar, navigation tree, resizable list/detail panes, dense rows, and a
-   property-page detail surface. Business data and example lookup stay shared.
+   The app grammar the windows share: a light glass command bar with DARK ink,
+   solid white work panes, a pale navigation pane, Explorer hot-track and
+   selection rectangles. The previous pass painted the menu bar, every toolbar
+   and every `.view-head` as a saturated blue band with WHITE text — 1.8-2.8:1
+   over the pale end of its own gradient — and washed a sky gradient into the
+   top of every app body. Work surfaces stay solid.
    ============================================================================= */
 
-:root[data-materials='aero'] .aero-gram-chrome .ui-app-chrome__body {
-  overflow: hidden;
-  background: color-mix(in srgb, var(--panel) 88%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-gram {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  color: var(--text);
-  background: color-mix(in srgb, var(--panel) 92%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-gram-toolbar {
-  flex: none;
-  min-height: 32px;
-}
-
-:root[data-materials='aero'] .aero-gram-select {
-  width: 132px;
-  height: 25px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel) 80%, #ffffff);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-gram-search {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex: 1;
-  min-width: 160px;
-  height: 25px;
-  padding: 0 7px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel) 76%, #ffffff);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--bg) 22%, transparent);
-  color: var(--muted);
-}
-
-:root[data-materials='aero'] .aero-gram-search input:where(:not([type='checkbox'], [type='radio'], [type='range'])) {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-}
-
-:root[data-materials='aero'] .aero-gram-shell,
-:root[data-materials='aero'] .aero-gram-workspace {
-  flex: 1;
-  min-height: 0;
-}
-
-:root[data-materials='aero'] .aero-gram-nav {
-  height: 100%;
-  overflow: auto;
-  padding: 6px 4px;
-  background:
-    var(--app-chrome-sheen),
-    color-mix(in srgb, var(--sidebar) 70%, var(--panel));
-  border-right: 1px solid var(--glass-border);
-}
-
-:root[data-materials='aero'] .aero-gram-nav-group + .aero-gram-nav-group {
-  margin-top: 10px;
-  padding-top: 7px;
-  border-top: 1px solid color-mix(in srgb, var(--glass-border) 70%, transparent);
-}
-
-:root[data-materials='aero'] .aero-gram-nav-title {
-  padding: 3px 8px 4px;
-  color: color-mix(in srgb, var(--muted) 84%, var(--text));
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
-}
-
-:root[data-materials='aero'] .aero-gram-nav-row {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 5px;
-  width: 100%;
-  min-height: 24px;
-  padding: 2px 7px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  text-align: left;
-  cursor: pointer;
-}
-
-:root[data-materials='aero'] .aero-gram-nav-row span:nth-child(2) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:root[data-materials='aero'] .aero-gram-nav-row:hover {
-  background: color-mix(in srgb, var(--panel) 62%, transparent);
-  border-color: color-mix(in srgb, var(--glass-border) 75%, transparent);
-}
-
-:root[data-materials='aero'] .aero-gram-nav-row.active {
-  background: var(--app-selection);
-  border-color: color-mix(in srgb, var(--accent) 48%, transparent);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
-}
-
-:root[data-materials='aero'] .aero-gram-nav-count {
-  min-width: 22px;
-  padding: 0 4px;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 65%, transparent);
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel) 55%, transparent);
-  color: var(--muted);
-  font-size: 10px;
-  text-align: center;
-}
-
-:root[data-materials='aero'] .aero-gram-list-pane {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  background: color-mix(in srgb, var(--panel) 93%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-gram-list-head {
-  display: grid;
-  grid-template-columns: minmax(100px, 1.1fr) minmax(120px, 1fr) 54px 44px;
-  gap: 7px;
-  align-items: center;
-  flex: none;
-  min-height: 25px;
-  padding: 3px 8px;
-  border-bottom: 1px solid var(--glass-border);
-  background:
-    var(--app-chrome-sheen),
-    color-mix(in srgb, var(--panel-2) 74%, #ffffff);
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-}
-
-:root[data-materials='aero'] .aero-gram-guide-head {
-  grid-template-columns: minmax(0, 1fr) 84px;
-}
-
-:root[data-materials='aero'] .aero-gram-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-:root[data-materials='aero'] .aero-gram-row {
-  display: grid;
-  grid-template-columns: minmax(100px, 1.1fr) minmax(120px, 1fr) 54px 44px;
-  gap: 7px;
-  align-items: center;
-  width: 100%;
-  min-height: 30px;
-  padding: 4px 8px;
-  border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-:root[data-materials='aero'] .aero-gram-row:nth-child(even),
-:root[data-materials='aero'] .aero-gram-guide-row:nth-child(even) {
-  background: color-mix(in srgb, var(--panel-2) 24%, transparent);
-}
-
-:root[data-materials='aero'] .aero-gram-row:hover,
-:root[data-materials='aero'] .aero-gram-guide-row:hover {
-  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
-}
-
-:root[data-materials='aero'] .aero-gram-row.active,
-:root[data-materials='aero'] .aero-gram-guide-row.active {
-  background: var(--app-selection);
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 80%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-gram-row-title,
-:root[data-materials='aero'] .aero-gram-row-meaning,
-:root[data-materials='aero'] .aero-gram-guide-title,
-:root[data-materials='aero'] .aero-gram-guide-summary {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:root[data-materials='aero'] .aero-gram-row-title {
-  font-weight: var(--font-weight-semibold);
-}
-
-:root[data-materials='aero'] .aero-gram-row-meaning,
-:root[data-materials='aero'] .aero-gram-guide-summary {
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-}
-
-:root[data-materials='aero'] .aero-gram-row-flags {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: var(--accent);
-}
-
-:root[data-materials='aero'] .aero-gram-level,
-:root[data-materials='aero'] .aero-gram-guide-cat,
-:root[data-materials='aero'] .aero-gram-guide-level {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 18px;
-  padding: 1px 6px;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 72%, transparent);
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel) 68%, transparent);
-  color: var(--text);
-  font-size: 10px;
-  font-weight: var(--font-weight-semibold);
-}
-
-:root[data-materials='aero'] .aero-gram-level.lv-N5 { color: #137a57; background: color-mix(in srgb, #7ee0b3 28%, var(--panel)); }
-:root[data-materials='aero'] .aero-gram-level.lv-N4 { color: #195c9d; background: color-mix(in srgb, #8bc8ff 32%, var(--panel)); }
-:root[data-materials='aero'] .aero-gram-level.lv-N3 { color: #6c3e92; background: color-mix(in srgb, #ceb2ff 30%, var(--panel)); }
-:root[data-materials='aero'] .aero-gram-level.lv-N2 { color: #8a5d13; background: color-mix(in srgb, #ffd37d 36%, var(--panel)); }
-:root[data-materials='aero'] .aero-gram-level.lv-N1 { color: #9b2d43; background: color-mix(in srgb, #ff9caf 30%, var(--panel)); }
-
-:root[data-materials='aero'] .aero-gram-guide-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px;
-  grid-template-areas:
-    "title cat"
-    "summary cat";
-  gap: 2px 8px;
-  align-items: center;
-  width: 100%;
-  min-height: 42px;
-  padding: 5px 8px;
-  border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-:root[data-materials='aero'] .aero-gram-guide-title { grid-area: title; font-weight: var(--font-weight-semibold); }
-:root[data-materials='aero'] .aero-gram-guide-summary { grid-area: summary; }
-:root[data-materials='aero'] .aero-gram-guide-cat { grid-area: cat; justify-self: end; }
-
-:root[data-materials='aero'] .aero-gram-detail {
-  height: 100%;
-  overflow: auto;
-  padding: 12px 16px 18px;
-  background:
-    linear-gradient(to bottom, color-mix(in srgb, #ffffff 58%, transparent), transparent 120px),
-    color-mix(in srgb, var(--panel) 94%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-gram-detail-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-:root[data-materials='aero'] .aero-gram-detail-kicker {
-  margin-bottom: 3px;
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
-}
-
-:root[data-materials='aero'] .aero-gram-detail h2 {
-  margin: 0;
-  color: var(--text);
-  font-size: 22px;
-  line-height: 1.2;
-}
-
-:root[data-materials='aero'] .aero-gram-detail-head p {
-  margin: 5px 0 0;
-  color: color-mix(in srgb, var(--accent) 78%, var(--text));
-  font-size: var(--font-size-sm);
-}
-
-:root[data-materials='aero'] .aero-gram-detail-actions {
-  display: flex;
-  gap: 6px;
-  padding: 8px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
-}
-
-:root[data-materials='aero'] .aero-gram-property {
-  padding: 10px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
-}
-
-:root[data-materials='aero'] .aero-gram-property h3 {
-  margin: 0 0 6px;
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
-}
-
-:root[data-materials='aero'] .aero-gram-property p {
-  margin: 0 0 8px;
-  line-height: 1.62;
-}
-
-:root[data-materials='aero'] .aero-gram-structure {
-  padding: 7px 9px;
-  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--panel-2) 62%, #ffffff);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--bg) 20%, transparent);
-  font-size: var(--font-size-sm);
-}
-
-:root[data-materials='aero'] .aero-gram-section-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 7px;
-}
-
-:root[data-materials='aero'] .aero-gram-section-row h3 {
-  margin: 0;
-}
-
-:root[data-materials='aero'] .aero-gram-examples,
-:root[data-materials='aero'] .aero-gram-tips {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-:root[data-materials='aero'] .aero-gram-examples li {
-  display: grid;
-  gap: 2px;
-  padding: 7px 9px 7px 11px;
-  border-left: 3px solid color-mix(in srgb, var(--accent) 65%, #ffffff);
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-  background: color-mix(in srgb, var(--panel-2) 34%, transparent);
-}
-
-:root[data-materials='aero'] .aero-gram-examples li.extra {
-  border-left-color: color-mix(in srgb, #38b985 72%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-gram-ex-jp {
-  font-size: var(--font-size-md);
-  line-height: 1.45;
-}
-
-:root[data-materials='aero'] .aero-gram-ex-reading,
-:root[data-materials='aero'] .aero-gram-ex-en {
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-  line-height: 1.35;
-}
-
-:root[data-materials='aero'] .aero-gram-tips li {
-  margin-bottom: 4px;
-  padding-left: 12px;
-  border-left: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  line-height: 1.55;
-}
-
-:root[data-materials='aero'] .aero-gram-message,
-:root[data-materials='aero'] .aero-gram-empty {
-  padding: 12px;
-  color: var(--muted);
-  font-size: var(--font-size-sm);
-}
-
-/* Licence credit for imported example sentences — present but unobtrusive. */
-:root[data-materials='aero'] .aero-gram-attribution {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-  opacity: 0.75;
-}
-
-/* =============================================================================
-   Vista Explorer application pass
-   ----------------------------------------------------------------------------- */
-
 :root[data-materials='aero'] {
-  --vista-app-blue-1: rgba(87, 184, 255, 0.9);
-  --vista-app-blue-2: rgba(34, 128, 224, 0.86);
-  --vista-app-blue-3: rgba(10, 82, 180, 0.74);
-  --vista-app-line: rgba(135, 190, 216, 0.9);
+  --vista-app-line: #a7c4da;
   --vista-app-pane: #ffffff;
-  --vista-app-pane-alt: #f4fbff;
-  --vista-app-nav: #edf7fd;
+  --vista-app-pane-alt: #f4f9fd;
+  --vista-app-nav: #eef5fb;
+  /* The command-bar glass: white top, a soft blue seam at the middle. */
+  --vista-command-bar: linear-gradient(180deg, #fbfdff 0, #eef4fa 46%, #e1ebf6 50%, #eaf1f9 100%);
+  --vista-command-edge: #a2bcd5;
+  --vista-command-ink: #1e395b;
 }
 
 :root[data-materials='aero'] .ui-app-chrome {
-  color: #17425f;
-  background:
-    linear-gradient(180deg, rgba(44, 145, 231, 0.56) 0, rgba(69, 169, 241, 0.36) 54px, rgba(255, 255, 255, 0.96) 112px),
-    var(--vista-app-pane);
+  color: var(--aero-sky-ink);
+  background: var(--vista-app-pane);
 }
 
 :root[data-materials='aero'] .ui-menubar {
-  min-height: 27px;
-  padding: 2px 6px;
-  color: #f7fdff;
-  /* The deep scrim is what keeps white menu labels readable: over the bare sky
-     gradient they measured 2.79:1 (round-2 visual scan); with it about 5:1. */
-  background:
-    linear-gradient(rgba(4, 44, 104, 0.5), rgba(4, 44, 104, 0.5)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(100, 194, 255, 0.2) 42%, rgba(19, 111, 209, 0.5)),
-    linear-gradient(90deg, var(--vista-app-blue-3), var(--vista-app-blue-1) 46%, var(--vista-app-blue-3));
-  border-bottom: 1px solid rgba(12, 91, 184, 0.72);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -1px 0 rgba(0, 54, 136, 0.38);
-  text-shadow: 0 1px 1px rgba(0, 45, 105, 0.75);
+  min-height: var(--app-menubar-h);
+  padding: 1px 4px;
+  color: var(--vista-command-ink);
+  background: linear-gradient(180deg, #f8fbfe, #e7eff8);
+  border-bottom: 1px solid var(--vista-command-edge);
+  box-shadow: inset 0 1px 0 #ffffff;
+  text-shadow: none;
 }
 
 :root[data-materials='aero'] .ui-menubar__btn {
@@ -4942,18 +3911,22 @@
   min-height: 24px;
   padding: 2px 9px;
   color: inherit;
-  border-radius: 2px;
+  border-radius: var(--aero-radius-sm);
   border: 1px solid transparent;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
-:root[data-materials='aero'] .ui-menubar__btn:hover,
+:root[data-materials='aero'] .ui-menubar__btn:hover {
+  color: var(--vista-command-ink);
+  background: var(--aero-hover-fill);
+  border-color: var(--aero-hover-edge);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
 :root[data-materials='aero'] .ui-menubar__btn--open {
-  color: #ffffff;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.54), rgba(117, 208, 255, 0.32) 50%, rgba(12, 101, 204, 0.38));
-  border-color: rgba(201, 241, 255, 0.74);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+  color: var(--vista-command-ink);
+  background: var(--app-selection);
+  border-color: var(--aero-selection-edge);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 :root[data-materials='aero'] .ui-toolbar,
@@ -4964,22 +3937,14 @@
 :root[data-materials='aero'] .aero-resources-toolbar,
 :root[data-materials='aero'] .aero-stats-toolbar,
 :root[data-materials='aero'] .aero-translate-toolbar,
-:root[data-materials='aero'] .aero-novels-toolbar,
-:root[data-materials='aero'] .aero-library-toolbar,
-:root[data-materials='aero'] .aero-media-toolbar,
-:root[data-materials='aero'] .aero-music-toolbar,
-:root[data-materials='aero'] .aero-gram-toolbar {
+:root[data-materials='aero'] .aero-library-toolbar {
   min-height: 34px;
   padding: 4px 8px;
-  color: #ffffff;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.42), rgba(117, 208, 255, 0.2) 42%, rgba(13, 103, 203, 0.44)),
-    linear-gradient(90deg, rgba(14, 93, 196, 0.88), rgba(90, 190, 252, 0.78) 46%, rgba(14, 93, 196, 0.84));
-  border-bottom: 1px solid rgba(8, 88, 176, 0.68);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.56),
-    inset 0 -1px 0 rgba(0, 60, 145, 0.28);
-  text-shadow: 0 1px 1px rgba(0, 45, 105, 0.72);
+  color: var(--vista-command-ink);
+  background: var(--vista-command-bar);
+  border-bottom: 1px solid var(--vista-command-edge);
+  box-shadow: inset 0 1px 0 #ffffff;
+  text-shadow: none;
 }
 
 :root[data-materials='aero'] .view-head h1,
@@ -4990,8 +3955,8 @@
   color: inherit;
 }
 
+/* Work surfaces are solid white — no sky wash. */
 :root[data-materials='aero'] .ui-app-chrome__body,
-:root[data-materials='aero'] .aero-media-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-anki-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-dict-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-settings-chrome .ui-app-chrome__body,
@@ -5001,16 +3966,12 @@
 :root[data-materials='aero'] .aero-resources-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-stats-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-translate-chrome .ui-app-chrome__body,
-:root[data-materials='aero'] .aero-novels-chrome .ui-app-chrome__body,
-:root[data-materials='aero'] .aero-gram-chrome .ui-app-chrome__body {
-  background:
-    linear-gradient(180deg, rgba(75, 170, 238, 0.36) 0, rgba(180, 229, 251, 0.26) 56px, transparent 116px),
-    var(--vista-app-pane);
+:root[data-materials='aero'] .aero-novels-chrome .ui-app-chrome__body {
+  background: var(--vista-app-pane);
 }
 
 :root[data-materials='aero'] .anki-view,
 :root[data-materials='aero'] .dict-view,
-:root[data-materials='aero'] .media-view,
 :root[data-materials='aero'] .flash-view,
 :root[data-materials='aero'] .library,
 :root[data-materials='aero'] .os-settings,
@@ -5018,9 +3979,7 @@
 :root[data-materials='aero'] .aero-flash,
 :root[data-materials='aero'] .aero-resources,
 :root[data-materials='aero'] .aero-stats,
-:root[data-materials='aero'] .aero-translate,
-:root[data-materials='aero'] .aero-novels,
-:root[data-materials='aero'] .aero-gram {
+:root[data-materials='aero'] .aero-translate {
   background: transparent;
 }
 
@@ -5028,13 +3987,11 @@
 :root[data-materials='aero'] .set-section,
 :root[data-materials='aero'] .os-set-card,
 :root[data-materials='aero'] .card-preview,
-:root[data-materials='aero'] .ui-panel,
 :root[data-materials='aero'] .aero-flash-panel,
 :root[data-materials='aero'] .aero-stats-panel,
 :root[data-materials='aero'] .aero-resource-group,
 :root[data-materials='aero'] .aero-resources-inspector,
-:root[data-materials='aero'] .aero-translate-pane,
-:root[data-materials='aero'] .aero-novels-detail {
+:root[data-materials='aero'] .aero-translate-pane {
   border: 1px solid var(--vista-app-line);
   border-radius: 2px;
   background:
@@ -5084,8 +4041,6 @@
 :root[data-materials='aero'] .aero-resources-tree,
 :root[data-materials='aero'] .aero-stats-summary,
 :root[data-materials='aero'] .aero-stats-knowledge,
-:root[data-materials='aero'] .aero-novels-tree,
-:root[data-materials='aero'] .aero-gram-nav,
 :root[data-materials='aero'] .os-set-nav-v2 {
   border: 1px solid var(--vista-app-line);
   border-radius: 2px;
@@ -5098,10 +4053,6 @@
 :root[data-materials='aero'] .aero-flash-source,
 :root[data-materials='aero'] .aero-flash-folder,
 :root[data-materials='aero'] .aero-resources-node,
-:root[data-materials='aero'] .aero-novels-filter,
-:root[data-materials='aero'] .aero-gram-row,
-:root[data-materials='aero'] .aero-gram-guide-row,
-:root[data-materials='aero'] .os-set-nav-btn,
 :root[data-materials='aero'] .ui-sidebar__item,
 :root[data-materials='aero'] .ui-tree__row {
   border-radius: 2px;
@@ -5110,15 +4061,14 @@
 :root[data-materials='aero'] .aero-flash-source.active,
 :root[data-materials='aero'] .aero-flash-folder.active,
 :root[data-materials='aero'] .aero-resources-node.active,
-:root[data-materials='aero'] .aero-novels-filter.active,
-:root[data-materials='aero'] .aero-gram-row.active,
-:root[data-materials='aero'] .aero-gram-guide-row.active,
-:root[data-materials='aero'] .os-set-nav-btn.active,
 :root[data-materials='aero'] .ui-sidebar__item[aria-current='true'],
 :root[data-materials='aero'] .ui-tree__row[aria-selected='true'] {
-  background: linear-gradient(180deg, #dff5ff, #9edcff);
+  /* The one Explorer selection rectangle (`--app-selection` + its edge); this
+     used to hardcode its own gradient and ignore the token. */
+  background: var(--app-selection);
+  border-color: var(--aero-selection-edge);
   color: #063d70;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.88);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
 :root[data-materials='aero'] .ui-input,
@@ -5212,7 +4162,7 @@
 }
 :where(:root[data-materials='aero'])
   :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):where(:focus-visible) {
-  outline: 1px dotted #17425f;
+  outline: 2px solid var(--focus-ring-color);
   outline-offset: 2px;
 }
 :where(:root[data-materials='aero'])
@@ -5279,7 +4229,7 @@
     0 1px 2px rgba(18, 49, 67, 0.18);
 }
 :where(:root[data-materials='aero']) :where(input[type='range']):where(:not(.blanc-root *)):where(:focus-visible) {
-  outline: 1px dotted #17425f;
+  outline: 2px solid var(--focus-ring-color);
   outline-offset: 2px;
 }
 :where(:root[data-materials='aero']) :where(input[type='range']):where(:not(.blanc-root *)):where(:disabled) {
@@ -5315,8 +4265,96 @@
   border-color: rgba(59, 143, 203, 0.96);
 }
 
+/* ---------- Gel button TIERS ---------------------------------------------------
+   The rule above repaints every `.ui-btn` / `.btn` as the same pale gel, which
+   also flattened `.btn.primary`, `.ui-btn--primary` and — worst — `.btn.danger`
+   and `.ui-btn--danger` (ui.css's danger face is scoped out of Aero, and
+   `.btn.danger` painted its label in the GREEN --accent-2). Three tiers, each
+   with dark ink on a light gel so every label clears 4.5:1:
+     primary — aqua gel, the one default action;
+     danger  — red gel, destructive;
+     ghost   — no plate until hot-tracked. */
+:root[data-materials='aero'] .ui-btn--primary,
+:root[data-materials='aero'] .btn.primary {
+  border-color: #2c7fb8;
+  background: linear-gradient(180deg, #f2fbff 0, #c9ebfb 46%, #8fd2f3 52%, #b6e3f8 100%);
+  color: #0b3a5c;
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 0 1px rgba(44, 127, 184, 0.18);
+}
+:root[data-materials='aero'] .ui-btn--primary:hover:not(:disabled),
+:root[data-materials='aero'] .btn.primary:hover:not(:disabled) {
+  border-color: #1f6ea6;
+  background: linear-gradient(180deg, #ffffff 0, #d6f1fd 46%, #79c8f0 52%, #a6dcf6 100%);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 6px rgba(60, 170, 230, 0.45);
+}
+:root[data-materials='aero'] .ui-btn--danger,
+:root[data-materials='aero'] .btn.danger {
+  border-color: #a8392a;
+  background: linear-gradient(180deg, #fff6f4 0, #fbd9d1 46%, #f1ab9b 52%, #f8c6ba 100%);
+  color: #6e1508;
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+:root[data-materials='aero'] .ui-btn--danger:hover:not(:disabled),
+:root[data-materials='aero'] .btn.danger:hover:not(:disabled) {
+  border-color: #8a2a1c;
+  background: linear-gradient(180deg, #ffffff 0, #ffd2c7 46%, #ec8e78 52%, #f6b3a3 100%);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 6px rgba(226, 88, 58, 0.4);
+}
+:root[data-materials='aero'] .ui-btn--ghost,
+:root[data-materials='aero'] .btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+:root[data-materials='aero'] .ui-btn--ghost:hover:not(:disabled),
+:root[data-materials='aero'] .btn.ghost:hover:not(:disabled) {
+  border-color: var(--aero-hover-edge);
+  background: var(--aero-hover-fill);
+}
+:root[data-materials='aero'] :is(.ui-btn, .btn):active:not(:disabled) {
+  box-shadow: inset 0 1px 3px rgba(0, 40, 80, 0.28);
+}
+:root[data-materials='aero'] :is(.ui-btn, .btn):focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 1px;
+}
+
+/* ---------- Status messages by severity ----------------------------------------
+   The light-glass banner rule above painted success, warning and error in the
+   same blue; the variants carry their meaning again (red / amber / green, each
+   with the palette's derived *-text ink). Toasts likewise: the Aero toast rule
+   in aero-shell.css outranked multiMonitor.css's err/warn faces. */
+:root[data-materials='aero'] .status-banner.bad,
+:root[data-materials='aero'] .form-msg.err,
+:root[data-materials='aero'] .ui-notification--error,
+:root[data-materials='aero'] .os-toast.err,
+:root[data-materials='aero'] .os-toast.error {
+  border-color: color-mix(in srgb, var(--red) 55%, #ffffff);
+  border-left: 3px solid var(--red);
+  background: linear-gradient(180deg, #fff8f7, #fde6e2);
+  color: var(--danger-text);
+}
+:root[data-materials='aero'] .status-banner.warn,
+:root[data-materials='aero'] .ui-notification--warning,
+:root[data-materials='aero'] .os-toast.warn,
+:root[data-materials='aero'] .os-toast.warning {
+  border-color: color-mix(in srgb, var(--aero-amber) 70%, #ffffff);
+  border-left: 3px solid var(--aero-amber);
+  background: linear-gradient(180deg, #fffcf2, #fdf0cf);
+  color: var(--warning-text);
+}
+:root[data-materials='aero'] .status-banner.ok,
+:root[data-materials='aero'] .form-msg.ok,
+:root[data-materials='aero'] .ui-notification--success,
+:root[data-materials='aero'] .os-toast.ok {
+  border-color: #9fd3a6;
+  border-left: 3px solid var(--aero-gel-green);
+  background: linear-gradient(180deg, #f6fcf5, #e1f3df);
+  color: var(--success-text);
+}
+
 :root[data-materials='aero'] .ui-statusbar {
-  min-height: 22px;
+  min-height: var(--app-statusbar-h);
   color: #17425f;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.94), rgba(218, 239, 249, 0.92)),
@@ -5359,7 +4397,9 @@
 
 :root[data-materials='aero'] .aero-settings .os-set-body {
   display: grid;
-  grid-template-columns: 184px minmax(0, 1fr);
+  /* The nav sizes the column (it used to be a 184px track holding a 200px-wide nav,
+     which overflowed into the pane by 16px). */
+  grid-template-columns: auto minmax(0, 1fr);
   min-height: 0;
   height: 100%;
   overflow: hidden;
@@ -5367,10 +4407,38 @@
 
 :root[data-materials='aero'] .aero-settings .os-set-nav-v2 {
   width: 200px;
-  min-width: 200px;
+  min-width: 0;
   padding: 6px 5px;
   max-height: 100%;
   overflow-y: auto;
+}
+
+/* A narrow Settings window folds the nav to an icon rail, the way a narrow
+   Explorer folds its navigation pane, instead of squeezing the pane to nothing.
+   Labels stay in the accessibility tree (visually hidden, not removed). */
+:root[data-materials='aero'] .aero-settings-chrome .ui-app-chrome__body {
+  container-type: inline-size;
+  container-name: aerosettings;
+}
+@container aerosettings (max-width: 420px) {
+  :root[data-materials='aero'] .aero-settings .os-set-nav-v2 {
+    width: 52px;
+    padding: 6px 4px;
+  }
+  :root[data-materials='aero'] .aero-settings .os-set-nav-item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  :root[data-materials='aero'] .aero-settings .os-set-nav-item > span,
+  :root[data-materials='aero'] .aero-settings .os-set-nav-group-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 :root[data-materials='aero'] .aero-settings .os-set-pane-v2 {
@@ -5455,23 +4523,30 @@
   padding: 5px 8px;
 }
 
-/* Reader lookup and settings popovers: Vista glass utility panels. */
+/* Reader lookup and settings popovers: Windows 6 utility panels.
+   The lookup popup used to carry the Study OS rose: a pink scrollbar, a pink
+   reading, a pink "add" button and a pink active familiarity grade, under a
+   white-on-blue head. Aero's accent is aqua and its alarm colour is red, so the
+   reading is the accent ink, the add button the gel primary, the grades share
+   the familiarity scale used everywhere else in Aero, and the head is a light
+   glass caption with dark ink. Blur is the token, so every transparency ladder
+   reaches it. */
 :root[data-materials='aero'] .dict-popup,
 :root[data-materials='aero'] .tr-popup {
   width: min(360px, calc(100vw - 18px));
-  border: 1px solid rgba(33, 126, 204, 0.92);
-  border-radius: 4px;
+  border: 1px solid var(--vista-command-edge);
+  border-radius: var(--aero-radius-md);
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.72) 0, rgba(217,241,252,0.82) 30px, rgba(247,253,255,0.96) 31px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0, rgba(234, 243, 251, 0.9) 30px, #ffffff 31px),
     #ffffff;
   box-shadow:
-    0 18px 38px rgba(0, 32, 86, 0.42),
-    inset 0 1px 0 rgba(255,255,255,0.92);
-  color: #17425f;
-  font: 12px Tahoma, "MS Sans Serif", sans-serif;
-  scrollbar-color: #ff7fa5 #f4fbff;
-  backdrop-filter: blur(7px) saturate(1.18);
-  -webkit-backdrop-filter: blur(7px) saturate(1.18);
+    0 14px 34px rgba(0, 24, 60, 0.32),
+    inset 0 1px 0 #ffffff;
+  color: var(--aero-sky-ink);
+  font: 12px 'Segoe UI', var(--font-body);
+  scrollbar-color: var(--scrollbar-thumb) #f4f9fd;
+  backdrop-filter: blur(var(--blur-sm)) saturate(1.18);
+  -webkit-backdrop-filter: blur(var(--blur-sm)) saturate(1.18);
 }
 
 :root[data-materials='aero'] .dict-popup::-webkit-scrollbar,
@@ -5481,29 +4556,25 @@
 
 :root[data-materials='aero'] .dict-popup::-webkit-scrollbar-track,
 :root[data-materials='aero'] .tr-popup::-webkit-scrollbar-track {
-  background: #f4fbff;
+  background: #f4f9fd;
 }
 
 :root[data-materials='aero'] .dict-popup::-webkit-scrollbar-thumb,
 :root[data-materials='aero'] .tr-popup::-webkit-scrollbar-thumb {
-  border: 2px solid #f4fbff;
+  border: 2px solid #f4f9fd;
   border-radius: 999px;
-  background: #ff7fa5;
+  background: var(--scrollbar-thumb);
 }
 
 :root[data-materials='aero'] .dict-head {
   min-height: 29px;
   padding: 4px 7px;
-  border-bottom: 1px solid rgba(103, 172, 212, 0.78);
-  border-radius: 3px 3px 0 0;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.64), rgba(113,205,255,0.28) 48%, rgba(14,104,207,0.38)),
-    linear-gradient(90deg, rgba(10,87,191,0.92), rgba(105,199,255,0.84) 48%, rgba(10,87,191,0.9));
-  color: #ffffff;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.68),
-    inset 0 -1px 0 rgba(0, 61, 148, 0.34);
-  text-shadow: 0 1px 1px rgba(0, 45, 105, 0.74);
+  border-bottom: 1px solid var(--vista-command-edge);
+  border-radius: var(--aero-radius-md) var(--aero-radius-md) 0 0;
+  background: var(--vista-command-bar);
+  color: var(--vista-command-ink);
+  box-shadow: inset 0 1px 0 #ffffff;
+  text-shadow: none;
 }
 
 :root[data-materials='aero'] .dict-q {
@@ -5520,69 +4591,51 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid rgba(204, 241, 255, 0.72);
-  border-radius: 2px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.86), rgba(177,225,255,0.56) 50%, rgba(46,136,217,0.58));
-  color: #063d70;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+  border: 1px solid var(--aero-hover-edge);
+  border-radius: var(--aero-radius-sm);
+  background: linear-gradient(180deg, #ffffff, #e9f3fb 48%, #d6e8f6 52%, #e6f1fa);
+  color: var(--vista-command-ink);
+  box-shadow: inset 0 1px 0 #ffffff;
   text-shadow: none;
 }
 
-:root[data-materials='aero'] .dict-x {
-  background:
-    linear-gradient(180deg, #ffd9cf, #f79676 52%, #d9472f);
-  border-color: rgba(255,239,229,0.9);
-  color: #ffffff;
+:root[data-materials='aero'] .dict-tts:hover {
+  border-color: var(--aero-selection-edge);
+  background: linear-gradient(180deg, #ffffff, #dff1fc 48%, #c3e3f8 52%, #d9eefb);
 }
 
-:root[data-materials='aero'] .dict-tts:hover,
+/* Close: neutral until hovered, then the red caption-button glow. */
 :root[data-materials='aero'] .dict-x:hover {
-  filter: brightness(1.08);
+  border-color: #8a2a1c;
+  background: linear-gradient(180deg, #ffcabb, #e8634c 45%, #c4200a 50%, #e24a2c);
+  color: #ffffff;
 }
 
 :root[data-materials='aero'] .dict-popup .wk-grade {
   gap: 5px;
   padding: 6px 8px;
-  border-bottom: 1px solid rgba(145, 199, 225, 0.78);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.88), rgba(227,245,253,0.86)),
-    #eef9ff;
+  border-bottom: 1px solid var(--vista-app-line);
+  background: var(--vista-app-pane-alt);
 }
 
 :root[data-materials='aero'] .dict-popup .wk-grade-btn {
   width: 25px;
   min-height: 22px;
-  border: 1px solid #7aa5c6;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #ffffff, #dff3ff 50%, #abd8f4);
-  color: #17425f;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92);
-  font: 700 11px Tahoma, "MS Sans Serif", sans-serif;
-}
-
-:root[data-materials='aero'] .dict-popup .wk-grade-btn.active {
-  border-color: #ff6d8d;
-  background: linear-gradient(180deg, #fff4f8, #ffc3d5);
-  color: #9a2340;
+  font: 700 11px 'Segoe UI', var(--font-body);
 }
 
 :root[data-materials='aero'] .dict-popup .dict-entries {
-  background: #f8fdff;
+  background: #ffffff;
 }
 
 :root[data-materials='aero'] .dict-popup .dict-entry {
   padding: 9px 10px 10px;
-  border-bottom: 1px solid rgba(121, 181, 211, 0.78);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(239,250,255,0.86)),
-    #ffffff;
+  border-bottom: 1px solid #dbe7f1;
+  background: #ffffff;
 }
 
 :root[data-materials='aero'] .dict-popup .dict-entry:nth-child(even) {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.88), rgba(232,246,253,0.88)),
-    #f3fbff;
+  background: var(--vista-app-pane-alt);
 }
 
 :root[data-materials='aero'] .dict-popup .dict-entry-head {
@@ -5596,57 +4649,57 @@
   color: #062f4c;
   font-size: 20px;
   line-height: 1.15;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.88);
 }
 
 :root[data-materials='aero'] .dict-popup .dict-reading {
-  color: #ff4f72;
+  color: var(--accent-text);
   font-size: 13px;
 }
 
 :root[data-materials='aero'] .dict-popup .dict-pitch-label,
 :root[data-materials='aero'] .dict-popup .dict-source,
 :root[data-materials='aero'] .dict-popup .dict-pos {
-  color: #5d7d91;
+  color: var(--muted);
 }
 
 :root[data-materials='aero'] .dict-popup .dict-pitch-pattern,
 :root[data-materials='aero'] .dict-popup .dict-glossary-html,
 :root[data-materials='aero'] .dict-popup .dict-senses {
-  color: #17425f;
+  color: var(--aero-sky-ink);
 }
 
+/* "Add" is the popup's primary action: the gel primary tier. */
 :root[data-materials='aero'] .dict-popup .dict-add {
-  border: 1px solid #ff4f72;
-  border-radius: 4px;
-  background:
-    linear-gradient(180deg, #fff8fb, #ffd7e2 50%, #ffa7bd);
-  color: #c03454;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92);
+  border: 1px solid #2c7fb8;
+  border-radius: var(--aero-radius-sm);
+  background: linear-gradient(180deg, #f2fbff 0, #c9ebfb 46%, #8fd2f3 52%, #b6e3f8 100%);
+  color: #0b3a5c;
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+
+:root[data-materials='aero'] .dict-popup .dict-add:hover {
+  border-color: #1f6ea6;
+  background: linear-gradient(180deg, #ffffff 0, #d6f1fd 46%, #79c8f0 52%, #a6dcf6 100%);
 }
 
 :root[data-materials='aero'] .dict-popup .dict-add.done {
   border-color: #9db9cc;
-  background: linear-gradient(180deg, #ffffff, #e7f4fb);
-  color: #5d7d91;
+  background: linear-gradient(180deg, #ffffff, #eef4f8);
+  color: var(--muted);
 }
 
 :root[data-materials='aero'] .dict-popup .dict-anki-cfg,
 :root[data-materials='aero'] .dict-popup .dict-anki-cfg.compact {
-  border-top: 1px solid rgba(145, 199, 225, 0.78);
-  background: linear-gradient(180deg, #f8fdff, #e4f3fb);
+  border-top: 1px solid var(--vista-app-line);
+  background: var(--vista-app-pane-alt);
 }
 
 :root[data-materials='aero'] .dict-popup .dict-anki-tip {
   border: 1px solid #7aa5c6;
-  border-radius: 3px;
+  border-radius: var(--aero-radius-sm);
   background: #ffffff;
-  color: #17425f;
+  color: var(--aero-sky-ink);
   box-shadow: 0 10px 24px rgba(0, 32, 86, 0.28);
-}
-
-:root[data-materials='aero'] .panel-backdrop {
-  z-index: 110;
 }
 
 :root[data-materials='aero'] .reader-bar {
@@ -5658,42 +4711,29 @@
   z-index: 130;
 }
 
-:root[data-materials='aero'] .settings-panel.reader-settings,
-:root[data-materials='aero'] .settings-panel.bookmarks-panel {
+:root[data-materials='aero'] .settings-panel.reader-settings {
   z-index: 140;
   width: 318px;
-  border: 1px solid rgba(33, 126, 204, 0.88);
-  border-radius: 4px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.76) 0, rgba(111,202,255,0.3) 30px, rgba(246,253,255,0.96) 31px),
-    #ffffff;
+  border: 1px solid var(--vista-command-edge);
+  border-radius: var(--aero-radius-md);
+  background: #ffffff;
   box-shadow:
-    0 16px 36px rgba(0, 32, 86, 0.38),
-    inset 0 1px 0 rgba(255,255,255,0.92);
-  color: #17425f;
-  font-family: Tahoma, "MS Sans Serif", sans-serif;
+    0 14px 32px rgba(0, 24, 60, 0.3),
+    inset 0 1px 0 #ffffff;
+  color: var(--aero-sky-ink);
+  font-family: 'Segoe UI', var(--font-body);
 }
 
-:root[data-materials='aero'] .settings-panel.reader-settings::before,
-:root[data-materials='aero'] .settings-panel.bookmarks-panel::before {
-  content: 'Reader Settings';
-  display: flex;
-  align-items: center;
-  min-height: 25px;
+/* No caption text drawn from CSS: `content: 'Reader Settings'` was English in
+   every language. A slim glass lip carries the shape instead. */
+:root[data-materials='aero'] .settings-panel.reader-settings::before {
+  content: '';
+  display: block;
+  height: 6px;
   margin: -7px -7px 7px;
-  padding: 0 8px;
-  border-bottom: 1px solid rgba(103, 172, 212, 0.78);
-  border-radius: 3px 3px 0 0;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.64), rgba(113,205,255,0.28) 48%, rgba(14,104,207,0.38)),
-    linear-gradient(90deg, rgba(10,87,191,0.92), rgba(105,199,255,0.84) 48%, rgba(10,87,191,0.9));
-  color: #ffffff;
-  font: 700 11px Tahoma, "MS Sans Serif", sans-serif;
-  text-shadow: 0 1px 1px rgba(0, 45, 105, 0.74);
-}
-
-:root[data-materials='aero'] .settings-panel.bookmarks-panel::before {
-  content: 'Bookmarks';
+  border-bottom: 1px solid var(--vista-command-edge);
+  border-radius: var(--aero-radius-md) var(--aero-radius-md) 0 0;
+  background: var(--vista-command-bar);
 }
 
 :root[data-materials='aero'] .settings-panel.reader-settings.reader-settings-embedded::before {
@@ -5728,16 +4768,15 @@
    frame; these rules make the actual Anki workspace look like an XP/Vista
    property sheet instead of a modern card layout. */
 :root[data-materials='aero'] .aero-anki-chrome .ui-app-chrome__body {
-  background:
-    linear-gradient(180deg, rgba(58, 158, 231, 0.34) 0, rgba(219, 246, 255, 0.92) 84px, rgba(246, 253, 255, 0.98) 85px),
-    #f6fdff;
+  /* Solid work surface (the 84px sky wash is gone, as everywhere else). */
+  background: var(--vista-app-pane-alt);
 }
 
 :root[data-materials='aero'] .aero-anki-chrome .anki-view {
   gap: 8px;
   padding: 14px 18px 10px;
   color: #17425f;
-  font: 12px Tahoma, "MS Sans Serif", sans-serif;
+  font: 12px 'Segoe UI', var(--font-body);
 }
 
 :root[data-materials='aero'] .aero-anki-chrome .view-head {
@@ -5779,12 +4818,12 @@
   margin: -10px -10px 9px;
   padding: 4px 8px;
   border-bottom: 1px solid #93c8df;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.5), rgba(110, 203, 255, 0.22) 48%, rgba(8, 95, 202, 0.34)),
-    linear-gradient(90deg, #075fbd, #47b8f4 48%, #075fbd);
-  color: #ffffff;
-  font: 700 11px Tahoma, "MS Sans Serif", sans-serif;
-  text-shadow: 0 1px 1px rgba(0, 48, 105, 0.76);
+  /* A property-sheet group header: light glass, dark ink (white on that blue
+     band was ~2.4:1 over its pale middle). */
+  background: var(--vista-command-bar);
+  color: var(--vista-command-ink);
+  font: 600 11.5px 'Segoe UI', var(--font-body);
+  text-shadow: none;
 }
 
 :root[data-materials='aero'] .aero-anki-chrome .set-row {
@@ -5804,7 +4843,7 @@
 :root[data-materials='aero'] .aero-anki-chrome .anki-note-type-label,
 :root[data-materials='aero'] .aero-anki-chrome .card-preview-face-label {
   color: #17425f;
-  font: 700 11px Tahoma, "MS Sans Serif", sans-serif;
+  font: 700 11px 'Segoe UI', var(--font-body);
 }
 
 :root[data-materials='aero'] .aero-anki-chrome .set-row-desc,
@@ -5860,7 +4899,7 @@
     linear-gradient(180deg, #ffffff, #e6f6fd 48%, #b7def4),
     #dff1fb;
   color: #17425f;
-  font: 12px Tahoma, "MS Sans Serif", sans-serif;
+  font: 12px 'Segoe UI', var(--font-body);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.96),
     0 1px 1px rgba(47, 103, 142, 0.12);
@@ -5904,7 +4943,7 @@
     linear-gradient(180deg, #ffffff, #f6fdff),
     #ffffff;
   color: #17425f;
-  font: 12px Tahoma, "MS Sans Serif", sans-serif;
+  font: 12px 'Segoe UI', var(--font-body);
   box-shadow: inset 1px 1px 2px rgba(45, 98, 137, 0.2);
 }
 
@@ -5972,7 +5011,7 @@
 
 :root[data-materials='aero'] .aero-anki-chrome .collapse-title {
   color: #17425f;
-  font: 700 12px Tahoma, "MS Sans Serif", sans-serif;
+  font: 700 12px 'Segoe UI', var(--font-body);
 }
 
 :root[data-materials='aero'] .aero-anki-chrome .collapse-summary {
@@ -6015,7 +5054,7 @@
 :root[data-materials='aero'] .aero-anki-chrome .fm-palette-label,
 :root[data-materials='aero'] .aero-anki-chrome .fm-example-count-label {
   color: #4d7084;
-  font: 700 10px Tahoma, "MS Sans Serif", sans-serif;
+  font: 700 10px 'Segoe UI', var(--font-body);
 }
 
 :root[data-materials='aero'] .aero-anki-chrome .card-preview {
@@ -6169,12 +5208,22 @@
   font-weight: 600;
 }
 
-/* Familiarity runs aqua → fresh green, the vision's own "water, not fire". */
+/* Familiarity runs aqua → fresh green, the vision's own "water, not fire".
+   The bubble GEOMETRY belongs to the Grammar band (`.gram-x-band`); it used to be
+   unscoped and reshaped the grade rows of the dictionary popup and the Lens
+   reader, which own their own layout. The colour SCALE is shared on purpose:
+   the same word reads the same familiarity in every Aero surface. */
+:root[data-materials='aero'] .gram-x-band .wk-grade-btn {
+  border-radius: 7px;
+}
 :root[data-materials='aero'] .wk-grade-btn {
   border: 1px solid rgba(160, 200, 226, 0.8);
-  border-radius: 7px;
   color: #43617a;
   background: linear-gradient(180deg, #ffffff, #e8f3fb);
+}
+:root[data-materials='aero'] .wk-grade-btn:hover {
+  border-color: var(--aero-hover-edge);
+  color: var(--aero-sky-ink);
 }
 :root[data-materials='aero'] .wk-grade-btn.wk-g-0.active { border-color: #7fb6dd; background: linear-gradient(180deg, #ffffff, #cfe7f8); color: #0d4f6b; }
 :root[data-materials='aero'] .wk-grade-btn.wk-g-1.active { border-color: #6fc4c8; background: linear-gradient(180deg, #ffffff, #ccecee); color: #0b5257; }
@@ -6233,10 +5282,12 @@
   background: linear-gradient(180deg, #ffffff, #f2f8fd);
   box-shadow: inset 0 1px 2px rgba(37, 90, 133, 0.1);
 }
+/* The field keeps a real focus ring: a 25%-alpha halo alone was ~1.3:1. */
 :root[data-materials='aero'] .gram-search:focus-visible {
-  border-color: #4ca4e8;
+  border-color: var(--aero-selection-edge-strong);
   box-shadow: 0 0 0 3px rgba(76, 164, 232, 0.25);
-  outline: none;
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 1px;
 }
 :root[data-materials='aero'] .gram-x-count {
   color: #5f7d92;
@@ -6348,4 +5399,271 @@
   background: var(--app-selection);
   border-color: var(--glass-border);
   color: var(--text);
+}
+
+/* =============================================================================
+   Aero part A — Windows 6 controls and remaps (E12 / E13)
+   -----------------------------------------------------------------------------
+   Everything below is additive and scoped to `:root[data-materials='aero']`.
+   ============================================================================= */
+
+/* ---------- Study OS rose, outside danger ---------------------------------------
+   styles.css paints these selection / highlight states in the Study OS red
+   (rgba(255, 46, 77)) as a BRAND colour. In Aero the brand is aqua and red means
+   "destructive", so a selected CSV column or the active review card read as an
+   error. One Explorer selection vocabulary instead. */
+:root[data-materials='aero'] .epub-mining-step-header.is-ready .epub-mining-step-badge {
+  border-color: var(--aero-selection-edge);
+  background: var(--app-selection);
+  color: var(--accent-text);
+}
+:root[data-materials='aero'] .csv-editor-col-head.col-selected,
+:root[data-materials='aero'] .csv-editor-context-menu button:hover,
+:root[data-materials='aero'] .flash-review-strip-card.active,
+:root[data-materials='aero'] .btn.active {
+  border-color: var(--aero-selection-edge);
+  background: var(--app-selection);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+:root[data-materials='aero'] .csv-editor-vis-btn:hover,
+:root[data-materials='aero'] .flash-review-strip-card:hover {
+  border-color: var(--aero-hover-edge);
+  background: var(--aero-hover-fill);
+}
+:root[data-materials='aero'] .csv-editor-cell-match {
+  background: rgba(255, 214, 92, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(214, 150, 20, 0.55);
+}
+:root[data-materials='aero'] .csv-editor-highlight {
+  background: rgba(255, 214, 92, 0.6);
+}
+:root[data-materials='aero'] .csv-editor-flashcard-side.front {
+  border-color: var(--aero-selection-edge);
+}
+:root[data-materials='aero'] .mwidget-btn.on {
+  color: var(--accent-text);
+  background: var(--app-selection);
+}
+
+/* ---------- Jiten / Novels: a light Explorer workbench ---------------------------
+   The three panes were a smoky near-black slab (rgba(8, 8, 10, 0.34)) under dark
+   Aero ink, with a maroon selected row; Wired remaps them, Aero did not. */
+:root[data-materials='aero'] .jiten-filters,
+:root[data-materials='aero'] .jiten-table-wrap,
+:root[data-materials='aero'] .jiten-inspector {
+  border-color: var(--vista-app-line);
+  border-radius: var(--aero-radius-sm);
+  background: var(--vista-app-pane);
+}
+:root[data-materials='aero'] .jiten-filters,
+:root[data-materials='aero'] .jiten-inspector {
+  background: var(--vista-app-nav);
+}
+:root[data-materials='aero'] .jiten-table-head {
+  border-bottom-color: var(--vista-command-edge);
+  background: var(--vista-command-bar);
+  color: var(--vista-command-ink);
+}
+:root[data-materials='aero'] .jiten-row {
+  border-bottom-color: #e3edf5;
+}
+:root[data-materials='aero'] .jiten-row:hover {
+  background: var(--aero-hover-fill);
+}
+:root[data-materials='aero'] .jiten-row.active {
+  background: var(--app-selection);
+  box-shadow: inset 0 0 0 1px var(--aero-selection-edge);
+}
+:root[data-materials='aero'] .jiten-mining-grid input,
+:root[data-materials='aero'] .jiten-source-row,
+:root[data-materials='aero'] .jiten-source-buttons button {
+  background: #ffffff;
+}
+:root[data-materials='aero'] .jiten-source-buttons button.active,
+:root[data-materials='aero'] .aero-novels-command.active {
+  border-color: var(--aero-selection-edge);
+  background: var(--app-selection);
+}
+:root[data-materials='aero'] .jiten-source-buttons span {
+  color: var(--success-text);
+}
+
+/* ---------- Progress bars: the era's green gel with a moving gloss -------------- */
+:root[data-materials='aero'] progress,
+:root[data-materials='aero'] .ui-progress {
+  appearance: none;
+  height: 14px;
+  overflow: hidden;
+  border: 1px solid #8a9eb0;
+  border-radius: var(--aero-radius-xs);
+  background: linear-gradient(180deg, #e9eef2, #fdfdfd 45%, #dfe6ec);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+:root[data-materials='aero'] progress::-webkit-progress-bar {
+  background: transparent;
+}
+:root[data-materials='aero'] progress::-webkit-progress-value,
+:root[data-materials='aero'] .ui-progress__bar {
+  position: relative;
+  border-radius: 1px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.65) 0, rgba(255, 255, 255, 0.15) 45%, rgba(0, 60, 0, 0.12) 55%, rgba(255, 255, 255, 0.2) 100%),
+    linear-gradient(90deg, #2fa62b, #57d24d 50%, #2fa62b);
+}
+/* The gloss sweep: a light band travelling the bar, transform-only. */
+:root[data-materials='aero'] .ui-progress__bar {
+  overflow: hidden;
+}
+:root[data-materials='aero'] .ui-progress__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+  transform: translateX(-120%);
+  animation: aero-progress-gloss 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes aero-progress-gloss {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(320%); }
+}
+html.reduce-motion[data-materials='aero'] .ui-progress__bar::after,
+html[data-display-anim='none'][data-materials='aero'] .ui-progress__bar::after,
+html[data-perf='battery'][data-materials='aero'] .ui-progress__bar::after,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .ui-progress__bar::after {
+  animation: none;
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='aero'] .ui-progress__bar::after {
+    animation: none;
+    display: none;
+  }
+}
+
+/* ---------- Tooltips: white-to-pale-blue, grey rim, the era's info tip ---------- */
+:root[data-materials='aero'] .ui-tooltip,
+:root[data-materials='aero'] [role='tooltip']:not(.aero-task-peek) {
+  border: 1px solid #767676;
+  border-radius: var(--aero-radius-sm);
+  background: linear-gradient(180deg, #ffffff, #e4ecf7);
+  color: #3c3c3c;
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.22);
+  font: 12px 'Segoe UI', var(--font-body);
+  text-shadow: none;
+}
+
+/* ---------- Explorer column headers with an aqua sort chevron -------------------- */
+:root[data-materials='aero'] th[aria-sort],
+:root[data-materials='aero'] .aero-flash-table-head,
+:root[data-materials='aero'] .jiten-table-head {
+  background: linear-gradient(180deg, #ffffff 0, #f6f9fc 50%, #eef3f8 51%, #f4f7fb 100%);
+  border-bottom: 1px solid #d5dfe9;
+  color: #4c607a;
+  font-weight: 400;
+}
+:root[data-materials='aero'] th[aria-sort]:hover {
+  background: linear-gradient(180deg, #f3fafe 0, #e3f2fb 50%, #d4ebf8 51%, #e2f2fb 100%);
+  box-shadow: inset 1px 0 0 #a9d4ee, inset -1px 0 0 #a9d4ee;
+}
+:root[data-materials='aero'] th[aria-sort='ascending'],
+:root[data-materials='aero'] th[aria-sort='descending'] {
+  position: relative;
+  background: linear-gradient(180deg, #f1f9fe 0, #e2f1fb 50%, #d2e9f7 51%, #e0f0fa 100%);
+}
+:root[data-materials='aero'] th[aria-sort='ascending']::before,
+:root[data-materials='aero'] th[aria-sort='descending']::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 50%;
+  width: 7px;
+  height: 4px;
+  margin-left: -3.5px;
+  background: linear-gradient(180deg, #3c95cf, #1f6ea6);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+:root[data-materials='aero'] th[aria-sort='descending']::before {
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* ---------- Tab hot-tracking ------------------------------------------------------ */
+:root[data-materials='aero'] .ui-tab:hover:not([aria-selected='true']) {
+  border-color: var(--aero-hover-edge);
+  background: var(--aero-hover-fill);
+}
+:root[data-materials='aero'] .ui-tab:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+
+/* ---------- Grammar: an Explorer workbench ------------------------------------------
+   The GrammarX pass above gives the rows and detail their glass; this frames the
+   real panes like an Explorer window: a command bar over the list, a pale filter
+   pane, a white work pane, and level badges in their own derived inks. */
+:root[data-materials='aero'] .gram-x-controls,
+:root[data-materials='aero'] .gram-controls {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--vista-command-edge);
+  background: var(--vista-command-bar);
+  color: var(--vista-command-ink);
+}
+:root[data-materials='aero'] .gram-x-filters,
+:root[data-materials='aero'] .gram-x-drawer {
+  border: 1px solid var(--vista-app-line);
+  border-radius: var(--aero-radius-sm);
+  background: var(--vista-app-nav);
+}
+:root[data-materials='aero'] .gram-x-list,
+:root[data-materials='aero'] .gram-list {
+  background: var(--vista-app-pane);
+}
+:root[data-materials='aero'] .gram-badge.lv-N5 { color: var(--lv-n5-text); }
+:root[data-materials='aero'] .gram-badge.lv-N4 { color: var(--lv-n4-text); }
+:root[data-materials='aero'] .gram-badge.lv-N3 { color: var(--lv-n3-text); }
+:root[data-materials='aero'] .gram-badge.lv-N2 { color: var(--lv-n2-text); }
+:root[data-materials='aero'] .gram-badge.lv-N1 { color: var(--lv-n1-text); }
+:root[data-materials='aero'] .gram-x-row:focus-visible,
+:root[data-materials='aero'] .gram-x-row-main:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+
+/* Tree rows hot-track like Explorer instead of washing in the accent. */
+:root[data-materials='aero'] .ui-tree__row:hover:not([aria-selected='true']) {
+  background: var(--aero-hover-fill);
+  box-shadow: inset 0 0 0 1px var(--aero-hover-edge);
+}
+
+/* ---------- Media Center (Video / Music / Library) accents ----------------------
+   mediaCenter.css re-sources its surfaces and ink from tokens for Aero, but a
+   handful of rules write the Study OS rose literally (#c94061 gradients, rgba(216,
+   74, 104) rings). In Aero the primary action is the aqua gel and focus is the
+   shared ring. */
+:root[data-materials='aero'] .mc-button-primary {
+  border-color: #2c7fb8;
+  background: linear-gradient(180deg, #f2fbff 0, #c9ebfb 46%, #8fd2f3 52%, #b6e3f8 100%);
+  color: #0b3a5c;
+  box-shadow: inset 0 1px 0 #ffffff, 0 2px 6px rgba(44, 127, 184, 0.2);
+}
+:root[data-materials='aero'] .mc-button-primary:hover {
+  border-color: #1f6ea6;
+  background: linear-gradient(180deg, #ffffff 0, #d6f1fd 46%, #79c8f0 52%, #a6dcf6 100%);
+}
+:root[data-materials='aero'] .mc-settings-link.is-active,
+:root[data-materials='aero'] .mc-media-tile.is-active .medialib-card__art {
+  border-color: var(--aero-selection-edge-strong);
+}
+:root[data-materials='aero'] .mc-settings-link.is-active {
+  background: var(--app-selection);
+}
+:root[data-materials='aero'] .mc-global-search:focus-within,
+:root[data-materials='aero'] .mc-subtitle-provider-key input:focus {
+  border-color: var(--aero-selection-edge-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring-color) 35%, transparent);
+}
+:root[data-materials='aero'] .mc-toggle input:focus-visible + i {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }

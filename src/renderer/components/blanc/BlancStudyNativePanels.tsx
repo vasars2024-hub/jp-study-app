@@ -1001,6 +1001,8 @@ export function BlancPitchPanel() {
 }
 
 const CONSOLE_LEVEL_ORDER: ConsoleLevel[] = ['debug', 'info', 'warn', 'error'];
+/** Rows the event list mounts at once (newest first in the ring buffer's order). */
+const CONSOLE_VISIBLE_ROWS = 300;
 
 /**
  * Pillar 5 — developer console.
@@ -1014,15 +1016,17 @@ const CONSOLE_LEVEL_ORDER: ConsoleLevel[] = ['debug', 'info', 'warn', 'error'];
  */
 export function BlancConsolePanel() {
   const { t, lang } = useT();
-  const [, forceRender] = useState(0);
+  const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
   const [minLevel, setMinLevel] = useState<ConsoleLevel>('debug');
   const [category, setCategory] = useState<ConsoleCategory | 'all'>('all');
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => onBlancConsoleChanged(() => forceRender((n) => n + 1)), []);
+  useEffect(() => onBlancConsoleChanged(() => setVersion((n) => n + 1)), []);
 
-  const all = getBlancConsole();
+  // Read once per change, not once per render: the snapshot is a fresh array
+  // each call, so the filter memos below never hit while it was read inline.
+  const all = useMemo(() => getBlancConsole(), [version]);
   const shown = useMemo(() => {
     const byFilter = filterEntries(all, {
       query,
@@ -1049,6 +1053,7 @@ export function BlancConsolePanel() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label={t('blanc.native.console.placeholder')}
             placeholder={t('blanc.native.console.placeholder')}
           />
           {query && (
@@ -1112,9 +1117,16 @@ export function BlancConsolePanel() {
 
       <fieldset>
         <legend>{t('blanc.native.console.legend.events')}</legend>
+        {shown.length > CONSOLE_VISIBLE_ROWS && (
+          // The list renders the newest rows only (up to 2,000 entries were all
+          // mounted at once); the cap is said, and Copy report still has them all.
+          <p className="blanc-note">
+            {t('blanc.refine.console.newest', { shown: CONSOLE_VISIBLE_ROWS, total: shown.length })}
+          </p>
+        )}
         {shown.length ? (
           <ol className="blanc-console-list">
-            {shown.map((entry) => (
+            {shown.slice(-CONSOLE_VISIBLE_ROWS).map((entry) => (
               <li key={entry.id} className={`blanc-console-entry level-${entry.level}`}>
                 <span className="blanc-console-time">
                   {new Date(entry.at).toLocaleTimeString(LANG_TAGS[lang])}
@@ -1293,7 +1305,13 @@ export function BlancAudioMinePanel() {
               className={lang === l ? 'active' : ''}
               aria-pressed={lang === l}
               disabled={busy}
-              onClick={() => setLang(l)}
+              onClick={() => {
+                setLang(l);
+                // The model follows the language (Kotoba-Whisper is Japanese-only),
+                // exactly as it does when the study language changes; the toggle
+                // used to keep the previous language's tier.
+                setTier(loadWhisperModelTier(l));
+              }}
             >
               {t(`blanc.native.audio.lang.${l}`)}
             </button>

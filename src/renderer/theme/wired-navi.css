@@ -1,0 +1,932 @@
+/**
+ * WIRED ARCHIVE — NAVI SHELL pass.
+ * -----------------------------------------------------------------------------
+ * The layer that makes the archive feel like one machine instead of a skin:
+ *
+ *   1. one shared CRT glass over the desktop (scanlines, grille, vignette,
+ *      rolling refresh band; Heavy adds flicker + focused-window wobble)
+ *   2. module-plate window chrome (inverted code stamp, signal meter, bracket
+ *      caption keys, L corner ticks, in-flow status strip)
+ *   3. the taskbar as a data rail (packet ticker, per-task carrier meters,
+ *      L09 clock, hover/focus states)
+ *   4. SYSTEM PROMPT dialogs, menus, palette and clipboard history — square,
+ *      opaque, no frosted glass
+ *   5. DIP switches, Navi cursors, amber caret
+ *   6. wallpaper power lines
+ *
+ * Palette is locked (cyan baseline, amber attention, red only for danger).
+ * Motion is stepped, transform/opacity only, and dies under OS reduced motion,
+ * `html.reduce-motion`, `data-wired-motion='off'`, idle-off (for idle loops)
+ * and the battery perf tier. Every selector carries
+ * `:root[data-materials='wired']` — terminalModeSettings stamps the
+ * `data-wired-*` attributes under every theme (secretIdentityScope.test.ts).
+ */
+
+/* =============================================================================
+   1. Shared CRT glass
+   ============================================================================= */
+:root[data-materials='wired'] .wired-crt {
+  position: absolute;
+  inset: 0;
+  /* Above every window and widget (their z climbs from 1), below the Start
+     backdrop (199999), taskbar (200000) and flyouts (200001). */
+  z-index: 199990;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+  /* Clean: vignette only. */
+  background: radial-gradient(ellipse at 50% 48%, transparent 56%, rgba(0, 0, 0, 0.38) 100%);
+}
+
+/* Standard + Heavy: scanlines, a faint aperture grille, vignette. */
+:root[data-materials='wired']:not([data-wired-crt='clean']) .wired-crt {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.022) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 48%, transparent 56%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+:root[data-materials='wired'][data-wired-crt='heavy'] .wired-crt {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.24) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.035) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 48%, transparent 50%, rgba(0, 0, 0, 0.5) 100%);
+  animation: wn-crt-flicker 7.3s steps(1) infinite;
+}
+
+/* The rolling refresh band: a soft phosphor bar that crawls down the tube. */
+:root[data-materials='wired']:not([data-wired-crt='clean']) .wired-crt::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 18%;
+  background: linear-gradient(180deg, transparent, rgba(109, 241, 255, 0.035) 46%, rgba(216, 251, 255, 0.045) 50%, transparent);
+  transform: translateY(-100%);
+  animation: wn-crt-roll 9s steps(90) infinite;
+  will-change: transform;
+}
+
+/* Heavy: the focused tube loses horizontal sync for two frames now and then. */
+:root[data-materials='wired'][data-wired-crt='heavy'] .fwin.focused:not(.fwin-anim-opening) .fwin-body {
+  animation: wm-sync-wobble 11s steps(2) infinite;
+}
+
+@keyframes wn-crt-roll {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(560%); }
+}
+
+@keyframes wn-crt-flicker {
+  0%, 97.4%, 100% { opacity: 1; }
+  97.6% { opacity: 0.78; }
+  98% { opacity: 0.92; }
+}
+
+/* Reduced static calms the glass; any motion gate stops the band + flicker. */
+:root[data-materials='wired'][data-wired-static='reduced'] .wired-crt::after {
+  opacity: 0.5;
+}
+
+:root[data-materials='wired'][data-wired-motion='off'] .wired-crt,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-crt::after,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-crt,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-crt::after,
+:root[data-materials='wired'][data-perf='battery'] .wired-crt,
+:root[data-materials='wired'][data-perf='battery'] .wired-crt::after,
+:root[data-materials='wired'].reduce-motion .wired-crt,
+:root[data-materials='wired'].reduce-motion .wired-crt::after,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.focused .fwin-body,
+:root[data-materials='wired'][data-wired-idle='off'] .fwin.focused .fwin-body,
+:root[data-materials='wired'].reduce-motion .fwin.focused .fwin-body {
+  animation: none;
+}
+
+:root[data-materials='wired'][data-wired-motion='off'] .wired-crt::after,
+:root[data-materials='wired'][data-perf='battery'] .wired-crt::after,
+:root[data-materials='wired'].reduce-motion .wired-crt::after {
+  display: none;
+}
+
+/* =============================================================================
+   2. Module-plate window chrome
+   ============================================================================= */
+
+/* L corner ticks, 10px, on the frame. Replaces the per-window scanline layer
+   (the shared CRT glass above carries scanlines now — one layer, not N). */
+:root[data-materials='wired'] .fwin:not(.fwin-frameless)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 1;
+  --wn-tick: rgba(109, 241, 255, 0.5);
+  background:
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 0 0 / 10px 1px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 0 0 / 1px 10px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 100% 0 / 10px 1px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 100% 0 / 1px 10px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 0 100% / 10px 1px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 0 100% / 1px 10px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 100% 100% / 10px 1px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 100% 100% / 1px 10px no-repeat;
+}
+
+/* Focused: ticks go amber and blink once as the module takes the line. */
+:root[data-materials='wired'] .fwin.focused:not(.fwin-frameless)::before {
+  --wn-tick: rgba(255, 177, 59, 0.95);
+  animation: wm-relay-blink 0.24s steps(1) 1;
+}
+
+:root[data-materials='wired'] .fwin-bar {
+  gap: 8px;
+  padding: 3px 4px 3px 6px;
+  min-height: 30px;
+}
+
+:root[data-materials='wired'] .fwin-title {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: rgba(216, 251, 255, 0.5);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+:root[data-materials='wired'] .fwin.focused .fwin-title {
+  color: #e9feff;
+}
+
+:root[data-materials='wired'] .fwin-title .fwin-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The inverted plate: dark ink stamped on the cyan, the module's real id. */
+:root[data-materials='wired'] .fwin-wired-code {
+  display: inline-block;
+  margin-right: 1px;
+  padding: 1px 6px;
+  color: #02070d;
+  background: rgba(109, 241, 255, 0.4);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+}
+
+:root[data-materials='wired'] .fwin.focused .fwin-wired-code {
+  background: #6df1ff;
+  box-shadow: 0 0 10px rgba(109, 241, 255, 0.42);
+}
+
+:root[data-materials='wired'] .fwin-wired-sep {
+  color: rgba(109, 241, 255, 0.36);
+}
+
+:root[data-materials='wired'] .fwin-wired-name {
+  letter-spacing: 0.06em;
+}
+
+/* Signal meter: four rising bars. Standby (unfocused) reads amber with the
+   top bar dark; the focused module holds a full cyan carrier. */
+:root[data-materials='wired'] .fwin-wired-meter {
+  flex: none;
+  width: 21px;
+  height: 10px;
+  margin-left: auto;
+  color: rgba(255, 177, 59, 0.72);
+  --wn-bar4: rgba(255, 177, 59, 0.18);
+  background:
+    linear-gradient(currentColor, currentColor) 0 100% / 3px 3px no-repeat,
+    linear-gradient(currentColor, currentColor) 6px 100% / 3px 5px no-repeat,
+    linear-gradient(currentColor, currentColor) 12px 100% / 3px 7px no-repeat,
+    linear-gradient(var(--wn-bar4), var(--wn-bar4)) 18px 100% / 3px 10px no-repeat;
+}
+
+:root[data-materials='wired'] .fwin.focused .fwin-wired-meter {
+  color: #6df1ff;
+  --wn-bar4: #6df1ff;
+  filter: drop-shadow(0 0 3px rgba(109, 241, 255, 0.55));
+}
+
+/* Caption keys: bracketed glyphs, mono, flat. The button keeps its accessible
+   name (aria-label); the original glyph is hidden by zeroing its font size. */
+:root[data-materials='wired'] .fwin-btns {
+  gap: 1px;
+}
+
+:root[data-materials='wired'] .fwin-b[data-cap] {
+  width: auto;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 3px;
+  color: rgba(109, 241, 255, 0.7);
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 0;
+  line-height: 1;
+  transition: none;
+}
+
+:root[data-materials='wired'] .fwin-b[data-cap]::before {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0;
+  white-space: pre;
+}
+
+:root[data-materials='wired'] .fwin-b[data-cap='popout']::before { content: '[^]'; }
+:root[data-materials='wired'] .fwin-b[data-cap='liquid']::before { content: '[\25C7]'; }
+:root[data-materials='wired'] .fwin-b[data-cap='liquid'].is-liquid::before { content: '[\25C6]'; }
+:root[data-materials='wired'] .fwin-b[data-cap='min']::before { content: '[_]'; }
+:root[data-materials='wired'] .fwin-b[data-cap='max']::before { content: '[\25A1]'; }
+:root[data-materials='wired'] .fwin-b[data-cap='max'][aria-pressed='true']::before { content: '[=]'; }
+:root[data-materials='wired'] .fwin-b[data-cap='close']::before { content: '[\00D7]'; }
+
+:root[data-materials='wired'] .fwin.focused .fwin-b[data-cap] {
+  color: #6df1ff;
+}
+
+:root[data-materials='wired'] .fwin-b[data-cap]:hover {
+  color: #02070d;
+  background: #6df1ff;
+  border-color: #6df1ff;
+}
+
+:root[data-materials='wired'] .fwin-b[data-cap]:active {
+  transform: translateY(1px);
+}
+
+/* The one control on the bar that destroys something keeps the danger red. */
+:root[data-materials='wired'] .fwin-b[data-cap='close']:hover {
+  color: #fff;
+  background: rgba(223, 39, 50, 0.88);
+  border-color: #df2732;
+}
+
+:root[data-materials='wired'] .fwin-b[data-cap]:focus-visible,
+:root[data-materials='wired'] .fwin-b:focus-visible {
+  outline: 1px solid #ffb13b;
+  outline-offset: 1px;
+  border-color: rgba(255, 177, 59, 0.7);
+}
+
+/* Field notes keep their own (amber) caption ink. */
+:root[data-materials='wired'] .fwin-note .fwin-b[data-cap] {
+  color: rgba(255, 241, 183, 0.8);
+}
+
+/* In-flow status strip ---------------------------------------------------- */
+:root[data-materials='wired'] .fwin-wired-ready {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(109, 241, 255, 0.62);
+}
+
+:root[data-materials='wired'] .fwin.focused .fwin-wired-ready {
+  color: #6df1ff;
+}
+
+:root[data-materials='wired'] .fwin-wired-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  color: rgba(216, 251, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-materials='wired'] .fwin-wired-uptime {
+  color: rgba(216, 251, 255, 0.72);
+}
+
+:root[data-materials='wired'] .fwin.focused .fwin-wired-uptime {
+  color: #fff1b7;
+}
+
+:root[data-materials='wired'] .fwin-wired-id {
+  color: rgba(109, 241, 255, 0.36);
+}
+
+/* LINK ▮▮▮▯ — the carrier the window is holding. */
+:root[data-materials='wired'] .fwin-wired-carrier {
+  width: 22px;
+  height: 7px;
+  --wn-on: rgba(109, 241, 255, 0.5);
+  --wn-off: rgba(109, 241, 255, 0.14);
+  background:
+    linear-gradient(var(--wn-on), var(--wn-on)) 0 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-on), var(--wn-on)) 6px 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-on), var(--wn-on)) 12px 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-off), var(--wn-off)) 18px 0 / 4px 100% no-repeat;
+}
+
+:root[data-materials='wired'] .fwin.focused .fwin-wired-carrier {
+  --wn-on: #6df1ff;
+}
+
+/* =============================================================================
+   2b. Window transitions — signal tear before the scan-reveal, an afterimage
+       line on close. Layered on the wired-motion.css lifecycle phases.
+   ============================================================================= */
+:root[data-materials='wired'] .fwin.fwin-anim-opening .fwin-bar {
+  animation: wn-signal-tear 0.12s steps(2) both;
+}
+
+@keyframes wn-signal-tear {
+  0% { transform: translateX(-6px) skewX(-8deg); opacity: 0.6; }
+  50% { transform: translateX(5px) skewX(6deg); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+
+/* Close: after the collapse, a 1px phosphor afterimage holds for a beat. */
+:root[data-materials='wired'] .fwin.fwin-anim-closing:not(.fwin-frameless)::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  height: 1px;
+  pointer-events: none;
+  background: #d8fbff;
+  box-shadow: 0 0 8px #6df1ff;
+  opacity: 0;
+  animation: wn-afterimage 0.3s steps(3) 0.06s both;
+}
+
+@keyframes wn-afterimage {
+  0% { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(0.2); }
+}
+
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.fwin-anim-opening .fwin-bar,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.fwin-anim-closing::after,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.focused::before,
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin.fwin-anim-opening .fwin-bar,
+:root[data-materials='wired'].reduce-motion .fwin.fwin-anim-opening .fwin-bar,
+:root[data-materials='wired'].reduce-motion .fwin.fwin-anim-closing::after,
+:root[data-materials='wired'].reduce-motion .fwin.focused::before {
+  animation: none;
+}
+
+/* =============================================================================
+   3. Taskbar data rail
+   ============================================================================= */
+:root[data-materials='wired'] .os-start-btn:hover,
+:root[data-materials='wired'] .os-desktop-switch:hover,
+:root[data-materials='wired'] .os-task-win:hover,
+:root[data-materials='wired'] .os-tray-btn:hover:not(:disabled) {
+  color: #e9feff;
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.16), rgba(109, 241, 255, 0.04)),
+    rgba(4, 28, 39, 0.96);
+  border-color: rgba(109, 241, 255, 0.56);
+}
+
+:root[data-materials='wired'] .os-start-btn:focus-visible,
+:root[data-materials='wired'] .os-desktop-switch:focus-visible,
+:root[data-materials='wired'] .os-task-win:focus-visible,
+:root[data-materials='wired'] .os-tray-btn:focus-visible {
+  outline: 1px solid #ffb13b;
+  outline-offset: 1px;
+  border-color: rgba(255, 177, 59, 0.7);
+}
+
+:root[data-materials='wired'] .os-start-btn:active,
+:root[data-materials='wired'] .os-task-win:active,
+:root[data-materials='wired'] .os-tray-btn:active {
+  transform: translateY(1px);
+}
+
+:root[data-materials='wired'] .os-tray-btn:disabled {
+  opacity: 0.38;
+}
+
+/* Per-task carrier meter: four blocks under the label. Active = full cyan,
+   background = three dim, minimised = one amber (parked on the rail). */
+:root[data-materials='wired'] .os-task-win {
+  position: relative;
+}
+
+:root[data-materials='wired'] .os-task-win:not(.os-task-win-foreign)::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  bottom: 3px;
+  width: 19px;
+  height: 2px;
+  pointer-events: none;
+  --wn-on: rgba(109, 241, 255, 0.45);
+  --wn-off: rgba(109, 241, 255, 0.12);
+  --wn-last: var(--wn-off);
+  background:
+    linear-gradient(var(--wn-on), var(--wn-on)) 0 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-on), var(--wn-on)) 5px 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-on), var(--wn-on)) 10px 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-last), var(--wn-last)) 15px 0 / 4px 100% no-repeat;
+}
+
+:root[data-materials='wired'] .os-task-win.active:not(.os-task-win-foreign)::after {
+  --wn-on: #6df1ff;
+  --wn-last: #6df1ff;
+}
+
+:root[data-materials='wired'] .os-task-win.min:not(.os-task-win-foreign)::after {
+  --wn-on: var(--wn-off);
+  background:
+    linear-gradient(#ffb13b, #ffb13b) 0 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-off), var(--wn-off)) 5px 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-off), var(--wn-off)) 10px 0 / 4px 100% no-repeat,
+    linear-gradient(var(--wn-off), var(--wn-off)) 15px 0 / 4px 100% no-repeat;
+}
+
+/* Packet ticker between the task slots and the tray. */
+:root[data-materials='wired'] .wired-rail-ticker {
+  position: relative;
+  flex: 0 0 132px;
+  height: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(109, 241, 255, 0.16);
+  background:
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.06) 0 1px, transparent 1px 6px),
+    rgba(0, 8, 13, 0.8);
+}
+
+:root[data-materials='wired'] .wired-rail-ticker i {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  width: 264px;
+  height: 6px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(109, 241, 255, 0.85) 0 3px,
+    transparent 3px 9px,
+    rgba(109, 241, 255, 0.4) 9px 11px,
+    transparent 11px 22px,
+    rgba(255, 177, 59, 0.8) 22px 24px,
+    transparent 24px 30px,
+    rgba(109, 241, 255, 0.6) 30px 31px,
+    transparent 31px 44px
+  );
+  animation: wn-rail-packets 6.6s steps(44) infinite;
+  will-change: transform;
+}
+
+@keyframes wn-rail-packets {
+  from { transform: translateX(-132px); }
+  to { transform: translateX(0); }
+}
+
+@media (max-width: 1100px) {
+  :root[data-materials='wired'] .wired-rail-ticker {
+    display: none;
+  }
+}
+
+:root[data-materials='wired'][data-wired-idle='off'] .wired-rail-ticker i,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-rail-ticker i,
+:root[data-materials='wired'][data-perf='battery'] .wired-rail-ticker i,
+:root[data-materials='wired'].reduce-motion .wired-rail-ticker i {
+  animation: none;
+}
+
+/* L09 · HH:MM:SS */
+:root[data-materials='wired'] .os-clock > span:first-child::before {
+  content: 'L09 \00B7 ';
+  color: rgba(255, 177, 59, 0.85);
+}
+
+/* Rotating globe (WiredGlobe.tsx): meridians run a stepped cosine on scaleX,
+   phase-staggered 1s apart; the surface node rides the same turn and hides on
+   the far side. 12s per revolution, 4 fps. */
+:root[data-materials='wired'] .wired-globe-meridian {
+  fill: none;
+  stroke: rgba(109, 241, 255, 0.5);
+  stroke-width: 0.7;
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+  animation: wg-meridian 12s steps(6) infinite;
+  animation-delay: calc(var(--wg-i, 0) * -1s);
+}
+
+@keyframes wg-meridian {
+  0% { transform: scaleX(1); }
+  12.5% { transform: scaleX(0.707); }
+  25% { transform: scaleX(0.02); }
+  37.5% { transform: scaleX(-0.707); }
+  50% { transform: scaleX(-1); }
+  62.5% { transform: scaleX(-0.707); }
+  75% { transform: scaleX(-0.02); }
+  87.5% { transform: scaleX(0.707); }
+  100% { transform: scaleX(1); }
+}
+
+:root[data-materials='wired'] .wired-globe-node-track {
+  transform-box: view-box;
+  animation: wg-node 12s steps(6) infinite;
+}
+
+:root[data-materials='wired'] .wired-globe-node {
+  fill: #6df1ff;
+}
+
+:root[data-materials='wired'] .wired-globe.is-alert .wired-globe-node {
+  fill: #ffb13b;
+}
+
+:root[data-materials='wired'] .wired-globe.is-alert .wired-globe-outline {
+  stroke: rgba(255, 177, 59, 0.6);
+}
+
+@keyframes wg-node {
+  0% { transform: translateX(0); opacity: 1; }
+  12.5% { transform: translateX(-9.8px); opacity: 1; }
+  24.9% { transform: translateX(-13.6px); opacity: 1; }
+  25% { transform: translateX(-13.6px); opacity: 0; }
+  74.9% { transform: translateX(13.6px); opacity: 0; }
+  75% { transform: translateX(13.6px); opacity: 1; }
+  87.5% { transform: translateX(9.8px); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+:root[data-materials='wired'][data-wired-idle='off'] .wired-globe-meridian,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-globe-node-track,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-globe-meridian,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-globe-node-track,
+:root[data-materials='wired'].reduce-motion .wired-globe-meridian,
+:root[data-materials='wired'].reduce-motion .wired-globe-node-track {
+  animation: none;
+}
+
+/* Frozen globe: fan the meridians out so it still reads as a sphere. */
+:root[data-materials='wired'][data-wired-idle='off'] .wired-globe-meridian,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-globe-meridian,
+:root[data-materials='wired'].reduce-motion .wired-globe-meridian {
+  transform: scaleX(calc(1 - var(--wg-i, 0) * 0.19));
+}
+
+/* =============================================================================
+   4. SYSTEM PROMPT surfaces — dialogs, menus, palette, clipboard history
+   ============================================================================= */
+:root[data-materials='wired'] .ui-overlay {
+  background: rgba(0, 4, 7, 0.72);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-materials='wired'] .ui-dialog,
+:root[data-materials='wired'] .ui-sheet {
+  border-radius: 0;
+  color: var(--text);
+  background: rgba(1, 13, 20, 0.97);
+  border: 1px solid rgba(109, 241, 255, 0.5);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.62), 0 0 28px rgba(109, 241, 255, 0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  font-family: var(--font-mono);
+}
+
+/* Amber header strip. The label is translated: DesktopShell's Wired wallpaper
+   publishes `--wn-kicker-prompt` from the catalog (`wired.prompt.kicker`), so
+   the CSS never carries the English. */
+:root[data-materials='wired'] .ui-dialog::before {
+  content: var(--wn-kicker-prompt, 'SYSTEM PROMPT');
+  display: block;
+  flex: none;
+  padding: 3px 10px;
+  color: #160a00;
+  background: #ffb13b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
+:root[data-materials='wired'] .ui-dialog__head {
+  border-bottom: 1px solid rgba(109, 241, 255, 0.24);
+  background: rgba(0, 8, 13, 0.8);
+}
+
+:root[data-materials='wired'] .ui-dialog__title {
+  color: #e9feff;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+:root[data-materials='wired'] .ui-dialog__foot {
+  border-top: 1px solid rgba(109, 241, 255, 0.2);
+  background: rgba(0, 8, 13, 0.6);
+}
+
+/* [ EXECUTE ] / [ ABORT ] — the labels are the buttons' own translated text;
+   only the brackets are drawn here. */
+:root[data-materials='wired'] .ui-dialog__foot button::before {
+  content: '[\00A0';
+  color: rgba(109, 241, 255, 0.55);
+}
+
+:root[data-materials='wired'] .ui-dialog__foot button::after {
+  content: '\00A0]';
+  color: rgba(109, 241, 255, 0.55);
+}
+
+:root[data-materials='wired'] .ui-dialog__foot button {
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+}
+
+:root[data-materials='wired'] .ui-dialog__foot .ui-btn--primary {
+  color: #02070d;
+  background: #6df1ff;
+  border-color: #6df1ff;
+}
+
+:root[data-materials='wired'] .ui-dialog__foot .ui-btn--primary::before,
+:root[data-materials='wired'] .ui-dialog__foot .ui-btn--primary::after {
+  color: rgba(2, 7, 13, 0.6);
+}
+
+:root[data-materials='wired'] .ui-dialog__foot .ui-btn--danger {
+  color: #fff;
+  background: rgba(223, 39, 50, 0.82);
+  border-color: #df2732;
+}
+
+:root[data-materials='wired'] .ui-dialog__foot .ui-btn--danger::before,
+:root[data-materials='wired'] .ui-dialog__foot .ui-btn--danger::after {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+:root[data-materials='wired'] .ui-dialog__foot button:focus-visible {
+  outline: 1px solid #ffb13b;
+  outline-offset: 2px;
+}
+
+/* Context menus. */
+:root[data-materials='wired'] .ui-menu {
+  border-radius: 0;
+  padding: 3px;
+  background: rgba(1, 13, 20, 0.97);
+  border: 1px solid rgba(109, 241, 255, 0.46);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.58), 0 0 18px rgba(109, 241, 255, 0.12);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .ui-menu__item {
+  border-radius: 0;
+  color: rgba(216, 251, 255, 0.86);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+:root[data-materials='wired'] .ui-menu__item:hover,
+:root[data-materials='wired'] .ui-menu__item:focus-visible {
+  color: #02070d;
+  background: #6df1ff;
+}
+
+:root[data-materials='wired'] .ui-menu__item--danger {
+  color: #ff9aa0;
+}
+
+:root[data-materials='wired'] .ui-menu__item--danger:hover,
+:root[data-materials='wired'] .ui-menu__item--danger:focus-visible {
+  color: #fff;
+  background: rgba(223, 39, 50, 0.85);
+}
+
+:root[data-materials='wired'] .ui-menu__sep {
+  background: rgba(109, 241, 255, 0.18);
+}
+
+/* Command palette + clipboard history. */
+:root[data-materials='wired'] .palette-backdrop {
+  background: rgba(0, 4, 7, 0.6);
+}
+
+:root[data-materials='wired'] .palette,
+:root[data-materials='wired'] .cbh-panel {
+  border-radius: 0;
+  color: var(--text);
+  background: rgba(1, 13, 20, 0.97);
+  border: 1px solid rgba(109, 241, 255, 0.46);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 24px rgba(109, 241, 255, 0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .palette *,
+:root[data-materials='wired'] .cbh-panel * {
+  border-radius: 0;
+}
+
+/* =============================================================================
+   5. DIP switches, cursors, caret
+   ============================================================================= */
+/* Square DIP switch, stepped throw (spec §5.14). Out-specifies ui.css's
+   `:root[data-materials] .ui-switch.ui-switch` pill by source order. */
+:root[data-materials='wired'] .ui-switch.ui-switch {
+  width: 40px;
+  height: 18px;
+  border-radius: 0;
+  border-color: rgba(109, 241, 255, 0.42);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 4px, rgba(109, 241, 255, 0.07) 4px 5px),
+    rgba(0, 8, 13, 0.92);
+  transition: none;
+}
+
+:root[data-materials='wired'] .ui-switch.ui-switch::before {
+  left: 2px;
+  width: 16px;
+  height: 12px;
+  border-radius: 0;
+  background: rgba(216, 251, 255, 0.5);
+  opacity: 1;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+  transition: transform 120ms steps(2);
+}
+
+:root[data-materials='wired'] .ui-switch.ui-switch:hover:not(:disabled)::before {
+  width: 16px;
+  background: rgba(233, 254, 255, 0.72);
+}
+
+:root[data-materials='wired'] .ui-switch.ui-switch:checked {
+  border-color: #6df1ff;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 4px, rgba(109, 241, 255, 0.12) 4px 5px),
+    rgba(4, 32, 43, 0.96);
+}
+
+:root[data-materials='wired'] .ui-switch.ui-switch:checked::before {
+  background: #6df1ff;
+  transform: translate(18px, -50%);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25), 0 0 8px rgba(109, 241, 255, 0.55);
+}
+
+:root[data-materials='wired'] .ui-switch.ui-switch:focus-visible {
+  outline: 1px solid #ffb13b;
+  outline-offset: 2px;
+}
+
+:root[data-materials='wired'].reduce-motion .ui-switch.ui-switch::before {
+  transition: none;
+}
+
+/* Navi cursors — drawn for this app, cyan on black, 1px stroke. */
+:root[data-materials='wired'] body,
+:root[data-materials='wired'] .os-desktop {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='24' viewBox='0 0 20 24'%3E%3Cpath d='M1.5 1.5v17.2l4.4-4.3 2.9 7 2.6-1.1-2.9-6.9h6.2z' fill='%2302070d' stroke='%236df1ff' stroke-width='1.2' stroke-linejoin='miter'/%3E%3Cpath d='M3.5 5.5v8' stroke='%236df1ff' stroke-opacity='.45'/%3E%3C/svg%3E") 1 1, default;
+}
+
+:root[data-materials='wired'] :is(a[href], button:not(:disabled), [role='button'], [role='tab'], [role='menuitem'], summary, select, .os-desk-icon) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='24' viewBox='0 0 20 24'%3E%3Cpath d='M1.5 1.5v17.2l4.4-4.3 2.9 7 2.6-1.1-2.9-6.9h6.2z' fill='%2302070d' stroke='%23ffb13b' stroke-width='1.2'/%3E%3Crect x='13' y='17' width='5' height='5' fill='%23ffb13b'/%3E%3C/svg%3E") 1 1, pointer;
+}
+
+:root[data-materials='wired'] :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']), textarea, [contenteditable='true']) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='24' viewBox='0 0 16 24'%3E%3Cpath d='M4 2h8M8 2v20M4 22h8' fill='none' stroke='%2302070d' stroke-width='3'/%3E%3Cpath d='M4 2h8M8 2v20M4 22h8' fill='none' stroke='%236df1ff' stroke-width='1.2'/%3E%3C/svg%3E") 8 12, text;
+  caret-color: #ffb13b;
+}
+
+:root[data-materials='wired'] .fwin-edge-r {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='16' viewBox='0 0 24 16'%3E%3Cpath d='M2 8h20M6 4L2 8l4 4M18 4l4 4-4 4' fill='none' stroke='%2302070d' stroke-width='3'/%3E%3Cpath d='M2 8h20M6 4L2 8l4 4M18 4l4 4-4 4' fill='none' stroke='%236df1ff' stroke-width='1.2'/%3E%3C/svg%3E") 12 8, ew-resize;
+}
+
+:root[data-materials='wired'] .fwin-edge-b {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='24' viewBox='0 0 16 24'%3E%3Cpath d='M8 2v20M4 6l4-4 4 4M4 18l4 4 4-4' fill='none' stroke='%2302070d' stroke-width='3'/%3E%3Cpath d='M8 2v20M4 6l4-4 4 4M4 18l4 4 4-4' fill='none' stroke='%236df1ff' stroke-width='1.2'/%3E%3C/svg%3E") 8 12, ns-resize;
+}
+
+:root[data-materials='wired'] .fwin-resize {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'%3E%3Cpath d='M3 3l16 16M3 9V3h6M19 13v6h-6' fill='none' stroke='%2302070d' stroke-width='3'/%3E%3Cpath d='M3 3l16 16M3 9V3h6M19 13v6h-6' fill='none' stroke='%236df1ff' stroke-width='1.2'/%3E%3C/svg%3E") 11 11, nwse-resize;
+}
+
+/* The resize corner reads as a hardware grip, not a rounded triangle. */
+:root[data-materials='wired'] .fwin-resize {
+  border-radius: 0;
+  background:
+    linear-gradient(135deg, transparent 0 54%, rgba(109, 241, 255, 0.5) 54% 58%, transparent 58% 70%, rgba(109, 241, 255, 0.5) 70% 74%, transparent 74%);
+}
+
+/* =============================================================================
+   6. Wallpaper — power lines over the grid
+   ============================================================================= */
+:root[data-materials='wired'] .wired-wall-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+:root[data-materials='wired'] .wired-wall-watermark {
+  fill: rgba(109, 241, 255, 0.03);
+  font-family: var(--font-mono);
+  font-size: 168px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+:root[data-materials='wired'] .wired-wall-wires path {
+  fill: none;
+  stroke: rgba(109, 241, 255, 0.2);
+  stroke-width: 1.3;
+  vector-effect: non-scaling-stroke;
+}
+
+:root[data-materials='wired'] .wired-wall-pole rect {
+  fill: rgba(0, 5, 9, 0.92);
+  stroke: rgba(109, 241, 255, 0.16);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* One signal walking the line. stroke-dashoffset on a single short path,
+   stepped at ~4 fps — the cheapest motion on the desktop. */
+:root[data-materials='wired'] .wired-wall-pulse {
+  fill: none;
+  stroke: rgba(216, 251, 255, 0.85);
+  stroke-width: 2;
+  stroke-dasharray: 10 990;
+  stroke-dashoffset: 1000;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px rgba(109, 241, 255, 0.8));
+  animation: wn-wire-pulse 14s steps(56) infinite;
+}
+
+@keyframes wn-wire-pulse {
+  from { stroke-dashoffset: 1000; }
+  to { stroke-dashoffset: 0; }
+}
+
+:root[data-materials='wired'][data-wired-idle='off'] .wired-wall-pulse,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-wall-pulse,
+:root[data-materials='wired'][data-perf='battery'] .wired-wall-pulse,
+:root[data-materials='wired'].reduce-motion .wired-wall-pulse {
+  animation: none;
+  opacity: 0;
+}
+
+/* With the finding overlay up, its right rail owns the top-right corner; the
+   wallpaper's kana column steps inward instead of printing under the eye. */
+:root[data-materials='wired'] .os-desktop:has(> .wired-found-overlay) .wired-wall-kana {
+  right: 300px;
+  top: 150px;
+  opacity: 0.6;
+}
+
+/* Living-layer wallpapers are painted for Study OS (often light); inside the
+   archive they become a dim cold haze behind the grid instead of a bright plate. */
+:root[data-materials='wired'] .os-env-stack .os-wall-stage,
+:root[data-materials='wired'] .os-env-stack .os-weather,
+:root[data-materials='wired'] .os-env-stack .os-day-lighting {
+  filter: grayscale(1) brightness(0.5) sepia(0.4) hue-rotate(150deg);
+  opacity: 0.2;
+}
+
+/* =============================================================================
+   OS reduced motion — everything in this sheet stands still.
+   ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='wired'] .wired-crt,
+  :root[data-materials='wired'] .fwin.focused .fwin-body,
+  :root[data-materials='wired'] .fwin.focused::before,
+  :root[data-materials='wired'] .fwin.fwin-anim-opening .fwin-bar,
+  :root[data-materials='wired'] .fwin.fwin-anim-closing::after,
+  :root[data-materials='wired'] .wired-rail-ticker i,
+  :root[data-materials='wired'] .wired-wall-pulse,
+  :root[data-materials='wired'] .wired-globe-meridian,
+  :root[data-materials='wired'] .wired-globe-node-track {
+    animation: none;
+  }
+
+  :root[data-materials='wired'] .wired-globe-meridian {
+    transform: scaleX(calc(1 - var(--wg-i, 0) * 0.19));
+  }
+
+  :root[data-materials='wired'] .wired-crt::after {
+    display: none;
+  }
+
+  :root[data-materials='wired'] .wired-wall-pulse {
+    opacity: 0;
+  }
+
+  :root[data-materials='wired'] .ui-switch.ui-switch::before {
+    transition: none;
+  }
+}

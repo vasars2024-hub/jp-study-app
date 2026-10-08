@@ -116,5 +116,16 @@ export function saveAeroLegacySettings(patch: Partial<AeroLegacySettings>): Aero
 export function onAeroLegacySettingsChanged(cb: (settings: AeroLegacySettings) => void): () => void {
   const handler = (event: Event): void => cb((event as CustomEvent<AeroLegacySettings>).detail);
   window.addEventListener(EVENT, handler);
-  return () => window.removeEventListener(EVENT, handler);
+  // `EVENT` is window-local: a gadget toggled in a popped-out Settings window
+  // never reached the desktop until it reloaded. `storage` fires in every OTHER
+  // window sharing this origin, which is exactly the missing half.
+  const onStorage = (event: StorageEvent): void => {
+    if (event.key !== KEY) return;
+    cb(loadAeroLegacySettings());
+  };
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(EVENT, handler);
+    window.removeEventListener('storage', onStorage);
+  };
 }

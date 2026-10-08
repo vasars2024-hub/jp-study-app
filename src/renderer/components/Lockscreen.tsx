@@ -1,6 +1,7 @@
 /**
  * Lockscreen — full-screen Win11-style gate (GrammarX), compact widget (floating),
- * or Windows XP welcome screen (Secret Aero).
+ * or the Aero logon screen (Secret Aero): a Vista-era dark teal stage with
+ * drifting light ribbons, a centred user tile, ease-of-access and power orbs.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
@@ -41,8 +42,13 @@ export default function Lockscreen({
   widgetMode?: boolean;
 }) {
   const { t, lang } = useT();
-  const xpMode = !widgetMode && isAeroLockscreen();
+  const aeroMode = !widgetMode && isAeroLockscreen();
   const wiredMode = !widgetMode && isWiredLockscreen();
+  // Aero logon extras: ease-of-access (high-contrast, larger type on this
+  // screen only) and the power orb's "display off" doze. Both are local to the
+  // lock screen and reversible; neither can bypass the passcode.
+  const [easeMode, setEaseMode] = useState(false);
+  const [dozing, setDozing] = useState(false);
   const [cfg] = useState<LockscreenSettings>(() => loadLockscreen());
   const [digits, setDigits] = useState('');
   const [password, setPassword] = useState('');
@@ -61,8 +67,25 @@ export default function Lockscreen({
   }, []);
 
   useEffect(() => {
-    if (xpMode || wiredMode) passwordRef.current?.focus();
-  }, [xpMode, wiredMode]);
+    if (aeroMode || wiredMode) passwordRef.current?.focus();
+  }, [aeroMode, wiredMode]);
+
+  // Doze: any key or press wakes the screen and puts focus back in the field.
+  useEffect(() => {
+    if (!dozing) return;
+    const wake = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDozing(false);
+      window.setTimeout(() => passwordRef.current?.focus(), 0);
+    };
+    window.addEventListener('keydown', wake, true);
+    window.addEventListener('pointerdown', wake, true);
+    return () => {
+      window.removeEventListener('keydown', wake, true);
+      window.removeEventListener('pointerdown', wake, true);
+    };
+  }, [dozing]);
 
   useEffect(() => {
     if (!widgetMode) return;
@@ -146,7 +169,7 @@ export default function Lockscreen({
   );
 
   useEffect(() => {
-    if (xpMode || wiredMode) return;
+    if (aeroMode || wiredMode) return;
     const onKey = (e: KeyboardEvent) => {
       if (unlocking) return;
       if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -163,7 +186,7 @@ export default function Lockscreen({
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [press, unlocking, xpMode, wiredMode]);
+  }, [press, unlocking, aeroMode, wiredMode]);
 
   const submitPassword = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -236,62 +259,102 @@ export default function Lockscreen({
     );
   }
 
-  if (xpMode) {
+  if (aeroMode) {
+    // The failure flash (`error`) lasts 420 ms; the Vista-style notice under the
+    // field stays until the person starts typing again, so it can be read.
+    const showIncorrect = error || (failCount > 0 && password === '');
     return (
       <div
-        className={`lockscreen lockscreen-xp${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}`}
+        className={`lockscreen lockscreen-aero${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}${easeMode ? ' is-ease' : ''}${dozing ? ' is-dozing' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={t('lockscreen.aria.xp')}
       >
-        <div className="lockscreen-xp-left">
-          <div className="lockscreen-xp-logo" aria-hidden="true">
-            <span className="lockscreen-xp-emblem" />
-            <span className="lockscreen-xp-wordmark">
-              <span className="lockscreen-xp-tag">Secret</span>
-              <span className="lockscreen-xp-brand">
-                Study<span className="lockscreen-xp-ed">OS</span>
-              </span>
-            </span>
-          </div>
-          <p className="lockscreen-xp-hint">{t('lockscreen.xp.hint')}</p>
+        <div className="lockscreen-aero-bg" aria-hidden="true">
+          <span className="lockscreen-aero-ribbon is-a" />
+          <span className="lockscreen-aero-ribbon is-b" />
+          <span className="lockscreen-aero-glow" />
         </div>
-        <div className="lockscreen-xp-right">
-          <div className={`lockscreen-xp-user${shake ? ' is-shake' : ''}${error ? ' is-error' : ''}`}>
-            <div className="lockscreen-xp-avatar" aria-hidden="true" />
-            <div className="lockscreen-xp-user-body">
-              <div className="lockscreen-xp-user-name">{t('lockscreen.user')}</div>
-              <div className="lockscreen-xp-user-prompt">
-                {error ? t('lockscreen.xp.incorrect') : t('lockscreen.xp.type')}
-              </div>
-              <form className="lockscreen-xp-pass-row" onSubmit={submitPassword}>
-                <input
-                  ref={passwordRef}
-                  type="password"
-                  className="lockscreen-xp-pass"
-                  value={password}
-                  maxLength={4}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  disabled={unlocking}
-                  aria-label={t('lockscreen.aria.password')}
-                  onChange={(e) => {
-                    setPassword(e.target.value.replace(/\D/g, '').slice(0, 4));
-                    setError(false);
-                  }}
-                />
-                <button type="submit" className="lockscreen-xp-go" disabled={unlocking} aria-label={t('lockscreen.aria.signIn')}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </form>
+        <div className="lockscreen-aero-clock" aria-hidden="true">
+          <time>{time}</time>
+          <span>{date}</span>
+        </div>
+        <div className="lockscreen-aero-center">
+          <div className={`lockscreen-aero-tile${shake ? ' is-shake' : ''}${error ? ' is-error' : ''}`}>
+            <div className="lockscreen-aero-frame" aria-hidden="true">
+              <span className="lockscreen-aero-picture" />
             </div>
-          </div>
-          <div className="lockscreen-xp-clock muted">
-            {time} · {date}
+            <div className="lockscreen-aero-name">{t('lockscreen.user')}</div>
+            <form className="lockscreen-aero-form" onSubmit={submitPassword}>
+              <input
+                ref={passwordRef}
+                type="password"
+                className="lockscreen-aero-pass"
+                value={password}
+                maxLength={4}
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={unlocking}
+                placeholder={t('lockscreen.aria.password')}
+                aria-label={t('lockscreen.aria.password')}
+                aria-invalid={showIncorrect || undefined}
+                aria-describedby="lockscreen-aero-status"
+                onChange={(e) => {
+                  setPassword(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  setError(false);
+                }}
+              />
+              <button type="submit" className="lockscreen-aero-go" disabled={unlocking} aria-label={t('lockscreen.aria.signIn')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12h13M12.5 6.5 18 12l-5.5 5.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </form>
+            <p id="lockscreen-aero-status" className="lockscreen-aero-status" role="status" aria-live="polite">
+              {showIncorrect ? t('lockscreen.xp.incorrect') : ''}
+            </p>
           </div>
         </div>
+        <button
+          type="button"
+          className="lockscreen-aero-orb lockscreen-aero-ease"
+          aria-pressed={easeMode}
+          aria-label={t('aeroVista.lock.easeOfAccess')}
+          title={t('aeroVista.lock.easeOfAccess')}
+          onClick={() => {
+            setEaseMode((on) => !on);
+            passwordRef.current?.focus();
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9.2" stroke="currentColor" strokeWidth="1.6" />
+            <circle cx="12" cy="7.4" r="1.6" fill="currentColor" />
+            <path d="M7.2 10.2 12 11.2l4.8-1M12 11.2v3.4M12 14.6l-2.6 4M12 14.6l2.6 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <div className="lockscreen-aero-brand" aria-hidden="true">
+          <span className="lockscreen-aero-mark" />
+          <span className="lockscreen-aero-word">Gum</span>
+          <span className="lockscreen-aero-edition">{t('aeroVista.lock.edition')}</span>
+        </div>
+        <button
+          type="button"
+          className="lockscreen-aero-orb lockscreen-aero-power"
+          aria-label={t('aeroVista.lock.sleep')}
+          title={t('aeroVista.lock.sleep')}
+          disabled={unlocking}
+          onClick={() => setDozing(true)}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3.6v7.6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+            <path d="M7.1 6.4a7.4 7.4 0 1 0 9.8 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+        </button>
+        {dozing && (
+          <div className="lockscreen-aero-doze" role="status" aria-live="polite">
+            <span>{t('aeroVista.lock.wakeHint')}</span>
+          </div>
+        )}
       </div>
     );
   }

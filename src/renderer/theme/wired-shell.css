@@ -67,7 +67,18 @@
 /* Desktop icons ----------------------------------------------------------- */
 :root[data-materials='wired'] .os-desk-icon {
   color: var(--wired-cyan);
-  text-shadow: var(--wired-glow);
+}
+
+/* Module codes under the icons are codes — they keep the phosphor. */
+:root[data-materials='wired'] .os-desk-icon-label {
+  text-shadow: 0 0 8px rgba(109, 241, 255, 0.35);
+  letter-spacing: 0.12em;
+}
+
+:root[data-materials='wired'] .os-desk-icon:hover .os-desk-icon-img,
+:root[data-materials='wired'] .os-desk-icon:focus-visible .os-desk-icon-img {
+  border-color: rgba(109, 241, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.2) inset, 0 0 22px rgba(109, 241, 255, 0.3);
 }
 
 :root[data-materials='wired'] .os-desk-icon-img {
@@ -118,7 +129,9 @@
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgba(109, 241, 255, 0.08);
   font-family: var(--font-mono);
-  text-shadow: var(--wired-glow);
+  /* Phosphor glow is reserved for headings, codes and live readouts; on every
+     button label it smeared the rail into one soft blur. */
+  text-shadow: none;
 }
 
 :root[data-materials='wired'] .os-start-btn.active,
@@ -185,9 +198,12 @@
   border: 1px solid rgba(109, 241, 255, 0.42);
   background:
     linear-gradient(180deg, rgba(109, 241, 255, 0.12), transparent 30%),
-    rgba(1, 14, 22, 0.96);
+    rgba(1, 14, 22, 0.985);
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.52), 0 0 32px rgba(109, 241, 255, 0.16);
-  backdrop-filter: blur(10px);
+  /* No blur: the panel is near-opaque, so a backdrop blur was paying a full
+     re-rasterise of everything behind it for a difference nobody could see. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 :root[data-materials='wired'] .os-start-aero-head,
@@ -420,20 +436,9 @@
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58), 0 0 24px rgba(109, 241, 255, 0.18);
 }
 
-:root[data-materials='wired'] .fwin::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 4px);
-  opacity: 0.5;
-  z-index: 2;
-}
-
-:root[data-materials='wired'][data-wired-crt='clean'] .fwin::before,
-:root[data-materials='wired'][data-wired-static='reduced'] .fwin::before {
-  opacity: 0.18;
-}
+/* `.fwin::before` used to carry a per-window scanline layer. Scanlines now
+   live on the single shared `.wired-crt` glass (wired-navi.css), and the
+   window's `::before` draws its L corner ticks instead. */
 
 :root[data-materials='wired'] .fwin-bar,
 :root[data-materials='wired'] .fwin-drag-strip {
@@ -472,20 +477,28 @@
   color: var(--text);
 }
 
+/* In-flow footer, not an overlay. It used to be `position: absolute` at z 3
+   over the window body, which hid the last ~20px of every window AND sat on
+   top of `.fwin-edge-b` (z 2) — bottom-edge resize was dead in Wired. As a
+   `flex: none` row of the `.fwin` column the body shrinks to make room, and the
+   absolutely-positioned resize edge (z 2, later in the DOM) stays on top. */
 :root[data-materials='wired'] .fwin-wired-status {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 3;
+  position: relative;
+  flex: none;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 3px 8px;
-  color: rgba(216, 251, 255, 0.78);
+  min-height: 18px;
+  padding: 2px 22px 2px 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  color: rgba(216, 251, 255, 0.6);
   background: rgba(0, 7, 11, 0.96);
   border-top: 1px solid rgba(109, 241, 255, 0.22);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
 }
 
 .fwin-wired-status {
@@ -496,35 +509,70 @@
    Sticky notes carry an inline pastel colour from the desktop shell. In the
    Wired that pastel reads as a bug, so the terminal palette overrides it
    outright (hence !important — it is beating an inline style, not a rule). */
+/* One identity: amber acetate monitor tape (spec §5.15). This block and the
+   one in wired-apps.css used to disagree — a cyan title bar here with
+   !important, amber everywhere else — so a note was half cyan, half amber.
+   The whole note is amber now; this block owns the inline-style overrides,
+   wired-apps.css owns the tape margin and stamp. */
 :root[data-materials='wired'] .fwin-note {
-  border-color: rgba(109, 241, 255, 0.34);
+  border: 1px solid rgba(255, 177, 59, 0.56);
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 177, 59, 0.05) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, rgba(255, 177, 59, 0.16), rgba(255, 177, 59, 0.07)),
+    rgba(20, 13, 2, 0.94);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.46), 0 0 18px rgba(255, 177, 59, 0.14);
 }
 
 :root[data-materials='wired'] .fwin-note .fwin-bar {
   background:
-    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.08) 0 1px, transparent 1px 16px),
-    rgba(3, 25, 35, 0.96) !important;
-  border-bottom: 1px solid rgba(109, 241, 255, 0.28) !important;
-  color: #e9feff;
+    repeating-linear-gradient(90deg, rgba(255, 177, 59, 0.1) 0 1px, transparent 1px 16px),
+    rgba(52, 33, 4, 0.96) !important;
+  border-bottom: 1px solid rgba(255, 177, 59, 0.36) !important;
+  color: #fff1b7;
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-title,
+:root[data-materials='wired'] .fwin-note .fwin-title .fwin-wired-name {
+  color: #fff1b7 !important;
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-wired-code {
+  color: #160a00;
+  background: #ffb13b;
+  box-shadow: none;
 }
 
 :root[data-materials='wired'] .fwin-note .fwin-body-note {
-  background:
-    linear-gradient(rgba(109, 241, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(109, 241, 255, 0.035) 1px, transparent 1px),
-    rgba(3, 13, 19, 0.96);
-  background-size: 18px 18px;
+  background: transparent;
+}
+
+/* The pastel swatches choose a colour the archive overrides anyway (every
+   field note is amber tape here), so offering them would be a control that
+   visibly does nothing. The stored colour is untouched for other themes. */
+:root[data-materials='wired'] .fwin-note .desk-note-palette {
+  display: none;
 }
 
 :root[data-materials='wired'] .fwin-note .desk-note-text {
   background: transparent !important;
-  color: var(--wired-cyan);
+  color: #fff1b7;
   font-family: var(--font-mono);
   caret-color: var(--wired-amber);
 }
 
 :root[data-materials='wired'] .fwin-note .desk-note-text::placeholder {
-  color: rgba(109, 241, 255, 0.4);
+  color: rgba(255, 241, 183, 0.4);
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-wired-status {
+  color: rgba(255, 241, 183, 0.6);
+  background: rgba(20, 13, 2, 0.96);
+  border-top-color: rgba(255, 177, 59, 0.28);
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-wired-ready,
+:root[data-materials='wired'] .fwin-note .fwin-wired-id {
+  color: rgba(255, 177, 59, 0.75);
 }
 
 /* Bulletin and flyouts ---------------------------------------------------- */
@@ -980,6 +1028,29 @@
   }
 }
 
+/* ===========================================================================
+   Finding overlay — the archive noticing you
+   ===========================================================================
+   Consolidated 2026-10 (NAVI SHELL pass). This section used to be three
+   generations of rules stacked on top of each other — every selector declared
+   two or three times, the last one winning — plus blocks for markup that no
+   longer exists (ribbon, drawn guide face, panel heads, protocol meter). It is
+   now one declaration per selector, at the values that were actually winning,
+   with these deliberate changes:
+
+   - Layout: nothing sits on the desktop icon column any more. The protocol
+     tiles were at left:18/top:86 with `pointer-events: auto` ABOVE the icons
+     (z 4 vs 1), which swallowed clicks on the first icon column. They are a
+     centred top strip now, and only their controls take the pointer.
+   - The right-hand instruments are a stacked rail (eye + scope, node map,
+     lyric rail, guide) instead of four panels overlapping each other when every
+     module is on.
+   - Every loop is stepped. CRT hardware does not tween; `linear` and `ease`
+     were the last smooth curves in the theme.
+   - Square corners throughout (were 3/4/6/8px).
+   - No whole-overlay `filter` (it forced the full-screen layer to re-raster
+     on every animation frame of every child).
+   --------------------------------------------------------------------------- */
 .wired-found-overlay {
   position: absolute;
   inset: 0;
@@ -987,6 +1058,7 @@
   pointer-events: none;
   overflow: hidden;
   color: #d8fbff;
+  opacity: 0.86;
   mix-blend-mode: screen;
 }
 .wired-found-overlay *,
@@ -996,193 +1068,73 @@
 }
 .wired-found-panel {
   position: absolute;
-  pointer-events: auto;
-  border: 1px solid rgba(109, 241, 255, 0.26);
-  background:
-    linear-gradient(180deg, rgba(109, 241, 255, 0.08), transparent 28%),
-    rgba(1, 12, 20, 0.88);
-  box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.34),
-    0 0 18px rgba(109, 241, 255, 0.12);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-.wired-found-panel-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 8px;
-  border-bottom: 1px solid rgba(109, 241, 255, 0.18);
-  color: var(--wired-amber);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-.wired-found-ribbon {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 14px;
-  height: 62px;
-  overflow: hidden;
-  border-top: 1px solid rgba(109, 241, 255, 0.12);
-  border-bottom: 1px solid rgba(109, 241, 255, 0.12);
-  background: linear-gradient(90deg, rgba(2, 9, 16, 0.46), rgba(109, 241, 255, 0.08), rgba(2, 9, 16, 0.46));
-}
-.wired-found-ribbon-track {
-  display: flex;
-  align-items: center;
-  gap: 34px;
-  width: max-content;
-  height: 100%;
-  padding: 0 26px;
-  animation: wiredRibbon 18s linear infinite;
-}
-.wired-found-ribbon-line {
-  font-size: clamp(18px, 2.6vw, 30px);
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: #6df1ff;
-  text-shadow: 0 0 12px rgba(109, 241, 255, 0.48);
-  white-space: nowrap;
-  text-transform: uppercase;
-}
-.wired-found-ribbon-line--mirror {
-  transform: scaleX(-1);
-  color: rgba(233, 254, 255, 0.88);
-}
-.wired-found-terminal {
-  left: 18px;
-  bottom: 78px;
-  width: min(380px, calc(100vw - 36px));
+  pointer-events: none;
+  border: 0;
   border-radius: 0;
+  background: transparent;
+}
+
+/* --- Echo terminal: bottom centre, above the ticker ------------------------ */
+.wired-found-terminal {
+  left: 50%;
+  bottom: 84px;
+  width: min(480px, calc(100vw - 640px));
+  min-width: 260px;
+  transform: translateX(-50%);
+  opacity: 0.62;
   font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
 }
 .wired-found-terminal-body {
-  min-height: 132px;
-  max-height: 176px;
+  position: relative;
+  min-height: 82px;
+  max-height: 122px;
   overflow: hidden;
-  padding: 8px 10px 10px;
-  color: rgba(109, 241, 255, 0.92);
-  font-size: 11px;
-  line-height: 1.45;
+  color: rgba(109, 241, 255, 0.78);
+  font-size: 12px;
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.18);
+}
+.wired-found-terminal-glass {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.04) 1px, transparent 1px);
+  background-size: 14px 14px;
+  opacity: 0.18;
+}
+.wired-found-terminal-line {
+  position: relative;
+  z-index: 1;
+  display: block;
+  padding: 2px 0;
+  animation: wiredTerminalFlicker 1.9s steps(2, end) infinite;
 }
 .wired-found-terminal-line.is-current {
   color: #fff1b7;
 }
-.wired-found-guide {
-  right: 18px;
-  bottom: 88px;
-  width: min(270px, calc(100vw - 36px));
-  border-radius: 0;
-  pointer-events: auto;
-}
-.wired-found-guide-face {
-  position: relative;
-  width: 120px;
-  height: 118px;
-  margin: 10px auto 0;
-  border-radius: 50% 50% 46% 46%;
-  background:
-    radial-gradient(circle at 45% 34%, rgba(255, 255, 255, 0.88), transparent 10%),
-    radial-gradient(circle at 50% 48%, rgba(189, 244, 255, 0.18), transparent 54%),
-    linear-gradient(180deg, rgba(48, 165, 233, 0.98), rgba(7, 44, 88, 0.98));
-  border: 1px solid rgba(216, 251, 255, 0.48);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
-}
-.wired-found-guide-hair {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  top: 6px;
-  height: 44px;
-  border-radius: 50% 50% 38% 38%;
-  background: linear-gradient(180deg, rgba(2, 11, 28, 0.72), rgba(10, 24, 48, 0.18));
-}
-.wired-found-guide-eye {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #06192d;
-  box-shadow: 0 0 0 1px rgba(216, 251, 255, 0.22);
-}
-.wired-found-guide-eye::after {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 3px;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.88);
-}
-.wired-found-guide-mouth {
-  position: absolute;
-  left: 50%;
-  bottom: 28px;
-  width: 18px;
-  height: 8px;
-  transform: translateX(-50%);
-  border-bottom: 2px solid rgba(5, 18, 32, 0.56);
-  border-radius: 0 0 20px 20px;
-}
-.wired-found-guide-copy {
-  padding: 8px 10px 0;
-  text-align: center;
-}
-.wired-found-guide-copy strong {
-  display: block;
-  color: #fff1b7;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.wired-found-guide-copy span {
-  display: block;
-  margin-top: 5px;
-  color: rgba(216, 251, 255, 0.82);
-  font-size: 11px;
-  line-height: 1.4;
-}
-.wired-found-guide-input {
-  display: grid;
-  gap: 6px;
-  padding: 10px;
-}
-.wired-found-guide-input span {
-  color: var(--wired-amber);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-.wired-found-guide-input input {
-  width: 100%;
-  border-radius: 0;
-  border: 1px solid rgba(109, 241, 255, 0.24);
-  background: rgba(1, 8, 13, 0.94);
-  color: #e9feff;
-  font-family: inherit;
-  letter-spacing: 0.04em;
-}
+
+/* --- Right rail ----------------------------------------------------------- */
+/* Row 1: observer eye + signal scope, side by side. */
 .wired-found-eye {
-  right: 318px;
-  top: 106px;
-  width: 184px;
-  border-radius: 0;
+  right: 18px;
+  top: 24px;
+  width: 132px;
+  opacity: 0.48;
 }
 .wired-found-eye-core {
   position: relative;
-  height: 100px;
+  height: 78px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.14), transparent 42%),
-    rgba(0, 9, 14, 0.9);
+    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.08), transparent 54%),
+    rgba(0, 9, 14, 0.92);
 }
 .wired-found-eye-core::before {
   content: '';
   position: absolute;
-  inset: 22px 18px;
+  inset: 18px 16px;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 50%, #f6ffff 0 30%, #b8f6ff 31% 44%, #07263e 45% 100%);
   border: 1px solid rgba(216, 251, 255, 0.48);
@@ -1197,11 +1149,10 @@
   margin-left: -16px;
   margin-top: -16px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #fff7d2, #49dfff 40%, #0d6eb7 70%, #022547 100%);
+  background: radial-gradient(circle at 30% 30%, #fff7d2, #6df1ff 40%, #0d5f7a 70%, #022547 100%);
   box-shadow: 0 0 24px rgba(109, 241, 255, 0.4);
-  /* --fx/--fy are written by usePointerParallax on the overlay root, once per
-     animation frame. Reading them here keeps the tracking on the compositor:
-     the old build re-rendered the whole React tree on every mousemove. */
+  /* --fx/--fy are written by usePointerParallax on the overlay root (quantised
+     to 1/48 steps for Wired), read here so tracking stays on the compositor. */
   transform: translate(calc((var(--fx, 0.5) - 0.5) * 18px), calc((var(--fy, 0.5) - 0.5) * 12px));
 }
 .wired-found-eye-glint {
@@ -1214,26 +1165,80 @@
   background: rgba(255, 255, 255, 0.92);
 }
 .wired-found-eye-copy {
-  padding: 8px 10px 10px;
-  color: rgba(216, 251, 255, 0.82);
-  font-size: 11px;
+  padding: 6px 4px 0;
+  color: rgba(216, 251, 255, 0.68);
+  font-size: 10px;
   text-align: center;
 }
-.wired-found-map {
+
+.wired-found-radar {
+  right: 160px;
+  top: 24px;
+  width: 108px;
+  opacity: 0.42;
+}
+.wired-found-radar-core {
+  position: relative;
+  height: 108px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.14), transparent 54%),
+    rgba(0, 9, 14, 0.9);
+}
+.wired-found-radar-ring {
+  position: absolute;
   left: 50%;
-  top: 118px;
-  width: min(350px, calc(100vw - 36px));
-  transform: translateX(-50%);
-  border-radius: 0;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
+  margin-top: -28px;
+  border-radius: 50%;
+  border: 1px solid rgba(109, 241, 255, 0.22);
+  animation: wiredRadar 4s steps(16) infinite;
+}
+.wired-found-radar-ring:nth-child(2) {
+  width: 88px;
+  height: 88px;
+  margin-left: -44px;
+  margin-top: -44px;
+  animation-delay: 1000ms;
+}
+.wired-found-radar-sweep {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from 0deg, rgba(109, 241, 255, 0.02), rgba(109, 241, 255, 0.26), rgba(109, 241, 255, 0.02));
+  clip-path: circle(46% at 50% 50%);
+  animation: wiredSweep 3.4s steps(48) infinite;
+}
+.wired-found-radar-point {
+  position: absolute;
+  left: calc(34% + (var(--fx, 0.5) - 0.5) * 16%);
+  top: calc(42% + (var(--fy, 0.5) - 0.5) * 16%);
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #fff1b7;
+  box-shadow: 0 0 14px rgba(255, 241, 183, 0.62);
+}
+
+/* Row 2: node map. */
+.wired-found-map {
+  right: 18px;
+  top: 146px;
+  width: 250px;
+  opacity: 0.38;
 }
 .wired-found-map-canvas {
   position: relative;
-  height: 190px;
+  height: 104px;
   overflow: hidden;
   background:
     linear-gradient(rgba(109, 241, 255, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(109, 241, 255, 0.08) 1px, transparent 1px),
-    rgba(0, 9, 14, 0.9);
+    rgba(0, 9, 14, 0.76);
   background-size: 28px 28px;
 }
 .wired-found-map svg {
@@ -1260,138 +1265,149 @@
   position: absolute;
   inset: -20%;
   background: linear-gradient(115deg, transparent 44%, rgba(109, 241, 255, 0.16) 49%, transparent 54%);
-  animation: wiredMapSweep 5.2s linear infinite;
-}
-.wired-found-radar {
-  right: 18px;
-  top: 126px;
-  width: 170px;
-  border-radius: 0;
-}
-.wired-found-radar-core {
-  position: relative;
-  height: 170px;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.14), transparent 54%),
-    rgba(0, 9, 14, 0.94);
-}
-.wired-found-radar-ring {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 86px;
-  height: 86px;
-  margin-left: -43px;
-  margin-top: -43px;
-  border-radius: 50%;
-  border: 1px solid rgba(109, 241, 255, 0.3);
-  animation: wiredRadar 4s linear infinite;
-}
-.wired-found-radar-ring:nth-child(2) {
-  width: 132px;
-  height: 132px;
-  margin-left: -66px;
-  margin-top: -66px;
-  animation-delay: 900ms;
-}
-.wired-found-radar-sweep {
-  position: absolute;
-  inset: 0;
-  background: conic-gradient(from 0deg, rgba(109, 241, 255, 0.02), rgba(109, 241, 255, 0.26), rgba(109, 241, 255, 0.02));
-  animation: wiredSweep 3.4s linear infinite;
-  clip-path: circle(46% at 50% 50%);
-}
-.wired-found-radar-point {
-  position: absolute;
-  /* Pointer-driven, same CSS-var channel as the iris (see .wired-found-eye-iris). */
-  left: calc(34% + (var(--fx, 0.5) - 0.5) * 16%);
-  top: calc(42% + (var(--fy, 0.5) - 0.5) * 16%);
-  width: 8px;
-  height: 8px;
-  margin-left: -4px;
-  margin-top: -4px;
-  border-radius: 50%;
-  background: #fff1b7;
-  box-shadow: 0 0 14px rgba(255, 241, 183, 0.62);
-}
-.wired-found-particles {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-.wired-found-particle {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(109, 241, 255, 0.84);
-  box-shadow: 0 0 10px rgba(109, 241, 255, 0.58);
-  animation: wiredParticleRise linear infinite;
-}
-.wired-found-ticker {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 12px;
-  height: 26px;
-  overflow: hidden;
-  border-top: 1px solid rgba(109, 241, 255, 0.2);
-  border-bottom: 1px solid rgba(109, 241, 255, 0.2);
-  background: rgba(0, 6, 10, 0.86);
-}
-.wired-found-ticker-track {
-  display: flex;
-  align-items: center;
-  gap: 42px;
-  width: max-content;
-  height: 100%;
-  padding: 0 16px;
-  color: #d8fbff;
-  font-size: 10px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  animation: wiredTicker 16s linear infinite;
-}
-@keyframes wiredRibbon {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-@keyframes wiredTicker {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-@keyframes wiredParticleRise {
-  from { transform: translate3d(0, 22px, 0) scale(0.4); opacity: 0; }
-  20% { opacity: 1; }
-  to { transform: translate3d(0, -24px, 0) scale(1.1); opacity: 0; }
-}
-@keyframes wiredSweep {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes wiredRadar {
-  from { transform: scale(0.7); opacity: 0.22; }
-  60% { opacity: 0.78; }
-  to { transform: scale(1.08); opacity: 0; }
-}
-@keyframes wiredMapSweep {
-  from { transform: translateX(-8%) rotate(0deg); }
-  to { transform: translateX(8%) rotate(360deg); }
+  animation: wiredMapSweep 5.2s steps(40) infinite;
 }
 
-.wired-found-overlay {
-  opacity: 0.84;
-  filter: saturate(1.08) contrast(1.02);
+/* Row 3: lyric analysis rail. Ends above the guide, below the map. */
+.wired-found-lyric-rail {
+  right: 18px;
+  top: 270px;
+  bottom: 330px;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  opacity: 0.86;
 }
-.wired-found-panel {
+.wired-found-lyric-rail header {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(109, 241, 255, 0.6);
+}
+.wired-found-lyric-rail ul {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 5px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+.wired-found-lyric-rail li {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(216, 251, 255, 0.7);
+  border-left: 1px solid rgba(109, 241, 255, 0.3);
+  padding-left: 6px;
+  animation: wlyricRailIn 240ms steps(3) both;
+}
+.wired-found-lyric-rail li.is-semantic {
+  color: #d8fbff;
+  font-size: 15px;
+}
+.wired-found-lyric-rail li.is-metadata {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(109, 241, 255, 0.56);
+}
+
+/* Row 4: the guide — the one right-rail panel that takes input. */
+.wired-found-guide {
+  right: 18px;
+  bottom: 72px;
+  width: min(238px, calc(100vw - 36px));
+  opacity: 0.74;
+  pointer-events: auto;
+}
+.wired-found-guide-face {
+  position: relative;
+  width: 154px;
+  height: 112px;
+  margin: 0 auto 2px;
+  overflow: hidden;
+  border-radius: 0;
+  background: rgba(0, 9, 14, 0.72);
+  box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.18), 0 0 20px rgba(109, 241, 255, 0.1);
+}
+.wired-found-guide-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.95;
+  filter: grayscale(1) brightness(0.68) contrast(1.75) saturate(1.35) hue-rotate(186deg);
+  transform: scale(1.06);
+}
+.wired-found-guide-glitch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 20%, rgba(109, 241, 255, 0.24) 44%, transparent 58%);
+}
+.wired-found-guide-glitch-a {
+  animation: wiredGuideGlitchA 2.9s steps(1, end) infinite;
+}
+.wired-found-guide-glitch-b {
+  opacity: 0.7;
+  clip-path: inset(52% 0 0 0);
+  animation: wiredGuideGlitchB 4.2s steps(1, end) infinite;
+}
+.wired-found-guide-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 4px);
+  opacity: 0.28;
+}
+.wired-found-guide-copy {
+  padding: 4px 2px 0;
+  text-align: center;
+}
+.wired-found-guide-copy strong {
+  display: block;
+  color: #fff1b7;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.wired-found-guide-copy span {
+  display: block;
+  margin-top: 5px;
+  color: rgba(216, 251, 255, 0.64);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.wired-found-guide-input {
+  display: grid;
+  gap: 6px;
+  padding: 8px 2px 0;
+  font-size: 10px;
+}
+.wired-found-guide-input span {
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.wired-found-guide-input input {
+  width: 100%;
+  border-radius: 0;
   border: 0;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.34);
+  background: rgba(0, 8, 13, 0.72);
+  box-shadow: inset 0 -1px 0 rgba(109, 241, 255, 0.08);
+  color: #e9feff;
+  caret-color: #ffb13b;
+  font-family: inherit;
+  letter-spacing: 0.04em;
 }
-.wired-found-panel-head {
-  display: none;
-}
+
+/* --- Kana static (was "matrix rain") ---------------------------------------
+   Columns of kana that hold, then jump a whole row at a time, fading in and
+   out in hard steps — static on a dead channel, not a falling waterfall. */
 .wired-found-matrix {
   position: absolute;
   inset: 0;
@@ -1404,240 +1420,68 @@
   top: -6%;
   bottom: -6%;
   width: 4.4%;
-  color: rgba(109, 241, 255, 0.42);
+  color: rgba(109, 241, 255, 0.34);
+  opacity: 0.54;
   font-size: clamp(14px, 1.8vw, 24px);
   line-height: 0.78;
   writing-mode: vertical-rl;
   text-orientation: upright;
   white-space: pre-wrap;
-  text-shadow: 0 0 10px rgba(109, 241, 255, 0.18);
-  mix-blend-mode: screen;
-  animation: wiredMatrixFlow 18s linear infinite;
+  text-shadow: 0 0 8px rgba(109, 241, 255, 0.14);
   user-select: none;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, black 18%, black 46%, rgba(0, 0, 0, 0) 80%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, black 18%, black 46%, rgba(0, 0, 0, 0) 80%);
+  animation-name: wiredMatrixFlow, wiredMatrixFade;
+  animation-duration: 18s, 18s;
+  animation-timing-function: steps(30), steps(6);
+  animation-iteration-count: infinite;
 }
-.wired-found-ribbon {
-  top: 6px;
-  height: 106px;
-  border: 0;
-  background: transparent;
-  opacity: 0.92;
-}
-.wired-found-ribbon-track {
-  gap: 56px;
-  padding: 0 18px;
-  animation-duration: 14s;
-}
-.wired-found-ribbon-line {
-  font-size: clamp(28px, 4.7vw, 74px);
-  letter-spacing: 0.18em;
-  opacity: 0.78;
-}
-.wired-found-ribbon-line--mirror {
-  opacity: 0.48;
-}
-.wired-found-terminal {
-  left: 18px;
-  bottom: 74px;
-  width: min(680px, calc(100vw - 36px));
-  pointer-events: none;
-}
-.wired-found-terminal-body {
-  position: relative;
-  min-height: 108px;
-  max-height: 176px;
-  overflow: hidden;
-  padding: 0;
-  color: rgba(109, 241, 255, 0.78);
-  font-size: clamp(12px, 1.45vw, 20px);
-  line-height: 1.25;
-  letter-spacing: 0.12em;
-  text-shadow: 0 0 10px rgba(109, 241, 255, 0.18);
-}
-.wired-found-terminal-glass {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(rgba(109, 241, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(109, 241, 255, 0.04) 1px, transparent 1px);
-  background-size: 14px 14px;
-  opacity: 0.18;
-  mix-blend-mode: screen;
-}
-.wired-found-terminal-line {
-  position: relative;
-  z-index: 1;
-  display: block;
-  padding: 2px 0;
-  animation: wiredTerminalFlicker 1.9s steps(2, end) infinite;
-}
-.wired-found-terminal-line.is-current {
-  color: #fff1b7;
-}
-.wired-found-guide {
-  right: 18px;
-  bottom: 72px;
-  width: min(300px, calc(100vw - 36px));
-  pointer-events: auto;
-}
-.wired-found-guide-face {
-  position: relative;
-  width: 192px;
-  height: 146px;
-  margin: 0 auto 6px;
-  overflow: hidden;
-  border-radius: 8px;
-  background: rgba(0, 9, 14, 0.72);
-}
-.wired-found-guide-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.95;
-  filter:
-    grayscale(1)
-    brightness(0.68)
-    contrast(1.75)
-    saturate(1.35)
-    hue-rotate(186deg)
-    drop-shadow(0 0 16px rgba(109, 241, 255, 0.12));
-  image-rendering: auto;
-  transform: scale(1.06);
-}
-.wired-found-guide-glitch {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(115deg, transparent 20%, rgba(109, 241, 255, 0.24) 44%, transparent 58%);
-  mix-blend-mode: screen;
-}
-.wired-found-guide-glitch-a {
-  animation: wiredGuideGlitchA 2.9s linear infinite;
-}
-.wired-found-guide-glitch-b {
-  animation: wiredGuideGlitchB 4.2s linear infinite;
-  opacity: 0.7;
-  clip-path: inset(52% 0 0 0);
-}
-.wired-found-guide-scan {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.08) 0,
-    rgba(255, 255, 255, 0.08) 1px,
-    transparent 1px,
-    transparent 4px
-  );
-  opacity: 0.28;
-  mix-blend-mode: screen;
-}
-.wired-found-guide-copy {
-  padding: 4px 2px 0;
-  text-align: center;
-}
-.wired-found-guide-copy strong {
-  font-size: 14px;
-  letter-spacing: 0.14em;
-}
-.wired-found-guide-copy span {
-  opacity: 0.9;
-  font-size: 11px;
-}
-.wired-found-guide-input {
-  padding: 8px 2px 0;
-}
-.wired-found-guide-input span {
-  font-size: 9px;
-}
-.wired-found-guide-input input {
-  border: 0;
-  border-bottom: 1px solid rgba(109, 241, 255, 0.34);
-  background: rgba(0, 8, 13, 0.72);
-  box-shadow: inset 0 -1px 0 rgba(109, 241, 255, 0.08);
-}
-.wired-found-eye {
-  right: 314px;
-  top: 112px;
-  width: 182px;
-  pointer-events: none;
-}
-.wired-found-eye-core {
-  position: relative;
-  height: 116px;
-  overflow: hidden;
-  border: 0;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.08), transparent 54%),
-    rgba(0, 9, 14, 0.92);
-}
-.wired-found-eye-core::before {
-  inset: 24px 18px;
-}
-.wired-found-eye-copy {
-  padding-top: 6px;
-  color: rgba(216, 251, 255, 0.68);
-}
-.wired-found-map {
-  left: 50%;
-  top: 114px;
-  width: min(340px, calc(100vw - 36px));
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-.wired-found-map-canvas {
-  height: 188px;
-  border: 0;
-  background:
-    linear-gradient(rgba(109, 241, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(109, 241, 255, 0.08) 1px, transparent 1px),
-    rgba(0, 9, 14, 0.76);
-  background-size: 28px 28px;
-  opacity: 0.82;
-}
-.wired-found-radar {
-  right: 18px;
-  top: 120px;
-  width: 170px;
-  pointer-events: none;
-}
-.wired-found-radar-core {
-  height: 170px;
-  border: 0;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.14), transparent 54%),
-    rgba(0, 9, 14, 0.9);
-}
-.wired-found-radar-ring {
-  border-color: rgba(109, 241, 255, 0.22);
-}
+
 .wired-found-particles {
-  opacity: 0.9;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.36;
 }
 .wired-found-particle {
-  background: rgba(109, 241, 255, 0.76);
-  box-shadow: 0 0 12px rgba(109, 241, 255, 0.45);
+  position: absolute;
+  border-radius: 0;
+  background: rgba(109, 241, 255, 0.42);
+  box-shadow: 0 0 8px rgba(109, 241, 255, 0.24);
+  animation: wiredParticleRise steps(12) infinite;
 }
+
+/* --- Broadcast ticker: teletype crawl, ~10 fps ----------------------------- */
 .wired-found-ticker {
+  position: absolute;
   left: 0;
   right: 0;
-  bottom: 10px;
-  height: 32px;
-  border: 0;
+  bottom: 50px;
+  height: 22px;
+  overflow: hidden;
   background: rgba(0, 6, 10, 0.72);
-  opacity: 0.85;
+  opacity: 0.42;
 }
 .wired-found-ticker-track {
+  display: flex;
+  align-items: center;
   gap: 54px;
-  animation-duration: 14s;
-}
-.wired-found-ticker-track span {
-  font-size: 10px;
+  width: max-content;
+  height: 100%;
+  padding: 0 16px;
+  color: #d8fbff;
+  font-size: 9px;
   letter-spacing: 0.22em;
+  text-transform: uppercase;
+  animation: wiredTicker 14s steps(140) infinite;
 }
-.wired-found-ribbon {
-  display: none;
+.wired-found-ticker-group {
+  display: flex;
+  align-items: center;
+  gap: 42px;
 }
+
+/* --- Lyric transmission ----------------------------------------------------- */
 .wlyric-stage {
   position: absolute;
   left: 0;
@@ -1650,7 +1494,7 @@
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 9%, black 91%, transparent 100%);
 }
 .wlyric-stage::before {
-  /* Signal detection: a faint vertical pulse near the entry edge, always on,
+  /* Signal detection: a faint vertical carrier near the entry edge, always on,
      independent of any given line — it announces the channel, not a lyric. */
   content: '';
   position: absolute;
@@ -1659,9 +1503,9 @@
   bottom: 10%;
   width: 1px;
   background: linear-gradient(180deg, transparent, rgba(109, 241, 255, 0.55), transparent);
-  animation: wlyricSignalPulse 3.6s ease-in-out infinite;
+  animation: wlyricSignalPulse 3.6s steps(4) infinite;
 }
-/* ----- back lane: the next line, mirrored and small, crawling the other way ----- */
+/* Back lane: the next line, mirrored and small, crawling the other way. */
 .wlyric-back-line {
   position: absolute;
   left: 0;
@@ -1671,7 +1515,6 @@
   align-items: center;
   white-space: nowrap;
   opacity: 0.4;
-  filter: blur(0.3px);
   will-change: transform;
   transform: translate3d(-120vw, 0, 0);
 }
@@ -1686,10 +1529,7 @@
   color: rgba(154, 226, 236, 0.55);
   text-shadow: 0 0 6px rgba(109, 241, 255, 0.22);
 }
-.wlyric-back-ch {
-  position: relative;
-  display: inline-block;
-}
+.wlyric-back-ch,
 .wlyric-back-ch-base {
   position: relative;
   display: inline-block;
@@ -1708,14 +1548,6 @@
   animation: wlyricBackGlitchFlicker var(--fdur, 2.4s) steps(1) infinite;
   animation-delay: var(--fdelay, 0s);
 }
-@keyframes wlyricBackBaseFlicker {
-  0%, 86%, 100% { opacity: 1; }
-  90%, 95% { opacity: 0; }
-}
-@keyframes wlyricBackGlitchFlicker {
-  0%, 86%, 100% { opacity: 0; }
-  90%, 95% { opacity: 1; }
-}
 
 .wlyric-line {
   position: absolute;
@@ -1728,6 +1560,14 @@
   will-change: transform;
   transform: translate3d(120vw, 0, 0);
 }
+/* Reduced motion / motion off: no conveyor. The line is parked, centred, and
+   simply replaced when the cue changes (WiredLyricStream sets `is-static`). */
+.wlyric-line.is-static,
+.wlyric-back-line.is-static {
+  left: 50%;
+  transform: translate3d(-50%, 0, 0);
+  will-change: auto;
+}
 .wlyric-inner {
   position: relative;
   font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
@@ -1737,7 +1577,6 @@
   line-height: 1;
   color: rgba(216, 251, 255, 0.86);
   text-shadow: 0 0 10px rgba(109, 241, 255, 0.3), 0 0 26px rgba(109, 241, 255, 0.1);
-  transition: text-shadow 240ms ease, color 240ms ease;
 }
 .wlyric-line.is-clear .wlyric-inner {
   color: #eafcff;
@@ -1748,11 +1587,9 @@
   inset: -30px -60px;
   pointer-events: none;
   background: radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.12), transparent 62%);
-  filter: blur(10px);
-  mix-blend-mode: screen;
 }
 
-/* ----- damped visualizer, riding beneath the line's baseline ------------- */
+/* Damped visualizer riding beneath the line's baseline. */
 .wlyric-bars {
   position: absolute;
   left: 50%;
@@ -1773,15 +1610,12 @@
   transform-origin: bottom center;
   transform: scaleY(0.05);
   background: linear-gradient(180deg, rgba(109, 241, 255, 0.85), rgba(109, 241, 255, 0.04));
-  border-radius: 1px;
   will-change: transform;
 }
 
-/* ----- per-character transmission effects --------------------------------- */
-.wlyric-ch {
-  position: relative;
-  display: inline-block;
-}
+/* Per-character transmission effects. All stepped; every keyframe ends where
+   it started, so nothing is ever left mid-transform. */
+.wlyric-ch,
 .wlyric-ch-base {
   position: relative;
   display: inline-block;
@@ -1795,39 +1629,19 @@
 .wlyric-range {
   display: inline-block;
 }
-
-/* substitute / decode: the base glyph flickers out to the alternate glyph
-   and back. Both keyframes end exactly where they started — nothing is
-   ever left mid-transform. */
 .wlyric-ch.is-substitute .wlyric-ch-base,
 .wlyric-ch.is-decode .wlyric-ch-base {
-  animation: wlyricBaseFlick 220ms ease both;
+  animation: wlyricBaseFlick 220ms steps(3) both;
 }
 .wlyric-ch.is-substitute .wlyric-ch-glitch,
 .wlyric-ch.is-decode .wlyric-ch-glitch {
-  animation: wlyricGlitchFlick 220ms ease both;
+  animation: wlyricGlitchFlick 220ms steps(3) both;
 }
-@keyframes wlyricBaseFlick {
-  0%, 100% { opacity: 1; }
-  22%, 74% { opacity: 0; }
-}
-@keyframes wlyricGlitchFlick {
-  0%, 100% { opacity: 0; }
-  22%, 74% { opacity: 1; }
-}
-
-/* shear: a one-, two-pixel shove that snaps back to the shared baseline. */
 .wlyric-ch.is-shear .wlyric-ch-base {
-  animation: wlyricShear 220ms ease-out;
+  animation: wlyricShear 220ms steps(3);
 }
-@keyframes wlyricShear {
-  0%, 100% { transform: translate(0, 0); }
-  32% { transform: translate(1.4px, -1px); }
-  64% { transform: translate(-1px, 1.4px); }
-}
-
-/* duplicate-channel separation: a faint color-split ghost of the same glyph,
-   read straight off the character's own data-ch attribute. */
+/* Duplicate-channel separation: a cyan or amber ghost of the same glyph — the
+   two signal colours, nothing else. */
 .wlyric-ch.is-duplicate::after {
   content: attr(data-ch);
   position: absolute;
@@ -1836,231 +1650,47 @@
   mix-blend-mode: screen;
 }
 .wlyric-ch.is-duplicate.dup-cyan::after {
-  color: #7af2ff;
-  animation: wlyricDuplicate 260ms ease-out;
+  color: #6df1ff;
+  animation: wlyricDuplicate 260ms steps(3);
 }
 .wlyric-ch.is-duplicate.dup-amber::after {
-  color: #ffcf8a;
-  animation: wlyricDuplicate 260ms ease-out;
+  color: #ffb13b;
+  animation: wlyricDuplicate 260ms steps(3);
 }
-.wlyric-ch.is-duplicate.dup-magenta::after {
-  color: #e2a0e8;
-  animation: wlyricDuplicate 260ms ease-out;
-}
-@keyframes wlyricDuplicate {
-  0%, 100% { opacity: 0; transform: translate(0, 0); }
-  40% { opacity: 0.6; transform: translate(2.4px, -1.4px); }
-  75% { opacity: 0.26; transform: translate(-1.4px, 1px); }
-}
-
-/* scan displacement: a narrow slice shifts as one, like a damaged signal. */
 .wlyric-range-scan.is-scan {
-  animation: wlyricScan 260ms ease-out;
+  animation: wlyricScan 260ms steps(3);
 }
-@keyframes wlyricScan {
-  0%, 100% { transform: translateY(0); }
-  35% { transform: translateY(-3px); }
-  70% { transform: translateY(2px); }
-}
-
-/* compression pulse: tracking tightens and relaxes — glyphs never collide. */
 .wlyric-range-compress.is-compress {
-  animation: wlyricCompress 220ms ease-out;
-}
-@keyframes wlyricCompress {
-  0%, 100% { letter-spacing: 0; }
-  50% { letter-spacing: -0.03em; }
-}
-@keyframes wlyricSignalPulse {
-  0%, 100% { opacity: 0.15; }
-  50% { opacity: 0.6; }
+  animation: wlyricCompress 220ms steps(2);
 }
 
-/* ----- right-side analysis rail: semantic + system-metadata feed --------- */
-.wired-found-lyric-rail {
-  right: 18px;
-  top: 300px;
-  bottom: 132px;
-  width: 118px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  pointer-events: none;
-  opacity: 0.86;
-}
-.wired-found-lyric-rail header {
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(109, 241, 255, 0.6);
-}
-.wired-found-lyric-rail ul {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 5px;
-  overflow: hidden;
-}
-.wired-found-lyric-rail li {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: rgba(216, 251, 255, 0.7);
-  border-left: 1px solid rgba(109, 241, 255, 0.3);
-  padding-left: 6px;
-  animation: wlyricRailIn 320ms ease-out;
-}
-.wired-found-lyric-rail li.is-semantic {
-  color: #d8fbff;
-  font-size: 15px;
-}
-.wired-found-lyric-rail li.is-metadata {
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(109, 241, 255, 0.56);
-}
-@keyframes wlyricRailIn {
-  0% { opacity: 0; transform: translateX(6px); }
-  100% { opacity: 1; transform: translateX(0); }
-}
-.wired-found-matrix-col {
-  color: rgba(109, 241, 255, 0.34);
-  opacity: 0.54;
-  text-shadow: 0 0 8px rgba(109, 241, 255, 0.14);
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, black 18%, black 46%, rgba(0, 0, 0, 0) 80%);
-  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, black 18%, black 46%, rgba(0, 0, 0, 0) 80%);
-  animation-name: wiredMatrixFlow, wiredMatrixFade;
-  animation-timing-function: linear, ease-out;
-}
-.wired-found-guide {
-  right: 18px;
-  bottom: 18px;
-  width: min(260px, calc(100vw - 36px));
-  opacity: 0.82;
-}
-.wired-found-guide-face {
-  width: 176px;
-  height: 128px;
-  margin-bottom: 2px;
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.18), 0 0 20px rgba(109, 241, 255, 0.1);
-}
-.wired-found-guide-copy strong {
-  font-size: 12px;
-}
-.wired-found-guide-copy span {
-  color: rgba(216, 251, 255, 0.64);
-}
-.wired-found-terminal {
-  left: 18px;
-  bottom: 72px;
-  width: min(480px, calc(100vw - 36px));
-  opacity: 0.62;
-}
-.wired-found-terminal-body {
-  min-height: 82px;
-  max-height: 122px;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-}
-.wired-found-guide {
-  right: 18px;
-  bottom: 72px;
-  width: min(238px, calc(100vw - 36px));
-  opacity: 0.74;
-}
-.wired-found-guide-face {
-  width: 154px;
-  height: 112px;
-}
-.wired-found-guide-copy strong {
-  font-size: 11px;
-}
-.wired-found-guide-copy span,
-.wired-found-guide-input {
-  font-size: 10px;
-}
-.wired-found-eye {
-  right: 22px;
-  top: 96px;
-  width: 132px;
-  opacity: 0.48;
-}
-.wired-found-eye-core {
-  height: 78px;
-}
-.wired-found-eye-core::before {
-  inset: 18px 16px;
-}
-.wired-found-eye-copy {
-  font-size: 10px;
-}
-.wired-found-map {
-  left: auto;
-  right: 170px;
-  top: 104px;
-  width: 210px;
-  transform: none;
-  opacity: 0.38;
-}
-.wired-found-map-canvas {
-  height: 118px;
-}
-.wired-found-radar {
-  right: 22px;
-  top: 210px;
-  width: 108px;
-  opacity: 0.42;
-}
-.wired-found-radar-core {
-  height: 108px;
-}
-.wired-found-radar-ring {
-  width: 56px;
-  height: 56px;
-  margin-left: -28px;
-  margin-top: -28px;
-}
-.wired-found-radar-ring:nth-child(2) {
-  width: 88px;
-  height: 88px;
-  margin-left: -44px;
-  margin-top: -44px;
-}
-.wired-found-particles {
-  opacity: 0.36;
-}
-.wired-found-particle {
-  background: rgba(109, 241, 255, 0.42);
-  box-shadow: 0 0 8px rgba(109, 241, 255, 0.24);
-}
-.wired-found-ticker {
-  bottom: 50px;
-  height: 22px;
-  opacity: 0.42;
-}
-.wired-found-ticker-track span {
-  font-size: 9px;
-}
+/* --- Protocol tiles: centred top strip ------------------------------------
+   Real session data dressed as archive instruments (see findingModules.ts).
+   The strip and the tiles let the pointer through; only their buttons catch
+   it, so nothing here can ever block a desktop icon or a window edge. */
 .wired-found-protocols {
   position: absolute;
-  left: 18px;
-  top: 86px;
+  left: 50%;
+  top: 16px;
   z-index: 2;
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  align-items: start;
   gap: 7px;
-  width: min(250px, calc(100vw - 36px));
-  pointer-events: auto;
+  width: min(600px, calc(100vw - 640px));
+  min-width: 200px;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 .wired-found-protocol {
   position: relative;
   display: grid;
-  gap: 2px;
+  gap: 5px;
   min-height: 42px;
   padding: 7px 9px;
   overflow: hidden;
   border: 1px solid rgba(109, 241, 255, 0.2);
-  border-radius: 4px;
+  border-radius: 0;
   color: rgba(216, 251, 255, 0.74);
   background:
     linear-gradient(90deg, rgba(109, 241, 255, 0.09), transparent 62%),
@@ -2068,11 +1698,10 @@
   font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
   text-align: left;
   box-shadow: 0 0 16px rgba(109, 241, 255, 0.08);
-  cursor: pointer;
+  pointer-events: none;
 }
-.wired-found-protocol:hover {
-  border-color: rgba(109, 241, 255, 0.42);
-  color: #e9feff;
+.wired-found-protocol button {
+  pointer-events: auto;
 }
 .wired-found-protocol span {
   color: rgba(255, 241, 183, 0.76);
@@ -2083,28 +1712,6 @@
   font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
-}
-.wired-found-protocol-meter i {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: rgba(109, 241, 255, 0.76);
-  transform-origin: left center;
-}
-
-/* ---------------------------------------------------------------------------
-   Instrument modules — MAGI / Voight-Kampff / capsule / ghost / bounty / summon
-   Each reads real session data (see findingModules.ts); the panels below are
-   the terminal fiction wrapped around those numbers. Palette stays locked to
-   the spec: cyan baseline, amber for attention, no new hues.
-   --------------------------------------------------------------------------- */
-
-/* The protocol tiles are articles now, not buttons — only their controls click. */
-.wired-found-protocols > article.wired-found-protocol {
-  cursor: default;
-  gap: 5px;
 }
 .wired-found-protocol header {
   display: flex;
@@ -2127,7 +1734,7 @@
   letter-spacing: 0.08em;
 }
 
-/* MAGI — three units, dissent shown in amber so a split vote reads at a glance. */
+/* Triad arbitration — three units, dissent shown in amber. */
 .wired-found-magi-units {
   display: grid;
   gap: 2px;
@@ -2163,7 +1770,7 @@
   color: #fff1b7;
 }
 
-/* Voight-Kampff — a reading test on the user's own vocabulary. */
+/* Recall probe — a reading test on the user's own vocabulary. */
 .wired-found-vk-word {
   padding: 4px 0;
   color: #e9feff;
@@ -2185,7 +1792,7 @@
   width: 100%;
   padding: 4px 5px;
   border: 1px solid rgba(109, 241, 255, 0.24);
-  border-radius: 3px;
+  border-radius: 0;
   color: rgba(216, 251, 255, 0.86);
   background: rgba(0, 8, 13, 0.5);
   font-family: inherit;
@@ -2213,7 +1820,7 @@
   justify-self: end;
   padding: 3px 8px;
   border: 1px solid rgba(255, 177, 59, 0.5);
-  border-radius: 3px;
+  border-radius: 0;
   color: #fff1b7;
   background: transparent;
   font-family: inherit;
@@ -2222,16 +1829,12 @@
   cursor: pointer;
 }
 
-/* Capsule sync — today's minutes against the daily target. */
+/* Carrier load — today's minutes against the daily target. */
 .wired-found-capsule-bar {
   height: 6px;
   overflow: hidden;
   border: 1px solid rgba(109, 241, 255, 0.28);
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(109, 241, 255, 0.1) 0 3px,
-    transparent 3px 6px
-  );
+  background: repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.1) 0 3px, transparent 3px 6px);
 }
 .wired-found-capsule-bar i {
   display: block;
@@ -2260,7 +1863,7 @@
 .wired-found-ghost-reveal {
   padding: 3px 6px;
   border: 1px dashed rgba(109, 241, 255, 0.36);
-  border-radius: 3px;
+  border-radius: 0;
   color: rgba(216, 251, 255, 0.86);
   background: transparent;
   font-family: inherit;
@@ -2273,7 +1876,9 @@
   color: #e9feff;
 }
 
-/* Bounty board — weakest vocabulary, priced by how unlearned it is. */
+/* Corrupted sectors — weakest vocabulary, ranked by damage. Two rows: term +
+   damage on the first, meaning on its own line, so a long term never crushes
+   the meaning to a single character. */
 .wired-found-bounty-list {
   display: grid;
   gap: 3px;
@@ -2281,10 +1886,6 @@
   padding: 0;
   list-style: none;
 }
-/* Two rows: term + reward on the first, meaning on its own line below. A
-   single three-column row crushed the meaning to one character as soon as the
-   term was long — and deck entries are routinely long (grammar points carry
-   their gloss in the term itself). */
 .wired-found-bounty-list li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2307,6 +1908,9 @@
 .wired-found-bounty-list i {
   grid-column: 2;
   grid-row: 1;
+  color: #fff1b7;
+  font-style: normal;
+  letter-spacing: 0.08em;
 }
 .wired-found-bounty-list span {
   grid-column: 1 / -1;
@@ -2318,17 +1922,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.wired-found-bounty-list i {
-  color: #fff1b7;
-  font-style: normal;
-  letter-spacing: 0.08em;
-}
 
-/* Summon — toggles a real companion onto the desktop. */
+/* Navi summon — toggles a real companion onto the desktop. */
 .wired-found-summon-btn {
   padding: 5px 8px;
   border: 1px solid rgba(255, 177, 59, 0.46);
-  border-radius: 3px;
+  border-radius: 0;
   color: #fff1b7;
   background: rgba(255, 177, 59, 0.07);
   font-family: inherit;
@@ -2340,67 +1939,58 @@
   border-color: rgba(255, 177, 59, 0.8);
   background: rgba(255, 177, 59, 0.14);
 }
-
-/* The ticker renders its message set twice so the scroll can loop seamlessly. */
-.wired-found-ticker-group {
-  display: flex;
-  align-items: center;
-  gap: 42px;
+.wired-found-protocol button:focus-visible,
+.wired-found-guide-input input:focus-visible {
+  outline: 1px solid #ffb13b;
+  outline-offset: 1px;
 }
 
-/* Idle loops are opt-out: `data-wired-idle='off'` is the user's setting, and
-   the OS-level reduced-motion preference overrides everything. Both must stop
-   the ambient layers without hiding the instruments that carry real data. */
-:root[data-materials='wired'][data-wired-idle='off'] .wired-found-matrix,
-:root[data-materials='wired'][data-wired-idle='off'] .wired-found-particles {
-  display: none;
-}
-:root[data-materials='wired'][data-wired-motion='off'] .wired-found-ticker-track,
-:root[data-materials='wired'][data-wired-motion='off'] .wired-found-radar-sweep,
-:root[data-materials='wired'][data-wired-motion='off'] .wired-found-map-sweep {
-  animation: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wired-found-matrix,
-  .wired-found-particles {
+/* Narrow desktops: the centre strip has no room between the rails. */
+@media (max-width: 1080px) {
+  .wired-found-protocols {
+    left: auto;
+    right: 18px;
+    top: auto;
+    bottom: 300px;
+    width: 220px;
+    transform: none;
+    grid-template-columns: 1fr;
+  }
+  .wired-found-terminal {
     display: none;
   }
+}
 
-  .wired-found-ticker-track,
-  .wired-found-radar-sweep,
-  .wired-found-map-sweep,
-  .wired-found-guide-glitch,
-  .wired-found-guide-scan,
-  .wlyric-stage::before,
-  .wlyric-back-ch-base,
-  .wlyric-back-ch-glitch {
-    animation: none;
-  }
-
-  .wired-found-eye-iris,
-  .wired-found-radar-point {
-    transition: none;
-  }
+/* --- Keyframes --------------------------------------------------------------- */
+@keyframes wiredTicker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes wiredParticleRise {
+  from { transform: translate3d(0, 22px, 0); opacity: 0; }
+  20% { opacity: 1; }
+  to { transform: translate3d(0, -24px, 0); opacity: 0; }
+}
+@keyframes wiredSweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes wiredRadar {
+  from { transform: scale(0.7); opacity: 0.22; }
+  60% { opacity: 0.78; }
+  to { transform: scale(1.08); opacity: 0; }
+}
+@keyframes wiredMapSweep {
+  from { transform: translateX(-8%) rotate(0deg); }
+  to { transform: translateX(8%) rotate(360deg); }
 }
 @keyframes wiredMatrixFade {
-  0% {
-    opacity: 0.08;
-  }
-  24% {
-    opacity: 0.52;
-  }
-  58% {
-    opacity: 0.36;
-  }
-  84% {
-    opacity: 0.16;
-  }
-  100% {
-    opacity: 0;
-  }
+  0% { opacity: 0.08; }
+  24% { opacity: 0.52; }
+  58% { opacity: 0.36; }
+  84% { opacity: 0.16; }
+  100% { opacity: 0; }
 }
-
 @keyframes wiredMatrixFlow {
   from { transform: translateY(14%); }
   to { transform: translateY(-30%); }
@@ -2423,10 +2013,117 @@
   90% { clip-path: inset(66% 0 8% 0); transform: translateX(2px); opacity: 0.24; }
   91% { clip-path: inset(52% 0 0 0); transform: translateX(0); opacity: 0.16; }
 }
+@keyframes wlyricBackBaseFlicker {
+  0%, 86%, 100% { opacity: 1; }
+  90%, 95% { opacity: 0; }
+}
+@keyframes wlyricBackGlitchFlicker {
+  0%, 86%, 100% { opacity: 0; }
+  90%, 95% { opacity: 1; }
+}
+@keyframes wlyricBaseFlick {
+  0%, 100% { opacity: 1; }
+  22%, 74% { opacity: 0; }
+}
+@keyframes wlyricGlitchFlick {
+  0%, 100% { opacity: 0; }
+  22%, 74% { opacity: 1; }
+}
+@keyframes wlyricShear {
+  0%, 100% { transform: translate(0, 0); }
+  32% { transform: translate(1.4px, -1px); }
+  64% { transform: translate(-1px, 1.4px); }
+}
+@keyframes wlyricDuplicate {
+  0%, 100% { opacity: 0; transform: translate(0, 0); }
+  40% { opacity: 0.6; transform: translate(2.4px, -1.4px); }
+  75% { opacity: 0.26; transform: translate(-1.4px, 1px); }
+}
+@keyframes wlyricScan {
+  0%, 100% { transform: translateY(0); }
+  35% { transform: translateY(-3px); }
+  70% { transform: translateY(2px); }
+}
+/* Compression pulse via a horizontal squeeze (transform), not letter-spacing,
+   so it never relayouts the line mid-transmission. */
+@keyframes wlyricCompress {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(0.97); }
+}
+@keyframes wlyricSignalPulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.6; }
+}
+@keyframes wlyricRailIn {
+  0% { opacity: 0; transform: translateX(6px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* --- Gates ------------------------------------------------------------------
+   Idle loops are opt-out (`data-wired-idle='off'`); `data-wired-motion='off'`,
+   `html.reduce-motion` and the OS preference stop every loop and every
+   transmission effect without hiding the instruments that carry real data. */
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-matrix,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-particles,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-matrix,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-particles,
+:root[data-materials='wired'].reduce-motion .wired-found-matrix,
+:root[data-materials='wired'].reduce-motion .wired-found-particles {
+  display: none;
+}
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-ticker-track,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-radar-sweep,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-radar-ring,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-map-sweep,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-terminal-line,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-guide-glitch,
+:root[data-materials='wired'][data-wired-idle='off'] .wlyric-stage::before,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-ticker-track,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-radar-sweep,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-radar-ring,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-map-sweep,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-terminal-line,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-guide-glitch,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-lyric-rail li,
+:root[data-materials='wired'][data-wired-motion='off'] .wlyric-stage::before,
+:root[data-materials='wired'][data-wired-motion='off'] .wlyric-stage *,
+:root[data-materials='wired'][data-wired-motion='off'] .wlyric-stage *::after,
+:root[data-materials='wired'].reduce-motion .wired-found-ticker-track,
+:root[data-materials='wired'].reduce-motion .wired-found-radar-sweep,
+:root[data-materials='wired'].reduce-motion .wired-found-radar-ring,
+:root[data-materials='wired'].reduce-motion .wired-found-map-sweep,
+:root[data-materials='wired'].reduce-motion .wired-found-terminal-line,
+:root[data-materials='wired'].reduce-motion .wired-found-guide-glitch,
+:root[data-materials='wired'].reduce-motion .wired-found-lyric-rail li,
+:root[data-materials='wired'].reduce-motion .wlyric-stage::before,
+:root[data-materials='wired'].reduce-motion .wlyric-stage *,
+:root[data-materials='wired'].reduce-motion .wlyric-stage *::after {
+  animation: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-materials='wired'] .fwin::before {
-    opacity: 0.12;
+  .wired-found-matrix,
+  .wired-found-particles {
+    display: none;
+  }
+
+  .wired-found-ticker-track,
+  .wired-found-radar-sweep,
+  .wired-found-radar-ring,
+  .wired-found-map-sweep,
+  .wired-found-terminal-line,
+  .wired-found-guide-glitch,
+  .wired-found-guide-scan,
+  .wired-found-lyric-rail li,
+  .wlyric-stage::before,
+  .wlyric-stage *,
+  .wlyric-stage *::after {
+    animation: none;
+  }
+
+  .wired-found-eye-iris,
+  .wired-found-radar-point {
+    transition: none;
   }
 
   :root[data-materials='wired'] .mini-frame,
@@ -2438,6 +2135,7 @@
     transform: none;
   }
 }
+
 
 /* ---------------------------------------------------------------------------
    Breach — the exit sequence
@@ -2470,7 +2168,7 @@
     rgba(109, 241, 255, 0.07) 0 1px,
     transparent 1px 3px
   );
-  animation: wiredBreachRoll 2.4s linear infinite;
+  animation: wiredBreachRoll 2.4s steps(3) infinite;
   pointer-events: none;
 }
 
@@ -2479,6 +2177,7 @@
   position: absolute;
   left: 0;
   right: 0;
+  top: 18%;
   height: 14%;
   background: linear-gradient(
     90deg,
@@ -2602,12 +2301,15 @@
   from { transform: translateY(0); }
   to { transform: translateY(3px); }
 }
+/* The band is parked at top:18% and travels by transform only (it used to
+   animate `top`, a layout property, on a full-width element). 321% of its own
+   14% height = 45% of the screen, i.e. down to where `top: 63%` used to land. */
 @keyframes wiredBreachTear {
-  0%, 44% { top: 18%; opacity: 0; transform: translateX(0); }
-  46% { opacity: 1; transform: translateX(-3%); }
-  52% { opacity: 1; transform: translateX(2%); }
-  58% { top: 63%; opacity: 1; transform: translateX(-1%); }
-  62%, 100% { opacity: 0; transform: translateX(0); }
+  0%, 44% { opacity: 0; transform: translate(0, 0); }
+  46% { opacity: 1; transform: translate(-3%, 80%); }
+  52% { opacity: 1; transform: translate(2%, 180%); }
+  58% { opacity: 1; transform: translate(-1%, 321%); }
+  62%, 100% { opacity: 0; transform: translate(0, 321%); }
 }
 
 /* The tear and roll are the whole point of the effect, so under reduced motion

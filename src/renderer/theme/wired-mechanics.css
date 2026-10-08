@@ -1,0 +1,728 @@
+/**
+ * WIRED ARCHIVE — study mechanics: layer descent, Navi terminal (TTY), Signal
+ * decrypt (DCR), intercept channel (ICP), the crossing transmission, the tray
+ * LAYER badge and the wallpaper depth stages.
+ * -----------------------------------------------------------------------------
+ * Palette locked to the spec: cyan #6df1ff, amber #ffb13b, red only for
+ * emergencies (none here — a NAK is amber). Motion is stepped and dies under
+ * `.reduce-motion`, `prefers-reduced-motion`, `data-wired-motion='off'` and
+ * battery saver; idle loops also honour `data-wired-idle='off'`.
+ * Everything is scoped to `[data-materials='wired']` except the Settings card,
+ * which renders under every theme.
+ */
+
+/* =============================================================================
+   1. Console layer + frame
+   ============================================================================= */
+:root[data-materials='wired'] .wmc-host {
+  position: absolute;
+  inset: 0;
+  /* Above windows and widgets, below the CRT glass (199990), Start and taskbar. */
+  z-index: 199970;
+  pointer-events: none;
+}
+
+:root[data-materials='wired'] .wmc-console {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 80px);
+  pointer-events: auto;
+  color: #d8fbff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background:
+    repeating-linear-gradient(0deg, rgba(109, 241, 255, 0.025) 0 1px, transparent 1px 3px),
+    rgba(1, 10, 16, 0.94);
+  border: 1px solid rgba(109, 241, 255, 0.38);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 14px 40px rgba(0, 0, 0, 0.55), inset 0 0 24px rgba(109, 241, 255, 0.05);
+  animation: wm-scan-reveal 0.28s steps(6) 1, wm-frame-power 0.5s steps(3) 1;
+}
+
+:root[data-materials='wired'] .wmc-console::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --wn-tick: rgba(109, 241, 255, 0.5);
+  background:
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 0 0 / 10px 1px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 0 0 / 1px 10px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 100% 0 / 10px 1px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 100% 0 / 1px 10px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 0 100% / 10px 1px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 0 100% / 1px 10px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 100% 100% / 10px 1px no-repeat,
+    linear-gradient(var(--wn-tick), var(--wn-tick)) 100% 100% / 1px 10px no-repeat;
+}
+
+:root[data-materials='wired'] .wmc-console.is-top::before {
+  --wn-tick: rgba(255, 177, 59, 0.95);
+}
+
+:root[data-materials='wired'] .wmc-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 3px 4px 3px 6px;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.22);
+  background: linear-gradient(180deg, rgba(109, 241, 255, 0.08), rgba(109, 241, 255, 0.02));
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+:root[data-materials='wired'] .wmc-code {
+  padding: 1px 6px;
+  color: #02070d;
+  background: rgba(109, 241, 255, 0.45);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+}
+
+:root[data-materials='wired'] .wmc-console.is-top .wmc-code {
+  background: #6df1ff;
+  box-shadow: 0 0 10px rgba(109, 241, 255, 0.42);
+}
+
+:root[data-materials='wired'] .wmc-sep { color: rgba(109, 241, 255, 0.36); }
+:root[data-materials='wired'] .wmc-name { font-size: 11px; letter-spacing: 0.06em; color: rgba(216, 251, 255, 0.72); }
+
+:root[data-materials='wired'] .wmc-meter {
+  width: 21px;
+  height: 10px;
+  margin-left: auto;
+  color: #6df1ff;
+  background:
+    linear-gradient(currentColor, currentColor) 0 100% / 3px 3px no-repeat,
+    linear-gradient(currentColor, currentColor) 6px 100% / 3px 5px no-repeat,
+    linear-gradient(currentColor, currentColor) 12px 100% / 3px 7px no-repeat,
+    linear-gradient(currentColor, currentColor) 18px 100% / 3px 10px no-repeat;
+}
+
+:root[data-materials='wired'] .wmc-close {
+  min-width: 34px;
+  height: 24px;
+  color: rgba(109, 241, 255, 0.75);
+  background: transparent;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 11px;
+}
+
+:root[data-materials='wired'] .wmc-close:hover,
+:root[data-materials='wired'] .wmc-close:focus-visible {
+  color: #ffb13b;
+  border-color: rgba(255, 177, 59, 0.6);
+  outline: none;
+}
+
+:root[data-materials='wired'] .wmc-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+:root[data-materials='wired'] .wmc-status {
+  display: flex;
+  gap: 14px;
+  padding: 3px 8px;
+  border-top: 1px solid rgba(109, 241, 255, 0.18);
+  color: rgba(109, 241, 255, 0.62);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+:root[data-materials='wired'] .wmc-status-right { margin-left: auto; }
+
+:root[data-materials='wired'] .wmc-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+:root[data-materials='wired'] .wmc-btn {
+  padding: 5px 12px;
+  color: #02070d;
+  background: rgba(109, 241, 255, 0.82);
+  border: 1px solid #6df1ff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+:root[data-materials='wired'] .wmc-btn:hover:not(:disabled) { background: #6df1ff; box-shadow: 0 0 10px rgba(109, 241, 255, 0.4); }
+:root[data-materials='wired'] .wmc-btn:focus-visible { outline: 1px solid #ffb13b; outline-offset: 2px; }
+:root[data-materials='wired'] .wmc-btn:disabled { opacity: 0.4; }
+
+:root[data-materials='wired'] .wmc-btn.is-ghost {
+  color: #6df1ff;
+  background: transparent;
+  border-color: rgba(109, 241, 255, 0.45);
+}
+
+:root[data-materials='wired'] .wmc-btn kbd,
+:root[data-materials='wired'] .wmc-dcr kbd {
+  padding: 0 3px;
+  border: 1px solid currentColor;
+  font: inherit;
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+:root[data-materials='wired'] .wmc-seg {
+  min-width: 40px;
+  padding: 2px 8px;
+  color: rgba(109, 241, 255, 0.7);
+  background: transparent;
+  border: 1px solid rgba(109, 241, 255, 0.35);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+:root[data-materials='wired'] .wmc-seg.is-on { color: #02070d; background: #6df1ff; }
+:root[data-materials='wired'] .wmc-seg:disabled { opacity: 0.3; border-style: dashed; }
+
+/* =============================================================================
+   2. TTY
+   ============================================================================= */
+:root[data-materials='wired'] .wmc-tty-screen {
+  /* Shrinks on short windows so the prompt line always stays on screen. */
+  height: clamp(140px, calc(100vh - 230px), 340px);
+  padding: 8px 10px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  user-select: text;
+}
+
+:root[data-materials='wired'] .wmc-tty-line.is-echo { color: #fff1b7; }
+:root[data-materials='wired'] .wmc-tty-line.is-out { color: #d8fbff; }
+:root[data-materials='wired'] .wmc-tty-line.is-ok { color: #6df1ff; text-shadow: 0 0 6px rgba(109, 241, 255, 0.35); }
+:root[data-materials='wired'] .wmc-tty-line.is-warn { color: #ffb13b; }
+:root[data-materials='wired'] .wmc-tty-line.is-err { color: #ffb13b; font-weight: 700; }
+:root[data-materials='wired'] .wmc-tty-line.is-sys { color: #6df1ff; letter-spacing: 0.08em; }
+:root[data-materials='wired'] .wmc-tty-line.is-dim { color: rgba(216, 251, 255, 0.45); }
+:root[data-materials='wired'] .wmc-tty-line[lang='ja'] { font-family: var(--font-jp, var(--font-mono)); }
+
+:root[data-materials='wired'] .wmc-tty-prompt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid rgba(109, 241, 255, 0.2);
+  color: #ffb13b;
+}
+
+:root[data-materials='wired'] .wmc-tty-prompt input {
+  flex: 1;
+  min-width: 0;
+  color: #e9feff;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+}
+
+:root[data-materials='wired'] .wmc-caret {
+  width: 7px;
+  height: 14px;
+  background: #ffb13b;
+  animation: wm-cursor-blink 1.06s steps(1) infinite;
+}
+
+/* =============================================================================
+   3. Signal decrypt
+   ============================================================================= */
+:root[data-materials='wired'] .wmc-dcr-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  min-height: 360px;
+  outline: none;
+}
+
+:root[data-materials='wired'] .wmc-dcr-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+:root[data-materials='wired'] .wmc-dcr-channels { display: flex; align-items: center; gap: 4px; }
+
+:root[data-materials='wired'] .wmc-dcr-meter {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  margin-left: auto;
+}
+
+:root[data-materials='wired'] .wmc-dcr-meter i {
+  width: 4px;
+  height: 100%;
+  background: rgba(109, 241, 255, 0.12);
+}
+
+:root[data-materials='wired'] .wmc-dcr-meter i.on {
+  background: #6df1ff;
+  box-shadow: 0 0 5px rgba(109, 241, 255, 0.6);
+}
+
+:root[data-materials='wired'] .wmc-dcr-meter i.on:nth-child(n + 8) { background: #fff1b7; }
+
+:root[data-materials='wired'] .wmc-dcr-packet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(109, 241, 255, 0.25);
+  background: rgba(0, 6, 11, 0.6);
+}
+
+:root[data-materials='wired'] .wmc-dcr-kicker {
+  display: flex;
+  gap: 12px;
+  color: rgba(109, 241, 255, 0.65);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+:root[data-materials='wired'] .is-amber { color: #ffb13b; }
+
+:root[data-materials='wired'] .wmc-dcr-prompt {
+  min-height: 64px;
+  color: #e9feff;
+  font-size: 34px;
+  line-height: 1.3;
+  text-align: center;
+  word-break: break-word;
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.35);
+}
+
+:root[data-materials='wired'] .wmc-dcr-packet.is-decrypting .wmc-dcr-prompt {
+  color: rgba(109, 241, 255, 0.78);
+}
+
+:root[data-materials='wired'] .wmc-dcr-packet.is-armed .wmc-dcr-prompt {
+  animation: wm-phosphor-settle 0.24s steps(3) 1;
+}
+
+:root[data-materials='wired'] .wmc-dcr-prompt:not([lang='ja']) { font-size: 18px; }
+
+:root[data-materials='wired'] .wmc-dcr-decode { align-self: center; }
+
+:root[data-materials='wired'] .wmc-dcr-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(109, 241, 255, 0.28);
+  text-align: center;
+  animation: wm-scan-reveal 0.2s steps(4) 1;
+}
+
+:root[data-materials='wired'] .wmc-dcr-word { font-size: 26px; color: #e9feff; }
+:root[data-materials='wired'] .wmc-dcr-reading { font-size: 16px; color: #fff1b7; }
+:root[data-materials='wired'] .wmc-dcr-meaning { font-size: 14px; color: #d8fbff; }
+:root[data-materials='wired'] .wmc-dcr-sentence { font-size: 13px; color: rgba(216, 251, 255, 0.6); }
+
+:root[data-materials='wired'] .wmc-dcr-grades { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+:root[data-materials='wired'] .wmc-grade.is-again { color: #02070d; background: rgba(255, 177, 59, 0.85); border-color: #ffb13b; }
+:root[data-materials='wired'] .wmc-grade.is-hard { background: rgba(109, 241, 255, 0.55); }
+
+:root[data-materials='wired'] .wmc-dcr-empty,
+:root[data-materials='wired'] .wmc-dcr-report {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 177, 59, 0.4);
+  animation: wm-scan-reveal 0.24s steps(5) 1;
+}
+
+:root[data-materials='wired'] .wmc-dcr-empty strong { color: #ffb13b; letter-spacing: 0.16em; }
+
+:root[data-materials='wired'] .wmc-dcr-report { border-color: rgba(109, 241, 255, 0.45); }
+
+:root[data-materials='wired'] .wmc-dcr-report dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 18px;
+  margin: 0;
+}
+
+:root[data-materials='wired'] .wmc-dcr-report dt { color: rgba(109, 241, 255, 0.65); }
+:root[data-materials='wired'] .wmc-dcr-report dd { margin: 0; color: #e9feff; font-variant-numeric: tabular-nums; }
+
+:root[data-materials='wired'] .wmc-dcr-log {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid rgba(109, 241, 255, 0.2);
+  background: rgba(0, 4, 8, 0.55);
+}
+
+:root[data-materials='wired'] .wmc-dcr-log header {
+  padding: 6px 8px;
+  color: rgba(109, 241, 255, 0.6);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.15);
+}
+
+:root[data-materials='wired'] .wmc-dcr-log ol {
+  flex: 1;
+  max-height: 340px;
+  margin: 0;
+  padding: 4px 6px;
+  overflow: auto;
+  list-style: none;
+}
+
+:root[data-materials='wired'] .wmc-dcr-log li {
+  display: grid;
+  grid-template-columns: 44px 28px 1fr auto;
+  gap: 4px;
+  padding: 1px 0;
+  font-size: 10.5px;
+  white-space: nowrap;
+  animation: wm-scan-reveal 0.12s steps(2) 1;
+}
+
+:root[data-materials='wired'] .wmc-dcr-log li span:nth-child(3) { overflow: hidden; text-overflow: ellipsis; }
+:root[data-materials='wired'] .wmc-dcr-log li span:first-child { color: rgba(216, 251, 255, 0.4); }
+:root[data-materials='wired'] .wmc-dcr-log li.is-ack b { color: #6df1ff; }
+:root[data-materials='wired'] .wmc-dcr-log li.is-nak b,
+:root[data-materials='wired'] .wmc-dcr-log li.is-nak i { color: #ffb13b; }
+:root[data-materials='wired'] .wmc-dcr-log li i { color: rgba(109, 241, 255, 0.55); font-style: normal; }
+
+/* =============================================================================
+   4. Intercept channel
+   ============================================================================= */
+:root[data-materials='wired'] .wmc-icp-body { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
+
+:root[data-materials='wired'] .wmc-icp-kicker {
+  color: #ffb13b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+:root[data-materials='wired'] .wmc-icp.is-incoming .wmc-icp-kicker { animation: wm-relay-blink 1.2s steps(1) infinite; }
+:root[data-materials='wired'] .wmc-icp-copy { margin: 0; color: rgba(216, 251, 255, 0.75); }
+
+:root[data-materials='wired'] .wmc-icp-burst {
+  padding: 14px 8px;
+  color: #e9feff;
+  font-size: 24px;
+  text-align: center;
+  border: 1px solid rgba(255, 177, 59, 0.5);
+  animation: wm-decrypt-noise 0.4s steps(4) 1;
+}
+
+:root[data-materials='wired'] .wmc-icp-form { display: flex; flex-direction: column; gap: 8px; }
+
+:root[data-materials='wired'] .wmc-icp-form input {
+  padding: 6px 8px;
+  color: #e9feff;
+  background: rgba(0, 8, 13, 0.9);
+  border: 1px solid rgba(109, 241, 255, 0.45);
+  font-size: 18px;
+}
+
+:root[data-materials='wired'] .wmc-icp-form input:focus { outline: 1px solid #ffb13b; }
+
+:root[data-materials='wired'] .wmc-icp-result { display: flex; flex-direction: column; gap: 8px; }
+:root[data-materials='wired'] .wmc-icp-verdict { display: flex; align-items: baseline; gap: 12px; }
+:root[data-materials='wired'] .wmc-icp-verdict b { font-size: 26px; letter-spacing: 0.12em; }
+:root[data-materials='wired'] .wmc-icp-result.is-ack .wmc-icp-verdict b { color: #6df1ff; text-shadow: 0 0 12px rgba(109, 241, 255, 0.5); }
+:root[data-materials='wired'] .wmc-icp-result.is-nak .wmc-icp-verdict b { color: #ffb13b; }
+:root[data-materials='wired'] .wmc-icp-result.is-nak { animation: wm-resync-shake 0.24s steps(2) 1; }
+:root[data-materials='wired'] .wmc-icp-diff { font-size: 20px; color: #6df1ff; }
+:root[data-materials='wired'] .wmc-icp-diff .is-missed { color: #ffb13b; text-decoration: underline wavy rgba(255, 177, 59, 0.7); }
+:root[data-materials='wired'] .wmc-icp-source { font-size: 15px; color: #e9feff; }
+:root[data-materials='wired'] .wmc-icp-gloss { color: rgba(216, 251, 255, 0.6); }
+
+/* =============================================================================
+   5. INCOMING TRANSMISSION (layer crossing)
+   ============================================================================= */
+:root[data-materials='wired'] .wmc-tx {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px),
+    rgba(0, 3, 6, 0.62);
+  animation: wm-scan-reveal 0.3s steps(6) 1;
+}
+
+:root[data-materials='wired'] .wmc-tx-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 380px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 22px 28px;
+  color: #d8fbff;
+  font-family: var(--font-mono);
+  background: rgba(1, 10, 16, 0.96);
+  border: 1px solid #ffb13b;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 40px rgba(255, 177, 59, 0.18);
+  animation: wm-frame-power 0.6s steps(3) 1;
+}
+
+:root[data-materials='wired'] .wmc-tx-kicker {
+  color: #ffb13b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  animation: wm-relay-blink 0.9s steps(1) 2;
+}
+
+:root[data-materials='wired'] .wmc-tx-layer {
+  color: #e9feff;
+  font-size: 54px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 18px rgba(109, 241, 255, 0.55);
+  animation: wm-phosphor-settle 0.5s steps(4) 1;
+}
+
+:root[data-materials='wired'] .wmc-tx-copy { margin: 0; text-align: center; color: rgba(216, 251, 255, 0.8); }
+
+:root[data-materials='wired'] .wmc-tx-unlocks {
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+  border: 1px dashed rgba(109, 241, 255, 0.35);
+}
+
+:root[data-materials='wired'] .wmc-tx-unlocks b { color: #6df1ff; margin-right: 8px; }
+
+/* =============================================================================
+   6. Tray LAYER badge + Start entries
+   ============================================================================= */
+:root[data-materials='wired'] .wired-layer-badge {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 6px;
+  color: #6df1ff;
+  background: transparent;
+  border: 1px solid rgba(109, 241, 255, 0.25);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+:root[data-materials='wired'] .wired-layer-badge:hover,
+:root[data-materials='wired'] .wired-layer-badge:focus-visible {
+  color: #ffb13b;
+  border-color: rgba(255, 177, 59, 0.6);
+  outline: none;
+}
+
+:root[data-materials='wired'] .wired-layer-badge-rail {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: rgba(109, 241, 255, 0.15);
+}
+
+:root[data-materials='wired'] .wired-layer-badge-rail i {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transform-origin: left center;
+}
+
+:root[data-materials='wired'] .wired-start-mech span::before {
+  content: '▸ ';
+  color: #ffb13b;
+}
+
+/* =============================================================================
+   7. "The Wired remembers" — live wallpaper text
+   ============================================================================= */
+:root[data-materials='wired'] .wired-wall-kana.is-live {
+  color: rgba(109, 241, 255, 0.24);
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.2);
+}
+
+:root[data-materials='wired'] .wired-wall-node b {
+  color: #e9feff;
+  font-weight: 500;
+}
+
+:root[data-materials='wired'] .wired-wall-node.node-c.is-due {
+  color: #ffb13b;
+  border-left-color: rgba(255, 177, 59, 0.6);
+}
+
+/* =============================================================================
+   8. Layer depth — deeper layers are darker and carry more static
+   (data-wired-depth 0..4, stamped by WiredMechanicsHost)
+   ============================================================================= */
+:root[data-materials='wired'][data-wired-depth] .wired-wall-atmosphere::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(216, 251, 255, 0.05) 0 1px, transparent 1px 2px),
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.035) 0 1px, transparent 1px 3px);
+  background-size: 100% 3px, 5px 100%;
+}
+
+:root[data-materials='wired'][data-wired-depth='1'] .os-desktop { --wmc-depth-dim: 0.1; }
+:root[data-materials='wired'][data-wired-depth='2'] .os-desktop { --wmc-depth-dim: 0.18; }
+:root[data-materials='wired'][data-wired-depth='3'] .os-desktop { --wmc-depth-dim: 0.26; }
+:root[data-materials='wired'][data-wired-depth='4'] .os-desktop { --wmc-depth-dim: 0.34; }
+
+:root[data-materials='wired'][data-wired-depth='1'] .wired-wall-atmosphere::after { opacity: 0.35; }
+:root[data-materials='wired'][data-wired-depth='2'] .wired-wall-atmosphere::after { opacity: 0.55; }
+:root[data-materials='wired'][data-wired-depth='3'] .wired-wall-atmosphere::after { opacity: 0.75; }
+:root[data-materials='wired'][data-wired-depth='4'] .wired-wall-atmosphere::after { opacity: 1; }
+
+/* The dim: a flat black wash under the wallpaper text, deeper per stage. */
+:root[data-materials='wired'][data-wired-depth] .wired-wall-atmosphere {
+  box-shadow: inset 0 0 0 100vmax rgba(0, 0, 0, var(--wmc-depth-dim, 0));
+}
+
+/* Depth 2+: the static crawls (stepped, ~3 fps), idle-gated below. */
+:root[data-materials='wired'][data-wired-depth='2'] .wired-wall-atmosphere::after,
+:root[data-materials='wired'][data-wired-depth='3'] .wired-wall-atmosphere::after,
+:root[data-materials='wired'][data-wired-depth='4'] .wired-wall-atmosphere::after {
+  animation: wmc-static-crawl 2.4s steps(8) infinite;
+}
+
+@keyframes wmc-static-crawl {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(3px); }
+}
+
+/* Depth 3+: the line pulse walks in amber, the watermark burns brighter. */
+:root[data-materials='wired'][data-wired-depth='3'] .wired-wall-pulse,
+:root[data-materials='wired'][data-wired-depth='4'] .wired-wall-pulse {
+  stroke: rgba(255, 241, 183, 0.9);
+}
+
+:root[data-materials='wired'][data-wired-depth='3'] .wired-wall-watermark,
+:root[data-materials='wired'][data-wired-depth='4'] .wired-wall-watermark {
+  fill: rgba(109, 241, 255, 0.055);
+}
+
+:root[data-materials='wired'][data-wired-idle='off'] .wired-wall-atmosphere::after,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-wall-atmosphere::after,
+:root[data-materials='wired'][data-perf='battery'] .wired-wall-atmosphere::after,
+:root[data-materials='wired'][data-wired-static='reduced'] .wired-wall-atmosphere::after,
+:root[data-materials='wired'].reduce-motion .wired-wall-atmosphere::after {
+  animation: none;
+}
+
+:root[data-materials='wired'][data-wired-static='reduced'][data-wired-depth] .wired-wall-atmosphere::after {
+  opacity: 0.25;
+}
+
+/* =============================================================================
+   9. Reticle cursor (LAYER:08)
+   ============================================================================= */
+:root[data-materials='wired'][data-wired-cursor='reticle'] body,
+:root[data-materials='wired'][data-wired-cursor='reticle'] .os-desktop {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%2302070d' stroke-width='3'%3E%3Ccircle cx='12' cy='12' r='6'/%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6'/%3E%3C/g%3E%3Cg fill='none' stroke='%236df1ff' stroke-width='1.2'%3E%3Ccircle cx='12' cy='12' r='6'/%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6'/%3E%3C/g%3E%3Crect x='11' y='11' width='2' height='2' fill='%23ffb13b'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
+/* =============================================================================
+   10. Motion gates
+   ============================================================================= */
+:root[data-materials='wired'][data-wired-motion='off'] :is(.wmc-console, .wmc-tx, .wmc-tx-panel, .wmc-tx-kicker, .wmc-tx-layer, .wmc-dcr-answer, .wmc-dcr-empty, .wmc-dcr-report, .wmc-dcr-log li, .wmc-dcr-prompt, .wmc-icp-burst, .wmc-icp-result, .wmc-icp-kicker, .wmc-caret),
+:root[data-materials='wired'].reduce-motion :is(.wmc-console, .wmc-tx, .wmc-tx-panel, .wmc-tx-kicker, .wmc-tx-layer, .wmc-dcr-answer, .wmc-dcr-empty, .wmc-dcr-report, .wmc-dcr-log li, .wmc-dcr-prompt, .wmc-icp-burst, .wmc-icp-result, .wmc-icp-kicker, .wmc-caret) {
+  animation: none;
+}
+
+:root[data-materials='wired'][data-perf='battery'] :is(.wmc-caret, .wmc-icp-kicker, .wmc-dcr-log li) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='wired'] :is(.wmc-console, .wmc-tx, .wmc-tx-panel, .wmc-tx-kicker, .wmc-tx-layer, .wmc-dcr-answer, .wmc-dcr-empty, .wmc-dcr-report, .wmc-dcr-log li, .wmc-dcr-prompt, .wmc-icp-burst, .wmc-icp-result, .wmc-icp-kicker, .wmc-caret),
+  :root[data-materials='wired'] .wired-wall-atmosphere::after {
+    animation: none;
+  }
+}
+
+/* =============================================================================
+   11. Settings card (renders under every theme; Wired skins it further)
+   ============================================================================= */
+.wired-mech-depth {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.wired-mech-depth-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wired-mech-depth-head b {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+
+.wired-mech-rail {
+  height: 4px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.wired-mech-rail i {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transform-origin: left center;
+}
+
+.wired-mech-unlocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 2px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.wired-mech-unlocks li {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.wired-mech-unlocks li.is-sealed { opacity: 0.5; }
+.wired-mech-unlocks small { opacity: 0.6; font-variant-numeric: tabular-nums; }
+
+:root[data-materials='wired'] .wired-mech-depth-head b { color: #6df1ff; text-shadow: 0 0 8px rgba(109, 241, 255, 0.4); }
+:root[data-materials='wired'] .wired-mech-rail { background: rgba(109, 241, 255, 0.12); }
+:root[data-materials='wired'] .wired-mech-rail i { background: #6df1ff; }
+:root[data-materials='wired'] .wired-mech-unlocks li.is-open code { color: #6df1ff; }
+:root[data-materials='wired'] .wired-mech-unlocks li.is-sealed code { color: rgba(255, 177, 59, 0.7); }

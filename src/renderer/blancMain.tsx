@@ -20,7 +20,9 @@ import BlancShell, { BlancLockscreen } from './components/blanc/BlancShell';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { withStrictMode } from './strictRoot';
 import ToastHost from './components/ToastHost';
-import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
+import GlobalDictionaryOverlay, { setPopupStyleLoader } from './components/GlobalDictionaryOverlay';
+import { ensureStudyOsCompat } from './blancStudyOsCompat';
+import { syncStudyLangToMain } from './studyEnvironment';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
 import { applyLangAttribute, initI18n } from './i18n';
 import { applyBlancModeClass } from './blancMode';
@@ -50,9 +52,11 @@ import './theme/tokens.css';
 // pins that structurally).
 import './theme/liquid-tokens.css';
 import './theme/liquid-surfaces.css';
-// styles.css is NOT booted here: it is 468 KB of Study OS rules that only the
-// ported panels need, and they pull it lazily via theme/studyos-compat.css.
-// Blanc's own page baseline now lives in theme/blanc.css.
+// styles.css is NOT booted here: it is ~800 KB of Study OS source (~500 KB
+// built) that only the ported panels need. They pull it on demand through
+// blancStudyOsCompat.ts (theme/studyos-compat.css, layered), and nothing at
+// startup may — blancBootGraph.test.ts guards it. Blanc's own page baseline
+// lives in theme/blanc.css.
 import './components/ui/ui.css';
 import './theme/a11y.css';
 import './theme/blanc.css';
@@ -127,6 +131,18 @@ void initProfileState().catch((err) => console.error('[profileState] init failed
 // hydrate them itself — the Study OS entry doing it does nothing for Blanc, and
 // without this the same queue renders full in one window and empty in the other.
 void initAgentOperationalState();
+// Main reads the study language for transcription, mining and the extension;
+// Study OS's entry pushes it at boot, and a Blanc-only session has no Study OS.
+syncStudyLangToMain();
+// The global lookup popups render Study OS class names (`dict-*`, `tr-popup-*`);
+// Blanc loads that sheet only when a popup is about to open.
+setPopupStyleLoader(ensureStudyOsCompat);
+// Extension mining, Whisper requests, reminders, the pending-Anki replay and
+// the automation host — run here only while no Study OS window is alive
+// (blancBackgroundJobs.ts). Dynamically imported: not startup cost.
+void import('./blancBackgroundJobs')
+  .then(({ installBlancBackgroundJobs }) => installBlancBackgroundJobs())
+  .catch((err) => console.warn('[blanc] background jobs unavailable:', err));
 
 function BlancRoot() {
   const [locked, setLocked] = useState(() => shouldShowLockscreen());
@@ -157,8 +173,22 @@ if (container) {
   // See main.tsx: catalogs are per-language chunks and t() is synchronous, so
   // the active one must resolve before the first paint or a non-English UI
   // flashes English. English is already loaded — a microtask for most sessions.
-  void initI18n().then(() => {
+  void initI18n().then(async () => {
     startAiSetupSync();
+    // The deck, word knowledge and level lists have a durable IndexedDB copy;
+    // reconcile it with the localStorage cache before anything reads or writes
+    // either — the same restore Study OS's entry runs. Without it a Blanc-only
+    // session whose localStorage cache was lost would write the empty cache
+    // over the durable deck on its first change.
+    await import('./levelLists')
+      .then(({ restoreLevelListsFromIdb }) => restoreLevelListsFromIdb())
+      .catch((err) => console.warn('[level-lists] startup restore skipped:', err));
+    await Promise.all([
+      import('./flashcardDeck').then(({ restoreDeckFromIdb }) => restoreDeckFromIdb()),
+      import('./knownWords').then(({ restoreKnowledgeFromIdb }) => restoreKnowledgeFromIdb()),
+      // Both swallow their own read errors; a failure here only means the
+      // localStorage cache keeps serving, exactly as before.
+    ]).catch(() => undefined);
     createRoot(container).render(
       withStrictMode(
         <AppErrorBoundary>

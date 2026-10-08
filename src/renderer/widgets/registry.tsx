@@ -39,6 +39,7 @@ import {
   NetworkWidget,
   RecentLookupsWidget,
 } from './system';
+import { ReviewMeterGadget, WordSlideShowGadget } from './aeroStudyGadgets';
 
 export const WIDGETS: WidgetDef[] = [
   // ---- Productivity ----
@@ -76,6 +77,9 @@ export const WIDGETS: WidgetDef[] = [
   // ---- Statistics ----
   { type: 'learning-heatmap', titleKey: 'widgets.title.learning-heatmap', category: 'Statistics', descKey: 'widgets.desc.learning-heatmap', defaultSize: { w: 300, h: 150 }, minSize: { w: 220, h: 120 }, component: LearningHeatmap },
   { type: 'learner-map', titleKey: 'widgets.title.learner-map', category: 'Statistics', descKey: 'widgets.desc.learner-map', defaultSize: { w: 420, h: 280 }, minSize: { w: 280, h: 180 }, component: LearnerMapWidget },
+  // Sidebar-gadget-shaped study meters (Aero mechanics); ordinary widgets in every theme.
+  { type: 'review-meter', titleKey: 'aeroMech.widget.reviewMeter.title', category: 'Statistics', descKey: 'aeroMech.widget.reviewMeter.desc', defaultSize: { w: 220, h: 150 }, minSize: { w: 170, h: 110 }, component: ReviewMeterGadget },
+  { type: 'word-slideshow', titleKey: 'aeroMech.widget.slides.title', category: 'Study', descKey: 'aeroMech.widget.slides.desc', defaultSize: { w: 240, h: 180 }, minSize: { w: 180, h: 130 }, component: WordSlideShowGadget },
 
   // ---- Music ----
   { type: 'mini-player', titleKey: 'widgets.title.mini-player', category: 'Music', descKey: 'widgets.desc.mini-player', defaultSize: { w: 300, h: 200 }, minSize: { w: 240, h: 180 }, component: MiniPlayer },

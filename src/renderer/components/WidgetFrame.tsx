@@ -4,8 +4,9 @@ import { getWidgetDef } from '../widgets/registry';
 import { readSetting } from '../widgets/types';
 import { getZoomFactor } from '../appZoom';
 import { useT } from '../i18n';
-import { useWiredMaterials } from './ui';
+import { useAeroMaterials, useWiredMaterials } from './ui';
 import { wiredWidgetTitle } from '../widgets/wiredLabels';
+import { aeroGadgetTitle } from '../widgets/aeroLabels';
 import { clearTimer } from '../widgets/timerStore';
 
 // Home Workspace widget host. A lighter cousin of the desktop's FloatingWindow:
@@ -47,6 +48,9 @@ export default function WidgetFrame({
 }: WidgetFrameProps) {
   const { t } = useT();
   const wired = useWiredMaterials();
+  // Aero renders widgets as frameless Sidebar-era gadgets: no title bar, a
+  // vertical close/options/grip toolbar that fades in beside the gadget.
+  const aero = useAeroMaterials();
   const def = getWidgetDef(widget.type);
   const frameRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -159,6 +163,89 @@ export default function WidgetFrame({
 
   const Body = def.component;
   const contentH = collapsed ? 0 : widget.h - 30;
+
+  if (aero) {
+    const title = aeroGadgetTitle(widget.type, t(def.titleKey));
+    // The toolbar sits outside the gadget's right edge; near the desk's right
+    // edge it would be off-screen, so it moves to the left side instead.
+    const deskW = deskRef.current?.clientWidth ?? Number.POSITIVE_INFINITY;
+    const toolsLeft = widget.x + widget.w + 34 > deskW;
+    return (
+      <section
+        ref={frameRef}
+        className={`widget-frame aero-gadget ${focused ? 'focused' : ''} ${blur ? 'blur' : ''} ${collapsed ? 'collapsed' : ''} ${locked ? 'locked' : ''} ${menuOpen ? 'is-menu-open' : ''} ${toolsLeft ? 'aero-gadget--tools-left' : ''}`}
+        style={{
+          left: widget.x,
+          top: widget.y,
+          width: widget.w,
+          height: collapsed ? 30 : widget.h,
+          zIndex: widget.z,
+          opacity,
+        }}
+        aria-label={title}
+        onPointerDown={onFocus}
+      >
+        {collapsed && (
+          <div className="widget-bar" title={title} onPointerDown={dragStart} onDoubleClick={() => onPatch({ collapsed: false })}>
+            <span className="widget-title">{title}</span>
+          </div>
+        )}
+        {!collapsed && (
+          <div className="widget-body">
+            <Body settings={widget.settings ?? {}} setSettings={setSettings} size={{ w: widget.w, h: widget.h }} instanceId={widget.id} />
+          </div>
+        )}
+        <div className="aero-gadget-tools" role="toolbar" aria-orientation="vertical" aria-label={t('aeroVista.gadget.toolbar')}>
+          <button
+            type="button"
+            className="aero-gadget-tool is-close"
+            title={t('aeroVista.gadget.close')}
+            aria-label={t('aeroVista.gadget.close')}
+            onClick={(ev) => { ev.stopPropagation(); setMenuOpen(false); onPatch({ hidden: true }); }}
+          >
+            <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M2 2l6 6M8 2 2 8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="aero-gadget-tool is-options"
+            title={t('widgetFrame.options')}
+            aria-label={t('widgetFrame.options')}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={(ev) => { ev.stopPropagation(); setMenuOpen((o) => !o); }}
+          >
+            <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M8.6 1.4a2.6 2.6 0 0 0-3.2 3.3L1.6 8.5a1 1 0 0 0 1.4 1.4l3.8-3.8a2.6 2.6 0 0 0 3.3-3.2L8.6 4.4 7.6 4.4 7.6 3.4z" fill="currentColor" />
+            </svg>
+          </button>
+          <div
+            className={`aero-gadget-grip${locked ? ' is-locked' : ''}`}
+            title={locked ? t('widgetFrame.locked') : t('aeroVista.gadget.drag')}
+            onPointerDown={dragStart}
+            onDoubleClick={() => onPatch({ collapsed: !collapsed })}
+          >
+            <i /><i /><i /><i /><i /><i />
+          </div>
+          {menuOpen && (
+            <>
+              <div className="widget-menu-backdrop" onPointerDown={(ev) => { ev.stopPropagation(); setMenuOpen(false); }} />
+              <div className="widget-menu" role="menu" onPointerDown={(ev) => ev.stopPropagation()}>
+                <button role="menuitem" onClick={() => { onPatch({ locked: !locked }); setMenuOpen(false); }}>{locked ? t('widgetFrame.unlock') : t('widgetFrame.lock')}</button>
+                <button role="menuitem" onClick={() => { onPatch({ collapsed: !collapsed }); setMenuOpen(false); }}>{collapsed ? t('widgetFrame.expand') : t('widgetFrame.collapse')}</button>
+                <button role="menuitem" onClick={() => { setSettings({ __blur: !blur }); setMenuOpen(false); }}>{blur ? t('aeroVista.gadget.smokedGlass') : t('aeroVista.gadget.clearGlass')}</button>
+                <button role="menuitem" onClick={() => { setSettings({ __opacity: opacity > 0.85 ? 0.7 : 1 }); setMenuOpen(false); }}>{opacity > 0.85 ? t('widgetFrame.makeTransparent') : t('widgetFrame.makeSolid')}</button>
+                <button role="menuitem" onClick={() => { onDuplicate(); setMenuOpen(false); }}>{t('widgetFrame.duplicate')}</button>
+                <button role="menuitem" className="danger" onClick={() => { clearTimer(widget.id); onRemove(); setMenuOpen(false); }}>{t('common.remove')}</button>
+              </div>
+            </>
+          )}
+        </div>
+        {!collapsed && !locked && <div className="widget-resize" title={t('widgetFrame.resize')} onPointerDown={resizeStart} />}
+      </section>
+    );
+  }
 
   return (
     <section

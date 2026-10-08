@@ -187,6 +187,18 @@ export function tokenizeCacheStats(): { entries: number; bytes: number } {
 }
 
 /**
+ * Drop every cached tokenization (Blanc's "Trim"). Results are recomputed on
+ * demand, so this only trades a little CPU later for up to the cache's byte cap
+ * now. Returns the estimated bytes released.
+ */
+export function clearTokenizeCache(): number {
+  const released = tokenizeCacheBytes;
+  tokenizeCache.clear();
+  tokenizeCacheBytes = 0;
+  return released;
+}
+
+/**
  * Tokenize `texts` a few at a time in idle periods, so the lines of a subtitle file are ready
  * before they are shown. Returns a cancel function. A no-op until the tokenizer is loaded.
  */

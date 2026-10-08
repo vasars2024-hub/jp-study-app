@@ -123,7 +123,8 @@
    Secret Frutiger Aero activator (platform chrome, all themes)
    -----------------------------------------------------------------------------
    A near-invisible corner "button" — the hidden discovery from the vision. It
-   reveals a faint glint on hover; click toggles the Aero theme. (Typing
+   reveals a faint glint on hover; double-click toggles the Aero theme. It sits
+   just ABOVE the taskbar in every shell, never over Show Desktop. (Typing
    "aero" anywhere outside a text field also toggles it — see SecretAeroTrigger.)
    ============================================================================= */
 .aero-secret-trigger {

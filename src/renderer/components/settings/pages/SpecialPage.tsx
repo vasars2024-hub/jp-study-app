@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
+import AeroMechanicsCard from './AeroMechanicsCard';
 import { useSettings } from '../SettingsContext';
 import { Toggle, useAeroMaterials, useWiredMaterials } from '../../ui';
 import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
@@ -35,6 +36,8 @@ import {
   type BlancModeSettings,
 } from '../../../blancMode';
 import { nextHistoryEntry } from '../../../secretHistory';
+import { isKnownCommand as isKnownTerminalCommand, runTerminalCommand } from '../../../wiredMechanics/terminalEngine';
+import WiredMechanicsCard from './WiredMechanicsCard';
 
 import type { ArcadeGameId } from '../../../games/ArcadeGames';
 
@@ -227,7 +230,11 @@ export default function SpecialPage() {
     if (id === 'desktopBuddy') {
       setAeroSummonOn(setSummonedCompanion('aero', shouldEnable));
     }
-    pushAeroTerminal(`${shouldEnable ? t('special.term.enabled') : t('special.term.disabled')} ${id}.`);
+    // The gadget's translated title, not its internal id ("desktopBuddy").
+    const feature = AERO_GADGET_FEATURES.find((f) => f.id === id);
+    pushAeroTerminal(
+      `${shouldEnable ? t('special.term.enabled') : t('special.term.disabled')} ${feature ? t(feature.titleKey) : id}.`,
+    );
   };
 
   const summonAeroBuddy = () => {
@@ -276,6 +283,11 @@ export default function SpecialPage() {
       pushWiredTerminal(`> [${entry.version}] ${t(entry.titleKey)} — ${t(entry.bodyKey)}`);
       return;
     }
+    const head = input.split(/\s+/)[0];
+    if (isKnownTerminalCommand(input) && !WIRED_TERMINAL_FEATURES.some((f) => f.command === head)) {
+      runSharedWiredCommand(raw.trim());
+      return;
+    }
     const token = input.replace(/^(toggle|enable|disable)\s+/, '');
     const match = WIRED_TERMINAL_FEATURES.find((feature) =>
       feature.command === token ||
@@ -288,6 +300,19 @@ export default function SpecialPage() {
     }
     const force = input.startsWith('enable ') ? true : input.startsWith('disable ') ? false : undefined;
     toggleFindingFeature(match.id, force);
+  };
+
+  /**
+   * Study commands (lookup, stats, due, layer, mine, sync…) come from the Navi
+   * terminal's shared engine, so this terminal and the TTY console answer the
+   * same command the same way. Loaded on first use.
+   */
+  const runSharedWiredCommand = (raw: string) => {
+    void import('../../../wiredMechanics/terminalRuntime').then(async (runtime) => {
+      const result = await runTerminalCommand(raw, runtime.createTerminalContext(() => []));
+      if (result.clear) setWiredTerminalLines([]);
+      result.lines.forEach((line) => pushWiredTerminal(line.text));
+    });
   };
 
   const runAeroCommand = (raw: string) => {
@@ -324,6 +349,14 @@ export default function SpecialPage() {
     if (input === 'history' || input === 'log') {
       const entry = nextHistoryEntry();
       pushAeroTerminal(`> [${entry.version}] ${t(entry.titleKey)} — ${t(entry.bodyKey)}`);
+      return;
+    }
+    // The arcade cards print a command under each game; it has to work here.
+    const gameToken = input.replace(/^(play|run|start)\s+/, '');
+    const game = AERO_GAME_MODULES.find((g) => g.command === gameToken);
+    if (game) {
+      pushAeroTerminal(t('aero.special.launching', { name: t(game.titleKey) }));
+      openArenaGame(game.id, 'aero');
       return;
     }
     const token = input.replace(/^(toggle|enable|disable)\s+/, '');
@@ -498,6 +531,9 @@ export default function SpecialPage() {
           </button>
         </SettingsCard>
       )}
+
+      {/* Wired study mechanics: layer descent, TTY, signal decrypt, intercepts. */}
+      {(wired || isWiredDiscovered) && <WiredMechanicsCard />}
 
       {isWiredDiscovered && (
         <SettingsCard
@@ -681,6 +717,8 @@ export default function SpecialPage() {
           {!aero && <p className="muted os-set-hint">{t('special.aero.gadgetHint')}</p>}
         </SettingsCard>
       )}
+
+      {isAeroDiscovered && <AeroMechanicsCard />}
 
       {isAeroDiscovered && (
         <SettingsCard

@@ -6,7 +6,6 @@ export const BLANC_TABS = [
   'media',
   'stats',
   'tools',
-  'blocks',
   'settings',
 ] as const;
 
@@ -32,6 +31,9 @@ export function isBlancTabId(value: unknown): value is BlancTabId {
 
 export function normalizeBlancTabId(value: unknown): BlancTabId {
   if (value === 'music') return 'media';
+  // Mono Blocks moved from its own primary tab into the Toolbox (a game is not
+  // one of the eight things Blanc is for); a saved "last tab" follows it there.
+  if (value === 'blocks') return 'tools';
   return isBlancTabId(value) ? value : DEFAULT_BLANC_MODE.lastTab;
 }
 

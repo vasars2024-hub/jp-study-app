@@ -35,6 +35,7 @@
 
 import React from 'react';
 import { useT } from '../../i18n';
+import { retryFailedLazyImports } from '../../retryableLazy';
 
 interface Props {
   /** The tool this boundary guards. Used for the message and for the reset key. */
@@ -88,6 +89,9 @@ export class BlancToolErrorBoundary extends React.Component<Props, State> {
   }
 
   private retry = (): void => {
+    // A lazy chunk that failed to load is re-armed first, so "Try again" really
+    // imports it again instead of re-throwing React.lazy's cached rejection.
+    retryFailedLazyImports();
     this.setState({ error: null });
   };
 

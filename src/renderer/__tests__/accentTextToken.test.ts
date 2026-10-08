@@ -250,6 +250,53 @@ describe('Media Center chrome is a remappable material, not a fixed dark palette
 });
 
 /**
+ * Aero is a LIGHT palette that lives in its own sheet (`theme/frutiger-aero.css`), so the
+ * `color-scheme: light` sweeps above — which read styles.css — never saw it. Measured in the
+ * Aero audit: `--accent-text` fell through to the dark default (a GREEN `--accent-2` for every
+ * accent-coloured reading and link), `tokens.css` pins `--danger: initial` for the secret skins
+ * so every bare `var(--danger)` / `var(--danger-text)` resolved to nothing (destructive buttons
+ * looked like plain ones), and the Media Center opened as its dark red default. The same three
+ * contracts, asserted against the sheets that actually carry Aero.
+ */
+describe('Aero carries the light-palette recipes', () => {
+  const FA = readFileSync(resolve(__dirname, '..', 'theme', 'frutiger-aero.css'), 'utf8')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('derives --accent-text from the accent and its own --text', () => {
+    const m = FA.match(/--accent-text\s*:\s*([^;]+);/);
+    expect(m, 'frutiger-aero.css no longer declares --accent-text').toBeTruthy();
+    expect(m?.[1]).toMatch(/color-mix\(in srgb, var\(--accent\) \d+%, var\(--text\)\)/);
+  });
+
+  it('gives --danger a real colour, more specific than the tokens.css pin', () => {
+    const block = FA.match(/:root\[data-theme='frutiger-aero'\]\[data-materials='aero'\]\s*\{([^}]*)\}/)?.[1];
+    expect(block, 'the (0,3,0) danger block moved').toBeTruthy();
+    expect(block).toMatch(/--danger\s*:\s*var\(--red\)/);
+  });
+
+  it('remaps the Media Center --mc-* surfaces under Aero', () => {
+    const aeroBlocks = mcBlocksOf(MC).filter((b) => b.selector.includes("[data-materials='aero']"));
+    expect(aeroBlocks.some((b) => /--mc-bg\s*:/.test(b.declarations)), 'no Aero block declares --mc-bg').toBe(true);
+    // and it rides on the shared light list, so every ink token the light palettes remap is remapped too
+    const light = mcBlocksOf(MC).find((b) => b.selector.includes(":root[data-theme='classic-light'] .mc-root"));
+    expect(light?.selector).toContain(":root[data-materials='aero'] :is(.mc-root, .mc-app-chrome)");
+  });
+});
+
+function mcBlocksOf(source: string): Block[] {
+  const out: Block[] = [];
+  const re = /([^{}]+)\{([^{}]*)\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source))) {
+    const selector = m[1].trim().replace(/\s+/g, ' ');
+    if (!selector || selector.startsWith('@')) continue;
+    out.push({ selector, declarations: m[2] });
+  }
+  return out;
+}
+
+/**
  * The status family, and the third instance of the same shape in one week.
  *
  * `--success`'s own comment in `styles.css` says its value was "picked to clear 4.5:1 on the

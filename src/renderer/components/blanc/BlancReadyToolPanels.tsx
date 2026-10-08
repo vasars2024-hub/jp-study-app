@@ -9,7 +9,6 @@ import {
   type YtVideo,
 } from '../../../shared/ytPlaylists';
 import { formatBytes, isBusy, type AssetSpec } from '../../../shared/assetRegistry';
-import { COMMAND_CATALOG, runCommand } from '../../keyboardShortcuts';
 import {
   clearAll,
   dismiss,
@@ -26,15 +25,12 @@ import {
 import { getLevel } from '../../knownWords';
 import { getTokenizer, tokenizeSync } from '../../tokenizer';
 import { parseSubtitles, type Cue } from '../../subtitles';
-import { loadSaved } from '../../savedWords';
-
-import { fuzzyScore } from '../../fuzzySearch';
 import { KANJI_RADICALS } from '../../../shared/kanjiRadicals';
 import { useAssets, type AssetView } from '../../assetStore';
 import { useT } from '../../i18n';
+import { useVisibleInterval } from '../../useVisibleInterval';
 import { LANG_TAGS, type TVars } from '../../../shared/i18n/core';
 import { blancToolLabel } from './blancToolLabels';
-import { commandCategory, commandLabel } from '../../commandI18n';
 import type {
   AgentExecutionEvent,
   AgentTask,
@@ -45,10 +41,7 @@ import { loadLocalAgentMemory } from '../../localAgentMemoryStore';
 import { registerLocalAgentTriggerHandler } from '../../localAgentTriggerRunner';
 import { loadLocalAgentSettings, saveLocalAgentSettings } from '../../localAgentSettingsStore';
 import type { LocalAgentSettings } from '../../../shared/localAgentSettings';
-import {
-  addDeckCards,
-  loadDeck,
-} from '../../flashcardDeck';
+import { addDeckCards } from '../../flashcardDeck';
 import type { AgentAutomation } from '../../../shared/localAgentAutomation';
 import type { LocalAgentModelInfo, LocalAgentRuntimeStatus } from '../../../shared/localAgentRuntime';
 import {
@@ -75,6 +68,7 @@ import {
   type AgentQueuedStepApprovalFailureCode,
 } from '../../../shared/agentStepApproval';
 import {
+  DEFAULT_AGENT_PROFILES,
   effectiveAgentPermission,
   getActiveAgentProfile,
   underPermissionCeiling,
@@ -93,10 +87,10 @@ import {
 import { AgentProfileOperationsEditor, agentPermissionLabelKey } from './AgentProfileOperations';
 import { AgentAutomationEditor } from '../agent/AgentAutomationEditor';
 
-// This panel renders Study OS class names, whose rules live in styles.css.
-// Imported here rather than in the boot entry so the 468 KB sheet rides this
-// lazy chunk instead of Blanc's boot. See theme/studyos-compat.css.
-void import('../../theme/studyos-compat.css');
+// No Study OS stylesheet here: every panel in this file renders Blanc's own
+// classes (`blanc-*`), so it does not need `studyos-compat.css` (~500 KB). It
+// used to pull it at module load, which — while the shell imported this file
+// statically — put the whole Study OS sheet into Blanc's startup.
 
 export type BlancAnalyzerResult = {
   level: BookLevelEstimate | null;
@@ -137,10 +131,6 @@ function notificationTime(ts: number, t: (key: string, vars?: TVars) => string):
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return t('notifications.time.hours', { count: hours });
   return t('notifications.time.days', { count: Math.floor(hours / 24) });
-}
-
-function openSection(id: string): void {
-  window.dispatchEvent(new CustomEvent('os:open', { detail: id }));
 }
 
 async function collectUnknownLemmas(text: string, threshold = 2): Promise<string[]> {
@@ -306,6 +296,28 @@ const APPROVAL_REFUSAL_KEYS: Record<AgentQueuedStepApprovalFailureCode, string> 
   'operation-denied': 'blanc.agent.approvalRefusal.operationDenied',
 };
 
+/** Catalog keys for the four built-in agent profiles' names. */
+const BUILT_IN_PROFILE_NAME_KEYS: Record<string, string> = {
+  'study-tutor': 'blanc.refine.agentProfile.studyTutor',
+  'media-assistant': 'blanc.refine.agentProfile.mediaAssistant',
+  'research-assistant': 'blanc.refine.agentProfile.researchAssistant',
+  'automation-assistant': 'blanc.refine.agentProfile.automationAssistant',
+};
+
+/**
+ * A profile's name in the UI language. The built-ins are stored with an
+ * English factory name; one the user has not renamed is shown translated, and
+ * a name the user typed is theirs and shown as typed.
+ */
+function agentProfileName(
+  profile: { id: string; name: string; builtIn?: boolean },
+  t: (key: string, vars?: TVars) => string,
+): string {
+  const key = BUILT_IN_PROFILE_NAME_KEYS[profile.id];
+  const factory = DEFAULT_AGENT_PROFILES.find((candidate) => candidate.id === profile.id);
+  return key && factory && profile.name === factory.name ? t(key) : profile.name;
+}
+
 export function LocalAgentPanel() {
   const { t, lang } = useT();
   const [settings, setSettings] = useState(() => loadLocalAgentSettings());
@@ -435,35 +447,32 @@ export function LocalAgentPanel() {
     (entry) => triggerHandler.current(entry),
   ), []);
 
+  // Runtime status and the model list are polled only while the window is
+  // visible (useVisibleInterval) — they used to poll every 5 s / 15 s in a
+  // minimised window too.
+  const pollAlive = useRef(true);
   useEffect(() => {
-    let active = true;
-    const refresh = (): void => {
-      void window.api.localAgentStatus().then((next) => {
-        if (active) setRuntimeStatus(next);
-      }).catch(() => undefined);
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 5_000);
+    pollAlive.current = true;
     return () => {
-      active = false;
-      window.clearInterval(timer);
+      pollAlive.current = false;
     };
   }, []);
-
+  const refreshRuntimeStatus = (): void => {
+    void window.api.localAgentStatus().then((next) => {
+      if (pollAlive.current) setRuntimeStatus(next);
+    }).catch(() => undefined);
+  };
+  const refreshModels = (): void => {
+    void window.api.localAgentModels().then((models) => {
+      if (pollAlive.current) setAvailableModels(models);
+    }).catch(() => undefined);
+  };
   useEffect(() => {
-    let active = true;
-    const refresh = (): void => {
-      void window.api.localAgentModels().then((models) => {
-        if (active) setAvailableModels(models);
-      }).catch(() => undefined);
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 15_000);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
+    refreshRuntimeStatus();
+    refreshModels();
   }, []);
+  useVisibleInterval(refreshRuntimeStatus, 5_000);
+  useVisibleInterval(refreshModels, 15_000);
 
   const changeProfile = (id: string): void => {
     setProfileStore(saveLocalAgentProfiles({ ...profileStore, activeProfileId: id }));
@@ -541,6 +550,12 @@ export function LocalAgentPanel() {
       else if (latest?.status === 'failed') setStatus(latest.error ?? t('blanc.agent.status.stepFailed'));
       else if (result.task.status === 'completed') setStatus(t('blanc.agent.status.taskCompleted'));
       else setStatus(t('blanc.agent.status.stepCompleted'));
+    } catch (error) {
+      // A rejected IPC or a throwing handler used to escape as an unhandled
+      // rejection with the panel's status still saying "Running…".
+      setStatus(t('blanc.agent.status.stepFailedDetail', {
+        detail: error instanceof Error ? error.message : String(error),
+      }));
     } finally {
       setBusy(false);
     }
@@ -637,7 +652,7 @@ export function LocalAgentPanel() {
             {t('blanc.agent.field.profile')}
             <select value={activeProfile.id} onChange={(event) => changeProfile(event.currentTarget.value)}>
               {profileStore.profiles.filter((profile) => profile.enabled).map((profile) => (
-                <option key={profile.id} value={profile.id}>{profile.name}</option>
+                <option key={profile.id} value={profile.id}>{agentProfileName(profile, t)}</option>
               ))}
             </select>
           </label>
@@ -1128,122 +1143,6 @@ export function SubtitleImporterPanel() {
   );
 }
 
-type ContextSearchItem = {
-  key: string;
-  label: string;
-  sub?: string;
-  run: () => void;
-};
-
-export function ContextSearchPanel() {
-  const { t, lang } = useT();
-  const [query, setQuery] = useState('');
-  const [grammarItems, setGrammarItems] = useState<ContextSearchItem[]>([]);
-
-  useEffect(() => {
-    let dead = false;
-    import('../../data/grammar')
-      .then(({ GRAMMAR }) => {
-        if (dead) return;
-        setGrammarItems(
-          GRAMMAR.map((g) => ({
-            key: `gr-${g.id}`,
-            label: g.title,
-            sub: `${g.level} · ${g.meaning}`,
-            run: () => openSection('grammar'),
-          })),
-        );
-      })
-      .catch(() => {
-        /* grammar data unavailable */
-      });
-    return () => {
-      dead = true;
-    };
-  }, []);
-
-  const items = useMemo<ContextSearchItem[]>(() => {
-    const out: ContextSearchItem[] = [];
-    for (const command of COMMAND_CATALOG) {
-      out.push({
-        key: `cmd-${command.id}`,
-        label: commandLabel(command.id, command.label, t),
-        sub: commandCategory(command.category, t),
-        run: () => {
-          void runCommand(command.id);
-        },
-      });
-    }
-    for (const saved of loadSaved().slice(0, 200)) {
-      out.push({
-        key: `sw-${saved.word}`,
-        label: saved.word,
-        sub: saved.meaning,
-        run: () => openSection('dictionary'),
-      });
-    }
-    for (const card of loadDeck().slice(0, 200)) {
-      out.push({
-        key: `fc-${card.id}`,
-        label: card.word,
-        sub: card.sentence ?? card.bookTitle,
-        run: () => openSection('flashcards'),
-      });
-    }
-    out.push(...grammarItems);
-    return out;
-  }, [grammarItems, lang]);
-
-  const results = useMemo(() => {
-    const q = query.trim();
-    if (!q) return items.slice(0, 30);
-    const scored: { item: ContextSearchItem; score: number }[] = [];
-    for (const item of items) {
-      const hay = `${item.label} ${item.sub ?? ''}`;
-      const score = fuzzyScore(q, hay);
-      if (score != null) scored.push({ item, score });
-    }
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, 30).map((row) => row.item);
-  }, [items, query]);
-
-  return (
-    <div className="blanc-tool-detail">
-      <fieldset>
-        <legend>{blancToolLabel(t, 'context-search')}</legend>
-        <label>
-          {t('blanc.ready.context.search')}
-          <input
-            value={query}
-            placeholder={t('blanc.ready.context.placeholder')}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        {!results.length ? (
-          <p className="blanc-note">{t('blanc.ready.context.noMatches')}</p>
-        ) : (
-          <div className="blanc-table-wrap">
-            <table className="blanc-table">
-              <tbody>
-                {results.map((item) => (
-                  <tr key={item.key}>
-                    <td>
-                      <button type="button" onClick={item.run}>
-                        {item.label}
-                      </button>
-                      {item.sub ? <div className="blanc-note">{item.sub}</div> : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </fieldset>
-    </div>
-  );
-}
-
 export function KanjiInspectorPanel() {
   const { t } = useT();
   const [value, setValue] = useState('');
@@ -1333,9 +1232,26 @@ export function BlancYoutubePanel() {
   }, []);
 
   useEffect(() => {
-    void window.api.ytList().then(applyStore);
+    void window.api.ytList().then(applyStore).catch((err: unknown) => {
+      setError(err instanceof Error ? err.message : String(err));
+    });
     return window.api.onYtChanged(applyStore);
   }, [applyStore]);
+
+  // Every IPC here can reject (network, yt-dlp missing, a main-side throw). The
+  // busy line is cleared in `finally`, so a failure reads as an error instead of
+  // a panel stuck on "Syncing…" forever.
+  const runYt = async (busyLabel: string, work: () => Promise<void>): Promise<void> => {
+    setBusy(busyLabel);
+    setError('');
+    try {
+      await work();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy('');
+    }
+  };
 
   const videos = store.videos ?? [];
   const planIds = new Set(store.planToWatchIds ?? []);
@@ -1352,36 +1268,38 @@ export function BlancYoutubePanel() {
   const addPlaylist = async (): Promise<void> => {
     const trimmed = url.trim();
     if (!trimmed) return;
-    setBusy(t('blanc.ready.youtube.syncing'));
-    setError('');
-    const result = await window.api.ytAddPlaylist(trimmed);
-    setBusy('');
-    if ('error' in result) {
-      setError(result.error);
-      return;
-    }
-    applyStore(result.store);
-    setUrl('');
+    await runYt(t('blanc.ready.youtube.syncing'), async () => {
+      const result = await window.api.ytAddPlaylist(trimmed);
+      if ('error' in result) {
+        setError(result.error);
+        return;
+      }
+      applyStore(result.store);
+      setUrl('');
+    });
   };
 
   const downloadSelected = async (): Promise<void> => {
     const ids = [...selected];
     if (!ids.length) return;
-    setBusy(t('blanc.ready.youtube.downloading'));
-    setError('');
-    const result = await window.api.ytDownloadVideos(ids);
-    setBusy('');
-    applyStore(result.store);
-    const fail = result.results.find((row) => !row.ok);
-    if (fail?.error) setError(fail.error);
-    setSelected(new Set());
+    await runYt(t('blanc.ready.youtube.downloading'), async () => {
+      const result = await window.api.ytDownloadVideos(ids);
+      applyStore(result.store);
+      const fail = result.results.find((row) => !row.ok);
+      if (fail?.error) setError(fail.error);
+      setSelected(new Set());
+    });
   };
 
   const togglePlan = async (video: YtVideo): Promise<void> => {
-    if (planIds.has(video.id)) {
-      applyStore(await window.api.ytRemoveFromPlanToWatch([video.id]));
-    } else {
-      applyStore(await window.api.ytAddToPlanToWatch([video.id]));
+    try {
+      if (planIds.has(video.id)) {
+        applyStore(await window.api.ytRemoveFromPlanToWatch([video.id]));
+      } else {
+        applyStore(await window.api.ytAddToPlanToWatch([video.id]));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -1553,51 +1471,10 @@ export function BlancModelsPanel() {
   );
 }
 
-// Exported so BlancAppDrawerPanel's one-time migration can read this store
-// without duplicating the parser — workspace-launcher is retired in favour of
-// the App Drawer (BLANC_REFINEMENT_PLAN.md, Pillar 3), and the migration reads
-// this exact key non-destructively (it is never written here again).
-export const WORKSPACE_LAUNCHER_KEY = 'jp-study.blanc.toolbox.workspaces.v1';
-
-/** One launchable target inside a workspace. */
-export interface WorkspaceTarget {
-  id: string;
-  /** Absolute path from the native picker, or an http(s) URL. */
-  target: string;
-  label: string;
-}
-
-export interface Workspace {
-  id: string;
-  name: string;
-  targets: WorkspaceTarget[];
-}
-
-export function readWorkspaces(): Workspace[] {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(WORKSPACE_LAUNCHER_KEY) ?? '[]') as unknown;
-    if (!Array.isArray(parsed)) return [];
-    // Rebuild from known keys only — stale shapes must not survive a reload.
-    return parsed.flatMap((raw): Workspace[] => {
-      if (!raw || typeof raw !== 'object') return [];
-      const row = raw as Record<string, unknown>;
-      if (typeof row.id !== 'string' || typeof row.name !== 'string') return [];
-      const targets = Array.isArray(row.targets) ? row.targets : [];
-      return [{
-        id: row.id,
-        name: row.name,
-        targets: targets.flatMap((rawTarget): WorkspaceTarget[] => {
-          if (!rawTarget || typeof rawTarget !== 'object') return [];
-          const entry = rawTarget as Record<string, unknown>;
-          if (typeof entry.id !== 'string' || typeof entry.target !== 'string' || !entry.target) return [];
-          return [{ id: entry.id, target: entry.target, label: typeof entry.label === 'string' ? entry.label : entry.target }];
-        }),
-      }];
-    });
-  } catch {
-    return [];
-  }
-}
+// The retired workspace-launcher store lives in its own tiny module, so the
+// App Drawer's one-time migration does not pull this whole panel file (and the
+// agent registry behind it) into the App Drawer's chunk.
+export { WORKSPACE_LAUNCHER_KEY, readWorkspaces, type Workspace, type WorkspaceTarget } from './blancWorkspaces';
 
 type BatchImageFormat = 'image/png' | 'image/jpeg' | 'image/webp';
 
@@ -1618,6 +1495,8 @@ interface BatchConvertItem {
   state: 'queued' | 'converting' | 'done' | 'failed';
   outputUrl: string;
   outputSize: number;
+  /** The format this item was actually converted to (the picker may have changed since). */
+  outputFormat?: BatchImageFormat;
   error: string;
 }
 
@@ -1659,6 +1538,16 @@ export function BatchConverterPanel() {
   const [format, setFormat] = useState<BatchImageFormat>('image/webp');
   const [quality, setQuality] = useState(0.86);
   const [busy, setBusy] = useState(false);
+  // Converted files are blob: URLs; the ones still held when the user leaves
+  // the tool were never revoked, so each batch's output stayed in memory for
+  // the rest of the session.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  useEffect(() => () => {
+    for (const item of itemsRef.current) {
+      if (item.outputUrl) URL.revokeObjectURL(item.outputUrl);
+    }
+  }, []);
 
   const chooseFiles = (list: FileList | null): void => {
     if (!list?.length) return;
@@ -1687,15 +1576,17 @@ export function BatchConverterPanel() {
   const convertAll = async (): Promise<void> => {
     setBusy(true);
     const pending = items.filter((item) => item.state === 'queued' || item.state === 'failed');
+    // The format and quality of THIS run: the picker can change while it runs.
+    const runFormat = format;
     for (const target of pending) {
       setItems((prev) => prev.map((item) => (item.id === target.id ? { ...item, state: 'converting', error: '' } : item)));
       try {
-        const blob = await convertImageFile(target.file, format, quality, t);
+        const blob = await convertImageFile(target.file, runFormat, quality, t);
         const outputUrl = URL.createObjectURL(blob);
         setItems((prev) => prev.map((item) => {
           if (item.id !== target.id) return item;
           if (item.outputUrl) URL.revokeObjectURL(item.outputUrl);
-          return { ...item, state: 'done', outputUrl, outputSize: blob.size };
+          return { ...item, state: 'done', outputUrl, outputSize: blob.size, outputFormat: runFormat };
         }));
       } catch (error) {
         setItems((prev) => prev.map((item) => (
@@ -1717,7 +1608,8 @@ export function BatchConverterPanel() {
     for (const item of doneItems) {
       const link = document.createElement('a');
       link.href = item.outputUrl;
-      link.download = batchOutputName(item.file.name, format);
+      // Named for the format it was converted to, not whatever is selected now.
+      link.download = batchOutputName(item.file.name, item.outputFormat ?? format);
       link.click();
     }
   };
@@ -1802,7 +1694,7 @@ export function BatchConverterPanel() {
                     </td>
                     <td>
                       {item.state === 'done' && (
-                        <a className="blanc-file-link" href={item.outputUrl} download={batchOutputName(item.file.name, format)}>
+                        <a className="blanc-file-link" href={item.outputUrl} download={batchOutputName(item.file.name, item.outputFormat ?? format)}>
                           {t('common.save')}
                         </a>
                       )}

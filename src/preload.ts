@@ -1299,6 +1299,22 @@ const api = {
     ipcRenderer.invoke('blanc:setFullScreen', on),
   blancSetGlobalShortcut: (chord: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('blanc:setGlobalShortcut', chord),
+  /** "Start in Blanc only (lowest memory)" launch preference (main/blancLaunch.ts). */
+  blancGetLaunchPrefs: (): Promise<{ blancOnly: boolean }> => ipcRenderer.invoke('blanc:getLaunchPrefs'),
+  blancSetLaunchPrefs: (patch: { blancOnly?: boolean }): Promise<{ blancOnly: boolean }> =>
+    ipcRenderer.invoke('blanc:setLaunchPrefs', patch),
+  /** Whether a Study OS window (main or pop-out) is alive; Blanc runs the background jobs when not. */
+  blancStudyOsAlive: (): Promise<boolean> => ipcRenderer.invoke('blanc:studyOsAlive'),
+  onStudyOsAlive: (cb: (alive: boolean) => void): (() => void) => {
+    const handler = (_e: unknown, alive: boolean): void => cb(alive === true);
+    ipcRenderer.on('blanc:study-os-alive', handler);
+    return () => ipcRenderer.removeListener('blanc:study-os-alive', handler);
+  },
+  /** Show Study OS, creating its window when there is none. */
+  blancOpenStudyOs: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('blanc:openStudyOs'),
+  /** This app's per-process memory (app.getAppMetrics), attributed to windows. */
+  appMemoryMetrics: (): Promise<import('./shared/appMemory').AppMemoryReport> =>
+    ipcRenderer.invoke('app:memoryMetrics'),
   appToggle: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('app:toggle'),
   appSetToggleShortcut: (chord: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('app:setToggleShortcut', chord),

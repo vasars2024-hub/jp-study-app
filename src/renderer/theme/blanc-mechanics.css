@@ -1,0 +1,155 @@
+/* Blanc mechanics (2026-10), the always-loaded part: top-bar chips, the RAM
+   panel, warm-tool markers and the Master search verb row. The Flow and
+   Capture-inbox overlays style themselves (blanc-mechanics-overlays.css, loaded
+   with their lazy chunks). Blanc tokens only — neutral, flat, no Study OS
+   material. */
+
+.blanc-root {
+  --blanc-mech-warn: #d9a441;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+
+.blanc-root .blanc-mech-chip,
+.blanc-root .blanc-mech-flow-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--lq-hit-target, 28px);
+  padding: 0 10px;
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-pill, 999px);
+  background: var(--blanc-panel);
+  color: var(--blanc-text);
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.blanc-root .blanc-mech-chip:hover,
+.blanc-root .blanc-mech-flow-btn:hover {
+  background: var(--blanc-hover);
+}
+
+.blanc-root .blanc-mech-chip:focus-visible,
+.blanc-root .blanc-mech-flow-btn:focus-visible {
+  outline: 2px solid var(--blanc-accent);
+  outline-offset: 2px;
+}
+
+.blanc-root .blanc-mech-chip.is-flow {
+  border-color: var(--blanc-border-strong);
+}
+
+.blanc-root .blanc-ram {
+  position: relative;
+  display: inline-flex;
+}
+
+.blanc-root .blanc-ram-chip {
+  color: var(--blanc-muted);
+}
+
+.blanc-root .blanc-ram-chip.is-over {
+  color: var(--blanc-mech-warn);
+  border-color: color-mix(in srgb, var(--blanc-mech-warn) 60%, transparent);
+  background: color-mix(in srgb, var(--blanc-mech-warn) 12%, var(--blanc-panel));
+}
+
+.blanc-root .blanc-ram-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 1100;
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(420px, calc(100vh - 80px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--blanc-border-strong);
+  border-radius: var(--blanc-radius-md, 10px);
+  background: var(--blanc-panel-raised, var(--blanc-panel));
+  color: var(--blanc-text);
+  box-shadow: var(--blanc-shadow);
+}
+
+.blanc-root .blanc-ram-panel h3 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blanc-faint, var(--blanc-muted));
+}
+
+.blanc-root .blanc-ram-total {
+  margin: 0 0 4px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.blanc-root .blanc-ram-tools {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.blanc-root .blanc-ram-tools li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.blanc-root .blanc-ram-tools li > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Toolbox: warm (loaded, hidden) tools ───────────────────────────── */
+
+.blanc-root .blanc-warm-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--blanc-muted);
+}
+
+.blanc-root .blanc-tool-launch .blanc-warm-dot + kbd {
+  margin-left: 6px;
+}
+
+.blanc-root .blanc-warm-count {
+  align-self: center;
+  color: var(--blanc-faint, var(--blanc-muted));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Master search verbs ────────────────────────────────────────────── */
+
+.blanc-master-search-hints.blanc-master-verbs {
+  color: var(--blanc-muted);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+@media (max-width: 560px) {
+  .blanc-root .blanc-mech-flow-btn span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .blanc-root .blanc-mech-chip,
+  .blanc-root .blanc-mech-flow-btn {
+    transition: background-color var(--blanc-dur, 180ms) var(--blanc-ease, ease);
+  }
+}

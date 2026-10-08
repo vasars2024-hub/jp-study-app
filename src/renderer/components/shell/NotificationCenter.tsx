@@ -140,7 +140,7 @@ export default function NotificationCenter() {
         </header>
         <div className="os-flyout-body" role="log" aria-label={t('notifications.listLabel')}>
           {items.length === 0 ? (
-            <div className="os-notif-empty type-body">{wired ? 'BULLETIN CHANNEL EMPTY / NO DISPATCHES' : t('notifications.empty')}</div>
+            <div className="os-notif-empty type-body">{wired ? t('wired.bulletin.empty') : t('notifications.empty')}</div>
           ) : (
             items.map((n) => {
               // A notice posted with catalog keys follows the live language; the

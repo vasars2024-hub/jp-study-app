@@ -71,20 +71,35 @@
   letter-spacing: 0.14em;
 }
 
-/* Radar Clock */
+/* Radar Clock. The face is an SVG <circle>, so it takes fill/stroke — the old
+   rule gave it `background` and `border-radius` (no effect on SVG) and a
+   keyframe that animated background-position from 0 0 to 0 0. The scope now
+   draws real range rings and a sweeping 30° wedge (productivity.tsx renders
+   them under Wired), rotated in 48 hard steps. */
 :root[data-materials='wired'] .wgt-analog-face {
-  border-radius: 50%;
-  border: 1px solid rgba(109, 241, 255, 0.4);
-  background:
-    radial-gradient(circle, transparent 0 32%, rgba(109, 241, 255, 0.07) 32.5% 33%, transparent 33.5% 62%, rgba(109, 241, 255, 0.07) 62.5% 63%, transparent 63.5%),
-    conic-gradient(rgba(109, 241, 255, 0.14) 0deg, transparent 40deg, transparent 360deg),
-    rgba(0, 7, 11, 0.94);
+  fill: rgba(0, 7, 11, 0.94);
+  stroke: rgba(109, 241, 255, 0.42);
+  stroke-width: 1;
+}
+
+:root[data-materials='wired'] .wgt-radar-ring,
+:root[data-materials='wired'] .wgt-radar-axis {
+  fill: none;
+  stroke: rgba(109, 241, 255, 0.1);
+  stroke-width: 1;
+}
+
+:root[data-materials='wired'] .wgt-radar-sweep {
+  fill: rgba(109, 241, 255, 0.14);
+  stroke: rgba(109, 241, 255, 0.5);
+  stroke-width: 0.6;
+  transform-box: view-box;
   animation: wm-radar-clock 6s steps(48) infinite;
 }
 
 @keyframes wm-radar-clock {
-  0% { background-position: 0 0; }
-  100% { background-position: 0 0; }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 :root[data-materials='wired'] .wgt-analog-tick {
@@ -143,6 +158,21 @@
   letter-spacing: 0.14em;
 }
 
+/* Past 80% the reactor runs hot (amber fill); the final ten seconds the
+   readout relay-blinks (data-final is set by the widget while running). */
+:root[data-materials='wired'] .wgt-pomo[data-late] .wgt-progress-fill {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 5px, rgba(0, 8, 13, 0.55) 5px 7px),
+    var(--wired-amber);
+  box-shadow: 0 0 8px rgba(255, 177, 59, 0.35);
+}
+
+:root[data-materials='wired'] .wgt-pomo[data-final] .wgt-pomo-time {
+  color: #fff1b7;
+  text-shadow: 0 0 14px rgba(255, 177, 59, 0.55);
+  animation: wm-relay-blink 1s steps(1) infinite;
+}
+
 /* Telemetry Timer (stopwatch) */
 :root[data-materials='wired'] .wgt-stopwatch {
   font-variant-numeric: tabular-nums;
@@ -172,25 +202,54 @@
   color: var(--wired-amber);
 }
 
-/* Maintenance Log (habit tracker) */
+/* Maintenance Log (habit tracker): each day is a socket — empty is a dark
+   recess with a pin-hole, stamped is a filled cyan plate. (The widget marks a
+   kept day with `.on`; the old rule waited for a `.done` class that never
+   came.) */
 :root[data-materials='wired'] .wgt-habit-day {
   border-radius: 0;
-  border: 1px solid rgba(109, 241, 255, 0.16);
+  border: 1px solid rgba(109, 241, 255, 0.2);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.22) 0 1px, transparent 1.5px),
+    rgba(0, 6, 10, 0.9);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
-:root[data-materials='wired'] .wgt-habit-day.done {
-  background: rgba(109, 241, 255, 0.32);
-  box-shadow: inset 0 0 6px rgba(109, 241, 255, 0.5);
+:root[data-materials='wired'] .wgt-habit-day.on {
+  color: #02070d;
+  border-color: #6df1ff;
+  background: rgba(109, 241, 255, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(2, 7, 13, 0.5), 0 0 6px rgba(109, 241, 255, 0.45);
 }
 
-/* Arming Timer (countdown) */
+/* Arming Timer (countdown): T- prefix, amber inside the hour, the danger red
+   only inside the last minute. */
 :root[data-materials='wired'] .wgt-countdown {
   font-variant-numeric: tabular-nums;
 }
 
-:root[data-materials='wired'] .wgt-countdown .wgt-stat-value::before {
+:root[data-materials='wired'] .wgt-countdown .wgt-pomo-time::before {
   content: 'T-';
-  color: var(--wired-amber);
+  margin-right: 2px;
+  color: rgba(255, 177, 59, 0.75);
+  font-size: 0.6em;
+  letter-spacing: 0.1em;
+  vertical-align: 0.3em;
+}
+
+:root[data-materials='wired'] .wgt-countdown[data-urgency='warn'] .wgt-pomo-time {
+  color: #fff1b7;
+  text-shadow: 0 0 12px rgba(255, 177, 59, 0.45);
+}
+
+:root[data-materials='wired'] .wgt-countdown[data-urgency='critical'] .wgt-pomo-time {
+  color: #ff9aa0;
+  text-shadow: 0 0 12px rgba(223, 39, 50, 0.6);
+  animation: wm-relay-blink 1s steps(1) infinite;
+}
+
+:root[data-materials='wired'] .wgt-countdown[data-urgency='critical'] .wgt-pomo-time::before {
+  color: #df2732;
 }
 
 /* Dispatch Queue (todo) */
@@ -363,7 +422,9 @@
   :root[data-materials='wired'] .widget-frame.widget-anim-mounting,
   :root[data-materials='wired'] .widget-frame.widget-anim-mounting .widget-title,
   :root[data-materials='wired'] .wgt-clock-time::after,
-  :root[data-materials='wired'] .wgt-analog-face,
+  :root[data-materials='wired'] .wgt-radar-sweep,
+  :root[data-materials='wired'] .wgt-pomo[data-final] .wgt-pomo-time,
+  :root[data-materials='wired'] .wgt-countdown[data-urgency='critical'] .wgt-pomo-time,
   :root[data-materials='wired'] .wgt-wotd-word,
   :root[data-materials='wired'] .wgt-heatmap-grid .wgt-heat-cell:nth-child(23n + 7),
   :root[data-materials='wired'] .wgt-recent-list > *:first-child,
@@ -373,7 +434,13 @@
 }
 
 :root[data-materials='wired'][data-wired-idle='off'] .wgt-clock-time::after,
-:root[data-materials='wired'][data-wired-idle='off'] .wgt-analog-face,
+:root[data-materials='wired'][data-wired-idle='off'] .wgt-radar-sweep,
+:root[data-materials='wired'][data-wired-motion='off'] .wgt-radar-sweep,
+:root[data-materials='wired'][data-wired-motion='off'] .wgt-pomo[data-final] .wgt-pomo-time,
+:root[data-materials='wired'][data-wired-motion='off'] .wgt-countdown[data-urgency='critical'] .wgt-pomo-time,
+:root[data-materials='wired'].reduce-motion .wgt-radar-sweep,
+:root[data-materials='wired'].reduce-motion .wgt-pomo[data-final] .wgt-pomo-time,
+:root[data-materials='wired'].reduce-motion .wgt-countdown[data-urgency='critical'] .wgt-pomo-time,
 :root[data-materials='wired'][data-wired-idle='off'] .wgt-heatmap-grid .wgt-heat-cell:nth-child(23n + 7),
 :root[data-materials='wired'][data-wired-idle='off'] .wgt-sys-dot {
   animation: none;

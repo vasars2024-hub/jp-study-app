@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { LiquidLoading } from './components/liquid/LiquidLoading';
 import DesktopShell from './components/DesktopShell';
 import { parseDetachTarget } from '../shared/studyDetach';
-import { t as translateStatic, useT } from './i18n';
+import { useT } from './i18n';
 import { useExtensionSnapshots } from './analysisActions';
 import BootScreen from './components/BootScreen';
 import ConsentScreen from './components/ConsentScreen';
@@ -60,20 +60,10 @@ import { canPresentLiquid } from './liquidWindowPresentation';
 import { readPopoutPresentation, togglePopoutPresentation } from './popoutPresentation';
 import { useReaderResumeHandoff } from './readerResumeHandoff';
 import { sectionOpensMediaWorkspace } from '../shared/mediaWorkspace';
-import { addDeckCards, loadDeck, removeDeckCards } from './flashcardDeck';
-import { recordClipboardEntry, loadClipboardHistory, type ClipboardEntryType } from './clipboardHistory';
-import { getLevel, setLevel, type WkLevel } from './knownWords';
-import { estimateLevelFromText } from './bookLevelEstimate';
-import { getStudyLang } from './studyEnvironment';
-import { studyLangOfText, type StudyLang } from '../shared/studyLang';
-import { compactLevelBadge, resolvePageLevelLang } from '../shared/pageLevelDetect';
+import { installStudyRendererBridges } from './studyBackgroundJobs';
 import { handleExtensionUiOpen } from './extensionBridgeUi';
 import { installCompanionMining } from './companionMine';
 import { revealShortcut } from './shortcutReveal';
-import { appendNotebookEvent } from './notebookTimeline';
-import { appendTranslationHistory } from './translationHistory';
-import { scoreTextComprehensibility, knownPercent } from './comprehensibility';
-import { matchGrammarPatterns } from './grammarMatch';
 import {
   shouldShowLockscreen,
   consumePendingAeroBoot,
@@ -136,31 +126,6 @@ function isLockscreenWindow(): boolean {
  * `main/debugBridge.ts` identifies it that way, so a second bare desktop would
  * break the `jp-bridge` harness (B6). Every secondary is tagged.
  */
-/**
- * Reading and meaning for a single word the extension mined. The extension
- * sends only the selection, so without this its local card was a bare word
- * with an empty back. Offline dictionary only: mining must not wait on a
- * network lookup, and a miss simply leaves the fields empty as before.
- */
-async function extensionWordGloss(term: string, lang: StudyLang): Promise<{ reading: string; meaning: string }> {
-  try {
-    if (typeof window.api?.lookupTermOffline !== 'function') return { reading: '', meaning: '' };
-    // In the word's own language: unfiltered, a Chinese word was glossed from
-    // whichever dictionary answered first, or from none.
-    const result = await window.api.lookupTermOffline(term, lang);
-    const entry = result?.entries?.find((e) => e.word === term) ?? result?.entries?.[0];
-    if (!entry) return { reading: '', meaning: '' };
-    const meaning = entry.senses
-      .slice(0, 2)
-      .map((sense) => sense.definitions.join('; '))
-      .filter(Boolean)
-      .join(' / ');
-    return { reading: entry.reading && entry.reading !== entry.word ? entry.reading : '', meaning };
-  } catch {
-    return { reading: '', meaning: '' };
-  }
-}
-
 function secondaryDesktop(): { desktopIndex: number; displayKey: string } | null {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('desk');
@@ -262,7 +227,12 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!blanc.enabled || popout || isBlancWindow()) return;
-    void window.api.blancOpen(blancOpenSize());
+    // A Blanc window that is already open (Study OS was opened from it, or
+    // created on demand after a Blanc-only start) is left alone: opening it again
+    // would resize it and pull focus away from the window the user just asked for.
+    void window.api.blancIsOpen().then((open) => {
+      if (!open) void window.api.blancOpen(blancOpenSize());
+    }).catch(() => void window.api.blancOpen(blancOpenSize()));
   }, [blanc.enabled, popout]);
   useEffect(() => {
     if (locked) return;
@@ -302,83 +272,11 @@ export default function App() {
     return () => window.removeEventListener(AERO_ENTRY_LOCKED_EVENT, onEntryLocked);
   }, []);
 
-  // Chrome extension selection mining → local flashcard collection (Phase 9).
-  //
-  // Main already tried Anki (extensionServer.handleMine); this keeps the local
-  // study copy through the same `mineToStudy` every in-app surface uses, so it
-  // carries the page title/URL, the sentence and — for a single word, where the
-  // extension sends only the selection — a reading and meaning from the local
-  // dictionary. A card that could not reach Anki joins the pending queue.
-  useEffect(() => {
-    return window.api.onExtensionMined((payload) => {
-      void (async () => {
-        const text = (payload.text || '').trim();
-        const term =
-          (payload.term || '').trim() ||
-          text
-            .split(/[\s。．！？!?]+/)
-            .find((s) => s.trim().length > 0)
-            ?.trim()
-            .slice(0, 40) ||
-          text.slice(0, 40);
-        if (!term) return;
-        const mode =
-          payload.mode === 'word' || payload.mode === 'sentence'
-            ? payload.mode
-            : text.length > 40 || /[。．！？!?]/.test(text)
-              ? 'sentence'
-              : 'word';
-        const folder =
-          typeof payload.folder === 'string' && payload.folder.trim()
-            ? payload.folder.trim().slice(0, 40)
-            : 'Extension';
-        let reading = (payload.reading || '').trim();
-        let meaning = (payload.meaning || '').trim();
-        // The page's language when the extension said it; else the text's own
-        // script (Han alone follows the study language).
-        const wordLang: StudyLang = payload.lang ?? studyLangOfText(`${term} ${payload.sentence ?? ''}`, getStudyLang());
-        if (mode === 'word' && (!reading || !meaning)) {
-          const found = await extensionWordGloss(term, wordLang);
-          reading ||= found.reading;
-          meaning ||= found.meaning;
-        }
-        const sentence = mode === 'sentence'
-          ? (payload.sentence || text).slice(0, 2000)
-          : payload.sentence?.trim() && payload.sentence.trim() !== term
-            ? payload.sentence.trim().slice(0, 2000)
-            : undefined;
-        const { mineToStudy } = await import('./studyMining');
-        await mineToStudy({
-          word: term.slice(0, 80),
-          reading,
-          meaning,
-          sentence,
-          source: 'extension',
-          // The page's language (from the extension), else its text; Han alone follows the study language.
-          studyLang: payload.lang ?? studyLangOfText(`${term} ${sentence ?? ''}`, getStudyLang()),
-          folder,
-          sourceTitle: payload.title?.trim() || undefined,
-          sourceUrl: payload.url?.trim() || undefined,
-          audioDataUrl:
-            typeof payload.audioDataUrl === 'string' && payload.audioDataUrl.startsWith('data:')
-              ? payload.audioDataUrl
-              : undefined,
-          ankiResult: payload.anki,
-          // Queued while Anki is down: replay this exact note (audio, deck, tags).
-          ...(payload.ankiRequest ? { anki: payload.ankiRequest } : {}),
-        });
-        const isAudio = folder === 'audio' || !!payload.audioDataUrl;
-        appendNotebookEvent({
-          stream: isAudio ? 'audio' : folder.toLowerCase().includes('ocr') ? 'ocr' : 'extension',
-          title: term.slice(0, 80),
-          detail: sentence ? sentence.slice(0, 400) : undefined,
-          folder: isAudio ? 'Audio' : folder.toLowerCase().includes('ocr') ? 'OCR' : 'Mined',
-          origin: 'extension',
-          href: 'flashcards',
-        });
-      })();
-    });
-  }, []);
+  // Main's study bridges — extension mining into the local deck, the Whisper
+  // requests, transcript cards, and the extension's known-word / level /
+  // clipboard / translation requests. One installer (studyBackgroundJobs.ts) so
+  // Blanc can run the same code when it is the only window open.
+  useEffect(() => installStudyRendererBridges(), []);
 
   // System-audio / live-captions mining (main/systemAudioCapture.ts): the
   // overlay and the global shortcuts ask main, main forwards the card here,
@@ -425,114 +323,6 @@ export default function App() {
     };
   }, []);
 
-  // Extension audio → Whisper (installed model in renderer worker).
-  useEffect(() => {
-    return window.api.onExtensionTranscribeRequest(({ id, pcmBase64 }) => {
-      void (async () => {
-        const { decodePcmBase64, transcribePcm } = await import('./whisperTranscribePcm');
-        try {
-          const result = await transcribePcm(decodePcmBase64(pcmBase64));
-          window.api.replyExtensionTranscribe(id, result.ok
-            ? { ok: true, text: result.text ?? '' }
-            // Not a component scope — the module-level `t` reads the live
-            // language, so a deferred call still answers in the current one.
-            : { ok: false, error: result.error ?? translateStatic('appShell.transcriptionFailed') });
-        } catch (err) {
-          window.api.replyExtensionTranscribe(id, {
-            ok: false,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      })();
-    });
-  }, []);
-
-  // Transcription queue → Whisper. The main process owns the queue but cannot
-  // run the model, so it asks the renderer one chunk at a time.
-  useEffect(() => {
-    return window.api.onTranscriptionChunkRequest?.(({ id, pcmBase64, lang }) => {
-      void (async () => {
-        const { decodePcmBase64, transcribePcm } = await import('./whisperTranscribePcm');
-        try {
-          const result = await transcribePcm(decodePcmBase64(pcmBase64), lang);
-          window.api.replyTranscriptionChunk({ id, ...result });
-        } catch (err) {
-          window.api.replyTranscriptionChunk({
-            id,
-            ok: false,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      })();
-    });
-  }, []);
-
-  // A completed Japanese transcript becomes one reversible local-deck batch.
-  // Re-running transcription replaces that media/language batch instead of
-  // silently duplicating every sentence.
-  useEffect(() => {
-    return window.api.onTranscriptionCardsReady((payload) => {
-      const previousIds = loadDeck()
-        .filter((card) => card.studyActionId === payload.batchId)
-        .map((card) => card.id);
-      if (previousIds.length) removeDeckCards(previousIds);
-      addDeckCards(payload.cards.map((card) => ({
-        word: card.sentence,
-        reading: '',
-        meaning: card.translation,
-        sentence: card.sentence,
-        front: card.sentence,
-        back: card.translation,
-        source: 'media' as const,
-        bookId: payload.mediaId,
-        bookTitle: payload.title,
-        folder: 'Media',
-        audioPath: card.audioPath,
-        sceneReference: card.timing === 'chunk-estimated'
-          ? `≈ ${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`
-          : `${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`,
-        timingFidelity: card.timing,
-        // Machine-read speech, not an authored subtitle line. A card that can be
-        // wrong about what was said has to say where the text came from.
-        textProvenance: 'transcript' as const,
-        studyActionId: payload.batchId,
-      })));
-      appendNotebookEvent({
-        stream: 'audio',
-        title: payload.title,
-        detail: `${payload.cards.length} transcript sentence cards`,
-        folder: 'Media',
-        origin: 'app',
-        href: 'flashcards',
-      });
-    });
-  }, []);
-
-  // Extension → app clipboard history
-  useEffect(() => {
-    return window.api.onExtensionClipboardAppend((payload) => {
-      const text = (payload.text || '').trim();
-      if (!text) return;
-      const rawType = payload.type;
-      const type: ClipboardEntryType =
-        rawType === 'word' ||
-        rawType === 'sentence' ||
-        rawType === 'paragraph' ||
-        rawType === 'dictionary' ||
-        rawType === 'reader' ||
-        rawType === 'manual' ||
-        rawType === 'text'
-          ? rawType
-          : 'text';
-      recordClipboardEntry(text, {
-        type,
-        readerMeta: payload.title || payload.url
-          ? { book: payload.title || 'Web', chapter: payload.url }
-          : undefined,
-      });
-    });
-  }, []);
-
   // Extension deep-links (options / popup "Open in JP Study")
   useEffect(() => {
     return window.api.onExtensionUiOpen((payload) => {
@@ -540,155 +330,9 @@ export default function App() {
     });
   }, []);
 
-  // Extension learning-tint: reply with known-word levels
-  useEffect(() => {
-    return window.api.onKnownLevelsRequest(({ id, terms }) => {
-      const levels: Record<string, number> = {};
-      for (const term of terms || []) {
-        if (typeof term === 'string' && term) levels[term] = getLevel(term);
-      }
-      window.api.replyKnownLevels(id, levels);
-    });
-  }, []);
-
-  useEffect(() => {
-    return window.api.onKnownLevelSet(({ id, term, level }) => {
-      try {
-        const lv = ([0, 1, 2, 3].includes(level) ? level : 0) as WkLevel;
-        setLevel(String(term || '').trim(), lv, true);
-        window.api.replyKnownLevelSet(id, { ok: true });
-      } catch (err) {
-        window.api.replyKnownLevelSet(id, {
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    return window.api.onComprehensibilityRequest(({ id, text }) => {
-      void (async () => {
-        try {
-          const score = await scoreTextComprehensibility(text || '');
-          window.api.replyComprehensibility(id, {
-            ok: true,
-            percent: knownPercent(score),
-            known: score.knownWords,
-            total: score.totalWords,
-          });
-        } catch (err) {
-          window.api.replyComprehensibility(id, {
-            ok: false,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      })();
-    });
-  }, []);
-
-  useEffect(() => {
-    return window.api.onGrammarMatchRequest(({ id, text }) => {
-      try {
-        const matches = matchGrammarPatterns(text || '', 8);
-        window.api.replyGrammarMatch(id, { ok: true, matches });
-      } catch (err) {
-        window.api.replyGrammarMatch(id, {
-          ok: false,
-          matches: [],
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    });
-  }, []);
-
   // Analysis snapshots raised by the browser extension. The notebook lives in
   // renderer storage, so the main window files them on the extension's behalf.
   useExtensionSnapshots();
-
-  useEffect(() => {
-    return window.api.onExtensionTranslationResult((payload) => {
-      if (!payload?.sourceText || !payload?.resultText) return;
-      appendTranslationHistory({
-        sourceLang: payload.sourceLang || 'ja',
-        targetLang: payload.targetLang || 'en',
-        sourceText: payload.sourceText,
-        resultText: payload.resultText,
-        origin: 'extension',
-      });
-      appendNotebookEvent({
-        stream: 'translations',
-        title: payload.sourceText.slice(0, 80),
-        detail: payload.resultText.slice(0, 120),
-        folder: 'Translations',
-        origin: 'extension',
-        href: 'translate',
-      });
-    });
-  }, []);
-
-  // Extension page-level badge: JLPT/HSK from Settings vocab bands (same as EPUB covers)
-  useEffect(() => {
-    return window.api.onLevelEstimateRequest(({ id, text }) => {
-      void (async () => {
-        try {
-          const studyLang = getStudyLang();
-          const lang = resolvePageLevelLang(text || '', studyLang);
-          if (!lang) {
-            window.api.replyLevelEstimate(id, {
-              ok: true,
-              badge: 'X',
-              empty: true,
-              lang: null,
-              scheme: null,
-            });
-            return;
-          }
-          const estimate = await estimateLevelFromText(text || '', lang);
-          if (!estimate) {
-            window.api.replyLevelEstimate(id, {
-              ok: true,
-              badge: '—',
-              noLists: true,
-              lang,
-              scheme: lang === 'zh' ? 'hsk' : 'jlpt',
-            });
-            return;
-          }
-          const badge = compactLevelBadge(estimate.label);
-          window.api.replyLevelEstimate(id, {
-            ok: true,
-            badge: badge || '—',
-            lang,
-            scheme: estimate.scheme,
-            label: estimate.label,
-            confidence: estimate.confidence,
-          });
-        } catch (err) {
-          window.api.replyLevelEstimate(id, {
-            ok: false,
-            badge: '—',
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      })();
-    });
-  }, []);
-
-  // Extension clipboard history list
-  useEffect(() => {
-    return window.api.onClipboardListRequest(({ id }) => {
-      const entries = loadClipboardHistory()
-        .slice(0, 40)
-        .map((e) => ({
-          id: e.id,
-          type: e.type,
-          text: e.text.slice(0, 500),
-          createdAt: e.createdAt,
-        }));
-      window.api.replyClipboardList(id, entries);
-    });
-  }, []);
 
   // Books handed off from the Mini Widget (too small for the reader).
   useEffect(() => {
