@@ -70,6 +70,8 @@ import {
   recordDeletedNotes,
 } from './intervals';
 import { ensureDeckName, ensureModel, invalidateAnkiCaches } from './noteTypes';
+import { ankiMediaContentHash, forgetAnkiMedia, storeAnkiMediaOnce } from './mediaUpload';
+import { registerAnkiReviewSyncIpc } from './reviewSync';
 
 const KNOWN_WORDS_MAX_AGE_MS = 5 * 60000; // shim refresh threshold (section 6)
 
@@ -106,7 +108,7 @@ async function storeImageFromClipboard(): Promise<string> {
     // Content hash → identical pastes dedupe to one media file.
     const hash = crypto.createHash('md5').update(png).digest('hex').slice(0, 12);
     const filename = `jsa-${hash}.png`;
-    await invoke('storeMediaFile', { filename, data: png.toString('base64') });
+    await storeAnkiMediaOnce(filename, png.toString('base64'));
     return `<img src="${filename}">`;
   } catch (err) {
     console.error('[anki] clipboard image capture failed:', err);
@@ -166,7 +168,7 @@ async function storeSuppliedImage(
       }
       const hash = crypto.createHash('md5').update(data).digest('hex').slice(0, 12);
       const filename = `jsa-vn-${hash}${extension}`;
-      await invoke('storeMediaFile', { filename, data: base64 });
+      await storeAnkiMediaOnce(filename, base64);
       return `<img src="${filename}">`;
     } catch {
       warnings.push('image-failed');
@@ -195,7 +197,7 @@ async function storeSuppliedClip(
   if (!data) return '';
   try {
     const filename = suppliedClipFilename(req, data);
-    await invoke('storeMediaFile', { filename, data });
+    await storeAnkiMediaOnce(filename, data);
     return `[sound:${filename}]`;
   } catch {
     warnings.push('clip-failed');
@@ -219,7 +221,7 @@ async function synthesizedAudioField(term: string, lang: StudyLang): Promise<str
     if (!result.ok || !result.path) return '';
     const data = (await fs.promises.readFile(result.path)).toString('base64');
     const filename = `jsa-tts-${lang}-${crypto.createHash('md5').update(data).digest('hex').slice(0, 12)}${path.extname(result.path)}`;
-    await invoke('storeMediaFile', { filename, data });
+    await storeAnkiMediaOnce(filename, data);
     return `[sound:${filename}]`;
   } catch {
     return '';
@@ -316,15 +318,15 @@ async function gatherMiningValues(
     const lang = mineAudioLanguage(req, term);
     values.audio = lang === 'ja'
       ? await fetchJapaneseAudio(term, reading || term, async (filename, data) => {
-        await invoke('storeMediaFile', { filename, data });
+        await storeAnkiMediaOnce(filename, data);
       })
       : await synthesizedAudioField(term, lang);
   } else if (typeof req.audioBase64 === 'string' && req.audioBase64.trim()) {
     const filename =
       (typeof req.audioFilename === 'string' && req.audioFilename.trim()) ||
-      `jp-study-audio-${Date.now()}.webm`;
+      `jp-study-audio-${ankiMediaContentHash(req.audioBase64.trim()).slice(0, 12)}.webm`;
     try {
-      await invoke('storeMediaFile', { filename, data: req.audioBase64.trim() });
+      await storeAnkiMediaOnce(filename, req.audioBase64.trim());
       values.audio = `[sound:${filename}]`;
     } catch {
       values.audio = '';
@@ -667,9 +669,9 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       if (typeof req.audioBase64 === 'string' && req.audioBase64.trim()) {
         const filename =
           (typeof req.audioFilename === 'string' && req.audioFilename.trim()) ||
-          `jp-study-audio-${Date.now()}.webm`;
+          `jp-study-audio-${ankiMediaContentHash(req.audioBase64.trim()).slice(0, 12)}.webm`;
         try {
-          await invoke('storeMediaFile', { filename, data: req.audioBase64.trim() });
+          await storeAnkiMediaOnce(filename, req.audioBase64.trim());
           autoAudio = `[sound:${filename}]`;
           const audioField =
             model.fieldMap.sentenceAudio || model.fieldMap.termAudio || model.fieldMap.notes;
@@ -942,6 +944,7 @@ export async function deleteMinedNotes(
         continue;
       }
       await invoke('deleteMediaFile', { filename });
+      forgetAnkiMedia(filename);
       deletedMediaFilenames.push(filename);
     }
     return {
@@ -1131,6 +1134,9 @@ export function registerAnkiIpc(): void {
   ipcMain.handle('anki:status', () => ankiStatusShim());
   ipcMain.handle('anki:addNote', (_e, req: AnkiAddRequest) => ankiAddNoteShim(req));
   ipcMain.handle('anki:knownWords', () => ankiKnownWordsShim());
+
+  // Two-way review sync, link discovery and the sync probe (reviewSync.ts).
+  registerAnkiReviewSyncIpc();
 
   startHeartbeat();
 }

@@ -518,6 +518,93 @@
   "content_rpMoreEntries_other": {
     "message": "Ещё $1 статьи — см. вкладку «Ещё»."
   },
+  "content_rpMoreDicts_one": {
+    "message": "Показать ещё $1 словарь"
+  },
+  "content_rpMoreDicts_few": {
+    "message": "Показать ещё $1 словаря"
+  },
+  "content_rpMoreDicts_many": {
+    "message": "Показать ещё $1 словарей"
+  },
+  "content_rpMoreDicts_other": {
+    "message": "Показать ещё $1 словаря"
+  },
+  "content_rpFewerDicts": {
+    "message": "Скрыть остальные словари"
+  },
+  "content_reason_polite": {
+    "message": "вежливая форма"
+  },
+  "content_reason_politeNegative": {
+    "message": "вежл. отрицание"
+  },
+  "content_reason_politePast": {
+    "message": "вежл. прошедшее"
+  },
+  "content_reason_politePastNegative": {
+    "message": "вежл. прош. отрицание"
+  },
+  "content_reason_politeVolitional": {
+    "message": "вежл. волитив"
+  },
+  "content_reason_negative": {
+    "message": "отрицание"
+  },
+  "content_reason_past": {
+    "message": "прошедшее"
+  },
+  "content_reason_te": {
+    "message": "て-форма"
+  },
+  "content_reason_causative": {
+    "message": "побудительный залог"
+  },
+  "content_reason_passive": {
+    "message": "страдательный залог"
+  },
+  "content_reason_passivePotential": {
+    "message": "страдат. / потенциал"
+  },
+  "content_reason_potential": {
+    "message": "потенциальная форма"
+  },
+  "content_reason_volitional": {
+    "message": "волитив"
+  },
+  "content_reason_imperative": {
+    "message": "повелительное"
+  },
+  "content_reason_conditionalBa": {
+    "message": "условное (–ば)"
+  },
+  "content_reason_conditionalTara": {
+    "message": "условное (–たら)"
+  },
+  "content_reason_tari": {
+    "message": "форма –たり"
+  },
+  "content_reason_tai": {
+    "message": "желательное (–たい)"
+  },
+  "content_reason_sugiru": {
+    "message": "чрезмерность (–すぎる)"
+  },
+  "content_reason_adverbial": {
+    "message": "наречная форма"
+  },
+  "content_reason_progressive": {
+    "message": "продолженное (–ている)"
+  },
+  "content_reason_shimau": {
+    "message": "завершённость (–てしまう)"
+  },
+  "content_reason_chau": {
+    "message": "завершённость (–ちゃう)"
+  },
+  "content_reason_teoku": {
+    "message": "заготовка (–ておく)"
+  },
   "content_rpNoSentence": {
     "message": "Не удалось найти предложение вокруг этого слова."
   },
@@ -2236,6 +2323,18 @@
   },
   "bg_errTimeout": {
     "message": "Gum слишком долго не отвечал. Повторите попытку чуть позже."
+  },
+  "bg_errLocked": {
+    "message": "Gum заблокирован — разблокируйте Gum, чтобы продолжить."
+  },
+  "common_queuedLocked": {
+    "message": "Gum заблокирован — сохранено здесь; синхронизируется после разблокировки Gum"
+  },
+  "popup_chipLocked": {
+    "message": "Gum заблокирован"
+  },
+  "popup_recWaitingLocked": {
+    "message": "$1 МБ ожидает — разблокируйте Gum для загрузки"
   },
   "bg_errBadRequest": {
     "message": "Gum не смог прочитать этот запрос. Обновите расширение и Gum до совместимых версий."

@@ -50,7 +50,12 @@ async function refreshStatus() {
   const st = await send({ type: 'status-summary' });
   const pending = st?.pending || 0;
 
-  if (st?.app && st?.paired !== false) {
+  if (st?.app && st?.locked) {
+    // The app is running with its lockscreen up (/v1/health `locked`): every
+    // lookup and save answers 423 until it is unlocked; saves are kept meanwhile.
+    chipEl.textContent = t('popup_chipLocked');
+    chipEl.className = 'status-chip warn locked';
+  } else if (st?.app && st?.paired !== false) {
     chipEl.textContent = pending > 0 ? tn('popup_chipConnectedQueued', pending) : t('popup_chipConnected');
     chipEl.className = 'status-chip' + (pending > 0 ? ' warn' : ' ok');
   } else if (st?.app) {
@@ -61,10 +66,11 @@ async function refreshStatus() {
     chipEl.className = 'status-chip err';
   }
 
-  stApp.textContent = st?.app ? t('popup_appRunning') : t('popup_appNotRunning');
-  stApp.className = 'v ' + (st?.app ? 'ok' : 'err');
-  stPair.textContent = !st?.app ? '—' : st?.paired === false ? t('popup_pairTokenNeeded') : t('popup_pairOk');
-  stPair.className = 'v ' + (!st?.app ? '' : st?.paired === false ? 'warn' : 'ok');
+  chipEl.title = st?.app && st?.locked ? t('bg_errLocked') : '';
+  stApp.textContent = st?.app ? (st.locked ? t('bg_errLocked') : t('popup_appRunning')) : t('popup_appNotRunning');
+  stApp.className = 'v ' + (st?.app ? (st.locked ? 'warn' : 'ok') : 'err');
+  stPair.textContent = !st?.app || st?.locked ? '—' : st?.paired === false ? t('popup_pairTokenNeeded') : t('popup_pairOk');
+  stPair.className = 'v ' + (!st?.app || st?.locked ? '' : st?.paired === false ? 'warn' : 'ok');
   stAnki.textContent = st?.profileName
     ? st.deckName
       ? `${st.profileName} → ${st.deckName}`
@@ -540,7 +546,7 @@ async function refreshRecorder() {
     .map(
       (r) => `<div class="rec-item" data-id="${escapeHtml(r.id)}">
         <span class="name" title="${escapeHtml(r.url || '')}">${escapeHtml(r.title || r.url || '')}</span>
-        <span>${escapeHtml(t(r.status === 'failed' ? 'popup_recFailed' : 'popup_recWaiting', String(Math.round((r.bytes || 0) / 1048576))))}</span>
+        <span>${escapeHtml(t(r.status === 'failed' ? 'popup_recFailed' : r.paused === 'locked' ? 'popup_recWaitingLocked' : 'popup_recWaiting', String(Math.round((r.bytes || 0) / 1048576))))}</span>
         <button type="button" data-rec="upload">${escapeHtml(t('popup_recUpload'))}</button>
         <button type="button" data-rec="save-disk" title="${escapeHtml(t('popup_recSaveDiskTitle'))}">${escapeHtml(t('popup_recSaveDisk'))}</button>
         <button type="button" data-rec="discard">${escapeHtml(t('popup_recDiscard'))}</button>

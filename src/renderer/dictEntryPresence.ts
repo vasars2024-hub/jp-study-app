@@ -9,11 +9,13 @@
  *   - the local deck, read synchronously — a card for this word in this study
  *     language, and whether that card already reached Anki (a note id, an export, or
  *     Anki's own duplicate verdict when it was pushed);
- *   - Anki itself, asked read-only through `canAddNotes` on the active profile's deck
- *     and note type (the same check the browser extension's popup makes), only while
- *     Anki is connected. A failed or unreachable check says nothing rather than "no".
+ *   - Anki itself, asked read-only through `canAddNotes` (or `findNotes` on a mapped
+ *     term field) on every deck / note type the settings route this language's cards
+ *     to (`checkAnkiPresenceAcross`), only while Anki is connected. A failed or
+ *     unreachable check says nothing rather than "no".
  */
 import type { DeckFlashcard } from './flashcardDeck';
+import type { AnkiPresenceTarget } from '../shared/ankiPresenceTargets';
 
 export interface EntryPresence {
   /** The local deck holds a card for this word. */
@@ -47,24 +49,60 @@ export function deckPresenceByWord(
   words: readonly string[],
   lang: string,
 ): Map<string, EntryPresence> {
-  const wanted = new Set(words.map(normWord).filter(Boolean));
-  const found = new Map<string, EntryPresence>();
-  for (const card of cards) {
-    if (cardLang(card) !== lang) continue;
-    const word = normWord(card.word ?? '');
-    if (!wanted.has(word)) continue;
-    const prev = found.get(word) ?? { inDeck: false, inAnki: false, ankiPending: false };
-    found.set(word, {
-      inDeck: true,
-      inAnki: prev.inAnki || Boolean(card.ankiNoteId || card.ankiExported || card.ankiDuplicate),
-      ankiPending: prev.ankiPending || Boolean(card.ankiPending),
-    });
-  }
+  const found = presenceIndex(cards, lang);
   const out = new Map<string, EntryPresence>();
   for (const word of words) {
-    out.set(word, found.get(normWord(word)) ?? { inDeck: false, inAnki: false, ankiPending: false });
+    const key = normWord(word);
+    const hit = key ? found.get(key) : undefined;
+    out.set(word, hit ? { ...hit } : { inDeck: false, inAnki: false, ankiPending: false });
   }
   return out;
+}
+
+interface PresenceIndex {
+  /** Shape of the array the index was built from: a changed array rebuilds it. */
+  length: number;
+  first: PresenceCard | undefined;
+  last: PresenceCard | undefined;
+  byLang: Map<string, Map<string, EntryPresence>>;
+}
+
+/**
+ * Word -> presence for one deck snapshot and study language. Every dictionary
+ * lookup asked this of the whole deck, normalising every card's word each time
+ * (20,000 NFKC passes per popup render on a large deck); the deck's snapshots
+ * are never edited once published, so the answer is kept per snapshot.
+ */
+const presenceIndexes = new WeakMap<readonly PresenceCard[], PresenceIndex>();
+
+function presenceIndex(cards: readonly PresenceCard[], lang: string): Map<string, EntryPresence> {
+  let entry = presenceIndexes.get(cards);
+  if (
+    !entry
+    || entry.length !== cards.length
+    || entry.first !== cards[0]
+    || entry.last !== cards[cards.length - 1]
+  ) {
+    entry = { length: cards.length, first: cards[0], last: cards[cards.length - 1], byLang: new Map() };
+    presenceIndexes.set(cards, entry);
+  }
+  let found = entry.byLang.get(lang);
+  if (!found) {
+    found = new Map();
+    for (const card of cards) {
+      if (cardLang(card) !== lang) continue;
+      const word = normWord(card.word ?? '');
+      if (!word) continue;
+      const prev = found.get(word) ?? { inDeck: false, inAnki: false, ankiPending: false };
+      found.set(word, {
+        inDeck: true,
+        inAnki: prev.inAnki || Boolean(card.ankiNoteId || card.ankiExported || card.ankiDuplicate),
+        ankiPending: prev.ankiPending || Boolean(card.ankiPending),
+      });
+    }
+    entry.byLang.set(lang, found);
+  }
+  return found;
 }
 
 /** Fold a live Anki duplicate verdict in. Only a `true` verdict changes anything. */
@@ -90,17 +128,21 @@ const ankiCache = new Map<string, { at: number; duplicates: Record<string, boole
  */
 export async function checkAnkiPresence(
   words: readonly string[],
-  target: { deckName: string; modelName: string },
+  target: { deckName: string; modelName: string; termField?: string },
   now = Date.now(),
 ): Promise<Record<string, boolean>> {
   const list = [...new Set(words.map(normWord).filter(Boolean))];
   const api = typeof window !== 'undefined' ? window.api?.ankiCheckDuplicates : undefined;
   if (!list.length || !target.deckName || !target.modelName || typeof api !== 'function') return {};
-  const key = `${target.deckName}\u0000${target.modelName}\u0000${list.join('\u0001')}`;
+  const key = `${target.deckName}\u0000${target.modelName}\u0000${target.termField ?? ''}\u0000${list.join('\u0001')}`;
   const hit = ankiCache.get(key);
   if (hit && now - hit.at < ANKI_CHECK_TTL_MS) return hit.duplicates;
   try {
-    const reply = await api(list, target);
+    const reply = await api(list, {
+      deckName: target.deckName,
+      modelName: target.modelName,
+      ...(target.termField ? { termField: target.termField } : {}),
+    });
     if (!reply?.ok) return {};
     ankiCache.set(key, { at: now, duplicates: reply.duplicates ?? {} });
     if (ankiCache.size > 100) {
@@ -116,4 +158,41 @@ export async function checkAnkiPresence(
 /** Forget every cached Anki verdict — after an Add, whose result changes them. */
 export function resetAnkiPresenceCache(): void {
   ankiCache.clear();
+}
+
+export interface AnkiPresenceAcross {
+  /** word -> true when any target holds it. */
+  duplicates: Record<string, boolean>;
+  /** word -> the targets (deck · note type) that hold it, for the marker's tooltip. */
+  holders: Record<string, string[]>;
+}
+
+/**
+ * `checkAnkiPresence` over every deck / note type the settings route this
+ * language's cards to (`shared/ankiPresenceTargets.ts`), not only the active
+ * profile's. Each target is asked once (and cached like the single check); a
+ * target that cannot be asked contributes nothing rather than a "no".
+ */
+export async function checkAnkiPresenceAcross(
+  words: readonly string[],
+  targets: readonly AnkiPresenceTarget[],
+  now = Date.now(),
+): Promise<AnkiPresenceAcross> {
+  const duplicates: Record<string, boolean> = {};
+  const holders: Record<string, string[]> = {};
+  const replies = await Promise.all(
+    targets.map((target) =>
+      checkAnkiPresence(words, target, now).then((found) => ({ target, found }))),
+  );
+  for (const { target, found } of replies) {
+    for (const [word, held] of Object.entries(found)) {
+      if (!held) continue;
+      duplicates[word] = true;
+      const label = `${target.deckName} · ${target.modelName}`;
+      const list = holders[word] ?? [];
+      if (!list.includes(label)) list.push(label);
+      holders[word] = list;
+    }
+  }
+  return { duplicates, holders };
 }

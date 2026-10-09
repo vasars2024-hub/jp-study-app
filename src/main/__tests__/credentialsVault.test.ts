@@ -210,7 +210,7 @@ describe('reading a secret that cannot be decrypted', () => {
     fs.writeFileSync(vaultFile(), 'not json at all', 'utf-8');
     expect(readSecret('jiten')).toBe('');
     expect(vaultStatuses()).toEqual(
-      ['gemini', 'deepseek', 'jimaku', 'opensubtitles', 'jiten', 'tmdb', 'mal'].map((id) => ({
+      ['gemini', 'deepseek', 'deepl', 'jimaku', 'opensubtitles', 'jiten', 'tmdb', 'mal'].map((id) => ({
         id,
         configured: false,
         lastTestedAt: 0,
@@ -285,6 +285,8 @@ describe('the renderer-facing shape', () => {
     expect(vaultStatuses().map((entry) => entry.id)).toEqual([
       'gemini',
       'deepseek',
+      // DeepL (the Translate workbench's optional MT engine) was born in the vault.
+      'deepl',
       'jimaku',
       'opensubtitles',
       'jiten',

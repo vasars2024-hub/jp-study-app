@@ -512,6 +512,87 @@
   "content_rpMoreEntries_other": {
     "message": "$1 more entries — see the More tab."
   },
+  "content_rpMoreDicts_one": {
+    "message": "Show $1 more dictionary"
+  },
+  "content_rpMoreDicts_other": {
+    "message": "Show $1 more dictionaries"
+  },
+  "content_rpFewerDicts": {
+    "message": "Show fewer dictionaries"
+  },
+  "content_reason_polite": {
+    "message": "polite"
+  },
+  "content_reason_politeNegative": {
+    "message": "polite negative"
+  },
+  "content_reason_politePast": {
+    "message": "polite past"
+  },
+  "content_reason_politePastNegative": {
+    "message": "polite past negative"
+  },
+  "content_reason_politeVolitional": {
+    "message": "polite volitional"
+  },
+  "content_reason_negative": {
+    "message": "negative"
+  },
+  "content_reason_past": {
+    "message": "past"
+  },
+  "content_reason_te": {
+    "message": "te-form"
+  },
+  "content_reason_causative": {
+    "message": "causative"
+  },
+  "content_reason_passive": {
+    "message": "passive"
+  },
+  "content_reason_passivePotential": {
+    "message": "passive / potential"
+  },
+  "content_reason_potential": {
+    "message": "potential"
+  },
+  "content_reason_volitional": {
+    "message": "volitional"
+  },
+  "content_reason_imperative": {
+    "message": "imperative"
+  },
+  "content_reason_conditionalBa": {
+    "message": "conditional (–ば)"
+  },
+  "content_reason_conditionalTara": {
+    "message": "conditional (–たら)"
+  },
+  "content_reason_tari": {
+    "message": "–たり form"
+  },
+  "content_reason_tai": {
+    "message": "desiderative (–たい)"
+  },
+  "content_reason_sugiru": {
+    "message": "excessive (–すぎる)"
+  },
+  "content_reason_adverbial": {
+    "message": "adverbial"
+  },
+  "content_reason_progressive": {
+    "message": "progressive (–ている)"
+  },
+  "content_reason_shimau": {
+    "message": "completion (–てしまう)"
+  },
+  "content_reason_chau": {
+    "message": "completion (–ちゃう)"
+  },
+  "content_reason_teoku": {
+    "message": "preparatory (–ておく)"
+  },
   "content_rpNoSentence": {
     "message": "No surrounding sentence was detected for this word."
   },
@@ -2134,6 +2215,18 @@
   },
   "bg_errTimeout": {
     "message": "Gum took too long to answer. Try again in a moment."
+  },
+  "bg_errLocked": {
+    "message": "Gum is locked — unlock Gum to continue."
+  },
+  "common_queuedLocked": {
+    "message": "Gum is locked — kept here; it will sync once you unlock Gum"
+  },
+  "popup_chipLocked": {
+    "message": "Gum is locked"
+  },
+  "popup_recWaitingLocked": {
+    "message": "$1 MB waiting — unlock Gum to upload"
   },
   "bg_errBadRequest": {
     "message": "Gum could not read that request. Update the extension and Gum to matching versions."

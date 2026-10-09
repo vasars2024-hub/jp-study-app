@@ -17,12 +17,18 @@ export default function DeckAudioExport() {
   const { t } = useT();
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<DeckMediaExportOutcome | null>(null);
+  // The Anki package keeps each reviewed card's schedule (SM-2 columns, FSRS
+  // memory state) unless the user wants the cards to arrive in Anki as new.
+  const [keepSchedule, setKeepSchedule] = useState(true);
 
   async function run(): Promise<void> {
     setBusy(true);
     setOutcome(null);
     try {
-      setOutcome(await runDeckAudioExport(loadDeck(), 'deck.csv'));
+      setOutcome(await runDeckAudioExport(loadDeck(), 'deck.csv', ',', {
+        includeImages: true,
+        includeSchedule: keepSchedule,
+      }));
     } catch (error) {
       setOutcome({
         ok: false,
@@ -41,6 +47,15 @@ export default function DeckAudioExport() {
     <fieldset className="auto-reading-options">
       <legend>{t('flash.deckExport.title')}</legend>
       <p className="muted">{t('flash.deckExport.lead')}</p>
+      <label className="pl-field">
+        <input
+          type="checkbox"
+          checked={keepSchedule}
+          disabled={busy}
+          onChange={(e) => setKeepSchedule(e.target.checked)}
+        />
+        <span>{t('anki3.export.keepSchedule')}</span>
+      </label>
       <button className="btn" type="button" onClick={() => void run()} disabled={busy}>
         {busy ? t('flash.deckExport.working') : t('flash.deckExport.run')}
       </button>
@@ -58,6 +73,8 @@ export default function DeckAudioExport() {
               {/* A clip whose file is gone is named, not folded into the total. */}
               {outcome.failed > 0
                 && ` ${t('flash.deckExport.failed', { count: outcome.failed })}`}
+              {(outcome.scheduled ?? 0) > 0
+                && ` ${t('anki3.export.scheduled', { count: outcome.scheduled ?? 0 })}`}
             </>
           ) : (
             t('flash.deckExport.error')

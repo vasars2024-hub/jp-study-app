@@ -62,6 +62,8 @@ import { useMusicMining } from './useMusicMining';
 import MusicStudyBar from './MusicStudyBar';
 import DictionaryPopup from '../DictionaryPopup';
 import { useMusicStudyPrefs } from '../../musicStudyPrefs';
+import { recordLinesStudied } from '../../stats';
+import { createLyricStudyLog } from '../../../shared/musicLyricStudy';
 
 // music2: known-word colouring brings the tokenizer, so the coloured line loads on demand.
 const MusicLyricText = lazy(() => import('./MusicLyricText'));
@@ -148,6 +150,12 @@ export interface MusicState {
   ytError: string;
   downloadYt: () => Promise<void>;
   emptyMessage: string;
+  /** The queue was arranged by hand (Play next, Add to queue, reorder). */
+  queueArranged: boolean;
+  /** Hand the queue back to the list's own order (the library, search or playlist shown). */
+  restoreListOrder: () => void;
+  /** Count a lyric line toward "lines studied" (once per line per session). */
+  noteLyricLineStudied: (index: number) => void;
 }
 
 export function useMusic(): MusicState {
@@ -293,7 +301,15 @@ export function useMusic(): MusicState {
     return window.api.onMediaChanged(setItems);
   }, []);
 
-  useEffect(() => player.setQueue(queueSongs), [queueSongs]);
+  // A queue the user arranged by hand is theirs: sorting or searching the list must not
+  // replace it. Any explicit `setQueue` (a playlist, "Use list order") hands it back.
+  const queueArranged = !!ps.queueArranged;
+  useEffect(() => {
+    if (!player.getState().queueArranged) player.setQueue(queueSongs);
+  }, [queueSongs, queueArranged]);
+  const queueSongsRef = useRef(queueSongs);
+  queueSongsRef.current = queueSongs;
+  const restoreListOrder = useCallback(() => player.setQueue(queueSongsRef.current), []);
   useEffect(() => window.api.onYoutubeProgress(setYt), []);
   useEffect(() => localStorage.setItem('jp-music-sort', sortBy), [sortBy]);
 
@@ -314,6 +330,21 @@ export function useMusic(): MusicState {
   const liveLyrics = useLiveLyrics(ps.current, ps.duration, ps.time);
   const { activeIndex } = liveLyrics;
 
+  // "Lines studied": a lyric line the learner replays, looks into or mines counts once per
+  // session, the way the video overlay counts a subtitle line (shared/musicLyricStudy.ts).
+  const lyricStudyLogRef = useRef<ReturnType<typeof createLyricStudyLog> | null>(null);
+  const lyricStudySourceRef = useRef({ trackId: '', lyrics: liveLyrics.lyrics });
+  lyricStudySourceRef.current = { trackId: ps.current?.id ?? '', lyrics: liveLyrics.lyrics };
+  const noteLyricLineStudied = useCallback((index: number) => {
+    const { trackId, lyrics: sheet } = lyricStudySourceRef.current;
+    const text = sheet.kind === 'synced'
+      ? sheet.cues[index]?.text
+      : sheet.kind === 'plain' ? sheet.lines[index] : undefined;
+    if (!trackId || typeof text !== 'string') return;
+    lyricStudyLogRef.current ??= createLyricStudyLog((count) => recordLinesStudied(count));
+    lyricStudyLogRef.current.note(trackId, index, text);
+  }, []);
+
   // Keep the active line centered (unless the user just scrolled by hand).
   // Scroll inside the lyrics pane only — scrollIntoView can nudge ancestor
   // scrollers and, with zoom + vh padding, shift the whole desktop shell.
@@ -330,6 +361,10 @@ export function useMusic(): MusicState {
 
   const play = useCallback(async (item: MediaItem) => {
     setError('');
+    // In a hand-arranged queue a track from outside it joins after the current one
+    // instead of leaving the player with no place in the queue to continue from.
+    const now = player.getState();
+    if (now.queueArranged && !now.queue.some((q) => q.id === item.id)) player.queueTrackNext(item);
     const err = await player.playItem(item);
     if (err) setError(err);
   }, []);
@@ -385,9 +420,14 @@ export function useMusic(): MusicState {
   const lookupAt = useCallback((e: React.MouseEvent) => {
     const dismissOnly = popupOpenOnDownRef.current && isLookupClick(e);
     const hit = lookupWordFromMouseUp(e);
-    if (hit && !hit.translate) setPopup({ query: hit.query, x: hit.x, y: hit.y });
-    else if (dismissOnly) setPopup(null);
-  }, []);
+    if (hit && !hit.translate) {
+      setPopup({ query: hit.query, x: hit.x, y: hit.y });
+      // A word looked up in a lyric line is that line studied.
+      const line = (e.target as Element | null)?.closest?.('[data-lyric-line]');
+      const index = Number(line?.getAttribute('data-lyric-line'));
+      if (line && Number.isInteger(index)) noteLyricLineStudied(index);
+    } else if (dismissOnly) setPopup(null);
+  }, [noteLyricLineStudied]);
 
   const pickLrcFile = useCallback(async () => {
     if (!ps.current) return;
@@ -456,6 +496,9 @@ export function useMusic(): MusicState {
     ytError,
     downloadYt,
     emptyMessage,
+    queueArranged,
+    restoreListOrder,
+    noteLyricLineStudied,
   };
 }
 
@@ -474,10 +517,36 @@ function songMenuItems(
   t: (key: string, vars?: Record<string, string | number>) => string,
   moves: Map<string, { up?: number; down?: number }>,
 ): MenuItem[] {
+  // Queue actions lead the menu in every view (library, search, playlist): they are the
+  // ones a listener reaches for while something is already playing.
+  const title = state.metaMap.get(song.id)?.title ?? song.title ?? song.fileName;
+  const isCurrent = state.ps.current?.id === song.id;
+  const queueItems: MenuItem[] = [
+    {
+      id: 'play-next',
+      label: t('fu1.queue.playNext'),
+      disabled: isCurrent,
+      onSelect: () => {
+        player.queueTrackNext(song);
+        state.setPlaylistNote(t('fu1.queue.queuedNext', { title }));
+      },
+    },
+    {
+      id: 'add-to-queue',
+      label: t('fu1.queue.addToQueue'),
+      disabled: isCurrent,
+      onSelect: () => {
+        player.queueTrackLast(song);
+        state.setPlaylistNote(t('fu1.queue.queuedLast', { title }));
+      },
+    },
+    { separator: true, label: '' },
+  ];
   const playlist = state.activePlaylist;
   if (playlist) {
     const { up, down } = moves.get(song.id) ?? {};
     return [
+      ...queueItems,
       {
         id: 'up',
         label: t('musicUi.playlists.moveUp'),
@@ -499,7 +568,8 @@ function songMenuItems(
       },
     ];
   }
-  const items: MenuItem[] = state.playlists.map((p) => {
+  const items: MenuItem[] = [...queueItems];
+  const playlistItems: MenuItem[] = state.playlists.map((p) => {
     const has = p.trackIds.includes(song.id);
     return {
       id: `add-${p.id}`,
@@ -510,7 +580,7 @@ function songMenuItems(
       },
     };
   });
-  if (items.length) items.push({ separator: true, label: '' });
+  if (playlistItems.length) items.push(...playlistItems, { separator: true, label: '' });
   items.push({
     id: 'new',
     label: t('musicUi.playlists.newWithSong'),
@@ -985,8 +1055,12 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
   /** Restart the line being sung, which is the one thing stepping cannot express. */
   const replayCue = (): void => {
     const target = musicCueReplaySec(studyCues, activeIndex);
-    if (target != null) player.seek(target);
+    if (target == null) return;
+    player.seek(target);
+    state.noteLyricLineStudied(activeIndex);
   };
+  const noteStudiedRef = useRef(state.noteLyricLineStudied);
+  noteStudiedRef.current = state.noteLyricLineStudied;
 
   /**
    * The same three gestures from the keyboard, on `music.*` ids of their own.
@@ -1023,7 +1097,9 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
       registerCommandHandler('music.replayLine', () => {
         const { studyCues: cues, activeIndex: index } = cueNavRef.current;
         const target = musicCueReplaySec(cues, index);
-        if (target != null) player.seek(target);
+        if (target == null) return;
+        player.seek(target);
+        noteStudiedRef.current(index);
       }),
     ];
     return () => offs.forEach((off) => off());
@@ -1058,7 +1134,10 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
       // the button would also open the popup over the card the user just made.
       onMouseUp={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
-      onClick={() => void mining.mine(line, kind, ps.time ?? 0)}
+      onClick={() => {
+        state.noteLyricLineStudied(line.index);
+        void mining.mine(line, kind, ps.time ?? 0);
+      }}
       disabled={mining.outcome.kind === 'busy' || mining.outcome.kind === 'recording'}
       title={t('music.mineHint')}
       aria-label={t('music.mineHint')}
@@ -1169,7 +1248,9 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
             // The line being sung now; nothing to mine between lines or on a plain sheet.
             if (lyrics.kind !== 'synced' || activeIndex < 0) return;
             const c = lyrics.cues[activeIndex];
-            if (c) void mining.mine({ index: activeIndex, text: c.text, startSec: c.start, endSec: c.end }, 'synced', ps.time ?? 0);
+            if (!c) return;
+            state.noteLyricLineStudied(activeIndex);
+            void mining.mine({ index: activeIndex, text: c.text, startSec: c.start, endSec: c.end }, 'synced', ps.time ?? 0);
           }}
         />
       )}
@@ -1188,6 +1269,7 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
             key={i}
             ref={i === activeIndex ? state.activeLineRef : undefined}
             className={`music-line ${i === activeIndex ? 'active' : ''} ${i < activeIndex ? 'past' : ''}`}
+            data-lyric-line={i}
             onDoubleClick={() => player.seek(c.start)}
             title={t('music.doubleClickJump')}
           >
@@ -1199,7 +1281,7 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
         <>
           <p className="muted music-plain-note">{t('music.notSynced')}</p>
           {lyrics.lines.map((l, i) => (
-            <div key={i} className="music-line plain">
+            <div key={i} className="music-line plain" data-lyric-line={i}>
               {lyricText(l)}
               {/* No timestamp exists for a plain line, so provenance records the listening
                   position instead — see shared/musicMining.ts. */}

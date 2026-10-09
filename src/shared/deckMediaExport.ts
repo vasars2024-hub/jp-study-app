@@ -16,6 +16,8 @@
  * else's), so they are decided here and tested without a filesystem.
  */
 
+import type { LocalSrsState } from './localSrs';
+
 /** The card fields this export reads. Structural, so both card shapes fit. */
 export interface DeckMediaExportCard {
   id: string;
@@ -27,6 +29,19 @@ export interface DeckMediaExportCard {
   back?: string;
   audioPath?: string;
   audioDataUrl?: string;
+  /** A managed picture (mined screenshot, imported image); exported with `includeImages`. */
+  imagePath?: string;
+  /** The card's local schedule; exported with `includeSchedule`. */
+  srs?: LocalSrsState;
+  suspended?: boolean;
+}
+
+/** What an export carries beyond the original text + audio columns. Both off by default. */
+export interface DeckMediaExportOptions {
+  /** Add an `Image` column and copy each card's managed picture. */
+  includeImages?: boolean;
+  /** Return each card's schedule so the package keeps reviewed cards reviewed. */
+  includeSchedule?: boolean;
 }
 
 /** One file to write next to the text export. */
@@ -45,6 +60,8 @@ export interface DeckMediaExport {
   media: DeckMediaItem[];
   /** Cards carrying no audio at all. Reported, never presented as exported. */
   withoutAudio: number;
+  /** Per card row, with `includeSchedule`: what the package writes as Anki scheduling columns. */
+  schedules?: Array<{ srs?: LocalSrsState; suspended?: boolean } | null>;
 }
 
 export const DECK_EXPORT_HEADERS = [
@@ -96,29 +113,34 @@ export function mediaFileNameFor(card: DeckMediaExportCard, prefix = 'jpstudy'):
  */
 export function buildDeckMediaExport(
   cards: readonly DeckMediaExportCard[],
+  options: DeckMediaExportOptions = {},
 ): DeckMediaExport {
-  const rows: string[][] = [[...DECK_EXPORT_HEADERS]];
+  const rows: string[][] = [options.includeImages ? [...DECK_EXPORT_HEADERS, 'Image'] : [...DECK_EXPORT_HEADERS]];
   const media: DeckMediaItem[] = [];
   const used = new Set<string>();
+  const schedules: Array<{ srs?: LocalSrsState; suspended?: boolean } | null> = [];
   let withoutAudio = 0;
+  // Two cards sharing an id would be a bug elsewhere, but a collision here
+  // would silently export one card's media under another's name.
+  const claim = (name: string): string => {
+    let unique = name;
+    let n = 2;
+    while (used.has(unique)) unique = name.replace(/(\.[^.]+)$/, `-${n++}$1`);
+    used.add(unique);
+    return unique;
+  };
 
   for (const card of cards) {
     let fileName = mediaFileNameFor(card);
     if (fileName) {
-      // Two cards sharing an id would be a bug elsewhere, but a collision here
-      // would silently export one card's audio under another's name.
-      let unique = fileName;
-      let n = 2;
-      while (used.has(unique)) unique = fileName.replace(/(\.[^.]+)$/, `-${n++}$1`);
-      used.add(unique);
-      fileName = unique;
+      fileName = claim(fileName);
       media.push(card.audioPath
         ? { fileName, sourcePath: card.audioPath }
         : { fileName, dataUrl: card.audioDataUrl });
     } else {
       withoutAudio += 1;
     }
-    rows.push([
+    const row = [
       card.word ?? '',
       card.reading ?? '',
       card.meaning ?? '',
@@ -126,8 +148,33 @@ export function buildDeckMediaExport(
       card.front ?? '',
       card.back ?? '',
       fileName ? `[sound:${fileName}]` : '',
-    ]);
+    ];
+    if (options.includeImages) {
+      let imageName = imageFileNameFor(card);
+      if (imageName && card.imagePath) {
+        imageName = claim(imageName);
+        media.push({ fileName: imageName, sourcePath: card.imagePath });
+      }
+      row.push(imageName ? `<img src="${imageName}">` : '');
+    }
+    rows.push(row);
+    if (options.includeSchedule) {
+      schedules.push(card.srs || card.suspended
+        ? { ...(card.srs ? { srs: card.srs } : {}), ...(card.suspended ? { suspended: true } : {}) }
+        : null);
+    }
   }
 
-  return { rows, media, withoutAudio };
+  return { rows, media, withoutAudio, ...(options.includeSchedule ? { schedules } : {}) };
+}
+
+const IMAGE_EXTENSION = /\.(png|jpe?g|webp|gif|avif)$/i;
+
+/** The exported picture's filename: card-keyed like the audio, under its own prefix. */
+export function imageFileNameFor(card: Pick<DeckMediaExportCard, 'id' | 'imagePath'>): string | null {
+  if (!card.imagePath) return null;
+  const extension = IMAGE_EXTENSION.exec(card.imagePath)?.[1]?.toLowerCase();
+  if (!extension) return null;
+  const safeId = card.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(-40) || 'card';
+  return `jpstudy-img-${safeId}.${extension === 'jpeg' ? 'jpg' : extension}`;
 }

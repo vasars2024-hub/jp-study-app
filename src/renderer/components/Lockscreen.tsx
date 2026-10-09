@@ -9,13 +9,14 @@ import { LANG_TAGS } from '../../shared/i18n/core';
 import {
   loadLockscreen,
   markLockscreenUnlocked,
-  verifyLockscreenPin,
+  verifyLockscreenPinDetailed,
   type LockscreenSettings,
 } from '../lockscreenSettings';
 import { AERO_THEME_ID } from '../theme/frutiger-aero';
 import { WIRED_ARCHIVE_THEME_ID } from '../theme/wired-archive';
 import { loadThemeId } from '../theme';
 import { useLockBlockedToasts } from '../lockBlockedNotice';
+import { trapTab } from './ui/focusTrap';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'] as const;
 
@@ -60,9 +61,43 @@ export default function Lockscreen({
   // Wired lockscreen: amber flash per failure; red is reserved for 3+ failures.
   const [failCount, setFailCount] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
+  /**
+   * Main's backoff (lockscreenPin.ts: after 5 misses, 30 s doubling to 5 min). Until this
+   * existed the screen said only "Incorrect passcode" during a lockout — so the RIGHT PIN,
+   * typed inside the window, read as wrong too (found by the e2e harness, flow
+   * `lockscreen`). Now the wait is stated and entry pauses until it is over.
+   */
+  const [retryUntil, setRetryUntil] = useState<number | null>(null);
+  const [retryNow, setRetryNow] = useState(() => Date.now());
+  const waiting = retryUntil !== null && retryNow < retryUntil;
+  const waitSeconds = waiting ? Math.max(1, Math.ceil((retryUntil - retryNow) / 1000)) : 0;
+  const retryText = waiting ? t('lockscreen.retryIn', { count: waitSeconds }) : null;
+  useEffect(() => {
+    if (retryUntil === null) return undefined;
+    setRetryNow(Date.now());
+    const timer = window.setInterval(() => {
+      const at = Date.now();
+      setRetryNow(at);
+      if (at >= retryUntil) setRetryUntil(null);
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [retryUntil]);
   const [clock, setClock] = useState(() => new Date());
   const widgetRef = useRef<HTMLDivElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  // a11y3: every skin is `role="dialog" aria-modal="true"`, so the keyboard has
+  // to stay inside it too. Tab is trapped at the window (capture), and if focus
+  // starts outside (the PIN pad skins focus nothing), it lands on the lock.
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') trapTab(e, rootRef.current);
+    };
+    window.addEventListener('keydown', onTab, true);
+    const root = rootRef.current;
+    if (root && !root.contains(document.activeElement)) (passwordRef.current ?? root).focus();
+    return () => window.removeEventListener('keydown', onTab, true);
+  }, []);
 
   useEffect(() => {
     const t = window.setInterval(() => setClock(new Date()), 30_000);
@@ -142,8 +177,9 @@ export default function Lockscreen({
     (pin: string) => {
       if (pin.length !== 4) return;
       // Main checks the hash (and backs off after repeated misses), so this is async.
-      void verifyLockscreenPin(pin).then((ok) => {
-        if (!ok) {
+      void verifyLockscreenPinDetailed(pin).then((res) => {
+        if (!res.ok) {
+          if (res.retryAfterMs && res.retryAfterMs > 0) setRetryUntil(Date.now() + res.retryAfterMs);
           fail();
           return;
         }
@@ -157,7 +193,7 @@ export default function Lockscreen({
 
   const press = useCallback(
     (key: (typeof KEYS)[number]) => {
-      if (unlocking || shake) return;
+      if (unlocking || shake || waiting) return;
       if (key === '') return;
       if (key === 'del') {
         setDigits((d) => d.slice(0, -1));
@@ -171,7 +207,7 @@ export default function Lockscreen({
         return next;
       });
     },
-    [unlocking, shake, tryUnlock],
+    [unlocking, shake, waiting, tryUnlock],
   );
 
   useEffect(() => {
@@ -196,7 +232,7 @@ export default function Lockscreen({
 
   const submitPassword = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (unlocking || shake) return;
+    if (unlocking || shake || waiting) return;
     tryUnlock(password.replace(/\D/g, '').slice(0, 4));
   };
 
@@ -214,6 +250,8 @@ export default function Lockscreen({
         role="dialog"
         aria-modal="true"
         aria-label={t('lockscreen.aria.wired')}
+        ref={rootRef}
+        tabIndex={-1}
       >
         <div className="lockscreen-wired-map" aria-hidden="true" />
         <div className="lockscreen-wired-noise" aria-hidden="true" />
@@ -245,19 +283,19 @@ export default function Lockscreen({
                 maxLength={4}
                 inputMode="numeric"
                 autoComplete="off"
-                disabled={unlocking}
+                disabled={unlocking || waiting}
                 aria-label={t('lockscreen.aria.accessCode')}
                 onChange={(e) => {
                   setPassword(e.target.value.replace(/\D/g, '').slice(0, 4));
                   setError(false);
                 }}
               />
-              <button type="submit" disabled={unlocking}>
+              <button type="submit" disabled={unlocking || waiting}>
                 {t('lockscreen.wired.auth')}
               </button>
             </div>
-            <p className="lockscreen-wired-status">
-              {error ? t('lockscreen.wired.denied') : t('lockscreen.wired.clearance')}
+            <p className="lockscreen-wired-status" role="status">
+              {retryText ?? (error ? t('lockscreen.wired.denied') : t('lockscreen.wired.clearance'))}
             </p>
           </form>
         </section>
@@ -275,6 +313,8 @@ export default function Lockscreen({
         role="dialog"
         aria-modal="true"
         aria-label={t('lockscreen.aria.xp')}
+        ref={rootRef}
+        tabIndex={-1}
       >
         <div className="lockscreen-aero-bg" aria-hidden="true">
           <span className="lockscreen-aero-ribbon is-a" />
@@ -300,7 +340,7 @@ export default function Lockscreen({
                 maxLength={4}
                 inputMode="numeric"
                 autoComplete="off"
-                disabled={unlocking}
+                disabled={unlocking || waiting}
                 placeholder={t('lockscreen.aria.password')}
                 aria-label={t('lockscreen.aria.password')}
                 aria-invalid={showIncorrect || undefined}
@@ -310,14 +350,14 @@ export default function Lockscreen({
                   setError(false);
                 }}
               />
-              <button type="submit" className="lockscreen-aero-go" disabled={unlocking} aria-label={t('lockscreen.aria.signIn')}>
+              <button type="submit" className="lockscreen-aero-go" disabled={unlocking || waiting} aria-label={t('lockscreen.aria.signIn')}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M5 12h13M12.5 6.5 18 12l-5.5 5.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </form>
             <p id="lockscreen-aero-status" className="lockscreen-aero-status" role="status" aria-live="polite">
-              {showIncorrect ? t('lockscreen.xp.incorrect') : ''}
+              {retryText ?? (showIncorrect ? t('lockscreen.xp.incorrect') : '')}
             </p>
           </div>
         </div>
@@ -348,7 +388,7 @@ export default function Lockscreen({
           className="lockscreen-aero-orb lockscreen-aero-power"
           aria-label={t('aeroVista.lock.sleep')}
           title={t('aeroVista.lock.sleep')}
-          disabled={unlocking}
+          disabled={unlocking || waiting}
           onClick={() => setDozing(true)}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -372,6 +412,8 @@ export default function Lockscreen({
         role="dialog"
         aria-modal="true"
         aria-label={t('lockscreen.aria.widget')}
+        ref={rootRef}
+        tabIndex={-1}
       >
         <div ref={widgetRef} className="lockscreen-widget">
           <header className="lockscreen-bar">
@@ -382,9 +424,10 @@ export default function Lockscreen({
             <span className="lockscreen-clock-inline">{time}</span>
           </header>
           <div className="lockscreen-date muted">{date}</div>
-          <p className={`lockscreen-prompt${error ? ' is-error' : ''}`}>
-            {error ? t('lockscreen.widget.wrong') : t('lockscreen.widget.enter')}
+          <p className={`lockscreen-prompt${error ? ' is-error' : ''}`} role="status">
+            {retryText ?? (error ? t('lockscreen.widget.wrong') : t('lockscreen.widget.enter'))}
           </p>
+          <span className="sr-only" role="status">{t('a11y3.lock.digits', { count: digits.length })}</span>
           <div className="lockscreen-dots" aria-hidden>
             {[0, 1, 2, 3].map((i) => (
               <span key={i} className={`lockscreen-dot${i < digits.length ? ' is-filled' : ''}${error ? ' is-error' : ''}`} />
@@ -402,7 +445,7 @@ export default function Lockscreen({
                     type="button"
                     className="lockscreen-key is-action"
                     title={t('lockscreen.delete')}
-                    disabled={unlocking}
+                    disabled={unlocking || waiting}
                     onClick={() => press('del')}
                   >
                     {t('lockscreen.del')}
@@ -414,7 +457,7 @@ export default function Lockscreen({
                   key={key}
                   type="button"
                   className="lockscreen-key"
-                  disabled={unlocking}
+                  disabled={unlocking || waiting}
                   onClick={() => press(key)}
                 >
                   {key}
@@ -433,6 +476,8 @@ export default function Lockscreen({
       role="dialog"
       aria-modal="true"
       aria-label={t('lockscreen.aria.win11')}
+      ref={rootRef}
+      tabIndex={-1}
     >
       <div className="lockscreen-win11-bg" aria-hidden="true">
         <div className="lockscreen-win11-bg-clouds" />
@@ -455,9 +500,10 @@ export default function Lockscreen({
           </svg>
         </div>
         <div className="lockscreen-win11-name">{t('lockscreen.user')}</div>
-        <p className={`lockscreen-win11-prompt${error ? ' is-error' : ''}`}>
-          {error ? t('lockscreen.win11.incorrect') : t('lockscreen.win11.enter')}
+        <p className={`lockscreen-win11-prompt${error ? ' is-error' : ''}`} role="status">
+          {retryText ?? (error ? t('lockscreen.win11.incorrect') : t('lockscreen.win11.enter'))}
         </p>
+        <span className="sr-only" role="status">{t('a11y3.lock.digits', { count: digits.length })}</span>
         <div className="lockscreen-win11-dots" aria-hidden>
           {[0, 1, 2, 3].map((i) => (
             <span key={i} className={`lockscreen-win11-dot${i < digits.length ? ' is-filled' : ''}${error ? ' is-error' : ''}`} />
@@ -475,7 +521,7 @@ export default function Lockscreen({
                   type="button"
                   className="lockscreen-win11-key is-action"
                   title={t('lockscreen.delete')}
-                  disabled={unlocking}
+                  disabled={unlocking || waiting}
                   onClick={() => press('del')}
                 >
                   {t('lockscreen.del')}
@@ -487,7 +533,7 @@ export default function Lockscreen({
                 key={key}
                 type="button"
                 className="lockscreen-win11-key"
-                disabled={unlocking}
+                disabled={unlocking || waiting}
                 onClick={() => press(key)}
               >
                 {key}

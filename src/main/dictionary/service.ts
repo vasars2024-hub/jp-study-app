@@ -76,6 +76,7 @@ import {
   type XrefQuery,
 } from './dictService';
 import {
+  CedictNotInstalledError,
   lookupChineseTerm,
   getCedictIndex,
   type CedictIndex,
@@ -699,7 +700,10 @@ async function loadCedictText(): Promise<string> {
   }
   const file = bundledCedictPath();
   if (!fs.existsSync(file)) {
-    throw new Error(`Could not load the Chinese dictionary (missing ${file}).`);
+    // The installer no longer bundles a copy (perf3: it is the `cc-cedict`
+    // download, the Chinese starter asset), so this is "not installed yet",
+    // which the lookup reports as a missing dictionary with a way to get one.
+    throw new CedictNotInstalledError(`Could not load the Chinese dictionary (missing ${file}).`);
   }
   return fs.readFileSync(file, 'utf8');
 }

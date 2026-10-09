@@ -201,7 +201,10 @@ const SettingsSearch = forwardRef<
         placeholder={t('settings.search.placeholder')}
         value={query}
         aria-label={t('settings.search.placeholder')}
-        aria-controls={listId}
+        // a11y3: `aria-expanded` is only valid on a combobox, not on a bare
+        // search field, and `aria-controls` must name a panel that exists.
+        role="combobox"
+        aria-controls={open ? listId : undefined}
         aria-expanded={open && (results.length > 0 || recent.length > 0 || !query.trim())}
         aria-autocomplete="list"
         autoComplete="off"

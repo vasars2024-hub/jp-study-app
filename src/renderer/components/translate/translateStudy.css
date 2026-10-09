@@ -175,3 +175,118 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---- Translation engines, consent, result source, glossary (xlate2) ---- */
+
+.xlate2-engine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  flex-basis: 100%;
+}
+
+.xlate2-engine-pick,
+.xlate2-engine-fallback {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.xlate2-engine-pick select {
+  min-height: 26px;
+  max-width: min(100%, 360px);
+}
+
+.xlate2-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.9em;
+}
+
+.xlate2-consent {
+  flex-basis: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--accent, #4aa3ff);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent, #4aa3ff) 8%, transparent);
+}
+
+.xlate2-consent p {
+  margin: 0 0 6px;
+}
+
+.xlate2-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.xlate2-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 6px 0;
+  font-size: 0.9em;
+}
+
+.xlate2-source-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgb(127 127 127 / 0.35));
+}
+
+.xlate2-fallback {
+  color: var(--warning, #b7791f);
+}
+
+.xlate2-glossary {
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgb(127 127 127 / 0.25));
+  border-radius: 8px;
+}
+
+.xlate2-glossary-form {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: center;
+  max-width: 560px;
+}
+
+.xlate2-glossary-form input[type='text'] {
+  min-height: 26px;
+  min-width: 0;
+}
+
+.xlate2-glossary-scope {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.xlate2-glossary-list,
+.xlate2-glossary-suggest ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.xlate2-glossary-list li,
+.xlate2-glossary-suggest li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.xlate2-glossary-suggest h4 {
+  margin: 10px 0 0;
+  font-size: 0.95em;
+}

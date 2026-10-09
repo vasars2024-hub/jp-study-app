@@ -2155,7 +2155,8 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       // A prefix or fuzzy row is a near miss, not the word: answering 猫 with 猫舌
       // made the popup head the wrong word. Only real matches are returned.
       const real = (local.entries || []).filter((e) => !e.via || REAL_MATCH_VIA.has(e.via));
-      const entries = real.slice(0, 8).map((e) => ({
+      const { arrangeEntriesForExtension } = await import('./dictionary/wireArrange');
+      const entries = arrangeEntriesForExtension(real).slice(0, 8).map((e) => ({
         word: e.word,
         reading: e.reading,
         via: e.via,
@@ -2164,7 +2165,9 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         senses: (e.senses || []).slice(0, 6).map((s) => ({
           partsOfSpeech: s.partsOfSpeech || [],
           definitions: (s.definitions || []).filter(Boolean).slice(0, 8),
+          ...(s.source ? { source: s.source } : {}),
         })),
+        ...(e.collapsed ? { collapsed: true } : {}),
         meanings: (e.senses || [])
           .flatMap((s) => s.definitions || [])
           .filter(Boolean)
@@ -2210,6 +2213,8 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       const found = await scanOfflinePrefixes(text, lang, {
         maxLen: Math.min(24, Math.max(1, Number(body.maxLen) || 24)),
       });
+      // Dictionary order and grouped/merged layout from the app's settings.
+      const { arrangeEntriesForExtension } = await import('./dictionary/wireArrange');
       json(res, 200, {
         ok: true,
         query: text,
@@ -2217,7 +2222,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         via: found.via,
         lang: found.lang ?? lang,
         deinflection: found.deinflection,
-        entries: (found.entries || []).slice(0, 8).map((e) => ({
+        entries: arrangeEntriesForExtension(found.entries || []).slice(0, 8).map((e) => ({
           word: e.word,
           reading: e.reading,
           via: e.via,
@@ -2226,11 +2231,14 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
           senses: (e.senses || []).slice(0, 8).map((s) => ({
             partsOfSpeech: s.partsOfSpeech || [],
             definitions: (s.definitions || []).filter(Boolean).slice(0, 8),
+            ...(s.source ? { source: s.source } : {}),
           })),
           source: e.source,
           isCommon: e.isCommon,
           jlpt: e.jlpt,
           frequency: e.frequency,
+          ...(e.collapsed ? { collapsed: true } : {}),
+          ...(e.priorityTags?.length ? { priorityTags: e.priorityTags } : {}),
         })),
       });
     } catch (err) {

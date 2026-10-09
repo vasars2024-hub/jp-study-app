@@ -1,5 +1,6 @@
 /** Dialog — accessible modal (Escape to close, focus trap, labelled). Phase 1 · M5a. */
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { trapTab } from './focusTrap';
 
 export interface DialogProps {
   open: boolean;
@@ -16,6 +17,13 @@ export function Dialog({ open, onClose, title, children, footer, dismissable = t
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // a11y3: held in a ref. Callers pass an inline arrow, and with onClose as a
+  // dependency every parent re-render re-ran the effect: its cleanup bounced
+  // focus to the opener and the re-run pulled it back to the panel, so a user
+  // typing in a field inside the dialog lost their place on every re-render.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
@@ -23,30 +31,17 @@ export function Dialog({ open, onClose, title, children, footer, dismissable = t
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
       } else if (e.key === 'Tab') {
-        // Minimal focus trap within the panel.
-        const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
-          'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
-        );
-        if (!focusable || focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
+        trapTab(e, panelRef.current);
       }
     };
     document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('keydown', onKey, true);
-      prev?.focus?.();
+      if (prev?.isConnected) prev.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

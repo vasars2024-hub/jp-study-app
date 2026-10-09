@@ -22,6 +22,8 @@ import {
 } from '../translate/TranslateContent';
 import TranslateStudyPanel, { TranslateOptionsBar } from '../translate/TranslateStudyPanel';
 import type { TransLang } from '../../translator';
+import { useTranslateProviders } from '../../translateProviderClient';
+import { isCloudTranslateProvider, translateProviderLabel } from '../../../shared/translateProviders';
 
 /**
  * Pillar 2 port of `TranslateView` — Blanc had no translate surface at all.
@@ -31,6 +33,7 @@ export function BlancTranslatePanel() {
   const { t } = useT();
   const state = useTranslate();
   const { source, target, input, output, busy, msg, error } = state;
+  const engine = useTranslateProviders(source, target).provider;
 
   // The `t <text>` verb: take the text (pending when this panel mounts, or
   // announced while it is open), put it in the source pane and translate it.
@@ -111,7 +114,12 @@ export function BlancTranslatePanel() {
         </div>
         <div className="blanc-status-row">
           <span>{t('translate.status.sourceChars', { count: input.length })}</span>
-          <span>{t('blanc.study.translate.runsLocally')}</span>
+          {/* "Runs locally" is only true while the pair uses an offline engine. */}
+          <span>
+            {isCloudTranslateProvider(engine)
+              ? t('xlate2.engine.cloudShort', { provider: translateProviderLabel(engine, t) })
+              : t('blanc.study.translate.runsLocally')}
+          </span>
         </div>
       </fieldset>
 

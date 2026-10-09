@@ -21,6 +21,7 @@
 import { kvBatch, kvGet, kvScanPrefix, kvUpdate } from './storage/db';
 import { recordReviewActivity } from './stats';
 import {
+  mergeNormalizedReviewLog,
   normalizeReviewLog,
   normalizeReviewLogEntry,
   REVIEW_LOG_LIMIT,
@@ -62,8 +63,10 @@ function emit(): void {
   }
 }
 
+/** `rows` are normalised already (`readStored`); only this window's own rows still need it. */
 function withHeld(rows: readonly ReviewLogEntry[]): ReviewLogEntry[] {
-  return normalizeReviewLog([...rows, ...ownRows]).filter((entry) => !ownRemoved.has(entry.id));
+  const own = ownRows.map(normalizeReviewLogEntry).filter((entry): entry is ReviewLogEntry => entry !== null);
+  return mergeNormalizedReviewLog([...rows, ...own]).filter((entry) => !ownRemoved.has(entry.id));
 }
 
 /** A stored value this module may merge into: nothing yet, or a review log. */
@@ -81,7 +84,8 @@ async function readStored(): Promise<ReviewLogEntry[]> {
     const entry = normalizeReviewLogEntry(value);
     if (entry) rows.push(entry);
   }
-  return normalizeReviewLog([...legacy, ...rows]);
+  // Both lists are normalised entries already: merge, do not re-validate.
+  return mergeNormalizedReviewLog([...legacy, ...rows]);
 }
 
 export function loadReviewLog(): Promise<ReviewLogEntry[]> {
@@ -188,6 +192,7 @@ export function appendReviewLog(input: Omit<ReviewLogEntry, 'id' | 'at'> & { at?
   // Written now either way: an append needs nothing from the stored log.
   persist();
   emit();
+  notifyEntryListeners('appended', entry);
   return entry;
 }
 
@@ -203,6 +208,37 @@ export function removeReviewLogEntry(entry: ReviewLogEntry): void {
   heldRemovals.add(entry.id);
   persist();
   emit();
+  notifyEntryListeners('removed', entry);
+}
+
+/**
+ * Row-level hook: who needs the answer itself, not just "the log changed" —
+ * the Anki review sync queues each graded answer and drops it again on undo.
+ * Synchronous with the append; a listener that throws is logged and skipped,
+ * never allowed to fail the review that called it.
+ */
+export interface ReviewLogEntryListener {
+  appended?(entry: ReviewLogEntry): void;
+  removed?(entry: ReviewLogEntry): void;
+}
+
+const entryListeners = new Set<ReviewLogEntryListener>();
+
+function notifyEntryListeners(kind: 'appended' | 'removed', entry: ReviewLogEntry): void {
+  for (const listener of [...entryListeners]) {
+    try {
+      listener[kind]?.(entry);
+    } catch (error) {
+      console.error('[review-log] entry listener threw:', error);
+    }
+  }
+}
+
+export function onReviewLogEntry(listener: ReviewLogEntryListener): () => void {
+  entryListeners.add(listener);
+  return () => {
+    entryListeners.delete(listener);
+  };
 }
 
 export function onReviewLogChanged(cb: () => void): () => void {

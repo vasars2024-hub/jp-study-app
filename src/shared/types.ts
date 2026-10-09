@@ -22,6 +22,18 @@ export interface DictSense {
   partsOfSpeech: string[];
   definitions: string[];
   tags: string[];
+  /**
+   * Title of the dictionary this sense came from. Set only where one entry holds
+   * senses from several dictionaries (the database merges a headword they agree
+   * on), so a surface can group or label them; absent means "the entry's source".
+   */
+  source?: string;
+  /**
+   * This sense's own structured-content HTML (sanitized), when the dictionary
+   * marked its senses. A surface renders it in place of `definitions`, under the
+   * sense's part-of-speech and usage tags.
+   */
+  html?: string;
 }
 
 export interface DictEntry {
@@ -66,6 +78,13 @@ export interface DictEntry {
    * (Jisho, CC-CEDICT, older callers).
    */
   via?: 'exact' | 'deinflected' | 'reading' | 'prefix' | 'gloss' | 'fuzzy';
+  /**
+   * JMdict priority codes (`news1`, `ichi1`, `nf12`, …) the dictionary itself
+   * attached to this headword. Absent when the source carries none — never derived.
+   */
+  priorityTags?: string[];
+  /** This entry's own conjugation chain (inner → outer), when it was reached by de-inflection. */
+  inflection?: string[];
 }
 
 /** Installed Yomitan dictionary metadata (Settings list). */

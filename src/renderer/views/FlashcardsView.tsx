@@ -286,50 +286,45 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                   <span>{t('flash.unfiled')}</span>
                   <strong>{unfiledCount}</strong>
                 </button>
+                {/* The delete control is a sibling of the folder button, not a
+                    role="button" span inside it: a control nested in a control
+                    is unreachable as itself for assistive tech (nested-interactive). */}
                 {folders.map((folder) => (
-                  <button
-                    key={folder}
-                    type="button"
-                    draggable
-                    className={`aero-flash-folder ${folderFilter === folder ? 'active' : ''} ${dropHover === folder ? 'dragover' : ''}`}
-                    aria-pressed={folderFilter === folder}
-                    onClick={() => state.setFolderFilter(folder)}
-                    onDragStart={(e) => e.dataTransfer.setData('app/flash-folder', folder)}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      state.setDropHover(folder);
-                    }}
-                    onDragLeave={() => state.setDropHover(null)}
-                    onDrop={(e) => {
-                      const draggedFolder = e.dataTransfer.getData('app/flash-folder');
-                      if (draggedFolder && draggedFolder !== folder) {
-                        void state.reorderFolder(draggedFolder, folder);
-                        return;
-                      }
-                      state.onFolderDrop(e, folder);
-                    }}
-                  >
-                    <span>{folder}</span>
-                    <strong>{epubCards.filter((card) => card.folder === folder).length}</strong>
-                    <span
-                      className="aero-flash-folder-x"
-                      role="button"
-                      tabIndex={0}
-                      title={t('flash.deleteFolder')}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        state.removeFolder(folder);
+                  <div key={folder} className="aero-flash-folder-item">
+                    <button
+                      type="button"
+                      draggable
+                      className={`aero-flash-folder ${folderFilter === folder ? 'active' : ''} ${dropHover === folder ? 'dragover' : ''}`}
+                      aria-pressed={folderFilter === folder}
+                      onClick={() => state.setFolderFilter(folder)}
+                      onDragStart={(e) => e.dataTransfer.setData('app/flash-folder', folder)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        state.setDropHover(folder);
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.stopPropagation();
-                          state.removeFolder(folder);
+                      onDragLeave={() => state.setDropHover(null)}
+                      onDrop={(e) => {
+                        const draggedFolder = e.dataTransfer.getData('app/flash-folder');
+                        if (draggedFolder && draggedFolder !== folder) {
+                          void state.reorderFolder(draggedFolder, folder);
+                          return;
                         }
+                        state.onFolderDrop(e, folder);
                       }}
                     >
-                      x
-                    </span>
-                  </button>
+                      <span>{folder}</span>
+                      <strong>{epubCards.filter((card) => card.folder === folder).length}</strong>
+                    </button>
+                    <button
+                      type="button"
+                      className="aero-flash-folder-x"
+                      title={t('flash.deleteFolder')}
+                      aria-label={t('fu1.flash.aero.deleteFolderNamed', { folder })}
+                      onClick={() => state.removeFolder(folder)}
+                    >
+                      <span aria-hidden>x</span>
+                    </button>
+                  </div>
                 ))}
                 {creatingFolder ? (
                   <div className="aero-flash-folder-edit">
@@ -397,15 +392,22 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                 filteredDeck.length === 0 ? (
                   <div className="aero-flash-empty">{t('flash.noCardsInView')}</div>
                 ) : (
-                  <div className="aero-flash-table" role="table" aria-label={t('flash.aero.table.aria')}>
-                    <div className="aero-flash-table-head" role="row">
+                  /*
+                    Not role="table": a deck row is a disclosure whose card rows have a
+                    different shape (word / reading / meaning), so no column header
+                    describes them and a table's rows could not hold them (axe:
+                    aria-required-children). It is a labelled list of decks; the header
+                    strip is visual only, and each figure carries its own column name.
+                  */
+                  <div className="aero-flash-table" role="group" aria-label={t('flash.aero.table.aria')}>
+                    <div className="aero-flash-table-head" aria-hidden="true">
                       <span>{t('flash.aero.table.source')}</span>
                       <span>{t('flash.aero.table.cards')}</span>
                       <span>{t('flash.aero.table.known')}</span>
                       <span>{t('flash.aero.table.folder')}</span>
                       <span>{t('flash.aero.table.actions')}</span>
                     </div>
-                    <div className="aero-flash-groups">
+                    <div className="aero-flash-groups" role="list">
                       {bookGroups.map((group) => {
                         const groupKey = `${group.bookId}::${group.bookTitle}`;
                         const collapsed = collapsedBooks[groupKey] ?? false;
@@ -413,7 +415,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                         const shown = Math.min(cardPage[groupKey] ?? AERO_DECK_PAGE, group.cards.length);
                         const hidden = group.cards.length - shown;
                         return (
-                          <section key={groupKey} className="aero-flash-group">
+                          <section key={groupKey} className="aero-flash-group" role="listitem">
                             <div
                               className="aero-flash-group-row"
                               draggable
@@ -438,9 +440,18 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                 />
                                 <span className="aero-flash-group-title">{group.bookTitle}</span>
                               </button>
-                              <span>{group.cards.length}</span>
-                              <span>{knownCount}</span>
-                              <span className="aero-flash-folder-tag">{group.cards[0]?.folder ?? t('flash.unfiled')}</span>
+                              <span>
+                                <span className="sr-only">{t('flash.aero.table.cards')} </span>
+                                {group.cards.length}
+                              </span>
+                              <span>
+                                <span className="sr-only">{t('flash.aero.table.known')} </span>
+                                {knownCount}
+                              </span>
+                              <span className="aero-flash-folder-tag">
+                                <span className="sr-only">{t('flash.aero.table.folder')} </span>
+                                {group.cards[0]?.folder ?? t('flash.unfiled')}
+                              </span>
                               <span className="aero-flash-row-actions">
                                 <Button size="sm" onClick={() => state.startReviewForGroup(group)}>
                                   {t('flash.aero.toolbar.review')}
@@ -452,18 +463,20 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                   type="button"
                                   className="aero-flash-row-x"
                                   title={t('flash.deleteDeck')}
+                                  aria-label={t('fu1.flash.aero.deleteDeckNamed', { deck: group.bookTitle })}
                                   onClick={() => state.removeBookDeck(group.bookId, group.bookTitle)}
                                 >
-                                  x
+                                  <span aria-hidden>x</span>
                                 </button>
                               </span>
                             </div>
                             {!collapsed && (
-                              <div className="aero-flash-card-rows">
+                              <div className="aero-flash-card-rows" role="list">
                                 {group.cards.slice(0, shown).map((card) => (
                                   <div
                                     key={card.id}
                                     className="aero-flash-card-row"
+                                    role="listitem"
                                     draggable
                                     onDragStart={(e) => state.onCardDragStart(e, card.id)}
                                   >
@@ -507,9 +520,10 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                         type="button"
                                         className="aero-flash-row-x"
                                         title={t('flash.aero.remove')}
+                                        aria-label={t('fu1.flash.aero.removeNamed', { word: card.word })}
                                         onClick={() => state.setDeck(removeDeckCard(card.id))}
                                       >
-                                        x
+                                        <span aria-hidden>x</span>
                                       </button>
                                     </span>
                                   </div>
@@ -523,7 +537,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                   it cannot drift from what is rendered.
                                 */}
                                 {hidden > 0 && (
-                                  <div className="aero-flash-card-row">
+                                  <div className="aero-flash-card-row" role="listitem">
                                     <span className="muted">
                                       {t('flash.aero.deck.showingOf', {
                                         shown,
@@ -568,8 +582,14 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                         {word.reading && word.reading !== word.word ? word.reading : ''}
                       </span>
                       <span className="aero-flash-meaning">{word.meaning}</span>
-                      <button className="aero-flash-row-x" title={t('flash.aero.remove')} onClick={() => removeSaved(word.word)}>
-                        x
+                      <button
+                        type="button"
+                        className="aero-flash-row-x"
+                        title={t('flash.aero.remove')}
+                        aria-label={t('fu1.flash.aero.removeNamed', { word: word.word })}
+                        onClick={() => removeSaved(word.word)}
+                      >
+                        <span aria-hidden>x</span>
                       </button>
                     </div>
                   ))}

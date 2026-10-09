@@ -17,6 +17,14 @@ import {
   upcomingIds,
   type PlayOrder,
 } from '../shared/musicPlayOrder';
+import {
+  arrangeQueueOrder,
+  queueAppend,
+  queueAsPlaylistIds,
+  queueInsertNext,
+  queueMoveEntry,
+  queueUpcoming,
+} from '../shared/musicQueue';
 import { createListenTracker } from './musicListening';
 import { t } from './i18n';
 
@@ -37,6 +45,12 @@ export interface PlayerState {
    * window's "Up next" shows what will actually play.
    */
   upNext: string[];
+  /**
+   * True once the user arranged the queue by hand (Play next, Add to queue, a reorder).
+   * The Music list then stops replacing the queue on every sort or search change; any
+   * explicit `setQueue` (playing a playlist, "Use library order") hands it back.
+   */
+  queueArranged: boolean;
 }
 
 /** How many upcoming ids the leader computes and publishes. */
@@ -69,7 +83,11 @@ const state: PlayerState = {
   shuffle: prefs.shuffle,
   repeat: prefs.repeat,
   upNext: [],
+  queueArranged: false,
 };
+
+/** Tracks queued by hand that have not played yet — "Add to queue" lines up after them. */
+const handQueued = new Set<string>();
 
 /** The leader's play order -- see `shared/musicPlayOrder.ts`. */
 let order: PlayOrder = EMPTY_PLAY_ORDER;
@@ -325,6 +343,8 @@ window.addEventListener('beforeunload', () => listening.flush());
 
 export function setQueue(items: MediaItem[]): void {
   state.queue = items;
+  state.queueArranged = false;
+  handQueued.clear();
   syncOrder();
   notify(false, false);
 }
@@ -342,6 +362,7 @@ async function playItemById(id: string, itemHint?: MediaItem): Promise<string | 
   // The chosen track becomes the current step of the play order (see `pickInOrder`).
   syncOrder();
   order = pickInOrder(order, id);
+  handQueued.delete(id);
   // Credit the outgoing track before the element is repointed.
   listening.flush();
 
@@ -485,6 +506,60 @@ function stopLocal(): void {
 export function stop(): void {
   if (!isLeader()) return delegate({ type: 'stop' });
   stopLocal();
+}
+
+// ----- the hand-arranged queue (rules in shared/musicQueue.ts) --------------
+//
+// These edit this window's queue and play order. The leader is the window that plays,
+// which is the window the Music panel normally runs in; a follower has no command for
+// it yet, so an edit there arranges only its own copy.
+
+/** Make `head` play first, in order, after the current track; everything else keeps its place. */
+function arrangeUpNext(head: readonly string[], extra: readonly MediaItem[] = []): void {
+  syncOrder();
+  const currentId = state.current?.id ?? null;
+  const next = arrangeQueueOrder(order.ids, order.cursor, currentId, head);
+  const byId = new Map<string, MediaItem>();
+  for (const item of state.queue) byId.set(item.id, item);
+  for (const item of extra) byId.set(item.id, item);
+  if (state.current) byId.set(state.current.id, state.current);
+  const ids = next.ids.filter((id) => byId.has(id));
+  state.queue = ids.map((id) => byId.get(id) as MediaItem);
+  // The cursor follows the current track by id, so a reorder never changes what is playing.
+  order = { ids, cursor: currentId ? ids.indexOf(currentId) : -1, shuffled: state.shuffle };
+  state.queueArranged = true;
+  notify();
+}
+
+/** "Play next": `item` plays right after the current track. */
+export function queueTrackNext(item: MediaItem): void {
+  syncOrder();
+  const currentId = state.current?.id ?? null;
+  if (item.id === currentId) return;
+  handQueued.add(item.id);
+  arrangeUpNext(queueInsertNext(queueUpcoming(order.ids, order.cursor), item.id, currentId), [item]);
+}
+
+/** "Add to queue": `item` plays after the other tracks queued by hand. */
+export function queueTrackLast(item: MediaItem): void {
+  syncOrder();
+  const currentId = state.current?.id ?? null;
+  if (item.id === currentId) return;
+  const head = queueAppend(queueUpcoming(order.ids, order.cursor), item.id, currentId, handQueued);
+  handQueued.add(item.id);
+  arrangeUpNext(head, [item]);
+}
+
+/** Move the "Up next" entry at `from` to `to` (indexes into `state.upNext`). */
+export function moveUpNext(from: number, to: number): void {
+  if (from === to || from < 0 || from >= state.upNext.length) return;
+  arrangeUpNext(queueMoveEntry(state.upNext, from, to));
+}
+
+/** The current track, then everything after it in play order (no repeat wrap). */
+export function getQueueIds(): string[] {
+  syncOrder();
+  return queueAsPlaylistIds(state.current?.id ?? null, queueUpcoming(order.ids, order.cursor));
 }
 
 /** Subscribe to player changes. Returns an unsubscribe fn. */

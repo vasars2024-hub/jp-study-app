@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { getUiLang, useT } from '../../i18n';
-import { verifyLockscreenPin } from '../../lockscreenSettings';
+import { verifyLockscreenPinDetailed } from '../../lockscreenSettings';
 import { useLockBlockedToasts } from '../../lockBlockedNotice';
+import { trapTab } from '../ui/focusTrap';
 
 function useMinuteClock(): Date {
   const [now, setNow] = useState(() => new Date());
@@ -30,13 +31,19 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
   const [error, setError] = useState('');
   const now = useMinuteClock();
   const inputRef = useRef<HTMLInputElement>(null);
+  const boxRef = useRef<HTMLElement>(null);
 
   const submit = (pin: string): void => {
     if (pin.length !== 4) return;
-    void Promise.resolve(verifyLockscreenPin(pin)).then((ok) => {
-      if (!ok) {
+    void Promise.resolve(verifyLockscreenPinDetailed(pin)).then((res) => {
+      if (!res.ok) {
         setDigits('');
-        setError(t('blanc.tb.wrongPin'));
+        // Main's backoff holds entry: say how long, or the right PIN reads as wrong too.
+        setError(
+          res.retryAfterMs && res.retryAfterMs > 0
+            ? t('lockscreen.retryIn', { count: Math.max(1, Math.ceil(res.retryAfterMs / 1000)) })
+            : t('blanc.tb.wrongPin'),
+        );
         return;
       }
       onUnlocked();
@@ -48,6 +55,13 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
+      // a11y: the box is `aria-modal`, and nothing behind a lock screen may take
+      // focus. The shared trap keeps Tab / Shift+Tab inside it (the PIN field is
+      // its only control, so Tab stays there).
+      if (event.key === 'Tab') {
+        trapTab(event, boxRef.current);
+        return;
+      }
       const target = event.target;
       if (
         target instanceof HTMLElement &&
@@ -67,13 +81,31 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
         setDigits((prev) => prev.slice(0, -1));
       }
     };
+    // Focus that lands outside the lock (a toast's button, a click on the window
+    // chrome) is brought back to the PIN field.
+    const onFocusIn = (event: FocusEvent): void => {
+      const box = boxRef.current;
+      const target = event.target;
+      if (!box || !(target instanceof Node) || box.contains(target)) return;
+      inputRef.current?.focus();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.addEventListener('focusin', onFocusIn);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('focusin', onFocusIn);
+    };
   }, []);
 
   return (
     <div className="blanc-lock">
-      <section className="blanc-lock-box" role="dialog" aria-modal="true" aria-label={t('blanc.tb.lockscreen')}>
+      <section
+        ref={boxRef}
+        className="blanc-lock-box"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('blanc.tb.lockscreen')}
+      >
         <time className="blanc-lock-time">
           {now.toLocaleTimeString(LANG_TAGS[getUiLang()], { hour: '2-digit', minute: '2-digit' })}
         </time>

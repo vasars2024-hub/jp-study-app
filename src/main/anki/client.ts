@@ -175,6 +175,17 @@ export interface AnkiActionMap {
   unsuspend: { params: { cards: number[] }; result: boolean };
   /** The profile the write landed in, echoed back into the commit result. */
   getActiveProfile: { params: undefined; result: string };
+  // ----- two-way review sync (main/anki/reviewSync.ts) -----
+  /**
+   * Answer cards as if the user pressed a button in Anki's reviewer: ease 1-4,
+   * positionally aligned verdicts (`false` = no such card). Added to AnkiConnect
+   * for Anki 2.1.55+; an older add-on answers "unsupported action".
+   */
+  answerCards: { params: { answers: { cardId: number; ease: number }[] }; result: boolean[] };
+  /** Due-now per card, positionally aligned with `cards`. */
+  areDue: { params: { cards: number[] }; result: boolean[] };
+  /** Media folder names matching a glob; the "already uploaded?" check. */
+  getMediaFilesNames: { params: { pattern: string }; result: string[] };
 }
 
 // ----- Timeout tiers ---------------------------------------------------------
@@ -222,6 +233,10 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   // BULK: a model row carries every template's full HTML, so a collection with
   // dozens of note types answers slower than any other read-only action.
   findModelsByName: BULK_TIMEOUT_MS,
+  // BULK: one call carries a whole batch of answers / cards.
+  answerCards: BULK_TIMEOUT_MS,
+  areDue: BULK_TIMEOUT_MS,
+  getMediaFilesNames: FAST_TIMEOUT_MS,
 };
 
 // ----- Error taxonomy --------------------------------------------------------

@@ -1,0 +1,66 @@
+/* "Sync with Anki" panel (AnkiSyncStatus.tsx) — Study OS card and Blanc fieldset alike. */
+.anki-sync-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.anki-sync-status > p {
+  margin: 0;
+}
+.anki-sync-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+.anki-sync-facts dt {
+  color: var(--muted);
+}
+.anki-sync-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.anki-sync-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.anki-sync-status .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.anki-sync-decks {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.anki-sync-decks caption {
+  text-align: start;
+  font-weight: 600;
+  padding-bottom: 4px;
+}
+.anki-sync-decks th,
+.anki-sync-decks td {
+  text-align: start;
+  padding: 3px 8px 3px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.anki-sync-decks td {
+  font-variant-numeric: tabular-nums;
+}
+.anki-sync-subhead {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.anki-sync-mappings {
+  margin: 0;
+  padding-inline-start: 18px;
+  font-size: 13px;
+}

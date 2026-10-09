@@ -117,6 +117,34 @@ describe('the grammar test dialog honours the dialog contract it declares', () =
     }
   });
 
+  it('keeps focus where the user put it when the parent re-renders with a new onClose', () => {
+    const dialog = open(() => undefined);
+    const control = [...dialog.querySelectorAll<HTMLButtonElement>('button')].at(-1) as HTMLButtonElement;
+    control.focus();
+    expect(document.activeElement).toBe(control);
+    const latest = vi.fn();
+    // Callers pass an inline arrow: a fresh function on every parent render.
+    act(() => {
+      root?.render(<GrammarTestModal pool={POOL} initialFilters={DEFAULT_PRACTICE_FILTERS} onClose={() => latest()} />);
+    });
+    expect(document.activeElement).toBe(control);
+    // The keyboard setup ran once; Escape still reaches the newest onClose.
+    escape();
+    expect(latest).toHaveBeenCalledTimes(1);
+  });
+
+  it('wraps Tab inside the dialog with the shared focus trap', () => {
+    const dialog = open(vi.fn());
+    const buttons = [...dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])')];
+    expect(buttons.length).toBeGreaterThan(1);
+    // Initial focus is the panel: Shift+Tab from there goes to the last control, not out.
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
+    });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(trigger);
+  });
+
   it('gives focus back to whatever opened it', () => {
     open(vi.fn());
     expect(document.activeElement).not.toBe(trigger);

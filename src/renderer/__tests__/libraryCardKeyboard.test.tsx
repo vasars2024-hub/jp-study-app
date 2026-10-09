@@ -109,29 +109,36 @@ async function press(node: HTMLElement, key: string): Promise<void> {
 }
 
 describe('LibraryView — a Covers card is reachable by keyboard', () => {
-  it('exposes each card as a focusable button named after the book', async () => {
+  // a11y3: the open action moved from the card (a role=button that CONTAINED
+  // Remove / File / Set-cover, axe nested-interactive) to a real <button
+  // class="card-open"> stretched over the cover, a sibling of those three. A
+  // native button turns Enter and Space into a click, which bubbles to the card.
+  it('exposes each card as a named group whose open control is a focusable button named after the book', async () => {
     await render();
     expect(cards().length).toBeGreaterThan(0);
     for (const card of cards()) {
-      expect(card.getAttribute('role')).toBe('button');
-      expect(card.getAttribute('tabindex')).toBe('0');
+      expect(card.getAttribute('role')).toBe('group');
+      const open = card.querySelector('button.card-open');
+      expect(open, 'no open button on the card').toBeTruthy();
+      expect(open?.getAttribute('aria-label')).toBe(card.getAttribute('aria-label'));
+      // Nothing interactive nests inside the open button.
+      expect(open?.querySelector('button, a[href], [tabindex]')).toBeNull();
     }
     // The accessible name is the title, not "card" or the badge text — this is
     // the only thing a screen-reader user has to choose a book by.
-    expect(cards().map((card) => card.getAttribute('aria-label')).sort())
+    expect(cards().map((card) => card.querySelector('button.card-open')?.getAttribute('aria-label')).sort())
       .toEqual(['Kafka on the Shore', 'コンビニ人間']);
   });
 
-  it('opens the book on Enter and on Space', async () => {
+  it('opens the book from its open button exactly once', async () => {
     await render();
     const card = cards().find((node) => node.getAttribute('aria-label') === 'コンビニ人間');
     expect(card, 'no card for the Japanese book').toBeTruthy();
-
-    await press(card!, 'Enter');
+    const open = card?.querySelector<HTMLButtonElement>('button.card-open');
+    expect(open, 'no open button').toBeTruthy();
+    // Enter / Space on a native button arrive as this click.
+    await act(async () => { open?.click(); });
     expect(opened).toEqual(['li_ja']);
-
-    await press(card!, ' ');
-    expect(opened).toEqual(['li_ja', 'li_ja']);
   });
 
   it('CONTROL — an unrelated key opens nothing', async () => {
@@ -146,9 +153,8 @@ describe('LibraryView — a Covers card is reachable by keyboard', () => {
   });
 
   it('CONTROL — Enter on the Remove button does not also open the book', async () => {
-    // The nested-interactive trap. The card's handler sees keydowns that bubble
-    // up from Remove / File / Set-cover, so without the `e.target` guard,
-    // confirming a removal would open the item it just removed.
+    // The nested-interactive trap: confirming a removal must not open the item
+    // it just removed. (Remove's click stops propagation; keys never reach it.)
     await render();
     const card = cards()[0];
     const remove = card.querySelector<HTMLElement>('.card-remove');

@@ -23,6 +23,33 @@ export function localDateKey(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/**
+ * `localDateKey` for a whole pass over the log. The local day's bounds are kept
+ * from the last call, so a run of rows on one day — and a time-ordered log is
+ * nothing but such runs — costs one `Date` per day instead of one per row
+ * (50,000 rows per chart, re-run on every review). Same answer for every input:
+ * the bounds are that day's own local midnights, so DST days are exact.
+ */
+export function localDateKeyer(): (ms: number) => string {
+  let from = Number.POSITIVE_INFINITY;
+  let to = Number.NEGATIVE_INFINITY;
+  let key = '';
+  return (ms: number): string => {
+    if (ms >= from && ms < to) return key;
+    const d = new Date(ms);
+    key = localDateKey(ms);
+    from = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    to = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+    return key;
+  };
+}
+
+/** Local midnight that starts `YYYY-MM-DD`: no row before it can fall on or after that day. */
+export function startOfLocalDateKey(dateKey: string): number {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1).getTime();
+}
+
 /** `count` local dates ending today, oldest first. */
 export function lastLocalDays(count: number, now: number): string[] {
   const out: string[] = [];
@@ -70,9 +97,12 @@ export function dailyReviewStats(
     date, learning: 0, young: 0, mature: 0, passed: 0, seconds: 0, timed: 0,
   }));
   const index = new Map(rows.map((row) => [row.date, row]));
+  // Rows before the window are skipped on a number compare, not a date format.
+  const start = startOfLocalDateKey(rows[0].date);
+  const dayOf = localDateKeyer();
   for (const entry of entries) {
-    if (!isReview(entry)) continue;
-    const row = index.get(localDateKey(entry.at));
+    if (!isReview(entry) || entry.at < start) continue;
+    const row = index.get(dayOf(entry.at));
     if (!row) continue;
     row[reviewMaturity(entry)] += 1;
     if (entry.correct) row.passed += 1;
@@ -119,12 +149,14 @@ export function weeklyRetention(
     blocks.push(block);
     for (let d = 0; d < 7; d += 1) dateToBlock.set(dates[w * 7 + d], block);
   }
+  const start = startOfLocalDateKey(dates[0]);
+  const dayOf = localDateKeyer();
   for (const entry of entries) {
     // Retention is about recall tests: a game-graded review is not one.
-    if (!isRecallReview(entry)) continue;
+    if (!isRecallReview(entry) || entry.at < start) continue;
     const maturity = reviewMaturity(entry);
     if (maturity === 'learning') continue;
-    const block = dateToBlock.get(localDateKey(entry.at));
+    const block = dateToBlock.get(dayOf(entry.at));
     if (!block) continue;
     block[maturity].total += 1;
     if (entry.correct) block[maturity].passed += 1;

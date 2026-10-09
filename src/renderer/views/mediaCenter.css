@@ -2161,7 +2161,14 @@
   overflow: auto;
 }
 
-.mc-track-queue > button {
+/* fu1: each row is a `MusicQueuePanel` list item — the row button plus, for an
+   upcoming track, its Move up / Move down buttons — so the line sits on the item. */
+.mc-track-queue .music-queue-item {
+  border-bottom: 1px solid var(--mc-line);
+  color: #aeb2bd;
+}
+
+.mc-track-queue .mc-track-row {
   width: 100%;
   display: grid;
   grid-template-columns: 25px minmax(0, 1fr) auto;
@@ -2169,19 +2176,18 @@
   gap: 6px;
   padding: 8px 9px;
   border: 0;
-  border-bottom: 1px solid var(--mc-line);
   background: transparent;
   color: #aeb2bd;
   text-align: left;
   cursor: pointer;
 }
 
-.mc-track-queue > button:hover,
-.mc-track-queue > button.is-active {
+.mc-track-queue .mc-track-row:hover,
+.mc-track-queue .mc-track-row.is-active {
   background: rgba(255, 255, 255, 0.035);
 }
 
-.mc-track-queue > button.is-active {
+.mc-track-queue .mc-track-row.is-active {
   color: var(--mc-accent-2);
 }
 
@@ -2193,13 +2199,14 @@
    is why an at-rest sweep of this surface reported a different worst run. `--mc-muted`
    is the next step up the same scale this rail already uses, so it is a token swap. */
 .mc-track-index,
-.mc-track-queue > button > span:last-child {
+.mc-track-queue .music-queue-index,
+.mc-track-queue .mc-track-row > span:last-child {
   color: var(--mc-muted);
   font-size: var(--mc-fs-micro, 11px);
   font-variant-numeric: tabular-nums;
 }
 
-.mc-track-queue > button > div {
+.mc-track-queue .mc-track-row > div {
   min-width: 0;
   display: flex;
   flex-direction: column;

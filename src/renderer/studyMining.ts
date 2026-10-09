@@ -49,6 +49,7 @@ import { writeLocalStorage } from './localStorageWrite';
 import { getStudyLang } from './studyEnvironment';
 import { normalizeStudyLang, studyLangFromTag, studyLangOfText, type StudyLang } from '../shared/studyLang';
 import { noteStudyOsJobInstalled } from './studyOsJobsReady';
+import { linkCardsToExistingAnkiNotes } from './ankiNoteLinking';
 
 export interface MineMediaPayload {
   base64: string;
@@ -737,6 +738,11 @@ export interface AnkiQueueReport {
   remaining: number;
   /** Anki was not reachable, so nothing was attempted. */
   unreachable: boolean;
+  /**
+   * Waiting cards that turned out to exist in Anki already (created on another
+   * machine and synced in) and were linked to that note instead of added again.
+   */
+  linked?: number;
 }
 
 const LEASE_KEY = 'jp-anki-mine-queue-lease';
@@ -845,6 +851,15 @@ async function drain(): Promise<AnkiQueueReport> {
     return report;
   }
   return withDrainLock(async (renew) => {
+    // A waiting card whose note already exists in Anki (mined on another machine
+    // and synced in through AnkiWeb) is linked to it, never added a second time.
+    const links = await linkCardsToExistingAnkiNotes(pendingAnkiCards());
+    if (links.linkedIds.length) {
+      await withQueue((q) => {
+        for (const id of links.linkedIds) delete q[id];
+      });
+      report.linked = links.linkedIds.length;
+    }
     // Oldest first; a note that timed out was restamped to the back.
     const queue = await withQueue((q) => ({ ...q }));
     const pending = pendingAnkiCards().sort((a, b) =>

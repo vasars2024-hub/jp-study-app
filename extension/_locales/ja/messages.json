@@ -509,6 +509,84 @@
   "content_rpMoreEntries_other": {
     "message": "ほかに $1 件 —「その他」タブを参照してください。"
   },
+  "content_rpMoreDicts_other": {
+    "message": "ほかの辞書を $1 件表示"
+  },
+  "content_rpFewerDicts": {
+    "message": "ほかの辞書を隠す"
+  },
+  "content_reason_polite": {
+    "message": "丁寧形"
+  },
+  "content_reason_politeNegative": {
+    "message": "丁寧・否定"
+  },
+  "content_reason_politePast": {
+    "message": "丁寧・過去"
+  },
+  "content_reason_politePastNegative": {
+    "message": "丁寧・過去否定"
+  },
+  "content_reason_politeVolitional": {
+    "message": "丁寧・意向"
+  },
+  "content_reason_negative": {
+    "message": "否定"
+  },
+  "content_reason_past": {
+    "message": "過去"
+  },
+  "content_reason_te": {
+    "message": "て形"
+  },
+  "content_reason_causative": {
+    "message": "使役"
+  },
+  "content_reason_passive": {
+    "message": "受身"
+  },
+  "content_reason_passivePotential": {
+    "message": "受身・可能"
+  },
+  "content_reason_potential": {
+    "message": "可能"
+  },
+  "content_reason_volitional": {
+    "message": "意向"
+  },
+  "content_reason_imperative": {
+    "message": "命令"
+  },
+  "content_reason_conditionalBa": {
+    "message": "仮定（〜ば）"
+  },
+  "content_reason_conditionalTara": {
+    "message": "仮定（〜たら）"
+  },
+  "content_reason_tari": {
+    "message": "〜たり"
+  },
+  "content_reason_tai": {
+    "message": "願望（〜たい）"
+  },
+  "content_reason_sugiru": {
+    "message": "過度（〜すぎる）"
+  },
+  "content_reason_adverbial": {
+    "message": "連用（副詞的）"
+  },
+  "content_reason_progressive": {
+    "message": "進行（〜ている）"
+  },
+  "content_reason_shimau": {
+    "message": "完了（〜てしまう）"
+  },
+  "content_reason_chau": {
+    "message": "完了（〜ちゃう）"
+  },
+  "content_reason_teoku": {
+    "message": "準備（〜ておく）"
+  },
   "content_rpNoSentence": {
     "message": "この単語を含む文が見つかりませんでした。"
   },
@@ -2083,6 +2161,18 @@
   },
   "bg_errTimeout": {
     "message": "Gum の応答に時間がかかりすぎました。少し待ってからもう一度お試しください。"
+  },
+  "bg_errLocked": {
+    "message": "Gum はロックされています — 続けるには Gum のロックを解除してください。"
+  },
+  "common_queuedLocked": {
+    "message": "Gum はロック中です — ここに保管し、ロック解除後に同期します"
+  },
+  "popup_chipLocked": {
+    "message": "Gum はロック中"
+  },
+  "popup_recWaitingLocked": {
+    "message": "$1 MB 待機中 — アップロードするには Gum のロックを解除してください"
   },
   "bg_errBadRequest": {
     "message": "Gum がこのリクエストを読み取れませんでした。拡張機能と Gum を対応するバージョンに更新してください。"

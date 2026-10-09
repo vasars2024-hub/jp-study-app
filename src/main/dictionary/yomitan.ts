@@ -21,11 +21,15 @@ import {
   syncDictionarySourceOrder,
 } from './service';
 import { fetchProviderAudio } from './audio';
+import { readAudioSourcesPrefs, resolveAudioChain } from './audioSources';
+import { audioExtForMime } from '../../shared/audioSources';
 import { normalizeAudioIdentity } from '../../shared/lexiconAudio';
 import { BUNDLED_GLOSS_LANGS, detectLangFromTitle } from './glossLang';
 import { parseTagBankRows, splitSenseTags, splitTagField, type DictTagBank } from '../../shared/dictTagBank';
 import { decodeBasicEntities, escapeHtmlText, sanitizeDictHtml } from '../../shared/dictHtmlSanitize';
 import { withoutFormsSenses } from '../../shared/dictFormsSense';
+import { extractStructuredSenses } from '../../shared/structuredSenses';
+import { isJmdictCommon, isJmdictPriorityCode, jmdictPriorityCodes } from '../../shared/jmdictPriority';
 
 interface StoredGlossaryEntry {
   word: string;
@@ -37,6 +41,8 @@ interface StoredGlossaryEntry {
   source?: string;
   /** Gloss languages of the source dictionary (tagged at load time). */
   langs?: string[];
+  /** JMdict priority codes the row carried (`shared/jmdictPriority.ts`); absent when none. */
+  prio?: string[];
 }
 
 interface StoredPitchEntry {
@@ -399,6 +405,9 @@ export function definitionsToSenses(definitions: unknown): { senses: DictSense[]
   }
   const plain: string[] = [];
   const htmlParts: string[] = [];
+  // Senses the structured content itself marked (`shared/structuredSenses.ts`),
+  // each with its own part of speech, usage tags and HTML.
+  const marked: DictSense[] = [];
   const defArray = Array.isArray(definitions) ? definitions : [definitions];
   for (const def of defArray) {
     if (typeof def === 'string') {
@@ -408,18 +417,29 @@ export function definitionsToSenses(definitions: unknown): { senses: DictSense[]
     } else {
       const rendered = renderStructuredContent(def);
       if (!rendered) continue;
+      htmlParts.push(rendered);
+      const structured = extractStructuredSenses(def);
+      if (structured) {
+        for (const sense of structured) {
+          const html = sanitizeDictHtml(renderStructuredContent(sense.content)) || undefined;
+          marked.push({
+            partsOfSpeech: sense.partsOfSpeech,
+            definitions: sense.definitions,
+            tags: sense.tags,
+            ...(html ? { html } : {}),
+          });
+        }
+        continue;
+      }
       const parts = htmlToDefinitions(rendered);
       if (parts.length) plain.push(...parts);
-      htmlParts.push(rendered);
     }
   }
   // Defence in depth: everything above is already escaped, but the allowlist
   // pass guarantees the stored HTML whatever a future renderer change emits.
   const glossaryHtml = htmlParts.length ? sanitizeDictHtml(htmlParts.join('<br>')) || undefined : undefined;
-  return {
-    senses: plain.length ? [{ partsOfSpeech: [], definitions: plain, tags: [] }] : [],
-    glossaryHtml,
-  };
+  const senses: DictSense[] = plain.length ? [{ partsOfSpeech: [], definitions: plain, tags: [] }] : [];
+  return { senses: [...senses, ...marked], glossaryHtml };
 }
 
 function parsePitchPositions(raw: unknown): number[] {
@@ -593,14 +613,19 @@ function parseTermBank(entries: unknown[], out: StoredDictIndex): void {
     // Column 2 is this sense's own tag list. It is parked raw here and resolved
     // once the whole zip has been read: a tag bank is free to appear after the
     // term banks in the archive, so classifying now would depend on entry order.
-    // Column 7 (termTags) is deliberately left alone — those are headword-level
+    // Column 7 (termTags) never becomes a usage label — those are headword-level
     // priority markers like `P`/`news1`, which are corpus frequency, not register,
-    // and mixing them in would put "common word" among the usage labels.
+    // and mixing them in would put "common word" among the usage labels. The
+    // JMdict priority codes among them (and any a generator put in column 2) are
+    // kept apart, as `prio`, for the "common" badge's explanation.
     const rawTags = splitTagField(row[2]);
-    if (rawTags.length) for (const sense of senses) sense.tags = rawTags;
+    // Parked beside whatever the structured content already marked on a sense;
+    // `resolveSenseTags` merges the two once the tag bank is known.
+    if (rawTags.length) for (const sense of senses) (sense as SenseWithRowTags).rowTags = rawTags;
+    const prio = jmdictPriorityCodes([...splitTagField(row[7]), ...rawTags]);
     const key = term;
     const list = out.terms[key] ?? [];
-    list.push({ word: term, reading, score, senses, glossaryHtml });
+    list.push({ word: term, reading, score, senses, glossaryHtml, ...(prio.length ? { prio } : {}) });
     out.terms[key] = list;
     out.info.hasTerms = true;
   }
@@ -619,15 +644,23 @@ function resolveSenseTags(out: StoredDictIndex): void {
   const bank = out.tags ?? {};
   for (const list of Object.values(out.terms)) {
     for (const entry of list) {
-      for (const sense of entry.senses) {
-        if (!sense.tags.length) continue;
-        const { partsOfSpeech, usage } = splitSenseTags(sense.tags, bank);
-        sense.partsOfSpeech = partsOfSpeech;
-        sense.tags = usage;
+      for (const sense of entry.senses as SenseWithRowTags[]) {
+        // A JMdict priority code in this column is the headword's `prio`, never a usage label.
+        const rowTags = sense.rowTags?.filter((tag) => !isJmdictPriorityCode(tag));
+        delete sense.rowTags;
+        if (!rowTags?.length) continue;
+        const { partsOfSpeech, usage } = splitSenseTags(rowTags, bank);
+        // The row's tags come first (they name the whole row); tags the structured
+        // content marked on this one sense follow, without repeats.
+        sense.partsOfSpeech = [...new Set([...partsOfSpeech, ...sense.partsOfSpeech])];
+        sense.tags = [...new Set([...usage, ...sense.tags])];
       }
     }
   }
 }
+
+/** A sense while its row's raw tag codes wait for the tag bank. */
+type SenseWithRowTags = DictSense & { rowTags?: string[] };
 
 /**
  * Yomitan term_meta rows: `pitch`, `freq` and `ipa` modes. Exported for the
@@ -993,13 +1026,25 @@ function enrichEntry(entry: StoredGlossaryEntry, via: 'exact' | 'prefix'): DictE
   const freq = getFrequencyDetail(entry.word, entry.reading);
   // Stores written before the renderer escaped its text carry raw dictionary
   // HTML on disk; it is sanitized on the way out, not trusted because it was ours.
-  const glossaryHtml = entry.glossaryHtml ? sanitizeDictHtml(entry.glossaryHtml) || undefined : undefined;
+  // Senses the structured content marked carry their own HTML; with two or more
+  // of them the entry renders sense by sense and the whole-entry block would only
+  // repeat them. With fewer, the block stays and sense HTML is dropped.
+  const perSense = entry.senses.filter((sense) => sense.html).length >= 2;
+  const glossaryHtml = !perSense && entry.glossaryHtml ? sanitizeDictHtml(entry.glossaryHtml) || undefined : undefined;
+  const senses = entry.senses.map((sense) => {
+    if (!sense.html) return sense;
+    const { html, ...rest } = sense;
+    const clean = perSense ? sanitizeDictHtml(html) : '';
+    return clean ? { ...rest, html: clean } : rest;
+  });
+  const prio = entry.prio?.length ? jmdictPriorityCodes(entry.prio) : [];
   return {
     word: entry.word,
     reading: entry.reading,
-    isCommon: entry.score > 0,
+    isCommon: entry.score > 0 || isJmdictCommon(prio),
     jlpt: [],
-    senses: entry.senses,
+    ...(prio.length ? { priorityTags: prio } : {}),
+    senses,
     pitchHtml: pitchHtml || undefined,
     ...(ipa.length ? { ipa } : {}),
     frequency: freq?.rank,
@@ -1364,11 +1409,28 @@ export async function fetchJapaneseAudio(
 ): Promise<string> {
   const identity = normalizeAudioIdentity({ lang: 'ja', term, reading });
   if (!identity) return '';
-  const fetched = await fetchProviderAudio(identity);
-  if (fetched.status !== 'ready') return '';
-  const filename = `jsa-${fetched.md5.slice(0, 12)}.mp3`;
+  // The same ordered sources the Dictionary plays from (`audioSources.ts`): a
+  // local recording the user installed wins when it is first in their list.
+  const result = await resolveAudioChain(
+    { lang: 'ja', term: identity.term, reading: identity.reading },
+    readAudioSourcesPrefs(),
+    async (id) => {
+      const fetched = await fetchProviderAudio(id);
+      return fetched.status === 'ready'
+        ? {
+            query: id.term,
+            status: 'ready',
+            clip: { provider: 'jpod101', mimeType: 'audio/mpeg', dataBase64: fetched.buffer.toString('base64'), cached: false },
+          }
+        : { query: id.term, status: fetched.status };
+    },
+  );
+  if (result.status !== 'ready' || !result.clip) return '';
+  // md5 of the bytes, as before, so a CDN clip keeps the media name it always had.
+  const md5 = crypto.createHash('md5').update(Buffer.from(result.clip.dataBase64, 'base64')).digest('hex');
+  const filename = `jsa-${md5.slice(0, 12)}.${audioExtForMime(result.clip.mimeType)}`;
   try {
-    await storeMedia(filename, fetched.buffer.toString('base64'));
+    await storeMedia(filename, result.clip.dataBase64);
   } catch {
     return '';
   }

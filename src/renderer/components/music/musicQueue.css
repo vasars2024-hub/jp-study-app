@@ -1,0 +1,140 @@
+/* The arrangeable play queue (MusicQueue.tsx). Hosts may restyle the row button
+   through `rowClassName`; these rules carry the layout every host needs. */
+.music-queue {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.music-queue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.music-queue-item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.music-queue-item > button:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.music-queue-item[draggable='true'] {
+  cursor: grab;
+}
+
+.music-queue-item.is-dragging {
+  opacity: 0.5;
+}
+
+.music-queue-item.is-drop-target {
+  box-shadow: inset 0 2px 0 var(--accent, #d84a68);
+}
+
+.music-queue-track {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.music-queue-track > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.music-queue-track strong,
+.music-queue-track small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-queue-track.is-active {
+  color: var(--accent, currentColor);
+}
+
+.music-queue-moves {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.music-queue-move-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.music-queue-move-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  opacity: 1;
+}
+
+.music-queue-move-btn:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.music-queue-move-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.music-queue-hint,
+.music-queue-note {
+  margin: 4px 9px 0;
+  font-size: 11px;
+}
+
+.music-queue-note:empty {
+  display: none;
+}
+
+.music-queue-actions,
+.music-queue-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px 0;
+}
+
+.music-queue-name {
+  padding: 0;
+  flex: 1 1 100%;
+}
+
+.music-queue-name input {
+  flex: 1 1 120px;
+  min-width: 0;
+  min-height: 28px;
+  font: inherit;
+}

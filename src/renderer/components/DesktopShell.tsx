@@ -3214,6 +3214,21 @@ export default function DesktopShell({
       onDrop={(e) => dropStartAppOnDesktop(e)}
       onContextMenu={onDesktopContextMenu}
     >
+      {/* a11y3: the first Tab stop. Desktop icons, widgets and every open window
+          sit before the taskbar in the DOM, so reaching Start or the window list
+          from the keyboard meant tabbing through all of them. Visible only when
+          focused (`sr-only-focusable`, theme/a11y.css). */}
+      <button
+        type="button"
+        className="sr-only sr-only-focusable os-skip-link"
+        onClick={() => {
+          const bar = deskRef.current?.querySelector<HTMLElement>('.os-taskbar');
+          const target = bar?.querySelector<HTMLElement>('.os-start-btn, button:not([disabled])');
+          target?.focus();
+        }}
+      >
+        {t('a11y3.shell.skipToTaskbar')}
+      </button>
       <DropRouter onOpenSection={(section) => open(section as WinSection)} />
       {/* An item from another monitor is hovering here. Purely an affordance —
           nothing is committed until main sends `deskdrag:adopt`. */}

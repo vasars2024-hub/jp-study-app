@@ -32,6 +32,8 @@ import {
   type TranslateBatchFailure,
   type TranslateBatchItemResult,
 } from '../shared/translateBatchFailure';
+import type { TranslateResultMeta, TranslateRouteFailure } from '../shared/translateProviders';
+import { registerTranslateProviderIpc, routeTranslation, TranslateRouteError } from './translateRouter';
 
 /** Any language code from shared/langs.ts (kept as an alias for callers). */
 export type TransLang = string;
@@ -63,6 +65,8 @@ const BATCH_PROMPT_TIMEOUT_MS = 90_000;
 const STRICT_PROMPT_TIMEOUT_MS = 45_000;
 const SENTENCE_PROMPT_TIMEOUT_MS = 60_000;
 const MODEL_LOAD_TIMEOUT_MS = 180_000;
+/** Deadline multiplier for the higher-quality tier's larger model (8B+ is several times slower per token). */
+const LARGE_MODEL_TIMEOUT_SCALE = 4;
 /**
  * Measured 2026-08-24, and the reason this constant exists at all. `createContext()` with no
  * size asks node-llama-cpp for the model's full trained context — 32,768 tokens for Qwen3-1.7B —
@@ -636,13 +640,17 @@ async function translateSentence(
   target: TransLang,
   hints?: readonly TranslateSenseHint[],
   style: TranslateStyle = 'natural',
+  /** A borrowed larger model's session (the higher-quality tier); the shared small one otherwise. */
+  on?: LlamaSessionHandle,
 ): Promise<string> {
-  const s = await ensureSession();
+  const s = on ?? await ensureSession();
+  // A larger model generates several times slower per token; its deadlines scale with it.
+  const scale = on ? LARGE_MODEL_TIMEOUT_SCALE : 1;
   const raw = await promptWithTimeout(
     s,
     buildSentencePrompt(text, source, target, hints, style),
     400,
-    SENTENCE_PROMPT_TIMEOUT_MS,
+    SENTENCE_PROMPT_TIMEOUT_MS * scale,
   );
   const first = cleanLlmOutput(raw);
   // A constrained prompt gives a small model one more way to fail: repeating the
@@ -662,7 +670,7 @@ async function translateSentence(
     s,
     buildStrictPrompt({ id: 's0', text, source, target }, hints),
     200,
-    STRICT_PROMPT_TIMEOUT_MS,
+    STRICT_PROMPT_TIMEOUT_MS * scale,
   );
   const strict = cleanLlmOutput(strictRaw).replace(/^["'«]|["'»]$/g, '').trim();
   return usable(strict) ? strict : '';
@@ -829,6 +837,17 @@ async function translateText(
  * show source and translation side by side, sentence by sentence, and mine one
  * sentence rather than the whole paste.
  */
+export interface TranslateDetailedOptions {
+  /**
+   * A GGUF other than the default small model — the "higher quality" tier. It is
+   * borrowed for this passage and released after, like `runLocalQwenPrompt`'s.
+   * Missing on disk is a `LocalModelMissingError`, never a quiet fallback.
+   */
+  modelFileName?: string;
+  /** Each sentence the moment it is translated, so the UI can show it before the passage ends. */
+  onSegment?: (index: number, segment: TranslateSegment, total: number) => void;
+}
+
 export async function translateTextDetailed(
   text: string,
   source: TransLang,
@@ -836,6 +855,7 @@ export async function translateTextDetailed(
   onPartial?: (progress: number) => void,
   hints?: readonly TranslateSenseHint[],
   style: TranslateStyle = 'natural',
+  options?: TranslateDetailedOptions,
 ): Promise<{ text: string; segments: TranslateSegment[] }> {
   if (!text.trim()) return { text, segments: [] };
   // A missing or unrecognized code used to fall into the `source === target`
@@ -860,20 +880,33 @@ export async function translateTextDetailed(
   const out: string[] = [];
   const segments: TranslateSegment[] = [];
   let translatedCount = 0;
-  for (let i = 0; i < parts.length; i++) {
-    // Hints apply to every sentence of the passage: a pin is recorded against a
-    // headword, not an offset, so a word pinned once is pinned wherever the
-    // splitter happens to have cut.
-    const translated = await enqueue(() => translateSentence(parts[i], source, target, hints, style));
-    // An untranslatable sentence is dropped rather than back-filled with its
-    // own source text: a Japanese clause sitting inside an English paragraph
-    // reads as part of the translation.
-    if (translated) {
-      out.push(translated);
-      translatedCount += 1;
+  const borrowed = options?.modelFileName ? await borrowSessionFor(options.modelFileName) : null;
+  try {
+    for (let i = 0; i < parts.length; i++) {
+      // Hints apply to every sentence of the passage: a pin is recorded against a
+      // headword, not an offset, so a word pinned once is pinned wherever the
+      // splitter happens to have cut.
+      const translated = await enqueue(() => translateSentence(
+        parts[i], source, target, hints, style, borrowed?.borrowed ? borrowed.session : undefined,
+      ));
+      // An untranslatable sentence is dropped rather than back-filled with its
+      // own source text: a Japanese clause sitting inside an English paragraph
+      // reads as part of the translation.
+      if (translated) {
+        out.push(translated);
+        translatedCount += 1;
+      }
+      const segment = { source: parts[i], target: translated };
+      segments.push(segment);
+      onPartial?.((i + 1) / parts.length);
+      try {
+        options?.onSegment?.(i, segment, parts.length);
+      } catch {
+        /* a display listener must never change what is translated */
+      }
     }
-    segments.push({ source: parts[i], target: translated });
-    onPartial?.((i + 1) / parts.length);
+  } finally {
+    if (borrowed?.borrowed) void borrowed.session.release().catch(() => undefined);
   }
   if (translatedCount === 0) {
     throw new Error('The translation model returned no usable output for this text.');
@@ -897,6 +930,9 @@ export async function translateForBook(
 }
 
 export function registerTranslateIpc(): void {
+  // The provider choice, consent and fallback channels live with the router.
+  registerTranslateProviderIpc();
+
   ipcMain.handle('translate:status', () => {
     const modelPath = resolveModelPath();
     return {
@@ -919,18 +955,78 @@ export function registerTranslateIpc(): void {
         target: string;
         senseHints?: unknown;
         style?: unknown;
+        /** An explicit engine for this request; otherwise the pair's saved choice (translateRouter). */
+        provider?: unknown;
+        /** Glossary terms; main keeps only the ones that occur in `text`. */
+        glossary?: unknown;
       },
-    ): Promise<{ ok: boolean; text?: string; segments?: TranslateSegment[]; error?: string }> => {
+    ): Promise<{
+      ok: boolean;
+      text?: string;
+      segments?: TranslateSegment[];
+      meta?: TranslateResultMeta;
+      error?: string;
+      errorKey?: string;
+      failure?: TranslateRouteFailure;
+    }> => {
+      // Each sentence goes to the window the moment it exists: the local model
+      // finishes one at a time, a streamed cloud reply one line at a time.
+      const onSegment = (index: number, segment: TranslateSegment, total: number): void => {
+        try {
+          e.sender.send('translate:partial', {
+            id: req.id,
+            progress: total > 0 ? (index + 1) / total : 1,
+            segment: { index, total, source: segment.source, target: segment.target },
+          });
+        } catch {
+          /* the window closed mid-translation */
+        }
+      };
       try {
         // Sanitized rather than trusted: the hints reach the prompt verbatim, so
         // an unbounded list from a renderer would crowd out the passage itself.
         const hints = sanitizeSenseHints(req.senseHints);
-        const { text, segments } = await translateTextDetailed(req.text, req.source, req.target, (progress) => {
-          e.sender.send('translate:partial', { id: req.id, progress });
-        }, hints, sanitizeTranslateStyle(req.style));
-        return segments.length ? { ok: true, text, segments } : { ok: true, text };
+        const known = (code: unknown): boolean => typeof code === 'string' && !!langSpec(code);
+        if (typeof req.text !== 'string' || !known(req.source) || !known(req.target) || req.source === req.target) {
+          // The router only adds engines; the offline path's own validation and
+          // same-language answer stay exactly what they were.
+          const { text, segments } = await translateTextDetailed(
+            req.text, req.source, req.target, undefined, hints, sanitizeTranslateStyle(req.style),
+          );
+          return segments.length ? { ok: true, text, segments } : { ok: true, text };
+        }
+        const routed = await routeTranslation({
+          text: req.text,
+          source: req.source,
+          target: req.target,
+          hints,
+          style: sanitizeTranslateStyle(req.style),
+          provider: req.provider,
+          glossary: req.glossary,
+          onSegment,
+        }, {
+          local: (args) => translateTextDetailed(args.text, args.source, args.target, undefined, args.hints, args.style, {
+            ...(args.modelFileName ? { modelFileName: args.modelFileName } : {}),
+            ...(args.onSegment ? { onSegment: args.onSegment } : {}),
+          }),
+          localAvailable: isTranslateAvailable,
+        });
+        return {
+          ok: true,
+          text: routed.text,
+          ...(routed.segments.length ? { segments: routed.segments } : {}),
+          meta: routed.meta,
+        };
       } catch (err) {
         console.error('[translate]', err);
+        if (err instanceof TranslateRouteError) {
+          return {
+            ok: false,
+            error: err.message,
+            errorKey: 'xlate2.error.cloud',
+            failure: { provider: err.provider, code: err.code },
+          };
+        }
         const errorKey = friendlyErrorKey(err);
         return { ok: false, error: friendlyError(err), ...(errorKey ? { errorKey } : {}) };
       }

@@ -15,7 +15,7 @@
  * difference between "silent" and "broken".
  */
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
-import { loadPopupSandbox, warmPopupDom, type PopupHarness, type JpMessage } from './extensionHarness';
+import { bootBackground, loadPopupSandbox, warmPopupDom, type PopupHarness, type JpMessage } from './extensionHarness';
 
 // jsdom's cold load (~21 s on Windows) used to be charged to the first test's
 // 20 s budget, so that test timed out even alone. Paid here instead.
@@ -336,5 +336,50 @@ describe('extension popup — status header', () => {
     expect(harness.text('#status-chip')).toBe('Connected · 3 queued');
     expect(harness.text('#pending-text')).toBe('3 items waiting to sync');
     expect(harness.document.getElementById('pending-bar')?.hidden).toBe(false);
+  });
+
+  it('shows the lock state when /v1/health says the app is locked', async () => {
+    harness = loadPopupSandbox({
+      respond: (msg: JpMessage) =>
+        msg.type === 'status-summary' ? { ok: true, app: true, locked: true, pending: 2 } : undefined,
+      tabRespond: () => undefined,
+    });
+    await harness.settle();
+
+    const chip = harness.document.getElementById('status-chip')!;
+    expect(harness.text('#status-chip')).toBe('Gum is locked');
+    expect(chip.classList.contains('locked')).toBe(true);
+    expect(chip.title).toBe('Gum is locked — unlock Gum to continue.');
+    expect(harness.text('#st-app')).toBe('Gum is locked — unlock Gum to continue.');
+    // The pairing is unknown while locked; it is not reported as fine or broken.
+    expect(harness.text('#st-pair')).toBe('—');
+    // What waits is still counted: it is kept for the unlock, not lost.
+    expect(harness.text('#pending-text')).toBe('2 items waiting to sync');
+  });
+
+  it('the same answer unlocked shows the ordinary connected chip, with no lock title', async () => {
+    harness = loadPopupSandbox({
+      respond: (msg: JpMessage) =>
+        msg.type === 'status-summary' ? { ok: true, app: true, paired: true, locked: false, pending: 0 } : undefined,
+      tabRespond: () => undefined,
+    });
+    await harness.settle();
+    expect(harness.text('#status-chip')).toBe('Connected');
+    expect(harness.document.getElementById('status-chip')!.title).toBe('');
+  });
+});
+
+describe('extension popup — status-summary from the worker while locked', () => {
+  it('reports locked from /v1/health and does not ask a locked app for mine-info', async () => {
+    const h = bootBackground({
+      responder: (url) =>
+        url.endsWith('/v1/health')
+          ? { status: 200, json: { ok: true, version: 1, locked: true } }
+          : { status: 423, json: { ok: false, code: 'locked', error: 'Gum is locked' } },
+    });
+    const st = (await h.send({ type: 'status-summary' })) as Record<string, unknown>;
+    expect(st).toMatchObject({ ok: true, app: true, locked: true });
+    expect(st.paired).toBeUndefined();
+    expect(h.fetches.map((f) => new URL(f.url).pathname)).toEqual(['/v1/health']);
   });
 });

@@ -674,7 +674,7 @@ function formatSaveResultMessage(res) {
   const term = res.term ? jpMsg('save_termQuoted', String(res.term).slice(0, 40)) : '';
 
   if (res.queued) {
-    return jpMsg('save_queued', term);
+    return res.locked ? jpMsg('common_queuedLocked') : jpMsg('save_queued', term);
   }
 
   const anki = res.anki || (res.destinations && res.destinations.anki) || null;
@@ -700,13 +700,13 @@ function formatSaveResultMessage(res) {
 
 function formatClipboardResultMessage(res) {
   if (!res?.ok && !res?.queued) return res?.error || jpMsg('clip_failed');
-  if (res.queued) return jpMsg('common_queuedWillSync');
+  if (res.queued) return jpMsg(res.locked ? 'common_queuedLocked' : 'common_queuedWillSync');
   return jpMsg('clip_added');
 }
 
 function formatCaptureResultMessage(res) {
   if (!res?.ok && !res?.queued) return res?.error || jpMsg('capture_failed');
-  if (res.queued) return jpMsg('capture_queued');
+  if (res.queued) return jpMsg(res.locked ? 'common_queuedLocked' : 'capture_queued');
   if (res.action === 'playlist') return jpMsg('capture_playlistSaved');
   if (res.action === 'video') return res.duplicate ? jpMsg('capture_videoDuplicate') : jpMsg('capture_videoSaved');
   return jpMsg('capture_pageSaved');
@@ -1287,12 +1287,20 @@ const JP_SERVER_ERROR_KEYS = {
   // Raised by the worker's offscreen microphone (recordings and page clips).
   mic_permission: 'bg_micGrantNeeded',
   mic_unavailable: 'content_micUnavailable',
+  // HTTP 423 while the app's lockscreen is engaged (src/main/lockGuard.ts).
+  // Not a failure of the request: the app is fine, it is just not answering
+  // study-data routes until it is unlocked, so saves are kept and retried.
+  locked: 'bg_errLocked',
 };
 
 function jpServerErrorCode(json, raw) {
   const code = json && typeof json.code === 'string' ? json.code : '';
   if (code && JP_SERVER_ERROR_KEYS[code]) return code;
+  if (json && json.locked === true) return 'locked';
   const s = String(raw || '');
+  // The app's own text, or the worker's already-translated message (most
+  // handlers forward only `error`, so the code is recognised by its text).
+  if (/^Gum is locked\b/i.test(s) || (s && s === jpMsg('bg_errLocked'))) return 'locked';
   if (/Gum window is not open|no (?:Gum|app) window/i.test(s)) return 'app_window_closed';
   // Only the bridge's own timeouts; a model's "timed out" is its own message.
   if (/^(?:timeout|Level estimate timed out)$/i.test(s)) return 'timeout';

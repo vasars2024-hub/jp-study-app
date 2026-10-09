@@ -456,6 +456,7 @@ export default function DashboardPage() {
                   <li key={job.id} className="scr-list-row">
                     <span
                       className={`scr-outcome scr-outcome--${outcome}`}
+                      role="img"
                       aria-label={sx(OUTCOME_LABEL[outcome])}
                     />
                     <span className="scr-list-main">

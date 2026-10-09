@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { supportsLexiconAudio } from '../../../shared/lexiconAudio';
+import {
+  audioSourceDisplayName,
+  type AudioAvailability,
+  type AudioSourceConfig,
+} from '../../../shared/audioSources';
+import { loadAudioSources, onAudioSourcesChanged } from '../../audioSourcesClient';
 import { useT } from '../../i18n';
 import './wordAudio.css';
+import './dict3.css';
 
 interface Props {
   /** The headword as the entry shows it — the provider matches on the written form. */
@@ -43,16 +50,63 @@ export default function WordAudio({ word, reading, lang }: Props) {
   /** The decoded clip, so a replay costs neither IPC nor disk. */
   const clip = useRef<string | null>(null);
   const run = useRef(0);
+  /**
+   * The user's enabled audio sources (`shared/audioSources.ts`), and the one this
+   * entry should play from — '' walks the ordered fallback chain.
+   */
+  const [sources, setSources] = useState<AudioSourceConfig[]>([]);
+  const [sourceId, setSourceId] = useState('');
+  const [availability, setAvailability] = useState<Record<string, AudioAvailability>>({});
+  const asked = useRef(false);
+
+  useEffect(() => {
+    let alive = true;
+    const read = (force: boolean) =>
+      void loadAudioSources(force).then((prefs) => {
+        if (alive) setSources(prefs.sources.filter((source) => source.enabled));
+      });
+    read(false);
+    const off = onAudioSourcesChanged(() => read(false));
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
 
   useEffect(() => {
     // A new word invalidates the last one's clip, and any request still in
     // flight for it: a reply must never play under the word that replaced it.
     run.current += 1;
     clip.current = null;
+    asked.current = false;
+    setAvailability({});
     setState('idle');
-  }, [word, reading, lang]);
+  }, [word, reading, lang, sourceId]);
 
   if (!word || !supportsLexiconAudio(lang)) return null;
+
+  /** Which sources have this word — local index and CDN cache only, so nothing leaves the machine. */
+  const askAvailability = () => {
+    if (asked.current) return;
+    asked.current = true;
+    const api = window.api?.dictAudioAvailability;
+    if (typeof api !== 'function') return;
+    const attempt = run.current;
+    void api({ lang, term: word, reading })
+      .then((list) => {
+        if (attempt !== run.current) return;
+        setAvailability(Object.fromEntries(list.map((item) => [item.id, item.available])));
+      })
+      .catch(() => undefined);
+  };
+
+  const sourceLabel = (source: AudioSourceConfig): string => {
+    const name = audioSourceDisplayName(source);
+    const known = availability[source.id];
+    if (known === 'yes') return t('dict3.audio.optionHas', { name });
+    if (known === 'no') return t('dict3.audio.optionMissing', { name });
+    return name;
+  };
 
   /**
    * A rejected `play()` is never reported as a network problem: the clip is in
@@ -73,7 +127,7 @@ export default function WordAudio({ word, reading, lang }: Props) {
     setState('loading');
     let result;
     try {
-      result = await window.api.dictAudio({ lang, term: word, reading });
+      result = await window.api.dictAudio({ lang, term: word, reading, ...(sourceId ? { sourceId } : {}) });
     } catch {
       // A rejected invoke means the handler is not there — an older main
       // process behind a reloaded renderer. Retryable from the user's side,
@@ -102,7 +156,7 @@ export default function WordAudio({ word, reading, lang }: Props) {
         ? t('lexicon.audio.offline')
         : t('lexicon.audio.play', { word });
 
-  return (
+  const button = (
     <button
       aria-label={label}
       className={`word-audio lq-hit is-${state}`}
@@ -127,5 +181,29 @@ export default function WordAudio({ word, reading, lang }: Props) {
         )}
       </svg>
     </button>
+  );
+
+  // One source means nothing to pick: the button alone, exactly as before.
+  if (sources.length < 2) return button;
+  return (
+    <>
+      {button}
+      <select
+        className="word-audio-source"
+        aria-label={t('dict3.audio.picker', { word })}
+        title={t('dict3.audio.picker', { word })}
+        value={sourceId}
+        onFocus={askAvailability}
+        onPointerDown={askAvailability}
+        onChange={(event) => setSourceId(event.target.value)}
+      >
+        <option value="">{t('dict3.audio.auto')}</option>
+        {sources.map((source) => (
+          <option key={source.id} value={source.id}>
+            {sourceLabel(source)}
+          </option>
+        ))}
+      </select>
+    </>
   );
 }

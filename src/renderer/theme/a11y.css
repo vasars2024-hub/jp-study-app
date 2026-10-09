@@ -20,6 +20,22 @@
   width: auto; height: auto;
   margin: 0; overflow: visible; clip: auto; white-space: normal;
 }
+/* a11y3: the desktop's "Skip to taskbar" control floats over the wallpaper
+   while focused instead of pushing the desktop down. */
+.os-skip-link:focus,
+.os-skip-link:focus-visible {
+  position: fixed !important;
+  top: 8px;
+  left: 8px;
+  z-index: 2147483000;
+  min-height: 32px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 2px solid Highlight;
+  background: Canvas;
+  color: CanvasText;
+  font: inherit;
+}
 
 /* ---------- Global focus-visible fallback -------------------------------
    Guarantees keyboard users always see a focus ring, even on elements that

@@ -33,17 +33,21 @@ let releaseChecked = false;
 let backupTimer: number | null = null;
 
 async function installJobs(): Promise<Uninstall> {
-  const [bridges, mining, automation, calendar, reminders, delivery] = await Promise.all([
+  const [bridges, mining, automation, calendar, reminders, delivery, reviewSync] = await Promise.all([
     import('./studyBackgroundJobs'),
     import('./studyMining'),
     import('./localAgentAutomationHost'),
     import('./calendar'),
     import('./calendarReminders'),
     import('./calendarReminderDelivery'),
+    import('./ankiReviewSync'),
   ]);
   const offs: Uninstall[] = [];
   offs.push(bridges.installStudyRendererBridges());
   offs.push(mining.installStudyMining());
+  // The review answers themselves are captured by every window (blancMain.tsx);
+  // sending them is a background job like the mining queue.
+  offs.push(reviewSync.installAnkiReviewSync());
   offs.push(automation.installLocalAgentAutomationHost());
   // The calendar scheduler normally runs only in the primary Study OS window
   // (one deliverer per shared storage). With no Study OS window, Blanc is it.

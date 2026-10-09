@@ -40,6 +40,15 @@ import { confirmDialog } from '../ui';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { getTranslateTarget, onTranslateTargetChanged, setTranslateTarget } from '../../translateTarget';
 import { getTranslateSource, onTranslateSourceChanged, setTranslateSource } from '../../translateSource';
+import { glossaryTermsForText } from '../../../shared/translateGlossary';
+import {
+  TRANSLATE_PAIR_CHOICE,
+  isTranslateProviderId,
+  joinTranslatedSentences,
+  translateProviderLabel,
+  type TranslateResultMeta,
+} from '../../../shared/translateProviders';
+import { loadTranslateGlossary } from '../../translateGlossaryStore';
 
 export type TranslateState = 'idle' | 'loading' | 'translating' | 'done' | 'error';
 export type TranslateTab = 'translate' | 'history';
@@ -98,6 +107,14 @@ export interface TranslateController {
   /** Translate whatever new source-language text lands on the clipboard. */
   clipboardWatch: boolean;
   setClipboardWatch: (on: boolean) => void;
+  /**
+   * Which engine produced the result on screen, whether the offline model stood
+   * in for a cloud provider, and which glossary terms it honours. Null until a
+   * translation finishes (and for history rows opened without re-running).
+   */
+  meta?: TranslateResultMeta | null;
+  /** Sentences finished so far while a translation is still running (progressive display). */
+  liveSegments?: TranslateSegment[];
 }
 
 /** Remembered Translate preferences. Read raw; written through the guarded writer. */
@@ -137,6 +154,8 @@ export function useTranslate(): TranslateController {
   const [reported, setReported] = useState<TranslateSegment[] | null>(null);
   const [style, setStyleState] = useState<TranslateStyle>(() => (readPref(STYLE_KEY) === 'literal' ? 'literal' : 'natural'));
   const [clipboardWatch, setClipboardWatchState] = useState(() => readPref(CLIPBOARD_WATCH_KEY) === '1');
+  const [meta, setMeta] = useState<TranslateResultMeta | null>(null);
+  const [liveSegments, setLiveSegments] = useState<TranslateSegment[]>([]);
   const styleRef = useRef(style);
   const startedRef = useRef(false);
   const requestRef = useRef(0);
@@ -199,6 +218,7 @@ export function useTranslate(): TranslateController {
     }
     setTranslatedInput('');
     setReported(null);
+    setMeta(null);
   }
 
   /**
@@ -214,6 +234,8 @@ export function useTranslate(): TranslateController {
     setOutput('');
     setTranslatedInput('');
     setReported(null);
+    setMeta(null);
+    setLiveSegments([]);
     setState('loading');
     setMsg(t('translate.msg.loadingModel'));
     startedRef.current = false;
@@ -223,13 +245,19 @@ export function useTranslate(): TranslateController {
     offModelRef.current = onModelProgress((p) => {
       if (request !== requestRef.current) return;
       if (p.status === 'progress' && typeof p.progress === 'number') {
-        const f = typeof p.file === 'string' ? p.file.split('/').pop() : 'model';
+        const f = (typeof p.file === 'string' ? p.file.split('/').pop() : undefined) ?? 'model';
         setMsg(t('translate.msg.loadingFile', { file: f, pct: Math.round(p.progress) }));
       }
     });
 
     try {
       let segments: TranslateSegment[] | null = null;
+      let resultMeta: TranslateResultMeta | null = null;
+      // Sentences as they finish, by index: a cloud reply streams them, the
+      // offline model produces them one at a time, and a fallback starts over.
+      const live: TranslateSegment[] = [];
+      // Only the glossary terms that occur in this passage are sent at all.
+      const glossary = glossaryTermsForText(loadTranslateGlossary(), text, from, to);
       const result = await translateTo(text, from, to, (prog) => {
         if (request !== requestRef.current) return;
         startedRef.current = true;
@@ -238,11 +266,28 @@ export function useTranslate(): TranslateController {
       }, undefined, {
         style: styleRef.current,
         onSegments: (s) => { segments = s; },
+        // The engine the learner chose for this pair (main resolves and enforces consent).
+        provider: TRANSLATE_PAIR_CHOICE,
+        ...(glossary.length ? { glossary } : {}),
+        onSegment: (index, segment, total) => {
+          if (request !== requestRef.current) return;
+          live[index] = segment;
+          const done = live.filter(Boolean);
+          startedRef.current = true;
+          setState('translating');
+          setLiveSegments([...done]);
+          // The result pane fills sentence by sentence instead of staying empty until the end.
+          setOutput(joinTranslatedSentences(done.map((s) => s.target), to));
+          setMsg(t('xlate2.progress.sentences', { done: done.length, total }));
+        },
+        onMeta: (m) => { resultMeta = m; },
       });
       if (request !== requestRef.current) return;
       setOutput(result);
       setTranslatedInput(text);
       setReported(segments);
+      setMeta(resultMeta);
+      setLiveSegments([]);
       setState('done');
       setMsg('');
       appendTranslationHistory({
@@ -251,6 +296,7 @@ export function useTranslate(): TranslateController {
         sourceText: text,
         resultText: result,
         origin: 'app',
+        ...(resultMeta ? { provider: (resultMeta as TranslateResultMeta).provider } : {}),
       });
       appendNotebookEvent({
         stream: 'translations',
@@ -262,6 +308,9 @@ export function useTranslate(): TranslateController {
       });
     } catch (e) {
       if (request !== requestRef.current) return;
+      // Sentences shown while it ran are not a translation once it failed.
+      setOutput('');
+      setLiveSegments([]);
       setError(e instanceof Error ? e.message : String(e));
       setState('error');
     } finally {
@@ -281,6 +330,7 @@ export function useTranslate(): TranslateController {
     setOutput(e.resultText);
     setTranslatedInput(e.sourceText);
     setReported(null);
+    setMeta(isTranslateProviderId(e.provider) ? { provider: e.provider } : null);
     setTab('translate');
     setState('done');
   }
@@ -365,6 +415,8 @@ export function useTranslate(): TranslateController {
     setOutput('');
     setTranslatedInput('');
     setReported(null);
+    setMeta(null);
+    setLiveSegments([]);
     setError('');
     setMsg('');
     setState('idle');
@@ -453,6 +505,8 @@ export function useTranslate(): TranslateController {
     copyResult,
     clipboardWatch,
     setClipboardWatch,
+    meta,
+    liveSegments,
   };
 }
 
@@ -585,6 +639,7 @@ export function TranslateHistoryList({
                     so every one of these history stamps read US-style in a ru desktop. */}
                 {e.pinned ? `${t('xlate.history.pinnedTag')} · ` : ''}
                 {e.sourceLang} → {e.targetLang} · {new Date(e.ts).toLocaleString(LANG_TAGS[lang])} · {t(`translate.history.origin.${e.origin}`)}
+                {isTranslateProviderId(e.provider) ? ` · ${t('xlate2.result.by', { provider: translateProviderLabel(e.provider, t) })}` : ''}
               </div>
               <p className="tr-history-src" lang={e.sourceLang}>{e.sourceText}</p>
               <p className="tr-history-dst muted" lang={e.targetLang}>{e.resultText}</p>

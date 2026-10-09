@@ -20,7 +20,7 @@ import { loadSaved, onSavedChanged, removeSaved, SAVED_WORDS_BOOK_ID, SAVED_WORD
 import { mineToStudy, notifyMined, type MineToStudyInput } from '../studyMining';
 import { cycleLevel, getLevel, onKnowledgeChanged, type WkLevel } from '../knownWords';
 import { getStudyLang, onStudyLangChanged, studyContentLang } from '../studyEnvironment';
-import { getActiveProfile, onProfileChanged } from '../profileState';
+import { getActiveProfile, getProfiles, onProfileChanged } from '../profileState';
 import { translateTo, type TransLang } from '../translator';
 // Imported from their defining modules rather than the `shared/mining` barrel.
 // That barrel re-exports `aiMiningCatalog` (41 KB of AI prompt presets), and
@@ -59,87 +59,38 @@ import WordAudio from './lexicon/WordAudio';
 import EntryNote from './lexicon/EntryNote';
 import EntryExplain from './lexicon/EntryExplain';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
-import UsageLabels, { entryUsageTags } from './lexicon/UsageLabels';
 import WordKnowledge from './lexicon/WordKnowledge';
 import EntryPitch from './lexicon/EntryPitch';
 import EntryFrequencies from './lexicon/EntryFrequencies';
 import KanjiBreakdown from './lexicon/KanjiBreakdown';
-import { posTagKey } from '../dictPosTags';
+import DeinflectTrace from './lexicon/DeinflectTrace';
+import CommonBadge from './lexicon/CommonBadge';
+import DictCardSections from './lexicon/DictCardSections';
 import {
-  checkAnkiPresence,
+  checkAnkiPresenceAcross,
   deckPresenceByWord,
   resetAnkiPresenceCache,
   withAnkiDuplicates,
   type EntryPresence,
 } from '../dictEntryPresence';
+import { ankiPresenceTargets } from '../../shared/ankiPresenceTargets';
+import { normalizeProfileRulesStore, type ProfileRule } from '../../shared/profileRules';
+import { buildDictCards, dictionaryRanker, type DictDisplayPrefs } from '../../shared/dictDisplay';
+import { sameDeinflectChain } from '../../shared/deinflectTrace';
+import {
+  cachedDictionaryOrder,
+  getDictDisplayPrefs,
+  loadDictDisplayPrefs,
+  loadDictionaryOrder,
+  onDictDisplayPrefsChanged,
+} from '../dictDisplayPrefs';
 import { FLASHCARD_DECK_EVENT, loadDeck } from '../flashcardDeck';
 import { exampleCoverage, rankByCoverage, type ExampleCoverage } from '../exampleCoverage';
 import { studyTokens, studyTokensReady } from '../studyTokens';
 
-type TFn = (key: string) => string;
-
-// Maps the stable de-inflection reason identifiers (shared/deinflect.ts) to
-// their localized catalog keys. Unmapped reasons fall back to the raw string.
-const REASON_KEY: Record<string, string> = {
-  polite: 'deinflect.reason.polite',
-  'polite negative': 'deinflect.reason.politeNegative',
-  'polite past': 'deinflect.reason.politePast',
-  'polite past negative': 'deinflect.reason.politePastNegative',
-  'polite volitional': 'deinflect.reason.politeVolitional',
-  negative: 'deinflect.reason.negative',
-  past: 'deinflect.reason.past',
-  '-te': 'deinflect.reason.te',
-  causative: 'deinflect.reason.causative',
-  passive: 'deinflect.reason.passive',
-  'passive/potential': 'deinflect.reason.passivePotential',
-  potential: 'deinflect.reason.potential',
-  volitional: 'deinflect.reason.volitional',
-  imperative: 'deinflect.reason.imperative',
-  'conditional (–ば)': 'deinflect.reason.conditionalBa',
-  'conditional (–たら)': 'deinflect.reason.conditionalTara',
-  '–たり': 'deinflect.reason.tari',
-  '–たい': 'deinflect.reason.tai',
-  '–すぎる': 'deinflect.reason.sugiru',
-  adverbial: 'deinflect.reason.adverbial',
-  'progressive (–ている)': 'deinflect.reason.progressive',
-  'completion (–てしまう)': 'deinflect.reason.shimau',
-  'completion (–ちゃう)': 'deinflect.reason.chau',
-  '–ておく': 'deinflect.reason.teoku',
-};
-
-function reasonLabel(reason: string, t: TFn): string {
-  const key = REASON_KEY[reason];
-  return key ? t(key) : reason;
-}
-
-/**
- * A sense's part-of-speech codes as tags, each explained in a tooltip and its
- * accessible name (`dictPosTags.ts`). A code with no explanation is shown as the
- * dictionary wrote it.
- */
-function PosTags({ codes, t }: { codes: readonly string[]; t: TFn }) {
-  return (
-    <span className="dict-pos">
-      {codes.map((code, i) => {
-        const key = posTagKey(code);
-        const label = key ? t(key) : '';
-        return (
-          <span key={`${code}-${i}`}>
-            {i > 0 && ', '}
-            {label ? (
-              <abbr className="dict-pos-tag" title={label}>
-                {code}
-                <span className="sr-only"> ({label})</span>
-              </abbr>
-            ) : (
-              <span className="dict-pos-tag">{code}</span>
-            )}
-          </span>
-        );
-      })}
-    </span>
-  );
-}
+// The de-inflection reason names (and their grammar links) live in
+// `shared/deinflectTrace.ts`, rendered by `lexicon/DeinflectTrace.tsx`; the
+// part-of-speech tags and sense rendering in `lexicon/DictSenseList.tsx`.
 
 /** Word-level bases: dictionary gloss first, Qwen only as the fail-switch. */
 const WORD_LEVEL_BASES = new Set(['expression', 'meaning', 'translation']);
@@ -433,10 +384,47 @@ export default function DictionaryResults({
   /** Bumped when the local deck changes, so the "in deck" markers re-read it. */
   const [deckTick, setDeckTick] = useState(0);
   /** Live Anki duplicate verdicts for the words on screen, keyed by the word set asked about. */
-  const [ankiDup, setAnkiDup] = useState<{ key: string; duplicates: Record<string, boolean> }>({ key: '', duplicates: {} });
+  const [ankiDup, setAnkiDup] = useState<{
+    key: string;
+    duplicates: Record<string, boolean>;
+    /** word -> "deck · note type" of every target that holds it, for the marker's tooltip. */
+    holders?: Record<string, string[]>;
+  }>({ key: '', duplicates: {} });
   const entriesRef = useRef<HTMLDivElement>(null);
   /** Position (in the shown list) of the entry that holds the list's one tab stop. */
   const [activeEntry, setActiveEntry] = useState(0);
+  /**
+   * Result layout (grouped / merged, collapsed secondaries) and the user's
+   * dictionary order, both owned by main (`dictDisplayPrefs.ts`), plus the mining
+   * rules, which decide which decks the "in Anki" marker asks.
+   */
+  const [displayPrefs, setDisplayPrefs] = useState<DictDisplayPrefs>(getDictDisplayPrefs);
+  const [dictOrder, setDictOrder] = useState<string[]>(cachedDictionaryOrder);
+  const [profileRules, setProfileRules] = useState<ProfileRule[]>([]);
+  useEffect(() => {
+    let alive = true;
+    // Re-read on every mount: main keeps it in memory, and a choice made in
+    // Settings in another window must reach a pop-up opened here afterwards.
+    void loadDictDisplayPrefs(true).then((prefs) => {
+      if (alive) setDisplayPrefs(prefs);
+    });
+    void loadDictionaryOrder().then((titles) => {
+      if (alive) setDictOrder(titles);
+    });
+    const rulesApi = window.api?.profileRulesGet;
+    if (typeof rulesApi === 'function') {
+      void rulesApi()
+        .then((raw) => {
+          if (alive) setProfileRules(normalizeProfileRulesStore(raw).rules);
+        })
+        .catch(() => undefined);
+    }
+    const off = onDictDisplayPrefsChanged((prefs) => setDisplayPrefs(prefs));
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
 
   /**
    * Keyboard travel between entries, the way Yomitan's popup moves between terms.
@@ -1115,6 +1103,8 @@ export default function DictionaryResults({
     entries.map((entry, index) => ({ entry, index, sourceLangs: entry.sourceLangs })),
     glossLangs,
   );
+  /** One card per headword, dictionaries in the user's order (`shared/dictDisplay.ts`). */
+  const cards = buildDictCards(shownEntries, dictionaryRanker(dictOrder));
 
   /**
    * Grading is offered only when the dictionary being read is the language the
@@ -1162,19 +1152,28 @@ export default function DictionaryResults({
     [presenceWords, lang, deckTick],
   );
   const ankiConnected = anki?.connected === true;
-  const ankiDeckName = active.anki.deckName;
-  const ankiModelName = active.anki.modelName;
+  /**
+   * Every deck / note type a card for this language can land in — the routed
+   * profile, the active one, every profile studying the language and every rule
+   * target (`shared/ankiPresenceTargets.ts`) — not only the active profile's.
+   */
+  const ankiTargets = useMemo(() => {
+    const profiles = getProfiles();
+    const list = ankiPresenceTargets(profiles.length ? profiles : [active], profileRules, active.id, lang);
+    return list.length ? list : [{ deckName: active.anki.deckName, modelName: active.anki.modelName, profileLabel: active.label }];
+  }, [active, profileRules, lang]);
+  const ankiTargetsKey = ankiTargets.map((target) => `${target.deckName}\u0000${target.modelName}\u0000${target.termField ?? ''}`).join('\u0001');
   useEffect(() => {
     if (!ankiConnected || !presenceWords.length) return undefined;
     let alive = true;
-    void checkAnkiPresence(presenceWords, { deckName: ankiDeckName, modelName: ankiModelName }).then((duplicates) => {
-      if (alive) setAnkiDup({ key: presenceKey, duplicates });
+    void checkAnkiPresenceAcross(presenceWords, ankiTargets).then(({ duplicates, holders }) => {
+      if (alive) setAnkiDup({ key: presenceKey, duplicates, holders });
     });
     return () => {
       alive = false;
     };
     // `deckTick`: an Add from here (or anywhere) changes what Anki holds.
-  }, [ankiConnected, presenceKey, ankiDeckName, ankiModelName, deckTick]);
+  }, [ankiConnected, presenceKey, ankiTargetsKey, deckTick]);
   const presence: Map<string, EntryPresence> = useMemo(
     () => (ankiDup.key === presenceKey ? withAnkiDuplicates(deckPresence, ankiDup.duplicates) : deckPresence),
     [deckPresence, ankiDup, presenceKey],
@@ -1221,9 +1220,11 @@ export default function DictionaryResults({
   }
 
   return (
-    <div className={`dict-results ${variant}`}>
+    // a11y3: busy while the lookup is in flight; the lookup's outcome (looking up,
+    // no match, error) is spoken through role="status" lines.
+    <div className={`dict-results ${variant}`} aria-busy={query.trim() && !result ? true : undefined}>
       {copyError && <div role="alert" className="dict-empty">{copyError}</div>}
-      {query.trim() && !result && <div className="dict-loading">{t('dict.results.lookingUp')}</div>}
+      {query.trim() && !result && <div className="dict-loading" role="status">{t('dict.results.lookingUp')}</div>}
       {result?.preparing && entries.length === 0 && (
         <div className="dict-empty" role="status">
           {result.preparing.percent == null
@@ -1234,7 +1235,7 @@ export default function DictionaryResults({
       {/* Not while the offline dictionary is still being built: its "no entry
           for this word" contradicts the line above, and it is not yet true. */}
       {result?.error && !result.preparing && (
-        <div className="dict-empty">
+        <div className="dict-empty" role="status">
           {result.errorCode ? t(`dict.lookup.${result.errorCode}`) : result.error}
         </div>
       )}
@@ -1247,7 +1248,7 @@ export default function DictionaryResults({
             </button>
           </div>
         ) : (
-          <div className="dict-empty">{t('dict.results.noMatch', { query })}</div>
+          <div className="dict-empty" role="status">{t('dict.results.noMatch', { query })}</div>
         )
       )}
 
@@ -1259,22 +1260,25 @@ export default function DictionaryResults({
 
       {result?.deinflection && (
         <div className="dict-deinflection">
-          <span className="dict-deinflection-forms" lang="ja">
-            {t('deinflect.matched', {
-              source: result.deinflection.source,
-              term: result.deinflection.term,
-            })}
-          </span>
-          {/* Each step of the chain as its own tag, innermost first — 食べさせられた is
-              causative › passive › past of 食べる — rather than one run-on line. */}
-          <span className="dict-deinflection-reasons" role="list" aria-label={t('dict2.deinflect.steps')}>
-            {result.deinflection.reasons.map((r, i) => (
-              <span key={`${r}-${i}`} role="listitem" className="dict-deinflect-step">
-                {i > 0 && <span className="dict-deinflect-sep" aria-hidden="true">›</span>}
-                {reasonLabel(r, t)}
-              </span>
-            ))}
-          </span>
+          {/* The whole chain, Yomitan-style: 食べさせられなかった ← causative ← passive
+              ← negative ← past ← 食べる, each step named and, where the grammar corpus
+              teaches it, a link to that point. A chain with no named steps (an
+              importer's bare lemma hit) keeps the plain "form → lemma" line. */}
+          {result.deinflection.reasons.length > 0 ? (
+            <DeinflectTrace
+              source={result.deinflection.source}
+              term={result.deinflection.term}
+              reasons={result.deinflection.reasons}
+              contentLang={contentLang}
+            />
+          ) : (
+            <span className="dict-deinflection-forms" lang={contentLang}>
+              {t('deinflect.matched', {
+                source: result.deinflection.source,
+                term: result.deinflection.term,
+              })}
+            </span>
+          )}
         </div>
       )}
 
@@ -1296,17 +1300,28 @@ export default function DictionaryResults({
       {hiddenGlossEntries > 0 && <p className="dict-gloss-hidden muted">{t('readerUi.gloss.otherHidden')}</p>}
 
       <div className="dict-entries" ref={entriesRef} onKeyDown={onEntriesKeyDown}>
-        {shownEntries.map(({ entry, index: i }, position) => {
+        {/* One card per headword (`shared/dictDisplay.ts`): the entries every
+            dictionary returned for the same word and reading share a card, laid
+            out grouped or merged by the user's setting. The card's first entry is
+            its headline — the one Add, star and copy act on. */}
+        {cards.map((card, position) => {
+          const i = card.entryIndexes[0];
+          const entry = entries[i];
           const saved = savedSet.has(entry.word);
           const here = presence.get(entry.word);
+          const ankiHolders = ankiDup.key === presenceKey ? ankiDup.holders?.[entry.word] ?? [] : [];
+          // A per-entry chain only when it says something the result's own trace does not.
+          const ownChain = entry.inflection?.length && !sameDeinflectChain(entry.inflection, result?.deinflection?.reasons)
+            ? entry.inflection
+            : null;
           return (
             <div
               className="dict-entry"
-              key={i}
+              key={card.key}
               role="article"
               aria-label={entry.reading && entry.reading !== entry.word ? `${entry.word} ${entry.reading}` : entry.word}
               // One tab stop for the whole list; arrows move between entries (see onEntriesKeyDown).
-              tabIndex={position === Math.min(activeEntry, shownEntries.length - 1) ? 0 : -1}
+              tabIndex={position === Math.min(activeEntry, cards.length - 1) ? 0 : -1}
               onFocus={(e) => {
                 if (e.target === e.currentTarget) setActiveEntry(position);
               }}
@@ -1325,9 +1340,9 @@ export default function DictionaryResults({
                     list shows several. Renders nothing for a language with no
                     provider, and fetches nothing until it is clicked. */}
                 <WordAudio lang={lang} reading={entry.reading} word={entry.word} />
-                {entry.isCommon && (
-                  <span className="dict-badge common">{t('dict.results.common')}</span>
-                )}
+                {/* "common", with the JMdict word lists that made it so when the
+                    dictionary named them (news1, ichi1, nf05 …) — never inferred. */}
+                <CommonBadge isCommon={entry.isCommon} priorityTags={entry.priorityTags} />
                 {/* JLPT only where the source carried one (Jisho); never estimated. */}
                 {entry.jlpt[0] && <span className="dict-badge jlpt">{entry.jlpt[0]}</span>}
                 {/* One chip per installed frequency corpus, or the merged rank as before. */}
@@ -1341,7 +1356,12 @@ export default function DictionaryResults({
                   </span>
                 )}
                 {here?.inAnki && (
-                  <span className="dict-badge dict-presence in-anki" title={t('dict2.presence.ankiTitle')}>
+                  <span
+                    className="dict-badge dict-presence in-anki"
+                    title={ankiHolders.length
+                      ? t('dict3.presence.ankiWhere', { targets: ankiHolders.join('; ') })
+                      : t('dict2.presence.ankiTitle')}
+                  >
                     {t('dict2.presence.inAnki')}
                   </span>
                 )}
@@ -1375,6 +1395,15 @@ export default function DictionaryResults({
                   />
                 )}
               </div>
+              {ownChain && (
+                <DeinflectTrace
+                  source={result?.deinflection?.source || query.trim()}
+                  term={entry.word}
+                  reasons={ownChain}
+                  contentLang={contentLang}
+                  compact
+                />
+              )}
               {/* Japanese: the contour with its downstep number for every reading
                   (`EntryPitch`), on the page as well as in the popup. */}
               {renderPitch ? renderPitch(entry) : lang === 'ja' ? <EntryPitch entry={entry} /> : entry.pitchHtml && (
@@ -1392,30 +1421,11 @@ export default function DictionaryResults({
                   <span className="dict-ipa-text">{entry.ipa.join(' / ')}</span>
                 </div>
               )}
-              {entry.glossaryHtml ? (
-                <>
-                  {/* A structured glossary arrives as one HTML block with no
-                      sense boundaries left in it, so the labels collapse to the
-                      entry and sit above the block rather than inside it. */}
-                  <UsageLabels tags={entryUsageTags(entry)} />
-                  <div
-                    className="dict-glossary-html"
-                    lang={lang}
-                    dangerouslySetInnerHTML={{ __html: entry.glossaryHtml }}
-                  />
-                </>
-              ) : (
-                <ol className="dict-senses">
-                  {entry.senses.slice(0, 6).map((s, j) => (
-                    <li key={j}>
-                      {s.partsOfSpeech.length > 0 && <PosTags codes={s.partsOfSpeech} t={t} />}
-                      <UsageLabels tags={s.tags} />
-                      {s.definitions.join('; ')}
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {entry.source && <div className="dict-source muted">{entry.source}</div>}
+              {/* Plain glossaries, structured ones with marked senses (each under
+                  its own part of speech) and whole structured blocks all render
+                  through `DictSenseList`; several dictionaries are grouped or
+                  merged per the user's layout (`DictCardSections`). */}
+              <DictCardSections card={card} prefs={displayPrefs} lang={lang} />
               <KanjiBreakdown word={entry.word} lang={lang} onLookup={onLookup} />
               <button
                 className={`dict-add lq-hit ${addState[i] === 'added' || addState[i] === 'dup' || addState[i] === 'queued' || addState[i] === 'saved' ? 'done' : ''}`}
@@ -1554,18 +1564,18 @@ export default function DictionaryResults({
       {/* Every study language has examples: Tatoeba has Japanese, Mandarin and
           Russian, and an imported corpus answers offline. */}
       {entries.length > 0 && (
-        <div className="dict-examples">
+        <div className="dict-examples" aria-busy={exState === 'loading' || undefined}>
           {exState === 'idle' && (
             <button className="dict-ex-btn lq-hit" onClick={loadExamples}>
               {t('dict.results.examples')}
             </button>
           )}
           {exState === 'loading' && (
-            <div className="dict-ex-status muted">{t('dict.results.searchingTatoeba')}</div>
+            <div className="dict-ex-status muted" role="status">{t('dict.results.searchingTatoeba')}</div>
           )}
-          {exState === 'error' && <div className="dict-ex-status muted">{exError}</div>}
+          {exState === 'error' && <div className="dict-ex-status muted" role="status">{exError}</div>}
           {exState === 'done' && examples.length === 0 && (
-            <div className="dict-ex-status muted">{t('dict.results.noExamples')}</div>
+            <div className="dict-ex-status muted" role="status">{t('dict.results.noExamples')}</div>
           )}
           {exState === 'done' && examples.length > 0 && (
             <>

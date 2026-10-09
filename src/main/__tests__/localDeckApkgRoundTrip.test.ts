@@ -28,7 +28,7 @@ describe('local deck APKG media round trip', () => {
       media: [{ fileName: 'jpstudy-card.wav', filePath: audio }],
     });
 
-    expect(result).toEqual({ notes: 1, media: 1 });
+    expect(result).toEqual({ notes: 1, media: 1, scheduled: 0 });
     const zip = new AdmZip(outputPath);
     expect(readMediaManifest(zip)).toEqual(new Map([['0', 'jpstudy-card.wav']]));
     expect(zip.getEntry('0')?.getData()).toEqual(fs.readFileSync(audio));

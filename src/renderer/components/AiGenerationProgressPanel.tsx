@@ -40,6 +40,7 @@ export default function AiGenerationProgressPanel({
       <div
         className={`mining-progress-track${indeterminate ? ' indeterminate' : ''}`}
         role="progressbar"
+        aria-label={phaseLabel}
         aria-valuenow={indeterminate ? undefined : pct}
         aria-valuemin={0}
         aria-valuemax={100}

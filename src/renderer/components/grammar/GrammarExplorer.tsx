@@ -393,7 +393,8 @@ export default function GrammarExplorer({
           size="sm"
           className={filtersActive ? 'gram-x-filters-btn is-on' : 'gram-x-filters-btn'}
           aria-expanded={showFilters}
-          aria-controls={FILTERS_PANEL_ID}
+          // a11y3: only while the panel exists; a reference to nothing is invalid ARIA.
+          aria-controls={showFilters ? FILTERS_PANEL_ID : undefined}
           // Filters can be active while the panel is shut, and a list quietly showing 4 of
           // 2,410 rows for no visible reason is the surface lying by omission. The marker is
           // a dot AND this label, never colour alone.
@@ -407,7 +408,7 @@ export default function GrammarExplorer({
         <Button
           size="sm"
           aria-expanded={showDrawer && !noSelection}
-          aria-controls={DRAWER_ID}
+          aria-controls={showDrawer && !noSelection ? DRAWER_ID : undefined}
           onClick={() => setShowDrawer((v) => !v)}
           disabled={noSelection}
           title={selectionReason}

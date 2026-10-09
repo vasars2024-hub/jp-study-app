@@ -289,7 +289,7 @@ export default function DefragApp({ deck, focusCardId }: DefragAppProps) {
       <div className="aero-mech-status" aria-live="polite">
         <span>{status}</span>
         {(running || phase === 'analyzing') && (
-          <div className="aero-mech-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((phase === 'analyzing' ? scan : progress) * 100)}>
+          <div className="aero-mech-progress" role="progressbar" aria-label={t(phase === 'analyzing' ? 'aeroMech.defrag.mapAnalysis' : 'aeroMech.defrag.mapDefrag')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((phase === 'analyzing' ? scan : progress) * 100)}>
             <i style={{ transform: `scaleX(${Math.max(0.01, phase === 'analyzing' ? scan : progress)})` }} />
           </div>
         )}

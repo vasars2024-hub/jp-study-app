@@ -455,4 +455,40 @@ var GUM_POPUP_CSS = String.raw`
   font-size: calc(var(--rp-font) - 3px);
   color: var(--rp-muted);
 }
+/* The app's dictionary layout: de-inflection trace, per-dictionary sections, per-sense labels. */
+#jp-study-popup .rp-trace {
+  font-size: calc(var(--rp-font) - 2px);
+  color: var(--rp-muted);
+  margin: 0 0 4px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+#jp-study-popup .rp-trace-form { color: var(--rp-text); }
+#jp-study-popup .rp-trace-step {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--rp-border);
+  border-radius: 6px;
+}
+#jp-study-popup .rp-trace-sep { opacity: 0.7; }
+#jp-study-popup .rp-dict { margin-top: 4px; }
+#jp-study-popup .rp-dict + .rp-dict { padding-top: 4px; border-top: 1px dashed var(--rp-border); }
+#jp-study-popup .rp-dict-name {
+  font-size: calc(var(--rp-font) - 3px);
+  color: var(--rp-muted);
+  letter-spacing: 0.02em;
+}
+#jp-study-popup .rp-sense-dict {
+  display: inline-block;
+  font-size: calc(var(--rp-font) - 4px);
+  color: var(--rp-muted);
+  border: 1px solid var(--rp-border);
+  border-radius: 5px;
+  padding: 0 4px;
+  margin-right: 2px;
+}
+#jp-study-popup .rp-more-dicts {
+  margin-top: 4px;
+  min-height: 24px;
+}
 `;

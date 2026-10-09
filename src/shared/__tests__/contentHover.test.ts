@@ -6,6 +6,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { fakeScan, loadContent, warmContentDom, type ContentHarness } from './contentHarness';
+import { extensionMessage } from './extensionHarness';
 
 const WORDS = {
   私: { reading: 'わたし', senses: [{ partsOfSpeech: ['pronoun'], definitions: ['I; me'] }] },
@@ -176,6 +177,45 @@ describe('popup — pitch accent number', () => {
   });
 });
 
+describe('popup — a locked app (HTTP 423)', () => {
+  const LOCKED_MSG = extensionMessage('bg_errLocked');
+
+  it('opens on the hovered word and says the app is locked, instead of no popup or an error', async () => {
+    h = await loadContent({
+      html: '<p id="p">学校へ行く</p>',
+      // What the worker's scanLookup answers for a 423: no cached entries.
+      reply: (msg) =>
+        msg.type === 'scan'
+          ? { ok: false, matched: '', entries: [], offline: false, locked: true, code: 'locked', error: LOCKED_MSG }
+          : undefined,
+    });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    expect(popup.querySelector('.rp-empty')?.textContent).toBe(LOCKED_MSG);
+    expect(LOCKED_MSG).toBe('Gum is locked — unlock Gum to continue.');
+  });
+
+  it('recognises the lock from the translated message alone (handlers that forward only `error`)', async () => {
+    h = await loadContent({
+      html: '<p id="p">学校へ行く</p>',
+      reply: (msg) => (msg.type === 'scan' ? { ok: false, entries: [], error: LOCKED_MSG } : undefined),
+    });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    expect(popup.querySelector('.rp-empty')?.textContent).toBe(LOCKED_MSG);
+  });
+
+  it('an ordinary lookup failure still opens nothing (negative control)', async () => {
+    h = await loadContent({
+      html: '<p id="p">学校へ行く</p>',
+      reply: (msg) => (msg.type === 'scan' ? { ok: false, entries: [], error: 'HTTP 500' } : undefined),
+    });
+    h.hover(textNode(h, 'p'), 0);
+    await new Promise((r) => setTimeout(r, 120));
+    expect(h.popup()).toBeNull();
+  });
+});
+
 describe('page integrity (bugs 9, 10, 16)', () => {
   it('leaves the page DOM untouched after a hover and marks the word with a Highlight', async () => {
     h = await loadContent({ html: '<p id="p">私はきのう学校へ行きました。</p>', reply: fakeScan(WORDS) });
@@ -228,6 +268,153 @@ describe('rich mining payload (bug 5, WP4)', () => {
       lemma: '猫',
       entryIndex: 0,
     });
+  });
+});
+
+describe('popup — the app\'s dictionary layout (grouped / merged, trace)', () => {
+  const scanReply = (body: Record<string, unknown>) => (msg: { type?: string }) =>
+    msg.type === 'scan' ? { ok: true, matched: '猫', via: 'exact', ...body } : undefined;
+  const sense = (definition: string, source?: string) => ({
+    partsOfSpeech: ['noun'],
+    definitions: [definition],
+    ...(source ? { source } : {}),
+  });
+
+  it('grouped + collapsed: one card, the first dictionary open, the rest behind "Show N more dictionaries"', async () => {
+    h = await loadContent({
+      html: '<p id="p">猫だ</p>',
+      reply: scanReply({
+        entries: [
+          { word: '猫', reading: 'ねこ', via: 'exact', source: 'JMdict', senses: [sense('cat')] },
+          { word: '猫', reading: 'ねこ', via: 'exact', source: 'Daijirin', senses: [sense('ネコ科の哺乳類')], collapsed: true },
+          { word: '猫', reading: 'ねこ', via: 'exact', source: 'Kenkyusha', senses: [sense('a cat; a puss')], collapsed: true },
+        ],
+      }),
+    });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    expect(popup.querySelectorAll('.rp-entry')).toHaveLength(1);
+    expect([...popup.querySelectorAll('.rp-dict-name')].map((el) => el.textContent)).toEqual(['JMdict']);
+    const toggle = popup.querySelector('[data-act="more-dicts"]') as HTMLButtonElement;
+    expect(toggle.textContent).toBe('Show 2 more dictionaries');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(popup.textContent).not.toContain('a cat; a puss');
+
+    toggle.click();
+    const names = [...popup.querySelectorAll('.rp-dict-name')].map((el) => el.textContent);
+    expect(names).toEqual(['JMdict', 'Daijirin', 'Kenkyusha']);
+    const again = popup.querySelector('[data-act="more-dicts"]') as HTMLButtonElement;
+    expect(again.textContent).toBe('Show fewer dictionaries');
+    expect(again.getAttribute('aria-expanded')).toBe('true');
+    // Focus stays on the toggle (keyboard users are not thrown back to the page).
+    expect(h.popupRoot()?.activeElement).toBe(again);
+
+    again.click();
+    expect(popup.querySelectorAll('.rp-dict')).toHaveLength(1);
+  });
+
+  it('grouped without collapsing: every dictionary is a labelled section, no toggle', async () => {
+    h = await loadContent({
+      html: '<p id="p">猫だ</p>',
+      reply: scanReply({
+        entries: [
+          { word: '猫', reading: 'ねこ', via: 'exact', source: 'JMdict', senses: [sense('cat')] },
+          { word: '猫', reading: 'ねこ', via: 'exact', source: 'Daijirin', senses: [sense('ネコ科の哺乳類')] },
+        ],
+      }),
+    });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    expect(popup.querySelectorAll('.rp-entry')).toHaveLength(1);
+    expect([...popup.querySelectorAll('.rp-dict')].map((el) => el.getAttribute('aria-label'))).toEqual(['JMdict', 'Daijirin']);
+    expect(popup.querySelector('[data-act="more-dicts"]')).toBeNull();
+  });
+
+  it('merged: one numbered list, each sense labelled with its dictionary', async () => {
+    h = await loadContent({
+      html: '<p id="p">猫だ</p>',
+      reply: scanReply({
+        entries: [
+          {
+            word: '猫',
+            reading: 'ねこ',
+            via: 'exact',
+            source: 'JMdict',
+            senses: [sense('cat', 'JMdict'), sense('ネコ科の哺乳類', 'Daijirin')],
+          },
+        ],
+      }),
+    });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    const items = [...popup.querySelectorAll('.rp-senses li')];
+    expect(items.map((li) => li.querySelector('.rp-sense-dict')?.textContent)).toEqual(['JMdict', 'Daijirin']);
+    // The per-sense labels name the dictionaries; no single-source footer.
+    expect(popup.querySelector('.rp-entry-src')).toBeNull();
+  });
+
+  it('a single-dictionary entry keeps its plain layout and source footer', async () => {
+    h = await loadContent({
+      html: '<p id="p">猫だ</p>',
+      reply: scanReply({ entries: [{ word: '猫', reading: 'ねこ', via: 'exact', source: 'JMdict', senses: [sense('cat')] }] }),
+    });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    expect(popup.querySelector('.rp-dict')).toBeNull();
+    expect(popup.querySelector('.rp-sense-dict')).toBeNull();
+    expect(popup.querySelector('.rp-entry-src')?.textContent).toBe('JMdict');
+  });
+
+  it('draws the de-inflection trace line, steps named in the UI language', async () => {
+    h = await loadContent({
+      html: '<p id="p">食べさせられた</p>',
+      reply: (msg) =>
+        msg.type === 'scan'
+          ? {
+              ok: true,
+              matched: '食べさせられた',
+              via: 'deinflected',
+              deinflection: { source: '食べさせられた', term: '食べる', reasons: ['causative', 'passive/potential', 'past', 'my-rule'] },
+              entries: [{ word: '食べる', reading: 'たべる', via: 'deinflected', senses: [sense('to eat')] }],
+            }
+          : undefined,
+    });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    const trace = popup.querySelector('.rp-trace');
+    expect(trace?.textContent).toBe('食べさせられた ← causative ← passive / potential ← past ← my-rule ← 食べる');
+    expect(trace?.getAttribute('title')).toBe('Deconjugation path');
+    // The header names the base form once; the chain is not repeated there.
+    expect(popup.querySelector('.rp-sub .rp-deinf')).toBeNull();
+    expect(popup.querySelector('.rp-sub .rp-base')?.textContent).toContain('食べる');
+  });
+
+  it('no trace line without a de-inflection', async () => {
+    h = await loadContent({ html: '<p id="p">猫だ</p>', reply: fakeScan(WORDS) });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    expect(popup.querySelector('.rp-trace')).toBeNull();
+  });
+
+  it('Save word on a grouped card mines the headline entry', async () => {
+    h = await loadContent({
+      html: '<p id="p">猫だ</p>',
+      reply: scanReply({
+        entries: [
+          { word: '猫', reading: 'ねこ', via: 'exact', source: 'JMdict', senses: [sense('cat')] },
+          { word: '猫', reading: 'ねこ', via: 'exact', source: 'Daijirin', senses: [sense('ネコ科の哺乳類')], collapsed: true },
+          { word: '猫舌', reading: 'ねこじた', via: 'exact', source: 'JMdict', senses: [sense('sensitive to hot food')] },
+        ],
+      }),
+    });
+    h.hover(textNode(h, 'p'), 0);
+    const popup = await h.waitFor(() => h!.popup());
+    expect(popup.querySelectorAll('.rp-entry')).toHaveLength(2);
+    const second = popup.querySelectorAll('.rp-entry')[1];
+    expect(second.getAttribute('data-idx')).toBe('2');
+    (second.querySelector('[data-act="entry-save"]') as HTMLElement).click();
+    const save = await h.waitFor(() => h!.sent.find((m) => m.type === 'save-text'));
+    expect(save).toMatchObject({ text: '猫舌', meaning: 'sensitive to hot food', entryIndex: 2 });
   });
 });
 

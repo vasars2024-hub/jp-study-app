@@ -107,6 +107,21 @@ describe('apiFetch — the message the user ends up reading', () => {
     expect((await api(h, '/v1/sentence-analysis/snapshot', 'POST')).error).toBe(OUTDATED_MSG);
   });
 
+  it('reads a locked app (423) as "Gum is locked", translated, and never as offline', async () => {
+    const locked: Responder = () => ({ status: 423, json: { ok: false, code: 'locked', error: 'Gum is locked' } });
+    const h = bootBackground({ responder: locked });
+    expect((await api(h, '/v1/mine', 'POST')).error).toBe(extensionMessage('bg_errLocked'));
+    const res = (await h.send({ type: 'lookup', query: '猫' })) as ApiResult & { code?: string; locked?: boolean };
+    expect(res).toMatchObject({ ok: false, offline: false, locked: true, code: 'locked' });
+    const shared = h.shared as unknown as { serverErrorCode: (json: unknown, raw: unknown) => string };
+    expect(shared.serverErrorCode(null, res.error)).toBe('locked');
+    // The same mapping in another UI language: the code, not the English text, decides.
+    expect(extensionMessage('bg_errLocked', undefined, 'ja')).not.toBe(extensionMessage('bg_errLocked'));
+    // A 423 whose body did not parse is still the lock.
+    const bare = bootBackground({ responder: () => ({ status: 423 }) });
+    expect((await api(bare, '/v1/scan', 'POST')).error).toBe(extensionMessage('bg_errLocked'));
+  });
+
   it('applies the outdated hint only to 404, not to other failures on that route', async () => {
     const h = bootBackground({ responder: () => ({ status: 500, json: { error: 'Model timed out' } }) });
     expect((await api(h, '/v1/sentence-analysis', 'POST')).error).toBe('Model timed out');

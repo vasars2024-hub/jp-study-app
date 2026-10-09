@@ -128,6 +128,7 @@ export default function VisualizerPage() {
                   value={viz.fftSize}
                   onChange={(e) => patchViz({ fftSize: Number(e.target.value) as VizSettings['fftSize'] })}
                   title={t('settings.visualizer.fftTitle')}
+                  aria-label={t('settings.visualizer.label.detail')}
                 >
                   {FFT_SIZES.map((n) => (
                     <option key={n} value={n}>
@@ -156,12 +157,14 @@ export default function VisualizerPage() {
                       value={viz.customColors[0]}
                       onChange={(e) => patchViz({ customColors: [e.target.value, viz.customColors[1]] })}
                       title={t('settings.visualizer.gradStart')}
+                      aria-label={t('settings.visualizer.gradStart')}
                     />
                     <input
                       type="color"
                       value={viz.customColors[1]}
                       onChange={(e) => patchViz({ customColors: [viz.customColors[0], e.target.value] })}
                       title={t('settings.visualizer.gradEnd')}
+                      aria-label={t('settings.visualizer.gradEnd')}
                     />
                   </>
                 )}

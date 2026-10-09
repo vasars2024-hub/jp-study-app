@@ -22,7 +22,9 @@ export default function CollapsibleSection({
         type="button"
         className="collapse-header"
         aria-expanded={open}
-        aria-controls={panelId}
+        // The panel is unmounted while closed, so pointing at it then would
+        // name an id that does not exist (an invalid idref).
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         <span className="collapse-chevron" aria-hidden />

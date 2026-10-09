@@ -189,6 +189,7 @@ import { logDiagnostic, errorDetail } from './main/errorLog';
 import { resolveAppAsset } from './main/appProtocolResolve';
 import { createFileOpenRouter, filePathsFromArgv, type FileOpenRouter } from './main/fileOpenRouter';
 import { APP_USER_MODEL_ID, handleSquirrelStartup } from './main/squirrelEvents';
+import { e2eMarkCreatedShown, initE2eHeadless, isE2eHeadless } from './main/e2eHeadless';
 
 // Windows identity, before any window or notification exists: the id Squirrel stamps
 // on the installer's shortcuts, used by every build so the zip and an installed copy
@@ -224,6 +225,10 @@ if (altUserData) {
   app.setPath('sessionData', path.resolve(altUserData));
   console.log(`[main] JP_USER_DATA_DIR -> userData = ${app.getPath('userData')}`);
 }
+
+// The end-to-end harness's headless mode (main/e2eHeadless.ts): `GUM_E2E_HEADLESS=1`, plus
+// `--e2e` in a packaged build. Before any window, tray, shortcut or session exists.
+initE2eHeadless();
 
 // Single instance so a Startup hotkey can launch with `--toggle` / `--open=` /
 // `--restart` and route into the already-running copy.
@@ -1730,6 +1735,8 @@ function createPopoutWindow(requested: string): boolean {
     maximizable: !mooncapWidget,
     fullscreenable: !mooncapWidget,
     frame: false,
+    // Shown on construction, as it always was — except under the e2e harness.
+    show: !isE2eHeadless(),
     backgroundColor: mooncapWidget ? '#050711' : '#14131a',
     autoHideMenuBar: true,
     webPreferences: {
@@ -1737,6 +1744,8 @@ function createPopoutWindow(requested: string): boolean {
       webviewTag: true,
     },
   });
+  // Under the harness it was created hidden; give it the "shown" a desktop would have.
+  if (isE2eHeadless()) e2eMarkCreatedShown(win);
   if (mooncapWidget) win.setAspectRatio(4 / 5);
   // Pop-outs host the same sections as the main window — including the
   // Immersion browser's <webview> — so they get the same webview hardening and
@@ -2020,7 +2029,9 @@ app.whenReady().then(async () => {
     logDiagnostic('info', 'security', 'permission-denied', `${permission} for ${origin ?? 'unknown'}`);
   installPermissionPolicy(session.defaultSession, 'app', appOriginPolicy, onDenied);
   installPermissionPolicy(session.fromPartition('persist:immersion'), 'immersion', appOriginPolicy, onDenied);
-  if (isDevServer()) startDebugBridge();
+  // The e2e harness drives an unpackaged PRODUCTION build (tools/e2e/build.cjs), which has
+  // no dev server; startDebugBridge itself still refuses any packaged build.
+  if (isDevServer() || isE2eHeadless()) startDebugBridge();
   ensureLibrary();
   if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'undefined' || !MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     registerAppProtocol();

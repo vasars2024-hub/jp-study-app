@@ -4351,6 +4351,24 @@ details.lib-filter-bar[open] .lib-filter-summary::after {
 .card {
   cursor: pointer;
 }
+/* a11y3: the card's open action, a real button stretched over the cover so the
+   Remove / File / Set-cover buttons are its siblings rather than its children.
+   Transparent; later absolutely-placed badges and buttons paint above it. The
+   inset ring keeps focus visible inside `.cover`'s overflow clip. */
+.card-open {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.card-open:focus-visible {
+  outline: 2px solid var(--accent, Highlight);
+  outline-offset: -3px;
+}
 .cover {
   position: relative;
   aspect-ratio: 3 / 4;
@@ -4878,6 +4896,21 @@ details.lib-filter-bar[open] .lib-filter-summary::after {
 
 /* ---------- Custom (ttu-style) novel reader ---------- */
 
+/* The Collection drawer (`.reader-collection`, 360px on the right) used to lie OVER the
+   page. Mining opens it, so the sentence just mined was covered at once — and on a
+   vertical-rl book, which starts at the right edge, the whole first page vanished under
+   it (found by the e2e harness, tools/e2e flow `epub`). On a window wide enough to keep a
+   readable page beside it, the page now yields that strip; the reader's ResizeObserver
+   re-paginates. A narrow window keeps the overlay. An explicit width, not `right`: in a
+   vertical-rl scroller the horizontal size is the BLOCK size, and Chromium sizes an
+   absolutely positioned box's auto block size from its content (the page buffer) rather
+   than from `left`/`right` — measured: `right: 360px` computed, width unchanged. */
+@media (min-width: 900px) {
+  .novel-scroller.beside-collection {
+    right: auto;
+    width: calc(100% - min(360px, 94vw));
+  }
+}
 .novel-scroller {
   position: absolute;
   inset: 0;

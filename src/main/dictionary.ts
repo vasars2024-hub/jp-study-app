@@ -73,6 +73,7 @@ import {
   setDictionarySourceEnabled,
   moveDictionarySource,
   removeDictionarySource,
+  syncDictionarySourceOrder,
   listUserNotesFromDb,
   readUserNoteFromDb,
   writeUserNoteToDb,
@@ -93,6 +94,15 @@ import {
   readExplainTarget,
 } from '../shared/lexiconExplainPrompt';
 import { normalizePolicy } from '../shared/agentExecutionBridge';
+import { readDictDisplayPrefs, writeDictDisplayPrefs } from './dictionary/displayPrefs';
+import {
+  audioSourceAvailability,
+  localAudioFolderStats,
+  readAudioSourcesPrefs,
+  resolveAudioChain,
+  writeAudioSourcesPrefs,
+  type RemoteAudio,
+} from './dictionary/audioSources';
 import { dictionaryDir } from './dictionary/db';
 import { disposeDictionaryReads, readDictionary, readDictionaryBatch } from './dictionary/readIpc';
 import type { LookupResult } from './dictionary/dictService';
@@ -1008,6 +1018,15 @@ export async function searchExamples(
  * against `headwords.lang`, so anything that is not a plain non-empty string is
  * rejected here rather than silently matching nothing three layers down.
  */
+/** The CDN source of the audio chain: the existing cache-then-provider path, unchanged. */
+const remoteHeadwordAudio: RemoteAudio = (identity, options) =>
+  getHeadwordAudioFromDb({
+    lang: identity.lang,
+    term: identity.term,
+    reading: identity.reading,
+    ...(options.cacheOnly ? { cacheOnly: true } : {}),
+  });
+
 function readPair(value: unknown): DictionaryLanguagePair | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const { sourceLang, targetLang } = value as Record<string, unknown>;
@@ -1218,6 +1237,42 @@ export function registerDictionaryIpc(): void {
     resetDictionaryPairPriority(readPair(pair) ?? GLOBAL_PAIR));
   ipcMain.handle('dict:setSourceEnabled', (_e, id: string, enabled: boolean) =>
     setDictionarySourceEnabled(id, enabled));
+  // Drag-to-reorder in Settings: the whole global order at once. Ids the
+  // database does not hold are ignored by `syncDictionarySourceOrder`.
+  ipcMain.handle('dict:setSourceOrder', (_e, ids: unknown) =>
+    syncDictionarySourceOrder(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string').slice(0, 500) : []));
+  // Result layout (grouped / merged, collapsed secondaries): one file every
+  // window and the extension server read (`shared/dictDisplay.ts`).
+  ipcMain.handle('dict:displayPrefsGet', () => readDictDisplayPrefs());
+  ipcMain.handle('dict:displayPrefsSet', (_e, prefs: unknown) => writeDictDisplayPrefs(prefs));
+  // The ordered audio-source list (`shared/audioSources.ts`).
+  ipcMain.handle('dict:audioSourcesGet', () => readAudioSourcesPrefs());
+  ipcMain.handle('dict:audioSourcesSet', (_e, prefs: unknown) => writeAudioSourcesPrefs(prefs));
+  ipcMain.handle('dict:audioFolderPick', async (): Promise<string | null> => {
+    const { dialog, BrowserWindow } = await import('electron');
+    const owner = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    const options = { properties: ['openDirectory' as const] };
+    const picked = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    return picked.canceled ? null : picked.filePaths[0] ?? null;
+  });
+  ipcMain.handle('dict:audioFolderStats', (_e, folder: unknown) =>
+    (typeof folder === 'string' && folder.trim()
+      ? localAudioFolderStats(folder.trim())
+      : Promise.resolve({ files: 0, truncated: false, exists: false })));
+  ipcMain.handle('dict:audioAvailability', (_e, request: unknown) => {
+    const raw = request && typeof request === 'object' && !Array.isArray(request) ? request as Record<string, unknown> : {};
+    const term = typeof raw.term === 'string' ? raw.term.trim().slice(0, MAX_AUDIO_QUERY_CHARS) : '';
+    if (!term) return Promise.resolve([]);
+    return audioSourceAvailability(
+      {
+        lang: typeof raw.lang === 'string' ? raw.lang : '',
+        term,
+        reading: typeof raw.reading === 'string' ? raw.reading.trim().slice(0, MAX_AUDIO_QUERY_CHARS) : undefined,
+      },
+      readAudioSourcesPrefs(),
+      remoteHeadwordAudio,
+    ).catch(() => []);
+  });
   // `lang` stays `unknown` all the way into the validator. The renderer sends a
   // code from a fixed list, but this channel is reachable from anything with the
   // preload bridge, and a bad code here would relabel rows.
@@ -1510,12 +1565,19 @@ export function registerDictionaryIpc(): void {
         ? raw.reading.trim().slice(0, MAX_AUDIO_QUERY_CHARS)
         : undefined;
       if (!term) return Promise.resolve({ query: term, status: 'unsupported' });
-      return getHeadwordAudioFromDb({
-        lang,
-        term,
-        reading,
-        cacheOnly: raw.cacheOnly === true,
-      }).catch(() => ({
+      // The user's ordered sources (local folders, the CDN), or only the one the
+      // entry's picker named. `remoteHeadwordAudio` is the CDN path unchanged.
+      return resolveAudioChain(
+        {
+          lang,
+          term,
+          reading,
+          cacheOnly: raw.cacheOnly === true,
+          ...(typeof raw.sourceId === 'string' && raw.sourceId ? { sourceId: raw.sourceId.slice(0, 60) } : {}),
+        },
+        readAudioSourcesPrefs(),
+        remoteHeadwordAudio,
+      ).catch(() => ({
         // The fetch path already turns its own failures into `offline`, so
         // reaching here means the filesystem or the database threw. Same shape
         // as a dead connection from the surface's side: retryable, not a claim

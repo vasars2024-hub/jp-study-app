@@ -119,6 +119,24 @@ export function normalizeReviewLog(value: unknown): ReviewLogEntry[] {
   return out.length > REVIEW_LOG_LIMIT ? out.slice(out.length - REVIEW_LOG_LIMIT) : out;
 }
 
+/**
+ * `normalizeReviewLog` for rows that are already normalised entries: the same
+ * dedupe (first id wins), time order and cap, without validating every row a
+ * second (and third) time. Loading a 200,000-row history used to normalise it
+ * once per row, then again as a list, then again with the session's rows.
+ */
+export function mergeNormalizedReviewLog(rows: readonly ReviewLogEntry[]): ReviewLogEntry[] {
+  const out: ReviewLogEntry[] = [];
+  const seen = new Set<string>();
+  for (const entry of rows) {
+    if (seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    out.push(entry);
+  }
+  out.sort((a, b) => a.at - b.at);
+  return out.length > REVIEW_LOG_LIMIT ? out.slice(out.length - REVIEW_LOG_LIMIT) : out;
+}
+
 export interface ReviewDaySummary {
   /** Local calendar date, YYYY-MM-DD. */
   date: string;
@@ -186,8 +204,23 @@ export function summarizeReviewLog(
   let grammarCorrect = 0;
   let gameAnswers = 0;
   let gameCorrect = 0;
+  // Rows before the window's first local midnight cannot land in it: skipped on
+  // a number compare. The rest reuse the day's bounds while they stay on one
+  // day, so a time-ordered log formats one date per day, not one per row.
+  const [y0, m0, d0] = perDay[0].date.split('-').map(Number);
+  const start = new Date(y0, m0 - 1, d0).getTime();
+  let dayFrom = Number.POSITIVE_INFINITY;
+  let dayTo = Number.NEGATIVE_INFINITY;
+  let dayBucket: ReviewDaySummary | undefined;
   for (const entry of entries) {
-    const bucket = index.get(localDayKey(entry.at));
+    if (entry.at < start) continue;
+    if (!(entry.at >= dayFrom && entry.at < dayTo)) {
+      const d = new Date(entry.at);
+      dayBucket = index.get(localDayKey(entry.at));
+      dayFrom = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      dayTo = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+    }
+    const bucket = dayBucket;
     if (!bucket) continue;
     if (entry.mode === 'review') {
       bucket.reviews += 1;

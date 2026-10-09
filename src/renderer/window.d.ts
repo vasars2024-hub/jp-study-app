@@ -448,8 +448,17 @@ declare global {
         options?: { sourceLangs?: string[] },
       ): Promise<import('../shared/lexiconXrefs').LexiconXrefResult>;
       dictAudio(
-        request: { lang: string; term: string; reading?: string; cacheOnly?: boolean },
-      ): Promise<import('../shared/lexiconAudio').LexiconAudioResult>;
+        request: { lang: string; term: string; reading?: string; cacheOnly?: boolean; sourceId?: string },
+      ): Promise<import('../shared/lexiconAudio').LexiconAudioResult & { sourceId?: string }>;
+      dictAudioSourcesGet?(): Promise<import('../shared/audioSources').AudioSourcesPrefs>;
+      dictAudioSourcesSet?(
+        prefs: import('../shared/audioSources').AudioSourcesPrefs,
+      ): Promise<import('../shared/audioSources').AudioSourcesPrefs>;
+      dictAudioFolderPick?(): Promise<string | null>;
+      dictAudioFolderStats?(folder: string): Promise<{ files: number; truncated: boolean; exists: boolean }>;
+      dictAudioAvailability?(
+        request: { lang: string; term: string; reading?: string },
+      ): Promise<import('../shared/audioSources').AudioSourceAvailability[]>;
       dictConjugation(word: string): Promise<import('../shared/conjugationClass').ConjugationAnalysis>;
       dictNoteGet(
         identity: import('../shared/lexiconNotes').LexiconNoteIdentity,
@@ -497,6 +506,11 @@ declare global {
       dictPairHasOverride(pair: import('../shared/dictionarySources').DictionaryLanguagePair): Promise<boolean>;
       dictResetPairPriority(pair: import('../shared/dictionarySources').DictionaryLanguagePair): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
       dictSetSourceEnabled(id: string, enabled: boolean): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
+      dictSetSourceOrder?(ids: string[]): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
+      dictDisplayPrefsGet?(): Promise<import('../shared/dictDisplay').DictDisplayPrefs>;
+      dictDisplayPrefsSet?(
+        prefs: import('../shared/dictDisplay').DictDisplayPrefs,
+      ): Promise<import('../shared/dictDisplay').DictDisplayPrefs>;
       dictSetSourceLang(id: string, lang: string): Promise<import('../shared/dictionarySources').DictionarySourceLangResult>;
       dictMoveSource(id: string, direction: -1 | 1, pair?: import('../shared/dictionarySources').DictionaryLanguagePair): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
       dictRemoveSource(id: string): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
@@ -505,7 +519,7 @@ declare global {
       ankiKnownWords(): Promise<{ ok: boolean; error?: string; words?: Record<string, number> }>;
       ankiCheckDuplicates?(
         terms: string[],
-        target: { deckName: string; modelName: string },
+        target: { deckName: string; modelName: string; termField?: string },
       ): Promise<{ ok: boolean; duplicates: Record<string, boolean>; error?: string; unreachable?: boolean }>;
       profileGet():Promise<ProfileSnapshot & { legacyMigrated: boolean }>;
       profileList(): Promise<StudyProfile[]>;
@@ -533,6 +547,20 @@ declare global {
       ankiGetIntervalsForNotes(noteIds: readonly number[]): Promise<IntervalSnapshot>;
       /** Read-only week-ahead due counts from Anki's own scheduler. */
       ankiDueForecast(): Promise<DueForecast>;
+      /** Two-way review sync — see `preload.ts`. Optional: an older main lacks them. */
+      ankiSyncProbe?(): Promise<import('../shared/ankiReviewSync').AnkiSyncProbeResult>;
+      ankiPushReviews?(request: {
+        items: import('../shared/ankiReviewSync').AnkiReviewPushItem[];
+        expectedProfile?: string;
+      }): Promise<import('../shared/ankiReviewSync').AnkiReviewPushResult>;
+      ankiPullSchedule?(request: {
+        noteIds: number[];
+        expectedProfile?: string;
+      }): Promise<import('../shared/ankiReviewSync').AnkiSchedulePullResult>;
+      ankiFindNoteLinks?(request: {
+        requests: import('../shared/ankiReviewSync').AnkiLinkRequest[];
+        expectedProfile?: string;
+      }): Promise<import('../shared/ankiReviewSync').AnkiLinkResult>;
       /** Deck Workbench AI additions — gate 12. Batch id is the renderer's. */
       ankiAiGenerateAdditions(request: {
         batchId: string;
@@ -1020,13 +1048,31 @@ declare global {
         target: string;
         senseHints?: import('../shared/translateCore').TranslateSenseHint[];
         style?: import('../shared/translateCore').TranslateStyle;
+        provider?: import('../shared/translateProviders').TranslateEngineRequest;
+        glossary?: import('../shared/translateGlossary').TranslateGlossaryTerm[];
       }): Promise<{
         ok: boolean;
         text?: string;
         segments?: import('../shared/translateCore').TranslateSegment[];
+        meta?: import('../shared/translateProviders').TranslateResultMeta;
         error?: string;
         errorKey?: string;
+        failure?: import('../shared/translateProviders').TranslateRouteFailure;
       }>;
+      translateProviders(): Promise<import('../shared/translateProviders').TranslateProviderSnapshot>;
+      translateSetPairProvider(
+        source: string,
+        target: string,
+        provider: import('../shared/translateProviders').TranslateProviderId,
+      ): Promise<import('../shared/translateProviders').TranslateProviderSnapshot>;
+      translateSetProviderConsent(
+        provider: import('../shared/translateProviders').TranslateCloudProviderId,
+        granted: boolean,
+      ): Promise<import('../shared/translateProviders').TranslateProviderSnapshot>;
+      translateSetFallback(on: boolean): Promise<import('../shared/translateProviders').TranslateProviderSnapshot>;
+      onTranslateProvidersChanged(
+        cb: (snapshot: import('../shared/translateProviders').TranslateProviderSnapshot) => void,
+      ): () => void;
       translateRunBatch(req: {
         items: Array<{ id: string; text: string; source: string; target: string }>;
       }): Promise<{
@@ -1043,7 +1089,11 @@ declare global {
         cb: (p: { status?: string; file?: string; progress?: number }) => void,
       ): () => void;
       onTranslateBatchProgress(cb: (p: { done: number; total: number }) => void): () => void;
-      onTranslatePartial(cb: (p: { id: number; progress: number }) => void): () => void;
+      onTranslatePartial(cb: (p: {
+        id: number;
+        progress: number;
+        segment?: { index: number; total: number; source: string; target: string };
+      }) => void): () => void;
       translateAnalyze(
         req: import('../shared/translateAnalysisCore').TranslateAnalyzeRequest,
       ): Promise<{
@@ -2401,6 +2451,7 @@ declare global {
         fileName: string;
         media: ReadonlyArray<import('../shared/deckMediaExport').DeckMediaItem>;
         rows?: string[][];
+        schedules?: import('../shared/localDeckApkg').LocalDeckApkgRequest['schedules'];
       }): Promise<import('../main/flashcardAudio').DeckExportResult>;
       flashcardRevealExport(directory: string): Promise<boolean>;
       flashcardReadAudio(

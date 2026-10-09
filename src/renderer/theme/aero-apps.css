@@ -562,14 +562,34 @@
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
-:root[data-materials='aero'] .aero-flash-folder-x {
-  opacity: 0;
-  justify-self: end;
-  color: var(--muted);
-  font-size: 11px;
+/* The folder's delete control is a sibling button (no control inside a
+   control), laid over the folder button's empty third grid track. */
+:root[data-materials='aero'] .aero-flash-folder-item {
+  position: relative;
 }
 
-:root[data-materials='aero'] .aero-flash-folder:hover .aero-flash-folder-x,
+:root[data-materials='aero'] .aero-flash-folder-x {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  /* WCAG 2.5.8 target floor: 24px. */
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  opacity: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+:root[data-materials='aero'] .aero-flash-folder-item:hover .aero-flash-folder-x,
 :root[data-materials='aero'] .aero-flash-folder-x:focus-visible {
   opacity: 1;
 }

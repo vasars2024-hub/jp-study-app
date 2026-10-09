@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "source": "ja",
+  "target": "en",
+  "description": "Invented Japanese sentences with reference English translations, written for this repo (no third-party text). Eight per category: keigo, omission (dropped subjects/objects, resolved by a second clause), idiom, counter, onomatopoeia. Scored by tools/translate-eval.cjs with chrF; alternate references cover legitimate variation.",
+  "items": [
+    { "id": "keigo-01", "category": "keigo", "source": "先生は明日の会議にいらっしゃいますか。", "references": ["Will the professor be coming to tomorrow's meeting?", "Will you be attending tomorrow's meeting, Professor?"] },
+    { "id": "keigo-02", "category": "keigo", "source": "資料は後ほどメールでお送りいたします。", "references": ["I will send you the materials by email later.", "We will email you the documents shortly."] },
+    { "id": "keigo-03", "category": "keigo", "source": "少々お待ちくださいませ。", "references": ["Please wait a moment.", "One moment, please."] },
+    { "id": "keigo-04", "category": "keigo", "source": "社長がそうおっしゃっていました。", "references": ["The president said so.", "That is what the company president said."] },
+    { "id": "keigo-05", "category": "keigo", "source": "お名前を伺ってもよろしいでしょうか。", "references": ["May I ask your name?", "Could I have your name, please?"] },
+    { "id": "keigo-06", "category": "keigo", "source": "このたびはご迷惑をおかけして、誠に申し訳ございません。", "references": ["We sincerely apologize for the inconvenience we have caused.", "We are truly sorry for the trouble we have caused you."] },
+    { "id": "keigo-07", "category": "keigo", "source": "部長はもうお帰りになりました。", "references": ["The manager has already gone home.", "The department head has already left for the day."] },
+    { "id": "keigo-08", "category": "keigo", "source": "何かございましたら、お気軽にお申し付けください。", "references": ["If there is anything you need, please feel free to let us know.", "Please don't hesitate to ask if you need anything."] },
+
+    { "id": "omission-01", "category": "omission", "source": "田中さんに電話した？うん、でも出なかった。", "references": ["Did you call Mr. Tanaka? Yes, but he didn't answer.", "Did you call Tanaka? Yeah, but he didn't pick up."] },
+    { "id": "omission-02", "category": "omission", "source": "このケーキ、食べてもいい？いいよ、全部どうぞ。", "references": ["Can I eat this cake? Sure, have all of it.", "Is it okay if I eat this cake? Go ahead, you can have the whole thing."] },
+    { "id": "omission-03", "category": "omission", "source": "宿題は終わった？まだ半分しかやってない。", "references": ["Have you finished your homework? I've only done half of it so far.", "Did you finish your homework? I've only done half so far."] },
+    { "id": "omission-04", "category": "omission", "source": "妹は犬が大好きで、毎朝散歩に連れていく。", "references": ["My younger sister loves dogs and takes hers for a walk every morning.", "My little sister loves dogs, and she takes the dog for a walk every morning."] },
+    { "id": "omission-05", "category": "omission", "source": "財布を忘れたので、取りに戻った。", "references": ["I forgot my wallet, so I went back to get it.", "I left my wallet behind, so I went back for it."] },
+    { "id": "omission-06", "category": "omission", "source": "新しい本を買ったけど、まだ読んでいない。", "references": ["I bought a new book, but I haven't read it yet."] },
+    { "id": "omission-07", "category": "omission", "source": "駅に着いたら連絡して。", "references": ["Let me know when you get to the station.", "Contact me when you arrive at the station."] },
+    { "id": "omission-08", "category": "omission", "source": "手紙をもらったけど、誰からか分からない。", "references": ["I got a letter, but I don't know who it's from.", "I received a letter, but I don't know who sent it."] },
+
+    { "id": "idiom-01", "category": "idiom", "source": "彼は顔が広いので、誰でも紹介してくれる。", "references": ["He knows a lot of people, so he can introduce you to anyone.", "He is well connected, so he will introduce you to anybody."] },
+    { "id": "idiom-02", "category": "idiom", "source": "試験の結果を聞いて、胸をなでおろした。", "references": ["I was relieved when I heard the exam results.", "Hearing the results of the exam, I breathed a sigh of relief."] },
+    { "id": "idiom-03", "category": "idiom", "source": "あの二人は犬猿の仲だ。", "references": ["Those two can't stand each other.", "Those two fight like cats and dogs."] },
+    { "id": "idiom-04", "category": "idiom", "source": "猫の手も借りたいほど忙しい。", "references": ["I'm so busy I'd take any help I can get.", "We are so busy we could use all the help we can get."] },
+    { "id": "idiom-05", "category": "idiom", "source": "彼女は口が堅いから、秘密を話しても大丈夫だ。", "references": ["She can keep a secret, so it's safe to tell her.", "She is tight-lipped, so you can tell her the secret."] },
+    { "id": "idiom-06", "category": "idiom", "source": "部長の話は耳にたこができるほど聞いた。", "references": ["I've heard the manager's story so many times I'm sick of it.", "I've heard the boss's talk so often I'm tired of hearing it."] },
+    { "id": "idiom-07", "category": "idiom", "source": "今さら後悔しても後の祭りだ。", "references": ["It's too late to regret it now.", "There's no point in regretting it now; it's too late."] },
+    { "id": "idiom-08", "category": "idiom", "source": "彼の冗談には腹を抱えて笑った。", "references": ["I doubled over laughing at his joke.", "His joke had me in stitches."] },
+
+    { "id": "counter-01", "category": "counter", "source": "机の上に鉛筆が三本ある。", "references": ["There are three pencils on the desk."] },
+    { "id": "counter-02", "category": "counter", "source": "猫を二匹飼っています。", "references": ["I have two cats.", "I keep two cats."] },
+    { "id": "counter-03", "category": "counter", "source": "駅まで車で十五分かかります。", "references": ["It takes fifteen minutes by car to get to the station.", "It's a fifteen-minute drive to the station."] },
+    { "id": "counter-04", "category": "counter", "source": "紙を五枚ください。", "references": ["Five sheets of paper, please.", "Please give me five sheets of paper."] },
+    { "id": "counter-05", "category": "counter", "source": "昨日、本を四冊買った。", "references": ["I bought four books yesterday.", "Yesterday I bought four books."] },
+    { "id": "counter-06", "category": "counter", "source": "この家には部屋が六つある。", "references": ["This house has six rooms.", "There are six rooms in this house."] },
+    { "id": "counter-07", "category": "counter", "source": "子どもが三人います。", "references": ["I have three children.", "I have three kids."] },
+    { "id": "counter-08", "category": "counter", "source": "ビールを二杯飲んだ。", "references": ["I drank two glasses of beer.", "I had two beers."] },
+
+    { "id": "onomatopoeia-01", "category": "onomatopoeia", "source": "雨がざあざあ降っている。", "references": ["It's pouring rain.", "The rain is pouring down."] },
+    { "id": "onomatopoeia-02", "category": "onomatopoeia", "source": "お腹がぺこぺこだ。", "references": ["I'm starving.", "I'm really hungry."] },
+    { "id": "onomatopoeia-03", "category": "onomatopoeia", "source": "赤ちゃんがすやすや眠っている。", "references": ["The baby is sleeping peacefully.", "The baby is sleeping soundly."] },
+    { "id": "onomatopoeia-04", "category": "onomatopoeia", "source": "緊張して胸がドキドキした。", "references": ["I was nervous and my heart was pounding.", "My heart was racing with nerves."] },
+    { "id": "onomatopoeia-05", "category": "onomatopoeia", "source": "彼は怒ってぷんぷんしている。", "references": ["He is fuming with anger.", "He's all huffy and angry."] },
+    { "id": "onomatopoeia-06", "category": "onomatopoeia", "source": "床がぴかぴかに磨かれている。", "references": ["The floor has been polished until it shines.", "The floor is polished to a shine."] },
+    { "id": "onomatopoeia-07", "category": "onomatopoeia", "source": "外は風がびゅうびゅう吹いている。", "references": ["The wind is howling outside.", "It's blowing hard outside."] },
+    { "id": "onomatopoeia-08", "category": "onomatopoeia", "source": "彼女はにこにこしながら手を振った。", "references": ["She waved with a big smile.", "She waved, smiling brightly."] }
+  ]
+}

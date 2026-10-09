@@ -87,8 +87,21 @@ function JobRow({ job, studyLang }: { job: RecorderJob; studyLang: string }) {
     <div className={`rr-job rr-job--${job.phase}`} data-testid="rr-job">
       <div className="rr-job-title" title={job.outputPath ?? job.partialPath}>{job.title}</div>
       <div className="rr-job-status">{status}</div>
+      {/* a11y3: the phase, announced once per change. The visible status above
+          carries a percentage that ticks every frame while converting, which a
+          live region would read out on every tick; the progress bar has it. */}
+      <span className="sr-only" role="status">
+        {job.phase === 'finalizing' ? t('a11y3.recorder.converting') : status}
+      </span>
       {job.phase === 'finalizing' && (
-        <div className="rr-progress" role="progressbar" aria-valuenow={Math.round(job.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+        <div
+          className="rr-progress"
+          role="progressbar"
+          aria-label={t('a11y3.recorder.converting')}
+          aria-valuenow={Math.round(job.progress * 100)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
           <span style={{ width: `${Math.round(job.progress * 100)}%` }} />
         </div>
       )}
@@ -188,6 +201,17 @@ export default function RecorderPanel() {
 
   return (
     <div className="rr-panel" ref={root}>
+      {/* a11y3: the session state for a screen reader. The pill's clock is
+          aria-live="off" on purpose (it ticks); this says what changed. */}
+      <span className="sr-only" role="status">
+        {state.phase === 'recording'
+          ? t('a11y3.recorder.recording')
+          : state.phase === 'paused'
+            ? t('a11y3.recorder.paused')
+            : state.phase === 'starting'
+              ? t('recorder.pill.starting')
+              : ''}
+      </span>
       {live && (
         <div className="rr-pill" role="group" aria-label={t('recorder.pill.label')}>
           <span className={`rr-dot${state.phase === 'paused' ? ' rr-dot--paused' : ''}`} aria-hidden="true" />
@@ -218,7 +242,7 @@ export default function RecorderPanel() {
       {(meters.mic.clipping || meters.system.clipping) && live && <div className="rr-note">{t('rec2.pill.clipping')}</div>}
       {state.phase === 'error' && (
         <div className="rr-job rr-job--error">
-          <div className="rr-job-status">{t(state.errorKey || 'recorder.error.streamFailed')}</div>
+          <div className="rr-job-status" role="alert">{t(state.errorKey || 'recorder.error.streamFailed')}</div>
           {state.errorDetail && <div className="rr-job-note">{state.errorDetail}</div>}
           <div className="rr-job-actions">
             <button type="button" className="rr-btn" onClick={() => void window.api.recorderStop()}>{t('recorder.job.dismiss')}</button>

@@ -28,6 +28,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   RETRY_QUEUE_KEY,
   bootBackground,
+  extensionMessage,
   readExtensionFile,
   type BackgroundHarness,
   type QueuedItem,
@@ -521,6 +522,106 @@ describe('retry queue — an item that can never succeed', () => {
     const flushCall = h.fetches.filter((f) => f.url.endsWith('/v1/mine')).pop();
     expect(flushCall).toBeDefined();
     expect(h.queue()).toHaveLength(0);
+  });
+});
+
+/* ===================== a locked app (HTTP 423 `locked`) ==================== */
+
+/**
+ * The app's lockscreen: /v1/health answers `{ locked }`, every content route
+ * answers 423 `{ code: 'locked' }` while it is true (src/main/lockGuard.ts).
+ */
+function lockableApp(state: { locked: boolean }): Responder {
+  return (url) => {
+    if (url.endsWith('/v1/health')) return { status: 200, json: { ok: true, version: 1, locked: state.locked } };
+    return state.locked
+      ? { status: 423, json: { ok: false, code: 'locked', error: 'Gum is locked' } }
+      : { status: 200, json: { ok: true } };
+  };
+}
+
+/** Let a fire-and-forget alarm run its health probe and the flush behind it. */
+async function settleLong(): Promise<void> {
+  for (let i = 0; i < 5; i++) await settle();
+}
+
+describe('retry queue — a locked app is retried later, never dropped', () => {
+  it('keeps every queued item through a 423 flush, uncounted, and stops at the first refusal', async () => {
+    const h = bootBackground({ responder: APP_DOWN });
+    for (const text of ['a', 'b', 'c']) await saveWord(h, text);
+    const app = { locked: true };
+    h.respond(lockableApp(app));
+    forgetFetches(h);
+
+    const res = (await h.send({ type: 'flush' })) as FlushResult & { locked?: boolean };
+    // Was: a 423 is a 4xx, so all three were dropped as `rejected` on the spot.
+    expect(res).toEqual({ flushed: 0, left: 3, dropped: 0, locked: true });
+    expect(h.queue().map((q) => q.payload.text)).toEqual(['a', 'b', 'c']);
+    expect(h.queue().every((q) => (q.attempts ?? 0) === 0)).toBe(true);
+    // One refused POST, not one per item.
+    expect(postedTo(h, '/v1/mine').map((b) => b.text)).toEqual(['a']);
+    expect((await activity(h)).some((a) => a.dropped)).toBe(false);
+    expect(h.badgeText()).toBe('3');
+  });
+
+  it('while locked, the alarm only asks /v1/health — once per tick — and sends nothing', async () => {
+    const h = bootBackground({ responder: APP_DOWN });
+    await saveWord(h, 'waiting');
+    const app = { locked: true };
+    h.respond(lockableApp(app));
+    await h.send({ type: 'flush' }); // learns the lock from the 423
+    forgetFetches(h);
+
+    for (let i = 0; i < 3; i++) {
+      h.chrome.listeners.onAlarm[0]({ name: 'jpStudyFlushQueue' });
+      await settleLong();
+    }
+    expect(h.fetches.map((f) => new URL(f.url).pathname)).toEqual(['/v1/health', '/v1/health', '/v1/health']);
+    expect(h.queue()).toHaveLength(1);
+    // The flag survives a worker restart, so a woken worker does not replay first.
+    expect(typeof h.chrome.storage.local.data.jpStudyAppLocked).toBe('number');
+  });
+
+  it('flushes in order on the first tick after /v1/health reports locked: false', async () => {
+    const h = bootBackground({ responder: APP_DOWN });
+    for (const text of ['first', 'second']) await saveWord(h, text);
+    const app = { locked: true };
+    h.respond(lockableApp(app));
+    await h.send({ type: 'flush' });
+    expect(h.queue()).toHaveLength(2);
+
+    app.locked = false;
+    forgetFetches(h);
+    h.chrome.listeners.onAlarm[0]({ name: 'jpStudyFlushQueue' });
+    await settleLong();
+    expect(h.fetches[0].url.endsWith('/v1/health')).toBe(true);
+    expect(postedTo(h, '/v1/mine').map((b) => b.text)).toEqual(['first', 'second']);
+    expect(h.queue()).toHaveLength(0);
+    expect(h.badgeText()).toBe('');
+    expect(h.chrome.storage.local.data.jpStudyAppLocked).toBeUndefined();
+  });
+
+  it('a save made while locked is queued and says why, in the UI language', async () => {
+    const app = { locked: true };
+    const h = bootBackground({ responder: lockableApp(app) });
+    const res = (await saveWord(h, '猫')) as SaveResult & { locked?: boolean };
+    expect(res).toMatchObject({ ok: true, queued: true, locked: true });
+    expect(h.shared.formatSaveResultMessage(res)).toBe(extensionMessage('common_queuedLocked'));
+    expect(h.queue().map((q) => q.payload.text)).toEqual(['猫']);
+
+    // Unlocking is noticed by the popup's status probe too, which drains at once.
+    app.locked = false;
+    await h.send({ type: 'status-summary' });
+    await settleLong();
+    expect(h.queue()).toHaveLength(0);
+  });
+
+  it('reading time waits for the unlock instead of being thrown away', async () => {
+    const app = { locked: true };
+    const h = bootBackground({ responder: lockableApp(app) });
+    const res = await h.send({ type: 'immersion-visit', url: 'https://example.com/a', seconds: 30, chars: 100 });
+    expect(res).toEqual({ ok: true, queued: true, locked: true });
+    expect(h.chrome.storage.local.data.jpStudyImmersionQueue).toHaveLength(1);
   });
 });
 

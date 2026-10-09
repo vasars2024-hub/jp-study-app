@@ -12,6 +12,7 @@ import {
 } from '../components/anki/AnkiContent';
 import { ProfileSettingsSection } from './SettingsView';
 import DeckWorkbench from '../components/anki/DeckWorkbench';
+import AnkiSyncStatus from '../components/anki/AnkiSyncStatus';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { stripTrailingTerminator } from '../../shared/sentenceJoin';
 import { useT } from '../i18n';
@@ -185,6 +186,13 @@ export default function AnkiView() {
       */}
       {showOfflineSections && (
         <>
+          {/* Sync status works without Anki too: what is waiting, and why it is waiting. */}
+          <div className="anki-card anki-card-flush">
+            <CollapsibleSection title={t('anki3.sync.title')} summary={t('anki3.sync.summary')}>
+              <AnkiSyncStatus />
+            </CollapsibleSection>
+          </div>
+
           <div className="anki-card anki-card-flush">
             <CollapsibleSection title={t('ankiWorkbench.title')} summary={t('ankiWorkbench.lead')}>
               <DeckWorkbench />

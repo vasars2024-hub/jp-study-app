@@ -28,6 +28,7 @@ import { sendTelemetryPingIfNeeded } from '../telemetryPing';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import type { DictionaryImportJobSnapshot } from '../../shared/dictionaryImportJob';
+import DictionaryDisplaySettings from '../components/settings/DictionaryDisplaySettings';
 
 /** Study-profile picker and controls — shared by Settings and Anki views. */
 export function ProfileSettingsSection() {
@@ -168,6 +169,25 @@ export function DictionarySettingsSection() {
     // also what enables the reset control.
     if (next.ok && scoped) setPairOverridden(true);
     if (!next.ok && next.error !== 'edge') setMsg({ kind: 'err', text: t('settings.study.dict.updateFailed') });
+  }
+
+  /** The source being dragged in the global list, while a drag is in progress. */
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  async function onDropSource(targetId: string) {
+    const from = sources.findIndex((source) => source.id === dragId);
+    const to = sources.findIndex((source) => source.id === targetId);
+    setDragId(null);
+    if (from < 0 || to < 0 || from === to || !isGlobalPair(activePair)) return;
+    const api = window.api.dictSetSourceOrder;
+    if (typeof api !== 'function') return;
+    const next = [...sources];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setMsg(null);
+    const result = await api(next.map((source) => source.id));
+    setSources(result.sources);
+    if (!result.ok) setMsg({ kind: 'err', text: t('settings.study.dict.updateFailed') });
   }
 
   async function onResetPair() {
@@ -419,8 +439,13 @@ export function DictionarySettingsSection() {
         </ul>
       )}
 
+      <DictionaryDisplaySettings />
+
       <h3 className="set-subhead">{t('settings.study.dict.sources.title')}</h3>
       <p className="set-row-desc muted">{t('settings.study.dict.sources.intro')}</p>
+      {isGlobalPair(activePair) && sources.length > 1 && (
+        <p className="set-row-desc muted">{t('dict3.settings.dragHint')}</p>
+      )}
       {!loading && pairs.length > 0 && (
         <div className="set-row">
           <label className="set-row-title" htmlFor="dict-pair-order">
@@ -457,7 +482,25 @@ export function DictionarySettingsSection() {
       {!loading && sources.length > 0 && (
         <ul className="dict-manage-list">
           {sources.map((source, index) => (
-            <li className={`dict-manage-row ${source.enabled ? '' : 'off'}`} key={source.id}>
+            <li
+              className={`dict-manage-row ${source.enabled ? '' : 'off'}${dragId === source.id ? ' is-dragging' : ''}`}
+              key={source.id}
+              // Drag to reorder the global order (a pair's own order keeps its
+              // up/down buttons): the whole order is written in one call.
+              draggable={isGlobalPair(activePair)}
+              onDragStart={(event) => {
+                setDragId(source.id);
+                event.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragOver={(event) => {
+                if (dragId && dragId !== source.id) event.preventDefault();
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                void onDropSource(source.id);
+              }}
+              onDragEnd={() => setDragId(null)}
+            >
               <label className="dict-manage-toggle" title={t('settings.study.dict.useTitle')}>
                 <input type="checkbox" aria-label={`${t('settings.study.dict.useTitle')}: ${source.title}`} checked={source.enabled} onChange={(event) => void updateSource(window.api.dictSetSourceEnabled(source.id, event.target.checked))} />
               </label>

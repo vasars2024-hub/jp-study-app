@@ -611,7 +611,7 @@
     if (hit) return hit;
     const res = await safeRuntimeSend({ type: 'scan', text, lang });
     if (res?.invalidated) return { matched: '', entries: [], invalidated: true };
-    if (!res || !res.ok) return { matched: '', entries: [], offline: !!res?.offline, error: res?.error };
+    if (!res || !res.ok) return { matched: '', entries: [], offline: !!res?.offline, locked: isLockedReply(res), error: res?.error };
     const entries = (res.entries || []).filter(isRealMatch);
     const out = entries.length
       ? { matched: matchedSurface(res.matched || text, { ...res, entries }), entries, deinflection: res.deinflection, offline: !!res.fromCache }
@@ -918,11 +918,9 @@
 
     const bits = [];
     if (hit.deinflection && hit.deinflection.term && hit.deinflection.term !== hit.term) {
-      const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
+      // The step-by-step chain is the Meaning tab's trace line; the header names the base form.
       bits.push(
-        `<span class="rp-base">${uiHtml('content_rpBase')} <b lang="${studyLangAttr(hit.deinflection.term)}">${esc(hit.deinflection.term)}</b>${
-          reasons ? ` <span class="rp-deinf" title="${uiHtml('content_rpDeinfTitle')}">${esc(reasons)}</span>` : ''
-        }</span>`,
+        `<span class="rp-base">${uiHtml('content_rpBase')} <b lang="${studyLangAttr(hit.deinflection.term)}">${esc(hit.deinflection.term)}</b></span>`,
       );
     }
     if (first) {
@@ -1041,59 +1039,162 @@
     const hit = currentHit;
     focusedEntry = 0;
     if (!hit.entries || !hit.entries.length) {
-      const offlineNote = hit.lookupOffline
+      const offlineNote = hit.lookupLocked
+        ? uiMsg('bg_errLocked')
+        : hit.lookupOffline
         ? uiMsg('content_rpDictOffline')
         : uiMsg('content_rpNoEntries');
       body.innerHTML = `<div class="rp-empty">${esc(offlineNote)}</div>`;
       return;
     }
     body.innerHTML = '';
-    hit.entries.slice(0, 5).forEach((entry, idx) => {
-      const block = document.createElement('div');
-      block.className = 'rp-entry' + (idx === 0 ? ' first focused' : '');
-      const word = entry.word || entry.term || hit.term;
-      const reading = entry.reading || '';
-      block.setAttribute('data-word', word);
-      block.setAttribute('data-idx', String(idx));
-      if (inDeck.get(word)) block.classList.add('in-deck');
-      let sensesHtml = '';
-      if (entry.glossaryHtml) {
-        sensesHtml = `<div class="rp-gloss-html">${sanitizeDictHtml(entry.glossaryHtml)}</div>`;
-      } else if (Array.isArray(entry.senses) && entry.senses.length) {
-        sensesHtml =
-          '<ol class="rp-senses">' +
-          entry.senses
-            .slice(0, cfg.popupCompact ? 3 : 6)
-            .map((s) => {
-              const defs = Array.isArray(s.definitions) ? s.definitions.join('; ') : '';
-              const pos =
-                Array.isArray(s.partsOfSpeech) && s.partsOfSpeech.length
-                  ? `<span class="rp-sense-pos">${esc(s.partsOfSpeech.join(', '))}</span> `
-                  : '';
-              return `<li>${pos}${esc(defs)}</li>`;
-            })
-            .join('') +
-          '</ol>';
-      } else if (Array.isArray(entry.meanings) && entry.meanings.length) {
-        sensesHtml =
-          '<ol class="rp-senses">' + entry.meanings.map((m) => `<li>${esc(m)}</li>`).join('') + '</ol>';
-      } else {
-        sensesHtml = `<div class="rp-empty">${uiHtml('content_rpNoGloss')}</div>`;
+    const trace = deinflectTraceHtml(hit);
+    if (trace) body.insertAdjacentHTML('beforeend', trace);
+    if (!hit.expandedDicts) hit.expandedDicts = new Set();
+    const cards = headwordCards(hit.entries, hit.term);
+    cards.slice(0, 5).forEach((card, pos) => body.appendChild(renderEntryCard(hit, card, pos)));
+    focusedEntryIdx = cards.length ? cards[0].items[0].idx : 0;
+    if (cards.length > 5) {
+      const more = document.createElement('div');
+      more.className = 'rp-note';
+      more.textContent = tn('content_rpMoreEntries', cards.length - 5);
+      body.appendChild(more);
+    }
+    void checkInDeck(hit);
+  }
+
+  /**
+   * One card per headword. The app's /v1/scan and /v1/lookup lay the entries out
+   * under the user's dictionary display setting (src/shared/dictDisplay.ts
+   * arrangeWireEntries): grouped mode sends one entry per dictionary, those of
+   * one headword side by side in the user's dictionary order, every one after the
+   * first marked `collapsed` when secondary dictionaries are folded; merged mode
+   * sends one entry whose senses each name the dictionary they came from.
+   */
+  function headwordCards(entries, fallbackWord) {
+    const cards = [];
+    const byKey = new Map();
+    (entries || []).forEach((entry, idx) => {
+      if (!entry) return;
+      const word = String(entry.word || entry.term || fallbackWord || '');
+      const key = `${word}\u0000${entry.reading || word}`;
+      let card = byKey.get(key);
+      if (!card) {
+        card = { key, items: [] };
+        byKey.set(key, card);
+        cards.push(card);
       }
-      const pitchSafe = entry.pitchHtml ? sanitizeDictHtml(entry.pitchHtml) : '';
-      const drop = pitchSafe ? pitchDownstep(pitchSafe) : null;
-      const pitch = pitchSafe
-        ? `<span class="rp-pitch" title="${uiHtml('content_rpPitch')}">${pitchSafe}${drop != null ? `<span class="rp-pitch-num">[${drop}]</span>` : ''}</span>`
-        : '';
-      const jlpt = Array.isArray(entry.jlpt) ? entry.jlpt[0] : entry.jlpt;
-      const badges = [
-        entry.isCommon ? `<span class="rp-badge common">${uiHtml('content_rpCommon')}</span>` : '',
-        jlpt ? `<span class="rp-badge jlpt" title="${uiHtml('content_rpJlptTitle')}">${esc(jlpt)}</span>` : '',
-        entry.frequency != null && entry.frequency !== ''
-          ? `<span class="rp-badge freq" title="${uiHtml('content_rpFreqTitle')}">#${esc(entry.frequency)}</span>`
-          : '',
-      ].join('');
-      block.innerHTML = `
+      card.items.push({ entry, idx });
+    });
+    return cards;
+  }
+
+  /** A card's dictionaries, in the order the app sent them; one section per dictionary. */
+  function cardSections(card) {
+    const sections = [];
+    for (const { entry, idx } of card.items) {
+      const source = String(entry.source || '');
+      let section = sections.find((s) => s.source === source);
+      if (!section) {
+        section = { source, idx, collapsed: entry.collapsed === true, entries: [] };
+        sections.push(section);
+      }
+      section.entries.push(entry);
+    }
+    return sections;
+  }
+
+  /**
+   * One entry's senses. When they come from more than one dictionary (merged
+   * mode), each numbered sense is labelled with its dictionary.
+   */
+  function entrySensesHtml(entry) {
+    const senses = Array.isArray(entry.senses) ? entry.senses.filter(Boolean) : [];
+    const sources = new Set(senses.map((s) => String(s.source || entry.source || '')).filter(Boolean));
+    const perSense = sources.size > 1;
+    if (entry.glossaryHtml && !perSense) {
+      return { html: `<div class="rp-gloss-html">${sanitizeDictHtml(entry.glossaryHtml)}</div>`, perSense };
+    }
+    if (senses.length) {
+      const limit = cfg.popupCompact ? 3 : perSense ? 8 : 6;
+      const items = senses.slice(0, limit).map((s) => {
+        const defs = Array.isArray(s.definitions) ? s.definitions.join('; ') : '';
+        const pos =
+          Array.isArray(s.partsOfSpeech) && s.partsOfSpeech.length
+            ? `<span class="rp-sense-pos">${esc(s.partsOfSpeech.join(', '))}</span> `
+            : '';
+        const dict = perSense && (s.source || entry.source)
+          ? `<span class="rp-sense-dict" title="${uiHtml('content_rpDictSource')}">${esc(s.source || entry.source)}</span> `
+          : '';
+        return `<li>${dict}${pos}${esc(defs)}</li>`;
+      });
+      return { html: `<ol class="rp-senses">${items.join('')}</ol>`, perSense };
+    }
+    if (Array.isArray(entry.meanings) && entry.meanings.length) {
+      return { html: '<ol class="rp-senses">' + entry.meanings.map((m) => `<li>${esc(m)}</li>`).join('') + '</ol>', perSense };
+    }
+    return { html: `<div class="rp-empty">${uiHtml('content_rpNoGloss')}</div>`, perSense };
+  }
+
+  function renderEntryCard(hit, card, pos) {
+    const { entry: first, idx } = card.items[0];
+    const entries = card.items.map((item) => item.entry);
+    const block = document.createElement('div');
+    block.className = 'rp-entry' + (pos === 0 ? ' first focused' : '');
+    const word = first.word || first.term || hit.term;
+    const reading = first.reading || '';
+    block.setAttribute('data-word', word);
+    block.setAttribute('data-idx', String(idx));
+    block.__gumCardKey = card.key;
+    if (inDeck.get(word)) block.classList.add('in-deck');
+
+    const pitchSafe = (entries.find((e) => e.pitchHtml) || {}).pitchHtml ? sanitizeDictHtml(entries.find((e) => e.pitchHtml).pitchHtml) : '';
+    const drop = pitchSafe ? pitchDownstep(pitchSafe) : null;
+    const pitch = pitchSafe
+      ? `<span class="rp-pitch" title="${uiHtml('content_rpPitch')}">${pitchSafe}${drop != null ? `<span class="rp-pitch-num">[${drop}]</span>` : ''}</span>`
+      : '';
+    const jlptOf = (e) => (Array.isArray(e.jlpt) ? e.jlpt[0] : e.jlpt);
+    const jlpt = entries.map(jlptOf).find(Boolean);
+    const freqs = entries.map((e) => e.frequency).filter((f) => f != null && f !== '');
+    const numeric = freqs.map(Number).filter((n) => Number.isFinite(n));
+    const frequency = numeric.length ? Math.min(...numeric) : freqs[0];
+    const badges = [
+      entries.some((e) => e.isCommon) ? `<span class="rp-badge common">${uiHtml('content_rpCommon')}</span>` : '',
+      jlpt ? `<span class="rp-badge jlpt" title="${uiHtml('content_rpJlptTitle')}">${esc(jlpt)}</span>` : '',
+      frequency != null && frequency !== ''
+        ? `<span class="rp-badge freq" title="${uiHtml('content_rpFreqTitle')}">#${esc(frequency)}</span>`
+        : '',
+    ].join('');
+
+    const sections = cardSections(card);
+    let content = '';
+    if (sections.length === 1) {
+      const parts = sections[0].entries.map(entrySensesHtml);
+      const perSense = parts.some((p) => p.perSense);
+      content = parts.map((p) => p.html).join('');
+      if (sections[0].source && !perSense) {
+        content += `<div class="rp-entry-src" title="${uiHtml('content_rpDictSource')}">${esc(sections[0].source)}</div>`;
+      }
+    } else {
+      const expanded = hit.expandedDicts ? hit.expandedDicts.has(card.key) : false;
+      const folded = sections.filter((s) => s.collapsed);
+      content = sections
+        .filter((s) => expanded || !s.collapsed)
+        .map((s) => {
+          const name = s.source
+            ? `<div class="rp-dict-name" title="${uiHtml('content_rpDictSource')}">${esc(s.source)}</div>`
+            : '';
+          const label = s.source ? ` aria-label="${esc(s.source)}"` : '';
+          return `<div class="rp-dict" role="group"${label}>${name}${s.entries.map((e) => entrySensesHtml(e).html).join('')}</div>`;
+        })
+        .join('');
+      if (folded.length) {
+        const text = expanded ? uiMsg('content_rpFewerDicts') : tn('content_rpMoreDicts', folded.length);
+        content += `<button type="button" class="rp-mini rp-more-dicts" data-act="more-dicts" aria-expanded="${expanded ? 'true' : 'false'}">${esc(text)}</button>`;
+      }
+    }
+
+    block.innerHTML = `
         <div class="rp-entry-head">
           <span class="rp-entry-word" lang="${studyLangAttr(word)}">${esc(word)}</span>
           ${reading && reading !== word ? `<span class="rp-entry-reading" lang="${studyLangAttr(word)}">${esc(reading)}</span>` : ''}
@@ -1104,18 +1205,73 @@
             <button type="button" class="rp-mini rp-entry-add" data-act="entry-save" data-idx="${idx}" title="${uiHtml('content_rpSaveEntry')}" aria-label="${uiHtml('content_rpSaveEntry')}">+</button>
           </span>
         </div>
-        ${sensesHtml}
-        ${entry.source ? `<div class="rp-entry-src" title="${uiHtml('content_rpDictSource')}">${esc(entry.source)}</div>` : ''}
+        ${content}
       `;
-      body.appendChild(block);
-    });
-    if (hit.entries.length > 5) {
-      const more = document.createElement('div');
-      more.className = 'rp-note';
-      more.textContent = tn('content_rpMoreEntries', hit.entries.length - 5);
-      body.appendChild(more);
+    return block;
+  }
+
+  /** Reason names from the de-inflector (src/shared/deinflectTrace.ts) → catalogue keys. */
+  const DEINFLECT_REASON_KEYS = {
+    polite: 'content_reason_polite',
+    'polite negative': 'content_reason_politeNegative',
+    'polite past': 'content_reason_politePast',
+    'polite past negative': 'content_reason_politePastNegative',
+    'polite volitional': 'content_reason_politeVolitional',
+    negative: 'content_reason_negative',
+    past: 'content_reason_past',
+    '-te': 'content_reason_te',
+    causative: 'content_reason_causative',
+    passive: 'content_reason_passive',
+    'passive/potential': 'content_reason_passivePotential',
+    potential: 'content_reason_potential',
+    volitional: 'content_reason_volitional',
+    imperative: 'content_reason_imperative',
+    'conditional (–ば)': 'content_reason_conditionalBa',
+    'conditional (–たら)': 'content_reason_conditionalTara',
+    '–たり': 'content_reason_tari',
+    '–たい': 'content_reason_tai',
+    '–すぎる': 'content_reason_sugiru',
+    adverbial: 'content_reason_adverbial',
+    'progressive (–ている)': 'content_reason_progressive',
+    'completion (–てしまう)': 'content_reason_shimau',
+    'completion (–ちゃう)': 'content_reason_chau',
+    '–ておく': 'content_reason_teoku',
+  };
+
+  /** A de-inflection step in the UI language; an unknown reason (an importer's own name) keeps its text. */
+  function reasonLabel(reason) {
+    const key = Object.prototype.hasOwnProperty.call(DEINFLECT_REASON_KEYS, reason) ? DEINFLECT_REASON_KEYS[reason] : '';
+    const label = key ? uiMsg(key) : '';
+    return label && label !== key ? label : String(reason);
+  }
+
+  /** The de-inflection steps, empty and repeated-adjacent reasons dropped (the app's trace does the same). */
+  function deinflectSteps(deinflection) {
+    const out = [];
+    for (const raw of (deinflection && Array.isArray(deinflection.reasons) ? deinflection.reasons : [])) {
+      const reason = String(raw == null ? '' : raw).trim();
+      if (reason && out[out.length - 1] !== reason) out.push(reason);
     }
-    void checkInDeck(hit);
+    return out;
+  }
+
+  /**
+   * The trace line, as the app's dictionary draws it: the surface form, each
+   * step innermost-first, then the dictionary form. Nothing without a de-inflection.
+   */
+  function deinflectTraceHtml(hit) {
+    const d = hit.deinflection;
+    if (!d || !d.term) return '';
+    const steps = deinflectSteps(d);
+    if (!steps.length) return '';
+    const lang = studyLangAttr(d.term);
+    const sep = '<span class="rp-trace-sep" aria-hidden="true"> ← </span>';
+    const parts = [
+      `<span class="rp-trace-form" lang="${lang}">${esc(d.source || hit.term)}</span>`,
+      ...steps.map((r) => `<span class="rp-trace-step">${esc(reasonLabel(r))}</span>`),
+      `<b class="rp-trace-form" lang="${lang}">${esc(d.term)}</b>`,
+    ];
+    return `<div class="rp-trace" title="${uiHtml('content_rpDeinfTitle')}">${parts.join(sep)}</div>`;
   }
 
   /**
@@ -1463,7 +1619,7 @@
       rows.push(`<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpPitchAccent')}</span><span class="rp-more-v">${sanitizeDictHtml(first.pitchHtml)}</span></div>`);
     }
     if (hit.deinflection && hit.deinflection.term) {
-      const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
+      const reasons = deinflectSteps(hit.deinflection).map(reasonLabel).join(' ‹ ');
       rows.push(
         `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpDeconjugation')}</span><span class="rp-more-v" lang="${studyLangAttr(hit.term)}">${esc(hit.deinflection.source || hit.term)} → ${esc(hit.deinflection.term)}${reasons ? ` <span class="rp-dim">(${esc(reasons)})</span>` : ''}</span></div>`,
       );
@@ -1517,11 +1673,29 @@
         updatePinButton();
         return;
       case 'tts':
-        void playEntryAudio(hit.entries && hit.entries[focusedEntry || 0], hit.term);
+        void playEntryAudio(hit.entries && hit.entries[focusedEntryIdx || 0], hit.term);
         return;
       case 'entry-audio': {
         const entry = hit.entries && hit.entries[Number(btn.getAttribute('data-idx')) || 0];
         void playEntryAudio(entry, hit.term);
+        return;
+      }
+      case 'more-dicts': {
+        // Grouped mode: the dictionaries folded behind "Show N more dictionaries".
+        const card = btn.closest('.rp-entry');
+        const key = card && card.__gumCardKey;
+        const body = popup.querySelector('.rp-body');
+        if (key == null || !body) return;
+        if (!hit.expandedDicts) hit.expandedDicts = new Set();
+        if (hit.expandedDicts.has(key)) hit.expandedDicts.delete(key);
+        else hit.expandedDicts.add(key);
+        const keep = focusedEntry;
+        renderMeaningTab(body);
+        focusedEntry = 0;
+        moveEntryFocus(keep);
+        const again = [...body.querySelectorAll('.rp-entry')].find((el) => el.__gumCardKey === key);
+        const toggle = again && again.querySelector('[data-act="more-dicts"]');
+        if (toggle) toggle.focus();
         return;
       }
       case 'entry-save': {
@@ -1545,7 +1719,7 @@
         return;
       }
       case 'save-word':
-        void doSave(hit.deinflection?.term || hit.term, 'word', false, mineContextFor(hit, focusedEntry || 0));
+        void doSave(hit.deinflection?.term || hit.term, 'word', false, mineContextFor(hit, focusedEntryIdx || 0));
         return;
       case 'save-sentence':
         void doSave(hit.sentence?.text || hit.term, 'sentence', false, { lemma: hit.deinflection?.term || hit.term });
@@ -1676,6 +1850,8 @@
 
   /** j/k (and the arrows inside the popup) move between dictionary entries. */
   let focusedEntry = 0;
+  /** Index into currentHit.entries of the focused card's headline entry (cards fold a headword's dictionaries). */
+  let focusedEntryIdx = 0;
   function moveEntryFocus(delta) {
     const body = popup && popup.querySelector('.rp-body');
     const entries = body ? [...body.querySelectorAll('.rp-entry')] : [];
@@ -1683,6 +1859,7 @@
     focusedEntry = Math.max(0, Math.min(entries.length - 1, focusedEntry + delta));
     entries.forEach((el, i) => el.classList.toggle('focused', i === focusedEntry));
     const target = entries[focusedEntry];
+    focusedEntryIdx = (target && Number(target.getAttribute('data-idx'))) || 0;
     if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'nearest' });
   }
 
@@ -1744,6 +1921,13 @@
     } catch {
       toast(uiMsg('content_copyBlocked'), 'err');
     }
+  }
+
+  /** Did the app refuse because its lockscreen is engaged (HTTP 423 `locked`)? */
+  function isLockedReply(res) {
+    if (!res || res.ok) return false;
+    if (res.locked === true || res.code === 'locked') return true;
+    return typeof S.serverErrorCode === 'function' && S.serverErrorCode(res, res.error) === 'locked';
   }
 
   /** A failed reply's message in the UI language (app error codes → _locales), else `fallbackKey`. */
@@ -1886,6 +2070,7 @@
       entries: res?.ok ? res.entries || [] : [],
       deinflection: res?.deinflection,
       lookupOffline: !!res?.offline,
+      lookupLocked: isLockedReply(res),
       block: null,
       blockText: '',
       start: 0,
@@ -1974,6 +2159,7 @@
         entries: found.entries || [],
         deinflection: found.deinflection,
         lookupOffline: !!found.offline,
+        lookupLocked: !!found.locked,
         block: null,
         blockText: t,
         start: 0,
@@ -1992,6 +2178,7 @@
       entries: found.entries || [],
       deinflection: found.deinflection,
       lookupOffline: !!found.offline,
+      lookupLocked: !!found.locked,
       block: null,
       blockText: '',
       start: 0,
@@ -2162,7 +2349,9 @@
     // A newer pointer position (or any newer lookup) owns the popup now.
     if (seq !== hoverSeq || token !== lookupToken || found.invalidated) return;
     if (!force && !hoverKeyDown && cfg.closeOnRelease) return;
-    if (!found.matched && !found.offline) return; // no dictionary hit — don't flicker a popup
+    // No dictionary hit: don't flicker a popup. Offline and locked still open one,
+    // to say why there is nothing to show.
+    if (!found.matched && !found.offline && !found.locked) return;
     const matched = found.matched || win.text;
     const end = win.start + matched.length;
     lastShownKey = key;
@@ -2176,6 +2365,7 @@
       entries: found.entries || [],
       deinflection: found.deinflection,
       lookupOffline: !!found.offline,
+      lookupLocked: !!found.locked,
       block: blockInfo.block,
       blockText: blockInfo.text,
       start: win.start,
@@ -2422,7 +2612,7 @@
       return {
         text: currentHit.deinflection?.term || currentHit.term,
         mode: currentHit.mode || 'word',
-        context: { ...mineContextFor(currentHit, focusedEntry || 0), lang: lookupLangFor(currentHit.term) },
+        context: { ...mineContextFor(currentHit, focusedEntryIdx || 0), lang: lookupLangFor(currentHit.term) },
       };
     }
     if (lastSavedSelection) {

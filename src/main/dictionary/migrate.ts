@@ -29,6 +29,7 @@ import {
   normalizeXrefText,
 } from '../../shared/lexiconXrefs';
 import type { DictSense, YomitanDictInfo } from '../../shared/types';
+import { jmdictPriorityCodes } from '../../shared/jmdictPriority';
 import type { SqliteDb } from './db';
 import { DEFAULT_SOURCE_LANG, resolveGlossLangs, resolveSourceLang } from './glossLang';
 import { rebuildCharacterProjection } from './importers/kanjidic';
@@ -54,6 +55,8 @@ export interface LegacyGlossaryEntry {
   glossaryHtml?: string;
   source?: string;
   langs?: string[];
+  /** JMdict priority codes the term row carried (`shared/jmdictPriority.ts`). */
+  prio?: string[];
 }
 
 export interface LegacyPitchEntry {
@@ -470,6 +473,7 @@ function importLegacyRows(
     // on the first IPA row: a database older than the `ipa` table can still
     // take a store that has none.
     let insertIpa: ReturnType<SqliteDb['prepare']> | null = null;
+    let updatePrio: ReturnType<SqliteDb['prepare']> | null = null;
     const insertFreq = db.prepare(`
       insert into freq_corpora (lang, norm, corpus, rank, per_million)
       values (?, ?, ?, ?, null)
@@ -495,6 +499,19 @@ function importLegacyRows(
         ).lastInsertRowid,
       );
       counts.headwords += 1;
+      // Only the codes `jmdictPriorityCodes` recognises reach the column; a store
+      // that carried none leaves it null, so nothing is ever shown that the
+      // dictionary did not say. Prepared on first use, like `insertIpa` below.
+      const prio = jmdictPriorityCodes(entry.prio);
+      if (prio.length) {
+        updatePrio ??= db.prepare('update headwords set prio = ? where id = ?');
+        updatePrio.run(prio.join(','), headwordId);
+      }
+      // Senses the structured content marked carry their own HTML; with two or
+      // more, every sense's HTML rides on its own first gloss and the whole-entry
+      // block is not stored a second time. With one, the block (which covers it)
+      // stays, exactly as before — the reader's per-sense rule is the same `>= 2`.
+      const senseHtml = entry.senses.filter((sense) => sense.html).length >= 2;
 
       entry.senses.forEach((sense, senseOrd) => {
         const senseId = Number(
@@ -509,7 +526,9 @@ function importLegacyRows(
         // The structured HTML belongs to the entry, not to one definition, so it
         // rides on the first gloss of the first sense — the only place a reader
         // can find it again without a second table.
-        const html = senseOrd === 0 ? entry.glossaryHtml ?? null : null;
+        const html = senseHtml
+          ? sense.html ?? null
+          : senseOrd === 0 ? entry.glossaryHtml ?? null : null;
         // A `see: …` definition is JMdict's own cross reference, not a meaning, so
         // it becomes an `xrefs` row and leaves the gloss list. `glossOrd` is
         // recounted over the definitions that stay, because `ord` is what the

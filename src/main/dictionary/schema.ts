@@ -32,7 +32,7 @@ import { relabelDictionarySourceLang } from './sourceLang';
 import { CORPUS_LANG_ALIAS_PAIRS } from '../../shared/dictionarySources';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 13;
+export const DICT_SCHEMA_VERSION = 14;
 
 export interface MigrationStep {
   version: number;
@@ -826,6 +826,25 @@ export const MIGRATIONS: MigrationStep[] = [
         );
         CREATE INDEX IF NOT EXISTS idx_ipa_lookup ON ipa(lang, norm);
       `);
+    },
+  },
+  {
+    version: 14,
+    name: 'JMdict priority codes on the headword they mark',
+    up(db) {
+      // A Yomitan JMdict carries `news1`, `ichi1`, `spec1`, `gai1`, `nf12` in a
+      // term row's termTags column: which word lists made the word "common". The
+      // importer used to drop the column entirely (it is not a usage label), so
+      // the "common" badge could not say why. Comma-separated codes, null when
+      // the dictionary gave none — a fact about the row, never derived.
+      //
+      // Additive and O(1): SQLite records a new nullable column in the schema
+      // without rewriting rows. Guarded on `table_info` because ADD COLUMN, unlike
+      // every other step in this ladder, is not idempotent on its own.
+      const columns = db.prepare('PRAGMA table_info(headwords)').all() as Array<{ name: string }>;
+      if (!columns.some((column) => column.name === 'prio')) {
+        db.exec('ALTER TABLE headwords ADD COLUMN prio TEXT');
+      }
     },
   },
 ];

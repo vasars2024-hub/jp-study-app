@@ -61,6 +61,13 @@ const HANDOFFS = {
    */
   grammarReview: { key: 'jp-pending-grammar-review', backing: 'session' },
   /*
+   * "Open this grammar point" from a dictionary's conjugation trace. `local`: the
+   * dictionary popup can live in another renderer than the Grammar explorer, and
+   * the explorer also listens for the `storage` event this write raises there.
+   * `take` on mount clears it.
+   */
+  grammarPoint: { key: 'jp-pending-grammar-point', backing: 'local' },
+  /*
    * "Play this game" from the Calendar's day view, the warm-up and the Agent. Same race as
    * `grammarPractice`: the Arena is a lazy chunk, so a bare event after `os:open` reached
    * nobody on a cold open. `session`: a game request is about now.

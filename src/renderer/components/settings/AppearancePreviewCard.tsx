@@ -106,6 +106,11 @@ export default function AppearancePreviewCard({
   onApply,
 }: AppearancePreviewCardProps) {
   const { t } = useT();
+  const accentName = (id: string, fallback: string): string => {
+    const key = `settings.appearance.accent.${id}`;
+    const out = t(key);
+    return out === key ? fallback : out;
+  };
   const [draft, setDraft] = useState<OsPersonalization>(look);
   const [draftTheme, setDraftTheme] = useState(theme);
   const [touched, setTouched] = useState(false);
@@ -188,7 +193,10 @@ export default function AppearancePreviewCard({
                   type="button"
                   className={`os-accent ${draft.accentMode === 'preset' && draft.accentPreset === a.id ? 'active' : ''}`}
                   style={{ background: a.accent }}
-                  title={a.label}
+                  title={accentName(a.id, a.label)}
+                  // Colour-only swatches: a title alone is not a reliable name.
+                  aria-label={accentName(a.id, a.label)}
+                  aria-pressed={draft.accentMode === 'preset' && draft.accentPreset === a.id}
                   onClick={() => patch({ accentMode: 'preset', accentPreset: a.id })}
                 />
               ))}
@@ -196,6 +204,7 @@ export default function AppearancePreviewCard({
                 type="color"
                 value={draft.customAccent}
                 title={t('settings.appearance.accent.customTitle')}
+                aria-label={t('settings.appearance.accent.customTitle')}
                 onChange={(e) => patch({ accentMode: 'custom', customAccent: e.target.value })}
               />
             </div>

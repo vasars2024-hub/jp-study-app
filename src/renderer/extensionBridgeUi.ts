@@ -4,6 +4,7 @@
 
 import { setBlancAdvanced, isBlancWindow } from './blancMode';
 import { setHandoff, setHandoffJson } from './pendingHandoff';
+import { popoutSectionFromSearch } from './popoutLabels';
 
 export function openAppSection(section: string): void {
   window.dispatchEvent(new CustomEvent('os:open', { detail: section }));
@@ -47,6 +48,49 @@ export function openGrammarPractice(detail?: GrammarPracticeLink): void {
   setHandoffJson('grammarPractice', detail ?? {});
   openAppSection('grammar');
   window.dispatchEvent(new CustomEvent('grammar:open-practice', { detail: detail ?? {} }));
+}
+
+/** The live event a mounted Grammar explorer (Study OS or Blanc) answers with `{ id }`. */
+export const GRAMMAR_OPEN_POINT_EVENT = 'grammar:open-point';
+
+/**
+ * Open one grammar point in the explorer — the dictionary's conjugation trace
+ * links each step to the point that teaches it.
+ *
+ * Same handoff-then-event shape as `openGrammarPractice`, for the same lazy-chunk
+ * race: the handoff serves an explorer that mounts after this call, the event one
+ * that is already mounted. The handoff is `local`, so an explorer in another
+ * window of the app picks it up from the `storage` event as well.
+ */
+export function openGrammarPoint(id: string): void {
+  const pointId = String(id || '').trim();
+  if (!pointId) return;
+  // Blanc's shell is always mounted and answers the event itself; a handoff left
+  // there would only resurface later in the Study OS explorer.
+  if (!isBlancWindow()) {
+    setHandoffJson('grammarPoint', pointId);
+    const popout = popoutSectionFromSearch(window.location.search);
+    if (popout && popout !== 'grammar') {
+      // A pop-out shows one app and has no desktop to open Grammar on, so the
+      // handoff would sit unseen until the user found the Study OS window. Raise
+      // that window and open Grammar there; its view drains the handoff on mount
+      // (or from the `storage` event when it is already open).
+      raiseMainWindowFor('grammar');
+    } else {
+      openAppSection('grammar');
+    }
+  }
+  window.dispatchEvent(new CustomEvent(GRAMMAR_OPEN_POINT_EVENT, { detail: { id: pointId } }));
+}
+
+/** Bring the Study OS window forward and open `target` there (the extension's focus-main IPC). */
+function raiseMainWindowFor(target: string): void {
+  try {
+    const raise = window.api?.extensionFocusMainAndOpen;
+    if (typeof raise === 'function') void Promise.resolve(raise(target)).catch(() => undefined);
+  } catch {
+    // No bridge (a test host or a torn-down preload): the handoff still waits for Grammar.
+  }
 }
 
 /** Opens Settings → Study → Chrome extension (token / bridge). */

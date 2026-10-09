@@ -22,6 +22,14 @@ import { BrowserWindow, app } from 'electron';
 import { llamaHostStats } from './llamaHost';
 import { forceCollect } from './debugGc';
 import {
+  clearE2eRecords,
+  clickE2eTrayItem,
+  e2eHeadlessStatus,
+  fireE2eShortcut,
+  isE2eHeadless,
+  queueE2eDialogResult,
+} from './e2eHeadless';
+import {
   EMPTY_WITNESS,
   INPUT_WITNESS_SOURCE,
   cdpKeyEvents,
@@ -109,9 +117,14 @@ export function planNetworkEmulation(
   };
 }
 
-/** Project root in dev — where `debug/` lives. */
+/**
+ * Project root in dev — where `debug/` lives. `JP_DEBUG_DIR` moves it, so a second
+ * instance (the e2e harness) writes its own `bridge.json` instead of overwriting the one
+ * a developer's instance in the same checkout is being driven through.
+ */
 function debugRoot(): string {
-  return path.join(process.cwd(), 'debug');
+  const override = (process.env.JP_DEBUG_DIR ?? '').trim();
+  return override ? path.resolve(override) : path.join(process.cwd(), 'debug');
 }
 
 function ensureDebugRoot(): string {
@@ -595,12 +608,14 @@ async function handle(
       if (!code) return { code: 400, body: { ok: false, error: 'missing js' } };
       try {
         // Wrapped so a bare expression still returns a value, and so DOM
-        // objects serialize instead of throwing a clone error.
-        const result = await win.webContents.executeJavaScript(
-          `(() => { try { const __r = (${code}); return JSON.parse(JSON.stringify(__r ?? null)); }
-            catch (e) { try { return String((${code})); } catch (e2) { return { __error: String(e2) }; } } })()`,
-          true,
-        );
+        // objects serialize instead of throwing a clone error. `await: true` settles a
+        // Promise first — without it a Promise serializes to `{}`.
+        const source = body.await === true
+          ? `(async () => { try { const __r = await (${code}); return JSON.parse(JSON.stringify(__r ?? null)); }
+            catch (e) { return { __error: String(e && e.stack || e) }; } })()`
+          : `(() => { try { const __r = (${code}); return JSON.parse(JSON.stringify(__r ?? null)); }
+            catch (e) { try { return String((${code})); } catch (e2) { return { __error: String(e2) }; } } })()`;
+        const result = await win.webContents.executeJavaScript(source, true);
         return { code: 200, body: { ok: true, result } };
       } catch (err) {
         return { code: 200, body: { ok: false, error: String(err) } };
@@ -1076,6 +1091,21 @@ async function handle(
     case '/focus': {
       const win = resolveWindow(body.window);
       if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
+      if (isE2eHeadless()) {
+        // Nothing may reach the desktop: the page is told it has focus (CDP) instead of the
+        // OS window being raised. Rendering is already live via the capturer count.
+        const cdp = cdpSender(win);
+        let emulated = false;
+        if (cdp) {
+          try {
+            await cdp('Emulation.setFocusEmulationEnabled', { enabled: true });
+            emulated = true;
+          } catch {
+            /* an older protocol; focus stays as it is */
+          }
+        }
+        return { code: 200, body: { ok: true, id: win.id, headless: true, focusEmulated: emulated, visible: win.isVisible() } };
+      }
       if (win.isMinimized()) win.restore();
       // Windows will not hand foreground to a background process on request
       // alone; `steal` is what makes the focus below actually take effect.
@@ -1155,6 +1185,38 @@ async function handle(
       if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
       win.webContents.reload();
       return { code: 200, body: { ok: true } };
+    }
+
+    /**
+     * The e2e harness's view of headless mode (main/e2eHeadless.ts): what was stubbed, what
+     * slipped onto the desktop anyway, and the OS-dialog answers it queues. Refused unless
+     * headless mode is on, so nothing here can change a developer's normal instance.
+     *
+     * Body: `{ action: 'status' | 'clear' | 'queueDialog' | 'fireShortcut' | 'clickTray',
+     * kind?, result?, accelerator?, label? }`.
+     */
+    case '/e2e': {
+      if (!isE2eHeadless()) return { code: 409, body: { ok: false, error: 'e2e headless mode is off' } };
+      const action = String(body.action ?? 'status');
+      if (action === 'clear') clearE2eRecords();
+      else if (action === 'queueDialog') {
+        const kind = String(body.kind ?? '');
+        if (kind !== 'open' && kind !== 'save' && kind !== 'message') {
+          return { code: 400, body: { ok: false, error: 'kind must be open, save or message' } };
+        }
+        queueE2eDialogResult(kind, body.result ?? {});
+      } else if (action === 'fireShortcut') {
+        // A registered global chord, delivered the way Windows would deliver the keypress.
+        const fired = fireE2eShortcut(String(body.accelerator ?? ''));
+        if (!fired) return { code: 404, body: { ok: false, error: `no handler holds ${String(body.accelerator)}` } };
+      } else if (action === 'clickTray') {
+        // A row of the tray menu (headless: the stand-in keeps the app's own menu).
+        const clicked = clickE2eTrayItem(String(body.label ?? ''));
+        if (!clicked) return { code: 404, body: { ok: false, error: `no tray row ${String(body.label)}` } };
+      } else if (action !== 'status') {
+        return { code: 400, body: { ok: false, error: `unknown action ${action}` } };
+      }
+      return { code: 200, body: { ok: true, ...e2eHeadlessStatus() } };
     }
 
     default:

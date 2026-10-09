@@ -41,6 +41,7 @@ export type FlashcardTextProvenance =
 
 import {
   filterLocalReviewsDue,
+  isLocalSrsState,
   limitNewCards,
   type LocalSrsAlgorithm,
   type LocalSrsRating,
@@ -174,7 +175,7 @@ import { levelForIntervalDays } from '../shared/anki';
 import { getLevel, isManualLevel, setInferredLevel, type WkLevel } from './knownWords';
 import { getStudyLang } from './studyEnvironment';
 import { getTokenizer, tokenizeSync, tokenizerReady } from './tokenizer';
-import { withoutAnkiOwned } from './ankiSchedulingOwner';
+import { ankiOwnsScheduling, hasAnkiTwin, withoutAnkiOwned } from './ankiSchedulingOwner';
 import { getActiveProfile } from './profileState';
 import { appendReviewLog, removeReviewLogEntry } from './reviewLog';
 import { REVIEW_ANSWER_CAP_MS, type ReviewLogEntry, type ReviewLogSource } from '../shared/reviewLog';
@@ -201,24 +202,31 @@ export interface ParsedFlashcardDeckStore {
 export function parseFlashcardDeckStore(raw: string | null): ParsedFlashcardDeckStore {
   try {
     const { value, layers } = unwrapOverEncoded<Partial<FlashcardDeckStore>>(raw);
-    const parsed = (value ?? {}) as Partial<FlashcardDeckStore>;
-    return {
-      store: {
-        folders: Array.isArray(parsed.folders)
-          ? parsed.folders.filter((folder): folder is string => typeof folder === 'string')
-          : [],
-        cards: Array.isArray(parsed.cards)
-          ? parsed.cards.filter((card): card is DeckFlashcard => !!card && typeof card.id === 'string')
-          : [],
-        ...(typeof parsed.savedAt === 'number' && Number.isFinite(parsed.savedAt)
-          ? { savedAt: parsed.savedAt }
-          : {}),
-      },
-      layers,
-    };
+    return { store: deckStoreFromValue(value), layers };
   } catch {
     return { store: { folders: [], cards: [] }, layers: 0 };
   }
+}
+
+/**
+ * The acceptance rule of `parseFlashcardDeckStore`, applied to a value that is
+ * already an object (an IndexedDB record). The durable read used to round-trip
+ * such a record through `JSON.stringify` + `JSON.parse` just to reach this rule
+ * — 8 MB each way on a 20,000-card deck, at every boot reconciliation.
+ */
+function deckStoreFromValue(value: unknown): FlashcardDeckStore {
+  const parsed = (value ?? {}) as Partial<FlashcardDeckStore>;
+  return {
+    folders: Array.isArray(parsed.folders)
+      ? parsed.folders.filter((folder): folder is string => typeof folder === 'string')
+      : [],
+    cards: Array.isArray(parsed.cards)
+      ? parsed.cards.filter((card): card is DeckFlashcard => !!card && typeof card.id === 'string')
+      : [],
+    ...(typeof parsed.savedAt === 'number' && Number.isFinite(parsed.savedAt)
+      ? { savedAt: parsed.savedAt }
+      : {}),
+  };
 }
 
 function newId(): string {
@@ -236,6 +244,27 @@ function newId(): string {
 let overflowStore: FlashcardDeckStore | null = null;
 /** `overflowStore` as JSON: the base of a later three-way merge. */
 let overflowText: string | null = null;
+/**
+ * The last cache write that did not fit. Retrying it re-serialised the whole
+ * deck (8 MB on 20,000 cards, ~40 ms) on every write only to hit the same
+ * quota; while the deck has not shrunk, and for a few minutes, the write is
+ * known to overflow and goes straight to the overflow path — exactly what a
+ * failed attempt would have done, without the attempt.
+ */
+let overflowAttempt: { cards: number; at: number } | null = null;
+const OVERFLOW_RETRY_MS = 5 * 60_000;
+
+/** `overflowText`, serialised on demand when the write that set it skipped the attempt. */
+function overflowBaseText(): string | null {
+  if (overflowText === null && overflowStore) {
+    try {
+      overflowText = JSON.stringify(overflowStore);
+    } catch {
+      /* stays null: the merge then treats the base as unknown, as before */
+    }
+  }
+  return overflowText;
+}
 /** True while boot reconciliation is deciding between the two copies. */
 let restoring = false;
 /** Cards created while reconciliation was reading the durable copy. */
@@ -336,7 +365,12 @@ function setJournalMarker(stamp: number | null): void {
 
 /** Whether a review may take the per-card path (nothing is being reconciled). */
 function canWriteHot(): boolean {
-  return !restoring && !pendingVerify && !lastReadSuspect && !unverifiedBase && !overflowStore && lastCacheCards !== null;
+  // An overflowed deck (the cache could not hold it: every deck past ~5M
+  // characters, i.e. most 20k-card decks) takes the per-card path too. Its base
+  // is this window's in-memory copy, which is exactly what `hot.base` tracks,
+  // and the per-card records land in IndexedDB like any other grade. Excluding
+  // it sent every grade of a large deck through a whole-deck rewrite.
+  return !restoring && !pendingVerify && !lastReadSuspect && !unverifiedBase && lastCacheCards !== null;
 }
 
 /** Every per-card record (a platform or test without range reads has none). */
@@ -556,16 +590,28 @@ function readCacheStore(): FlashcardDeckStore {
     const own = overflowStore.savedAt ?? 0;
     if (marker !== null && marker > own) {
       // Another window's newer deck overflowed too and lives only in IndexedDB.
-      lastReadSuspect = { baseText: overflowText };
+      lastReadSuspect = { baseText: overflowBaseText() };
       return copyStore(overflowStore);
     }
     if (marker !== null) return copyStore(overflowStore);
     // No marker: another window wrote a deck that fits the cache again. Its
-    // copy is the newer one when its stamp is.
-    const cached = parseFlashcardDeckStore(safeGetCache()).store;
+    // copy is the newer one when its stamp is. Parsed once per cache text, not
+    // once per read, while this window keeps its own newer overflow copy.
+    const raw = safeGetCache();
+    let cached: FlashcardDeckStore;
+    if (raw !== null && parsedCache?.raw === raw) {
+      cached = parsedCache.store;
+    } else {
+      const parsed = parseFlashcardDeckStore(raw);
+      cached = parsed.store;
+      // Only a plain value is remembered: an over-encoded one must still reach
+      // the self-heal below once it is the copy this window reads.
+      if (raw !== null && parsed.layers === 1) rememberParse(raw, cached);
+    }
     if ((cached.savedAt ?? 0) <= own) return copyStore(overflowStore);
     overflowStore = null;
     overflowText = null;
+    overflowAttempt = null;
   }
   try {
     const raw = localStorage.getItem(FLASHCARD_DECK_STORAGE_KEY);
@@ -621,16 +667,25 @@ function readCacheStore(): FlashcardDeckStore {
  */
 function writeCache(store: FlashcardDeckStore, unverified = false): boolean {
   let text: string | null = null;
+  const knownFull = overflowStore !== null
+    && overflowAttempt !== null
+    && store.cards.length >= overflowAttempt.cards
+    && Date.now() - overflowAttempt.at < OVERFLOW_RETRY_MS;
   try {
+    if (knownFull) throw new Error('deck cache known to be full');
     text = JSON.stringify(store);
     setCacheItem(FLASHCARD_DECK_STORAGE_KEY, text);
     rememberParse(text, store);
     overflowStore = null;
     overflowText = null;
+    overflowAttempt = null;
     setOverflowMarker(unverified ? DECK_UNVERIFIED : null);
     return true;
   } catch {
+    if (!knownFull) overflowAttempt = { cards: store.cards.length, at: Date.now() };
     overflowStore = store;
+    // Null when the attempt was skipped: `overflowBaseText` serialises it on
+    // the rare read that needs it as a merge base.
     overflowText = text;
     setOverflowMarker(unverified ? DECK_UNVERIFIED : store.savedAt ?? 0);
     return false;
@@ -810,6 +865,9 @@ function writeStore(store: FlashcardDeckStore): void {
 
 function normalizeDurableDeck(raw: unknown): FlashcardDeckStore | null {
   if (raw == null) return null;
+  // A record is an object already: same rule, no 8 MB JSON round trip. A
+  // string (an over-encoded legacy value) still goes through the peeling parser.
+  if (typeof raw === 'object') return deckStoreFromValue(raw);
   const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
   return parseFlashcardDeckStore(text).store;
 }
@@ -923,8 +981,10 @@ export function resetDeckMemoryForTests(): void {
   hotWrites = Promise.resolve();
   durableRecordsSeen = 0;
   introducedMemo = null;
+  dueLoadMemo = null;
   overflowStore = null;
   overflowText = null;
+  overflowAttempt = null;
   restoring = false;
   lastReadSuspect = null;
   pendingBase = null;
@@ -1071,10 +1131,30 @@ export function updateDeckCard(
   >,
 ): DeckFlashcard[] {
   const store = readStore();
-  store.cards = store.cards.map((c) => (c.id === id ? { ...c, ...patch } : c));
-  writeStore(store);
+  const changed: DeckFlashcard[] = [];
+  store.cards = store.cards.map((c) => {
+    if (c.id !== id) return c;
+    const next = { ...c, ...patch };
+    changed.push(next);
+    return next;
+  });
+  writeChangedCards(store, changed);
   return store.cards;
 }
+
+/**
+ * Persist a write that changed only `changed` (no card added or removed, no
+ * folder list change): the per-card path when it is open, like a review —
+ * an Anki export marks cards one `updateDeckCard` at a time, and each of those
+ * rewrote the whole deck. Anything else, or nothing changed, is a whole write.
+ */
+function writeChangedCards(store: FlashcardDeckStore, changed: readonly DeckFlashcard[]): void {
+  if (changed.length > 0 && changed.length <= HOT_CARD_LIMIT && canWriteHot()) writeStoreHot(store, changed);
+  else writeStore(store);
+}
+
+/** Above this many changed cards a batch is a whole-deck write anyway. */
+const HOT_CARD_LIMIT = 200;
 
 /**
  * Write the Deck Workbench's field edits back into the deck, in one persisted
@@ -1144,10 +1224,14 @@ export function updateDeckCardReadingBatch(
 
 export function setDeckCardFolder(id: string, folder: string | null): DeckFlashcard[] {
   const store = readStore();
-  store.cards = store.cards.map((c) =>
-    c.id === id ? { ...c, folder: folder && folder.trim() ? folder.trim() : undefined } : c,
-  );
-  writeStore(store);
+  const changed: DeckFlashcard[] = [];
+  store.cards = store.cards.map((c) => {
+    if (c.id !== id) return c;
+    const next = { ...c, folder: folder && folder.trim() ? folder.trim() : undefined };
+    changed.push(next);
+    return next;
+  });
+  writeChangedCards(store, changed);
   return store.cards;
 }
 
@@ -1163,12 +1247,14 @@ export function setDeckCardKnown(id: string, known: boolean): DeckFlashcard[] {
  */
 export function dueDeckCardNow(id: string, now = Date.now()): boolean {
   const store = readStore();
-  const index = store.cards.findIndex((card) => card.id === id);
+  const index = deckCardIndex(store.cards, id);
   if (index < 0) return false;
   const card = store.cards[index];
   if (!card.srs || !Number.isFinite(card.srs.dueAt) || card.srs.dueAt <= now) return false;
   const next: DeckFlashcard = { ...card, srs: { ...card.srs, dueAt: now } };
-  store.cards = store.cards.map((entry, i) => (i === index ? next : entry));
+  const before = store.cards;
+  store.cards = replaceCardAt(before, index, next);
+  carryDueLoad(before, store.cards, card, next);
   if (canWriteHot()) writeStoreHot(store, [next]);
   else writeStore(store);
   return true;
@@ -1352,14 +1438,122 @@ function dueLoadFor(cards: readonly DeckFlashcard[], now: number): (dayOffset: n
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   const from = start.getTime();
-  const perDay = new Map<number, number>();
-  for (const card of cards) {
-    const due = card.srs?.dueAt;
-    if (card.suspended || typeof due !== 'number' || !Number.isFinite(due) || due < from) continue;
-    const offset = Math.floor((due - from) / (24 * 60 * 60 * 1000));
-    perDay.set(offset, (perDay.get(offset) ?? 0) + 1);
+  // Built once per snapshot and day, then carried across each grade
+  // (`carryDueLoad`): it was a full deck scan per graded card.
+  if (!dueLoadMemo || dueLoadMemo.cards !== cards || dueLoadMemo.from !== from) {
+    const perDay = new Map<number, number>();
+    for (const card of cards) {
+      const offset = dueDayOffset(card, from);
+      if (offset !== null) perDay.set(offset, (perDay.get(offset) ?? 0) + 1);
+    }
+    dueLoadMemo = { cards, from, perDay };
   }
+  const perDay = dueLoadMemo.perDay;
   return (dayOffset) => perDay.get(dayOffset) ?? 0;
+}
+
+/** The day (from local midnight `from`) a card adds review load to, or null. */
+function dueDayOffset(card: DeckFlashcard, from: number): number | null {
+  const due = card.srs?.dueAt;
+  if (card.suspended || typeof due !== 'number' || !Number.isFinite(due) || due < from) return null;
+  return Math.floor((due - from) / (24 * 60 * 60 * 1000));
+}
+
+/**
+ * Test seam: the review-load map a grade on `cards` would use, sorted by day.
+ * `fresh` drops the carried map first, so a test can compare the two.
+ */
+export function dueLoadEntriesForTests(
+  cards: readonly DeckFlashcard[],
+  now: number,
+  fresh = false,
+): Array<[number, number]> {
+  if (fresh) dueLoadMemo = null;
+  dueLoadFor(cards, now);
+  return [...(dueLoadMemo?.perDay ?? new Map<number, number>())].sort((a, b) => a[0] - b[0]);
+}
+
+/** `dueLoadFor`'s map for one snapshot of the deck (see `dueLoadFor`). */
+let dueLoadMemo: { cards: readonly DeckFlashcard[]; from: number; perDay: Map<number, number> } | null = null;
+
+/**
+ * Carry the load map from `before` to `after`, two snapshots that differ only
+ * in `previous` being replaced by `next`: the same map a fresh scan of `after`
+ * would build, at the cost of two lookups.
+ */
+function carryDueLoad(
+  before: readonly DeckFlashcard[],
+  after: readonly DeckFlashcard[],
+  previous: DeckFlashcard,
+  next: DeckFlashcard,
+): void {
+  if (!dueLoadMemo || dueLoadMemo.cards !== before) return;
+  const { from } = dueLoadMemo;
+  const perDay = new Map(dueLoadMemo.perDay);
+  const was = dueDayOffset(previous, from);
+  if (was !== null) {
+    const count = (perDay.get(was) ?? 0) - 1;
+    if (count > 0) perDay.set(was, count);
+    else perDay.delete(was);
+  }
+  const now = dueDayOffset(next, from);
+  if (now !== null) perDay.set(now, (perDay.get(now) ?? 0) + 1);
+  dueLoadMemo = { cards: after, from, perDay };
+}
+
+// ── Memoised selectors over one deck snapshot ───────────────────────────────
+//
+// A snapshot's `cards` array is never edited once a write has published it:
+// every write builds a new array, and replaces (never edits) the cards it
+// changes. What is derived from one array can therefore be cached on that
+// array's identity, valid for exactly as long as it is the current deck. Every
+// lookup is still verified against the array, so a caller that sorted a
+// snapshot in place costs a rebuild, never a wrong card.
+
+const idIndexMemo = new WeakMap<readonly DeckFlashcard[], Map<string, number>>();
+
+function buildIdIndex(cards: readonly DeckFlashcard[]): Map<string, number> {
+  const index = new Map<string, number>();
+  cards.forEach((card, i) => {
+    // First occurrence, as `findIndex` answered.
+    if (!index.has(card.id)) index.set(card.id, i);
+  });
+  idIndexMemo.set(cards, index);
+  return index;
+}
+
+/** Position of card `id` in this snapshot, or -1 (`findIndex` without the scan). */
+export function deckCardIndex(cards: readonly DeckFlashcard[], id: string): number {
+  let index = idIndexMemo.get(cards) ?? buildIdIndex(cards);
+  let at = index.get(id);
+  if (at !== undefined && cards[at]?.id !== id) {
+    index = buildIdIndex(cards);
+    at = index.get(id);
+  }
+  if (at === undefined) {
+    // Not indexed: confirm against the array before answering "absent".
+    const found = cards.findIndex((card) => card.id === id);
+    if (found >= 0) buildIdIndex(cards);
+    return found;
+  }
+  return at;
+}
+
+/** One card of the current deck by id, through the snapshot's index. */
+export function findDeckCard(id: string): DeckFlashcard | undefined {
+  const cards = loadDeck();
+  const at = deckCardIndex(cards, id);
+  return at >= 0 ? cards[at] : undefined;
+}
+
+/** `cards` with the card at `index` replaced by `next`; the id index carries over. */
+function replaceCardAt(cards: readonly DeckFlashcard[], index: number, next: DeckFlashcard): DeckFlashcard[] {
+  const out = cards.slice();
+  const previous = out[index];
+  out[index] = next;
+  const ids = idIndexMemo.get(cards);
+  if (ids && previous && previous.id === next.id) idIndexMemo.set(out, ids);
+  return out;
 }
 
 const REVIEW_UNDO_LIMIT = 50;
@@ -1378,7 +1572,7 @@ export function reviewDeckCard(
   details: DeckReviewDetails = {},
 ): DeckFlashcard[] {
   const store = readStore();
-  const index = store.cards.findIndex((card) => card.id === id);
+  const index = deckCardIndex(store.cards, id);
   if (index < 0) return store.cards;
   const previous = store.cards[index];
   const config = loadSchedulingConfig();
@@ -1411,7 +1605,9 @@ export function reviewDeckCard(
     if (suspended) next.suspended = true;
     leech = { tagged, suspended };
   }
-  store.cards = store.cards.map((card, i) => (i === index ? next : card));
+  const before = store.cards;
+  store.cards = replaceCardAt(before, index, next);
+  carryDueLoad(before, store.cards, previous, next);
   // One card changed: write that card durably now, the whole deck later.
   if (canWriteHot()) writeStoreHot(store, [next]);
   else writeStore(store);
@@ -1857,22 +2053,56 @@ export function reviewSessionCounts(
   mode: FlashcardReviewMode,
   now = Date.now(),
 ): Map<string, number> {
+  // One pass over the pool, answering for every source at once what
+  // `dueDeckCards` + the audio filter would answer for that source's cards: it
+  // used to run the whole due filter (and its SRS validation) once per source,
+  // twice over every card. Each source has its own new-card budget, spent in
+  // deck order, exactly as `limitNewCards` spends it on that source's list.
   const newPerDay = getActiveProfile().deckParams.newPerDay;
-  const introduced = introducedTodayCount(now);
-  const sessionSize = (cards: DeckFlashcard[]): number => {
-    const due = dueOnly ? dueDeckCards(cards, now, newPerDay, introduced) : cards;
-    return mode === 'audio' ? due.filter((card) => card.audioDataUrl || card.audioPath).length : due.length;
-  };
-  const byBook = new Map<string, DeckFlashcard[]>();
+  const budget = newPerDay === undefined || !Number.isFinite(newPerDay)
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, Math.floor(newPerDay) - Math.max(0, introducedTodayCount(now)));
+  const ankiOwned = ankiOwnsScheduling();
+  const all = { count: 0, newTaken: 0 };
+  const tallies = new Map<string, { count: number; newTaken: number }>();
   for (const card of pool) {
     const key = `${card.bookId || 'unknown'}::${card.bookTitle || 'Unknown source'}`;
-    const list = byBook.get(key);
-    if (list) list.push(card);
-    else byBook.set(key, [card]);
+    let tally = tallies.get(key);
+    if (!tally) {
+      tally = { count: 0, newTaken: 0 };
+      tallies.set(key, tally);
+    }
+    const audioOk = mode !== 'audio' || Boolean(card.audioDataUrl || card.audioPath);
+    if (!dueOnly) {
+      if (audioOk) {
+        all.count += 1;
+        tally.count += 1;
+      }
+      continue;
+    }
+    if (card.suspended || (ankiOwned && hasAnkiTwin(card))) continue;
+    const scheduled = isLocalSrsState(card.srs);
+    if (scheduled && (card.srs as LocalSrsState).dueAt > now) continue;
+    tallyDueCard(all, scheduled, audioOk, budget);
+    tallyDueCard(tally, scheduled, audioOk, budget);
   }
-  const counts = new Map<string, number>([['all', sessionSize(pool)]]);
-  for (const [key, cards] of byBook) counts.set(key, sessionSize(cards));
+  const counts = new Map<string, number>([['all', all.count]]);
+  for (const [key, tally] of tallies) counts.set(key, tally.count);
   return counts;
+}
+
+/** One due card into a source's count: a new card only while that source's budget lasts. */
+function tallyDueCard(
+  tally: { count: number; newTaken: number },
+  scheduled: boolean,
+  audioOk: boolean,
+  budget: number,
+): void {
+  if (!scheduled) {
+    if (tally.newTaken >= budget) return;
+    tally.newTaken += 1;
+  }
+  if (audioOk) tally.count += 1;
 }
 
 /** Lapses at which a card counts as a leech (Anki's default threshold). */
@@ -1980,11 +2210,40 @@ export function searchDeckCards(cards: DeckFlashcard[], query: string): DeckFlas
   if (q === SUSPENDED_QUERY) return cards.filter((card) => card.suspended === true);
   const dated = DECK_DATE_QUERY.exec(q);
   if (dated) return cards.filter((c) => deckCardMatchesDate(c, dated[1] as DeckDateQueryKind, dated[2]));
-  return cards.filter((c) =>
-    [c.word, c.reading, c.meaning, c.front, c.back, c.sentence, c.bookTitle].some((field) =>
-      field ? field.normalize('NFKC').toLowerCase().includes(q) : false,
-    ),
-  );
+  // The separator cannot be matched across: a query holding it (nobody types
+  // U+0000) takes the per-field path, which is the same answer.
+  if (q.includes(SEARCH_FIELD_SEPARATOR)) {
+    return cards.filter((c) => searchFields(c).some((field) => (field ? normalizeSearchField(field).includes(q) : false)));
+  }
+  return cards.filter((c) => searchHaystack(c).includes(q));
+}
+
+const SEARCH_FIELD_SEPARATOR = '\u0000';
+
+function searchFields(c: DeckFlashcard): Array<string | undefined> {
+  return [c.word, c.reading, c.meaning, c.front, c.back, c.sentence, c.bookTitle];
+}
+
+function normalizeSearchField(field: string): string {
+  return field.normalize('NFKC').toLowerCase();
+}
+
+/**
+ * Every searchable field of a card, each normalised exactly as the per-field
+ * test did, joined by a separator no normalised query contains. Cached per card
+ * object: a card is replaced, never edited, when it changes, so the cache
+ * cannot go stale — and a 20,000-card search stops being 140,000 Unicode
+ * normalisations per keystroke.
+ */
+const haystacks = new WeakMap<DeckFlashcard, string>();
+
+function searchHaystack(c: DeckFlashcard): string {
+  let text = haystacks.get(c);
+  if (text === undefined) {
+    text = searchFields(c).map((field) => (field ? normalizeSearchField(field) : '')).join(SEARCH_FIELD_SEPARATOR);
+    haystacks.set(c, text);
+  }
+  return text;
 }
 
 /** Grouping sentinel for cards with no source title; show t('flash.unknownSource') at render time. */

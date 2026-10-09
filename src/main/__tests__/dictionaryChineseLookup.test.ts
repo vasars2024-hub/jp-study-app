@@ -21,6 +21,7 @@ import { importCedict } from '../dictionary/importers/cedict';
 import { importLegacyIndex } from '../dictionary/migrate';
 import {
   buildCedictIndex,
+  CedictNotInstalledError,
   hasHanText,
   lookupCedictIndex,
   lookupChineseInDb,
@@ -198,6 +199,28 @@ describe('lookupChineseTerm — database first, CC-CEDICT second', () => {
     }));
     expect(result.entries).toEqual([]);
     expect(result.error).toBe('missing cedict.u8');
+  });
+
+  // perf3: the installer no longer bundles CC-CEDICT; it is the `cc-cedict`
+  // download. Not having it yet is "no Chinese dictionary", not an error.
+  it('reports CC-CEDICT not installed as a missing Chinese dictionary', async () => {
+    const result = await lookupChineseTerm('传统', deps({
+      loadCedictText: async () => { throw new CedictNotInstalledError(); },
+    }));
+    expect(result.entries).toEqual([]);
+    expect(result.error).toBeUndefined();
+    expect(result.missingSourceLangs).toEqual(['zh']);
+  });
+
+  it('is a plain miss, not a missing dictionary, when the database has a Chinese one', async () => {
+    importCedict(db, CEDICT_TEXT, { dictId: 'cc-cedict' });
+    const notInstalled = deps({ loadCedictText: async () => { throw new CedictNotInstalledError(); } });
+    const miss = await lookupChineseTerm('不存在的词', notInstalled);
+    expect(miss.entries).toEqual([]);
+    expect(miss.missingSourceLangs).toBeUndefined();
+    expect(miss.error).toBeUndefined();
+    const hit = await lookupChineseTerm('传统', notInstalled);
+    expect(hit.entries[0].word).toBe('传统');
   });
 
   it('parses CC-CEDICT once and reuses the index', async () => {

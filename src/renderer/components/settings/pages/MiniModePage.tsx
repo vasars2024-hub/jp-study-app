@@ -174,6 +174,7 @@ export default function MiniModePage() {
           <div className="mini-add-row">
             <select
               className="mini-add-select"
+              aria-label={t('settings.mini.addApp')}
               value={pick}
               disabled={!choices.length}
               onChange={(e) => setAddPick(e.target.value as MiniAppId)}
@@ -272,6 +273,7 @@ export default function MiniModePage() {
           <div className="mini-add-row">
             <select
               className="mini-add-select"
+              aria-label={t('settings.mini.routines.add')}
               value={routinePick}
               disabled={!routineChoices.length}
               onChange={(e) => setAddRoutinePick(e.target.value)}

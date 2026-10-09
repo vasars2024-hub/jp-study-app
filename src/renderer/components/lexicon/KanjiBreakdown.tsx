@@ -10,8 +10,9 @@
  * reads per entry it will probably never expand. Facts come only from the character
  * rows; a character the dictionary has no row for says so instead of being guessed.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { DictResult } from '../../../shared/types';
+import { onDictionariesChanged } from '../../dictionaryChangeSignal';
 import { useT } from '../../i18n';
 import './dictEntryExtras.css';
 
@@ -20,7 +21,23 @@ type CharacterFacts = NonNullable<DictResult['character']>;
 /** Characters per word worth breaking down; beyond this it is a phrase, not a word. */
 const MAX_CHARS = 6;
 
+/**
+ * Per-character facts for the session — dropped whenever the installed dictionaries
+ * change, because a miss cached before KANJIDIC2 was installed kept saying "no character
+ * dictionary covers these characters" until a restart (found by the e2e harness).
+ */
 const factsCache = new Map<string, CharacterFacts | null>();
+let factsGeneration = 0;
+let watchingFacts = false;
+
+function watchCharacterDictionaries(): void {
+  if (watchingFacts) return;
+  watchingFacts = true;
+  onDictionariesChanged(() => {
+    factsCache.clear();
+    factsGeneration += 1;
+  });
+}
 
 /** The distinct Han characters of `word`, in order, capped. */
 export function hanCharacters(word: string, max = MAX_CHARS): string[] {
@@ -61,22 +78,44 @@ export default function KanjiBreakdown({ word, lang, onLookup }: Props) {
   const { t } = useT();
   const chars = lang === 'ja' || lang === 'zh' ? hanCharacters(word) : [];
   const [open, setOpen] = useState(false);
-  const [loaded, setLoaded] = useState<{ word: string; rows: Array<{ char: string; facts: CharacterFacts | null }> } | null>(null);
+  const [loaded, setLoaded] = useState<{
+    word: string;
+    generation: number;
+    rows: Array<{ char: string; facts: CharacterFacts | null }>;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [generation, setGeneration] = useState(() => factsGeneration);
+  // Registered after the module-level watcher (which clears the cache first), so the
+  // generation read here is already the new one.
+  useEffect(() => {
+    watchCharacterDictionaries();
+    return onDictionariesChanged(() => setGeneration(factsGeneration));
+  }, []);
+
+  const rows = loaded?.word === word && loaded.generation === generation ? loaded.rows : null;
+  const charsKey = chars.join('');
+
+  // An open panel whose rows went stale (another word, or the dictionaries changed) reloads.
+  const stale = !rows;
+  useEffect(() => {
+    if (!open || !stale || !charsKey) return undefined;
+    let alive = true;
+    setLoading(true);
+    void Promise.all([...charsKey].map((char) => characterFacts(char, lang as 'ja' | 'zh'))).then((facts) => {
+      if (!alive) return;
+      setLoaded({ word, generation, rows: [...charsKey].map((char, i) => ({ char, facts: facts[i] })) });
+      setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open, stale, word, generation, charsKey, lang]);
 
   // A single character is the word itself: the character panel below the entries covers it.
   if (chars.length === 0 || (chars.length === 1 && [...word].length === 1)) return null;
 
-  const rows = loaded?.word === word ? loaded.rows : null;
-
-  const toggle = async (): Promise<void> => {
-    const next = !open;
-    setOpen(next);
-    if (!next || rows || loading) return;
-    setLoading(true);
-    const facts = await Promise.all(chars.map((char) => characterFacts(char, lang as 'ja' | 'zh')));
-    setLoaded({ word, rows: chars.map((char, i) => ({ char, facts: facts[i] })) });
-    setLoading(false);
+  const toggle = (): void => {
+    setOpen((was) => !was);
   };
 
   return (
@@ -85,7 +124,7 @@ export default function KanjiBreakdown({ word, lang, onLookup }: Props) {
         type="button"
         className="dict-kanji-toggle lq-hit"
         aria-expanded={open}
-        onClick={() => void toggle()}
+        onClick={toggle}
       >
         {t('dict2.kanji.toggle', { count: chars.length })}
       </button>

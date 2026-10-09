@@ -380,8 +380,12 @@ export default function App() {
   useEffect(() => {
     let off: (() => void) | undefined;
     let dead = false;
-    void import('./studyMining').then(({ installStudyMining }) => {
-      if (!dead) off = installStudyMining();
+    void Promise.all([import('./studyMining'), import('./ankiReviewSync')]).then(([{ installStudyMining }, reviewSync]) => {
+      if (dead) return;
+      // Two-way Anki review sync: capture this window's graded answers, and sync
+      // when Anki comes up (opt-in; see shared/ankiReviewSync.ts for the rules).
+      const offs = [installStudyMining(), reviewSync.installAnkiReviewCapture(), reviewSync.installAnkiReviewSync()];
+      off = () => offs.forEach((stop) => stop());
     });
     return () => {
       dead = true;

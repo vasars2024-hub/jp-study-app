@@ -8,6 +8,7 @@
  * A left click runs the most recent owner's `onClick`.
  */
 import { Menu, nativeImage, Tray, type MenuItemConstructorOptions } from 'electron';
+import { isE2eHeadless } from './e2eHeadless';
 
 export interface RecordingIndicatorSection {
   tooltip: string;
@@ -53,6 +54,8 @@ function refresh(): void {
     return;
   }
   if (!tray) {
+    // The e2e harness runs on the owner's desktop: no notification-area icon.
+    if (isE2eHeadless()) return;
     try {
       tray = new Tray(indicatorIcon());
       tray.on('click', () => {

@@ -933,7 +933,10 @@ export function ExportsPage() {
                   className={`scr-outcome scr-outcome--${
                     record.outcome === 'ok' ? 'done' : record.outcome === 'partial' ? 'warning' : 'failed'
                   }`}
-                  aria-label={record.outcome}
+                  role="img"
+                  aria-label={sx(
+                    record.outcome === 'ok' ? 'job.done' : record.outcome === 'partial' ? 'job.warning' : 'job.failed',
+                  )}
                 />
                 <span className="scr-list-main">
                   <span className="scr-list-title">{record.destination}</span>
@@ -1071,7 +1074,12 @@ export function HistoryPage() {
                       className={`scr-outcome scr-outcome--${
                         job.failed > 0 && job.stage === 'done' ? 'warning' : STAGE_OUTCOME[job.stage] ?? 'done'
                       }`}
-                      aria-label={job.stage}
+                      role="img"
+                      aria-label={sx(
+                        job.failed > 0 && job.stage === 'done'
+                          ? 'job.warning'
+                          : (`job.${STAGE_OUTCOME[job.stage] ?? job.stage}` as ScraperTextKey),
+                      )}
                     />
                   </div>
                   <div role="gridcell" className="scr-td">

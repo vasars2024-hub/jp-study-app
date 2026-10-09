@@ -182,7 +182,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
 
       <div className="sp-row">
         <span className="sp-label">{t('settings.reader.font')}</span>
-        <select value={s.font} onChange={(e) => set({ font: e.target.value as ReaderFont })}>
+        <select aria-label={t('settings.reader.font')} value={s.font} onChange={(e) => set({ font: e.target.value as ReaderFont })}>
           <option value="default">{t('settings.reader.font.default')}</option>
           <option value="serif">{t('settings.reader.font.serif')}</option>
           <option value="sans">{t('settings.reader.font.sans')}</option>
@@ -193,6 +193,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
       <div className="sp-row">
         <span className="sp-label">{t('settings.reader.fontWeight')}</span>
         <select
+          aria-label={t('settings.reader.fontWeight')}
           value={s.fontWeight}
           onChange={(e) => set({ fontWeight: Number(e.target.value) })}
         >

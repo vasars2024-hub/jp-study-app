@@ -262,7 +262,7 @@ export function RamChip({ activeTool }: { activeTool: string | null }) {
         type="button"
         className={`blanc-mech-chip blanc-ram-chip${over ? ' is-over' : ''}`}
         aria-expanded={open}
-        aria-controls="blanc-ram-panel"
+        aria-controls={open ? 'blanc-ram-panel' : undefined}
         aria-label={chipLabel}
         title={chipLabel}
         onClick={() => setOpen((value) => !value)}

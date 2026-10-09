@@ -124,7 +124,9 @@ export default function ScraperSearch() {
         aria-label={sx('app.search')}
         role="combobox"
         aria-expanded={open}
-        aria-controls="scr-search-results"
+        // Only while the popup exists: an IDREF to an absent element is an
+        // invalid aria-controls value.
+        aria-controls={open ? 'scr-search-results' : undefined}
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);

@@ -717,6 +717,7 @@ export default function ReaderCollectionPanel({
           <span className="reader-collection-compose-label">{t('readerCollection.ankiDeck')}</span>
           <select
             className="reader-collection-deck"
+            aria-label={t('readerCollection.ankiDeck')}
             title={ankiConnected ? t('readerCollection.deckTitleConnected') : t('readerCollection.deckTitleDisconnected')}
             value={prefs.ankiDeck}
             onChange={(e) => patchPrefs({ ankiDeck: e.target.value })}
@@ -859,6 +860,7 @@ export default function ReaderCollectionPanel({
             <select
               className="reader-collection-sort"
               title={t('readerCollection.sortTitle')}
+              aria-label={t('readerCollection.sortTitle')}
               value={sort}
               onChange={(e) => setSort(e.target.value as SortMode)}
             >

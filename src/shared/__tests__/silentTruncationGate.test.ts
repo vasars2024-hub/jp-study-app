@@ -116,6 +116,14 @@ describe('D137 — a capped list under a count that claims the full number', () 
     expect(report.silent).toBe(0);
   });
 
+  it('does NOT score `.slice(n)` — dropping the first n items renders all the rest', () => {
+    // `columnsFor(mode).slice(1).map(…)` ("every column but the name") is an offset, not a cap.
+    const offset = SILENT.replace('.slice(0, 50)', '.slice(1)');
+    const report = run(build(offset));
+    expect(report.truncated).toBe(0);
+    expect(report.silent).toBe(0);
+  });
+
   it('sees a cap written as a named constant, not only a literal', () => {
     // `DIFF_PREVIEW_ROWS`, `VISIBLE_VOCAB`, `MAX_ROWS` — the repo caps by constant more often
     // than by literal, so a literal-only detector would miss most of the class.

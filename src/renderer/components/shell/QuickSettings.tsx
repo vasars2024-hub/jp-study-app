@@ -186,6 +186,7 @@ export default function QuickSettings() {
           <div className="os-qs-row">
             <span className="os-qs-row-label">{t('quickSettings.wallpaperFit')}</span>
             <Select
+              aria-label={t('quickSettings.wallpaperFit')}
               value={fit}
               options={fitOptions}
               onChange={(e) => {

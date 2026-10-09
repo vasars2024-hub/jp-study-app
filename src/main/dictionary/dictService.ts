@@ -118,6 +118,8 @@ export interface LookupSense {
   pos: string[];
   tags: string[];
   glosses: { lang: string; text: string; html?: string }[];
+  /** The dictionary this sense came from; set only once an entry merges several. */
+  dictTitle?: string;
 }
 
 export interface LookupSource {
@@ -151,6 +153,8 @@ export interface LookupEntry {
   fuzzyDistance?: number;
   /** IPA transcriptions from enabled IPA sources; absent when none covers the word. */
   ipa?: string[];
+  /** JMdict priority codes the contributing rows carried; absent when none did. */
+  prio?: string[];
 }
 
 export interface CharacterSource {
@@ -303,6 +307,8 @@ interface HeadwordRow {
   variant_of: number | null;
   score: number;
   freq_rank: number | null;
+  /** Comma-separated JMdict priority codes (schema step 14), null when the row has none. */
+  prio?: string | null;
   priority: number;
   licence: string | null;
   attribution: string | null;
@@ -333,7 +339,7 @@ const WORD_SOURCE_WHERE = `d.enabled = 1 and d.kind <> '${EXAMPLE_DICTIONARY_KIN
 /** The `HeadwordRow` column list — one source of truth for both shapes below. */
 const HEADWORD_COLUMNS = `
   h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
-  h.variant_of, h.score, h.freq_rank,
+  h.variant_of, h.score, h.freq_rank, h.prio,
   coalesce(pp.priority, d.priority) as priority, d.licence, d.attribution
 `;
 
@@ -343,6 +349,25 @@ const HEADWORD_JOINS = `
   left join dict_pair_priority pp
     on pp.dict_id = d.id and pp.source_lang = h.lang and pp.target_lang = ?
 `;
+
+/**
+ * `h.prio` arrived in schema step 14. A handle that cannot be migrated (a
+ * read-only open of an older file) still answers lookups — without priority
+ * codes — so every headword statement goes through this once per handle.
+ */
+const prioColumnByDb = new WeakMap<SqliteDb, boolean>();
+function headwordSql(db: SqliteDb, sql: string): string {
+  let has = prioColumnByDb.get(db);
+  if (has === undefined) {
+    try {
+      has = (db.prepare('PRAGMA table_info(headwords)').all() as Array<{ name: string }>).some((c) => c.name === 'prio');
+    } catch {
+      has = false;
+    }
+    prioColumnByDb.set(db, has);
+  }
+  return has ? sql : sql.replace(/\bh\.prio\b/g, 'null as prio');
+}
 
 const HEADWORD_SELECT = `
   select ${HEADWORD_COLUMNS}
@@ -444,6 +469,7 @@ function toEntry(
   // simplified row that does. Every reader has to follow that or half of Chinese
   // returns empty entries.
   const senseOwner = row.variant_of ?? row.id;
+  const prio = row.prio ? row.prio.split(',').map((code) => code.trim()).filter(Boolean) : [];
   return {
     headwordId: row.id,
     dictId: row.dict_id,
@@ -465,6 +491,7 @@ function toEntry(
       ...(row.attribution ? { attribution: row.attribution } : {}),
     }],
     ...(fuzzyDistance === undefined ? {} : { fuzzyDistance }),
+    ...(prio.length ? { prio } : {}),
   };
 }
 
@@ -473,23 +500,44 @@ function sameSemanticEntry(a: LookupEntry, b: LookupEntry): boolean {
     a.via === b.via && a.fuzzyDistance === b.fuzzyDistance;
 }
 
+/** A sense's content, without the dictionary it is credited to — two dictionaries saying the same thing say it once. */
+function senseKey(sense: LookupSense): string {
+  return JSON.stringify({ pos: sense.pos, tags: sense.tags, glosses: sense.glosses });
+}
+
 function mergeSenses(a: LookupSense[], b: LookupSense[]): LookupSense[] {
   const out = [...a];
   for (const sense of b) {
-    const key = JSON.stringify(sense);
-    if (!out.some((candidate) => JSON.stringify(candidate) === key)) out.push(sense);
+    const key = senseKey(sense);
+    if (!out.some((candidate) => senseKey(candidate) === key)) out.push(sense);
   }
   return out;
 }
 
-/** Merge duplicate semantic rows without losing the dictionaries that supplied them. */
+/** Senses credited to `title` unless a previous merge already credited them. */
+function creditSenses(senses: LookupSense[], title: string): LookupSense[] {
+  return senses.map((sense) => (sense.dictTitle ? sense : { ...sense, dictTitle: title }));
+}
+
+/**
+ * Merge duplicate semantic rows without losing the dictionaries that supplied them.
+ *
+ * Once two dictionaries share an entry, each sense is credited to the one it came
+ * from (`dictTitle`), so a surface can still group or label the senses by
+ * dictionary. A single-source entry is left exactly as it was read.
+ */
 export function mergeLookupEntry(existing: LookupEntry, incoming: LookupEntry): LookupEntry {
   if (!sameSemanticEntry(existing, incoming)) return existing;
   const sources = [...existing.sources];
   for (const source of incoming.sources) {
     if (!sources.some((candidate) => candidate.dictId === source.dictId)) sources.push(source);
   }
-  return { ...existing, senses: mergeSenses(existing.senses, incoming.senses), sources };
+  const crossDictionary = incoming.dictId !== existing.dictId || sources.length > 1;
+  const senses = crossDictionary
+    ? mergeSenses(creditSenses(existing.senses, existing.dictTitle), creditSenses(incoming.senses, incoming.dictTitle))
+    : mergeSenses(existing.senses, incoming.senses);
+  const prio = [...new Set([...(existing.prio ?? []), ...(incoming.prio ?? [])])];
+  return { ...existing, senses, sources, ...(prio.length ? { prio } : {}) };
 }
 
 const VIA_RANK: Record<LookupEntry['via'], number> = {
@@ -665,15 +713,15 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   };
 
   const pair = pairTarget(query);
-  const byNorm = prepareCached(db, `${HEADWORD_SELECT} and h.lang = ? and h.norm = ? order by priority, h.id`);
+  const byNorm = prepareCached(db, headwordSql(db, `${HEADWORD_SELECT} and h.lang = ? and h.norm = ? order by priority, h.id`));
   const byReading = prepareCached(
     db,
-    `${HEADWORD_SELECT} and h.lang = ? and h.reading_norm = ? order by priority, h.id`,
+    headwordSql(db, `${HEADWORD_SELECT} and h.lang = ? and h.reading_norm = ? order by priority, h.id`),
   );
-  const byInflection = prepareCached(db, INFLECTION_PROBE_SQL);
+  const byInflection = prepareCached(db, headwordSql(db, INFLECTION_PROBE_SQL));
   const byPrefix = prepareCached(
     db,
-    `${HEADWORD_SELECT} and h.lang = ? and h.norm > ? and h.norm < ? order by length(h.norm), priority, h.id limit ?`,
+    headwordSql(db, `${HEADWORD_SELECT} and h.lang = ? and h.norm > ? and h.norm < ? order by length(h.norm), priority, h.id limit ?`),
   );
 
   for (const lang of searchLangs) {
@@ -777,13 +825,13 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     const chars = [...norm];
     if (budget > 0) {
       const prefix = chars.slice(0, Math.min(FUZZY_PREFIX_CHARS, chars.length - 1)).join('');
-      const byFuzzyPrefix = prepareCached(db, `
+      const byFuzzyPrefix = prepareCached(db, headwordSql(db, `
         ${HEADWORD_SELECT}
         and h.lang = ?
         and ((h.norm >= ? and h.norm < ?) or (h.reading_norm >= ? and h.reading_norm < ?))
         order by h.score desc, h.id
         limit ?
-      `);
+      `));
 
       const matches: { row: HeadwordRow; distance: number }[] = [];
       const consider = (row: HeadwordRow) => {

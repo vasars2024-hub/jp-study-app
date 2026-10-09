@@ -11,6 +11,7 @@
 import type { DictEntry, DictResult, DictSense, DeinflectionInfo } from '../../shared/types';
 import { sanitizeDictHtml } from '../../shared/dictHtmlSanitize';
 import { withoutFormsSenses } from '../../shared/dictFormsSense';
+import { isJmdictCommon, jmdictPriorityCodes } from '../../shared/jmdictPriority';
 import type { LookupEntry, LookupResult, LookupSense } from './dictService';
 
 /**
@@ -51,37 +52,54 @@ function legacyVia(entry: LookupEntry, query: string | undefined): DictEntry['vi
   return undefined;
 }
 
-function toLegacySense(sense: LookupSense): DictSense {
+function senseHtml(sense: LookupSense): string | undefined {
+  return sense.glosses.find((gloss) => gloss.html)?.html;
+}
+
+function toLegacySense(sense: LookupSense, perSenseHtml: boolean): DictSense {
+  // Stored HTML is sanitized on every read, never trusted because it was ours.
+  const html = perSenseHtml ? senseHtml(sense) : undefined;
+  const clean = html ? sanitizeDictHtml(html) : '';
   return {
     partsOfSpeech: unique(sense.pos),
     definitions: unique(sense.glosses.map((gloss) => gloss.text.trim()).filter(Boolean)),
     tags: unique(sense.tags),
+    ...(sense.dictTitle ? { source: sense.dictTitle } : {}),
+    ...(clean ? { html: clean } : {}),
   };
 }
 
 function toLegacyEntry(entry: LookupEntry, query?: string): DictEntry {
   const glosses = entry.senses.flatMap((sense) => sense.glosses);
+  // Two or more senses with HTML of their own means the dictionary's senses were
+  // kept apart (a structured dictionary that marks them, or one row per sense
+  // merged here): the entry is then drawn sense by sense, each under its own part
+  // of speech. With at most one, that HTML is the whole entry's block, as before.
+  const perSenseHtml = entry.senses.filter((sense) => senseHtml(sense)).length >= 2;
   // Stored gloss HTML came from an imported dictionary file (or a JSON store
   // written before the import escaped its text) and is inserted with innerHTML
   // by the pop-ups, so it is sanitized here, on every read, not trusted.
-  const rawHtml = glosses.find((gloss) => gloss.html)?.html;
+  const rawHtml = perSenseHtml ? undefined : glosses.find((gloss) => gloss.html)?.html;
   const glossaryHtml = rawHtml ? sanitizeDictHtml(rawHtml) : '';
   const sourceLangs = unique(glosses.map((gloss) => gloss.lang));
   const via = legacyVia(entry, query);
+  const priorityTags = jmdictPriorityCodes(entry.prio);
   return {
     word: entry.text,
     reading: entry.reading,
-    isCommon: entry.score > 0,
+    isCommon: entry.score > 0 || isJmdictCommon(priorityTags),
     // No word-level JLPT source exists on this path: the database has no JLPT
     // column for headwords (only KANJIDIC's per-character `chars.jlpt`), and the
     // bundled JMdict carries none. Left empty rather than estimated.
     jlpt: [],
-    senses: entry.senses.map(toLegacySense),
+    senses: entry.senses.map((sense) => toLegacySense(sense, perSenseHtml)),
     ...(entry.ipa?.length ? { ipa: [...entry.ipa] } : {}),
     ...(glossaryHtml ? { glossaryHtml } : {}),
     source: entry.dictTitle,
     ...(sourceLangs.length ? { sourceLangs } : {}),
     ...(via ? { via } : {}),
+    ...(priorityTags.length ? { priorityTags } : {}),
+    ...(entry.via === 'deinflected' && entry.reasons?.length ? { inflection: [...entry.reasons] } : {}),
   };
 }
 

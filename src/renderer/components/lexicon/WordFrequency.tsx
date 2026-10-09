@@ -43,7 +43,9 @@ export default function WordFrequency({ query, lang }: Props) {
         const next = await window.api.dictFrequency(query, { sourceLangs: [lang] });
         // A reply for the previous word must never land under the current one.
         if (attempt !== run.current) return;
-        setResult(next);
+        // The IPC answers null when no frequency corpus is installed or the
+        // dictionary is still being prepared; that is "no panel", not a crash.
+        setResult(next && Array.isArray(next.entries) ? next : EMPTY);
       } catch {
         if (attempt === run.current) setResult(EMPTY);
       }

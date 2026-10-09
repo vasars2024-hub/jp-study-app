@@ -119,7 +119,9 @@ describe('Media Center integration contract', () => {
       expect(source).toContain(`id: '${id}'`);
     }
     expect(source).toContain('<PersistentPlayer state={music}');
-    expect(source).toContain('ps.queue.length > 0 ? ps.queue : state.baseSongs');
+    // fu1: Up next moved into the shared, arrangeable `MusicQueuePanel`.
+    expect(source).toContain('<MusicQueuePanel state={state}');
+    expect(read('renderer/components/music/MusicQueue.tsx')).toContain('ps.queue.length > 0 ? ps.queue : state.baseSongs');
     expect(source).toContain('<DiscoveryPosterArt');
   });
 

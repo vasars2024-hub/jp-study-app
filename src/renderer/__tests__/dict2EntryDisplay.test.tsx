@@ -182,11 +182,12 @@ describe('dict2 pitch, part of speech, inflection', () => {
   it('lists each de-inflection step as its own item', async () => {
     stubApi({ result: { deinflection: { source: '食べさせられた', term: '食べる', reasons: ['causative', 'passive', 'past'] } } });
     await render(<DictionaryResults query="食べさせられた" variant="page" lang="ja" />);
-    const steps = [...host.querySelectorAll('.dict-deinflection-reasons [role="listitem"]')];
+    // dict3: the steps now read as Yomitan's trace, each behind a "←".
+    const steps = [...host.querySelectorAll('.dict-deinflection-reasons > li')];
     expect(steps.map((s) => s.textContent)).toEqual([
-      'deinflect.reason.causative',
-      '›deinflect.reason.passive',
-      '›deinflect.reason.past',
+      '←deinflect.reason.causative',
+      '←deinflect.reason.passive',
+      '←deinflect.reason.past',
     ]);
   });
 });

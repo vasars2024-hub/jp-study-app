@@ -70,6 +70,7 @@ import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import { readingWorkspaceEntryFromLibraryItem } from '../../shared/readingWorkspace';
 import { resolveReadingWorkspaceActions } from '../../shared/readingWorkspaceActions';
 import type { ReadingWorkspaceActionId } from '../../shared/readingWorkspaceActions';
+import { isLibrarySort, readLibrarySort, writeLibrarySort, type LibrarySort } from '../librarySortPref';
 
 interface Props {
   onOpen: (item: LibraryItem) => void;
@@ -91,16 +92,6 @@ interface Props {
 
 /** 'all' and 'unfiled' are reserved views; anything else is a folder name. */
 type FolderFilter = 'all' | 'unfiled' | string;
-
-type LibrarySort =
-  | 'recent'
-  | 'date-desc'
-  | 'date-asc'
-  | 'title'
-  | 'lang'
-  | 'length'
-  | 'level'
-  | 'source';
 
 type LibraryGroup = 'none' | 'lang' | 'level' | 'source' | 'series';
 type InboxLangFilter = 'all' | 'ja' | 'zh' | 'en' | 'unknown';
@@ -202,7 +193,13 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [active, setActive] = useState<FolderFilter>('all');
-  const [sortBy, setSortBy] = useState<LibrarySort>('date-desc');
+  // Remembered between visits (librarySortPref); both sort pickers write through `chooseSort`.
+  const [sortBy, setSortBy] = useState<LibrarySort>(readLibrarySort);
+  const chooseSort = useCallback((value: string) => {
+    if (!isLibrarySort(value)) return;
+    setSortBy(value);
+    writeLibrarySort(value);
+  }, []);
   const [groupBy, setGroupBy] = useState<LibraryGroup>('none');
   const [layout, setLayout] = useState<LibraryLayout>(DEFAULT_LIBRARY_LAYOUT);
   const [langFilter, setLangFilter] = useState<InboxLangFilter>('all');
@@ -1338,7 +1335,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 id="aero-lib-sort"
                 className="media-model-select"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as LibrarySort)}
+                onChange={(e) => chooseSort(e.target.value)}
               >
                 <option value="recent">{t('read2.library.sort.recent')}</option>
                 <option value="date-desc">{t('library.sort.dateDesc')}</option>
@@ -1685,7 +1682,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           id="lib-sort"
           className="media-model-select"
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as LibrarySort)}
+          onChange={(e) => chooseSort(e.target.value)}
           aria-label={t('library.sort.label')}
         >
           <option value="recent">{t('read2.library.sort.recent')}</option>
@@ -1894,23 +1891,18 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 // the whole surface was mouse-only, and a screen reader was told
                 // the card was a group of decorations.
                 //
-                // The shape is the one already used by `aero-library-tile`
-                // further down this same file, so the two library grids now
-                // answer the keyboard identically.
-                role="button"
-                tabIndex={0}
+                //
+                // a11y3: the card itself was then `role="button"` with Remove,
+                // File and Set-cover buttons INSIDE it (axe nested-interactive,
+                // serious): a screen reader announces one button and cannot reach
+                // the ones within. The card is now a named group, and the open
+                // action is a real <button> stretched over the cover (`.card-open`)
+                // beside, not around, the other three. It has no handler of its
+                // own: its click (Enter and Space included, natively) bubbles to
+                // the card's `onClick`, so a mouse click anywhere still opens.
+                role="group"
                 aria-label={it.title}
                 onClick={() => onOpen(it)}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter' && e.key !== ' ') return;
-                  // The nested Remove / File / Set-cover buttons handle their own
-                  // keys. Without this guard, Enter on Remove would delete the
-                  // item AND open it, because the keydown bubbles to the card.
-                  if (e.target !== e.currentTarget) return;
-                  // Space would scroll the grid out from under the card just picked.
-                  e.preventDefault();
-                  onOpen(it);
-                }}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData('app/lib-item', it.id);
@@ -1918,6 +1910,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 }}
               >
                 <CoverCard item={it}>
+                  <button type="button" className="card-open ui-focusable" aria-label={it.title} />
                   <span className="kind-badge">
                     {it.kind === 'book' ? t('library.kind.book') : t('library.kind.manga')}
                   </span>

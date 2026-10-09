@@ -7,7 +7,11 @@
  */
 
 import { escapeCsvField, type CsvDelimiter } from '../shared/csvEditor';
-import { buildDeckMediaExport, type DeckMediaExportCard } from '../shared/deckMediaExport';
+import {
+  buildDeckMediaExport,
+  type DeckMediaExportCard,
+  type DeckMediaExportOptions,
+} from '../shared/deckMediaExport';
 
 export interface DeckMediaExportOutcome {
   ok: boolean;
@@ -22,6 +26,8 @@ export interface DeckMediaExportOutcome {
   withoutAudio: number;
   packagePath?: string;
   packageVerified?: boolean;
+  /** Cards the package carries with their review schedule. */
+  scheduled?: number;
   error?: string;
 }
 
@@ -37,13 +43,20 @@ export async function runDeckAudioExport(
   cards: readonly DeckMediaExportCard[],
   fileName = 'deck.csv',
   delimiter: CsvDelimiter = ',',
+  options: DeckMediaExportOptions = { includeImages: true, includeSchedule: true },
 ): Promise<DeckMediaExportOutcome> {
-  const built = buildDeckMediaExport(cards);
+  const built = buildDeckMediaExport(cards, options);
   const text = built.rows
     .map((row) => row.map((field) => escapeCsvField(field, delimiter)).join(delimiter))
     .join('\n');
 
-  const result = await window.api.flashcardExportDeck({ text, fileName, media: built.media, rows: built.rows });
+  const result = await window.api.flashcardExportDeck({
+    text,
+    fileName,
+    media: built.media,
+    rows: built.rows,
+    ...(built.schedules ? { schedules: built.schedules } : {}),
+  });
   return {
     ok: result.ok === true,
     directory: result.directory,
@@ -53,6 +66,7 @@ export async function runDeckAudioExport(
     withoutAudio: built.withoutAudio,
     packagePath: result.packagePath,
     packageVerified: result.packageVerified,
+    ...(typeof result.scheduled === 'number' ? { scheduled: result.scheduled } : {}),
     error: result.error,
   };
 }

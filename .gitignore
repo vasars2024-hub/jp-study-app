@@ -244,3 +244,6 @@ src/.coordination/**/baselines/*.json
 src/.coordination/**/runs/*.json
 src/.coordination/**/*-atlas*.json
 src/.coordination/**/*-matrix*.json
+
+# End-to-end harness output (tools/e2e/run.cjs)
+tools/e2e/out/

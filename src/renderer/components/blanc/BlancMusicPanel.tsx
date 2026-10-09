@@ -20,6 +20,7 @@ import {
   useMusic,
   type SortBy,
 } from '../music/MusicContent';
+import { MusicQueuePanel } from '../music/MusicQueue';
 import DictionaryPopup from '../DictionaryPopup';
 
 /**
@@ -75,6 +76,11 @@ export function BlancMusicPanel() {
         <MusicControls state={state} />
         <MusicNowPlaying state={state} />
         {!ps.current && <p className="blanc-note">{t('blanc.study.music.pickSong')}</p>}
+      </fieldset>
+
+      <fieldset>
+        <legend>{t('mediaCenter.common.upNext')}</legend>
+        <MusicQueuePanel state={state} limit={12} />
       </fieldset>
 
       <fieldset>

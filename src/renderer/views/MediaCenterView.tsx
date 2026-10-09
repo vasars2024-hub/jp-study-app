@@ -92,6 +92,7 @@ import {
   useMusic,
   type MusicState,
 } from '../components/music/MusicContent';
+import { MusicQueuePanel } from '../components/music/MusicQueue';
 import { useT } from '../i18n';
 import { openMediaWorkspace } from '../mediaWorkspaceBridge';
 import {
@@ -861,15 +862,8 @@ function MusicPanel({ state }: { state: MusicState }) {
   const { t } = useT();
   const { ps } = state;
   // Up next is what will actually play: the current track, then the leader's play order
-  // after it (`ps.upNext`, shuffle included). It used to be the first eight rows of the
-  // queue, whatever was playing — track 40 playing still listed tracks 1-8.
-  const pool = ps.queue.length > 0 ? ps.queue : state.baseSongs;
-  const byId = new Map(pool.map((item) => [item.id, item]));
-  const currentIndex = ps.current ? pool.findIndex((item) => item.id === ps.current?.id) : -1;
-  const upcoming = ps.upNext.length
-    ? ps.upNext.map((id) => byId.get(id)).filter((item): item is MediaItem => !!item)
-    : pool.slice(currentIndex + 1);
-  const queue = (ps.current && currentIndex >= 0 ? [pool[currentIndex], ...upcoming] : pool).slice(0, 8);
+  // after it (`ps.upNext`, shuffle included) — `MusicQueuePanel` draws it and lets the
+  // listener reorder it and save it as a playlist.
   return (
     <div className="mc-page mc-music-page">
       <div className="mc-music-head">
@@ -966,17 +960,9 @@ function MusicPanel({ state }: { state: MusicState }) {
             <Icon name="music" size={15} />
           </div>
           <div className="mc-track-queue">
-            {queue.length > 0 ? queue.map((item, index) => (
-              // `mc-track-row` is the same admission the library list already makes with
-              // `music-row`: these are repeating rows of one kind of thing, not chrome.
-              <button type="button" key={item.id} className={`mc-track-row${ps.current?.id === item.id ? ' is-active' : ''}`} onClick={() => void state.play(item)}>
-                <span className="mc-track-index">{ps.current?.id === item.id && ps.playing ? <Icon name="volume" size={11} /> : String(index + 1).padStart(2, '0')}</span>
-                <div><strong>{state.metaMap.get(item.id)?.title ?? item.title}</strong><small>{state.metaMap.get(item.id)?.artist ?? item.artist ?? t('mediaCenter.music.unknownArtist')}</small></div>
-                <span>{item.durationSec ? fmt(item.durationSec) : '—'}</span>
-              </button>
-            )) : (
-              <div className="mc-aside-empty"><Icon name="music" size={22} /><p>{t('mediaCenter.music.queueEmpty')}</p></div>
-            )}
+            {/* `mc-track-row` is the same admission the library list already makes with
+                `music-row`: these are repeating rows of one kind of thing, not chrome. */}
+            <MusicQueuePanel state={state} rowClassName="mc-track-row" />
           </div>
           <div className="mc-queue-summary">
             <span><strong>{state.baseSongs.length}</strong> {t('mediaCenter.music.tracks')}</span>

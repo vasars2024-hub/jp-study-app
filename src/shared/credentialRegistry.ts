@@ -133,7 +133,12 @@ export const CREDENTIAL_REGISTRY: CredentialSpec[] = [
     signupUrl: 'https://aistudio.google.com/apikey',
     freeTierKey: 'credential.gemini.freeTier',
     testable: false,
-    usedByKeys: ['credential.use.aiMining', 'credential.use.translateAnalysis', 'credential.use.aiOcr'],
+    usedByKeys: [
+      'credential.use.aiMining',
+      'credential.use.translateAnalysis',
+      'credential.use.aiOcr',
+      'xlate2.credential.useTranslate',
+    ],
     store: 'vault',
     refusesWhenUnencrypted: true,
   },
@@ -155,7 +160,31 @@ export const CREDENTIAL_REGISTRY: CredentialSpec[] = [
     // No `freeTierKey`: the field states a fact about someone else's pricing,
     // and an unverified one printed in the UI ages badly. Omitted is honest.
     testable: false,
-    usedByKeys: ['credential.use.aiMining', 'credential.use.translateAnalysis'],
+    usedByKeys: ['credential.use.aiMining', 'credential.use.translateAnalysis', 'xlate2.credential.useTranslate'],
+    store: 'vault',
+    refusesWhenUnencrypted: true,
+  },
+  {
+    // Read only by `main/translateRouter.ts`, and only after the user has
+    // consented to DeepL in the Translate workbench. A Free key (`…:fx`) is sent
+    // to api-free.deepl.com, any other to api.deepl.com.
+    id: 'deepl',
+    label: 'DeepL API',
+    descKey: 'xlate2.credential.deeplDesc',
+    kind: 'apiKey',
+    category: 'ai',
+    fields: [
+      {
+        name: 'apiKey',
+        labelKey: 'credential.field.apiKey',
+        secret: true,
+        placeholderKey: 'credential.field.apiKey.placeholder',
+      },
+    ],
+    signupUrl: 'https://www.deepl.com/pro-api',
+    freeTierKey: 'xlate2.credential.deeplFreeTier',
+    testable: false,
+    usedByKeys: ['xlate2.credential.useTranslate'],
     store: 'vault',
     refusesWhenUnencrypted: true,
   },

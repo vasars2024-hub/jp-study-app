@@ -626,9 +626,23 @@ const api = {
     ipcRenderer.invoke('dict:xrefs', text, options),
   /** A word's native pronunciation, from the disk cache or, on a click, the provider. */
   dictAudio: (
-    request: { lang: string; term: string; reading?: string; cacheOnly?: boolean },
-  ): Promise<import('./shared/lexiconAudio').LexiconAudioResult> =>
+    request: { lang: string; term: string; reading?: string; cacheOnly?: boolean; sourceId?: string },
+  ): Promise<import('./shared/lexiconAudio').LexiconAudioResult & { sourceId?: string }> =>
     ipcRenderer.invoke('dict:audio', request),
+  /** The ordered audio sources (`shared/audioSources.ts`). */
+  dictAudioSourcesGet: (): Promise<import('./shared/audioSources').AudioSourcesPrefs> =>
+    ipcRenderer.invoke('dict:audioSourcesGet'),
+  dictAudioSourcesSet: (
+    prefs: import('./shared/audioSources').AudioSourcesPrefs,
+  ): Promise<import('./shared/audioSources').AudioSourcesPrefs> => ipcRenderer.invoke('dict:audioSourcesSet', prefs),
+  /** Opens a folder chooser; resolves null when cancelled. Only ever on a user's click. */
+  dictAudioFolderPick: (): Promise<string | null> => ipcRenderer.invoke('dict:audioFolderPick'),
+  dictAudioFolderStats: (folder: string): Promise<{ files: number; truncated: boolean; exists: boolean }> =>
+    ipcRenderer.invoke('dict:audioFolderStats', folder),
+  /** Which sources have this word, without fetching anything (local index + CDN cache only). */
+  dictAudioAvailability: (
+    request: { lang: string; term: string; reading?: string },
+  ): Promise<import('./shared/audioSources').AudioSourceAvailability[]> => ipcRenderer.invoke('dict:audioAvailability', request),
   /** Every form of a conjugable Japanese word, from IPADIC's own class table. */
   dictConjugation: (
     word: string,
@@ -794,6 +808,15 @@ const api = {
     ipcRenderer.invoke('dict:resetPairPriority', pair),
   dictSetSourceEnabled: (id: string, enabled: boolean): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
     ipcRenderer.invoke('dict:setSourceEnabled', id, enabled),
+  /** The whole global source order at once (drag to reorder). */
+  dictSetSourceOrder: (ids: string[]): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
+    ipcRenderer.invoke('dict:setSourceOrder', ids),
+  /** Grouped / merged results and collapsed secondary dictionaries (`shared/dictDisplay.ts`). */
+  dictDisplayPrefsGet: (): Promise<import('./shared/dictDisplay').DictDisplayPrefs> =>
+    ipcRenderer.invoke('dict:displayPrefsGet'),
+  dictDisplayPrefsSet: (
+    prefs: import('./shared/dictDisplay').DictDisplayPrefs,
+  ): Promise<import('./shared/dictDisplay').DictDisplayPrefs> => ipcRenderer.invoke('dict:displayPrefsSet', prefs),
   /**
    * Queues the relabel; it does not perform it. `jobId` names a job on the
    * import stream (`onDictImportChanged`) whose terminal snapshot is the real
@@ -850,7 +873,7 @@ const api = {
   /** Which terms the target deck/note type already holds (AnkiConnect `canAddNotes`). Read-only. */
   ankiCheckDuplicates: (
     terms: string[],
-    target: { deckName: string; modelName: string },
+    target: { deckName: string; modelName: string; termField?: string },
   ): Promise<{ ok: boolean; duplicates: Record<string, boolean>; error?: string; unreachable?: boolean }> =>
     ipcRenderer.invoke('anki:checkDuplicates', terms, target),
 
@@ -920,6 +943,27 @@ const api = {
     ipcRenderer.invoke('anki:getIntervalsForNotes', [...noteIds]),
   /** Read-only week-ahead due counts from Anki's own scheduler. */
   ankiDueForecast: (): Promise<DueForecast> => ipcRenderer.invoke('anki:dueForecast'),
+  /** Two-way review sync (main/anki/reviewSync.ts): can sync run, and on which Anki profile. */
+  ankiSyncProbe: (): Promise<import('./shared/ankiReviewSync').AnkiSyncProbeResult> =>
+    ipcRenderer.invoke('anki:syncProbe'),
+  /** Replay Gum answers into Anki with `answerCards`, under the conflict rules in shared/ankiReviewSync.ts. */
+  ankiPushReviews: (request: {
+    items: import('./shared/ankiReviewSync').AnkiReviewPushItem[];
+    expectedProfile?: string;
+  }): Promise<import('./shared/ankiReviewSync').AnkiReviewPushResult> =>
+    ipcRenderer.invoke('anki:pushReviews', request),
+  /** Anki's schedule for linked notes, for display only. */
+  ankiPullSchedule: (request: {
+    noteIds: number[];
+    expectedProfile?: string;
+  }): Promise<import('./shared/ankiReviewSync').AnkiSchedulePullResult> =>
+    ipcRenderer.invoke('anki:pullSchedule', request),
+  /** Existing Anki notes that already are these Gum cards (term-field match). Read-only. */
+  ankiFindNoteLinks: (request: {
+    requests: import('./shared/ankiReviewSync').AnkiLinkRequest[];
+    expectedProfile?: string;
+  }): Promise<import('./shared/ankiReviewSync').AnkiLinkResult> =>
+    ipcRenderer.invoke('anki:findNoteLinks', request),
   onAnkiIntervalsChanged: (cb: (s: IntervalSnapshot) => void): (() => void) => {
     const handler = (_e: unknown, s: IntervalSnapshot): void => cb(s);
     ipcRenderer.on('anki:intervalsChanged', handler);
@@ -1724,15 +1768,46 @@ const api = {
     senseHints?: import('./shared/translateCore').TranslateSenseHint[];
     /** `literal` asks for a structure-preserving rendering; omitted is natural. */
     style?: import('./shared/translateCore').TranslateStyle;
+    /** An explicit engine, or 'pair' for the workbench's saved choice; omitted = offline. */
+    provider?: import('./shared/translateProviders').TranslateEngineRequest;
+    /** Glossary terms; main keeps only those that occur in `text`. */
+    glossary?: import('./shared/translateGlossary').TranslateGlossaryTerm[];
   }): Promise<{
     ok: boolean;
     text?: string;
     /** The sentence pairs the passage was translated as, for the aligned view. */
     segments?: import('./shared/translateCore').TranslateSegment[];
+    /** Which engine produced it, any fallback, and the glossary report. */
+    meta?: import('./shared/translateProviders').TranslateResultMeta;
     error?: string;
     errorKey?: string;
+    failure?: import('./shared/translateProviders').TranslateRouteFailure;
   }> =>
     ipcRenderer.invoke('translate:run', req),
+  // Translation engines: the per-pair choice, per-provider cloud consent, offline fallback.
+  translateProviders: (): Promise<import('./shared/translateProviders').TranslateProviderSnapshot> =>
+    ipcRenderer.invoke('translate:providers'),
+  translateSetPairProvider: (
+    source: string,
+    target: string,
+    provider: import('./shared/translateProviders').TranslateProviderId,
+  ): Promise<import('./shared/translateProviders').TranslateProviderSnapshot> =>
+    ipcRenderer.invoke('translate:setPairProvider', source, target, provider),
+  translateSetProviderConsent: (
+    provider: import('./shared/translateProviders').TranslateCloudProviderId,
+    granted: boolean,
+  ): Promise<import('./shared/translateProviders').TranslateProviderSnapshot> =>
+    ipcRenderer.invoke('translate:setProviderConsent', provider, granted),
+  translateSetFallback: (on: boolean): Promise<import('./shared/translateProviders').TranslateProviderSnapshot> =>
+    ipcRenderer.invoke('translate:setFallback', on),
+  onTranslateProvidersChanged: (
+    cb: (snapshot: import('./shared/translateProviders').TranslateProviderSnapshot) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, snapshot: import('./shared/translateProviders').TranslateProviderSnapshot): void =>
+      cb(snapshot);
+    ipcRenderer.on('translate:providersChanged', handler);
+    return () => ipcRenderer.removeListener('translate:providersChanged', handler);
+  },
   translateRunBatch: (req: {
     items: Array<{ id: string; text: string; source: string; target: string }>;
   }): Promise<{
@@ -1847,8 +1922,17 @@ const api = {
     ipcRenderer.on('translate:batchProgress', handler);
     return () => ipcRenderer.removeListener('translate:batchProgress', handler);
   },
-  onTranslatePartial: (cb: (p: { id: number; progress: number }) => void): (() => void) => {
-    const handler = (_e: unknown, p: { id: number; progress: number }): void => cb(p);
+  onTranslatePartial: (cb: (p: {
+    id: number;
+    progress: number;
+    /** The sentence just finished, when main reports one (progressive display). */
+    segment?: { index: number; total: number; source: string; target: string };
+  }) => void): (() => void) => {
+    const handler = (_e: unknown, p: {
+      id: number;
+      progress: number;
+      segment?: { index: number; total: number; source: string; target: string };
+    }): void => cb(p);
     ipcRenderer.on('translate:partial', handler);
     return () => ipcRenderer.removeListener('translate:partial', handler);
   },
@@ -3868,6 +3952,7 @@ const api = {
     fileName: string;
     media: ReadonlyArray<import('./shared/deckMediaExport').DeckMediaItem>;
     rows?: string[][];
+    schedules?: import('./shared/localDeckApkg').LocalDeckApkgRequest['schedules'];
   }): Promise<import('./main/flashcardAudio').DeckExportResult> =>
     ipcRenderer.invoke('flashcards:exportDeck', request),
   /** Open a folder this app wrote under userData/exports. Refuses anything else. */

@@ -144,6 +144,14 @@ setPopupStyleLoader(ensureStudyOsCompat);
 void import('./blancBackgroundJobs')
   .then(({ installBlancBackgroundJobs }) => installBlancBackgroundJobs())
   .catch((err) => console.warn('[blanc] background jobs unavailable:', err));
+// Anki review sync: a card graded here is queued for Anki even while Study OS
+// runs the background jobs (opt-in; shared/ankiReviewSync.ts). Loaded after
+// first paint, not as startup cost.
+window.setTimeout(() => {
+  void import('./ankiReviewSync')
+    .then(({ installAnkiReviewCapture }) => installAnkiReviewCapture())
+    .catch((err) => console.warn('[blanc] Anki review capture unavailable:', err));
+}, 3000);
 
 function BlancRoot() {
   const [locked, setLocked] = useState(() => shouldShowLockscreen());

@@ -23,6 +23,9 @@ import {
 } from '../data/grammar/practiceFilters';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { clearHandoff, takeHandoffJson } from '../pendingHandoff';
+
+/** `openGrammarPoint`'s live event (`extensionBridgeUi.ts`), named here so this lazy view imports nothing for it. */
+const GRAMMAR_OPEN_POINT_EVENT = 'grammar:open-point';
 import { consumeGrammarReviewEvent, GRAMMAR_REVIEW_EVENT } from '../grammarDue';
 
 /*
@@ -92,6 +95,33 @@ export default function GrammarView() {
     };
     window.addEventListener('grammar:open-practice', onPractice);
     return () => window.removeEventListener('grammar:open-practice', onPractice);
+  }, []);
+
+  // "Open this point" from the dictionary's conjugation trace (`openGrammarPoint`):
+  // drain the handoff, then listen — in this window (event) and in others (storage).
+  const [pointRequest, setPointRequest] = useState<{ id: string; key: number } | null>(null);
+  useEffect(() => {
+    const open = (id: string | null | undefined) => {
+      const pointId = String(id ?? '').trim();
+      if (!pointId) return;
+      setMode('grammar');
+      setPointRequest((previous) => ({ id: pointId, key: (previous?.key ?? 0) + 1 }));
+    };
+    open(takeHandoffJson<string>('grammarPoint'));
+    const onPoint = (ev: Event) => {
+      clearHandoff('grammarPoint');
+      open((ev as CustomEvent<{ id?: string }>).detail?.id);
+    };
+    // Another window of the app wrote the handoff (a dictionary pop-up there).
+    const onStorage = (ev: StorageEvent) => {
+      if (ev.newValue) open(takeHandoffJson<string>('grammarPoint'));
+    };
+    window.addEventListener(GRAMMAR_OPEN_POINT_EVENT, onPoint);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(GRAMMAR_OPEN_POINT_EVENT, onPoint);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   // "Review grammar now" from Flashcards / Calendar / Statistics (`grammarDue.ts`):
@@ -231,6 +261,7 @@ export default function GrammarView() {
           <GrammarExplorer
             className={aero ? 'gram-x--aero' : ''}
             renderDetail={(point) => <GrammarDetail key={point.id} point={point} />}
+            focusRequest={pointRequest}
           />
         ) : mode === 'practice' ? (
           <GrammarPracticePanel initialFilters={practiceSeed} />

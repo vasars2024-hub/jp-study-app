@@ -11,7 +11,7 @@
  * Enter = default action, the default button is pre-focused — Cancel when the
  * action is destructive (`danger`), Confirm otherwise.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Dialog } from './Dialog';
 import { Button } from './Button';
@@ -109,6 +109,10 @@ export interface PromptOptions {
 function PromptDialog({ opts, onDone }: { opts: PromptOptions; onDone: (value: string | null) => void }) {
   const [value, setValue] = useState(opts.defaultValue ?? '');
   const inputRef = useRef<HTMLInputElement>(null);
+  // a11y3: the field had no accessible name at all (axe `label`, critical) in
+  // every prompt in the app. The question asked is its label; with no message,
+  // the dialog title is.
+  const messageId = useId();
   useEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
@@ -128,10 +132,12 @@ function PromptDialog({ opts, onDone }: { opts: PromptOptions; onDone: (value: s
         </>
       }
     >
-      {opts.message != null && <div style={{ marginBottom: 8, whiteSpace: 'pre-line' }}>{opts.message}</div>}
+      {opts.message != null && <div id={messageId} style={{ marginBottom: 8, whiteSpace: 'pre-line' }}>{opts.message}</div>}
       <input
         ref={inputRef}
         className="ui-input"
+        aria-labelledby={opts.message != null ? messageId : undefined}
+        aria-label={opts.message != null ? undefined : opts.title ?? t('common.enterValue')}
         value={value}
         placeholder={opts.placeholder}
         onChange={(e) => setValue(e.target.value)}

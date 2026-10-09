@@ -15,7 +15,8 @@
     "postinstall": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && node tools/sync-ort-assets.cjs && node tools/sync-kuromoji-assets.cjs && node tools/sync-tesseract-assets.cjs",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "node tools/e2e/run.cjs"
   },
   "keywords": [],
   "author": "Arseniy",
@@ -43,6 +44,7 @@
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.5.4",
+    "axe-core": "4.13.0",
     "electron": "^42.3.0",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",

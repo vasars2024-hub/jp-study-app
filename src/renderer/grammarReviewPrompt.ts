@@ -82,6 +82,20 @@ export function japaneseClozeNeedles(title: string): string[] {
     out.push(core);
     // A dictionary-form ending also matches its conjugated uses (てしまう → てしまった).
     if (U_ROW_ENDING.test(core) && core.length >= 3) out.push(core.slice(0, -1));
+    // A pattern with a slot INSIDE it (〜は〜です, 〜ば〜ほど) never occurs as one run of
+    // text, so the joined core above matches none of its own examples and the point was
+    // stuck on recognition prompts forever (found by the e2e harness: n5-desu at three
+    // successful reviews still asked "recall the meaning"). Its literal pieces of two or
+    // more characters are fallbacks, after the whole, longest first.
+    const pieces = alt
+      .replace(/[（(][^）)]*[）)]/g, '')
+      .replace(/[A-Za-z0-9]+/g, '')
+      .split(/[〜～~…]/)
+      .map((piece) => piece.replace(/[.．・+＋\s]/g, '').trim())
+      .filter(Boolean);
+    if (pieces.length >= 2) {
+      for (const piece of pieces) if (piece.length >= 2 && piece !== core) out.push(piece);
+    }
   }
   return [...new Set(out)].sort((a, b) => b.length - a.length);
 }

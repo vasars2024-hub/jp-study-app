@@ -75,6 +75,23 @@ describe('building the export', () => {
     expect(built.rows[2][6]).toBe('[sound:jpstudy-dup-2.mp3]');
   });
 
+  it('adds pictures and schedules only when asked, aligned with the card rows', () => {
+    const srs = {
+      version: 2 as const, dueAt: 1, intervalDays: 3, ease: 2.5, repetitions: 2, lapses: 0, lastReviewedAt: 0, lastRating: 'good' as const,
+    };
+    const built = buildDeckMediaExport([
+      { id: 'a', word: '猫', imagePath: 'C:/m/shot.JPEG', srs },
+      { id: 'b', word: '犬', suspended: true },
+      { id: 'c', word: '鳥', imagePath: 'C:/m/notes.txt' },
+    ], { includeImages: true, includeSchedule: true });
+    expect(built.rows[0]).toEqual([...DECK_EXPORT_HEADERS, 'Image']);
+    expect(built.rows[1][7]).toBe('<img src="jpstudy-img-a.jpg">');
+    // Not a picture type: no file, no markup.
+    expect(built.rows[3][7]).toBe('');
+    expect(built.media).toEqual([{ fileName: 'jpstudy-img-a.jpg', sourcePath: 'C:/m/shot.JPEG' }]);
+    expect(built.schedules).toEqual([{ srs }, { suspended: true }, null]);
+  });
+
   it('exports an empty deck as a header and nothing else', () => {
     const built = buildDeckMediaExport([]);
     expect(built.rows).toEqual([DECK_EXPORT_HEADERS]);

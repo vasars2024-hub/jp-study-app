@@ -95,6 +95,7 @@ import {
 import { previewScheduleDelays } from '../../../shared/flashcardScheduling';
 import { isInSteps } from '../../../shared/learningSteps';
 import { nextSessionCardId, requeueStepCard } from '../../../shared/reviewSessionQueue';
+import { useDueClock } from '../../useDueClock';
 import { loadSchedulingConfig } from '../../flashcardScheduling';
 import { useReviewSessionPrefs } from '../../reviewSessionPrefs';
 import ReviewAnswerTimer from './ReviewAnswerTimer';
@@ -559,8 +560,12 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     () => filterDeckCards(epubCards, folderFilter),
     [epubCards, folderFilter],
   );
-  // Due now, with the profile's new-cards-per-day allowance applied.
-  const epubDueCards = useMemo(() => dueDeckCards(epubReviewPool), [epubReviewPool]);
+  // Due-ness moves with the clock, not only with the deck: re-evaluate the due lists
+  // below once a minute and when the window comes back (useDueClock.ts).
+  const dueClock = useDueClock();
+  // Due now, with the profile's new-cards-per-day allowance applied. (`dueClock` is a
+  // dependency on purpose: dueDeckCards reads Date.now.)
+  const epubDueCards = useMemo(() => dueDeckCards(epubReviewPool), [epubReviewPool, dueClock]);
   // A mix draws from the chosen decks; every other choice is one key.
   const sessionBookKey = useMemo<string | readonly string[]>(
     () => (reviewBookKey === REVIEW_MIX_KEY ? reviewMixKeys : reviewBookKey),
@@ -575,10 +580,10 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       ? filterDeckByBook(sessionPool, sessionBookKey)
       : filterDeckByBooks(sessionPool, sessionBookKey);
     return reviewDueOnly ? dueDeckCards(pool) : pool;
-  }, [sessionPool, sessionBookKey, reviewDueOnly]);
+  }, [sessionPool, sessionBookKey, reviewDueOnly, dueClock]);
   const epubReviewSessionCandidates = useMemo(
     () => reviewSessionCards(sessionPool, sessionBookKey, reviewDueOnly, reviewMode),
-    [sessionPool, sessionBookKey, reviewDueOnly, reviewMode],
+    [sessionPool, sessionBookKey, reviewDueOnly, reviewMode, dueClock],
   );
   /**
    * What the source picker labels each option with: the size of the session that
@@ -588,7 +593,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
    */
   const reviewSourceCounts = useMemo(
     () => reviewSessionCounts(epubReviewPool, reviewDueOnly, reviewMode),
-    [epubReviewPool, reviewDueOnly, reviewMode],
+    [epubReviewPool, reviewDueOnly, reviewMode, dueClock],
   );
   const reviewSourceCount = useCallback(
     (bookKey: string) => reviewSourceCounts.get(bookKey) ?? 0,
@@ -2944,19 +2949,15 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                 : undefined
                             }
                           />
+                          {/* a11y3: a pointer shortcut only. It was a second role=button
+                              inside the collapse toggle (nested-interactive: a screen reader
+                              hears one control and cannot reach the other); keyboard users
+                              open the same deck menu with the Options button beside it. */}
                           <span
                             className="flash-group-title flash-group-title-btn"
-                            role="button"
-                            tabIndex={0}
                             onClick={(e) => {
                               e.stopPropagation();
                               state.setDeckMenuGroup(group);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.stopPropagation();
-                                state.setDeckMenuGroup(group);
-                              }
                             }}
                           >
                             {group.bookTitle === UNKNOWN_BOOK_TITLE ? t('flash.unknownSource') : group.bookTitle}

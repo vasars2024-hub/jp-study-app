@@ -29,6 +29,8 @@ import {
   synthesizeWithSupertonic,
 } from './flashcardTtsHost';
 import { writeLocalDeckApkgOffMain } from './anki/localDeckApkgHost';
+import type { LocalDeckApkgRequest } from '../shared/localDeckApkg';
+import { isLocalSrsState } from '../shared/localSrs';
 import {
   MINED_MEDIA_EXTENSIONS,
   MINED_MEDIA_MAX_BYTES,
@@ -255,7 +257,21 @@ export interface DeckExportResult {
   /** Ready-to-import package written beside the text backup. */
   packagePath?: string;
   packageVerified?: boolean;
+  /** Cards the package carries with their review schedule (the rest import as new). */
+  scheduled?: number;
   error?: string;
+}
+
+/** Per-row schedules from the renderer: anything that is not a valid local SRS state exports as new. */
+function sanitizeExportSchedules(value: unknown): LocalDeckApkgRequest['schedules'] {
+  if (!Array.isArray(value)) return undefined;
+  return value.map((entry) => {
+    if (!entry || typeof entry !== 'object') return null;
+    const raw = entry as { srs?: unknown; suspended?: unknown };
+    const srs = isLocalSrsState(raw.srs) ? raw.srs : undefined;
+    const suspended = raw.suspended === true;
+    return srs || suspended ? { ...(srs ? { srs } : {}), ...(suspended ? { suspended } : {}) } : null;
+  });
 }
 
 /**
@@ -275,6 +291,7 @@ export async function exportDeckWithAudio(
   fileName: string,
   media: ReadonlyArray<{ fileName: string; sourcePath?: string; dataUrl?: string }>,
   rows?: string[][],
+  schedules?: LocalDeckApkgRequest['schedules'],
 ): Promise<DeckExportResult> {
   const safeName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '') || 'deck.csv';
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -315,10 +332,11 @@ export async function exportDeckWithAudio(
   }
   let packagePath: string | undefined;
   let packageVerified = false;
+  let scheduled = 0;
   if (rows && rows.length > 1) {
     packagePath = path.join(directory, safeName.replace(/\.[^.]+$/, '') + '.apkg');
     try {
-      await writeLocalDeckApkgOffMain({
+      const packaged = await writeLocalDeckApkgOffMain({
         kind: 'write',
         id: crypto.randomUUID(),
         outputPath: packagePath,
@@ -326,8 +344,10 @@ export async function exportDeckWithAudio(
         rows,
         media: packagedMedia,
         nowMs: Date.now(),
+        ...(schedules ? { schedules } : {}),
       });
       packageVerified = true;
+      scheduled = packaged.scheduled ?? 0;
     } catch (error) {
       return {
         ok: false,
@@ -338,7 +358,7 @@ export async function exportDeckWithAudio(
       };
     }
   }
-  return { ok: true, directory, written, failed, packagePath, packageVerified };
+  return { ok: true, directory, written, failed, packagePath, packageVerified, ...(scheduled ? { scheduled } : {}) };
 }
 
 /** A spawn failure that carries which classification the caller should report. */
@@ -875,6 +895,7 @@ export function registerFlashcardAudioIpc(): void {
       fileName?: unknown;
       media?: unknown;
       rows?: unknown;
+      schedules?: unknown;
     };
     return exportDeckWithAudio(
       typeof request.text === 'string' ? request.text : '',
@@ -888,6 +909,7 @@ export function registerFlashcardAudioIpc(): void {
       Array.isArray(request.rows)
         ? request.rows.filter((row): row is string[] => Array.isArray(row) && row.every((field) => typeof field === 'string'))
         : undefined,
+      sanitizeExportSchedules(request.schedules),
     );
   });
   ipcMain.handle('flashcards:revealExport', (_event, directory?: unknown) => {

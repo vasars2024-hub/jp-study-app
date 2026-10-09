@@ -77,7 +77,7 @@ export default function MediaJobStrip() {
                 {job.error ?? t(`media.jobs.phase.${job.phase}`)}
               </span>
               {pct !== null && !job.finished && (
-                <span className="medialib-jobs__bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                <span className="medialib-jobs__bar" role="progressbar" aria-label={job.title} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
                   <i style={{ width: `${pct}%` }} />
                 </span>
               )}

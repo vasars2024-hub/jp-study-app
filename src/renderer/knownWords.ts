@@ -36,6 +36,7 @@ export function resetKnownWordsCacheForTests(): void {
   cacheLang = null;
   cache = null;
   migrated = false;
+  countsMemo = null;
 }
 
 function migrateLegacyOnce(): void {
@@ -90,7 +91,11 @@ let mirrorTimer: ReturnType<typeof setTimeout> | null = null;
  * localStorage used to lose every graded word with no second copy anywhere.
  */
 function scheduleMirror(lang: StudyLang, entries: Record<string, Entry>, savedAt: number): void {
-  pendingMirrors.set(lang, { savedAt, entries: { ...entries } });
+  // By reference, not a copy (a 20,000-key spread per graded card): every edit
+  // of `entries` is followed by `persist`, which re-schedules this same slot
+  // with its newer stamp, so the value that lands is always the latest
+  // entries under the latest stamp — what the copy of the last call held.
+  pendingMirrors.set(lang, { savedAt, entries });
   if (mirrorTimer) return;
   mirrorTimer = setTimeout(() => {
     mirrorTimer = null;
@@ -123,7 +128,11 @@ function writeCache(lang: StudyLang, entries: Record<string, Entry>, savedAt: nu
   }
 }
 
+/** Bumped by every write of the in-memory store (see `knowledgeCounts`). */
+let storeVersion = 0;
+
 function persist(): void {
+  storeVersion += 1;
   const entries = db();
   const lang = cacheLang ?? getStudyLang();
   const savedAt = Date.now();
@@ -296,12 +305,22 @@ export function bulkSetFromAnki(levels: Record<string, WkLevel>): number {
 }
 
 export function knowledgeCounts(): Record<WkLevel, number> {
+  const entries = db();
+  // Every edit of the store goes through `persist`, which bumps the version;
+  // a re-read replaces the object. Either one recounts.
+  if (countsMemo && countsMemo.entries === entries && countsMemo.version === storeVersion) {
+    return { ...countsMemo.counts };
+  }
   const out: Record<WkLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
   // Manual "New" entries ({ l: 0, m: 1 }) only pin the word against sync; they
   // are not counted, matching the time before they were stored at all.
-  for (const e of Object.values(db())) if (e.l > 0 && e.l <= 3) out[e.l] += 1;
+  for (const e of Object.values(entries)) if (e.l > 0 && e.l <= 3) out[e.l] += 1;
+  countsMemo = { entries, version: storeVersion, counts: { ...out } };
   return out;
 }
+
+/** `knowledgeCounts` for one version of the store: Statistics asks on every knowledge event. */
+let countsMemo: { entries: Record<string, Entry>; version: number; counts: Record<WkLevel, number> } | null = null;
 
 /**
  * Every stored entry with its source, for the bulk manager (kw2). Unlike

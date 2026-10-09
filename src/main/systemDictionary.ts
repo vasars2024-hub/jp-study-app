@@ -39,6 +39,7 @@ import {
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { refuseWhileLocked } from './lockGuard';
+import { createE2eTray, isE2eHeadless } from './e2eHeadless';
 import {
   captureSelection,
   noteCompanionLookup,
@@ -450,7 +451,9 @@ function openShortcutSettings(): void {
 function ensureTray(): void {
   if (tray) return;
   try {
-    tray = new Tray(loadTrayIcon());
+    // The e2e harness runs on the owner's desktop: no notification-area icon. Its
+    // stand-in keeps the menu so the harness can click the rows (e2eHeadless.ts).
+    tray = isE2eHeadless() ? (createE2eTray() as unknown as Tray) : new Tray(loadTrayIcon());
   } catch (err) {
     console.error('[systemDictionary] tray creation failed', err);
     tray = null;

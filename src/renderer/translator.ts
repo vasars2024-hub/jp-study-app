@@ -8,6 +8,16 @@ import {
   type TranslateSenseHint,
   type TranslateStyle,
 } from '../shared/translateCore';
+import type { TranslateGlossaryTerm } from '../shared/translateGlossary';
+import {
+  TRANSLATE_FALLBACK_KEYS,
+  sanitizeTranslateResultMeta,
+  sanitizeTranslateRouteFailure,
+  translateProviderLabel,
+  type TranslateEngineRequest,
+  type TranslateResultMeta,
+  type TranslateRouteFailure,
+} from '../shared/translateProviders';
 import { t } from './i18n';
 
 export interface ModelProgress {
@@ -20,10 +30,16 @@ export type TranslateLang = 'ja' | 'zh' | 'ru';
 /** Any BCP-47-ish language code; Qwen handles arbitrary pairs. */
 export type TransLang = string;
 
+interface PartialEvent {
+  id: number;
+  progress: number;
+  segment?: { index: number; total: number; source: string; target: string };
+}
+
 let nextId = 1;
 let modelProgressHooked = false;
 const modelProgressListeners = new Set<(p: ModelProgress) => void>();
-const partialListeners = new Set<(p: { id: number; progress: number }) => void>();
+const partialListeners = new Set<(p: PartialEvent) => void>();
 
 function ensureIpcHooks(): void {
   if (modelProgressHooked) return;
@@ -85,6 +101,25 @@ export interface TranslateRunOptions {
   style?: TranslateStyle;
   /** Receives the sentence pairs when main reports them (the aligned view). */
   onSegments?: (segments: TranslateSegment[]) => void;
+  /**
+   * An explicit engine, or `'pair'` for the engine the Translate workbench saved
+   * for this language pair. Omitted = offline, as every other surface has always been.
+   */
+  provider?: TranslateEngineRequest;
+  /** The learner's glossary terms for this passage (main keeps only those that occur in it). */
+  glossary?: readonly TranslateGlossaryTerm[];
+  /** Each sentence as soon as it is finished, before the passage is (progressive display). */
+  onSegment?: (index: number, segment: TranslateSegment, total: number) => void;
+  /** Which engine produced the result, any fallback, and the glossary report. */
+  onMeta?: (meta: TranslateResultMeta) => void;
+}
+
+/** The message for a translation that failed with no fallback: who failed and why, in the UI language. */
+export function translateFailureMessage(failure: TranslateRouteFailure): string {
+  return t('xlate2.error.cloud', {
+    provider: translateProviderLabel(failure.provider, t),
+    reason: t(TRANSLATE_FALLBACK_KEYS[failure.code]),
+  });
 }
 
 export function translateTo(
@@ -97,8 +132,13 @@ export function translateTo(
 ): Promise<string> {
   ensureIpcHooks();
   const id = nextId++;
-  const onPartial = (p: { id: number; progress: number }): void => {
-    if (p.id === id) onProgress?.(p.progress);
+  const onPartial = (p: PartialEvent): void => {
+    if (p.id !== id) return;
+    onProgress?.(p.progress);
+    const segment = p.segment;
+    if (segment && options?.onSegment && typeof segment.source === 'string' && typeof segment.target === 'string') {
+      options.onSegment(segment.index, { source: segment.source, target: segment.target }, segment.total);
+    }
   };
   partialListeners.add(onPartial);
   return window.api
@@ -110,12 +150,20 @@ export function translateTo(
       ...(senseHints?.length ? { senseHints: [...senseHints] } : {}),
       // Only sent when it changes the prompt, so every existing request is unchanged.
       ...(options?.style === 'literal' ? { style: 'literal' as const } : {}),
+      ...(options?.provider ? { provider: options.provider } : {}),
+      ...(options?.glossary?.length ? { glossary: options.glossary.map((term) => ({ ...term })) } : {}),
     })
     .then((res) => {
-      // Errors main words itself arrive with a catalog key and are said in the UI language.
-      if (!res.ok) throw new Error(res.errorKey ? t(res.errorKey) : res.error ?? t('translate.error.failed'));
+      if (!res.ok) {
+        const failure = sanitizeTranslateRouteFailure(res.failure);
+        if (failure) throw new Error(translateFailureMessage(failure));
+        // Errors main words itself arrive with a catalog key and are said in the UI language.
+        throw new Error(res.errorKey ? t(res.errorKey) : res.error ?? t('translate.error.failed'));
+      }
       const segments = sanitizeTranslateSegments(res.segments);
       if (segments) options?.onSegments?.(segments);
+      const meta = sanitizeTranslateResultMeta(res.meta);
+      if (meta) options?.onMeta?.(meta);
       return res.text ?? '';
     })
     .finally(() => partialListeners.delete(onPartial));

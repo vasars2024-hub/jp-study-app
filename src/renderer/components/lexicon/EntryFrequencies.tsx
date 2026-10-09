@@ -14,7 +14,13 @@
 import { useEffect, useState } from 'react';
 import type { DictEntry } from '../../../shared/types';
 import { frequencyBand, type LexiconFrequencyResult } from '../../../shared/lexiconFrequency';
-import { cachedWordFrequency, fetchWordFrequency, frequencySourceShortLabel } from '../../dictFrequencyCache';
+import {
+  cachedWordFrequency,
+  fetchWordFrequency,
+  frequencySourceShortLabel,
+  onWordFrequencyCacheCleared,
+  wordFrequencyCacheGeneration,
+} from '../../dictFrequencyCache';
 import { useT } from '../../i18n';
 import './dictEntryExtras.css';
 
@@ -23,7 +29,10 @@ const MAX_CHIPS = 4;
 
 export default function EntryFrequencies({ entry, lang }: { entry: DictEntry; lang: string }) {
   const { t, lang: uiLang } = useT();
-  const key = `${lang}|${entry.word}`;
+  // A dictionary installed or removed mid-session drops the cache; the row asks again.
+  const [generation, setGeneration] = useState(wordFrequencyCacheGeneration);
+  useEffect(() => onWordFrequencyCacheCleared(() => setGeneration(wordFrequencyCacheGeneration())), []);
+  const key = `${lang}|${entry.word}|${generation}`;
   const [fetched, setFetched] = useState<{ key: string; value: LexiconFrequencyResult } | null>(null);
   const reply = fetched?.key === key ? fetched.value : cachedWordFrequency(entry.word, lang);
 
@@ -31,12 +40,12 @@ export default function EntryFrequencies({ entry, lang }: { entry: DictEntry; la
     if (!entry.word || cachedWordFrequency(entry.word, lang)) return undefined;
     let alive = true;
     void fetchWordFrequency(entry.word, lang).then((value) => {
-      if (alive && value) setFetched({ key: `${lang}|${entry.word}`, value });
+      if (alive && value) setFetched({ key: `${lang}|${entry.word}|${generation}`, value });
     });
     return () => {
       alive = false;
     };
-  }, [entry.word, lang]);
+  }, [entry.word, lang, generation]);
 
   const ranks = reply?.entries ?? [];
   if (!ranks.length) {

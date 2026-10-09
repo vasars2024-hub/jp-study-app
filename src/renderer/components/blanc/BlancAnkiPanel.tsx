@@ -20,6 +20,7 @@ import {
   useAnkiConfig,
 } from '../anki/AnkiContent';
 import { ProfileSwitcher } from '../ProfileSwitcher';
+import AnkiSyncStatus from '../anki/AnkiSyncStatus';
 
 /**
  * "Mapped onto <b>model</b>. ..." as one catalog sentence, with the model name
@@ -72,6 +73,12 @@ export function BlancAnkiPanel() {
             })}
           </p>
         )}
+      </fieldset>
+
+      {/* Offline too: the queue and the last problem are what a closed Anki leaves behind. */}
+      <fieldset>
+        <legend>{t('anki3.sync.title')}</legend>
+        <AnkiSyncStatus />
       </fieldset>
 
       {!loading && status?.connected && (

@@ -193,7 +193,7 @@ export default function UpdateApp({ deck, initialView = 'home' }: UpdateAppProps
         <div className="aero-mech-install-line" aria-live="polite">
           {t('aeroMech.update.installing', { n: Math.min(index + 1, queue.length), total: queue.length, word: current.word })}
         </div>
-        <div className="aero-mech-progress" role="progressbar" aria-valuemin={0} aria-valuemax={queue.length} aria-valuenow={index}>
+        <div className="aero-mech-progress" role="progressbar" aria-label={t('aeroMech.update.installingTitle')} aria-valuemin={0} aria-valuemax={queue.length} aria-valuenow={index}>
           <i style={{ transform: `scaleX(${Math.max(0.01, index / Math.max(1, queue.length))})` }} />
         </div>
         <AeroMechCard key={`${current.id}-${index}`} card={current} mode="learn" onGrade={grade} onSkip={skip} />

@@ -171,6 +171,22 @@ export function setAgentSpendGuard(guard: AgentSpendGuard | null): void {
 }
 
 /**
+ * The monthly ceiling's verdict for a cloud request that does not go through
+ * `runCloudAiRequest` — a dedicated translation API (DeepL) has no LLM body for
+ * this runtime to build, but the user's ceiling still applies to it. `true`
+ * with no guard registered, exactly as an unguarded `runCloudAiRequest` is.
+ */
+export function cloudSpendAllows(estimatedCostUsd: number | undefined): boolean {
+  if (!spendGuard) return true;
+  try {
+    return spendGuard.verdict(estimatedCostUsd).kind !== 'refuse';
+  } catch {
+    // An unreadable ledger refuses: a ceiling that cannot be read is not a reason to spend.
+    return false;
+  }
+}
+
+/**
  * Rates for a request whose caller supplied none.
  *
  * Registered for the same reason as the spend guard, and the two only work

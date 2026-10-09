@@ -38,6 +38,31 @@ describe('japaneseClozeNeedles', () => {
     expect(japaneseClozeNeedles('〜てしまう / 〜ちゃう')).toEqual(['てしまう', 'てしま', 'ちゃう', 'ちゃ']);
     expect(japaneseClozeNeedles('に (particle)')).toEqual([]);
   });
+
+  // Found by the headless e2e harness (tools/e2e, flow `grammar`): a pattern with a slot
+  // inside it never occurs as one run, so 〜は〜です at three good reviews still got a
+  // recognition prompt. Its literal pieces are fallbacks after the joined core.
+  it('adds the literal pieces of a pattern with an inner slot, after the whole', () => {
+    expect(japaneseClozeNeedles('〜は〜です')).toEqual(['はです', 'はで', 'です']);
+    expect(japaneseClozeNeedles('〜ば〜ほど')).toEqual(['ばほど', 'ほど']);
+    // A slot only at the edges adds nothing (unchanged behaviour).
+    expect(japaneseClozeNeedles('〜てから')).toEqual(['てから']);
+  });
+
+  it('a mature 〜は〜です point gets a cloze/production prompt, not recognition forever', () => {
+    const DESU: GrammarPointLike = {
+      id: 'n5-desu',
+      title: '〜は〜です',
+      lang: 'ja',
+      meaning: 'A is B',
+      examples: [{ jp: 'わたしは学生です。', en: 'I am a student.' }],
+    };
+    const learned = grammarReviewPrompt(DESU, state(1));
+    expect(learned.kind).toBe('cloze');
+    expect(learned.cloze?.answers).toEqual(['です']);
+    expect(grammarReviewPrompt(DESU, state(3)).kind).toBe('production');
+    expect(grammarReviewPrompt(DESU, state(0)).kind).toBe('recognition');
+  });
 });
 
 describe('clozeForExample', () => {

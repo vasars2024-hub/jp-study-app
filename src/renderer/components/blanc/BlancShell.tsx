@@ -680,6 +680,19 @@ export default function BlancShell({
   const blancToolsRef = useRef(blancTools);
   blancToolsRef.current = blancTools;
 
+  // A dictionary's conjugation trace opens the grammar point that teaches a step
+  // (`openGrammarPoint`): same request the master search makes for a point.
+  useEffect(() => {
+    const onPoint = (ev: Event): void => {
+      const id = String((ev as CustomEvent<{ id?: string }>).detail?.id ?? '').trim();
+      if (!id) return;
+      setMasterGrammarRequest((previous) => ({ id, key: (previous?.key ?? 0) + 1 }));
+      requestToolRef.current('grammar');
+    };
+    window.addEventListener('grammar:open-point', onPoint);
+    return () => window.removeEventListener('grammar:open-point', onPoint);
+  }, []);
+
   const chooseNavTab = (next: BlancTabId): void => {
     if (deferredNavFrame.current !== null) {
       window.cancelAnimationFrame(deferredNavFrame.current);
@@ -1184,7 +1197,11 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
       <fieldset>
         <legend>{t('blanc.shell.read.folders')}</legend>
         <div className="blanc-folder-row">
-          <select value={activeFolder} onChange={(event) => setActiveFolder(event.target.value)}>
+          <select
+            aria-label={t('blanc.shell.read.folders')}
+            value={activeFolder}
+            onChange={(event) => setActiveFolder(event.target.value)}
+          >
             <option value="all">{t('blanc.shell.read.allCount', { count: items.length })}</option>
             <option value="unfiled">{t('blanc.shell.read.unfiled')}</option>
             {folders.map((folder) => (
@@ -1289,6 +1306,9 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
   const [reading, setReading] = useState('');
   const [meaning, setMeaning] = useState('');
   const [sentence, setSentence] = useState('');
+  // Rendered a page at a time: the table mounted one row (six cells and a
+  // checkbox) per card, 20,000 rows on a large deck.
+  const [rowLimit, setRowLimit] = useState(BLANC_DECK_PAGE);
 
   useEffect(() => onDeckChanged(() => setCards(loadDeck())), []);
   useEffect(() => {
@@ -1456,7 +1476,7 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
             </tr>
           </thead>
           <tbody>
-            {cards.map((card) => (
+            {cards.slice(0, rowLimit).map((card) => (
               <tr key={card.id}>
                 <td>
                   <input
@@ -1487,10 +1507,21 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
             )}
           </tbody>
         </table>
+        {cards.length > rowLimit && (
+          <p className="blanc-note">
+            <span>{t('perf3.deck.rowsShown', { shown: rowLimit, total: cards.length })}</span>{' '}
+            <button type="button" onClick={() => setRowLimit((limit) => limit + BLANC_DECK_PAGE)}>
+              {t('perf3.deck.showMore', { count: Math.min(BLANC_DECK_PAGE, cards.length - rowLimit) })}
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );
 }
+
+/** Rows the Blanc deck table mounts per page. */
+const BLANC_DECK_PAGE = 200;
 
 
 /**
@@ -2243,6 +2274,7 @@ function BlancToolsPanel({
               type="button"
               role="tab"
               aria-selected={tool === id}
+              aria-keyshortcuts="Delete"
               className={tool === id ? 'active' : ''}
               title={tip(t('blanc.tb.switchTo', { name: item.label }))}
               onClick={() => chooseTool(id)}
@@ -2255,9 +2287,16 @@ function BlancToolsPanel({
               {toolboxSettings.showTabIcons && <Icon name={item.icon} size={13} />}
               <span>{item.label}</span>
             </button>
+            {/* a11y3: a tablist may own only tabs (axe aria-required-children,
+                critical), so the pointer close stays out of the accessibility
+                tree and out of the Tab order. Keyboard and screen-reader users
+                close the focused tab with Delete, which the tab advertises
+                through aria-keyshortcuts. */}
             <button
               type="button"
               className="blanc-tab-close"
+              tabIndex={-1}
+              aria-hidden="true"
               title={tip(t('blanc.tb.closeTab', { name: item.label }))}
               aria-label={t('blanc.tb.closeTab', { name: item.label })}
               onClick={() => closeToolTab(id)}

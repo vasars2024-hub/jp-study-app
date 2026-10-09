@@ -509,6 +509,84 @@
   "content_rpMoreEntries_other": {
     "message": "还有 $1 个条目——请查看“更多”标签。"
   },
+  "content_rpMoreDicts_other": {
+    "message": "显示另外 $1 部词典"
+  },
+  "content_rpFewerDicts": {
+    "message": "收起其他词典"
+  },
+  "content_reason_polite": {
+    "message": "敬体"
+  },
+  "content_reason_politeNegative": {
+    "message": "敬体否定"
+  },
+  "content_reason_politePast": {
+    "message": "敬体过去"
+  },
+  "content_reason_politePastNegative": {
+    "message": "敬体过去否定"
+  },
+  "content_reason_politeVolitional": {
+    "message": "敬体意志"
+  },
+  "content_reason_negative": {
+    "message": "否定"
+  },
+  "content_reason_past": {
+    "message": "过去"
+  },
+  "content_reason_te": {
+    "message": "て形"
+  },
+  "content_reason_causative": {
+    "message": "使役"
+  },
+  "content_reason_passive": {
+    "message": "被动"
+  },
+  "content_reason_passivePotential": {
+    "message": "被动／可能"
+  },
+  "content_reason_potential": {
+    "message": "可能"
+  },
+  "content_reason_volitional": {
+    "message": "意志"
+  },
+  "content_reason_imperative": {
+    "message": "命令"
+  },
+  "content_reason_conditionalBa": {
+    "message": "条件（〜ば）"
+  },
+  "content_reason_conditionalTara": {
+    "message": "条件（〜たら）"
+  },
+  "content_reason_tari": {
+    "message": "〜たり形"
+  },
+  "content_reason_tai": {
+    "message": "愿望（〜たい）"
+  },
+  "content_reason_sugiru": {
+    "message": "过度（〜すぎる）"
+  },
+  "content_reason_adverbial": {
+    "message": "副词形"
+  },
+  "content_reason_progressive": {
+    "message": "进行（〜ている）"
+  },
+  "content_reason_shimau": {
+    "message": "完成（〜てしまう）"
+  },
+  "content_reason_chau": {
+    "message": "完成（〜ちゃう）"
+  },
+  "content_reason_teoku": {
+    "message": "准备（〜ておく）"
+  },
   "content_rpNoSentence": {
     "message": "未检测到这个词所在的句子。"
   },
@@ -2083,6 +2161,18 @@
   },
   "bg_errTimeout": {
     "message": "Gum 响应超时。请稍后重试。"
+  },
+  "bg_errLocked": {
+    "message": "Gum 已锁定——请解锁 Gum 后继续。"
+  },
+  "common_queuedLocked": {
+    "message": "Gum 已锁定——已暂存在此，解锁 Gum 后会同步"
+  },
+  "popup_chipLocked": {
+    "message": "Gum 已锁定"
+  },
+  "popup_recWaitingLocked": {
+    "message": "$1 MB 待上传——请解锁 Gum 以上传"
   },
   "bg_errBadRequest": {
     "message": "Gum 无法读取该请求。请将扩展和 Gum 更新到相互匹配的版本。"

@@ -160,12 +160,19 @@ export function readCards(db: Database, nowMs = Date.now()): ApkgCardsResult {
 
   let rows: unknown[][] = [];
   let withSchedule = true;
-  try {
-    const res = db.exec(`
-      SELECT n.mid, n.flds, n.tags, c.did, c.type, c.queue, c.due, c.ivl, c.factor, c.reps, c.lapses
+  const scheduleQuery = (columns: string) => db.exec(`
+      SELECT n.mid, n.flds, n.tags, c.did, c.type, c.queue, c.due, c.ivl, c.factor, c.reps, c.lapses${columns}
       FROM notes n
       LEFT JOIN cards c ON c.id = (SELECT MIN(c2.id) FROM cards c2 WHERE c2.nid = n.id)
     `);
+  try {
+    // `c.data` carries Anki's FSRS memory state; a hand-built collection may lack the column.
+    let res;
+    try {
+      res = scheduleQuery(', c.data');
+    } catch {
+      res = scheduleQuery('');
+    }
     rows = res[0]?.values ?? [];
   } catch {
     // No cards table (or an unexpected shape) — fall back to notes alone.
@@ -185,6 +192,7 @@ export function readCards(db: Database, nowMs = Date.now()): ApkgCardsResult {
             factor: num(r[8]),
             reps: num(r[9]),
             lapses: num(r[10]),
+            ...(typeof r[11] === 'string' && r[11] ? { data: r[11] } : {}),
           }
         : undefined;
     return {

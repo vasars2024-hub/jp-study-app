@@ -1,0 +1,112 @@
+/* Dictionary, Yomitan parity: the conjugation trace, per-dictionary sections,
+   per-sense structured HTML and the audio source picker. Same badge rule as
+   dictEntryExtras.css: one hue, tinted, label mixed toward --text. */
+
+.dict-trace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  font-size: 12px;
+  margin: 2px 0 6px;
+}
+.dict-trace.is-compact {
+  font-size: 11px;
+  margin: 0 0 4px;
+  color: var(--muted);
+}
+.dict-trace-form {
+  font-weight: 600;
+}
+.dict-trace-form.is-lemma {
+  color: var(--accent, #3a86c8);
+}
+.dict-trace-steps {
+  display: contents;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dict-trace-steps > li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dict-trace-arrow {
+  opacity: 0.6;
+}
+.dict-trace-step {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+button.dict-trace-step {
+  min-height: 24px;
+  border: 1px solid color-mix(in srgb, var(--accent, #3a86c8) 40%, transparent);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+button.dict-trace-step:hover,
+button.dict-trace-step:focus-visible {
+  background: color-mix(in srgb, var(--accent, #3a86c8) 16%, transparent);
+}
+
+.dict-sections {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0;
+}
+.dict-section-head {
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  margin-bottom: 2px;
+}
+.dict-sections-toggle {
+  justify-self: start;
+  min-height: 24px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dict-sense-source {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  font-size: 10px;
+  border-radius: 5px;
+  color: var(--muted);
+  border: 1px solid color-mix(in srgb, currentcolor 35%, transparent);
+}
+.dict-sense-html {
+  display: inline;
+}
+.dict-sense-html ul,
+.dict-sense-html ol {
+  margin: 2px 0;
+  padding-left: 18px;
+}
+
+.dict-badge.prio {
+  --dict-badge-hue: #8a8a8a;
+  background: color-mix(in srgb, var(--dict-badge-hue) 16%, transparent);
+  color: color-mix(in srgb, var(--dict-badge-hue) 42%, var(--text));
+}
+.dict-badge.has-prio {
+  cursor: help;
+}
+
+.word-audio-source {
+  min-height: 24px;
+  max-width: 12ch;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  background: transparent;
+  color: var(--muted);
+}

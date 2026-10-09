@@ -3479,7 +3479,7 @@ export default function NovelReader({ item, onClose }: Props) {
         >
           {linkView ? (
             <div
-              className="novel-scroller novel-link-view"
+              className={`novel-scroller novel-link-view${collectionOpen ? ' beside-collection' : ''}`}
               onClick={onContentClick}
               onMouseDown={(e) => {
                 popupOpenOnDownRef.current = !!popupRef.current;
@@ -3499,7 +3499,9 @@ export default function NovelReader({ item, onClose }: Props) {
           ) : (
             <div
               ref={scrollerRef}
-              className="novel-scroller"
+              // `beside-collection`: the page yields the Collection drawer's strip
+              // instead of lying under it (styles.css, next to `.novel-scroller`).
+              className={`novel-scroller${collectionOpen ? ' beside-collection' : ''}`}
               style={scrollerStyle}
               onClick={onContentClick}
               onMouseDown={(e) => {
@@ -3572,6 +3574,7 @@ export default function NovelReader({ item, onClose }: Props) {
           className="chapter-select"
           value=""
           title={t('novel.reader.jumpToChapter')}
+          aria-label={t('novel.reader.jumpToChapter')}
           onChange={(e) => e.target.value !== '' && goTo(Number(e.target.value), 0)}
         >
           <option value="" disabled>

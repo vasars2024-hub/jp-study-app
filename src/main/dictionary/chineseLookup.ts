@@ -30,7 +30,7 @@ import type { DictEntry, DictResult } from '../../shared/types';
 import type { LexiconLookupResult } from '../../shared/lexiconInterlinear';
 import { cedictHeadwords, parseCedictLine, pinyinToneMarks, type CedictEntry } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
-import { lookup } from './dictService';
+import { lookup, missingSourceDictionaries } from './dictService';
 import { lookupResultToDictResult } from './lexiconAdapter';
 
 export interface CedictIndex {
@@ -164,6 +164,21 @@ export interface ChineseLookupDeps {
   script?: () => 'simplified' | 'traditional';
 }
 
+/**
+ * What `loadCedictText` throws when there is no CC-CEDICT at all: not
+ * downloaded, and no bundled copy (the installer ships none; it is the
+ * `cc-cedict` asset in Settings > Storage). A lookup turns it into
+ * `missingSourceLangs: ['zh']`, which every dictionary surface already renders
+ * as "no Chinese dictionary is installed" with a link to get one, rather than
+ * an error string.
+ */
+export class CedictNotInstalledError extends Error {
+  constructor(message = 'CC-CEDICT is not installed') {
+    super(message);
+    this.name = 'CedictNotInstalledError';
+  }
+}
+
 let indexPromise: Promise<CedictIndex> | null = null;
 
 /** Drop the cached CC-CEDICT index so a newly installed copy is picked up. */
@@ -275,6 +290,21 @@ export async function lookupChineseTerm(
     }
     return result;
   } catch (err) {
+    if (err instanceof CedictNotInstalledError) {
+      if (result) return result;
+      // "No Chinese dictionary" only when the database has none either: an
+      // imported one that simply lacks this word is a plain miss.
+      let databaseHasChinese = false;
+      try {
+        const db = deps.db();
+        databaseHasChinese = !!db && missingSourceDictionaries(db, ['zh']).length === 0;
+      } catch {
+        /* unreadable database: nothing installed that can answer */
+      }
+      return databaseHasChinese
+        ? { query: q, entries: [] }
+        : { query: q, entries: [], missingSourceLangs: ['zh'] };
+    }
     return result ?? { query: q, entries: [], error: err instanceof Error ? err.message : String(err) };
   }
 }

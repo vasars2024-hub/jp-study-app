@@ -38,6 +38,8 @@ import {
   type LevelBand,
 } from '../../firstRunSetup';
 import { seedKnownWords, seedWordsFor } from '../../firstRunSeed';
+import { trapTab } from '../ui/focusTrap';
+import { useFocusReturn } from '../shell/focusReturn';
 import { currentDeckSize } from '../../firstStepsTracker';
 import { setBlancModeEnabled } from '../../blancMode';
 import {
@@ -97,6 +99,9 @@ export default function FirstRunSetup({ onClose }: FirstRunSetupProps) {
   const [theme, setTheme] = useState<FirstRunTheme>(() => loadFirstRun().theme ?? 'study-os');
   const headingRef = useRef<HTMLHeadingElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  // a11y3: setup reopened from Help (Restart setup) hands focus back to that
+  // button when it closes, instead of dropping it on <body>.
+  useFocusReturn(true, cardRef);
   const index = FIRST_RUN_STEPS.indexOf(step);
 
   // A new step announces itself: focus moves to its heading (the dialog is
@@ -152,20 +157,9 @@ export default function FirstRunSetup({ onClose }: FirstRunSetupProps) {
       close('later');
       return;
     }
-    if (event.key !== 'Tab' || !cardRef.current) return;
-    const focusables = [...cardRef.current.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), [href], select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    )];
-    if (focusables.length === 0) return;
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    // a11y3: each step focuses its heading (tabIndex -1), and Shift+Tab from
+    // there used to leave the modal; the shared trap wraps from any position.
+    trapTab(event, cardRef.current);
   };
 
   const chooseStudyLang = (value: StudyLang): void => {

@@ -48,6 +48,7 @@ export default function AnkiQueueStatus({ deck }: { deck: DeckFlashcard[] }) {
   else if (report && report.sent + report.duplicate > 0) {
     note = t('flash.ankiQueue.sent', { count: report.sent + report.duplicate });
   }
+  if (report?.linked) note = `${note} ${t('anki3.queue.linked', { count: report.linked })}`.trim();
   if (report?.failed) note = `${note} ${t('flash.ankiQueue.failed', { count: report.failed })}`.trim();
   if (gaveUp) note = `${note} ${t('flash.ankiQueue.gaveUp', { count: gaveUp, tries: ANKI_QUEUE_MAX_ATTEMPTS })}`.trim();
 

@@ -156,6 +156,11 @@ export default function VirtualList<T>({
   // accessibility tree, or they sit between the collection and its items and
   // break the ownership the role just promised.
   const structural = listRole || gridRole ? ('presentation' as const) : undefined;
+  // An EMPTY collection drops its role: a `list` with no `listitem` or a
+  // `rowgroup`/`grid` with no `row` is invalid ARIA (axe aria-required-children,
+  // critical), and the empty state rendered in its place is neither. It reads
+  // as the plain message it is.
+  const containerRole = total === 0 ? undefined : listRole ?? gridRole;
 
   return (
     <div
@@ -163,8 +168,8 @@ export default function VirtualList<T>({
       className={className}
       style={{ overflowY: 'auto', position: 'relative', ...style }}
       onScroll={onScroll}
-      role={listRole ?? gridRole}
-      aria-rowcount={gridRole === 'grid' ? ariaRowCount ?? total : undefined}
+      role={containerRole}
+      aria-rowcount={gridRole === 'grid' && total > 0 ? ariaRowCount ?? total : undefined}
     >
       {total === 0
         ? emptyState ?? null

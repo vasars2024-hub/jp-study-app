@@ -118,6 +118,11 @@ export interface AnkiCardSchedule {
   factor: number;
   reps: number;
   lapses: number;
+  /**
+   * The card's `data` column. Anki 23.10+ keeps the FSRS memory state here as
+   * JSON (`{"s": stability, "d": difficulty, ...}`); empty for SM-2 cards.
+   */
+  data?: string;
 }
 
 /** One raw note row, as read out of the collection. */
@@ -168,7 +173,68 @@ export function ankiScheduleToLocalSrs(
     lastReviewedAt: Math.max(0, Math.min(nowMs, dueAt - intervalDays * DAY_MS)),
     lastRating: schedule.type === 3 ? 'again' : 'good',
   };
+  const memory = fsrsMemoryFromCardData(schedule.data);
+  if (memory) {
+    state.stability = memory.stability;
+    state.difficulty = memory.difficulty;
+    state.algorithm = 'fsrs';
+  }
   return isLocalSrsState(state) ? state : undefined;
+}
+
+/** Anki's FSRS memory state from a card's `data` JSON, when it carries a sane one. */
+export function fsrsMemoryFromCardData(data: string | undefined): { stability: number; difficulty: number } | null {
+  if (!data || !data.trim().startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(data) as { s?: unknown; d?: unknown };
+    const s = Number(parsed.s);
+    const d = Number(parsed.d);
+    if (!Number.isFinite(s) || s <= 0 || s > 36_500) return null;
+    if (!Number.isFinite(d) || d < 1 || d > 10) return null;
+    return { stability: s, difficulty: d };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The inverse of `ankiScheduleToLocalSrs`, for `.apkg` export: a local SRS
+ * state as Anki `cards` columns against a collection created at `crtSec`.
+ * `null` for a card never reviewed (exported as new). FSRS states carry their
+ * memory pair in `data`, which Anki 23.10+ reads; SM-2 states carry the ease
+ * in `factor` (permille), which every Anki version reads.
+ */
+export function localSrsToAnkiSchedule(
+  srs: LocalSrsState | undefined,
+  options: { crtSec: number; suspended?: boolean },
+): AnkiCardSchedule | null {
+  if (!srs || !isLocalSrsState(srs)) return null;
+  const intervalDays = Math.max(0, Math.round(srs.intervalDays));
+  const dueSec = Math.floor(srs.dueAt / 1000);
+  let type: number;
+  let queue: number;
+  let due: number;
+  if (srs.phase === 'learning' || srs.phase === 'relearning') {
+    type = srs.phase === 'learning' ? 1 : 3;
+    queue = 1;
+    due = dueSec;
+  } else {
+    type = 2;
+    queue = 2;
+    due = Math.max(0, Math.floor((dueSec - options.crtSec) / 86_400));
+  }
+  if (options.suspended) queue = -1;
+  const fsrs = srs.algorithm === 'fsrs' && typeof srs.stability === 'number' && typeof srs.difficulty === 'number';
+  return {
+    type,
+    queue,
+    due,
+    ivl: type === 1 ? 0 : Math.max(1, intervalDays),
+    factor: Math.max(1300, Math.round((srs.ease || LOCAL_SRS_DEFAULT_EASE) * 1000)),
+    reps: Math.max(1, Math.floor(srs.repetitions)),
+    lapses: Math.max(0, Math.floor(srs.lapses)),
+    data: fsrs ? JSON.stringify({ s: srs.stability, d: srs.difficulty }) : '',
+  };
 }
 
 const SOUND_RE = /\[sound:([^\]]+)\]/g;

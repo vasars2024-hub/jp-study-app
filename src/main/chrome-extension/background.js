@@ -132,12 +132,116 @@ async function apiFetch(path, opts = {}) {
     // place the substitution can happen without touching every one of them.
     err.serverError = raw;
     err.code = serverErrorCode(json, raw);
+    // 423: the app's lockscreen is engaged. Retryable later, never a refusal:
+    // see shouldQueue / shouldRetryQueued and the lock state below.
+    if (res.status === 423) err.code = 'locked';
+    err.locked = err.code === 'locked';
     if (err.auth) err.message = AUTH_FAILED_MSG;
+    else if (err.locked) err.message = t(SERVER_ERROR_KEYS.locked || 'bg_errLocked');
     else if (err.code && message === raw) err.message = t(SERVER_ERROR_KEYS[err.code]);
     err.payload = json;
+    if (err.locked) await noteAppLocked(true);
     throw err;
   }
+  // A content route answered: whatever the last health probe said, the app is
+  // unlocked now, so what waited for it goes out.
+  if (appLockedHint === true) void noteAppLocked(false);
   return json;
+}
+
+/* ------------------------------ app lock state ----------------------------- */
+/*
+ * While Gum's lockscreen is engaged every content route answers 423 and
+ * /v1/health reports `locked: true`. Nothing queued is dropped meanwhile: the
+ * retry queue and the recording uploader stop sending (a recording in progress
+ * would otherwise PUT a chunk every two seconds into a locked app) and the
+ * flush alarm — the existing one-minute cadence, no new timer — asks
+ * /v1/health instead, once per tick. When it reports `locked: false` the queue
+ * flushes and the recordings resume. The flag is kept in storage.local so a
+ * worker woken mid-lock does not start by replaying the whole backlog.
+ */
+const LOCK_KEY = 'jpStudyAppLocked';
+/** null = not read from storage yet. */
+let appLockedHint = null;
+
+async function isAppLockedHint() {
+  if (appLockedHint === null) {
+    try {
+      const data = await chrome.storage.local.get(LOCK_KEY);
+      appLockedHint = !!data[LOCK_KEY];
+    } catch {
+      appLockedHint = false;
+    }
+  }
+  return appLockedHint;
+}
+
+/** Record the lock state; on the locked → unlocked edge, flush and resume. */
+async function noteAppLocked(locked) {
+  const was = await isAppLockedHint();
+  appLockedHint = !!locked;
+  if (was === appLockedHint) return;
+  try {
+    if (appLockedHint) await chrome.storage.local.set({ [LOCK_KEY]: Date.now() });
+    else await chrome.storage.local.remove(LOCK_KEY);
+  } catch {
+    /* the in-memory flag still holds for this worker's life */
+  }
+  if (!appLockedHint) {
+    void flushQueue();
+    void resumeRecordingUploads();
+  }
+}
+
+/** GET /v1/health (no token; it answers while locked). null when nothing answered. */
+async function probeHealth() {
+  try {
+    const { port } = await getConfig();
+    const res = await fetch(`${baseUrl(port)}/v1/health`);
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      /* ignore */
+    }
+    return { status: res.status, ok: res.ok, json, locked: !!(res.ok && json && json.locked === true) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Before sending anything that a lock would refuse: is the app still locked?
+ * Only asks /v1/health when the last answer WAS a lock, so an unlocked app
+ * costs nothing extra; concurrent callers share one probe.
+ */
+let lockProbe = null;
+async function stillLocked() {
+  if (!(await isAppLockedHint())) return false;
+  if (!lockProbe) {
+    lockProbe = probeHealth().finally(() => {
+      lockProbe = null;
+    });
+  }
+  const health = await lockProbe;
+  // Nothing answered: the app closed while locked. Keep the flag; sending now
+  // would only fail offline, and a restarted app reports its state next tick.
+  if (!health) return true;
+  if (health.ok && !health.locked) {
+    appLockedHint = false;
+    try {
+      await chrome.storage.local.remove(LOCK_KEY);
+    } catch {
+      /* ignore */
+    }
+    return false;
+  }
+  return true;
+}
+
+/** `{ locked: true }` for a reply about something kept because the app is locked. */
+function lockedFlag(err) {
+  return err && err.locked ? { locked: true } : {};
 }
 
 /* ------------------------------- retry queue ------------------------------ */
@@ -151,7 +255,9 @@ async function apiFetch(path, opts = {}) {
  * will never sync and never surfacing the reason. Those are reported instead.
  */
 function shouldQueue(err) {
-  return !!(err && err.offline);
+  // A locked app (423) is the other condition waiting fixes: it is running and
+  // will take the save the moment the user unlocks it.
+  return !!(err && (err.offline || err.locked));
 }
 
 /**
@@ -166,7 +272,7 @@ function shouldQueue(err) {
  */
 function shouldRetryQueued(err) {
   if (!err) return false;
-  if (err.offline) return true;
+  if (err.offline || err.locked) return true;
   return !err.auth && Number(err.status) >= 500;
 }
 
@@ -325,7 +431,7 @@ async function flushImmersion() {
       await apiFetch('/v1/immersion/visit', { method: 'POST', body: JSON.stringify(body) });
       done.add(visit.url);
     } catch (err) {
-      if (err.offline) break;
+      if (err.offline || err.locked) break;
       done.add(visit.url); // refused: retrying will not change the answer
     }
   }
@@ -393,10 +499,16 @@ async function doFlushQueue() {
     if (queue.length) await writeQueue(queue); // persist ids given to legacy items
     return queue;
   });
+  // Locked: one /v1/health probe instead of a 423 per item. Nothing is touched.
+  if (await stillLocked()) {
+    await updateBadge(snapshot.length);
+    return { flushed: 0, left: snapshot.length, dropped: 0, locked: true };
+  }
   const sent = new Set();
   const dropped = [];
   const updates = new Map();
   let flushed = 0;
+  let locked = false;
   const now = Date.now();
   for (const item of snapshot) {
     const endpoint = QUEUE_ENDPOINTS[item.kind];
@@ -421,6 +533,12 @@ async function doFlushQueue() {
       flushed += 1;
       await dropLargeFields(item);
     } catch (err) {
+      if (err.locked) {
+        // The app locked (or was locked) under us: this item and every one
+        // after it wait, unchanged and uncounted, for the unlock.
+        locked = true;
+        break;
+      }
       // Only an answered failure counts against the attempt bound — see the
       // comment on MAX_QUEUE_ATTEMPTS.
       const attempts = (typeof item.attempts === 'number' ? item.attempts : 0) + (err.offline ? 0 : 1);
@@ -455,6 +573,7 @@ async function doFlushQueue() {
   }
   // Always written, so a badge left stale by a crashed write is corrected here.
   await updateBadge(left.length);
+  if (locked) return { flushed, left: left.length, dropped: dropped.length, locked: true };
   try {
     await flushImmersion();
   } catch {
@@ -523,7 +642,7 @@ async function smartCapture(tab) {
   } catch (err) {
     if (!(await enqueueIfRetryable('capture', payload, err))) throw err;
     await recordActivity({ kind: 'page', label: page.title || page.url, queued: true });
-    return { ok: true, queued: true, kind, action, openTarget };
+    return { ok: true, queued: true, ...lockedFlag(err), kind, action, openTarget };
   }
 }
 
@@ -548,7 +667,7 @@ async function downloadCurrent(tab) {
     // toast used to say "failed" for a download that then ran).
     if (!(await enqueueIfRetryable('download', payload, err))) throw err;
     await recordActivity({ kind: 'download', label: tab.title || tab.url, queued: true });
-    return { ok: true, queued: true, kind, openTarget: 'youtube' };
+    return { ok: true, queued: true, ...lockedFlag(err), kind, openTarget: 'youtube' };
   }
 }
 
@@ -652,7 +771,7 @@ async function saveText(tab, text, mode, opts = {}) {
       label: trimmed.slice(0, 48),
       queued: true,
     });
-    return saveQueuedResponse(payload, resolved, trimmed);
+    return { ...saveQueuedResponse(payload, resolved, trimmed), ...lockedFlag(err) };
   }
 }
 
@@ -715,7 +834,7 @@ async function clipboardText(tab, text, entryType) {
     return { ...out };
   } catch (err) {
     if (!(await enqueueIfRetryable('clipboard', payload, err))) throw err;
-    return { ok: true, queued: true };
+    return { ok: true, queued: true, ...lockedFlag(err) };
   }
 }
 
@@ -737,7 +856,7 @@ async function saveAudioClipboard(tab) {
     out = await apiFetch('/v1/audio/save', { method: 'POST', body: JSON.stringify(payload) });
   } catch (err) {
     if (!(await enqueueIfRetryable('audio-save', payload, err))) throw err;
-    out = { ok: true, queued: true };
+    out = { ok: true, queued: true, ...lockedFlag(err) };
   }
   // Clear the clip once it is saved or queued: a second Save used to make a
   // second card from the same recording.
@@ -990,7 +1109,7 @@ async function scanLongStrip(tab) {
   } catch (err) {
     if (!(await enqueueIfRetryable('manga-import', payload, err))) throw err;
     await recordActivity({ kind: 'manga', label: result.title || result.url, queued: true });
-    return { ok: true, queued: true, isLongStrip: result.isLongStrip, imageCount: result.images.length };
+    return { ok: true, queued: true, ...lockedFlag(err), isLongStrip: result.isLongStrip, imageCount: result.images.length };
   }
 }
 
@@ -1432,7 +1551,16 @@ async function scanLookup(text, lang) {
       const cached = await cachedScan(q, lang);
       if (cached) return { ok: true, ...cached, fromCache: true, offline: true };
     }
-    return { ok: false, matched: '', entries: [], offline: !!err.offline, error: String(err.message || err) };
+    // Locked: no cached answers either — the lock is there to keep study data
+    // off the screen, and the popup says why instead of looking empty.
+    return {
+      ok: false,
+      matched: '',
+      entries: [],
+      offline: !!err.offline,
+      ...(err.locked ? { locked: true, code: 'locked' } : {}),
+      error: String(err.message || err),
+    };
   }
 }
 
@@ -1836,6 +1964,16 @@ const REC_FINISH_POLL_MAX = 900; // 30 min of conversion at most per pump
 async function uploadStep(recId) {
   let rec = await IDB.get('recs', recId);
   if (!rec || rec.status === 'finished' || rec.status === 'failed') return;
+  // Locked: the chunks stay in IndexedDB and nothing is sent — a recording in
+  // progress would otherwise PUT one every two seconds into a 423. The flush
+  // alarm probes /v1/health and resumes this once the app is unlocked.
+  if (await isAppLockedHint()) return pauseForLock(recId);
+  if (rec.paused === 'locked') {
+    rec =
+      (await updateRec(recId, (r) => {
+        delete r.paused;
+      })) || rec;
+  }
   const { token, port } = await getConfig();
   const auth = token ? { Authorization: `Bearer ${token}` } : {};
   if (rec.status === 'finishing' && rec.serverId) return pollFinish(recId);
@@ -1859,7 +1997,8 @@ async function uploadStep(recId) {
         r.uploadedSeq = -1;
       });
       if (!rec) return;
-    } catch {
+    } catch (err) {
+      if (err && err.locked) return pauseForLock(recId);
       return; // offline or busy: the flush alarm tries again
     }
   }
@@ -1881,6 +2020,11 @@ async function uploadStep(recId) {
       );
     } catch {
       return;
+    }
+    if (res.status === 423) {
+      // Not acknowledged, so the chunk stays; nothing after it is tried.
+      await noteAppLocked(true);
+      return pauseForLock(recId);
     }
     if (res.status === 404) {
       // The app lost the session (restart past 24 h): start a new one next time.
@@ -1905,6 +2049,7 @@ async function uploadStep(recId) {
     uploadedSeq = chunk.seq;
     await updateRec(recId, (r) => {
       r.uploadedSeq = Math.max(r.uploadedSeq ?? -1, uploadedSeq);
+      delete r.paused;
     });
     await IDB.delete('chunks', chunk.key);
   }
@@ -1926,9 +2071,19 @@ async function uploadStep(recId) {
       return pollFinish(recId);
     }
     await completeRecording(recId, result);
-  } catch {
-    /* retried by the flush alarm */
+  } catch (err) {
+    // Retried by the flush alarm; a 423 keeps the row `stopped` until unlock.
+    if (err && err.locked) await pauseForLock(recId);
   }
+}
+
+/** Mark a recording as waiting for the app to be unlocked (shown by the popup's list). */
+async function pauseForLock(recId) {
+  await updateRec(recId, (r) => {
+    if (r.paused === 'locked') return false;
+    r.paused = 'locked';
+    return true;
+  });
 }
 
 async function completeRecording(recId, result) {
@@ -1953,8 +2108,10 @@ async function pollFinish(recId) {
     let st;
     try {
       st = await apiFetch(`/v1/recordings/${rec.serverId}/status`, { timeoutMs: 15_000 });
-    } catch {
-      return; // offline: the flush alarm resumes polling
+    } catch (err) {
+      // Offline or locked: the flush alarm resumes polling (after the unlock).
+      if (err && err.locked) await pauseForLock(recId);
+      return;
     }
     if (st && (st.state === 'finished' || st.state === 'failed')) {
       await completeRecording(recId, st.result || { ok: st.state === 'finished', id: rec.serverId, error: st.error });
@@ -2247,9 +2404,19 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== ALARM_FLUSH) return;
+  void onFlushAlarm();
+});
+
+/**
+ * The one-minute tick. While the app is locked this is the only thing that
+ * talks to it: a single /v1/health probe, and nothing else until it reports
+ * `locked: false` — then the queue flushes and recordings resume.
+ */
+async function onFlushAlarm() {
+  if (await stillLocked()) return;
   void flushQueue();
   void resumeRecordingUploads();
-});
+}
 
 // A recording follows its tab: closing the tab ends it.
 if (chrome.tabs.onRemoved && chrome.tabs.onRemoved.addListener) {
@@ -2400,7 +2567,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           });
           return;
         }
-        sendResponse({ ok: true, running: true, paired: true, data: await res.json() });
+        const data = await res.json();
+        // Additive in the app: `locked: true` while its lockscreen is engaged.
+        const locked = !!(data && data.locked === true);
+        await noteAppLocked(locked);
+        sendResponse({ ok: true, running: true, paired: true, ...(locked ? { locked: true } : {}), data });
       } catch {
         // Nothing answered on the port — this is the genuine not-running case.
         sendResponse({ ok: false, running: false, error: t('common_gumNotRunning') });
@@ -2422,16 +2593,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const res = await fetch(`${baseUrl(port)}/v1/health`);
         if (res.ok) {
           out.app = true;
+          let health = null;
           try {
-            out.version = (await res.json())?.version ?? null;
+            health = await res.json();
           } catch {
             /* ignore */
           }
+          out.version = health?.version ?? null;
+          out.locked = !!(health && health.locked === true);
+          await noteAppLocked(out.locked);
         }
       } catch {
         /* app offline */
       }
-      if (out.app) {
+      // Locked: /v1/mine-info would only answer 423, and says nothing about the
+      // pairing, so it is not asked; `paired` stays undetermined.
+      if (out.app && !out.locked) {
         try {
           const info = await apiFetch('/v1/mine-info');
           out.profileName = info?.profileName || '';
@@ -2684,7 +2861,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }),
         );
       } catch (err) {
-        sendResponse({ ok: false, entries: [], offline: !!err.offline, error: String(err.message || err) });
+        sendResponse({
+          ok: false,
+          entries: [],
+          offline: !!err.offline,
+          ...(err.locked ? { locked: true, code: 'locked' } : {}),
+          error: String(err.message || err),
+        });
       }
       return;
     }
@@ -2893,14 +3076,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }),
         );
       } catch (err) {
-        if (err.offline) {
+        if (err.offline || err.locked) {
           await queueImmersion({
             url: msg.url || '',
             title: msg.title || '',
             seconds: Number(msg.seconds) || 0,
             chars: Number(msg.chars) || 0,
           });
-          sendResponse({ ok: true, queued: true });
+          sendResponse({ ok: true, queued: true, ...lockedFlag(err) });
           return;
         }
         sendResponse({ ok: false, error: String(err.message || err) });
@@ -2957,6 +3140,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return;
     }
     if (from === 'page' && msg?.type === 'recording-upload') {
+      // A user's Retry asks /v1/health first when the last answer was a lock.
+      await stillLocked();
       await pumpUpload(String(msg.id || ''));
       sendResponse({ ok: true });
       return;

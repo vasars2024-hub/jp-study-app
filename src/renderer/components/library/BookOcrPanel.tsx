@@ -121,7 +121,7 @@ export function BookOcrPanel({ item }: Props) {
           <span>{t(`bookOcr.phase.${progress.phase}`)}</span>
           {total > 0 && <span className="muted">{t('bookOcr.pages', { done, total })}</span>}
         </div>
-        <Progress value={total > 0 ? done / total : undefined} />
+        <Progress value={total > 0 ? done / total : undefined} aria-label={t(`bookOcr.phase.${progress.phase}`)} />
         <div className="book-ocr-meta muted">
           {confidence > 0 && <span>{t('bookOcr.confidence', { percent: Math.round(confidence * 100) })}</span>}
           {etaMs != null && <span>{formatEta(etaMs, t)}</span>}

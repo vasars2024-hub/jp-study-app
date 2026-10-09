@@ -260,6 +260,9 @@ function truncatedRenders(text) {
       if (!sliceCall) continue;
       const arg = sliceCall[1].trim();
       if (arg === '') continue; // `.slice()` is a copy, not a truncation
+      // `.slice(n)` with ONE argument drops the first n items (e.g. "every column but the
+      // name"); it renders everything after them, so it is an offset, not a row cap.
+      if (!arg.includes(',')) continue;
       const cap = /(-?[\w$]+)\s*$/.exec(arg.split(',').pop().trim());
       if (!cap) continue;
       const capText = cap[1];

@@ -28,6 +28,7 @@ import {
   saveGrammarSrs,
 } from '../../grammarSrs';
 import { useT } from '../../i18n';
+import { trapTab } from '../ui/focusTrap';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import {
   applyGrade,
@@ -247,6 +248,13 @@ export default function GrammarTestModal({
    * inlined rather than adopted wholesale because swapping the render tree two
    * days before release risks the layout for no accessibility gain.
    */
+  // Held in a ref, as in the shared Dialog: callers pass an inline arrow, and
+  // with `onClose` as a dependency every parent re-render re-ran this effect —
+  // its cleanup bounced focus to the opener and the re-run pulled it back to the
+  // panel, so the focused answer button was lost on every re-render.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     const restoreTo = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
@@ -255,32 +263,21 @@ export default function GrammarTestModal({
         // Stop it here: the desktop shell also listens for Escape, and an
         // unstopped one closes the Grammar window out from under the dialog.
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
-      if (e.key !== 'Tab') return;
-      const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
-        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
-      );
-      if (!focusable || focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
+      // a11y3: shared trap; it also wraps Shift+Tab from the panel itself,
+      // which is where this dialog puts the initial focus.
+      trapTab(e, panelRef.current);
     };
     document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('keydown', onKey, true);
       // Put focus back where it came from, or the user lands at the top of the
       // document and has to Tab through the whole window to get back.
-      restoreTo?.focus?.();
+      if (restoreTo?.isConnected) restoreTo.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div

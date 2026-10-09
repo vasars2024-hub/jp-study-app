@@ -53,7 +53,7 @@ export default function MiningProgressPanel({ progress, active = true, compact }
         <span className="mining-progress-phase">{phaseLabel}</span>
         <span className="mining-progress-pct">{pct}%</span>
       </div>
-      <div className="mining-progress-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+      <div className="mining-progress-track" role="progressbar" aria-label={phaseLabel} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
         <div className="mining-progress-fill" style={{ width: `${pct}%` }} />
       </div>
       {progress.message && <p className="mining-progress-message">{progress.message}</p>}

@@ -15,6 +15,8 @@ export interface TranslationHistoryEntry {
   origin: TranslationOrigin;
   /** Kept at the top of the list and never evicted by the size cap. */
   pinned?: boolean;
+  /** The engine that produced `resultText` (a `TranslateProviderId`). Absent on rows from before engines were selectable. */
+  provider?: string;
 }
 
 /** Exported for the Files app's location column — see `lookupHistory.ts`. */
@@ -69,6 +71,7 @@ export function appendTranslationHistory(
     resultText: entry.resultText.slice(0, 8000),
     origin: entry.origin,
     ...(same?.pinned || entry.pinned ? { pinned: true } : {}),
+    ...(typeof entry.provider === 'string' && entry.provider ? { provider: entry.provider.slice(0, 40) } : {}),
   };
   persist([full, ...prev.filter((e) => e !== same)]);
   return full;

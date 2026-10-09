@@ -4095,7 +4095,7 @@
           return { ok, ev: `lines=${lines.length} hint=${!!hint} recovery=${recovery}` };
         } },
         { id: 'queueMirror', f: (w) => {
-          const songs = qa(w, '.music-song'); const queue = qa(w, '.mc-track-queue > button');
+          const songs = qa(w, '.music-song'); const queue = qa(w, '.mc-track-queue .mc-track-row');
           return { ok: songs.length > 0 && queue.length === songs.length
               && activeOf(songs, 'active') === 1 && activeOf(queue, 'is-active') === 1,
             ev: `songs=${songs.length} queue=${queue.length} active=${activeOf(songs, 'active')}/${activeOf(queue, 'is-active')}` };
@@ -4135,13 +4135,13 @@
           // visible text field before it drives — deliberately, so the round trip has real
           // state to lose — and on this surface that field is the music search, which filters
           // the library list to nothing. Measured: typing the mark leaves `.music-song` 0 and
-          // `.mc-track-queue > button` 2. So the first attempt at this step refused "no songs
+          // `.mc-track-queue .mc-track-row` 2. So the first attempt at this step refused "no songs
           // in the library to select" on a library holding two, and the five player rows
           // stayed dark for the same reason as before, one layer down.
           //
           // The queue row is the same action, not a workaround: `MediaCenterView.tsx:1250`
           // is `onClick={() => void state.play(item)}`, exactly what the library row calls.
-          const rows = songs.length ? songs : qa(w, '.mc-track-queue > button');
+          const rows = songs.length ? songs : qa(w, '.mc-track-queue .mc-track-row');
           const via = songs.length ? 'library' : 'queue';
           const titleOf = (el) => txt(q(el, '.music-song-title') || q(el, 'strong') || el);
           if (!rows.length) return { refused: 'neither the library list nor the queue offers a track' };
@@ -4159,7 +4159,7 @@
         searchNarrow: (w) => {
           const g = musicState(); const input = q(w, '.music-search input');
           if (!input) return { refused: 'no music search' };
-          if (g.search == null) { g.search = input.value; g.before = qa(w, '.mc-track-queue > button').length; }
+          if (g.search == null) { g.search = input.value; g.before = qa(w, '.mc-track-queue .mc-track-row').length; }
           typeInto(input, '__lqp_no_song__'); return { before: g.before };
         },
         searchRestore: (w) => {
@@ -4209,7 +4209,7 @@
         transport: (w) => detach(q(w, '.mc-player-play'), 'no play control'),
         like: (w) => stripAttr(q(w, '.mc-player-like'), 'aria-pressed', 'no like control'),
         lyricsRecovery: (w) => detach(q(w, '.music-hint p, .music-line-text'), 'no lyric state'),
-        queueMirror: (w) => detach(q(w, '.mc-track-queue > button'), 'no queue rows'),
+        queueMirror: (w) => detach(q(w, '.mc-track-queue .mc-track-row'), 'no queue rows'),
         youtubeDraft: (w) => detach(q(w, '.music-yt button'), 'no YouTube action'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },

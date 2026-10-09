@@ -1360,7 +1360,7 @@ export function BlancAudioMinePanel() {
         {busy && (
           <div className="blanc-audio-progress">
             <span>{statusLine}</span>
-            <progress max={1} value={state === 'transcribing' ? progress : undefined} />
+            <progress max={1} value={state === 'transcribing' ? progress : undefined} aria-label={statusLine} />
           </div>
         )}
         {state === 'error' && <p className="blanc-warning">{error}</p>}

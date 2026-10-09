@@ -98,6 +98,17 @@ const NAME_FROM_CONTENT = new Set([
   'option',
   'tab',
   'menuitem',
+  // a11y3: ARIA 1.2 names these from content too. Without them a
+  // `<button role="radio">Cloud</button>` read as unnamed.
+  'radio',
+  'checkbox',
+  'switch',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'treeitem',
+  'gridcell',
+  'row',
+  'tooltip',
   'cell',
   'columnheader',
   'rowheader',

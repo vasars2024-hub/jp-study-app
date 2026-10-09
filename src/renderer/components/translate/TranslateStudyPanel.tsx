@@ -10,8 +10,11 @@
  * The grammar library (~2 MB) is a dynamic import: it is fetched the first time
  * a translation finishes, never when the Translate surface — or Blanc — opens.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import SubtitleCueLine from '../SubtitleCueLine';
+import { TranslateEngineBar, TranslateResultSource } from './TranslateEngineBar';
+import { TranslateGlossaryPanel } from './TranslateGlossaryPanel';
+import { useTranslateGlossary } from '../../translateGlossaryStore';
 import { useT } from '../../i18n';
 import { isStudyLang, studyLangFromTag, type StudyLang } from '../../../shared/studyLang';
 import type { SentenceAnalysisResult } from '../../../shared/sentenceAnalysisCore';
@@ -96,36 +99,59 @@ function lookup(hit: WordLookupHit): void {
  */
 export function TranslateOptionsBar({ state, className = '' }: { state: TranslateController; className?: string }) {
   const { t } = useT();
+  const glossaryId = useId();
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const glossaryCount = useTranslateGlossary().length;
   return (
-    <div className={`xlate-options ${className}`.trim()}>
-      <div className="dict-lang-toggle" role="radiogroup" aria-label={t('xlate.style.label')}>
-        {(['natural', 'literal'] as const).map((style) => (
-          <button
-            key={style}
-            type="button"
-            role="radio"
-            aria-checked={state.style === style}
-            className={`gram-level-btn ${state.style === style ? 'active' : ''}`}
-            title={t(`xlate.style.${style}Hint`)}
-            disabled={state.busy}
-            onClick={() => state.setStyle(style)}
-          >
-            {t(`xlate.style.${style}`)}
-          </button>
-        ))}
+    <>
+      <div className={`xlate-options ${className}`.trim()}>
+        <TranslateEngineBar source={state.source} target={state.target} disabled={state.busy} />
+        <button
+          type="button"
+          className="btn ghost xlate2-glossary-toggle"
+          aria-expanded={glossaryOpen}
+          aria-controls={glossaryOpen ? `${glossaryId}-glossary` : undefined}
+          onClick={() => setGlossaryOpen((open) => !open)}
+        >
+          {t('xlate2.glossary.toggle', { count: glossaryCount })}
+        </button>
+        <div className="dict-lang-toggle" role="radiogroup" aria-label={t('xlate.style.label')}>
+          {(['natural', 'literal'] as const).map((style) => (
+            <button
+              key={style}
+              type="button"
+              role="radio"
+              aria-checked={state.style === style}
+              className={`gram-level-btn ${state.style === style ? 'active' : ''}`}
+              title={t(`xlate.style.${style}Hint`)}
+              disabled={state.busy}
+              onClick={() => state.setStyle(style)}
+            >
+              {t(`xlate.style.${style}`)}
+            </button>
+          ))}
+        </div>
+        <label className="xlate-watch" title={t('xlate.clipboard.hint')}>
+          <input
+            type="checkbox"
+            checked={state.clipboardWatch}
+            onChange={(e) => state.setClipboardWatch(e.target.checked)}
+          />
+          {t('xlate.clipboard.watch')}
+        </label>
+        {state.clipboardWatch && (
+          <span className="xlate-watch-status muted" role="status">{t('xlate.clipboard.watching')}</span>
+        )}
       </div>
-      <label className="xlate-watch" title={t('xlate.clipboard.hint')}>
-        <input
-          type="checkbox"
-          checked={state.clipboardWatch}
-          onChange={(e) => state.setClipboardWatch(e.target.checked)}
+      {glossaryOpen && (
+        <TranslateGlossaryPanel
+          id={`${glossaryId}-glossary`}
+          source={state.source}
+          target={state.target}
+          passage={state.input}
         />
-        {t('xlate.clipboard.watch')}
-      </label>
-      {state.clipboardWatch && (
-        <span className="xlate-watch-status muted" role="status">{t('xlate.clipboard.watching')}</span>
       )}
-    </div>
+    </>
   );
 }
 
@@ -186,6 +212,8 @@ export default function TranslateStudyPanel({ state }: { state: TranslateControl
         )}
         <span className="xlate-study-keys muted">{t('xlate.keysHint')}</span>
       </div>
+
+      <TranslateResultSource meta={state.meta} />
 
       {studyLang && <p className="xlate-legend muted">{t('xlate.legend')}</p>}
 

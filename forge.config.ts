@@ -196,6 +196,64 @@ async function resolveSquirrelDeltaBase(): Promise<string | undefined> {
   return undefined;
 }
 
+/**
+ * Installer size (perf3 pass, measured from the files, compressed estimates):
+ * production `node_modules` files nothing in the app ever loads. Each one is
+ * excluded from the copy, never from a dependency the app requires.
+ */
+const UNUSED_RUNTIME_FILES: readonly RegExp[] = [
+  // kuromoji's own test fixtures (one 23 MB matrix.def, ~6 MB compressed). The
+  // dictionary the main-process tokenizer reads is `kuromoji/dict/`.
+  /^\/node_modules\/kuromoji\/test(\/|$)/,
+  // llama.cpp's source as a git bundle (31 MB, ~31 MB compressed). Only
+  // node-llama-cpp's from-source rebuild reads it (`cloneLlamaCppRepo`), which
+  // needs a compiler toolchain an installed app does not have; the prebuilt
+  // CPU and Vulkan binaries it would replace ship beside it.
+  /^\/node_modules\/node-llama-cpp\/llama\/gitRelease\.bundle$/,
+  // The TypeScript compiler (39 MB, ~7 MB): an optional peer of node-llama-cpp
+  // that only its CLI (`inspect gpu`) imports. Nothing in the app requires it.
+  /^\/node_modules\/typescript(\/|$)/,
+  // sql.js: main loads `dist/sql-wasm.js` + `dist/sql-wasm.wasm`
+  // (`src/main/anki/apkgCollection.ts`). The asm.js, debug and worker builds and
+  // the release zips (~19 MB, ~6 MB) are never required.
+  /^\/node_modules\/sql\.js\/dist\/(sql-asm[^/]*|[^/]*-debug\.[^/]*|worker\.[^/]*|sqljs-[^/]*\.zip)$/,
+];
+
+/**
+ * `public/` paths dropped from the packaged resources after they are copied.
+ *
+ * - `cedict/`: CC-CEDICT (9.4 MB, ~3.8 MB compressed) is the `cc-cedict` asset in
+ *   Settings > Storage (`src/shared/assetRegistry.ts`, the Chinese starter offered
+ *   at first run), which `src/main/dictionary/service.ts` already prefers. Without
+ *   either copy a Chinese lookup reports "no Chinese dictionary installed" with a
+ *   link to get one (`CedictNotInstalledError`). Only Chinese study needs it.
+ * - The JSEP and JSPI builds of onnxruntime-web (38 MB, ~9.5 MB): the renderer's
+ *   Whisper worker loads `@huggingface/transformers`' web build, whose
+ *   onnxruntime-web/webgpu bundle names only the `asyncify` engine (and the plain
+ *   one for Safari). Both stay; the source `public/` is untouched, so the
+ *   `check-runtime-assets` preflight is unchanged.
+ */
+const ON_DEMAND_PUBLIC_PATHS: readonly string[] = [
+  'cedict',
+  'ort/ort-wasm-simd-threaded.jsep.mjs',
+  'ort/ort-wasm-simd-threaded.jsep.wasm',
+  'ort/ort-wasm-simd-threaded.jspi.mjs',
+  'ort/ort-wasm-simd-threaded.jspi.wasm',
+];
+
+/** Every `public/` directory the packager copied under `buildPath` (resources/ or *.app/Contents/Resources/). */
+function packagedPublicDirs(buildPath: string): string[] {
+  const candidates = [path.join(buildPath, 'resources', 'public')];
+  try {
+    for (const entry of fs.readdirSync(buildPath)) {
+      if (entry.endsWith('.app')) candidates.push(path.join(buildPath, entry, 'Contents', 'Resources', 'public'));
+    }
+  } catch {
+    /* not a directory listing we can read: only the default candidate */
+  }
+  return candidates.filter((dir) => fs.existsSync(dir));
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     icon: 'assets/icon',
@@ -222,10 +280,27 @@ const config: ForgeConfig = {
     // shipped only when the folder exists, so a public clone packages exactly as before;
     // main.ts serves its `public/` after ours (`<resourcesPath>/private-assets/public`).
     extraResource: ['public', SIDECAR_STAGING_DIR, ...(fs.existsSync('private-assets') ? ['private-assets'] : [])],
+    // Optional assets the app downloads on demand, and engine builds it never
+    // loads, leave the packaged copy of `public/` (see ON_DEMAND_PUBLIC_PATHS).
+    afterCopyExtraResources: [
+      (buildPath, _electronVersion, _platform, _arch, done) => {
+        try {
+          for (const dir of packagedPublicDirs(buildPath)) {
+            for (const rel of ON_DEMAND_PUBLIC_PATHS) {
+              fs.rmSync(path.join(dir, ...rel.split('/')), { recursive: true, force: true });
+            }
+          }
+          done();
+        } catch (err) {
+          done(err instanceof Error ? err : new Error(String(err)));
+        }
+      },
+    ],
     // Ship Vite output + production node_modules; public ships once via extraResource.
     ignore: (file) => {
       if (!file) return false;
       if (file.startsWith('/.vite')) return false;
+      if (UNUSED_RUNTIME_FILES.some((pattern) => pattern.test(file))) return true;
       if (file.startsWith('/node_modules')) return false;
       if (file.startsWith('/jp-study-app-lockscrene-4d2eb54a')) return true;
       if (file.startsWith('/out')) return true;

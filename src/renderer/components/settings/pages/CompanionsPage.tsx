@@ -682,6 +682,7 @@ export default function CompanionsPage() {
                 <li key={idx} className="buddy-step-row">
                   <select
                     className="set-select"
+                    aria-label={t('a11y3.companions.stepType', { n: idx + 1 })}
                     disabled={editing.builtin}
                     value={step.type}
                     onChange={(e) => {
@@ -696,6 +697,7 @@ export default function CompanionsPage() {
                     ))}
                   </select>
                   <StepFields
+                    n={idx + 1}
                     step={step}
                     disabled={!!editing.builtin}
                     routines={routines}
@@ -810,11 +812,14 @@ export default function CompanionsPage() {
 }
 
 function StepFields({
+  n,
   step,
   disabled,
   routines,
   onChange,
 }: {
+  /** 1-based position, so each field's accessible name says which step it edits. */
+  n: number;
   step: BuddyStep;
   disabled: boolean;
   routines: BuddyRoutine[];
@@ -827,6 +832,7 @@ function StepFields({
         <select
           className="set-select"
           disabled={disabled}
+          aria-label={t('a11y3.companions.stepApp', { n })}
           value={step.appId}
           onChange={(e) => onChange({ type: 'openApp', appId: e.target.value })}
         >
@@ -842,6 +848,7 @@ function StepFields({
         <select
           className="set-select"
           disabled={disabled}
+          aria-label={t('a11y3.companions.stepCommand', { n })}
           value={step.commandId}
           onChange={(e) => onChange({ type: 'runCommand', commandId: e.target.value })}
         >
@@ -858,6 +865,7 @@ function StepFields({
           <select
             className="set-select"
             disabled={disabled}
+            aria-label={t('a11y3.companions.stepEnvSetting', { n })}
             value={step.key}
             onChange={(e) =>
               onChange({
@@ -876,6 +884,7 @@ function StepFields({
           <select
             className="set-select"
             disabled={disabled}
+            aria-label={t('a11y3.companions.stepEnvValue', { n })}
             value={step.value ?? 'toggle'}
             onChange={(e) =>
               onChange({
@@ -897,6 +906,7 @@ function StepFields({
           <select
             className="set-select"
             disabled={disabled}
+            aria-label={t('a11y3.companions.stepMood', { n })}
             value={step.mood}
             onChange={(e) =>
               onChange({
@@ -915,6 +925,7 @@ function StepFields({
           <input
             className="ui-input"
             disabled={disabled}
+            aria-label={t('a11y3.companions.stepStatus', { n })}
             value={step.status ?? ''}
             placeholder={t('settings.companions.statusPlaceholder')}
             onChange={(e) => onChange({ type: 'setMood', mood: step.mood, status: e.target.value })}
@@ -929,6 +940,7 @@ function StepFields({
           min={0}
           max={10000}
           disabled={disabled}
+          aria-label={t('a11y3.companions.stepWait', { n })}
           value={step.ms}
           onChange={(e) => onChange({ type: 'wait', ms: Number(e.target.value) })}
         />
@@ -939,6 +951,7 @@ function StepFields({
           <input
             className="ui-input"
             disabled={disabled}
+            aria-label={t('a11y3.companions.stepNotifyTitle', { n })}
             value={step.title}
             placeholder={t('settings.companions.titlePlaceholder')}
             onChange={(e) => onChange({ type: 'notify', title: e.target.value, body: step.body })}
@@ -946,6 +959,7 @@ function StepFields({
           <input
             className="ui-input"
             disabled={disabled}
+            aria-label={t('a11y3.companions.stepNotifyBody', { n })}
             value={step.body ?? ''}
             placeholder={t('settings.companions.bodyPlaceholder')}
             onChange={(e) => onChange({ type: 'notify', title: step.title, body: e.target.value })}
@@ -957,6 +971,7 @@ function StepFields({
         <select
           className="set-select"
           disabled={disabled}
+          aria-label={t('a11y3.companions.stepMusic', { n })}
           value={step.action}
           onChange={(e) =>
             onChange({
@@ -975,6 +990,7 @@ function StepFields({
         <input
           className="ui-input"
           disabled={disabled}
+          aria-label={t('a11y3.companions.stepSpeak', { n })}
           value={step.text}
           onChange={(e) => onChange({ type: 'speak', text: e.target.value })}
         />
@@ -985,6 +1001,7 @@ function StepFields({
           <input
             className="ui-input"
             disabled={disabled}
+            aria-label={t('a11y3.companions.stepEvent', { n })}
             value={step.event}
             placeholder={t('settings.companions.eventNamePlaceholder')}
             onChange={(e) => onChange({ type: 'dispatch', event: e.target.value, detail: step.detail })}
@@ -992,6 +1009,7 @@ function StepFields({
           <input
             className="ui-input"
             disabled={disabled}
+            aria-label={t('a11y3.companions.stepDetail', { n })}
             value={step.detail ?? ''}
             placeholder={t('settings.companions.detailPlaceholder')}
             onChange={(e) => onChange({ type: 'dispatch', event: step.event, detail: e.target.value })}
@@ -1003,6 +1021,7 @@ function StepFields({
         <select
           className="set-select"
           disabled={disabled}
+          aria-label={t('a11y3.companions.stepPalette', { n })}
           value={step.mode ?? 'commands'}
           onChange={(e) =>
             onChange({ type: 'palette', mode: e.target.value === 'search' ? 'search' : 'commands' })
@@ -1017,6 +1036,7 @@ function StepFields({
         <select
           className="set-select"
           disabled={disabled}
+          aria-label={t('a11y3.companions.stepRoutine', { n })}
           value={step.routineId}
           onChange={(e) => onChange({ type: 'routine', routineId: e.target.value })}
         >

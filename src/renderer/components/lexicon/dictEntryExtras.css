@@ -69,6 +69,11 @@ span.dict-pos-tag {
 
 .dict-ex-standing {
   display: inline-block;
+  /* A badge, not a row: inside the example's column layout it was stretched to the full
+     card width (seen in the e2e harness's capture of the i+1 list). */
+  align-self: flex-start;
+  justify-self: start;
+  width: fit-content;
   margin-left: 6px;
   padding: 0 5px;
   font-size: 10px;
