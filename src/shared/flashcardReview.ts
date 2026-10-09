@@ -1,5 +1,27 @@
 export type FlashcardReviewMode = 'mixed' | 'text' | 'audio';
-export type FlashcardPromptKind = 'listening' | 'reading' | 'comprehension' | 'recall';
+/**
+ * `cloze`: the card's own mined sentence with the target word blanked out and
+ * the meaning as a hint — production in context, built from what the user
+ * already mined rather than a second note to author.
+ */
+export type FlashcardPromptKind = 'listening' | 'reading' | 'comprehension' | 'recall' | 'cloze';
+
+/**
+ * The mined sentence split around its first occurrence of the word, or `null`
+ * when there is no usable gap (no sentence, the word is not in it, or the
+ * sentence IS the word).
+ */
+export function clozeParts(
+  sentence: string | undefined,
+  word: string | undefined,
+): { before: string; after: string } | null {
+  const text = sentence?.trim();
+  const target = word?.trim();
+  if (!text || !target || text === target) return null;
+  const at = text.indexOf(target);
+  if (at < 0) return null;
+  return { before: text.slice(0, at), after: text.slice(at + target.length) };
+}
 /**
  * The order of a sitting.
  *
@@ -19,6 +41,9 @@ export interface ReviewPlanCard {
   reviewGroup?: string;
   /** Position within its group for `source` order (a cue's start, else when it was added). */
   sourceOrder?: number;
+  /** The target word and its mined sentence, which decide whether a cloze prompt is possible. */
+  word?: string;
+  sentence?: string;
 }
 
 export type PlannedReviewCard<T extends ReviewPlanCard> = T & {
@@ -134,21 +159,30 @@ export function planFlashcardReview<T extends ReviewPlanCard>(
   const random = options.random ?? Math.random;
   const eligible = mode === 'audio' ? cards.filter(hasAudio) : cards;
   const ordered = orderReviewPlan(eligible, options.order ?? 'spread', random);
-  const textKinds: FlashcardPromptKind[] = ['reading', 'comprehension', 'recall'];
-  const mixedKinds: FlashcardPromptKind[] = ['listening', 'reading', 'comprehension', 'recall'];
+  const textKinds: FlashcardPromptKind[] = ['reading', 'comprehension', 'recall', 'cloze'];
+  const mixedKinds: FlashcardPromptKind[] = ['listening', 'reading', 'comprehension', 'recall', 'cloze'];
   let textIndex = Math.floor(random() * textKinds.length);
   let mixedIndex = Math.floor(random() * mixedKinds.length);
+  /** The next text kind this card can actually be asked in. */
+  const nextTextKind = (card: T): FlashcardPromptKind => {
+    for (let tries = 0; tries < textKinds.length; tries += 1) {
+      const kind = textKinds[textIndex++ % textKinds.length];
+      if (kind !== 'cloze' || clozeParts(card.sentence, card.word)) return kind;
+    }
+    return 'reading';
+  };
 
   return ordered.map((card) => {
     let promptKind: FlashcardPromptKind;
     if (mode === 'audio') {
       promptKind = 'listening';
     } else if (mode === 'text') {
-      promptKind = textKinds[textIndex++ % textKinds.length];
+      promptKind = nextTextKind(card);
     } else {
       let candidate = mixedKinds[mixedIndex++ % mixedKinds.length];
-      if (candidate === 'listening' && !hasAudio(card)) {
-        candidate = textKinds[textIndex++ % textKinds.length];
+      if ((candidate === 'listening' && !hasAudio(card))
+        || (candidate === 'cloze' && !clozeParts(card.sentence, card.word))) {
+        candidate = nextTextKind(card);
       }
       promptKind = candidate;
     }

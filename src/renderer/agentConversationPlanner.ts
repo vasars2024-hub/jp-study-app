@@ -8,7 +8,19 @@ import {
   resumeAgentQueueItem,
   type AgentTaskQueue,
 } from '../shared/localAgentTaskQueue';
-import type { AgentExecutionEvent, AgentTask } from '../shared/localAgent';
+import {
+  createAgentTask,
+  evaluateAgentToolAccess,
+  type AgentExecutionEvent,
+  type AgentTask,
+  type AgentToolOperationId,
+} from '../shared/localAgent';
+import {
+  detectAgentStudyIntent,
+  STUDY_RECIPE_OPERATIONS,
+  studyRecipeSteps,
+  type DetectedStudyIntent,
+} from '../shared/agentStudyCoach';
 import { resolveAgentQueuedStepApproval } from '../shared/agentStepApproval';
 import { selectAgentMemoryContext } from '../shared/localAgentMemory';
 import { getActiveAgentProfile } from '../shared/localAgentProfiles';
@@ -52,6 +64,10 @@ export type AgentConversationPlanResult =
       summary: string;
       modelFileName?: string;
       queue: AgentTaskQueue;
+      /** Who made the plan: the local model, a cloud model, or a study recipe (no model). */
+      planner?: 'local' | 'cloud' | 'recipe';
+      /** How long planning took, for the composer's latency line. */
+      elapsedMs?: number;
     }
   | {
       ok: false;
@@ -199,6 +215,57 @@ export function agentConversationPlanContext(conversation: AgentConversation): A
 export interface AgentConversationPlanOptions {
   target?: 'local' | AiProviderId;
   cloudProviderId?: AiProviderId;
+  /** Off to send even a recognised study request to the model (tests, or a user retrying). */
+  recipes?: boolean;
+  /** A quick action names its recipe outright instead of having its label recognised. */
+  studyIntent?: DetectedStudyIntent;
+}
+
+/**
+ * A study recipe's task (`shared/agentStudyCoach.ts`): the core requests planned without a
+ * model. Every step is checked against the same permission and profile allow-list the
+ * executor will check again; one refused step and the request goes to the model planner
+ * instead, which may still find a way within what is allowed. Null when nothing was planned.
+ */
+async function planStudyRecipe(
+  objective: string,
+  authority: ReturnType<typeof readAgentStepApprovalContext>,
+  t: AgentToolRegistryTranslate,
+  now: number,
+  forced?: DetectedStudyIntent,
+): Promise<{ task: AgentTask; summary: string } | null> {
+  const detected = forced ?? detectAgentStudyIntent(objective);
+  if (!detected) return null;
+  const allowed = (operation: AgentToolOperationId): boolean => evaluateAgentToolAccess(
+    { callId: 'recipe-check', operation, arguments: {}, confirmed: true },
+    authority.permission,
+    authority.allowedOperations,
+  ).status === 'allowed';
+  // The read step must be allowed; a write step is planned only when it is.
+  const [readOperation, writeOperation] = STUDY_RECIPE_OPERATIONS[detected.intent];
+  if (!allowed(readOperation)) return null;
+  const taskId = `agent-recipe-${now.toString(36)}`;
+  let extra: Parameters<typeof studyRecipeSteps>[3] = {};
+  let count = 0;
+  // The write step's content is computed now, so the plan shows exactly what Run will write.
+  // Lazy: the coach reads the grammar library and the tokenizer, which only these two need.
+  if (detected.intent === 'cards-from-text' && writeOperation && allowed(writeOperation)) {
+    const coach = await import('./studyCoachAgentHandlers');
+    const found = await coach.findCardCandidates(detected.text ?? '');
+    extra = { cards: found.cards };
+    count = found.cards.length;
+  } else if (detected.intent === 'plan-week' && writeOperation && allowed(writeOperation)) {
+    const coach = await import('./studyCoachAgentHandlers');
+    const plan = await coach.computeWeekPlan(t);
+    extra = { sessions: plan.sessions };
+    count = plan.sessions.length;
+  }
+  const steps = studyRecipeSteps(detected, (key, vars) => t(key, vars), taskId, extra);
+  if (!steps.length || steps.some((step) => !allowed(step.request.operation))) return null;
+  return {
+    task: createAgentTask(taskId, objective, steps, now),
+    summary: t(`agent2.recipe.summary.${detected.intent}`, { count }),
+  };
 }
 
 /** Main's typed refusals, mapped onto the codes this surface translates. */
@@ -242,6 +309,25 @@ export async function createAgentConversationPlan(
   const disclosedContext = settings.privacyMode
     ? []
     : agentConversationPlanContext(conversation);
+
+  // The everyday study requests are planned here, with no model: instantly, offline, and
+  // through the same queue and approval controls as a model's plan.
+  const startedAt = Date.now();
+  if (options.recipes !== false) {
+    let recipe: Awaited<ReturnType<typeof planStudyRecipe>> = null;
+    try {
+      recipe = await planStudyRecipe(objective, authority, t, startedAt, options.studyIntent);
+    } catch {
+      recipe = null;
+    }
+    if (recipe) {
+      return enqueueConversationPlan(conversation, disclosedContext, recipe.task, recipe.summary, {
+        planner: 'recipe',
+        elapsedMs: Date.now() - startedAt,
+      });
+    }
+  }
+
   const plan = window.api?.localAgentPlan;
   if (typeof plan !== 'function') {
     return { ok: false, code: 'planner-unavailable' };
@@ -291,17 +377,38 @@ export async function createAgentConversationPlan(
     };
   }
 
+  return enqueueConversationPlan(
+    conversation,
+    disclosedContext,
+    response.task,
+    response.summary || response.task.objective,
+    {
+      ...(response.modelFileName ? { modelFileName: response.modelFileName } : {}),
+      ...(response.planner ? { planner: response.planner } : {}),
+      elapsedMs: typeof response.elapsedMs === 'number' ? response.elapsedMs : Date.now() - startedAt,
+    },
+  );
+}
+
+/** Queue a planned task under its conversation, durably — one path for model and recipe plans. */
+async function enqueueConversationPlan(
+  conversation: AgentConversation,
+  disclosedContext: ReturnType<typeof agentConversationPlanContext>,
+  task: AgentTask,
+  summary: string,
+  meta: { modelFileName?: string; planner?: 'local' | 'cloud' | 'recipe'; elapsedMs?: number },
+): Promise<AgentConversationPlanResult> {
   let pendingQueue: AgentTaskQueue | null = null;
   try {
     const currentQueue = loadLocalAgentTaskQueue();
     // A model/backend replaying an id must not replace a task from another
     // conversation or inherit its provenance through the generic queue helper.
-    if (currentQueue.items.some((item) => item.id === response.task?.id)) {
+    if (currentQueue.items.some((item) => item.id === task.id)) {
       return { ok: false, code: 'task-conflict' };
     }
     const queue = enqueueAgentTask(
       currentQueue,
-      response.task,
+      task,
       0,
       Date.now(),
       {
@@ -312,19 +419,21 @@ export async function createAgentConversationPlan(
     pendingQueue = queue;
     const receipt = await saveLocalAgentTaskQueueDurably(queue);
     if (!receipt.ok) {
-      quarantineAgentPlan(conversation.id, queue, response.task.id);
+      quarantineAgentPlan(conversation.id, queue, task.id);
       return { ok: false, code: 'store-failed' };
     }
-    quarantinedAgentPlans.delete(response.task.id);
+    quarantinedAgentPlans.delete(task.id);
     return {
       ok: true,
-      taskId: response.task.id,
-      summary: (response.summary || response.task.objective).slice(0, 500),
-      ...(response.modelFileName ? { modelFileName: response.modelFileName } : {}),
+      taskId: task.id,
+      summary: summary.slice(0, 500),
+      ...(meta.modelFileName ? { modelFileName: meta.modelFileName } : {}),
+      ...(meta.planner ? { planner: meta.planner } : {}),
+      ...(typeof meta.elapsedMs === 'number' ? { elapsedMs: meta.elapsedMs } : {}),
       queue,
     };
   } catch {
-    if (pendingQueue) quarantineAgentPlan(conversation.id, pendingQueue, response.task.id);
+    if (pendingQueue) quarantineAgentPlan(conversation.id, pendingQueue, task.id);
     return { ok: false, code: 'store-failed' };
   }
 }

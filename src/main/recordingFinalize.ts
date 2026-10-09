@@ -26,7 +26,18 @@ const ffmpegPath = (ffmpegStatic as unknown as string | null) ?? '';
 export type FinalizeErrorCode = 'no-ffmpeg' | 'no-input' | 'corrupt' | 'disk-full' | 'cancelled' | 'failed';
 
 export type FinalizeResult =
-  | { ok: true; output: string; durationSec: number | null; hasAudio: boolean; width: number | null; height: number | null }
+  | {
+    ok: true;
+    output: string;
+    durationSec: number | null;
+    hasAudio: boolean;
+    width: number | null;
+    height: number | null;
+    /** The ffmpeg encoder that produced the MP4. */
+    encoder: string;
+    /** A hardware encoder failed on this recording and x264 finished it instead. */
+    fellBack: boolean;
+  }
   | { ok: false; error: FinalizeErrorCode; detail?: string };
 
 export interface FinalizeRequest {
@@ -35,6 +46,10 @@ export interface FinalizeRequest {
   /** Applied when the recording was made without the live crop. */
   crop?: CropPx | null;
   quality: RecorderQuality;
+  /** The ffmpeg video encoder to try first; x264 finishes it when a hardware one fails. */
+  encoder?: string;
+  /** Fit every frame into the first frame's size (window recordings; see `recorderFinalizeArgs`). */
+  fitToFirstFrame?: boolean;
   /** The recorded length, for progress (a MediaRecorder WebM carries no duration). */
   durationHintSec?: number;
   onProgress?: (fraction: number) => void;
@@ -207,15 +222,17 @@ export function finalizeRecording(request: FinalizeRequest): FinalizeHandle {
     if (cancelled) return { ok: false, error: 'cancelled' };
     if (!probe.hasVideo) return { ok: false, error: 'corrupt', detail: 'no video stream' };
     const total = request.durationHintSec && request.durationHintSec > 0 ? request.durationHintSec : probe.durationSec ?? 0;
-    const args = recorderFinalizeArgs({
-      input: request.input,
-      output: request.output,
-      crop: request.crop ?? null,
-      hasAudio: probe.hasAudio,
-      quality: request.quality,
-    });
-    const result = await runFinalizeChild({
-      start: () => spawn(ffmpegPath, args, { windowsHide: true }),
+    const fit = request.fitToFirstFrame && probe.width && probe.height ? { width: probe.width, height: probe.height } : null;
+    const attempt = (encoder: string) => runFinalizeChild({
+      start: () => spawn(ffmpegPath, recorderFinalizeArgs({
+        input: request.input,
+        output: request.output,
+        crop: request.crop ?? null,
+        hasAudio: probe.hasAudio,
+        quality: request.quality,
+        encoder,
+        fit,
+      }), { windowsHide: true }),
       stallMs: finalizeStallTimeoutMs(size),
       onChild: (c) => {
         child = c;
@@ -225,7 +242,23 @@ export function finalizeRecording(request: FinalizeRequest): FinalizeHandle {
         if (seconds !== null && total > 0) request.onProgress?.(Math.min(0.99, seconds / total));
       },
     });
+    let encoder = request.encoder && request.encoder !== 'libx264' ? request.encoder : 'libx264';
+    let fellBack = false;
+    let result = await attempt(encoder);
     child = null;
+    // A hardware encoder that fails on THIS recording (a crop below NVENC's minimum
+    // size, a driver that went away since the probe, a busy encoder session) is not
+    // the recording's fault: x264 finishes it. A corrupt input or a full disk would
+    // fail x264 just the same, so those are reported as they are.
+    if (!cancelled && encoder !== 'libx264' && (result.stalled || result.code !== 0)
+      && classify(result.stderr) === 'failed') {
+      removeOutput();
+      request.onProgress?.(0);
+      encoder = 'libx264';
+      fellBack = true;
+      result = await attempt(encoder);
+      child = null;
+    }
     if (cancelled) {
       removeOutput();
       return { ok: false, error: 'cancelled' };
@@ -244,7 +277,16 @@ export function finalizeRecording(request: FinalizeRequest): FinalizeHandle {
       return { ok: false, error: 'failed', detail: 'output has no video' };
     }
     request.onProgress?.(1);
-    return { ok: true, output: request.output, durationSec: out.durationSec, hasAudio: out.hasAudio, width: out.width, height: out.height };
+    return {
+      ok: true,
+      output: request.output,
+      durationSec: out.durationSec,
+      hasAudio: out.hasAudio,
+      width: out.width,
+      height: out.height,
+      encoder,
+      fellBack,
+    };
   })();
 
   return {

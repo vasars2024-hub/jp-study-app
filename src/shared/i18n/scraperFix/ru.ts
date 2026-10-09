@@ -78,6 +78,15 @@ export const SCRAPER_FIX_RU: Catalog = {
   'scraperFix.qbit.versionStatus': 'qBittorrent ответил {status} на запрос версии.',
   'scraperFix.qbit.connected': 'Подключено к {address}.',
   'scraperFix.qbit.connectedNoSwarm': 'Подключено к {address}, но qBittorrent не подключён ни к одному рою.',
+  // ---- qBittorrent transport and API-key codes (round 2) ----
+  'scraperFix.qbit.unreachable': 'qBittorrent недоступен по адресу {address}. Он запущен, и включён ли в нём Web UI?',
+  'scraperFix.qbit.hostUnresolved': 'Не удалось определить адрес узла {host}.',
+  'scraperFix.qbit.timeout': '{address} не ответил вовремя. Возможно, qBittorrent занят или брандмауэр блокирует соединение.',
+  'scraperFix.qbit.transport': 'Не удалось подключиться к qBittorrent по адресу {address}: {detail}',
+  'scraperFix.qbit.loginBackoff': 'Имя пользователя или пароль отклонены. Повтор через {seconds} с, чтобы qBittorrent не заблокировал этот компьютер.',
+  'scraperFix.qbit.noApiKey': 'Для этого подключения не сохранён API-ключ.',
+  'scraperFix.qbit.apiKeyWhitespace': 'В начале или в конце сохранённого API-ключа есть пробелы.',
+  'scraperFix.qbit.apiKeyControlChar': 'Сохранённый API-ключ содержит пробел или управляющий символ, поэтому им нельзя пользоваться.',
   // ---- Seanime acquisition notices (AcquisitionMessageCode) ----
   'scraperFix.acq.autoStarted': 'Автозагрузчик Seanime запущен.',
   'scraperFix.acq.autoNotStarted': 'Seanime не запустил автозагрузчик.',

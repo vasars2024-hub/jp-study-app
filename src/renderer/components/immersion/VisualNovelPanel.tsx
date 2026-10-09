@@ -66,6 +66,9 @@ import { TRACKING_KEYS, VisualNovelCaptureBar, VisualNovelCaptureSetup } from '.
 import { writeLocalStorageJson } from '../../localStorageWrite';
 import { VISUAL_NOVEL_FOCUS_EVENT, onOpenIntent, takeVisualNovelFocus } from '../../openIntents';
 import './visualNovel.css';
+import { loadDeck, onDeckChanged } from '../../flashcardDeck';
+import { visualNovelReadingStats } from '../../../shared/visualNovelReadingStats';
+import { visualNovelStatsLine } from './visualNovelStatsLine';
 
 interface ProgressDraft {
   status: VisualNovelStatus;
@@ -384,6 +387,16 @@ export default function VisualNovelPanel({
     () => selected ? capturesForVisualNovel(database, selected.id) : [],
     [database, selected],
   );
+  /** Re-count mined cards when the deck changes (a line mined from the reader overlay, say). */
+  const [deckStamp, setDeckStamp] = useState(0);
+  useEffect(() => onDeckChanged(() => setDeckStamp((n) => n + 1)), []);
+  const readingStats = useMemo(() => {
+    if (!selected) return null;
+    const bookId = visualNovelMediaItem(selected).id;
+    const mined = loadDeck().filter((card) => card.bookId === bookId).length;
+    return visualNovelReadingStats(selected, captures, mined);
+    // `deckStamp` is the change signal for the deck, not an input.
+  }, [selected, captures, deckStamp]);
   const selectedCapture = captures.find((capture) => capture.id === selectedCaptureId)
     ?? captures[captures.length - 1]
     ?? null;
@@ -1072,6 +1085,11 @@ export default function VisualNovelPanel({
                   )}
                   {sessionStartedAt ? ` · ${t('vnPanel.timing')}` : ''}
                 </span>
+                {readingStats && readingStats.lines > 0 && (
+                  <small className="visual-novel-reading-stats" data-vn-reading-stats="">
+                    {visualNovelStatsLine(readingStats, t, lang)}
+                  </small>
+                )}
                 <div className="visual-novel-summary-actions">
                   <button className="btn small" type="button" disabled={!!launchWhy} title={launchWhy ? t(launchWhy) : undefined} onClick={() => void launchVisualNovel()}>{t('vnPanel.launch')}</button>
                   {sessionStartedAt && <button className="btn small" type="button" onClick={() => void stopReadingTimer()}>{t('vnPanel.stopTimer')}</button>}

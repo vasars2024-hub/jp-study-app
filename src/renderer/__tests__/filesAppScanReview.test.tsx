@@ -115,7 +115,10 @@ beforeEach(() => {
     })),
   );
   importPaths.mockImplementation(async () => [{ id: 'lib-1' }]);
-  addMediaPaths.mockImplementation(async () => [{ id: 'med-1' }]);
+  // Like the real `media:addPaths`, the rows carry their path: the importer picks its
+  // own rows out of the returned library by path (fileImportExecute.ts).
+  addMediaPaths.mockImplementation(async (paths: string[]) =>
+    paths.map((path, i) => ({ id: i === 0 ? 'med-1' : `med-${i + 1}`, path })));
   dictImportYomitan.mockImplementation(async () => ({ ok: true }));
   attachSubtitleFile.mockImplementation(async () => ({ ok: true, message: '', lang: 'ja' }));
   getWallpaper.mockImplementation(async () => 'C:\\old.jpg');

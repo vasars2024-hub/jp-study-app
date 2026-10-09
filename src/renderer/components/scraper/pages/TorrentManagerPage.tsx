@@ -281,6 +281,30 @@ export default function TorrentManagerPage() {
     }
   };
 
+  const torrentFileInput = useRef<HTMLInputElement>(null);
+  const [addingFiles, setAddingFiles] = useState(false);
+  const [fileReport, setFileReport] = useState<QbitSendReport | null>(null);
+  const addTorrentFiles = async (list: FileList | null) => {
+    const add = window.api?.scraperQbitAddTorrentFiles;
+    if (!list?.length || typeof add !== 'function') return;
+    setAddingFiles(true);
+    setFileReport(null);
+    try {
+      // Read here, checked in main: a file over 10 MB is not a .torrent, and is not sent.
+      const files = await Promise.all([...list].slice(0, 50).map(async (file) => ({
+        fileName: file.name,
+        data: file.size > 10 * 1024 * 1024 ? new Uint8Array(0) : new Uint8Array(await file.arrayBuffer()),
+      })));
+      setFileReport(await add({ config: qbit, files, ingest: { via: 'torrent-manager-file' } }));
+      await refreshTransfers();
+    } catch (error) {
+      setTransferNotice({ text: sxs('transfer.failed', errorText(error)), bad: true });
+    } finally {
+      setAddingFiles(false);
+      if (torrentFileInput.current) torrentFileInput.current.value = '';
+    }
+  };
+
   const send = async () => {
     const rows = results.filter((r) => selected.has(r.id));
     if (!rows.length) return;
@@ -486,6 +510,44 @@ export default function TorrentManagerPage() {
           </Pill>
         </div>
       </ScrCard>
+
+      {typeof window.api?.scraperQbitAddTorrentFiles === 'function' && (
+        <ScrCard
+          id="qbit-torrent-files"
+          title={t('scr2.torrentFile.title')}
+          description={t('scr2.torrentFile.desc')}
+          trailing={
+            <Button
+              size="sm"
+              disabled={addingFiles || !qbit.enabled}
+              title={!qbit.enabled ? t('scr2.torrentFile.disabled') : addingFiles ? sx('why.busy') : undefined}
+              onClick={() => torrentFileInput.current?.click()}
+            >
+              {addingFiles ? t('scr2.torrentFile.adding') : t('scr2.torrentFile.choose')}
+            </Button>
+          }
+        >
+          <input
+            ref={torrentFileInput}
+            type="file"
+            accept=".torrent,application/x-bittorrent"
+            multiple
+            hidden
+            aria-label={t('scr2.torrentFile.choose')}
+            onChange={(event) => void addTorrentFiles(event.currentTarget.files)}
+          />
+          {fileReport && (
+            <div className="scr-setting-summary" role="status">
+              <span>{t('scr2.torrentFile.result', { sent: fileReport.sent, skipped: fileReport.skipped, failed: fileReport.failed })}</span>
+              {fileReport.details.filter((d) => d.outcome !== 'sent').map((d, i) => (
+                <span key={`${d.name}-${i}`} className="scr-muted">
+                  {d.name}: {d.reasonCode ? t(`scr2.${d.reasonCode}`) : d.reason}
+                </span>
+              ))}
+            </div>
+          )}
+        </ScrCard>
+      )}
 
       <ScrCard
         id="seanime-acquisition"

@@ -14,10 +14,11 @@
 
 import { WHISPER_MODEL_SPECS, whisperSpec, type WhisperModelTier } from '../shared/whisperModels';
 import { whisperHfId, type WhisperDevice } from './whisperSettings';
+import { WHISPER_DOWNLOADED_EVENT, WHISPER_DOWNLOADED_KEY } from './whisperDownloadSignal';
 
-const DOWNLOADED_KEY = 'jp-study-whisper-downloaded';
+const DOWNLOADED_KEY = WHISPER_DOWNLOADED_KEY;
 const AUTO_DEVICE_KEY = 'jp-study-whisper-auto-device';
-const DOWNLOADED_EVENT = 'whisper-downloaded-changed';
+const DOWNLOADED_EVENT = WHISPER_DOWNLOADED_EVENT;
 /** The Cache Storage bucket Transformers.js writes model files into. */
 const TRANSFORMERS_CACHE = 'transformers-cache';
 

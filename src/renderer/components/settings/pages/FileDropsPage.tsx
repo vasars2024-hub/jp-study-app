@@ -7,6 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
+import ResetSectionButton from '../ResetSectionButton';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import type { DropTargetId } from '../../../../shared/fileRouting';
@@ -125,9 +126,12 @@ export default function FileDropsPage() {
         description={t('settings.fileDrops.reset.desc')}
         highlight={focusSettingId === 'filedrop-reset'}
       >
-        <button type="button" className="btn" onClick={() => setPrefs(resetFileDropPrefs())}>
-          {t('settings.fileDrops.reset.action')}
-        </button>
+        <ResetSectionButton
+          settingId="filedrop-reset"
+          section={t('settings.nav.fileDrops')}
+          label={t('settings.fileDrops.reset.action')}
+          onReset={() => setPrefs(resetFileDropPrefs())}
+        />
       </SettingsCard>
     </>
   );

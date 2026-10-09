@@ -31,10 +31,10 @@ describe('central Agent tool registry', () => {
     expect(matrix.filter((entry) => entry.available).map((entry) => entry.definition.id).sort())
       .toEqual(Object.keys(handlers).sort());
     expect(availableAgentToolOperationIds(handlers))
-      .toHaveLength(AGENT_TOOL_OPERATIONS.length - 3);
+      .toHaveLength(AGENT_TOOL_OPERATIONS.length - 1);
   });
 
-  it('does not advertise lookup and queue stubs as grammar, analysis or scheduling', () => {
+  it('does not advertise the queue stub as scheduling, and installs the grammar analysis', () => {
     const handlers = createCentralAgentToolRegistry(t);
     const matrix = agentToolCapabilityMatrix(handlers);
     const unavailable = Object.fromEntries(matrix
@@ -42,13 +42,12 @@ describe('central Agent tool registry', () => {
       .map((entry) => [entry.definition.id, entry.reason]));
 
     expect(unavailable).toMatchObject({
-      'dictionary.explain-grammar': 'dedicated-analysis-required',
-      'dictionary.analyze-sentence': 'dedicated-analysis-required',
       'flashcard.schedule-reviews': 'false-success-stub-removed',
     });
-    expect(handlers['dictionary.explain-grammar']).toBeUndefined();
-    expect(handlers['dictionary.analyze-sentence']).toBeUndefined();
     expect(handlers['flashcard.schedule-reviews']).toBeUndefined();
+    // The study coach answers these from the grammar library (`studyCoachAgentHandlers.ts`).
+    expect(handlers['dictionary.explain-grammar']).toBeTypeOf('function');
+    expect(handlers['dictionary.analyze-sentence']).toBeTypeOf('function');
   });
 
   it('records the complete current unavailable surface instead of silently growing it', () => {
@@ -57,11 +56,9 @@ describe('central Agent tool registry', () => {
       .map((entry) => entry.definition.id)
       .sort();
 
-    // Every remaining entry is unavailable by a decision, not by a missing
-    // adapter: two need dedicated analysis, one had a false-success stub removed.
+    // The one remaining entry is unavailable by a decision, not by a missing
+    // adapter: its false-success stub was removed.
     expect(unavailable).toEqual([
-      'dictionary.analyze-sentence',
-      'dictionary.explain-grammar',
       'flashcard.schedule-reviews',
     ]);
     expect(new Set(agentToolCapabilityMatrix(createCentralAgentToolRegistry(t))

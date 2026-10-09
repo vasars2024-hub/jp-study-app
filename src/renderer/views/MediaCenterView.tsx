@@ -28,6 +28,8 @@ import {
 import SeanimeStudyLibraryPanel from '../components/reading/SeanimeStudyLibraryPanel';
 import SeanimeWatchLoopPanel from '../components/reading/SeanimeWatchLoopPanel';
 import { onMediaCenterIntent, onMediaCenterPlay, takeMediaCenterIntent, takeMediaCenterPlay } from '../mediaCenterIntent';
+import { noServerNotice, probeMediaServer } from '../mediaOpenFallback';
+import { showOsToast } from '../components/ToastHost';
 import { useStudyReadiness } from '../useStudyReadiness';
 import MediaLibraryShell from '../components/media/library/MediaLibraryShell';
 import MediaArtwork from '../components/media/library/MediaArtwork';
@@ -78,6 +80,7 @@ import { loadExternalPlayerPreferences } from '../externalPlayerStore';
 import { loadVideoServerProfilesDocument } from '../videoServerProfilesStore';
 import { isLiked, toggleLiked } from '../likedSongs';
 import {
+  MusicLookupPopup,
   MusicLyricsPane,
   MusicNowPlaying,
   MusicSearchBox,
@@ -940,6 +943,8 @@ function MusicPanel({ state }: { state: MusicState }) {
           </div>
           {state.error && <div className="mc-inline-error">{state.error}</div>}
           <div className="mc-lyrics-frame"><MusicLyricsPane state={state} /></div>
+          {/* music2: a lyric click looked a word up and nothing drew the answer here. */}
+          <MusicLookupPopup state={state} />
           {/*
             The inline `MusicControls` transport used to sit here and it duplicated
             `.mc-playerbar` control for control — same track, same shuffle/prev/play/
@@ -1862,16 +1867,48 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     setTab('video');
   });
 
+  /*
+   * A video opened from outside (a drop, "Open with Gum", a double-click on an .mp4).
+   * It is already in the library; when the media server cannot play it — the binary is
+   * missing, or the sidecar is switched off — the user is told so and offered the system
+   * player instead of a workspace that can only say "not installed" (mediaOpenFallback.ts).
+   * The status is asked directly rather than read from `workspace`, which is still
+   * `pending` when the drop is what opened this window.
+   */
+  const playOpenedItem = useStableCallback((item: MediaItem) => {
+    if (item.kind === 'audio' || item.kind === 'audiobook') {
+      playItem(item);
+      return;
+    }
+    void probeMediaServer(window.api).then((reach) => {
+      if (reach === 'workspace') {
+        playItem(item);
+        return;
+      }
+      const notice = noServerNotice(reach);
+      showOsToast(t(notice.messageKey, { name: item.title || item.fileName }), 'warn', {
+        label: t(notice.actionKey),
+        run: () => {
+          void window.api.launchTarget(item.path).then((error) => {
+            if (error) showOsToast(t('mediaWorkspace.openFile.systemPlayerFailed'), 'err');
+          });
+        },
+      });
+      if (notice.tab === 'video') void media.playItem(item.id);
+      setTab(notice.tab);
+    });
+  });
+
   // A single video dropped on the window (`DropRouter`) plays, rather than only landing in
   // the library. Taken on mount too: the drop may be what opened this window.
   useEffect(() => {
     const apply = (): void => {
       const item = takeMediaCenterPlay();
-      if (item) playItem(item);
+      if (item) playOpenedItem(item);
     };
     apply();
     return onMediaCenterPlay(apply);
-  }, [playItem]);
+  }, [playOpenedItem]);
 
   /** A file's resume position from the shared resume store (the workspace writes it). */
   const resumeAt = useStableCallback((item: MediaItem): number | undefined => {

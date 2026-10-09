@@ -78,6 +78,15 @@ export const SCRAPER_FIX_JA: Catalog = {
   'scraperFix.qbit.versionStatus': 'qBittorrent はバージョン要求に {status} を返しました。',
   'scraperFix.qbit.connected': '{address} に接続しました。',
   'scraperFix.qbit.connectedNoSwarm': '{address} に接続しましたが、qBittorrent はどのスウォームにも接続していません。',
+  // ---- qBittorrent transport and API-key codes (round 2) ----
+  'scraperFix.qbit.unreachable': '{address} の qBittorrent に接続できません。Web UI を有効にして起動していますか？',
+  'scraperFix.qbit.hostUnresolved': 'ホスト {host} の名前を解決できませんでした。',
+  'scraperFix.qbit.timeout': '{address} が時間内に応答しませんでした。qBittorrent が混み合っているか、ファイアウォールが接続を遮断している可能性があります。',
+  'scraperFix.qbit.transport': '{address} の qBittorrent に接続できませんでした：{detail}',
+  'scraperFix.qbit.loginBackoff': 'ユーザー名またはパスワードが拒否されました。qBittorrent にこのコンピューターを締め出されないよう、{seconds} 秒間は再試行しません。',
+  'scraperFix.qbit.noApiKey': 'この接続には API キーが保存されていません。',
+  'scraperFix.qbit.apiKeyWhitespace': '保存された API キーの先頭か末尾に空白があります。',
+  'scraperFix.qbit.apiKeyControlChar': '保存された API キーに空白か制御文字が含まれているため、キーとして使えません。',
   // ---- Seanime acquisition notices (AcquisitionMessageCode) ----
   'scraperFix.acq.autoStarted': 'Seanime の自動ダウンローダーを開始しました。',
   'scraperFix.acq.autoNotStarted': 'Seanime は自動ダウンローダーを開始しませんでした。',

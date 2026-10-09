@@ -14,8 +14,37 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { isStudyLang } from '../../shared/studyLang';
-import { formatRecorderClock, recordedMs, type RecorderJob, type RecorderState } from '../../shared/regionRecorder';
+import {
+  EMPTY_RECORDER_METER,
+  formatRecorderClock,
+  recordedMs,
+  recorderEncoderFamily,
+  stepRecorderMeter,
+  type RecorderJob,
+  type RecorderMeterState,
+  type RecorderState,
+} from '../../shared/regionRecorder';
+import { onWhisperDownloadsChanged } from '../whisperDownloadSignal';
 import './recorder.css';
+
+/** One level meter: a dB-scaled bar, a held peak tick, red when the input clips. */
+export function RecorderMeter({ label, meter }: { label: string; meter: RecorderMeterState }) {
+  const pct = Math.round(meter.level * 100);
+  return (
+    <span
+      className={`rr-level${meter.clipping ? ' rr-level--clip' : ''}`}
+      role="meter"
+      aria-label={label}
+      title={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+    >
+      <span className="rr-level-fill" style={{ width: `${pct}%` }} />
+      <span className="rr-level-peak" style={{ left: `${Math.round(meter.peak * 100)}%` }} aria-hidden="true" />
+    </span>
+  );
+}
 
 async function whisperModelReady(lang: string): Promise<boolean> {
   const [{ isDownloadedIn, loadDownloaded }, { loadWhisperDevice, loadWhisperModelTier }] = await Promise.all([
@@ -51,6 +80,8 @@ function JobRow({ job, studyLang }: { job: RecorderJob; studyLang: string }) {
       : t('recorder.job.transcribing');
   } else if (job.phase === 'error') status = t(job.errorKey || 'recorder.job.error.failed');
   else status = t('recorder.job.ready');
+  const waiting = job.transcript === 'model-missing' || job.transcript === 'waiting-model';
+  const family = recorderEncoderFamily(job.encoder);
 
   return (
     <div className={`rr-job rr-job--${job.phase}`} data-testid="rr-job">
@@ -67,22 +98,28 @@ function JobRow({ job, studyLang }: { job: RecorderJob; studyLang: string }) {
       {job.transcript === 'failed' && <div className="rr-job-note">{t('recorder.job.transcriptFailed')}</div>}
       {job.transcript === 'done' && <div className="rr-job-note">{t('recorder.job.transcriptDone')}</div>}
       {job.playedDirect && <div className="rr-job-note">{t('recorder.job.playedDirect')}</div>}
-      {job.transcript === 'model-missing' && (
-        <div className="rr-job-note">
-          {download === null ? t('recorder.job.modelMissing') : t('recorder.job.modelDownloading', { pct: download })}
+      {family && job.phase !== 'finalizing' && !job.encoderFellBack && (
+        <div className="rr-job-note">{t('rec2.job.encodedWith', { encoder: t(`rec2.encoder.${family}`) })}</div>
+      )}
+      {job.encoderFellBack && <div className="rr-job-note">{t('rec2.job.encoderFellBack')}</div>}
+      {waiting && (
+        <div className="rr-job-note" role="status">
+          {download === null ? t('rec2.job.waitingModel') : t('recorder.job.modelDownloading', { pct: download })}
           {downloadError && <span className="rr-error"> {downloadError}</span>}
         </div>
       )}
       <div className="rr-job-actions">
-        {job.transcript === 'model-missing' && download === null && (
+        {waiting && download === null && (
           <button
             type="button"
             className="rr-btn rr-btn--primary"
             onClick={() => {
               setDownload(0);
               setDownloadError('');
+              // The finished download is heard by main (`recorder:model-changed`), which
+              // starts every recording waiting for it — this one and any other.
               void downloadWhisperModel(studyLang, (pct) => setDownload(pct))
-                .then(() => act('transcribe'))
+                .then(() => window.api.recorderModelChanged())
                 .catch((err: unknown) => setDownloadError(err instanceof Error ? err.message : String(err)))
                 .finally(() => setDownload(null));
             }}
@@ -106,7 +143,7 @@ function JobRow({ job, studyLang }: { job: RecorderJob; studyLang: string }) {
 export default function RecorderPanel() {
   const { t } = useT();
   const [state, setState] = useState<RecorderState | null>(null);
-  const [levels, setLevels] = useState({ mic: 0, system: 0 });
+  const [meters, setMeters] = useState({ mic: EMPTY_RECORDER_METER, system: EMPTY_RECORDER_METER, at: 0 });
   const [now, setNow] = useState(Date.now());
   const [studyLang, setStudyLang] = useState('ja');
   const root = useRef<HTMLDivElement>(null);
@@ -116,13 +153,21 @@ export default function RecorderPanel() {
     void window.api.recorderGetState().then((s) => alive && s && setState(s)).catch(() => undefined);
     const offs = [
       window.api.onRecorderState((s) => setState(s)),
-      window.api.onRecorderLevels((l) => setLevels(l)),
+      window.api.onRecorderLevels((l) => {
+        const at = Date.now();
+        setMeters((prev) => ({
+          mic: stepRecorderMeter(prev.mic, l.mic, at, prev.at || at),
+          system: stepRecorderMeter(prev.system, l.system, at, prev.at || at),
+          at,
+        }));
+      }),
       window.api.onRecorderModelCheck(({ requestId, lang }) => {
         setStudyLang(lang);
         void whisperModelReady(lang)
           .then((ready) => window.api.recorderModelCheckReply({ requestId, ready }))
           .catch(() => window.api.recorderModelCheckReply({ requestId, ready: false }));
       }),
+      onWhisperDownloadsChanged(() => window.api.recorderModelChanged()),
     ];
     const timer = window.setInterval(() => setNow(Date.now()), 500);
     return () => {
@@ -147,9 +192,10 @@ export default function RecorderPanel() {
         <div className="rr-pill" role="group" aria-label={t('recorder.pill.label')}>
           <span className={`rr-dot${state.phase === 'paused' ? ' rr-dot--paused' : ''}`} aria-hidden="true" />
           <span className="rr-clock" aria-live="off">{state.phase === 'starting' ? t('recorder.pill.starting') : clock}</span>
-          {state.mic && (
-            <span className="rr-level" title={t('recorder.pill.micLevel')} aria-label={t('recorder.pill.micLevel')}>
-              <span style={{ width: `${Math.round(levels.mic * 100)}%` }} />
+          {(state.mic || state.systemAudio === 'on') && (
+            <span className="rr-meters">
+              {state.mic && <RecorderMeter label={t('recorder.pill.micLevel')} meter={meters.mic} />}
+              {state.systemAudio === 'on' && <RecorderMeter label={t('rec2.pill.systemLevel')} meter={meters.system} />}
             </span>
           )}
           <button
@@ -166,6 +212,10 @@ export default function RecorderPanel() {
         </div>
       )}
       {live && state.systemAudio === 'unsupported' && <div className="rr-note">{t('recorder.pill.noLoopback')}</div>}
+      {live && state.source === 'window' && state.windowName && (
+        <div className="rr-note" title={state.windowName}>{t('rec2.pill.window', { name: state.windowName })}</div>
+      )}
+      {(meters.mic.clipping || meters.system.clipping) && live && <div className="rr-note">{t('rec2.pill.clipping')}</div>}
       {state.phase === 'error' && (
         <div className="rr-job rr-job--error">
           <div className="rr-job-status">{t(state.errorKey || 'recorder.error.streamFailed')}</div>

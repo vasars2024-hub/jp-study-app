@@ -24,6 +24,8 @@ import {
 } from '../components/stats/StatsContent';
 import { useT } from '../i18n';
 import DailyGoalPanel from '../components/DailyGoalPanel';
+import { StatsGames } from '../components/stats/StatsGames';
+import StatsReviewInsights from '../components/stats/StatsReviewInsights';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import '../components/stats/statsLiquid.css';
 
@@ -192,6 +194,7 @@ export default function StatisticsView() {
                   <StatsShows state={state} />
                 </section>
               )}
+              <StatsReviewInsights />
             </main>
 
             <aside className="aero-stats-knowledge">
@@ -202,6 +205,7 @@ export default function StatisticsView() {
               <WordKnowledge />
               <StatsReviews />
               <StatsGrammar />
+              <StatsGames />
             </aside>
           </div>
         </div>
@@ -267,7 +271,11 @@ export default function StatisticsView() {
 
       <StatsReviews />
 
+      <StatsReviewInsights />
+
       <StatsGrammar />
+
+      <StatsGames />
 
       {!hasData ? (
         <div className="stats-empty">

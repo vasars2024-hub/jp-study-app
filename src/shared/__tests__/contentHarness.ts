@@ -45,6 +45,8 @@ export interface ContentHarness {
   sent: ContentMessage[];
   /** Deliver a message to content.js's runtime listener; resolves with its response. */
   deliver(msg: ContentMessage): Promise<unknown>;
+  /** Write jpStudySettings the way the options page does, firing chrome.storage.onChanged. */
+  changeSettings(next: Record<string, unknown>): void;
   /** Point at `node` (a text node) at `offset` with the hover key held. */
   hover(node: Node, offset: number, opts?: { holdKey?: boolean }): void;
   /** Hover-key + click at `node`/`offset`. */
@@ -88,6 +90,7 @@ export async function loadContent(opts: ContentHarnessOptions): Promise<ContentH
   const sent: ContentMessage[] = [];
   const listeners: Array<(msg: unknown, sender: unknown, respond: (r: unknown) => void) => unknown> = [];
   const store: Record<string, unknown> = { ...(opts.storage ?? {}), jpStudySettings: opts.settings ?? {} };
+  const storageListeners: Array<(changes: Record<string, { newValue?: unknown }>, area: string) => void> = [];
 
   win.chrome = {
     runtime: {
@@ -117,7 +120,10 @@ export async function loadContent(opts: ContentHarnessOptions): Promise<ContentH
           Object.assign(store, JSON.parse(JSON.stringify(items)));
         },
       },
-      onChanged: { addListener: () => undefined, removeListener: () => undefined },
+      onChanged: {
+        addListener: (fn: (typeof storageListeners)[number]) => storageListeners.push(fn),
+        removeListener: () => undefined,
+      },
     },
     i18n: createI18nStub('en'),
   };
@@ -169,6 +175,10 @@ export async function loadContent(opts: ContentHarnessOptions): Promise<ContentH
         for (const l of listeners) if (l(msg, { id: 'testtesttest' }, respond) === true) keep = true;
         if (!keep && !answered) resolve(undefined);
       });
+    },
+    changeSettings(next) {
+      store.jpStudySettings = JSON.parse(JSON.stringify(next));
+      for (const l of storageListeners) l({ jpStudySettings: { newValue: store.jpStudySettings } }, 'local');
     },
     hover(node, offset, hoverOpts = {}) {
       caret = { node, offset };

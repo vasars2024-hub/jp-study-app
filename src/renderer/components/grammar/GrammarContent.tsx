@@ -46,6 +46,30 @@ import { findCaptureSentences, findDeckSentences, type DeckSentenceHit } from '.
 import { READING_LENS_HISTORY_LIMIT, type ReadingLensHistoryEntry } from '../../../shared/readingLensHistory';
 import { FLASHCARD_DECK_EVENT, loadDeck } from '../../flashcardDeck';
 import { requestFlashcardsFocus } from '../../openIntents';
+import { loadLookupHistory, onLookupHistoryChanged } from '../../lookupHistory';
+import {
+  findGrammarSightings,
+  sightingRuns,
+  type GrammarSighting,
+  type GrammarSightingInput,
+  type GrammarSightingSource,
+} from '../../grammarSightings';
+
+const SIGHTING_SOURCE_KEYS: Record<GrammarSightingSource, string> = {
+  deck: 'gram2.seen.source.deck',
+  lookup: 'gram2.seen.source.lookup',
+  capture: 'gram2.seen.source.capture',
+};
+
+function SightingSentence({ sighting }: { sighting: GrammarSighting }) {
+  return (
+    <>
+      {sightingRuns(sighting).map((run, i) => (run.mark ? <mark key={i}>{run.text}</mark> : <span key={i}>{run.text}</span>))}
+    </>
+  );
+}
+
+const compareKey = (sentence: string): string => sentence.normalize('NFKC').replace(/\s+/g, ' ').trim();
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
 type CatFilter = 'All' | GuideCategory;
@@ -129,6 +153,33 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
     () => findCaptureSentences(captures, exampleQuery(point)),
     [captures, point],
   );
+  const [historyRev, setHistoryRev] = useState(0);
+  useEffect(() => onLookupHistoryChanged(() => setHistoryRev((n) => n + 1)), []);
+  /**
+   * The point as the offline highlighter finds it in the learner's own material —
+   * deck sentences, the sentences words were looked up in, reading captures —
+   * matched by point id (`grammarSightings.ts`). Sentences already listed above are
+   * not repeated.
+   */
+  const sightings = useMemo(() => {
+    const lang = point.lang ?? 'ja';
+    const shown = new Set([...deckSentences, ...captureSentences].map((hit) => compareKey(hit.sentence)));
+    const inputs: GrammarSightingInput[] = [];
+    for (const card of loadDeck()) {
+      if (!card.sentence || (card.studyLang || 'ja') !== lang) continue;
+      inputs.push({ id: `deck:${card.id}`, sentence: card.sentence, source: 'deck', cardId: card.id, word: card.word });
+    }
+    for (const entry of loadLookupHistory()) {
+      if (!entry.context || entry.lang !== lang) continue;
+      inputs.push({ id: `lookup:${entry.lemma}`, sentence: entry.context, source: 'lookup', word: entry.lemma });
+    }
+    for (const capture of captures) {
+      const parts = capture.text.match(/[^。！？!?\r\n]+[。！？!?]?/g) ?? [];
+      parts.forEach((sentence, index) => inputs.push({ id: `capture:${capture.captureId}:${index}`, sentence, source: 'capture' }));
+    }
+    return findGrammarSightings(point, inputs.filter((input) => !shown.has(compareKey(input.sentence))));
+    // deckRev / historyRev are the deck and lookup-history subscriptions.
+  }, [point, deckRev, historyRev, captures, deckSentences, captureSentences]);
   const commitExamples = useCallback(
     (rows: ExampleImportRow[]) => {
       const { byPoint, unmatched } = assignExampleRows(rows, point, GRAMMAR);
@@ -353,6 +404,35 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
                 <li key={hit.id}>
                   <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
                     <MatchedSentence hit={hit} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {sightings.length > 0 && (
+          <>
+            <h4 className="gram-more-status muted">{t('gram2.seen.label')}</h4>
+            <ul className="gram-examples gram-examples-seen">
+              {sightings.map((sighting) => (
+                <li key={sighting.id}>
+                  {sighting.cardId ? (
+                    <button
+                      type="button"
+                      className="gram-more-btn gram-ex-jp"
+                      lang={contentLangOf(point.lang)}
+                      onClick={() => requestFlashcardsFocus({ folder: null, cardId: sighting.cardId as string })}
+                    >
+                      <SightingSentence sighting={sighting} />
+                    </button>
+                  ) : (
+                    <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
+                      <SightingSentence sighting={sighting} />
+                    </span>
+                  )}
+                  <span className="gram-ex-en muted">
+                    {t(SIGHTING_SOURCE_KEYS[sighting.source])}
+                    {sighting.word ? <span lang={contentLangOf(point.lang)}> · {sighting.word}</span> : null}
                   </span>
                 </li>
               ))}

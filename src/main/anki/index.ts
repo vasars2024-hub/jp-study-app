@@ -1120,6 +1120,13 @@ export function registerAnkiIpc(): void {
   // no cache: the panel asks when it is opened or refreshed.
   ipcMain.handle('anki:dueForecast', () => getDueForecast());
 
+  // "Already in Anki?" before the dictionary's Add: the same read-only
+  // `canAddNotes` check the extension popup uses (extensionDuplicates.ts).
+  ipcMain.handle('anki:checkDuplicates', async (_e, terms: unknown, target: unknown) => {
+    const { checkAnkiDuplicatesFromIpc } = await import('./extensionDuplicates');
+    return checkAnkiDuplicatesFromIpc(terms, target);
+  });
+
   // Legacy shims (byte-compatible, section 7).
   ipcMain.handle('anki:status', () => ankiStatusShim());
   ipcMain.handle('anki:addNote', (_e, req: AnkiAddRequest) => ankiAddNoteShim(req));

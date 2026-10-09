@@ -17,6 +17,7 @@ import { reachMediaWorkspace } from './mediaWorkspaceBridge';
 import { t } from './i18n';
 import { GLOBAL_COMMAND_DEFAULTS, migrateLegacyGlobalChords, type GlobalCommandStatus } from '../shared/globalCommands';
 import { reportGlobalShortcutFailures } from './globalShortcutNotice';
+import { isDnd, setDnd } from './notificationStore';
 
 export type CommandCategory =
   | 'Navigation'
@@ -320,6 +321,24 @@ export const COMMAND_CATALOG: AppCommand[] = [
     category: 'Window',
     defaultKeys: 'Ctrl+Alt+0',
     note: 'Returns the interface scale to 100%. A reader keeps its own font size.',
+  },
+  // shell2: the taskbar's three panels had no keyboard route of their own (Tab-walking
+  // to a tray button was the only one), and Do not disturb lived only inside the center.
+  {
+    id: 'shell.openNotifications',
+    label: 'Open notification center',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+N',
+    note: 'Opens or closes the notification center. Opening marks everything read.',
+  },
+  { id: 'shell.openStart', label: 'Open Start', category: 'Window', defaultKeys: '' },
+  { id: 'shell.openQuickSettings', label: 'Open quick settings', category: 'Window', defaultKeys: '' },
+  {
+    id: 'shell.toggleDnd',
+    label: 'Toggle Do not disturb',
+    category: 'Window',
+    defaultKeys: '',
+    note: 'Hides pop-up messages except errors and warnings. Everything still lands in the notification center.',
   },
 
   // Reader (handlers attach while a book is open)
@@ -676,6 +695,30 @@ export const COMMAND_CATALOG: AppCommand[] = [
     defaultKeys: '',
     note: 'Synced lyrics only. Unbound by default — bind it in this list.',
   },
+  // music2: the video study loop's other three gestures, for synced lyrics. Same ownership
+  // rule as the three above (own ids, registered by the lyrics pane), and unbound by default
+  // for the same reason: the free single letters belong to the player's keymap.
+  {
+    id: 'music.toggleAutoPause',
+    label: 'Toggle auto-pause after each lyric line',
+    category: 'Music',
+    defaultKeys: '',
+    note: 'Synced lyrics only. Pauses at the end of every line so you can read it before the next one.',
+  },
+  {
+    id: 'music.toggleLineLoop',
+    label: 'Toggle lyric line repeat',
+    category: 'Music',
+    defaultKeys: '',
+    note: 'Synced lyrics only. Repeats the line being sung until you turn it off.',
+  },
+  {
+    id: 'music.mineLine',
+    label: 'Mine the current lyric line',
+    category: 'Music',
+    defaultKeys: '',
+    note: 'Makes a card from the line being sung, with the line audio when the song is a local file.',
+  },
 
   // Video player (Phase 5b)
   { id: 'nav.open.video', label: 'Open Video player', category: 'Navigation', defaultKeys: '' },
@@ -806,6 +849,14 @@ export const COMMAND_CATALOG: AppCommand[] = [
     defaultKeys: '',
     global: true,
     note: 'System-wide. Starts recording the same box as last time without drawing it.',
+  },
+  {
+    id: 'recorder.window',
+    label: 'Record the active window',
+    category: 'Immersion',
+    defaultKeys: '',
+    global: true,
+    note: 'System-wide. Records the window in front, wherever it moves; it stops when the window closes.',
   },
   {
     id: 'recorder.stop',
@@ -2033,6 +2084,27 @@ function builtinHandler(id: string): Handler | null {
       return () => void bumpZoom(-ZOOM_STEP);
     case 'window.zoomReset':
       return () => void setZoom(ZOOM_DEFAULT);
+    // shell2: panels and Do not disturb. Events the panels already listen for.
+    case 'shell.openNotifications':
+      return () => void window.dispatchEvent(new CustomEvent('shell:toggleNotifications'));
+    case 'shell.openStart':
+      return () => void window.dispatchEvent(new CustomEvent('shell:start', { detail: { open: true } }));
+    case 'shell.openQuickSettings':
+      return () => void window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
+    case 'shell.toggleDnd':
+      return () => {
+        // The confirmation is raised while pop-ups are still allowed (turning on)
+        // or once they are again (turning off), so the user always sees it.
+        // `record: false` keeps a settings echo out of the notification history.
+        const next = !isDnd();
+        const say = (key: string): void =>
+          void window.dispatchEvent(
+            new CustomEvent('os:toast', { detail: { message: t(key), kind: 'muted', record: false } }),
+          );
+        if (next) say('shell2.dnd.on');
+        setDnd(next);
+        if (!next) say('shell2.dnd.off');
+      };
     case 'nav.undo':
       return () => {
         if (!canUndo()) {

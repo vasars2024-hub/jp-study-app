@@ -24,10 +24,18 @@ export interface FlashcardsFocus {
   cardId: string | null;
   /**
    * Start a sitting straight away: `listening` is the audio-first review of
-   * the folder (a sentence deck just made from a video). Absent opens the deck.
+   * the folder (a sentence deck just made from a video). `ahead` reviews the
+   * scheduled cards due by the end of `aheadUntil` now (the Calendar's "Study
+   * ahead" on a coming day). Absent opens the deck.
    */
-  review?: 'listening';
+  review?: 'listening' | 'ahead';
+  /** Local `YYYY-MM-DD`, with `review: 'ahead'`. */
+  aheadUntil?: string;
+  /** Text for the deck's find box, e.g. `added:2026-10-07` from the Calendar's day view. */
+  search?: string;
 }
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
 function announce(eventName: string): void {
   try {
@@ -59,8 +67,14 @@ export function takeFlashcardsFocus(): FlashcardsFocus | null {
   if (!raw || typeof raw !== 'object') return null;
   const folder = typeof raw.folder === 'string' && raw.folder ? raw.folder : null;
   const cardId = typeof raw.cardId === 'string' && raw.cardId ? raw.cardId : null;
-  if (!folder && !cardId) return null;
-  return raw.review === 'listening' ? { folder, cardId, review: 'listening' } : { folder, cardId };
+  const search = typeof raw.search === 'string' && raw.search.trim() ? raw.search.trim().slice(0, 200) : undefined;
+  const aheadUntil = raw.review === 'ahead' && typeof raw.aheadUntil === 'string' && DATE_KEY.test(raw.aheadUntil)
+    ? raw.aheadUntil
+    : undefined;
+  if (!folder && !cardId && !search && !aheadUntil) return null;
+  const extra = { ...(search ? { search } : {}) };
+  if (aheadUntil) return { folder, cardId, ...extra, review: 'ahead', aheadUntil };
+  return raw.review === 'listening' ? { folder, cardId, ...extra, review: 'listening' } : { folder, cardId, ...extra };
 }
 
 export function requestDictionaryQuery(query: string): void {

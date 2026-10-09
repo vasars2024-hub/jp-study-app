@@ -84,7 +84,8 @@ describe('the shell taskbar declares its popups', () => {
     const tag = buttonTag(read(SHELL), 'os-tray-overflow-btn');
     expect(tag).toContain('aria-haspopup="dialog"');
     expect(tag).toContain('aria-expanded={trayOverflowOpen}');
-    expect(tag).toContain('aria-controls={TRAY_OVERFLOW_ID}');
+    // Same idiom as Start above (a11y2): the panel is unmounted while closed.
+    expect(tag).toContain('aria-controls={trayOverflowOpen ? TRAY_OVERFLOW_ID : undefined}');
   });
 
   it('the notification bell declares its popup and claims no expanded state it cannot read', () => {

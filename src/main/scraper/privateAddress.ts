@@ -13,7 +13,10 @@
 // request starts. A direct (non-proxied) guarded request also connects through
 // `publicOnlyLookup`, which re-checks the addresses the socket actually uses, so
 // a DNS-rebinding answer that changes between the two lookups is still refused.
-// A proxied request is resolved by the proxy, out of our reach.
+// A proxied request is resolved by the proxy, out of our reach; http.ts checks
+// the name again once the proxied response arrives and discards it when the
+// name resolves privately by then (it cannot see the proxy's own lookup).
+// A guarded crawl's robots.txt fetch is under the same guard as the crawl.
 
 import dns from 'node:dns';
 import type { LookupFunction } from 'node:net';

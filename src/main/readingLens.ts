@@ -32,6 +32,7 @@ import {
 } from 'electron';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { refuseWhileLocked } from './lockGuard';
 import { ocrClipboardImage, ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
 import { coverDisplay } from './screenSources';
 import {
@@ -338,6 +339,9 @@ interface LensOpenExtras {
 }
 
 function openLens(requestedMode: LensOpenMode, extras: LensOpenExtras = {}): void {
+  // Every way in (hotkeys, wheel, IPC) ends here; the hotkeys are already refused
+  // in globalCommands.ts, this covers the rest (lockGuard.ts).
+  if (refuseWhileLocked('window:lens')) return;
   const repeat = repeatTargetOf(requestedMode);
   // A repeat with nothing replayable is an ordinary selection, decided here so
   // the renderer never receives a `repeat` init it cannot honour.

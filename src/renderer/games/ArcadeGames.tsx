@@ -24,6 +24,11 @@ interface ArcadeGamePanelProps {
   level: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   sourceLang: SourceLang;
   onProgress: () => void;
+  /**
+   * The host asks for a few study answers before another run (`ArcadeStudyGate` in the
+   * Arena), so the shell's own Restart button is not offered: the host offers it instead.
+   */
+  restartGated?: boolean;
 }
 
 interface ArcadeShellProps extends ArcadeGamePanelProps {
@@ -133,6 +138,7 @@ function ArcadeShell({
   complete,
   onReset,
   children,
+  restartGated,
 }: ArcadeShellProps) {
   const { t } = useT();
   return (
@@ -157,7 +163,7 @@ function ArcadeShell({
         text, and it has to announce itself.
       */}
       <div className="arcade-game__status" role="status" aria-live="polite">{localizeArcadeText(status, t)}</div>
-      {complete && (
+      {complete && !restartGated && (
         <button type="button" className="btn primary" onClick={onReset}>
           {t('games.arcade.restart')}
         </button>
@@ -1514,7 +1520,8 @@ function ThemedMinesweeper(props: ArcadeGamePanelProps) {
     });
   };
 
-  const flag = (event: MouseEvent, index: number): void => {
+  // A right click, or F on a focused cell: flagging was mouse-only.
+  const flag = (event: Pick<MouseEvent, 'preventDefault'>, index: number): void => {
     event.preventDefault();
     setState((current) => {
       if (current.complete || current.board[index].selected) return current;
@@ -1541,6 +1548,10 @@ function ThemedMinesweeper(props: ArcadeGamePanelProps) {
             className={`${cell.selected ? cell.mine ? 'mine' : 'open' : ''} ${cell.flagged ? 'flagged' : ''}`.trim()}
             onClick={() => reveal(index)}
             onContextMenu={(event) => flag(event, index)}
+            onKeyDown={(event) => {
+              if (event.key === 'f' || event.key === 'F') flag(event, index);
+            }}
+            aria-keyshortcuts="F"
           >
             {cell.selected ? (cell.mine ? '!' : cell.value || '') : cell.flagged ? 'F' : ''}
           </button>

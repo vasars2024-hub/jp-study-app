@@ -267,6 +267,37 @@ describe('extension popup — the Transcribe button', () => {
   });
 });
 
+describe('extension popup — recorder row stays live while open', () => {
+  it('ticks the Stop clock and drops a finished upload without reopening the popup', async () => {
+    // Seen in Chrome 2026-10-08: "Stop recording (0:00)" never moved, and after Stop the
+    // recording the app had already finished stayed listed as waiting with Upload/Discard.
+    let status: unknown = { ok: true, active: [{ id: 'r1', startedAt: Date.now() - 65_000 }], pending: [] };
+    harness = loadPopupSandbox({
+      respond: (msg: JpMessage) => {
+        if (msg.type === 'status-summary') return { ok: true, app: true, paired: true, pending: 0 };
+        if (msg.type === 'record-status') return status;
+        return undefined;
+      },
+      tabRespond: () => undefined,
+    });
+    await harness.settle();
+    const stop = harness.document.getElementById('rec-stop')!;
+    expect(stop.hidden).toBe(false);
+    const first = stop.textContent;
+    expect(first).toMatch(/1:0[5-6]/);
+    await new Promise((r) => setTimeout(r, 2200));
+    expect(stop.textContent).not.toBe(first);
+
+    status = { ok: true, active: [], pending: [{ id: 'r1', title: 'Page', bytes: 0, status: 'stopped' }] };
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(harness.document.getElementById('rec-pending')!.hidden).toBe(false);
+    status = { ok: true, active: [], pending: [] };
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(harness.document.getElementById('rec-pending')!.hidden).toBe(true);
+    expect(stop.hidden).toBe(true);
+  }, 20_000);
+});
+
 describe('extension popup — status header', () => {
   it('reports the app as not running when the background worker says so', async () => {
     harness = loadPopupSandbox({

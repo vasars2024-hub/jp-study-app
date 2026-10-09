@@ -1,0 +1,113 @@
+/* Region Recorder history and window picker (Settings → Screen recorder, Blanc's recorder tool). */
+.rr-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rr-history-list,
+.rr-window-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rr-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rr-history-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.rr-history-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.rr-history-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rr-history-meta {
+  font-size: 0.85em;
+}
+
+.rr-history-warn {
+  font-size: 0.85em;
+  color: #d93f44;
+}
+
+.rr-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.rr-window-starter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rr-window-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.rr-window-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rr-window-pick:hover,
+.rr-window-pick:focus-visible {
+  border-color: #3b82f6;
+}
+
+.rr-window-pick img,
+.rr-window-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.rr-window-name {
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -76,9 +76,10 @@ describe('Agent capability directory authority projection', () => {
       reason: 'available',
       confirmation: 'external-connection',
     });
+    // Sentence analysis has an adapter now: the study coach reads the grammar library.
     expect(rows.find((row) => row.id === 'dictionary.analyze-sentence')).toMatchObject({
-      available: false,
-      reason: 'dedicated-analysis-required',
+      available: true,
+      reason: 'available',
     });
     expect(rows.find((row) => row.id === 'flashcard.schedule-reviews')).toMatchObject({
       available: false,
@@ -115,7 +116,7 @@ describe('Agent capability directory authority projection', () => {
     expect(rows.find((row) => row.id === 'flashcard.schedule-reviews')?.reason)
       .toBe('false-success-stub-removed');
     expect(rows.find((row) => row.id === 'dictionary.explain-grammar')?.reason)
-      .toBe('dedicated-analysis-required');
+      .toBe('agent-disabled');
   });
 
   it('ships every operation label and directory string in all four UI catalogs', () => {
@@ -149,7 +150,7 @@ describe('Agent capability directory authority projection', () => {
 
   it('renders an accessible localized status directory from supplied authority snapshots', () => {
     const selectedCapabilities = capabilities().filter(({ definition }) => (
-      definition.id === 'dictionary.lookup' || definition.id === 'dictionary.analyze-sentence'
+      definition.id === 'dictionary.lookup' || definition.id === 'flashcard.schedule-reviews'
     ));
     const html = renderToStaticMarkup(createElement(AgentCapabilityDirectory, {
       capabilities: selectedCapabilities,
@@ -162,7 +163,7 @@ describe('Agent capability directory authority projection', () => {
     expect(html).toContain('Active profile: Test profile');
     expect(html).toContain('Look up a word');
     expect(html).toContain('Ready with current settings');
-    expect(html).toContain('Requires the dedicated analysis workflow');
+    expect(html).toContain(String(CATALOGS.en['agent.capabilities.reason.false-success-stub-removed']));
     expect(html).toContain('<code>dictionary.lookup</code>');
     expect(html).not.toContain('agent.capabilities.');
   });

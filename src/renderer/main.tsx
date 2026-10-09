@@ -5,11 +5,10 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import SystemDictOverlay from './components/SystemDictOverlay';
-import ReadingLensOverlay from './components/lens/ReadingLensOverlay';
 import { installVisualNovelStudyTimeSync } from './visualNovelStudyTime';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { withStrictMode } from './strictRoot';
-import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
+import { applyZoom, installZoomResizeHook, loadZoom, zoomForWindow } from './appZoom';
 import { bootOsLook } from './components/DesktopSettings';
 import { bootDisplayPrefs, loadDisplayPrefs } from './displayPrefs';
 import { bootMotionPrefs } from './motion/motionPrefs';
@@ -68,40 +67,14 @@ import './components/shell/shell.css';
 // Multi-monitor desktops, cross-monitor drag ghost, drop router, and the two
 // settings pages they add. Its own sheet — styles.css is single-owner.
 import './multiMonitor.css';
-// Aero desktop-shell glass (Phase 2 · M1) — scoped to [data-materials='aero'],
-// loaded after shell.css so Aero flyout/palette corrections win over base shell styles.
-import './theme/aero-shell.css';
-// Aero "Windows 6" experience layer: logon screen, gadgets, Flip 3D, live walls.
-import './theme/aero-vista.css';
-// Aero study mechanics: Memory Defragmenter, Vocabulary Update, balloons, screensaver, study gadgets.
-import './theme/aero-mechanics.css';
-import './theme/wired-shell.css';
-// WIRED ARCHIVE shared motion library (bespoke spec §1–§2) — wm-* keyframes
-// and the window-lifecycle visuals; loaded after wired-shell.css so its
-// lifecycle rules win over the base fwin styling.
-import './theme/wired-motion.css';
-// WIRED ARCHIVE widget instruments (bespoke spec §6).
-import './theme/wired-widgets.css';
-// XP–Aero application grammar (Phase 4 · M1) — scoped to [data-materials='aero'],
-// loaded after ui.css so the density/material overrides win. Default apps unchanged.
-import './theme/aero-apps.css';
-import './theme/wired-apps.css';
-// WIRED ARCHIVE "NAVI SHELL" pass — shared CRT glass, module-plate window
-// chrome, data-rail taskbar, cursors, SYSTEM PROMPT dialogs. After wired-apps
-// so its shell-level rules win; every rule is scoped to [data-materials='wired'].
-import './theme/wired-navi.css';
-// WIRED study mechanics — TTY / signal decrypt / intercept consoles, layer
-// descent (tray badge, crossing transmission, wallpaper depth stages).
-import './theme/wired-mechanics.css';
-import './theme/blanc.css';
-// Living-desktop weather overlays (Phase 3 · M3) + atmosphere polish (M5/M6).
-import './environment/weather.css';
-import './environment/atmosphere.css';
-// Last of the stylesheets on purpose: `flatten.css` mirrors rules from every
-// sheet above it (and from six component sheets that are imported lazily by
-// their own components), so it is written to out-specify each of them rather
-// than to win on order — but importing it last keeps the two consistent.
-import './theme/flatten.css';
+// Everything that used to follow here — the Aero sheets (aero-shell, aero-vista,
+// aero-mechanics, aero-apps), the WIRED sheets (wired-shell, wired-motion,
+// wired-widgets, wired-apps, wired-navi, wired-mechanics), and the always-on
+// tail (blanc, weather, atmosphere, and flatten LAST) — now loads through the
+// ordered slot in `theme/themeSheets.ts`, in exactly this historical order:
+// the active material's sheets plus the tail before the first render, the
+// other material only when the user switches to it (perf2).
+import { bootThemeSheets, prefetchThemeSheets, MATERIAL_SHEETS } from './theme/themeSheets';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { registerWiredArchive } from './theme/wired-archive';
 import { installNotificationCapture } from './notificationStore';
@@ -125,6 +98,9 @@ import { initAgentOperationalState } from './agentOperationalClient';
 import { installLocalAgentAutomationHost } from './localAgentAutomationHost';
 import { bootAeroSafeMode } from './aeroSafeMode';
 import { startAiSetupSync } from './aiSetupClient';
+import { hasDiscoveredAero } from './aeroDiscovery';
+import { hasDiscoveredWired } from './wiredDiscovery';
+import { installSettingsLinkRelay } from './settingsDeepLink';
 
 // Lazy: the reader pulls the tokenizer and the mining path, which no other
 // window should pay for at boot.
@@ -134,6 +110,9 @@ const CompanionOverlay = React.lazy(() => import('./components/companion/Compani
 const RegionSelectOverlay = React.lazy(() => import('./recorder/RegionSelectOverlay'));
 const RecorderPanel = React.lazy(() => import('./recorder/RecorderPanel'));
 const RecorderFrame = React.lazy(() => import('./recorder/RecorderFrame'));
+// The Reading Lens window only (perf2): ~250 KB of OCR + lookup UI the desktop
+// and every other overlay used to evaluate at boot.
+const ReadingLensOverlay = React.lazy(() => import('./components/lens/ReadingLensOverlay'));
 
 // Hydrates this window's view of the main-owned Agent queue, memory and
 // automations, and performs the one-way localStorage adoption. The schedule
@@ -141,6 +120,9 @@ const RecorderFrame = React.lazy(() => import('./recorder/RecorderFrame'));
 void initAgentOperationalState();
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
+// Settings is lazy now (perf2): keep a deep link that fires before its first
+// mount, so a feature's "open settings" lands on its card (set2).
+installSettingsLinkRelay();
 
 // Previously nothing captured these outside a dev console (PHASE_6_5_AUDIT.md
 // Phase 8 gap) — forward to the main-process diagnostic log. Never sends
@@ -267,8 +249,10 @@ function prewarmTokenizerLater(): void {
 // before paint so there is no flash of the default look.
 // #root is sized to (100/zoom)vw×vh then zoomed so the shell always fills
 // the window (no top-left pin / blank void, no clipped taskbar).
-applyZoom(loadZoom());
-installZoomResizeHook();
+// The recorder's picker and border are screen geometry, never zoomed (appZoom.ts `zoomForWindow`).
+const windowZoom = zoomForWindow(typeof window !== 'undefined' ? window.location.search : '', loadZoom());
+applyZoom(windowZoom.zoom);
+if (windowZoom.followResize) installZoomResizeHook();
 // Register the secret Aero theme BEFORE bootTheme() so a persisted 'frutiger-aero'
 // selection is recognised and re-applied on launch.
 registerFrutigerAero();
@@ -304,6 +288,11 @@ if (isBlancWindow()) {
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-materials'] });
   }
 }
+// The saved theme's material sheets plus the always-on tail (perf2). Started
+// right after bootTheme so the chunk reads overlap the rest of this boot; every
+// first render below awaits it, so a saved Aero/WIRED desktop never paints a
+// frame without its sheets. A Blanc window takes the tail only.
+const themeSheetsReady = bootThemeSheets({ materials: !isBlancWindow() });
 applyBlancModeClass();
 // Sets <html lang> from the saved UI language before first paint — CJK glyph
 // shapes depend on it, so doing it later would flash the wrong forms.
@@ -375,6 +364,16 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !i
     // Per-environment ambient soundscapes are dormant until a sound pack exists.
     installAmbientAudio();
   }, 2500);
+  // The Soundscape mixer follows Pomodoro work blocks and Focus Mode when the
+  // user turns that on (snd2). Desktop window only: that is where the timers and
+  // Focus Mode live, and a second window must never start a second mixer.
+  runWhenIdle(() => {
+    // Same primary-window test the calendar reminders use (bare query string).
+    if (new URLSearchParams(window.location.search).toString() !== '') return;
+    void import('./soundscape/focusSoundscape')
+      .then(({ installFocusSoundscape }) => installFocusSoundscape())
+      .catch((err) => console.warn('[soundscape:focus-link]', err));
+  }, 4000);
   runWhenIdle(() => {
     // Move legacy localStorage data into IndexedDB after the shell can respond.
     runStorageMigrations().catch((err) => {
@@ -393,6 +392,12 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !i
   }, 3500);
 
   prewarmTokenizerLater();
+  // A secret desktop the user has found but is not in: fetch (never apply) its
+  // sheets once the shell is idle, so a later switch paints styled at once.
+  runWhenIdle(() => {
+    if (hasDiscoveredAero()) prefetchThemeSheets(MATERIAL_SHEETS.aero);
+    if (hasDiscoveredWired()) prefetchThemeSheets(MATERIAL_SHEETS.wired);
+  }, 20000);
 
   installKeyboardShortcuts();
   runWhenIdle(startReleaseCheck, 12000);
@@ -415,6 +420,9 @@ if (container) {
   // boot in a non-English UI. English is the default and is already loaded, so
   // for most sessions this costs a microtask, not a fetch.
   void initI18n().then(async () => {
+    // The ordered theme-sheet slot (see bootThemeSheets above) is in before any
+    // window paints its first React frame.
+    await themeSheetsReady;
     // Every window — the Reading Lens and the dictionary overlay too — hides its
     // AI entry points from the first paint when "Use AI features" is off.
     startAiSetupSync();
@@ -487,7 +495,9 @@ if (container) {
       createRoot(container).render(
         withStrictMode(
           <AppErrorBoundary>
-            <ReadingLensOverlay />
+            <React.Suspense fallback={null}>
+              <ReadingLensOverlay />
+            </React.Suspense>
           </AppErrorBoundary>,
         ),
       );

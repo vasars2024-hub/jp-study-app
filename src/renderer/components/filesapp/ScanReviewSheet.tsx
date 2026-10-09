@@ -607,9 +607,18 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
         ) : null}
 
         {state.status === 'importing' ? (
-          <p className="fa-review-progress" role="status">
-            {t('filesApp.review.importing', { done: state.done, total: state.total })}
-          </p>
+          <>
+            <p className="fa-review-progress" role="status">
+              {t('filesApp.review.importing', { done: state.done, total: state.total })}
+            </p>
+            {/* files2: a bar as well as the count, so a long import visibly moves. */}
+            <progress
+              className="fa-review-progress-bar"
+              max={Math.max(1, state.total)}
+              value={state.done}
+              aria-label={t('filesApp.review.importing', { done: state.done, total: state.total })}
+            />
+          </>
         ) : null}
 
         {state.status === 'report' && plan ? (

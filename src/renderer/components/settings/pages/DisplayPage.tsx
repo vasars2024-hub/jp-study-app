@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import MonitorsPage from './MonitorsPage';
-import { confirmDialog, Toggle } from '../../ui';
+import ResetSectionButton from '../ResetSectionButton';
+import { Toggle } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN } from '../../../appZoom';
 import {
@@ -432,24 +433,17 @@ export default function DisplayPage() {
         title={t('settings.display.reset.title')}
         description={t('settings.display.reset.desc')}
       >
-        <button
-          type="button"
-          className="btn"
-          onClick={async () => {
-            const ok = await confirmDialog({
-              title: t('settings.display.reset.dialogTitle'),
-              message: t('settings.display.reset.dialogMessage'),
-              confirmLabel: t('common.reset'),
-              danger: true,
-            });
-            if (ok) {
-              setD(resetDisplayPrefs());
-              setZoomValue(ZOOM_DEFAULT);
-            }
+        <ResetSectionButton
+          settingId="display-reset"
+          section={t('settings.nav.display')}
+          label={t('settings.display.reset.button')}
+          dialogTitle={t('settings.display.reset.dialogTitle')}
+          dialogMessage={t('settings.display.reset.dialogMessage')}
+          onReset={() => {
+            setD(resetDisplayPrefs());
+            setZoomValue(ZOOM_DEFAULT);
           }}
-        >
-          {t('settings.display.reset.button')}
-        </button>
+        />
       </SettingsCard>
     </>
   );

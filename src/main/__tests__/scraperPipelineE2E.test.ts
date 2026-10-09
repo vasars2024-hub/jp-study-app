@@ -42,12 +42,13 @@ import {
   type ScraperSourceEntry,
 } from '../../shared/scraperSourceSettings';
 import { parseStudySubtitles, parseSubtitles } from '../../shared/subtitleCues';
-import { cancelScrape, jobResult, resetScrapeJobs, startScrape } from '../scraper/engine';
+import { cancelScrape, jobResult, pageFailuresNote, resetScrapeJobs, startScrape } from '../scraper/engine';
 import { onAcquisitionHandoff, type AcquisitionHandoff } from '../scraper/handoffs';
 import { probeHttp, scraperRequest } from '../scraper/http';
 import { resetScraperHttpCache } from '../scraper/httpCache';
 import { resetScraperLogs } from '../scraper/logBus';
-import { qbitPollTorrents, qbitSend, resetQbitSessions } from '../scraper/qbittorrent';
+import { qbitAddTorrentFiles, qbitPollTorrents, qbitSend, resetQbitSessions } from '../scraper/qbittorrent';
+import { makeTorrent } from './e2eFixtures/torrentFixture';
 import { resetRobotsCache } from '../scraper/robots';
 import { setScraperSecret } from '../scraper/credentials';
 import { setScraperStoreRoot } from '../scraper/store';
@@ -710,5 +711,51 @@ describe.skipIf(!HAVE_FFMPEG)('probe: P8 features', () => {
     const result = await probeHttp({ url: `${site.base}/`, method: 'GET', headers: {} });
     expect(result.status).toBe(0);
     expect(site.hits.at(-1)).not.toBe('GET /');
+  });
+});
+
+describe.skipIf(!HAVE_FFMPEG)('probe: round 2 (page failures, .torrent files, the robots guard)', () => {
+  it('a site-rule page after the first that fails is in the job summary, not only the log', async () => {
+    const run = await scrape(`${site.base}/shows/broken-pages`);
+    expect(run.error).toBe('');
+    expect(run.result?.episodes.map((row) => row.number)).toEqual([1, 2]);
+    const done = run.events.find((e): e is Extract<ScrapeJobEvent, { kind: 'done' }> => e.kind === 'done');
+    expect(done?.summary.pageFailures).toEqual([
+      { page: 2, url: `${site.base}/shows/broken-pages?page=2`, reason: 'status', status: 503 },
+    ]);
+    expect(done?.summary.note).toContain('Could not read page 2 (HTTP 503); the episode list may be incomplete.');
+    expect(pageFailuresNote([{ page: 3, url: 'u', reason: 'empty' }])).toBe('Could not read page 3 (no rows); the episode list may be incomplete.');
+  });
+
+  it('a .torrent file goes to qBittorrent as a multipart add, is handed to the ingest, and is imported', async () => {
+    const torrent = makeTorrent(`${SHOW} - 09 (1080p).mkv`);
+    // P5 pointed the ingest at its own (now closed) remote client: point it back.
+    await invoke(MEDIA_INGEST_CHANNELS.syncQbit, qbitConfig(qbit.port));
+    await vi.waitFor(async () => {
+      const state = await invoke<MediaIngestState>(MEDIA_INGEST_CHANNELS.getState);
+      if (state.qbit.status !== 'watching') throw new Error(`qbit status ${state.qbit.status}`);
+    }, { timeout: 5_000, interval: 25 });
+    const before = handoffs.length;
+    const libraryBefore = library.length;
+    const report = await qbitAddTorrentFiles({
+      config: qbitConfig(qbit.port),
+      files: [{ fileName: 'from-browser.torrent', data: torrent.bytes }, { fileName: 'junk.torrent', data: Buffer.from('<html>') }],
+      ingest: { hint: { title: SHOW, provider: 'scraper', season: 1 }, via: 'e2e-torrent-file' },
+    });
+    expect(report).toMatchObject({ sent: 1, skipped: 1, failed: 0, infoHashes: [torrent.infoHash] });
+    expect(qbit.torrents.get(torrent.infoHash)).toMatchObject({ category: 'gum-e2e' });
+    expect(handoffs.length).toBe(before + 1);
+    expect(handoffs.at(-1)?.rows[0]).toMatchObject({ infoHash: torrent.infoHash });
+    await waitForLibrary(libraryBefore + 1);
+    expect(library.some((item) => item.fileName === torrent.name)).toBe(true);
+  });
+
+  it('a guarded crawl never asks a private host for its robots.txt', async () => {
+    site.reset();
+    const settings = e2eSettings();
+    settings.safety.allowPrivateNetwork = false;
+    const run = await scrape(`${site.base}/shows/gum-test-show`, settings);
+    expect(run.error).toMatch(/private or local network/);
+    expect(site.hits).toEqual([]);
   });
 });

@@ -18,6 +18,13 @@ import { segmentStudyText, studyWordKey } from '../../shared/studySegmentation';
 import { packFor } from '../data/gamePacks';
 import type { GamePack } from '../data/gamePacks/types';
 import { listCards, loadGameLists, packExtrasFromLists } from './gameItemImport';
+import { getLevel } from '../knownWords';
+import {
+  iPlusOneScore,
+  isStudyTarget,
+  studyWordStatus,
+  type StudyWordStatus,
+} from '../../shared/gameStudyMix';
 import {
   buildClozePool,
   buildVocabPool,
@@ -73,6 +80,58 @@ export function surfaceInSentence(sentence: string, word: string): string | null
   return null;
 }
 
+/** Sentences split into pieces per content build: each split tokenizes the sentence once. */
+const PIECE_LIMIT = 300;
+const MIN_PIECES = 3;
+const MAX_PIECES = 9;
+
+/** IPADIC parts that lean on the word before them: they ride in its piece. */
+function attachesToPrevious(pos: string, detail: string): boolean {
+  return pos === '助詞'
+    || pos === '助動詞'
+    || pos === '記号'
+    || (pos === '名詞' && (detail === '接尾' || detail === '非自立'))
+    || (pos === '動詞' && (detail === '非自立' || detail === '接尾'));
+}
+
+/**
+ * A sentence in phrase-sized pieces for Sentence Builder: each content word with the
+ * particles, endings and punctuation that follow it (猫が / 好き / です。). Null when it
+ * cannot be split yet or would make fewer than three or more than nine pieces.
+ */
+export function builderPieces(sentence: string): string[] | null {
+  const lang = getStudyLang();
+  const pieces: string[] = [];
+  if (lang === 'ja') {
+    if (!tokenizerReady()) return null;
+    try {
+      for (const token of tokenizeSync(sentence)) {
+        if (!token.surface.trim()) continue;
+        if (pieces.length && attachesToPrevious(token.pos, token.posDetail)) pieces[pieces.length - 1] += token.surface;
+        else pieces.push(token.surface);
+      }
+    } catch {
+      return null;
+    }
+  } else {
+    for (const part of segmentStudyText(sentence, lang)) {
+      const text = part.text.trim();
+      if (!text) continue;
+      if (!part.wordLike && pieces.length) pieces[pieces.length - 1] += text;
+      else pieces.push(text);
+    }
+  }
+  return pieces.length >= MIN_PIECES && pieces.length <= MAX_PIECES ? pieces : null;
+}
+
+function withPieces(cards: SourceCard[]): SourceCard[] {
+  return cards.map((card, i) => {
+    if (i >= PIECE_LIMIT || !card.sentence) return card;
+    const pieces = builderPieces(card.sentence);
+    return pieces ? { ...card, pieces } : card;
+  });
+}
+
 /** Read the actual cloze surface, whose conjugation can differ from the card. */
 function readingOfSurface(surface: string): string {
   if (getStudyLang() !== 'ja' || !tokenizerReady()) return '';
@@ -91,20 +150,72 @@ function wordsForLevel(level: LevelTier): string[] | null {
   return list && list.words.length ? list.words : null;
 }
 
+interface DeckSource extends SourceCard {
+  status: StudyWordStatus;
+  addedAt: number;
+}
+
+/** Sentences checked for i+1 per content build: each check tokenizes the sentence once. */
+const I_PLUS_ONE_CHECK_LIMIT = 400;
+
+function startOfToday(now: number): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/** The word's known-word level, under its own spelling or its lemma. */
+function knownLevelOf(word: string): number {
+  const lemma = lemmaOf(word);
+  return Math.max(getLevel(word), lemma && lemma !== word ? getLevel(lemma) : 0);
+}
+
 /**
  * The deck's cards in the study language only: a Russian learner's round never
- * deals Japanese cards. `folder` narrows to one deck folder.
+ * deals Japanese cards. `folder` narrows to one deck folder; `due` to the cards
+ * due now and the ones still being learned; `mined-today` to the cards added today.
  */
-function deckCards(folder?: string): SourceCard[] {
+function deckCards(folder?: string, scope: 'all' | 'due' | 'mined-today' = 'all', now = Date.now()): DeckSource[] {
   const lang = getStudyLang();
+  const today = startOfToday(now);
   return loadDeck()
     .filter((c) => normalizeStudyLang(c.studyLang) === lang && (!folder || c.folder === folder))
     .map((c) => ({
-    word: c.word,
-    reading: c.reading,
-    meaning: c.meaning,
-    sentence: c.sentence,
-  }));
+      word: c.word,
+      reading: c.reading,
+      meaning: c.meaning,
+      sentence: c.sentence,
+      ...(c.audioDataUrl ? { audioDataUrl: c.audioDataUrl } : {}),
+      ...(c.audioPath ? { audioPath: c.audioPath } : {}),
+      addedAt: c.addedAt,
+      status: studyWordStatus(c.srs, knownLevelOf(c.word), now),
+    }))
+    .filter((c) => scope === 'all'
+      || (scope === 'due' ? isStudyTarget(c.status) : Number.isFinite(c.addedAt) && c.addedAt >= today));
+}
+
+/**
+ * How many words of `sentence`, other than the answer, the learner does not know yet
+ * (known-word level under 2). Particles, punctuation and proper nouns do not count. Null
+ * when the sentence cannot be split yet (the Japanese tokenizer is still loading).
+ */
+export function unknownWordsBesides(sentence: string, answer: string): number | null {
+  const lang = getStudyLang();
+  if (lang === 'ja') {
+    if (!tokenizerReady()) return null;
+    try {
+      return tokenizeSync(sentence)
+        .filter((token) => token.content && !token.proper && token.surface !== answer && !answer.includes(token.surface))
+        .filter((token) => Math.max(getLevel(token.lemma), getLevel(token.surface)) < 2)
+        .length;
+    } catch {
+      return null;
+    }
+  }
+  return segmentStudyText(sentence, lang)
+    .filter((part) => part.wordLike && part.text !== answer)
+    .filter((part) => Math.max(getLevel(part.text), getLevel(studyWordKey(part.text, lang))) < 2)
+    .length;
 }
 
 export interface ArenaContent {
@@ -116,6 +227,57 @@ export interface ArenaContent {
   studyLang: StudyLang;
   /** The bundled pack for the study language, extended by the learner's imported lists. */
   pack: GamePack;
+  /**
+   * i+1 (`shared/gameStudyMix.ts`): item keys (a vocab word, a cloze sentence) of words due
+   * or still being learned, of words already known, and of sentences whose other words are
+   * all known. The engine's `PickContext` takes them as sets.
+   */
+  target: string[];
+  known: string[];
+  prefer: string[];
+  /** The study queue this content was drawn from, for the Arena's one-line summary. */
+  queue: { due: number; learning: number; known: number };
+}
+
+/** Split the material into i+1 tiers. Vocab keys are words, cloze keys are sentences. */
+function studyTiers(cards: readonly DeckSource[], vocab: readonly VocabItem[], cloze: readonly ClozeItem[]) {
+  const statusByWord = new Map<string, StudyWordStatus>();
+  for (const card of cards) {
+    const word = card.word.trim();
+    if (word && !statusByWord.has(word)) statusByWord.set(word, card.status);
+  }
+  const target: string[] = [];
+  const known: string[] = [];
+  const prefer: string[] = [];
+  for (const item of vocab) {
+    const status = statusByWord.get(item.word);
+    if (status && isStudyTarget(status)) target.push(item.word);
+    else if (status === 'known') known.push(item.word);
+  }
+  // Target sentences are checked first: they are the rounds an i+1 context matters most for.
+  const targetFirst: ClozeItem[] = [];
+  const rest: ClozeItem[] = [];
+  for (const item of cloze) {
+    const status = item.word ? statusByWord.get(item.word) : undefined;
+    if (status && isStudyTarget(status)) {
+      target.push(item.sentence);
+      targetFirst.push(item);
+    } else {
+      if (status === 'known') known.push(item.sentence);
+      rest.push(item);
+    }
+  }
+  for (const item of [...targetFirst, ...rest].slice(0, I_PLUS_ONE_CHECK_LIMIT)) {
+    const unknown = unknownWordsBesides(item.sentence, item.answer);
+    if (unknown !== null && iPlusOneScore(unknown) >= 3) prefer.push(item.sentence);
+  }
+  const queue = { due: 0, learning: 0, known: 0 };
+  for (const status of statusByWord.values()) {
+    if (status === 'due') queue.due += 1;
+    else if (status === 'learning') queue.learning += 1;
+    else if (status === 'known') queue.known += 1;
+  }
+  return { target, known, prefer, queue };
 }
 
 /**
@@ -145,14 +307,31 @@ export function loadArenaContent(level: LevelTier, material = 'auto'): ArenaCont
         cloze: extras.cloze?.length ? extras.cloze : onlyList.cloze,
         reading: extras.reading?.length ? extras.reading : onlyList.reading,
       };
-      return { vocab, cloze, sentences: buildSentencePool(cards), usingFallback: false, studyLang, pack };
+      // A list's words have no schedule here; their known-word level is what places them.
+      const listed: DeckSource[] = cards.map((card) => ({
+        ...card,
+        addedAt: 0,
+        status: studyWordStatus(undefined, knownLevelOf(card.word), Date.now()),
+      }));
+      return {
+        vocab,
+        cloze,
+        sentences: withPieces(buildSentencePool(cards)),
+        usingFallback: false,
+        studyLang,
+        pack,
+        ...studyTiers(listed, vocab, cloze),
+      };
     }
   }
   const folder = material.startsWith('folder:') ? material.slice(7) : undefined;
-  const cards = deckCards(folder);
-  const vocab = buildVocabPool(cards, folder ? null : wordsForLevel(level), level, lemmaOf);
+  // "Due" and "mined today" are the session's whole material, like a folder: the level's
+  // word list does not narrow them, or a due word outside the list could never be drilled.
+  const scope = material === 'due' ? 'due' : material === 'mined-today' ? 'mined-today' : 'all';
+  const cards = deckCards(folder, scope);
+  const vocab = buildVocabPool(cards, folder || scope !== 'all' ? null : wordsForLevel(level), level, lemmaOf);
   const cloze = buildClozePool(cards, surfaceInSentence, readingOfSurface);
-  const sentences = buildSentencePool(cards);
+  const sentences = withPieces(buildSentencePool(cards));
   return {
     vocab,
     cloze,
@@ -160,6 +339,25 @@ export function loadArenaContent(level: LevelTier, material = 'auto'): ArenaCont
     usingFallback: vocab.length === 0 && cloze.length === 0 && sentences.length === 0,
     studyLang,
     pack: packFor(studyLang, lists.length ? packExtrasFromLists(lists) : undefined),
+    ...studyTiers(cards, vocab, cloze),
+  };
+}
+
+/** The deck's study queue for the warm-up: counts per kind of round the due words can fill. */
+export function warmUpQueue(now = Date.now()): {
+  dueCloze: number;
+  dueReadable: number;
+  dueVocab: number;
+  deckCards: number;
+} {
+  const all = deckCards(undefined, 'all', now);
+  const due = all.filter((card) => isStudyTarget(card.status));
+  const lang = getStudyLang();
+  return {
+    dueCloze: buildClozePool(due, surfaceInSentence, readingOfSurface).length,
+    dueReadable: due.filter((card) => (lang === 'ru' ? card.reading.normalize('NFD').includes('́') : !!card.reading.trim())).length,
+    dueVocab: buildVocabPool(due, null, 1, lemmaOf).length,
+    deckCards: all.length,
   };
 }
 

@@ -24,6 +24,13 @@ export const AGENT_STUDY_DATA_OPERATIONS: ReadonlySet<AgentToolOperationId> = ne
   'study.stats-summary',
   'study.known-words',
   'dictionary.search-knowledge',
+  // The study coach reads the same record: the deck's queue and today's mined words, the
+  // review log and statistics, and (for a text or a sentence) which words are known.
+  'study.recommend-next',
+  'study.cards-from-text',
+  'study.quiz-mined-today',
+  'study.plan-week',
+  'dictionary.analyze-sentence',
 ]);
 
 /** Replaces a withheld tool's output if one is ever bound for a cloud request. */

@@ -6,67 +6,17 @@
  * them. This card lists recent warnings/errors, copies a diagnostics bundle for
  * a bug report, and opens the log folder.
  *
- * The update control tells the truth in all five cases (see
- * `shared/release.ts` ReleaseStatusKind) — including "your build is newer than
- * the latest release", which the old silent check could never say — and hides
- * itself when the project publishes no releases.
+ * The update control lives in `UpdatePanel.tsx`; it still tells the truth in
+ * all five `shared/release.ts` ReleaseStatusKind cases for a portable build.
  */
 import { useCallback, useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useT } from '../../../i18n';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { DiagnosticEntry } from '../../../../main/crashRecovery';
-import type { ReleaseStatus } from '../../../../shared/release';
 
-export function UpdateCard() {
-  const { t } = useT();
-  const [status, setStatus] = useState<ReleaseStatus | null>(null);
-  const [checking, setChecking] = useState(false);
-
-  const check = useCallback(async () => {
-    if (!window.api?.releaseStatus) return;
-    setChecking(true);
-    try {
-      setStatus(await window.api.releaseStatus());
-    } catch {
-      setStatus({ kind: 'unavailable', current: '', checkedAt: Date.now() });
-    } finally {
-      setChecking(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void check();
-  }, [check]);
-
-  if (!window.api?.releaseStatus || status?.kind === 'no-releases') return null;
-  const vars = { current: status?.current ?? '', latest: status?.latest ?? '' };
-  const line = checking || !status
-    ? t('help.update.checking')
-    : status.kind === 'update'
-      ? t('help.update.available', vars)
-      : status.kind === 'current'
-        ? t('help.update.current', vars)
-        : status.kind === 'newer'
-          ? t('help.update.newer', vars)
-          : t('help.update.unavailable');
-
-  return (
-    <SettingsCard id="updates" title={t('help.update.title')} description={t('help.update.desc')}>
-      <p className="muted" role="status">{line}</p>
-      <div className="fm-actions">
-        <button type="button" className="btn" disabled={checking} onClick={() => void check()}>
-          {t('help.update.check')}
-        </button>
-        {status?.kind === 'update' && status.url ? (
-          <button type="button" className="btn primary" onClick={() => void window.api.openExternal?.(status.url ?? '')}>
-            {t('help.update.open')}
-          </button>
-        ) : null}
-      </div>
-    </SettingsCard>
-  );
-}
+// The update control moved to `UpdatePanel.tsx` (upd2): version, install kind,
+// channel, last check, Squirrel state, release notes on request.
 
 export function DiagnosticsCard() {
   const { t, lang } = useT();

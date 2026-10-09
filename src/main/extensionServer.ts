@@ -49,6 +49,13 @@ import {
   requestAnnotate,
 } from './extensionAnnotate';
 import { handleRecordingsRoute, setMicRecordingHandler } from './extensionRecordings';
+import {
+  appLocked,
+  EXTENSION_LOCKED_BODY,
+  EXTENSION_LOCKED_STATUS,
+  extensionRouteAllowedWhileLocked,
+  refuseWhileLocked,
+} from './lockGuard';
 import type { MineNoteRequest, MineNoteResult } from '../shared/anki';
 import {
   ensureChromeExtensionFolder,
@@ -1225,6 +1232,18 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
   const url = new URL(req.url ?? '/', `http://127.0.0.1`);
   const pathname = url.pathname.replace(/\/+$/, '') || '/';
 
+  // Locked (lockGuard.ts): only liveness, the pairing pull and the URL classifier
+  // answer. Everything that reads or writes study data — lookups, mining, the
+  // known-word snapshot, recordings — is refused with `code: 'locked'`, which the
+  // extension shows as its message ("Gum is locked"). Body drained, never a reset:
+  // a reset reads as "Gum is not running".
+  if (!extensionRouteAllowedWhileLocked(pathname) && appLocked()) {
+    req.resume();
+    refuseWhileLocked(`extension:${pathname}`);
+    json(res, EXTENSION_LOCKED_STATUS, { ...EXTENSION_LOCKED_BODY });
+    return;
+  }
+
   // Recordings stream their own chunk bodies with their own caps
   // (extensionRecordings.ts), so they are routed before the generic body cap.
   if (pathname === '/v1/recordings' || pathname.startsWith('/v1/recordings/')) {
@@ -1284,6 +1303,8 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       ok: true,
       version: 1,
       port: bridgeState?.port ?? EXTENSION_PORT,
+      // Additive: content routes answer 423 `locked` while this is true.
+      locked: appLocked(),
       features: {
         sentenceAnalysis: true,
         scan: true,

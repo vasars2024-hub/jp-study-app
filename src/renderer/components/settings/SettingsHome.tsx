@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import Icon from '../Icons';
-import { groupLabelKey, pageMeta, SETTINGS_NAV } from './settingsRegistry';
-import { getRecentPages } from './settingsRecent';
+import { groupLabelKey, pageMeta, SETTINGS_NAV, SETTINGS_REGISTRY } from './settingsRegistry';
+import { clearRecentChanges, getRecentChanges, getRecentPages } from './settingsRecent';
 import { useSettings } from './SettingsContext';
 import { loadThemeId } from '../../theme';
 import { getTheme } from '../../theme/engine';
@@ -11,6 +11,10 @@ import { LANG_LABELS, LANG_TAGS } from '../../../shared/i18n/core';
 import { useAeroMaterials } from '../ui';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import { requestWiredArchiveEntry } from '../../wiredArchiveLifecycle';
+import { useThemeSheets } from '../../theme/useThemeSheets';
+import type { ThemeSheetId } from '../../theme/themeSheets';
+
+const WIRED_ACCESS_SHEETS: readonly ThemeSheetId[] = ['wired-apps'];
 
 const QUICK: {
   page: SettingsPageId;
@@ -46,11 +50,21 @@ export default function SettingsHome() {
   const s = useSettings();
   const { t, lang } = useT();
   const aero = useAeroMaterials();
+  // The diagnostics card below is Aero-only, but its rules live in a WIRED sheet,
+  // which loads with its own theme only (theme/themeSheets.ts).
+  useThemeSheets(WIRED_ACCESS_SHEETS, aero);
   const [diagArmed, setDiagArmed] = useState(false);
   const [diagCode, setDiagCode] = useState('');
   const [diagMessage, setDiagMessage] = useState<{ key: string; count?: number }>({ key: 'settings.home.diag.sealed' });
   const diagClickRef = useRef({ count: 0, last: 0 });
   const recent = getRecentPages();
+  // Only ids the registry still knows: a card that was renamed or removed must
+  // not leave a row that navigates nowhere.
+  const [changed, setChanged] = useState(() =>
+    getRecentChanges()
+      .map(({ id, at }) => ({ entry: SETTINGS_REGISTRY.find((e) => e.id === id && !e.movedTo), at }))
+      .filter((row): row is { entry: (typeof SETTINGS_REGISTRY)[number]; at: number } => !!row.entry),
+  );
   // Same lookup as Settings > Appearance: the translated name first, then the engine's own
   // label. `THEMES` omits hidden themes, so Aero and Wired used to show their raw ids here.
   const currentThemeId = s.theme || loadThemeId();
@@ -214,6 +228,57 @@ export default function SettingsHome() {
           </ul>
         </section>
       )}
+
+      {changed.length > 0 && (
+        <section aria-labelledby="os-set-home-changed-title">
+          <div className="os-set-home-section-head">
+            <h3 id="os-set-home-changed-title" className="os-set-home-section-title">{t('set2.home.recentChanges')}</h3>
+            <button
+              type="button"
+              className="btn small"
+              onClick={() => {
+                clearRecentChanges();
+                setChanged([]);
+              }}
+            >
+              {t('set2.home.clearRecentChanges')}
+            </button>
+          </div>
+          <ul className="os-set-recent-list" aria-labelledby="os-set-home-changed-title">
+            {changed.map(({ entry, at }) => {
+              const meta = pageMeta(entry.pageId);
+              return (
+                <li key={entry.id}>
+                  {/* Lands on the card itself, highlighted, the way a search hit does. */}
+                  <button
+                    type="button"
+                    className="os-set-recent-item"
+                    onClick={() => s.navigate(entry.pageId, entry.id, { guided: true })}
+                  >
+                    <Icon name={meta?.icon ?? 'settings'} size={15} />
+                    <span>
+                      {meta ? `${t(meta.labelKey)} · ` : ''}
+                      {t(entry.titleKey)}
+                    </span>
+                    <small className="muted">{relativeTime(at, Date.now(), LANG_TAGS[lang])}</small>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </div>
   );
+}
+
+/** "3 min ago" in the UI language — Intl owns the wording, so no catalog keys. */
+function relativeTime(at: number, now: number, locale: string): string {
+  const seconds = Math.round((at - now) / 1000);
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  const abs = Math.abs(seconds);
+  if (abs < 60) return rtf.format(seconds, 'second');
+  if (abs < 3600) return rtf.format(Math.round(seconds / 60), 'minute');
+  if (abs < 86_400) return rtf.format(Math.round(seconds / 3600), 'hour');
+  return rtf.format(Math.round(seconds / 86_400), 'day');
 }

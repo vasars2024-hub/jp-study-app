@@ -10,9 +10,9 @@
  *   - every answer → the review log (`game` rows), which also counts it into
  *     the day's practice totals;
  *   - session time → the day's study seconds in Statistics;
- *   - a word the round tested → its deck card when there is one (a miss sends
- *     the card back to relearning; a right answer on a due card counts as a
- *     Good review), otherwise its known-word level, inferred from how long the
+ *   - a word the round tested → practice credit on its deck card when there is
+ *     one (the schedule is untouched; grading a DUE card is an opt-in setting,
+ *     off by default), otherwise its known-word level, inferred from how long the
  *     word has been answered right without a miss, through the same interval
  *     thresholds the deck and Anki sync use. A level set by hand is never
  *     touched (`setInferredLevel` skips it).
@@ -21,12 +21,14 @@ import { levelForIntervalDays } from '../../shared/anki';
 import { isLocalReviewDue } from '../../shared/localSrs';
 import { normalizeStudyLang } from '../../shared/studyLang';
 import type { ReviewLogEntry } from '../../shared/reviewLog';
-import { loadDeck, reviewDeckCard } from '../flashcardDeck';
+import { ankiOwnsScheduling, hasAnkiTwin } from '../ankiSchedulingOwner';
+import { loadDeck, reviewDeckCard, type DeckFlashcard } from '../flashcardDeck';
 import { getLevel, setInferredLevel } from '../knownWords';
 import { getActiveProfile } from '../profileState';
 import { appendReviewLog, loadReviewLog } from '../reviewLog';
 import { recordStudyTime } from '../stats';
 import type { GameRound } from './engine';
+import { loadGameArenaSettings } from './settings';
 
 const DAY_MS = 86_400_000;
 /** A session longer than this was left open, not played; count at most this much. */
@@ -59,27 +61,111 @@ async function inferWordLevel(word: string, correct: boolean): Promise<void> {
 }
 
 /**
- * Bank one answered round.
- *
- * - A word whose deck card is DUE: the answer is that card's review (Good /
- *   Again) through the deck's own path, which writes the one review row — no
- *   extra `game` row, so the answer is not counted twice in the day's totals.
- * - A word with a deck card that is not due (or never studied): practice only.
- *   A game miss used to send a card scheduled weeks out straight back to
- *   relearning; the schedule now belongs to real reviews.
- * - A word with no card: practice row plus known-word inference from its streak.
+ * One session's banking memory. A word answered twice in a session (Word Match deals a
+ * word again, a weak word comes back) is evidence once: the first answer is banked, the
+ * repeats are not, so the day's totals and the card's history never count it twice.
  */
-export function bankArenaAnswer(round: GameRound, correct: boolean, at = Date.now()): void {
-  const word = round.word;
-  const card = word
-    ? loadDeck().find((c) => c.word === word && normalizeStudyLang(c.studyLang) === round.studyLang)
-    : undefined;
-  if (card?.srs && isLocalReviewDue(card.srs, at)) {
-    reviewDeckCard(card.id, correct ? 'good' : 'again', at);
-    return;
+export interface ArenaBankSession {
+  banked: Set<string>;
+  /**
+   * The deck indexed by study language and word, read once per session on the
+   * first answer — not a full deck read and scan per answer.
+   */
+  cards?: Map<string, DeckFlashcard>;
+}
+
+export function newArenaBankSession(): ArenaBankSession {
+  return { banked: new Set() };
+}
+
+const cardKey = (studyLang: string, word: string): string => `${studyLang}\u0000${word}`;
+
+function indexDeck(): Map<string, DeckFlashcard> {
+  const index = new Map<string, DeckFlashcard>();
+  for (const card of loadDeck()) {
+    const key = cardKey(normalizeStudyLang(card.studyLang), card.word);
+    // The first card for a word wins, as `Array.find` did.
+    if (!index.has(key)) index.set(key, card);
   }
-  appendReviewLog({ mode: 'game', word: (word ?? round.jp).slice(0, 120), correct, at });
+  return index;
+}
+
+function findCard(word: string, studyLang: string, session?: ArenaBankSession): DeckFlashcard | undefined {
+  if (!session) return loadDeck().find((c) => c.word === word && normalizeStudyLang(c.studyLang) === studyLang);
+  session.cards ??= indexDeck();
+  return session.cards.get(cardKey(studyLang, word));
+}
+
+/**
+ * Whether a game answer may grade this card: only with the opt-in setting, only
+ * when it is due, and never a suspended card or one whose schedule Anki owns.
+ */
+export function gameMayGradeCard(card: DeckFlashcard, at: number, gradeDueCards: boolean): boolean {
+  if (!gradeDueCards || !card.srs || card.suspended) return false;
+  if (ankiOwnsScheduling() && hasAnkiTwin(card)) return false;
+  return isLocalReviewDue(card.srs, at);
+}
+
+/**
+ * What banking an answer did, for the post-game review:
+ *   review    the card was due and the opt-in setting let the answer grade it (Good / Again);
+ *   practice  practice credit (a game row in the review log, tied to the card when there is one);
+ *   repeat    already banked this session, nothing written.
+ */
+export interface ArenaBankOutcome {
+  kind: 'review' | 'practice' | 'repeat';
+  word: string;
+  correct: boolean;
+  cardId?: string;
+}
+
+/**
+ * Bank one answered round. A game answer is PRACTICE: it never moves a card's
+ * schedule unless the user opted in.
+ *
+ * - A word with a deck card: practice credit — a `game` row that names the
+ *   card, counted in the day's practice, schedule untouched. The post-game
+ *   review offers "Review now" for a missed card instead.
+ * - Opt-in (`gradeDueCards`, off by default) and the card is DUE, not suspended
+ *   and not Anki-owned: the answer grades it (Good / Again) through the deck's
+ *   own path, which writes the one review row — tagged `source: 'game'` so FSRS
+ *   training and true retention leave it out — and no extra `game` row.
+ * - A word with no card: practice row plus known-word inference from its streak.
+ * - Any word already banked in this `session`: nothing (see `ArenaBankSession`).
+ */
+export function bankArenaAnswer(
+  round: Pick<GameRound, 'word' | 'jp' | 'studyLang'>,
+  correct: boolean,
+  at = Date.now(),
+  session?: ArenaBankSession,
+): ArenaBankOutcome {
+  const word = round.word;
+  const key = (word ?? round.jp).slice(0, 120);
+  const card = word ? findCard(word, round.studyLang, session) : undefined;
+  if (session?.banked.has(key)) {
+    return { kind: 'repeat', word: key, correct, ...(card ? { cardId: card.id } : {}) };
+  }
+  session?.banked.add(key);
+  if (card && gameMayGradeCard(card, at, loadGameArenaSettings().gradeDueCards)) {
+    reviewDeckCard(card.id, correct ? 'good' : 'again', at, { source: 'game' });
+    return { kind: 'review', word: key, correct, cardId: card.id };
+  }
+  appendReviewLog({ mode: 'game', word: key, correct, at, ...(card ? { cardId: card.id } : {}) });
   if (word && !card) void inferWordLevel(word, correct).catch(() => undefined);
+  return { kind: 'practice', word: key, correct, ...(card ? { cardId: card.id } : {}) };
+}
+
+/**
+ * Word Match: each pair is its own answer about its own word, so a board with one wrong
+ * pair is three right answers and one miss — not one miss for four words.
+ */
+export function bankArenaPairs(
+  studyLang: GameRound['studyLang'],
+  pairs: readonly { jp: string; correct: boolean }[],
+  at = Date.now(),
+  session?: ArenaBankSession,
+): ArenaBankOutcome[] {
+  return pairs.map((pair) => bankArenaAnswer({ word: pair.jp, jp: pair.jp, studyLang }, pair.correct, at, session));
 }
 
 /** Bank a finished session's time as study time. */

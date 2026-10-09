@@ -174,7 +174,14 @@ describe('scheduleReview under SM-2', () => {
     for (const rating of ['again', 'hard', 'good', 'easy'] as const) {
       const seam = scheduleReview(undefined, rating, DEFAULT_SCHEDULING_CONFIG, NOW);
       const direct = scheduleLocalReview(undefined, rating, NOW);
-      expect(seam).toEqual(direct);
+      // One intended difference: a new card's Again is not a lapse (Anki's rule),
+      // where the old day scheduler counted one. Intervals and dates are identical.
+      if (rating === 'again') {
+        expect(seam.lapses).toBe(0);
+        expect({ ...seam, lapses: direct.lapses }).toEqual(direct);
+      } else {
+        expect(seam).toEqual(direct);
+      }
     }
     const learned = scheduleReview(legacy, 'good', DEFAULT_SCHEDULING_CONFIG, NOW);
     expect(learned).toEqual(scheduleLocalReview(migrateSrsState(legacy), 'good', NOW));
@@ -216,6 +223,27 @@ describe('scheduleReview under FSRS', () => {
     expect(lapsed.repetitions).toBe(0);
     expect(lapsed.lapses).toBe(1);
     expect(lapsed.dueAt - lapsed.lastReviewedAt).toBe(10 * 60 * 1000);
+  });
+
+  it('does not count a brand-new card\'s first Again as a lapse (no learning steps)', () => {
+    expect(fsrs.learningStepsMinutes).toEqual([]);
+    const first = scheduleReview(undefined, 'again', fsrs, NOW);
+    expect(first.lapses).toBe(0);
+    // Agains while relearning are not lapses either.
+    const again = scheduleReview(first, 'again', fsrs, first.dueAt);
+    expect(again.lapses).toBe(0);
+    // Once graduated to review state, the next Again is the first real lapse.
+    const graduated = scheduleReview(again, 'good', fsrs, again.dueAt);
+    expect(graduated.intervalDays).toBeGreaterThanOrEqual(1);
+    expect(scheduleReview(graduated, 'again', fsrs, graduated.dueAt).lapses).toBe(1);
+  });
+
+  it('does not count a brand-new card\'s Again as a lapse under SM-2 either', () => {
+    const first = scheduleReview(undefined, 'again', DEFAULT_SCHEDULING_CONFIG, NOW);
+    expect(first.lapses).toBe(0);
+    expect(scheduleReview(first, 'again', DEFAULT_SCHEDULING_CONFIG, first.dueAt).lapses).toBe(0);
+    const reviewed = scheduleReview(undefined, 'good', DEFAULT_SCHEDULING_CONFIG, NOW);
+    expect(scheduleReview(reviewed, 'again', DEFAULT_SCHEDULING_CONFIG, reviewed.dueAt).lapses).toBe(1);
   });
 
   it('makes the retention setting actually shorten intervals', () => {

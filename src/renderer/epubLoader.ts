@@ -4,6 +4,8 @@
 // app's own DOM — no iframes — so native CSS writing-mode gives us real
 // right-to-left (縦書き) scrolling, which epub.js's renderer can't do.
 
+import { PUBLISHER_CSS_MAX_INPUT, sanitizeInlineStyle, sanitizePublisherCss } from '../shared/epubPublisherCss';
+
 export interface EpubChapter {
   href: string; // spine href, relative to the OPF (used to match the TOC)
   absPath: string; // archive-absolute path, e.g. "/OEBPS/text/ch01.xhtml"
@@ -26,6 +28,12 @@ export interface LoadedEpub {
   totalChars: number;
   /** 'rtl' when the book declares right-to-left / vertical progression. */
   direction: 'ltr' | 'rtl';
+  /**
+   * The book's own CSS, sanitised and scoped to `PUBLISHER_CSS_SCOPE`
+   * (`epubPublisherCss.ts`): 縦中横, upright text, 傍点, ruby, alignment, image
+   * sizing. '' for a book without usable styles (and for PDFs).
+   */
+  publisherCss?: string;
   destroy: () => void; // revoke blob URLs + free the parser
 }
 
@@ -100,6 +108,40 @@ export async function loadEpub(buffer: ArrayBuffer): Promise<LoadedEpub> {
     return doc;
   }
 
+  // ---- publisher CSS (sanitised and scoped in `epubPublisherCss`) ----
+  const cssChunks: string[] = [];
+  const cssSeen = new Set<string>();
+  const rootClasses = new Set<string>();
+  let cssBytes = 0;
+  const pushCss = (key: string, text: string): void => {
+    if (!text || cssSeen.has(key) || cssBytes >= PUBLISHER_CSS_MAX_INPUT) return;
+    cssSeen.add(key);
+    cssBytes += text.length;
+    cssChunks.push(text);
+  };
+  async function collectStyles(doc: Document, chapterAbsPath: string): Promise<void> {
+    for (const el of [doc.documentElement, doc.body].filter(Boolean) as Element[]) {
+      for (const name of (el.getAttribute('class') ?? '').split(/\s+/)) if (name) rootClasses.add(name);
+    }
+    const nodes = Array.from(doc.querySelectorAll('link, style'));
+    for (const node of nodes) {
+      if (node.tagName.toLowerCase() === 'style') {
+        const text = node.textContent ?? '';
+        pushCss(`inline:${text.length}:${text.slice(0, 200)}`, text);
+        continue;
+      }
+      const rel = (node.getAttribute('rel') ?? '').toLowerCase().split(/\s+/);
+      // `alternate stylesheet` is a different presentation the book did not choose by default.
+      if (!rel.includes('stylesheet') || rel.includes('alternate')) continue;
+      const hrefAttr = node.getAttribute('href') ?? '';
+      // Only resources inside the archive: an absolute or protocol URL is never fetched.
+      if (!hrefAttr || /^[a-z][a-z0-9+.-]*:/i.test(hrefAttr) || hrefAttr.startsWith('//')) continue;
+      const cssPath = resolveRelative(chapterAbsPath, hrefAttr);
+      if (cssSeen.has(cssPath)) continue;
+      pushCss(cssPath, await readText(cssPath, cssPath));
+    }
+  }
+
   const spineItems: any[] = book.spine?.spineItems ?? [];
   const chapters: EpubChapter[] = [];
   // Map spine hrefs to chapter index under several keys (full path AND bare
@@ -129,6 +171,9 @@ export async function loadEpub(buffer: ArrayBuffer): Promise<LoadedEpub> {
     try {
       const raw = await readText(absPath, href);
       const doc = parseChapter(raw);
+      // The book's own styles, read BEFORE `sanitize` strips the elements that
+      // carry them. Kept raw here; `sanitizePublisherCss` decides what survives.
+      await collectStyles(doc, absPath);
       const body = doc.body ?? doc.querySelector('body');
       if (body) {
         sanitize(body);
@@ -149,6 +194,10 @@ export async function loadEpub(buffer: ArrayBuffer): Promise<LoadedEpub> {
           }
         }
         if (!label) label = (body.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 24);
+        // `splitBody` unwraps a chapter's sole wrapper (`<div class="main">`), so the
+        // page never contains it: its classes are the book's root as far as the
+        // publisher CSS is concerned, the same as `<body>`'s.
+        for (const name of unwrappedWrapperClasses(body)) rootClasses.add(name);
         parts = splitBody(body);
       }
     } catch {
@@ -233,7 +282,9 @@ export async function loadEpub(buffer: ArrayBuffer): Promise<LoadedEpub> {
     }
   };
 
-  return { title, chapters, toc, totalChars, direction, destroy };
+  const publisherCss = sanitizePublisherCss(cssChunks.join('\n'), { rootClasses });
+
+  return { title, chapters, toc, totalChars, direction, publisherCss, destroy };
 }
 
 function stripAnchor(href: string): string {
@@ -269,6 +320,22 @@ export function readableCharCount(el: Element): number {
 }
 
 const charCount = readableCharCount;
+
+/** Classes of the wrappers `splitBody` descends through (and so drops from the page). */
+function unwrappedWrapperClasses(body: Element): string[] {
+  const names: string[] = [];
+  let el: Element = body;
+  for (;;) {
+    const kids = Array.from(el.children);
+    if (kids.length !== 1) break;
+    const sole = kids[0];
+    // The exact test `splitBody` uses, so a class is only dropped when its element is.
+    if (!WRAPPER_TAGS.has(sole.tagName) || sole.children.length === 0) break;
+    for (const name of (sole.getAttribute('class') ?? '').split(/\s+/)) if (name) names.push(name);
+    el = sole;
+  }
+  return names;
+}
 
 function splitBody(body: Element): { html: string; chars: number }[] {
   const kids = Array.from(body.children);
@@ -325,6 +392,14 @@ function sanitize(root: Element): void {
       if (name.startsWith('on')) el.removeAttribute(attr.name);
       if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(attr.value)) {
         el.removeAttribute(attr.name);
+      }
+      // An inline style goes through the same allow-list as the book's
+      // stylesheets: it used to be kept verbatim, so `position: fixed` or a
+      // remote `url(...)` in a chapter reached the app's own DOM.
+      if (name === 'style') {
+        const clean = sanitizeInlineStyle(attr.value);
+        if (clean) el.setAttribute('style', clean);
+        else el.removeAttribute(attr.name);
       }
     }
   });

@@ -12,6 +12,7 @@ import Icon from '../components/Icons';
 import DeckActionMenu from '../components/DeckActionMenu';
 import DeckImportPanel from '../components/DeckImportPanel';
 import FlashcardFileMenu from '../components/flashcards/FlashcardFileMenu';
+import GrammarDueChip from '../components/grammar/GrammarDueChip';
 import {
   BookCoverThumb,
   FlashcardAiMode,
@@ -230,6 +231,8 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
               {t('flash.reviewDictionary')}
             </Button>
           </Toolbar>
+          {/* gram2: grammar points due beside the card queue; renders nothing until grammar review is in use. */}
+          <GrammarDueChip className="aero-flash-grammar-due" />
 
           <div className="aero-flash-layout">
             <aside className="aero-flash-nav">
@@ -481,6 +484,17 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                           onClick={() => void state.playCardInVideo(card.id)}
                                         >
                                           <Icon name="video" size={13} />
+                                        </Button>
+                                      )}
+                                      {state.cardBookPositionOf(card.id) && (
+                                        <Button
+                                          size="sm"
+                                          data-flash-action="row-open-in-book"
+                                          title={t('read2.flash.openInBook', { term: card.word })}
+                                          aria-label={t('read2.flash.openInBook', { term: card.word })}
+                                          onClick={() => state.openCardInBook(card.id)}
+                                        >
+                                          <Icon name="bookmark" size={13} />
                                         </Button>
                                       )}
                                       <FlashcardFileMenu

@@ -3,6 +3,7 @@ import { ToastViewport } from './ui/Toast';
 import ReadingReminderHost from './reading/ReadingReminderHost';
 import CalendarReminderHost from './calendar/CalendarReminderHost';
 import { useT } from '../i18n';
+import { shouldShowToast } from '../notificationStore';
 // Side effect: registers the UI-language byte-size format with `formatBytes`.
 // Here because every renderer shell mounts this host exactly once.
 import './shell/localeFormat';
@@ -80,6 +81,9 @@ export default function ToastHost() {
       const kind = d?.kind ?? 'ok';
       const action =
         d?.action && typeof d.action.run === 'function' && d.action.label ? d.action : undefined;
+      // shell2: Do not disturb holds back informational pop-ups. The notification
+      // capture records them separately, so nothing is lost — it waits in the center.
+      if (!shouldShowToast(kind, Boolean(action))) return;
       const remaining = action ? ACTION_TIMEOUT_MS : PLAIN_TIMEOUT_MS;
       setToasts((prev) => [
         ...prev.slice(-4),

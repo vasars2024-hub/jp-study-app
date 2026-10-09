@@ -84,7 +84,9 @@ describe('the tray overflow removes clutter without removing capability', () => 
   it('the chevron and the panel agree on one id, so aria-controls cannot point at nothing', () => {
     const source = read(SHELL);
     expect(source).toContain("const TRAY_OVERFLOW_ID = 'os-tray-overflow';");
-    expect(source).toContain('aria-controls={TRAY_OVERFLOW_ID}');
+    // …and only while the panel is mounted (a11y2): closed, the popover does not
+    // exist, so the idref is dropped rather than left dangling.
+    expect(source).toContain('aria-controls={trayOverflowOpen ? TRAY_OVERFLOW_ID : undefined}');
     expect(trayOverflowComponent(source)).toContain('id={TRAY_OVERFLOW_ID}');
   });
 

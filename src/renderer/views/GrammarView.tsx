@@ -23,6 +23,7 @@ import {
 } from '../data/grammar/practiceFilters';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { clearHandoff, takeHandoffJson } from '../pendingHandoff';
+import { consumeGrammarReviewEvent, GRAMMAR_REVIEW_EVENT } from '../grammarDue';
 
 /*
  * `review` is spaced review of due points. The corpus curation tool that used to
@@ -91,6 +92,18 @@ export default function GrammarView() {
     };
     window.addEventListener('grammar:open-practice', onPractice);
     return () => window.removeEventListener('grammar:open-practice', onPractice);
+  }, []);
+
+  // "Review grammar now" from Flashcards / Calendar / Statistics (`grammarDue.ts`):
+  // same drain-then-listen order as the practice link above, for the same race.
+  useEffect(() => {
+    if (takeHandoffJson<unknown>('grammarReview') !== null) setMode('review');
+    const onReview = () => {
+      consumeGrammarReviewEvent();
+      setMode('review');
+    };
+    window.addEventListener(GRAMMAR_REVIEW_EVENT, onReview);
+    return () => window.removeEventListener(GRAMMAR_REVIEW_EVENT, onReview);
   }, []);
 
   /*

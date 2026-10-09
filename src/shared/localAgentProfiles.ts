@@ -57,9 +57,10 @@ const ALL_OPERATIONS: AgentToolOperationId[] = [
   'study.filter-vocabulary', 'study.undo-filter', 'study.preview-cards',
   'study.create-cards', 'study.preview-anki', 'study.export-anki',
   'study.resume-session', 'study.open-context', 'study.stats-summary', 'study.known-words',
+  'study.recommend-next', 'study.cards-from-text', 'study.quiz-mined-today', 'study.plan-week',
   'dictionary.lookup', 'dictionary.explain-grammar', 'dictionary.analyze-sentence',
   'dictionary.search-knowledge', 'calendar.list', 'calendar.schedule-session',
-  'calendar.create-reminder', 'calendar.delete-event', 'settings.read',
+  'calendar.schedule-sessions', 'calendar.create-reminder', 'calendar.delete-event', 'settings.read',
   'settings.change-preference', 'settings.configure-module', 'settings.reset',
   'settings.preview-theme', 'settings.apply-theme', 'settings.reset-theme', 'settings.undo-theme',
   'settings.preview-css', 'settings.apply-css', 'settings.reset-css',
@@ -82,6 +83,9 @@ const TUTOR_OPERATIONS: AgentToolOperationId[] = [
   'study.undo-filter', 'study.preview-cards', 'study.create-cards',
   'study.preview-anki', 'study.export-anki', 'study.resume-session', 'study.open-context',
   'study.stats-summary', 'study.known-words',
+  // The study coach: the five everyday requests (`shared/agentStudyCoach.ts`).
+  'study.recommend-next', 'study.cards-from-text', 'study.quiz-mined-today', 'study.plan-week',
+  'calendar.schedule-sessions',
 ];
 const MEDIA_OPERATIONS: AgentToolOperationId[] = [
   'media.search', 'media.add-item', 'media.analyze-subtitles', 'media.generate-profile',
@@ -94,12 +98,12 @@ const MEDIA_OPERATIONS: AgentToolOperationId[] = [
 const RESEARCH_OPERATIONS: AgentToolOperationId[] = [
   'dictionary.search-knowledge', 'dictionary.lookup', 'media.search', 'anime.search',
   'visual-novel.search', 'calendar.list', 'settings.read',
-  'study.stats-summary', 'study.known-words',
+  'study.stats-summary', 'study.known-words', 'study.recommend-next', 'study.plan-week',
 ];
 const AUTOMATION_OPERATIONS: AgentToolOperationId[] = [
   'media.search', 'media.organize-files', 'anime.check-releases', 'flashcard.list-decks',
   'flashcard.create-deck', 'flashcard.add-cards', 'flashcard.delete-cards', 'flashcard.schedule-reviews',
-  'calendar.list', 'calendar.schedule-session', 'calendar.create-reminder',
+  'calendar.list', 'calendar.schedule-session', 'calendar.schedule-sessions', 'calendar.create-reminder',
   'study.get-context', 'study.list-opportunities', 'study.prepare-media',
   'study.filter-vocabulary', 'study.undo-filter', 'study.preview-cards',
   'study.create-cards', 'study.preview-anki', 'study.export-anki',

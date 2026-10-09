@@ -178,11 +178,15 @@ function replayWhere(): Where {
   return resumeWhere();
 }
 
-export default function TourOverlay() {
+export default function TourOverlay({ holdForSetup = false }: { holdForSetup?: boolean } = {}) {
   const { t } = useT();
   // On a first boot the consent card is also up; the tour opening over it hid the
   // card's text behind the bubble. Wait for the card's answer, then start.
-  const [active, setActive] = useState(() => shouldRunTour() && !telemetryConsentPending());
+  // onb2: first-run setup holds it the same way; its last step either leaves the
+  // tour armed ("Show me around") or completes it ("Start studying").
+  const holdRef = useRef(holdForSetup);
+  holdRef.current = holdForSetup;
+  const [active, setActive] = useState(() => shouldRunTour() && !telemetryConsentPending() && !holdForSetup);
   const [where, setWhere] = useState<Where>(() => (shouldRunTour() ? replayWhere() : resumeWhere()));
   const [rect, setRect] = useState<Rect | null>(null);
   const [bubbleSize, setBubbleSize] = useState<{ width: number; height: number } | null>(null);
@@ -287,13 +291,26 @@ export default function TourOverlay() {
 
   useEffect(() => {
     const onConsentDecided = (): void => {
-      if (!shouldRunTour()) return;
+      if (!shouldRunTour() || holdRef.current) return;
       setWhere(replayWhere());
       setActive(true);
     };
     window.addEventListener(TELEMETRY_CONSENT_DECIDED_EVENT, onConsentDecided);
     return () => window.removeEventListener(TELEMETRY_CONSENT_DECIDED_EVENT, onConsentDecided);
   }, []);
+
+  // Setup closed: start if it left the tour armed (and nothing else holds it).
+  // Only on the held → released edge: the mount already chose where to start,
+  // and `replayWhere` consumes the requested chapter, so a second call on mount
+  // would throw that request away.
+  const wasHeldRef = useRef(holdForSetup);
+  useEffect(() => {
+    const wasHeld = wasHeldRef.current;
+    wasHeldRef.current = holdForSetup;
+    if (!wasHeld || holdForSetup || !shouldRunTour() || telemetryConsentPending()) return;
+    setWhere(replayWhere());
+    setActive(true);
+  }, [holdForSetup]);
 
   // A hotkey the user rebinds while the bubble is up must not stay stale on it.
   useEffect(() => onShortcutsChanged(() => setShortcutsVersion((v) => v + 1)), []);

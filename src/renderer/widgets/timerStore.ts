@@ -195,6 +195,27 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+/** Any timer started, paused, reset or settled (snd2: the soundscape follows the Pomodoro). */
+export function onTimersChanged(listener: () => void): () => void {
+  return subscribe(listener);
+}
+
+/** True while some Pomodoro widget is counting down a WORK block. */
+export function isPomodoroWorkRunning(): boolean {
+  for (const { state } of entries.values()) {
+    if (state.kind === 'pomodoro' && state.running && state.phase === 'work') return true;
+  }
+  return false;
+}
+
+/** True when some Pomodoro sits on its break phase (running or waiting to start). */
+export function isPomodoroOnBreak(): boolean {
+  for (const { state } of entries.values()) {
+    if (state.kind === 'pomodoro' && state.phase === 'break') return true;
+  }
+  return false;
+}
+
 /**
  * Three rising tones through the app's sound engine, so the master mute, the
  * sound on/off switch, the volume sliders and reduced-sensory mode all apply.

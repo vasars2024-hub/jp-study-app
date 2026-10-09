@@ -75,6 +75,10 @@ export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): s
     memories: context.memories ?? [],
     applicationState: context.applicationState ?? {},
   }, MAX_PROMPT_CONTEXT_CHARACTERS);
+  // The everyday study requests, routed by name: a small model told which operation answers
+  // "what should I study?" picks it far more reliably than one left to infer it from labels.
+  const routes = STUDY_ROUTES.filter(([operation]) => approved.has(operation))
+    .map(([operation, request]) => `- ${request} -> ${operation}`);
   return [
     'You are the offline planning model for Gum, a language study app (Japanese, Chinese and Russian).',
     'Return a concise plan, not hidden chain-of-thought. Never claim an action already happened.',
@@ -90,9 +94,21 @@ export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): s
       `Communication: ${context.profile.responseLength} responses, ${context.profile.explanationDepth} explanations, ${context.profile.language} language, ${context.profile.teachingStyle} teaching style, ${context.profile.correctionStyle} corrections`,
     ] : []),
     `Approved operations:\n${boundedJson(available, MAX_PROMPT_CONTEXT_CHARACTERS)}`,
+    ...(routes.length ? [`Common study requests and the operation that answers each:\n${routes.join('\n')}`] : []),
     `Local context:\n${promptContext}`,
   ].join('\n\n');
 }
+
+/** Everyday study requests and the operation that answers each (see `shared/agentStudyCoach.ts`). */
+const STUDY_ROUTES: ReadonlyArray<readonly [AgentToolOperationId, string]> = [
+  ['study.recommend-next', 'What should I study now / what is next'],
+  ['study.cards-from-text', 'Make flashcards from this text (pass the text as "text")'],
+  ['dictionary.analyze-sentence', 'Explain the grammar of this sentence (pass the sentence as "term")'],
+  ['dictionary.explain-grammar', 'Explain a grammar pattern such as 〜ている (pass it as "term")'],
+  ['study.quiz-mined-today', 'Quiz me on the words I mined today'],
+  ['study.plan-week', 'Plan my study week (then calendar.schedule-sessions with its sessions)'],
+  ['study.stats-summary', 'How am I doing / my statistics'],
+];
 
 interface RawModelStep {
   label?: unknown;

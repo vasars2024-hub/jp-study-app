@@ -25,6 +25,7 @@ import { normalizeAudioIdentity } from '../../shared/lexiconAudio';
 import { BUNDLED_GLOSS_LANGS, detectLangFromTitle } from './glossLang';
 import { parseTagBankRows, splitSenseTags, splitTagField, type DictTagBank } from '../../shared/dictTagBank';
 import { decodeBasicEntities, escapeHtmlText, sanitizeDictHtml } from '../../shared/dictHtmlSanitize';
+import { withoutFormsSenses } from '../../shared/dictFormsSense';
 
 interface StoredGlossaryEntry {
   word: string;
@@ -1014,8 +1015,14 @@ function lookupOffline(query: string, exactOnly = false): DictEntry[] {
   const q = normalizeQuery(query);
   if (!q) return [];
 
+  // JMdict's flattened "forms" table is a row of its own here; it is not a meaning
+  // (see shared/dictFormsSense.ts), so it never reaches a popup.
   const direct = glossaryByTerm.get(q);
-  if (direct?.length) return direct.map((e) => enrichEntry(e, 'exact'));
+  if (direct?.length) {
+    return direct
+      .map((e) => withoutFormsSenses(enrichEntry(e, 'exact')))
+      .filter((e): e is DictEntry => e !== null);
+  }
   if (exactOnly) return [];
 
   // Prefix scan for partial selections (cap at 8). Tagged `prefix` so a caller
@@ -1024,7 +1031,8 @@ function lookupOffline(query: string, exactOnly = false): DictEntry[] {
   for (const [term, entries] of glossaryByTerm) {
     if (!term.startsWith(q)) continue;
     for (const e of entries) {
-      out.push(enrichEntry(e, 'prefix'));
+      const shown = withoutFormsSenses(enrichEntry(e, 'prefix'));
+      if (shown) out.push(shown);
       if (out.length >= 8) return out;
     }
   }

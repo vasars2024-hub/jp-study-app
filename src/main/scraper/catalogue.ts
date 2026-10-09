@@ -549,6 +549,90 @@ export async function catalogueWorkById(
   return work.id > 0 ? work : null;
 }
 
+/** One entry's numbering facts and the entries it is a sequel of (for season mapping). */
+export interface CataloguePrequelHop {
+  id: number;
+  format: string;
+  episodes: number;
+  titles: string[];
+  /** Direct prequels, TV entries first. */
+  prequelIds: number[];
+}
+
+const ANILIST_RELATIONS_QUERY = `
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    id format episodes
+    title { romaji english native }
+    relations { edges { relationType node { id type format } } }
+  }
+}`;
+
+interface JikanRelation {
+  relation?: string;
+  entry?: { mal_id?: number; type?: string; name?: string }[];
+}
+
+/**
+ * One step along an entry's prequel chain: its format, episode count, titles
+ * and direct prequels. `null` when the catalogue did not answer — the caller
+ * then treats the chain as incomplete and invents no offset.
+ */
+export async function cataloguePrequelHop(
+  provider: 'mal' | 'jikan' | 'anilist',
+  id: number,
+  correlationId: string,
+): Promise<CataloguePrequelHop | null> {
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+  if (provider === 'anilist') {
+    const response = await scraperRequest(ANILIST, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ query: ANILIST_RELATIONS_QUERY, variables: { id } }),
+      correlationId,
+    });
+    if (response.status !== 200) return null;
+    try {
+      const media = (JSON.parse(response.body) as {
+        data?: { Media?: AnilistMedia & { relations?: { edges?: { relationType?: string; node?: { id?: number; type?: string; format?: string } }[] } } };
+      }).data?.Media;
+      if (!media?.id) return null;
+      const prequels = (media.relations?.edges ?? [])
+        .filter((edge) => edge.relationType === 'PREQUEL' && edge.node?.type === 'ANIME' && typeof edge.node.id === 'number')
+        .sort((a, b) => Number(/^TV/.test(b.node?.format ?? '')) - Number(/^TV/.test(a.node?.format ?? '')))
+        .map((edge) => Number(edge.node?.id));
+      return {
+        id: media.id,
+        format: media.format ?? '',
+        episodes: media.episodes ?? 0,
+        titles: [media.title?.english, media.title?.romaji, media.title?.native].filter((t): t is string => Boolean(t)),
+        prequelIds: prequels,
+      };
+    } catch {
+      return null;
+    }
+  }
+  const json = await getJson<{ data?: JikanAnime & { relations?: JikanRelation[] } }>(`${JIKAN}/anime/${id}/full`, correlationId);
+  const anime = json?.data;
+  if (!anime?.mal_id) return null;
+  const prequels = (anime.relations ?? [])
+    .filter((r) => (r.relation ?? '').toLowerCase() === 'prequel')
+    .flatMap((r) => r.entry ?? [])
+    .filter((e) => e.type === 'anime' && typeof e.mal_id === 'number')
+    .map((e) => e.mal_id as number);
+  return {
+    id: anime.mal_id,
+    format: anime.type ?? '',
+    episodes: anime.episodes ?? 0,
+    titles: [anime.title_english, anime.title, anime.title_japanese, ...(anime.titles ?? []).map((t) => t.title)]
+      .filter((t): t is string => Boolean(t)),
+    prequelIds: prequels,
+  };
+}
+
+/** Jikan's rate limit between the hops of a chain walk. */
+export const CATALOGUE_HOP_DELAY_MS = PAGE_DELAY_MS;
+
 /**
  * Full detail for one title — what the Metadata tab renders.
  *

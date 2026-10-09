@@ -67,6 +67,28 @@ function outOfView(el: HTMLElement, scroller: HTMLElement | null): boolean {
 export const SCROLL_SETTLE_MS = 300;
 
 /**
+ * a11y2: smooth scrolling is motion. Under the OS "reduce motion" setting, the
+ * app's own Reduced/Disabled motion, or animation level None, a jump is what
+ * the user asked for — and it also skips the settle wait above.
+ */
+export function prefersReducedScroll(): boolean {
+  if (typeof document === 'undefined') return false;
+  const root = document.documentElement;
+  if (root.classList.contains('reduce-motion')) return true;
+  if (root.dataset.motionMode === 'disabled' || root.dataset.displayAnim === 'none') return true;
+  try {
+    return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
+/** The `behavior` every programmatic scroll in the app should ask for. */
+export function preferredScrollBehavior(): ScrollBehavior {
+  return prefersReducedScroll() ? 'auto' : 'smooth';
+}
+
+/**
  * `el.scrollIntoView({behavior:'smooth', ...options})`, but it actually arrives.
  *
  * Returns a cancel function; call it from an effect cleanup so an unmounted component cannot
@@ -78,6 +100,12 @@ export function scrollIntoViewReliably(
   settleMs: number = SCROLL_SETTLE_MS,
 ): () => void {
   if (!el) return () => undefined;
+  if (prefersReducedScroll()) {
+    const instant = { ...options };
+    delete instant.behavior;
+    el.scrollIntoView(instant);
+    return () => undefined;
+  }
   const scroller = nearestScroller(el);
   const before = positionOf(scroller);
   el.scrollIntoView({ behavior: 'smooth', ...options });
@@ -102,6 +130,12 @@ export function scrollToReliably(
   settleMs: number = SCROLL_SETTLE_MS,
 ): () => void {
   if (!scroller) return () => undefined;
+  if (prefersReducedScroll()) {
+    const instant = { ...options };
+    delete instant.behavior;
+    scroller.scrollTo(instant);
+    return () => undefined;
+  }
   const before = positionOf(scroller);
   scroller.scrollTo({ behavior: 'smooth', ...options });
   const settle = window.setTimeout(() => {

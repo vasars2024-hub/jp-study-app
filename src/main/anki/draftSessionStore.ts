@@ -20,6 +20,7 @@ import {
   ANKI_DRAFT_SESSION_STORE_FILE,
   ANKI_DRAFT_SESSION_VERSION,
   cancelSession,
+  dedupeRecentReads,
   describeSessionProgress,
   failSession,
   planResume,
@@ -102,8 +103,19 @@ function persist(sessions: AnkiDraftSession[]): void {
   }
 }
 
+/**
+ * Older reads kept behind each listed source. Beyond this they are dropped, so
+ * re-reading one file forty times cannot push every other file out of the
+ * retained set (D26).
+ */
+export const MAX_EARLIER_READS_PER_SOURCE = 3;
+
 function commit(sessions: AnkiDraftSession[]): AnkiDraftSession[] {
-  const trimmed = [...sessions]
+  const surplus = new Set(
+    dedupeRecentReads(sessions).flatMap((read) => read.earlier.slice(MAX_EARLIER_READS_PER_SOURCE)),
+  );
+  const trimmed = sessions
+    .filter((s) => !surplus.has(s.id))
     .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
     .slice(0, MAX_RETAINED_SESSIONS);
   cache = trimmed;
@@ -195,10 +207,18 @@ export function failDraftSession(id: string, error: string): AnkiDraftSession | 
   return replace(failSession(session, error, Date.now()));
 }
 
-/** Forget a session outright. The pages were never data; only bookkeeping is lost. */
+/**
+ * Forget a session outright. The pages were never data; only bookkeeping is lost.
+ *
+ * The older reads the list folds under it go too: discarding the one visible
+ * row of a file used to let the next-older read of the same file surface in its
+ * place, so "Discard" looked like it had not worked (D26).
+ */
 export function deleteDraftSession(id: string): boolean {
   const before = load();
-  const after = before.filter((s) => s.id !== id);
+  const group = dedupeRecentReads(before).find((read) => read.session.id === id);
+  const drop = new Set([id, ...(group?.earlier ?? [])]);
+  const after = before.filter((s) => !drop.has(s.id));
   if (after.length === before.length) return false;
   commit(after);
   return true;
@@ -247,20 +267,19 @@ export function resumeDraftSession(id: string, currentFingerprint?: string): Dra
 export interface DraftSessionSummary {
   session: AnkiDraftSession;
   progress: AnkiDraftSessionProgress;
+  /** Older reads of the same source folded under this one (D26). Absent from older hosts. */
+  earlierReads?: number;
 }
 
-/** What a surface lists: every session with its derived progress alongside. */
+/**
+ * What a surface lists: the newest read of each source, newest first, with its
+ * derived progress — one row per file however often it was read (D26). Two
+ * reads are one row when they share the normalized path AND the fingerprint.
+ */
 export function summarizeDraftSessions(): DraftSessionSummary[] {
-  const seen = new Set<string>();
-  return listDraftSessions().filter((session) => {
-    const source = session.request.filePath;
-    if (!source) return true;
-    const key = `${session.sourceKind}:${path.normalize(source).toLocaleLowerCase('en-US')}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }).map((session) => ({
-    session,
+  return dedupeRecentReads(load()).map(({ session, earlier }) => ({
+    session: { ...session, request: { ...session.request } },
     progress: describeSessionProgress(session),
+    earlierReads: earlier.length,
   }));
 }

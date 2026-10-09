@@ -17,8 +17,10 @@ import {
   LANG_ORDER,
   PLACEHOLDERS,
   TranslateHistoryList,
+  handleTranslateHotkey,
   useTranslate,
 } from '../components/translate/TranslateContent';
+import TranslateStudyPanel, { TranslateOptionsBar } from '../components/translate/TranslateStudyPanel';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
@@ -167,6 +169,18 @@ export default function TranslateView() {
           disabled: busy || !input.trim(),
           onSelect: () => void run(),
         },
+        {
+          id: 'copy-result',
+          label: t('xlate.copyResult'),
+          disabled: state.state !== 'done' || !output,
+          onSelect: state.copyResult,
+        },
+        {
+          id: 'mine-result',
+          label: t('xlate.mineSentence'),
+          disabled: state.state !== 'done' || !output,
+          onSelect: state.mineResult,
+        },
       ],
     },
   ];
@@ -241,7 +255,7 @@ export default function TranslateView() {
         }
         className="aero-translate-chrome"
       >
-        <div className="aero-translate">
+        <div className="aero-translate" onKeyDown={(e) => handleTranslateHotkey(e, state)}>
           {tabBar}
           {tab === 'history' ? (
             historyPanel
@@ -329,6 +343,9 @@ export default function TranslateView() {
                 </section>
               </div>
 
+              <TranslateOptionsBar state={state} />
+              <TranslateStudyPanel state={state} />
+
               {input.trim() && (
                 <LexiconWorkbenchResults
                   query={input}
@@ -356,7 +373,12 @@ export default function TranslateView() {
                       <span>{msg}</span>
                     </>
                   )}
-                  {error && <span className="aero-translate-error">{error}</span>}
+                  {error && <span className="aero-translate-error" role="alert">{error}</span>}
+                  {error && (
+                    <button type="button" className="aero-translate-run" onClick={() => void run()} disabled={!input.trim()}>
+                      {t('xlate.retry')}
+                    </button>
+                  )}
                   {error && <TranslateModelInstall />}
                 </div>
               )}
@@ -388,7 +410,7 @@ export default function TranslateView() {
 
   return (
     <AppChrome menus={menus} status={classicStatus} className="tr-chrome">
-      <div className="tr-view">
+      <div className="tr-view" onKeyDown={(e) => handleTranslateHotkey(e, state)}>
         {/* L5 — contextual, not dense work: the intro line, the tab bar and the
             direction toggle. The panes below stay conventional Work; a textarea
             someone is composing in, its output, and the analysis and workbench
@@ -551,9 +573,17 @@ export default function TranslateView() {
                   <span className="muted">{msg}</span>
                 </div>
               )}
-              {error && <div className="media-error tr-error">{error}</div>}
+              {error && <div className="media-error tr-error" role="alert">{error}</div>}
+              {error && (
+                <button type="button" className="btn" onClick={() => void run()} disabled={!input.trim()}>
+                  {t('xlate.retry')}
+                </button>
+              )}
               {error && <TranslateModelInstall />}
             </div>
+
+            <TranslateOptionsBar state={state} />
+            <TranslateStudyPanel state={state} />
 
             {input.trim() && (
               <LexiconWorkbenchResults

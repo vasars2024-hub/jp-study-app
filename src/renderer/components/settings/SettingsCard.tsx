@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { useSettings } from './SettingsContext';
+import { pushRecentChange } from './settingsRecent';
 import { useT } from '../../i18n';
 import { scrollIntoViewReliably } from '../../utils/reliableScroll';
 
@@ -56,12 +57,29 @@ export default function SettingsCard({
 
   if (advancedOnly && !advancedMode) return null;
 
+  // "Recently changed" on Settings Home (set2): any form change inside an id'd
+  // card, or a press of one of its state buttons (segmented rows, switches,
+  // radios), records the card. One delegated pair here instead of one call per
+  // control on ~145 cards.
+  const record = id
+    ? {
+        onChange: (): void => pushRecentChange(id),
+        onClick: (event: MouseEvent<HTMLElement>): void => {
+          const target = event.target as Element | null;
+          if (target?.closest('[aria-pressed], [role="radio"], [role="switch"], [role="menuitemradio"], [role="option"]')) {
+            pushRecentChange(id);
+          }
+        },
+      }
+    : {};
+
   return (
     <section
       ref={ref}
       className={`os-set-card${focused ? ' is-highlight' : ''}${advancedOnly ? ' os-set-card-adv' : ''}`}
       data-setting-id={id}
       aria-labelledby={titleId}
+      {...record}
     >
       <header className="os-set-card-head">
         <div className="os-set-card-text">

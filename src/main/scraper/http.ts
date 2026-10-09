@@ -176,7 +176,8 @@ export function decodeBody(buffer: Buffer, contentType: string | undefined): str
 export interface ScraperRequestOptions {
   method?: string;
   headers?: Record<string, string>;
-  body?: string;
+  /** A Uint8Array is sent as raw bytes (a multipart upload); a string as UTF-8. */
+  body?: string | Uint8Array;
   timeoutMs?: number;
   followRedirects?: boolean;
   maxBytes?: number;
@@ -396,7 +397,8 @@ function openProxyTunnel(
 export interface ResolvedRequestOptions {
   method: string;
   headers: Record<string, string>;
-  body?: string;
+  /** A Uint8Array is sent as raw bytes (a multipart upload); a string as UTF-8. */
+  body?: string | Uint8Array;
   timeoutMs: number;
   maxBytes: number;
   followRedirects: boolean;
@@ -575,7 +577,48 @@ async function performRequest(
     }, Math.max(0, deadlineAt - Date.now()));
     signal?.addEventListener('abort', onAbort, { once: true });
 
+    /**
+     * A guarded request through a PROXY: the proxy resolved the host name, so
+     * `publicOnlyLookup` never saw the address it connected to. The best this
+     * side can do is check again once the proxied connection has answered and
+     * before a byte of the response is used: the name is re-resolved here, and a
+     * private answer now (a DNS rebind between the pre-flight check and the
+     * proxy's own lookup) discards the response. It narrows the window to the
+     * proxy's lookup itself; a proxy with its own split-horizon DNS stays out of
+     * reach, which is the documented limit.
+     */
     const onResponse = (response: http.IncomingMessage) => {
+      if (!(resolved.publicOnlySockets && proxy)) {
+        handleResponse(response);
+        return;
+      }
+      activeResponse = response;
+      response.pause();
+      void resolvesToPrivateAddress(parsed.hostname).then(
+        (isPrivate) => {
+          if (settled) {
+            response.destroy();
+            return;
+          }
+          if (isPrivate) {
+            kill(new HttpError(
+              `Refusing ${parsed.hostname}: through the proxy it reached a private or local network address. `
+                + 'Turn on "Allow private network" in the profile\'s Safety settings to reach it.',
+              'ERR_PRIVATE_ADDRESS',
+            ));
+            return;
+          }
+          handleResponse(response);
+          response.resume();
+        },
+        () => {
+          handleResponse(response);
+          response.resume();
+        },
+      );
+    };
+
+    const handleResponse = (response: http.IncomingMessage) => {
       activeResponse = response;
       mark.ttfb = Date.now() - started;
 
@@ -840,11 +883,28 @@ async function assertPublicHop(hop: URL): Promise<void> {
  * Anything but a 200 reads as "no rules", which is the fail-open the module
  * documents.
  */
-async function fetchRobotsText(robotsUrl: string, policy: ScraperNetworkPolicy): Promise<string | null> {
+async function fetchRobotsText(
+  robotsUrl: string,
+  policy: ScraperNetworkPolicy,
+  guardPrivate = false,
+): Promise<string | null> {
   const resolved = resolveRequestOptions({ timeoutMs: 10_000, maxBytes: 512 * 1024 }, policy);
+  // The robots.txt fetch is a request to a host a PAGE named, so it is under the
+  // same private-address guard as the crawl itself: every hop, the first one
+  // included (a host that rebinds between the crawl's check and this fetch), and
+  // the addresses the socket really connects to. A refusal reads as "no
+  // robots.txt" (fail open, robots.ts), and the crawl's own request is then
+  // refused by the guard on its own.
+  if (guardPrivate) {
+    resolved.beforeHop = (hop) => assertPublicHop(hop);
+    resolved.publicOnlySockets = true;
+  }
   const response = await performRequest(robotsUrl, resolved);
   return response.status === 200 ? response.body : null;
 }
+
+/** Test seam: the robots.txt fetch on its own (it is otherwise only reached through a crawl). */
+export const __httpTestables = { fetchRobotsText };
 
 /**
  * One request, under whatever profile the surrounding job is running.
@@ -899,7 +959,7 @@ export async function scraperRequest(
       const allowed = await isCrawlAllowed(
         hop.toString(),
         userAgent,
-        (robotsUrl) => fetchRobotsText(robotsUrl, policy),
+        (robotsUrl) => fetchRobotsText(robotsUrl, policy, guardPrivate),
         correlationId,
       );
       if (!allowed) throw new HttpError(`robots.txt disallows ${hop.toString()}.`, 'ERR_ROBOTS');
@@ -942,7 +1002,7 @@ export async function scraperRequest(
     const allowed = await isCrawlAllowed(
       url,
       userAgent,
-      (robotsUrl) => fetchRobotsText(robotsUrl, policy),
+      (robotsUrl) => fetchRobotsText(robotsUrl, policy, guardPrivate),
       correlationId,
     );
     if (!allowed) {

@@ -106,6 +106,9 @@ import {
   type AgentConversationPlanFailureCode,
 } from '../../agentConversationPlanner';
 import { AgentConversationPlanQueue } from './AgentConversationPlanQueue';
+import { AgentStudyQuickActions, type QuickStudyRequest } from './AgentStudyQuickActions';
+import { AgentPlanningClock } from './AgentPlanningClock';
+import { detectAgentStudyIntent } from '../../../shared/agentStudyCoach';
 import { AgentCapabilityDirectory } from './AgentCapabilityDirectory';
 import { AgentGovernancePanel } from './AgentGovernancePanel';
 import { AiSetupPrompt } from '../ai/AiSetupPrompt';
@@ -1359,6 +1362,9 @@ export default function AgentWorkspaceShell() {
   }, [aiPreferredTarget]);
   const [allowLocalFallback, setAllowLocalFallback] = useState(false);
   const [planning, setPlanning] = useState(false);
+  // Latency feedback: when the plan was asked for, and whether the offline model has to load first.
+  const [planStartedAt, setPlanStartedAt] = useState<number | null>(null);
+  const [planModelLoading, setPlanModelLoading] = useState(false);
   const [planNotice, setPlanNotice] = useState<{
     kind: 'status' | 'error';
     text: string;
@@ -1656,6 +1662,8 @@ export default function AgentWorkspaceShell() {
     visionUnsupported,
     sensitiveConsentRequired,
     cloudSensitiveConsent,
+    // An everyday study request plans without a model (`shared/agentStudyCoach.ts`).
+    recipeReady: detectAgentStudyIntent(draft) !== null,
     ...(aiReadiness.loaded && aiSetupStatus ? {
       setup: {
         aiEnabled: aiReadiness.enabled,
@@ -1970,23 +1978,34 @@ export default function AgentWorkspaceShell() {
     if (runningRequestId) void cancelAgentPrompt(runningRequestId);
   }, [runningRequestId]);
 
-  const createPlan = useCallback(async (): Promise<void> => {
+  const createPlan = useCallback(async (quick?: QuickStudyRequest): Promise<void> => {
     if (!selected || planning || attachments.length > 0) return;
-    const objective = draft.trim();
+    const objective = (quick?.objective ?? draft).trim();
     if (!objective || objective.length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT) return;
+    const recipe = quick?.studyIntent ?? detectAgentStudyIntent(objective);
+    const startedAt = Date.now();
     setPlanning(true);
-    setPlanNotice({ kind: 'status', text: t('agent.plan.planning') });
+    setPlanStartedAt(startedAt);
+    setPlanNotice({ kind: 'status', text: recipe ? t('agent2.plan.recipePlanning') : t('agent.plan.planning') });
+    // A model plan on the offline model: say when it has to load first (the slow part).
+    if (!recipe && target === 'local') {
+      void window.api?.localAgentStatus?.()
+        .then((status) => setPlanModelLoading(!status.loaded))
+        .catch(() => undefined);
+    }
     const result = await createAgentConversationPlan(selected, objective, t, {
       target,
       ...(aiSetupStatus ? { cloudProviderId: aiSetupStatus.providerId } : {}),
+      ...(quick ? { studyIntent: quick.studyIntent } : {}),
     });
     if (result.ok) {
+      const seconds = Math.round(((result.elapsedMs ?? Date.now() - startedAt) / 1000) * 10) / 10;
       setPlanNotice({
         kind: 'status',
-        text: t('agent.plan.queued', {
+        text: `${t('agent.plan.queued', {
           summary: result.summary,
           count: result.queue.items.find((item) => item.id === result.taskId)?.task.steps.length ?? 0,
-        }),
+        })} ${t(`agent2.plan.took.${result.planner ?? 'local'}`, { seconds })}`,
       });
       setPlanQueueFailure(null);
     } else {
@@ -1997,6 +2016,8 @@ export default function AgentWorkspaceShell() {
       });
     }
     setPlanning(false);
+    setPlanStartedAt(null);
+    setPlanModelLoading(false);
   }, [aiSetupStatus, attachments.length, draft, planning, selected, t, target]);
 
   const createConversation = useCallback(() => {
@@ -2492,6 +2513,26 @@ export default function AgentWorkspaceShell() {
 
               <form className="agent-composer" onSubmit={submitPrompt}>
                 {/*
+                  The study coach's everyday requests: planned without a model, so they
+                  work before the offline model is installed — and the row says so.
+                */}
+                <AgentStudyQuickActions
+                  draft={draft}
+                  disabled={
+                    blocked
+                    || !selected
+                    || attachments.length > 0
+                    || (composerState.setup !== undefined
+                      && (!composerState.setup.aiEnabled || !composerState.setup.agentEnabled))
+                  }
+                  noModel={composerState.setup !== undefined && !composerState.setup.plannerReady}
+                  onRequest={(request) => void createPlan(request)}
+                  onNeedsText={() => {
+                    setPlanNotice({ kind: 'status', text: t('agent2.quick.needsText') });
+                    composerRef.current?.focus();
+                  }}
+                />
+                {/*
                   The provider picker used to sit loose above this disclosure, so
                   Full mode asked the reader to scan a model select before it asked
                   for a prompt. It is the same class of tool as the budgets — how
@@ -2843,6 +2884,9 @@ export default function AgentWorkspaceShell() {
                   >
                     {planNotice.text}
                   </p>
+                ) : null}
+                {planning && planStartedAt !== null ? (
+                  <AgentPlanningClock startedAt={planStartedAt} modelLoading={planModelLoading} />
                 ) : null}
 
                 {!executing && (

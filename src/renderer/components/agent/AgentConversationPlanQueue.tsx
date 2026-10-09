@@ -9,6 +9,8 @@ import {
 } from '../../../shared/agentExecutionRecord';
 import { useT } from '../../i18n';
 import { confirmDialog } from '../ui';
+import { studyAnswerOf } from '../../../shared/agentStudyCoach';
+import { AgentStudyAnswerView } from './AgentStudyAnswer';
 import { recoverAgentExecutionClaim } from '../../agentExecutionLeaseClient';
 import {
   isAgentConversationPlanQuarantined,
@@ -190,12 +192,19 @@ export function AgentConversationPlanQueue({
                 <strong>{item.task.objective}</strong>
                 <span className="agent-chip">{t(`agent.plan.status.${item.status}`)}</span>
               </div>
-              <details className="agent-plan-details">
+              {/* Opens by itself once a step has answered, so the answer is not one click away. */}
+              <details
+                className="agent-plan-details"
+                open={item.task.steps.some((step) => studyAnswerOf(step.result) !== null) || undefined}
+              >
                 <summary>{t('agent.plan.steps', { count: item.task.steps.length })}</summary>
                 <ol className="agent-plan-steps">
                   {item.task.steps.map((step) => {
                     const argumentsPreview = valuePreview(step.request.arguments);
-                    const resultPreview = valuePreview(step.result);
+                    // A study-coach answer reads as an answer, with the data it is based on;
+                    // any other result keeps its raw preview.
+                    const answer = studyAnswerOf(step.result);
+                    const resultPreview = answer ? '' : valuePreview(step.result);
                     return (
                       <li key={step.id} className="agent-plan-step">
                         <span className="agent-plan-step-label">{step.label}</span>
@@ -205,6 +214,7 @@ export function AgentConversationPlanQueue({
                         {argumentsPreview ? (
                           <code>{t('agent.plan.arguments', { value: argumentsPreview })}</code>
                         ) : null}
+                        {answer ? <AgentStudyAnswerView answer={answer} /> : null}
                         {resultPreview ? (
                           <code>{t('agent.plan.result', { value: resultPreview })}</code>
                         ) : null}

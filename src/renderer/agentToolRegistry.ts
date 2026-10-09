@@ -43,6 +43,7 @@ import { createVisualNovelAgentHandlers } from './visualNovelAgentHandlers';
 import { createMediaAgentHandlers } from './mediaAgentHandlers';
 import { createAnimeAgentHandlers } from './animeAgentHandlers';
 import { createCardStudioAgentHandlers } from './cardStudioAgentHandlers';
+import { createStudyCoachAgentHandlers } from './studyCoachAgentHandlers';
 
 export type AgentToolRegistryTranslate = (key: string, vars?: TVars) => string;
 
@@ -61,8 +62,6 @@ export type AgentToolCapability =
 
 const UNAVAILABLE: Readonly<Partial<Record<AgentToolOperationId, AgentToolUnavailableReason>>> = {
   'flashcard.schedule-reviews': 'false-success-stub-removed',
-  'dictionary.explain-grammar': 'dedicated-analysis-required',
-  'dictionary.analyze-sentence': 'dedicated-analysis-required',
 };
 
 function textArgument(
@@ -191,6 +190,9 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
     ...createMediaAgentHandlers(t),
     ...createAnimeAgentHandlers(t),
     ...createCardStudioAgentHandlers(t),
+    // The study coach: what to study now, cards from a text, grammar of a sentence, today's
+    // mined words in a game, a week of sessions — each answer citing the data it read.
+    ...createStudyCoachAgentHandlers(t),
     'dictionary.lookup': async (arguments_) => (
       window.api.lookupTerm(textArgument(t, arguments_, 'term'))
     ),

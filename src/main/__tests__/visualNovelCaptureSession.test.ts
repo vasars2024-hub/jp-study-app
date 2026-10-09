@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CLIPBOARD_POLL_MS,
+  CROSS_SOURCE_ECHO_MS,
+  SAME_SOURCE_BURST_MS,
   TEST_CAPTURE_MS,
   createCaptureSession,
   type CaptureSocket,
@@ -173,6 +175,47 @@ describe('texthooker websocket client', () => {
     h.setClipboard('同じ行です。');
     h.advance(CLIPBOARD_POLL_MS);
     expect(h.saved).toHaveLength(1);
+  });
+
+  it('keeps a line the game genuinely says twice in a row', () => {
+    const h = harness();
+    h.session.start('vn-5', { clipboard: false, websocket: true });
+    h.sockets[0].onmessage?.({ data: 'はい。' });
+    h.advance(SAME_SOURCE_BURST_MS + 100);
+    h.sockets[0].onmessage?.({ data: 'はい。' });
+    expect(h.saved).toHaveLength(2);
+    expect(h.session.state().lines).toBe(2);
+  });
+
+  it('drops the same text re-fired by the same hook inside a short burst', () => {
+    const h = harness();
+    h.session.start('vn-5', { clipboard: false, websocket: true });
+    h.sockets[0].onmessage?.({ data: 'はい。' });
+    h.sockets[0].onmessage?.({ data: 'はい。' });
+    expect(h.saved).toHaveLength(1);
+  });
+
+  it('drops only ONE echo from the other source, so a later repeat on either pipe is kept', () => {
+    const h = harness();
+    h.session.start('vn-6', { clipboard: true, websocket: true });
+    h.sockets[0].onmessage?.({ data: 'うん。' });
+    h.setClipboard('うん。');
+    h.advance(CLIPBOARD_POLL_MS);
+    expect(h.saved).toHaveLength(1);
+    // The game says it again a second later; the websocket delivers it.
+    h.advance(1_000);
+    h.sockets[0].onmessage?.({ data: 'うん。' });
+    expect(h.saved).toHaveLength(2);
+  });
+
+  it('keeps a repeat that arrives on the other source after the echo window', () => {
+    const h = harness();
+    h.session.start('vn-7', { clipboard: true, websocket: true });
+    h.sockets[0].onmessage?.({ data: 'そうか。' });
+    h.advance(CROSS_SOURCE_ECHO_MS + CLIPBOARD_POLL_MS);
+    h.setClipboard('そうか。');
+    h.advance(CLIPBOARD_POLL_MS);
+    expect(h.saved).toHaveLength(2);
   });
 });
 

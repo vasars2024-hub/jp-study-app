@@ -14,6 +14,7 @@ import { updateDeckCard, type DeckFlashcard } from './flashcardDeck';
 import { normalizeStudyLang, studyLangOfText, type StudyLang } from '../shared/studyLang';
 import { getStudyLang } from './studyEnvironment';
 import type { MineNoteRequest, MineNoteResult } from '../shared/anki';
+import { bookLocationRef } from '../shared/bookLocation';
 
 /** Front/back text a surface wrote itself: kept on the card `mineToStudy` made. */
 function keepFrontBack(result: MineToStudyResult, front?: string, back?: string): void {
@@ -143,6 +144,9 @@ export interface ReaderCollectionMine {
   sentence?: string;
   bookId?: string;
   bookTitle?: string;
+  /** The reader's locator where it was mined (`bookRoundTrip.ts`); kept on the card's `sourceRef`. */
+  position?: string;
+  percent?: number;
   studyLang: StudyLang;
   /** Set when "auto-send to Anki" is on: the note goes to this deck (or the profile default). */
   ankiDeck?: string;
@@ -151,6 +155,11 @@ export interface ReaderCollectionMine {
 
 export function readerCollectionStudyInput(input: ReaderCollectionMine): MineToStudyInput {
   const sentence = input.sentence?.trim() || undefined;
+  // `sourceRef`, never `sourceUrl`: the URL is part of the dedupe key, and a
+  // word mined on two pages of the same book is still one card.
+  const sourceRef = input.bookId && input.position
+    ? bookLocationRef(input.bookId, input.position, input.percent, sentence)
+    : undefined;
   return {
     word: input.front,
     reading: input.reading,
@@ -159,6 +168,7 @@ export function readerCollectionStudyInput(input: ReaderCollectionMine): MineToS
     source: 'epub',
     ...(input.bookId ? { sourceId: input.bookId } : {}),
     ...(input.bookTitle ? { sourceTitle: input.bookTitle } : {}),
+    ...(sourceRef ? { sourceRef } : {}),
     studyLang: input.studyLang,
     notify: false,
     ...(input.sendToAnki

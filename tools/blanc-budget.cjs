@@ -33,6 +33,19 @@ const { execFileSync } = require('node:child_process');
 const ROOT = path.join(__dirname, '..');
 const BUDGET_PATH = path.join(ROOT, 'blanc-budget.json');
 
+/**
+ * The gate when no blanc-budget.json exists (a fresh clone, CI). Recorded
+ * 2026-10-08 from a production renderer build:
+ *   Blanc     2,306,987 B boot (2.20 MiB) -> ceiling 2.3 MiB
+ *   Study OS  8,621,931 B boot before perf2 (7.35 MB JS + 1.27 MB CSS),
+ *             3,961,983 B after (3.27 MB JS + 0.69 MB CSS) -> ceiling 4.3 MB
+ * The local JSON, when present, wins — `--update` rewrites it.
+ */
+const DEFAULT_BUDGET = {
+  blanc: { maxBytes: 2_411_724 },
+  studyOs: { maxBytes: 4_300_000 },
+};
+
 /** Subsystems that must never be in Blanc's boot path. */
 const FORBIDDEN = {
   'city engine': /citySession|startCitySession|initCityState/,
@@ -87,9 +100,10 @@ function main() {
       }
     }
 
+    const ofType = (assets, ext) => totalBytes(outDir, assets.filter((a) => a.endsWith(ext)));
     report = {
-      blanc: { bytes: blancBytes, files: blancAssets.length },
-      studyOs: { bytes: mainBytes, files: mainAssets.length },
+      blanc: { bytes: blancBytes, files: blancAssets.length, js: ofType(blancAssets, '.js'), css: ofType(blancAssets, '.css') },
+      studyOs: { bytes: mainBytes, files: mainAssets.length, js: ofType(mainAssets, '.js'), css: ofType(mainAssets, '.css') },
       ratio: Number((blancBytes / mainBytes).toFixed(3)),
       violations,
     };
@@ -98,54 +112,52 @@ function main() {
   }
 
   if (update) {
+    // A ceiling, not a mirror: the recorded size plus 5% headroom, so the next
+    // unrelated commit does not fail on a few bytes of churn.
+    const ceil = (n) => Math.ceil((n * 1.05) / 1024) * 1024;
     const next = {
       $comment:
-        'Recorded by tools/blanc-budget.cjs --update. blanc.maxBytes is the gate: ' +
-        'Blanc\'s boot payload must not exceed it. Raise it only with a reason.',
-      blanc: { maxBytes: report.blanc.bytes, recordedBytes: report.blanc.bytes },
-      studyOs: { recordedBytes: report.studyOs.bytes },
+        'Recorded by tools/blanc-budget.cjs --update. blanc.maxBytes and studyOs.maxBytes are the ' +
+        'gates: each window\'s boot payload (entry script + everything its HTML preloads) must not ' +
+        'exceed them. Raise one only with a reason.',
+      blanc: { maxBytes: ceil(report.blanc.bytes), recordedBytes: report.blanc.bytes, js: report.blanc.js, css: report.blanc.css },
+      studyOs: { maxBytes: ceil(report.studyOs.bytes), recordedBytes: report.studyOs.bytes, js: report.studyOs.js, css: report.studyOs.css },
       recordedAt: new Date().toISOString().slice(0, 10),
     };
     fs.writeFileSync(BUDGET_PATH, `${JSON.stringify(next, null, 2)}\n`);
-    console.log(`Recorded budget: Blanc ${(report.blanc.bytes / 1024 / 1024).toFixed(2)} MB.`);
+    console.log(
+      `Recorded budget: Blanc ${(report.blanc.bytes / 1024 / 1024).toFixed(2)} MB, ` +
+        `Study OS ${(report.studyOs.bytes / 1024 / 1024).toFixed(2)} MB.`,
+    );
     return;
   }
 
   // blanc-budget.json is a machine-local report (.gitignore), so a fresh clone
-  // or CI never has one. Failing there made the whole gate unrunnable — including
-  // its structural half, which needs no recorded number at all. Without a budget
-  // the byte check is skipped (and says so); the forbidden-subsystem check still
-  // decides the exit code.
-  if (!fs.existsSync(BUDGET_PATH)) {
-    const mbNow = (report.blanc.bytes / 1024 / 1024).toFixed(2);
-    console.log(
-      `Blanc boot payload: ${mbNow} MB. No blanc-budget.json on this machine, so the byte budget ` +
-        'is not checked; record one with --update.',
-    );
-    if (report.violations.length) {
-      console.log(`PILLAR 1 VIOLATIONS — Study OS subsystems in Blanc's boot path (${report.violations.length}):`);
-      for (const v of report.violations) console.log(`    ${v}`);
-    } else {
-      console.log('Blanc boots none of the Study OS desktop subsystems.');
-    }
-    process.exitCode = report.violations.length ? 1 : 0;
-    return;
-  }
-  const budget = JSON.parse(fs.readFileSync(BUDGET_PATH, 'utf8'));
+  // or CI never has one. It used to skip the byte check there; DEFAULT_BUDGET
+  // now stands in, so the gate means the same thing on every machine.
+  const recorded = fs.existsSync(BUDGET_PATH) ? JSON.parse(fs.readFileSync(BUDGET_PATH, 'utf8')) : null;
+  const budget = {
+    blanc: { maxBytes: recorded?.blanc?.maxBytes ?? DEFAULT_BUDGET.blanc.maxBytes },
+    studyOs: { maxBytes: recorded?.studyOs?.maxBytes ?? DEFAULT_BUDGET.studyOs.maxBytes },
+  };
   const max = budget.blanc.maxBytes;
   const over = report.blanc.bytes > max;
+  const studyMax = budget.studyOs.maxBytes;
+  const studyOver = report.studyOs.bytes > studyMax;
+  const failed = over || studyOver || report.violations.length > 0;
 
   if (asJson) {
-    console.log(JSON.stringify({ ...report, budget: max, over }, null, 2));
-    process.exitCode = over || report.violations.length ? 1 : 0;
+    console.log(JSON.stringify({ ...report, budget: max, studyOsBudget: studyMax, over, studyOver }, null, 2));
+    process.exitCode = failed ? 1 : 0;
     return;
   }
 
   const mb = (n) => `${(n / 1024 / 1024).toFixed(2)} MB`;
-  console.log(`Blanc boot payload:    ${mb(report.blanc.bytes)} across ${report.blanc.files} files`);
-  console.log(`Study OS boot payload: ${mb(report.studyOs.bytes)} across ${report.studyOs.files} files`);
+  const split = (r) => `${mb(r.js)} JS + ${mb(r.css)} CSS`;
+  console.log(`Blanc boot payload:    ${mb(report.blanc.bytes)} (${split(report.blanc)}) across ${report.blanc.files} files`);
+  console.log(`Study OS boot payload: ${mb(report.studyOs.bytes)} (${split(report.studyOs)}) across ${report.studyOs.files} files`);
   console.log(`Blanc is ${Math.round((1 - report.ratio) * 100)}% smaller than Study OS.`);
-  console.log(`Budget: ${mb(max)}\n`);
+  console.log(`Budgets: Blanc ${mb(max)}, Study OS ${mb(studyMax)}${recorded ? '' : ' (built-in defaults; no blanc-budget.json)'}\n`);
 
   if (report.violations.length) {
     console.log(`PILLAR 1 VIOLATIONS — Study OS subsystems in Blanc's boot path (${report.violations.length}):`);
@@ -154,12 +166,16 @@ function main() {
   }
 
   if (over) {
-    console.log(`OVER BUDGET by ${mb(report.blanc.bytes - max)}. Either code-split the regression or raise the budget deliberately with --update.`);
-  } else if (!report.violations.length) {
+    console.log(`BLANC OVER BUDGET by ${mb(report.blanc.bytes - max)}. Either code-split the regression or raise the budget deliberately with --update.`);
+  }
+  if (studyOver) {
+    console.log(`STUDY OS OVER BUDGET by ${mb(report.studyOs.bytes - studyMax)}. See src/renderer/__tests__/studyOsBootGraph.test.ts for the edges that used to cost the most.`);
+  }
+  if (!failed) {
     console.log('Within budget, and Blanc boots none of the Study OS desktop subsystems.');
   }
 
-  process.exitCode = over || report.violations.length ? 1 : 0;
+  process.exitCode = failed ? 1 : 0;
 }
 
 main();

@@ -67,6 +67,11 @@ export interface MangaOcrOrderRequest {
   order: string[];
 }
 
+/** Outcome of importing a Mokuro `.mokuro` volume file into an item's OCR cache. */
+export type MangaMokuroImportResult =
+  | { ok: true; pages: number; unmatched: number; matchedBy: 'name' | 'order' }
+  | { ok: false; reason: 'invalid' | 'tooLarge' | 'noMatch' | 'noPages' };
+
 /** Analyze (OCR) and optionally translate every page of a manga item. */
 export interface MangaOcrVolumeRequest {
   itemId: string;

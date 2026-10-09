@@ -29,7 +29,7 @@ import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../wiredDiscovery';
 import { onCompanionEvent, type CompanionEventDetail } from './companionEvents';
 import { onPlayingChanged, isPlaying as musicIsPlaying } from '../audioBus';
 import { READING_RECORDED_EVENT } from '../stats';
-import { loadEnvironment, saveEnvironment } from './environmentStore';
+import { environmentSwapEpoch, loadEnvironment, saveEnvironment } from './environmentStore';
 import { withLiveRoutineAssignments } from './companionAssignments';
 import { pushCompanionOsState } from './companionOsBridge';
 import { getZoomFactor } from '../appZoom';
@@ -181,6 +181,12 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   const [aeroDiscovered, setAeroDiscovered] = useState(hasDiscoveredAero);
   const [wiredDiscovered, setWiredDiscovered] = useState(hasDiscoveredWired);
   const listRef = useRef<CompanionInstance[]>([]);
+  /**
+   * The environment swap the list was seeded under (environmentStore). Writing a list
+   * from an earlier swap would put the previous mode's companions — Aero's assistant —
+   * back into the environment that just replaced it.
+   */
+  const listEpochRef = useRef(environmentSwapEpoch());
   const envRef = useRef(env);
   // Physics is read every frame from a ref so the weight slider applies live
   // without restarting the wander loop (which would reset motion state), and
@@ -360,8 +366,12 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   }, [menuId]);
 
   const persist = useCallback((next: CompanionInstance[]) => {
+    const epoch = listEpochRef.current;
     // Idle callback when available so we don't block drag/scroll on JSON write.
     const run = () => {
+      // The environment was swapped (Aero ↔ Study) after this list was read: it is the
+      // previous mode's list, and writing it would undo the swap's companions.
+      if (epoch !== environmentSwapEpoch()) return;
       const merged = withLiveRoutineAssignments(next, loadEnvironment().companions ?? []);
       saveEnvironment({ companions: merged });
       pushCompanionOsState(merged);
@@ -375,8 +385,11 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     else window.setTimeout(run, 0);
   }, []);
 
-  // Init / resync when companions toggled or type set changes
+  // Init / resync when companions toggled, the type set changes, or the whole
+  // environment was swapped (Aero ↔ Study: same types can still mean another list).
+  const swapEpoch = environmentSwapEpoch();
   useEffect(() => {
+    listEpochRef.current = swapEpoch;
     if (!env.enabled || !env.companionsEnabled) {
       listRef.current = [];
       setList([]);
@@ -389,7 +402,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     listRef.current = next;
     setList(next);
     dirtyRef.current = true;
-  }, [env.enabled, env.companionsEnabled, env.companionTypes?.join(','), aeroDiscovered, wiredDiscovered]);
+  }, [env.enabled, env.companionsEnabled, env.companionTypes?.join(','), aeroDiscovered, wiredDiscovered, swapEpoch]);
 
   // Routine assignments are edited in Settings › Companions, which writes them
   // into `env.companions`. The resync effect above deliberately does NOT depend
@@ -641,8 +654,9 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('secret:lifecycle', onVis);
       elCache.clear();
-      // One disk flush on unmount if positions moved
-      if (dirtyRef.current && listRef.current.length) {
+      // One disk flush on unmount if positions moved — never a list from before an
+      // environment swap (Aero ↔ Study), which would bring that mode's companions back.
+      if (dirtyRef.current && listRef.current.length && listEpochRef.current === environmentSwapEpoch()) {
         dirtyRef.current = false;
         const snapshot = listRef.current.map((c) => ({ ...c }));
         listRef.current = snapshot;

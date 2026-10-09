@@ -78,6 +78,15 @@ export const SCRAPER_FIX_ZH: Catalog = {
   'scraperFix.qbit.versionStatus': 'qBittorrent 对版本请求返回了 {status}。',
   'scraperFix.qbit.connected': '已连接到 {address}。',
   'scraperFix.qbit.connectedNoSwarm': '已连接到 {address}，但 qBittorrent 未连接到任何种子群。',
+  // ---- qBittorrent transport and API-key codes (round 2) ----
+  'scraperFix.qbit.unreachable': '无法连接到 {address} 上的 qBittorrent。它是否已运行并启用了 Web UI？',
+  'scraperFix.qbit.hostUnresolved': '无法解析主机 {host}。',
+  'scraperFix.qbit.timeout': '{address} 没有及时响应。qBittorrent 可能正忙，或者防火墙丢弃了连接。',
+  'scraperFix.qbit.transport': '无法连接到 {address} 上的 qBittorrent：{detail}',
+  'scraperFix.qbit.loginBackoff': '用户名或密码被拒绝。{seconds} 秒内不再重试，以免 qBittorrent 封禁这台电脑。',
+  'scraperFix.qbit.noApiKey': '此连接没有保存 API 密钥。',
+  'scraperFix.qbit.apiKeyWhitespace': '保存的 API 密钥开头或结尾有空格。',
+  'scraperFix.qbit.apiKeyControlChar': '保存的 API 密钥包含空格或控制字符，无法作为密钥使用。',
   // ---- Seanime acquisition notices (AcquisitionMessageCode) ----
   'scraperFix.acq.autoStarted': 'Seanime 自动下载器已启动。',
   'scraperFix.acq.autoNotStarted': 'Seanime 未启动自动下载器。',

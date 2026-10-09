@@ -12,7 +12,9 @@ function normalize(value: unknown): DictionarySavedSearch | null {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<DictionarySavedSearch>;
   const query = typeof candidate.query === 'string' ? candidate.query.trim() : '';
-  if (!query || (candidate.lang !== 'ja' && candidate.lang !== 'zh')) return null;
+  // Russian is a dictionary language too: rejecting it silently dropped every
+  // saved Russian search (the Save button did nothing for a Russian learner).
+  if (!query || (candidate.lang !== 'ja' && candidate.lang !== 'zh' && candidate.lang !== 'ru')) return null;
   return { query, lang: candidate.lang };
 }
 

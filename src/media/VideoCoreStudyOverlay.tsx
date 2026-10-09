@@ -114,6 +114,7 @@ import {
 } from '../shared/videoCoreStudy';
 import { decideExternalSubtitleMount } from '../shared/externalSubtitleMount';
 import { decodeSubtitleBytes } from '../shared/subtitleDecode';
+import { youtubeIdentityFromPath } from '../shared/youtubeDownloadFiles';
 import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
 import {
   minedCueKey,
@@ -337,10 +338,13 @@ function miningSourceFromPlayback(
   playbackInfo: VideoCore_VideoPlaybackInfo | null,
 ): VideoCoreMiningSource | null {
   if (!playbackInfo) return null;
+  // A YouTube download has no media metadata, so its cards used to carry no source title
+  // at all; the title yt-dlp wrote into the file name is the video's own.
   const mediaTitle = playbackInfo.media?.title?.userPreferred
     || playbackInfo.media?.title?.romaji
     || playbackInfo.media?.title?.english
-    || playbackInfo.media?.title?.native;
+    || playbackInfo.media?.title?.native
+    || youtubeIdentityFromPath(playbackInfo.localFile?.path)?.title;
   return {
     playbackId: playbackInfo.id,
     playbackType: String(playbackInfo.playbackType),
@@ -3186,6 +3190,26 @@ export default function VideoCoreStudyOverlay({
    * No layout code changes — that is the "new blocks without redesigning the player"
    * acceptance criterion, made structural.
    */
+  const miningPanel = (
+    <VideoCoreMiningPanel
+      cue={studyCue}
+      displayText={plainText}
+      source={miningSource}
+      video={video}
+      subtitleDelaySec={subtitleDelaySec}
+      mineRequest={mineRequest}
+      audioStreamOrdinal={audioStreamOrdinal}
+      /*
+        The same second line that is on screen, so the card is captioned with the
+        translation the user was actually reading. Gated on `dualSubs` rather than
+        passed unconditionally: with the second line switched off there is nothing the
+        user has read and agreed with.
+      */
+      translationText={preferences.dualSubs ? secondaryText : ''}
+      defaultExpanded={workspace.layout.mode === 'mining'}
+    />
+  );
+  const workspaceHasCardEditor = workspace.workspace.blocks.some((block) => block.blockId === 'cardEditor');
   const blockRenderers: BlockRenderers = {
     grammar: (
       <VideoCoreGrammarPanel
@@ -3216,25 +3240,15 @@ export default function VideoCoreStudyOverlay({
       block that stays mounted (see StudyDocks) because the mine shortcut reaches into
       it; `cardPreview` is what a contextual `mine` trigger opens.
     */
-    cardEditor: (
-      <VideoCoreMiningPanel
-        cue={studyCue}
-        displayText={plainText}
-        source={miningSource}
-        video={video}
-        subtitleDelaySec={subtitleDelaySec}
-        mineRequest={mineRequest}
-        audioStreamOrdinal={audioStreamOrdinal}
-        /*
-          The same second line that is on screen, so the card is captioned with the
-          translation the user was actually reading. Gated on `dualSubs` rather than
-          passed unconditionally: with the second line switched off there is nothing the
-          user has read and agreed with.
-        */
-        translationText={preferences.dualSubs ? secondaryText : ''}
-        defaultExpanded={workspace.layout.mode === 'mining'}
-      />
-    ),
+    cardEditor: miningPanel,
+    /*
+      Only a workspace WITHOUT a card editor renders the preview, so one workspace never
+      holds two mining panels. This entry used to be missing altogether: Transcript,
+      Review, Practice, Listening and Immersion have no `cardEditor`, so their `mine`
+      trigger opened a block with no renderer and nothing consumed the request — C and a
+      transcript row's Mine did nothing at all there (2026-10 hardware run).
+    */
+    ...(workspaceHasCardEditor ? {} : { cardPreview: miningPanel }),
     transcript: (
       <VideoCoreTranscriptPanel
         cues={allCues}

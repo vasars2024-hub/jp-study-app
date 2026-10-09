@@ -1,0 +1,49 @@
+/* music2: lyric study switches and known-word colouring. */
+.music-study-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.music-study-toggle {
+  min-height: 28px;
+  padding: 2px 10px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.music-study-toggle.is-on {
+  color: var(--accent-contrast, #fff);
+  background: var(--accent, #d84a68);
+  border-color: var(--accent, #d84a68);
+}
+
+.music-study-toggle:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+}
+
+.music-study-toggle:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Same marks the subtitle line and the translate study use: dotted underline,
+   strong for new words, faint for words being learned. */
+.music-line-tokens .wk-new {
+  text-decoration: underline dotted var(--accent, #d84a68);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.music-line-tokens .wk-learning {
+  text-decoration: underline dotted color-mix(in srgb, var(--accent, #d84a68) 45%, transparent);
+  text-underline-offset: 4px;
+}

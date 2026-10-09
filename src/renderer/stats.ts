@@ -14,6 +14,7 @@
 import type { ArenaMistake, GameId, SourceLang } from './games/types';
 import type { LevelTier } from '../shared/levelScale';
 import type { StudyDayRaw } from '../shared/studyActivityHeatmap';
+import type { StudyDayActivity } from '../shared/calendarDayDetail';
 import { getStudyLang, STUDY_LANG_EVENT, STUDY_LANG_KEY, type StudyLang } from './studyEnvironment';
 import { LANG_TAGS } from '../shared/i18n/core';
 import { getUiLang, t } from './i18n';
@@ -66,6 +67,13 @@ interface DayEntry {
   mediaMined?: number;
   /** Distinct subtitle lines actively studied in the player that day. */
   linesStudied?: number;
+  /**
+   * That day's reading per book (library item id) and watching per show (resume key), so the
+   * Calendar's day view can say WHAT was read or watched and open it. Optional: days recorded
+   * before the tally existed carry only the totals above.
+   */
+  books?: Record<string, { title: string; seconds: number; chars: number }>;
+  shows?: Record<string, { title: string; seconds: number }>;
 }
 interface BookEntry {
   title: string;
@@ -443,6 +451,15 @@ export function recordReading(
   const day = data.days[key] ?? { seconds: 0, chars: 0 };
   day.seconds += Math.max(0, seconds);
   day.chars += Math.max(0, chars);
+  if (bookId) {
+    const books = day.books && typeof day.books === 'object' ? day.books : {};
+    const dayBook = books[bookId] ?? { title, seconds: 0, chars: 0 };
+    dayBook.title = title || dayBook.title;
+    dayBook.seconds += Math.max(0, seconds);
+    dayBook.chars += Math.max(0, chars);
+    books[bookId] = dayBook;
+    day.books = books;
+  }
   data.days[key] = day;
 
   const book = data.books[bookId] ?? { title, seconds: 0, chars: 0, lastRead: 0 };
@@ -482,6 +499,12 @@ export function recordWatching(showId: string, title: string, seconds: number): 
 
   const day = data.days[key] ?? { seconds: 0, chars: 0 };
   day.watchSeconds = (day.watchSeconds ?? 0) + seconds;
+  const shows = day.shows && typeof day.shows === 'object' ? day.shows : {};
+  const dayShow = shows[showId] ?? { title, seconds: 0 };
+  dayShow.title = title || dayShow.title;
+  dayShow.seconds += seconds;
+  shows[showId] = dayShow;
+  day.shows = shows;
   data.days[key] = day;
 
   const show = data.shows[showId] ?? { title, seconds: 0, lastWatched: 0 };
@@ -879,6 +902,37 @@ export function getStudyDaysByKey(): Record<string, StudyDayRaw> {
     };
   }
   return out;
+}
+
+/**
+ * One day's whole entry — totals, review and practice tallies, and the per-book and per-show
+ * reading/watching — for the Calendar's day view (`shared/calendarDayDetail.ts`). Null for a
+ * day with nothing recorded.
+ */
+export function getStudyDayActivity(key: string): StudyDayActivity | null {
+  const e = load().days[key];
+  if (!e || typeof e !== 'object') return null;
+  return {
+    seconds: e.seconds,
+    chars: e.chars,
+    watchSeconds: e.watchSeconds,
+    listenSeconds: e.listenSeconds,
+    studySeconds: e.studySeconds,
+    reviews: e.reviews,
+    reviewsPassed: e.reviewsPassed,
+    practice: e.practice,
+    practiceCorrect: e.practiceCorrect,
+    mediaMined: dayCount(e.mediaMined),
+    linesStudied: dayCount(e.linesStudied),
+    ...(e.books && typeof e.books === 'object' ? { books: e.books } : {}),
+    ...(e.shows && typeof e.shows === 'object' ? { shows: e.shows } : {}),
+  };
+}
+
+/** Every day (YYYY-MM-DD) that counts as studied for the streak, as `computeStreak` judges it. */
+export function getActiveStudyDates(): Set<string> {
+  const days = load().days;
+  return new Set(Object.keys(days).filter((key) => dayIsActive(days[key])));
 }
 
 export function getSyncPayload(): StatsSyncPayload {

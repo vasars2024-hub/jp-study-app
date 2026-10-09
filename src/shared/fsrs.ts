@@ -12,15 +12,14 @@
  * mean anything at all — at 0.95 the user is asked more often because the model
  * says recall has fallen to 95%, not because a constant was made smaller.
  *
- * Two deliberate limits, stated rather than hidden:
+ * Both halves of FSRS-5 are here: the long-term step (`fsrsReview`) for a
+ * review a day or more after the last one, and the short-term step
+ * (`fsrsShortTermReview`, weights 17 and 18) for a same-day review inside
+ * learning or relearning steps. Which one applies is the scheduler's decision.
  *
- * - This is the LONG-TERM model. FSRS's same-day short-term steps are not
- *   implemented; a lapse goes to a fixed relearning step, exactly as the SM-2
- *   path already does. A caller must not present sub-day intervals from here as
- *   FSRS scheduling, because they are not.
- * - The weights are FSRS-5's published defaults. Nothing in this app optimises
- *   them against the user's own review log yet, so `DEFAULT_FSRS_WEIGHTS` is a
- *   population prior, not a personal fit.
+ * The weights default to FSRS-5's published population prior. A personal fit
+ * comes from `fsrsOptimizer.ts`, fitted on the user's own review log, and is
+ * passed in as `weights`; `isValidFsrsWeights` is the gate it goes through.
  */
 
 /** Again / Hard / Good / Easy as the model numbers them. */
@@ -38,6 +37,28 @@ export const DEFAULT_FSRS_WEIGHTS: readonly number[] = [
   0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575,
   0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621,
 ];
+
+/**
+ * The range each weight may take, as fsrs-rs clamps them for FSRS-5. The
+ * optimiser projects onto these after every step, and a stored personal fit
+ * outside them is refused rather than trusted.
+ */
+export const FSRS_WEIGHT_BOUNDS: ReadonlyArray<readonly [number, number]> = [
+  [0.01, 100], [0.01, 100], [0.01, 100], [0.01, 100],
+  [1, 10], [0.001, 4], [0.001, 4], [0.001, 0.75],
+  [0, 4.5], [0, 0.8], [0.001, 3.5], [0.001, 5],
+  [0.001, 0.25], [0.001, 0.9], [0, 4], [0, 1],
+  [1, 6], [0, 2], [0, 2],
+];
+
+/** Nineteen finite weights, each inside its FSRS-5 bound. */
+export function isValidFsrsWeights(value: unknown): value is number[] {
+  if (!Array.isArray(value) || value.length !== DEFAULT_FSRS_WEIGHTS.length) return false;
+  return value.every((w, i) => {
+    const [low, high] = FSRS_WEIGHT_BOUNDS[i];
+    return typeof w === 'number' && Number.isFinite(w) && w >= low && w <= high;
+  });
+}
 
 export const FSRS_DECAY = -0.5;
 /** 0.9^(1/DECAY) - 1, i.e. the constant that makes R(S, S) = 0.9. */
@@ -141,7 +162,9 @@ function stabilityOnRecall(
  * Stability after a lapse.
  *
  * Never above the stability the card already had: forgetting a card cannot be
- * what makes the app wait longer to ask it again.
+ * what makes the app wait longer to ask it again. FSRS-5 caps it a little
+ * lower still, at `S / e^(w17 * w18)` — the stability a same-day Good would
+ * have to multiply back up to the old one.
  */
 function stabilityOnLapse(
   memory: FsrsMemory,
@@ -153,7 +176,30 @@ function stabilityOnLapse(
     * memory.difficulty ** -w[12]
     * ((memory.stability + 1) ** w[13] - 1)
     * Math.exp(w[14] * (1 - retrievability));
-  return clampStability(Math.min(lapsed, memory.stability));
+  const ceiling = memory.stability / Math.exp(w[17] * w[18]);
+  return clampStability(Math.min(lapsed, ceiling));
+}
+
+/**
+ * The FSRS-5 short-term step: a review on the same day as the last one, inside
+ * learning or relearning steps. Stability is scaled by `e^(w17 * (G - 3 + w18))`
+ * — Good on a step grows it, Again shrinks it — and difficulty moves exactly as
+ * it does on a long-term review.
+ */
+export function fsrsShortTermReview(
+  memory: FsrsMemory,
+  grade: FsrsGrade,
+  weights: readonly number[] = DEFAULT_FSRS_WEIGHTS,
+): FsrsMemory {
+  const w = weights;
+  const current: FsrsMemory = {
+    stability: clampStability(memory.stability),
+    difficulty: clampDifficulty(memory.difficulty),
+  };
+  return {
+    stability: clampStability(current.stability * Math.exp(w[17] * (grade - 3 + w[18]))),
+    difficulty: nextDifficulty(current.difficulty, grade, w),
+  };
 }
 
 /**

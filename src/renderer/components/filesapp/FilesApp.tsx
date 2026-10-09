@@ -28,6 +28,7 @@ import {
   Suspense,
   lazy,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -92,6 +93,8 @@ import {
 import { performFilesOpenRoute } from './filesOpenRoute';
 import { runOwnerDelete } from './filesOwnerDeleters';
 import { FilesPreviewPane } from './FilesPreviewPane';
+import { filesCursorTarget, filesRangeIds } from './filesKeyboard';
+import HelpLink from '../onboarding/HelpLink';
 import { filesSourceLabel } from './filesSourceLabels';
 import { ContextMenu, type MenuItem } from '../ui/ContextMenu';
 import {
@@ -365,6 +368,13 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     initialScope ?? entryScope?.categoryId ?? null,
   );
   const [query, setQuery] = useState('');
+  /**
+   * files2: the filters read a DEFERRED copy of the query. Every keystroke used to
+   * refilter (and recount) the whole index synchronously before the box could show
+   * the character; deferred, the input answers at once and the list catches up in
+   * an interruptible render — the same thing a debounce buys, without the lag.
+   */
+  const deferredQuery = useDeferredValue(query);
   /* Gate 22 owns the sort column, the direction and the view mode. They are NOT
      component state: they are read from the view-state document keyed by the
      folder on screen, further down where all three scopes are known. */
@@ -645,7 +655,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * because `visibleItems` only ever removes.
    */
   const counts = useMemo(() => {
-    if (!query.trim()) {
+    if (!deferredQuery.trim()) {
       const snapshotItems = state.snapshot?.items;
       if (!snapshotItems) return countByCategory([]);
       if (allItems.length === snapshotItems.length) {
@@ -653,10 +663,10 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       }
       return countByCategory(allItems);
     }
-    const folded = foldFilesQuery(query);
+    const folded = foldFilesQuery(deferredQuery);
     return countByCategory(allItems.filter((i) => matchesFoldedQuery(i, folded)));
     // `lang` is not read here; counts are numbers, not translated strings.
-  }, [state.snapshot, allItems, query]);
+  }, [state.snapshot, allItems, deferredQuery]);
 
   const countFor = useCallback(
     (id: FilesCategoryId) => counts.find((c) => c.categoryId === id)?.total ?? 0,
@@ -697,7 +707,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   );
 
   const visible = useMemo(() => {
-    const folded = foldFilesQuery(query);
+    const folded = foldFilesQuery(deferredQuery);
     if (scopedSmart) {
       // Recomputed from the live index every render: gate 19's "stays live" is
       // structural because there is no stored membership to go out of date.
@@ -719,7 +729,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       (item) =>
         (scope === null || categoryContains(scope, item.categoryId)) && matchesFoldedQuery(item, folded),
     );
-  }, [allItems, sortedAll, scope, scopedCollection, scopedSmart, query, sortColumn, sortDirection]);
+  }, [allItems, sortedAll, scope, scopedCollection, scopedSmart, deferredQuery, sortColumn, sortDirection]);
 
   /** The selected row, so closing the inspector returns focus to what opened it. */
   const selectedRowRef = useRef<HTMLElement | null>(null);
@@ -919,6 +929,60 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     setRevealNote(null);
     setOpenState({ status: 'idle' });
   }, []);
+
+  /* ------------------- files2: keyboard and range selection ------------------ */
+
+  /** The row a navigation key moved to; the list scrolls it into view. */
+  const [cursorIndex, setCursorIndex] = useState<number | undefined>(undefined);
+  /** Set by a navigation key: focus follows the selection once its row renders. */
+  const focusSelectedRow = useRef(false);
+
+  const navigateTo = useCallback(
+    (index: number) => {
+      const target = visible[index];
+      if (!target) return;
+      focusSelectedRow.current = true;
+      setCursorIndex(index);
+      selectItem(target.id);
+    },
+    [visible, selectItem],
+  );
+
+  // The target row may be outside the rendered window until the list has
+  // scrolled and repainted, so focus is retried for a few frames.
+  useEffect(() => {
+    if (!focusSelectedRow.current) return undefined;
+    let frame = 0;
+    let tries = 0;
+    const tick = (): void => {
+      const row = selectedRowRef.current;
+      if (row?.isConnected && row.dataset.rowId === selectedId) {
+        focusSelectedRow.current = false;
+        row.focus();
+        return;
+      }
+      tries += 1;
+      if (tries < 6) frame = requestAnimationFrame(tick);
+      else focusSelectedRow.current = false;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [selectedId, cursorIndex]);
+
+  /** Shift+click: check every row from the selected one to this one. */
+  const checkRange = useCallback(
+    (targetId: string) => {
+      const ids = filesRangeIds(
+        visible.map((entry) => entry.id),
+        selectedId,
+        targetId,
+      );
+      if (ids.length === 0) return;
+      setBulkSelectedIds((current) => new Set([...current, ...ids]));
+      setBulkMineState({ status: 'idle' });
+    },
+    [visible, selectedId],
+  );
 
   /* ------------------- explorer basics (audit r2 #9) ------------------ */
 
@@ -2262,6 +2326,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             // announces twenty rows unless the caller supplies these. Row 1 is the
             // header, so the body starts at 2.
             aria-rowindex={index + 2}
+            data-row-id={item.id}
             data-selected={item.id === selectedId ? 'true' : undefined}
             data-broken={item.flags.brokenLink ? 'true' : undefined}
             aria-selected={item.id === selectedId}
@@ -2274,7 +2339,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               e.dataTransfer.setData(FILES_DRAG_ITEM_TYPE, item.id);
               e.dataTransfer.effectAllowed = 'copy';
             }}
-            onClick={() => selectItem(item.id)}
+            onClick={(e) => {
+              // files2: Shift+click checks the range for the bulk actions.
+              if (e.shiftKey && selectedId && selectedId !== item.id) checkRange(item.id);
+              selectItem(item.id);
+            }}
             /* Gate 10, the filing-system gesture: single click selects, double
                click opens. Both routes end in the same `openItem`, so there is
                one decision path and not a shortcut that skips the router. */
@@ -2283,9 +2352,30 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               void openItem(item);
             }}
             onKeyDown={(e) => {
+              // files2: Enter on the selected row opens it (the keyboard twin of
+              // double-click); on any other row it selects first, as before.
+              if (e.key === 'Enter' && item.id === selectedId && !e.altKey) {
+                e.preventDefault();
+                void openItem(item);
+                return;
+              }
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 selectItem(item.id);
+              }
+              if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+                e.preventDefault();
+                if (bulkMineState.status !== 'running') {
+                  setBulkSelectedIds(new Set(visible.map((entry) => entry.id)));
+                  setBulkMineState({ status: 'idle' });
+                }
+                return;
+              }
+              const target = e.ctrlKey || e.metaKey || e.altKey ? null : filesCursorTarget(index, e.key, visible.length);
+              if (target !== null) {
+                e.preventDefault();
+                navigateTo(target);
+                return;
               }
               if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
                 e.preventDefault();
@@ -2370,10 +2460,38 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           </div>
           )}
           gridRole="rowgroup"
+          scrollToIndex={cursorIndex}
           emptyState={
-            <p className="fa-state">
-              {t(query.trim() ? 'filesApp.state.noMatches' : 'filesApp.state.empty')}
-            </p>
+            // files2: an empty result says what to do next, not only that it is empty.
+            <div className="fa-state fa-empty-state">
+              <p>{t(query.trim() ? 'filesApp.state.noMatches' : 'filesApp.state.empty')}</p>
+              <div className="fa-empty-actions">
+                {query.trim() ? (
+                  <button type="button" className="btn small" onClick={() => setQuery('')}>
+                    {t('files2.empty.clearSearch')}
+                  </button>
+                ) : null}
+                {scope !== null || collectionScope !== null || smartScope !== null ? (
+                  <button
+                    type="button"
+                    className="btn small"
+                    onClick={() => {
+                      setScope(null);
+                      setCollectionScope(null);
+                      setSmartScope(null);
+                    }}
+                  >
+                    {t('files2.empty.showEverything')}
+                  </button>
+                ) : null}
+                {!query.trim() ? (
+                  <button type="button" className="btn small primary" onClick={() => setScanOpen(true)}>
+                    {t('files2.empty.scan')}
+                  </button>
+                ) : null}
+                <HelpLink topic="files" />
+              </div>
+            </div>
           }
         />
       </div>

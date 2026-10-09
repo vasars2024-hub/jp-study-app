@@ -31,6 +31,8 @@ export interface ImmersionSite {
   lastStreakDay?: string;
   totalSeconds: number;
   totalChars: number;
+  /** Dictionary lookups made on this page. Absent on rows written before it was counted. */
+  totalLookups?: number;
   favorite?: boolean;
   folderId?: string;
   createdAt: number;
@@ -131,6 +133,8 @@ export interface ImmersionVisitInput {
   lang?: ImmersionLang;
   seconds?: number;
   chars?: number;
+  /** Dictionary lookups made on the page since the last flush. */
+  lookups?: number;
   completionPct?: number;
   estimatedDifficulty?: number;
   /**
@@ -568,6 +572,7 @@ export function sanitizeSite(raw: unknown): ImmersionSite | null {
     lastStreakDay: typeof o.lastStreakDay === 'string' ? o.lastStreakDay : undefined,
     totalSeconds: Math.max(0, Number(o.totalSeconds) || 0),
     totalChars: Math.max(0, Number(o.totalChars) || 0),
+    ...(Number(o.totalLookups) > 0 ? { totalLookups: Math.floor(Number(o.totalLookups)) } : {}),
     favorite: Boolean(o.favorite),
     folderId: typeof o.folderId === 'string' ? o.folderId : undefined,
     createdAt: typeof o.createdAt === 'number' ? o.createdAt : now,
@@ -579,6 +584,53 @@ function clampNum(v: unknown, min: number, max: number, fallback: number): numbe
   const n = Number(v);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, n));
+}
+
+/** One site (host) with the reading stats of every page visited on it. */
+export interface ImmersionHostTotals {
+  host: string;
+  seconds: number;
+  chars: number;
+  lookups: number;
+  pages: number;
+  lastVisited: number;
+}
+
+/** `www.` dropped, so `www.nhk.or.jp` and `nhk.or.jp` are one site. */
+export function immersionHostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '').toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Per-site totals from the per-page history rows, most time first (then most
+ * characters). The rows already hold seconds, characters and lookups per page;
+ * nothing ever added them up per site, which is the unit a reader thinks in
+ * ("how much NHK did I read").
+ */
+export function immersionTotalsByHost(
+  sites: readonly Pick<ImmersionSite, 'url' | 'totalSeconds' | 'totalChars' | 'totalLookups' | 'lastVisited'>[],
+  limit = Infinity,
+): ImmersionHostTotals[] {
+  const byHost = new Map<string, ImmersionHostTotals>();
+  for (const site of sites) {
+    const host = immersionHostOf(site.url);
+    if (!host) continue;
+    const row = byHost.get(host) ?? { host, seconds: 0, chars: 0, lookups: 0, pages: 0, lastVisited: 0 };
+    row.seconds += Math.max(0, site.totalSeconds || 0);
+    row.chars += Math.max(0, site.totalChars || 0);
+    row.lookups += Math.max(0, site.totalLookups ?? 0);
+    row.pages += 1;
+    row.lastVisited = Math.max(row.lastVisited, site.lastVisited || 0);
+    byHost.set(host, row);
+  }
+  return [...byHost.values()]
+    .filter((row) => row.seconds > 0 || row.chars > 0 || row.lookups > 0)
+    .sort((a, b) => b.seconds - a.seconds || b.chars - a.chars || a.host.localeCompare(b.host))
+    .slice(0, limit);
 }
 
 /** Stable id from URL host+path (for stats bookId without needing a saved site). */

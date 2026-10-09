@@ -24,6 +24,12 @@ describe('dictionary saved searches', () => {
     ]);
   });
 
+  it('saves Russian searches (the language was silently rejected before)', async () => {
+    const store = await import('../dictionarySavedSearches');
+    store.saveDictionarySearch({ query: 'погода', lang: 'ru' });
+    expect(store.loadDictionarySavedSearches()).toEqual([{ query: 'погода', lang: 'ru' }]);
+  });
+
   it('keeps valid memory when storage is corrupt and clears persistently', async () => {
     const store = await import('../dictionarySavedSearches');
     store.saveDictionarySearch({ query: '猫', lang: 'ja' });

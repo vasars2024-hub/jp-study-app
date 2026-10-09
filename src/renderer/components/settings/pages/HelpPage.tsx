@@ -16,8 +16,10 @@ import { useT } from '../../../i18n';
 import Icon, { type IconName } from '../../Icons';
 import { Tile, TileList } from '../../ui/Tile';
 import SettingsAssistantCard from './SettingsAssistantCard';
-import { DiagnosticsCard, UpdateCard } from './DiagnosticsCard';
+import { DiagnosticsCard } from './DiagnosticsCard';
+import UpdatePanel from './UpdatePanel';
 import HelpShortcutsCard from './HelpShortcutsCard';
+import { FirstRunCard, HelpSearchCard } from './HelpSearchCard';
 
 /**
  * `idle` before the button is used; `started` only when an overlay actually
@@ -56,7 +58,10 @@ export default function HelpPage() {
       {/* v1.0 audit 5.6, second half. Above the tour deliberately: a user who
           opens Help already has a question, and replaying an 8-step tour is the
           slower answer to "where is X". */}
+      {/* onb2: "how do I…" answers first, then the setup that can be re-run. */}
+      <HelpSearchCard />
       <SettingsAssistantCard />
+      <FirstRunCard />
     <SettingsCard id="guided-tour" title={t('help.tour.title')} description={t('help.tour.body')}>
       <p className="muted">
         {state.completedAt
@@ -102,7 +107,7 @@ export default function HelpPage() {
       )}
     </SettingsCard>
       <HelpShortcutsCard />
-      <UpdateCard />
+      <UpdatePanel />
       <DiagnosticsCard />
     </>
   );

@@ -355,6 +355,10 @@ declare global {
         itemId: string,
         targetLang?: string,
       ): Promise<import('../shared/types').LibraryItem['ocrMeta'] | null>;
+      mangaOcrImportMokuro?(
+        itemId: string,
+        json: string,
+      ): Promise<import('../shared/mangaOcrIpc').MangaMokuroImportResult>;
       onMangaOcrVolumeProgress(
         cb: (p: import('../shared/mangaOcrIpc').MangaOcrVolumeProgress) => void,
       ): () => void;
@@ -499,7 +503,11 @@ declare global {
       ankiStatus(): Promise<AnkiStatus>;
       ankiAddNote(req: AnkiAddRequest): Promise<AnkiAddResult>;
       ankiKnownWords(): Promise<{ ok: boolean; error?: string; words?: Record<string, number> }>;
-      profileGet(): Promise<ProfileSnapshot & { legacyMigrated: boolean }>;
+      ankiCheckDuplicates?(
+        terms: string[],
+        target: { deckName: string; modelName: string },
+      ): Promise<{ ok: boolean; duplicates: Record<string, boolean>; error?: string; unreachable?: boolean }>;
+      profileGet():Promise<ProfileSnapshot & { legacyMigrated: boolean }>;
       profileList(): Promise<StudyProfile[]>;
       profileSwitch(id: ProfileId): Promise<{ ok: boolean; error?: string; snapshot: ProfileSnapshot }>;
       profileCreate(name: string): Promise<{ ok: boolean; error?: string; snapshot: ProfileSnapshot }>;
@@ -875,6 +883,7 @@ declare global {
       lockscreenLock?(): Promise<{ locked: boolean }>;
       lockscreenIsLocked?(): Promise<boolean>;
       onLockscreenLocked?(cb: () => void): () => void;
+      onLockscreenBlocked?(cb: (notice: { kind: string; action: string }) => void): () => void;
       companionPacksList?(): Promise<unknown[]>;
       companionPacksImport?(opts?: { kind?: 'file' | 'folder' }): Promise<import('../shared/companionPacks').CompanionPackImportResult>;
       companionPacksRename?(id: string, name: string): Promise<boolean>;
@@ -933,7 +942,11 @@ declare global {
       appUpdateStatus?(): Promise<import('../shared/appUpdate').AppUpdateStatus>;
       appUpdateRestart?(): Promise<boolean>;
       onAppUpdateChanged?(cb: (status: import('../shared/appUpdate').AppUpdateStatus) => void): () => void;
-      catalogGet(): Promise<import('../shared/resourcesCatalog').ResourcesCatalog | null>;
+      appUpdateDetails?(): Promise<import('../shared/appUpdate').AppUpdateDetails>;
+      appUpdateCheckNow?(): Promise<import('../shared/appUpdate').AppUpdateDetails>;
+      appUpdateReleaseNotes?(): Promise<import('../shared/appUpdate').AppReleaseNotes>;
+      onAppUpdateDetails?(cb: (details: import('../shared/appUpdate').AppUpdateDetails) => void): () => void;
+      catalogGet():Promise<import('../shared/resourcesCatalog').ResourcesCatalog | null>;
       catalogRefresh(): Promise<
         import('../shared/resourcesCatalog').CatalogResult<
           import('../shared/resourcesCatalog').ResourcesCatalog
@@ -1006,7 +1019,14 @@ declare global {
         source: string;
         target: string;
         senseHints?: import('../shared/translateCore').TranslateSenseHint[];
-      }): Promise<{ ok: boolean; text?: string; error?: string; errorKey?: string }>;
+        style?: import('../shared/translateCore').TranslateStyle;
+      }): Promise<{
+        ok: boolean;
+        text?: string;
+        segments?: import('../shared/translateCore').TranslateSegment[];
+        error?: string;
+        errorKey?: string;
+      }>;
       translateRunBatch(req: {
         items: Array<{ id: string; text: string; source: string; target: string }>;
       }): Promise<{
@@ -2323,7 +2343,18 @@ declare global {
       // Region Recorder (main/regionRecorder.ts).
       recorderGetState(): Promise<import('../shared/regionRecorder').RecorderState>;
       recorderSetSettings(patch: Partial<import('../shared/regionRecorder').RecorderSettings>): Promise<import('../shared/regionRecorder').RecorderState>;
-      recorderStart(mode?: import('../shared/regionRecorder').RecorderStartMode): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderStart(mode?: import('../shared/regionRecorder').RecorderStartMode, sourceId?: string): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderDetectEncoders(force?: boolean): Promise<import('../shared/regionRecorder').RecorderState>;
+      recorderListWindows(): Promise<import('../shared/regionRecorder').RecorderWindowSource[]>;
+      recorderHistory(): Promise<Array<import('../shared/regionRecorder').RecorderHistoryEntry & { missing: boolean }>>;
+      recorderHistoryAction(
+        id: string,
+        action: import('../shared/regionRecorder').RecorderHistoryAction,
+      ): Promise<{ ok: boolean; mediaId?: string; errorKey?: string }>;
+      onRecorderHistoryChanged(cb: (entries: import('../shared/regionRecorder').RecorderHistoryEntry[]) => void): () => void;
+      recorderModelChanged(): void;
+      onRecorderStudyTag(cb: (request: import('../shared/regionRecorder').RecorderStudyTagRequest) => void): () => void;
+      recorderStudyTagReply(reply: { requestId: string; ok: boolean }): void;
       recorderStop(): Promise<import('../shared/regionRecorder').RecorderState>;
       recorderPause(paused: boolean): Promise<import('../shared/regionRecorder').RecorderState>;
       recorderChooseFolder(): Promise<import('../shared/regionRecorder').RecorderState>;
@@ -2465,6 +2496,9 @@ declare global {
       scraperQbitSend(
         input: import('../shared/scraperIpc').ScraperQbitSendInput,
       ): Promise<import('../shared/scraperResults').QbitSendReport>;
+      scraperQbitAddTorrentFiles?(
+        input: import('../shared/scraperIpc').ScraperQbitTorrentFileInput,
+      ): Promise<import('../shared/scraperResults').QbitSendReport & { infoHashes: string[] }>;
       scraperQbitAction(
         input: import('../shared/scraperIpc').ScraperQbitActionInput,
       ): Promise<import('../shared/scraperIpc').ScraperQbitActionReport>;

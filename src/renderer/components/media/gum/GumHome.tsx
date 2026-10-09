@@ -27,6 +27,7 @@ import {
 import type { MediaItem } from '../../../../shared/types';
 import { providerEpisodeTitle } from '../../../../shared/mediaLibraryEntries';
 import { useT } from '../../../i18n';
+import { preferredScrollBehavior } from '../../../utils/reliableScroll';
 import { ContextualSurface } from '../../liquid/LiquidSurface';
 import { LiquidLoading } from '../../liquid/LiquidLoading';
 import type { ContinueWatchingRow } from '../ContinueWatchingShelf';
@@ -264,7 +265,8 @@ function Row({ children, kind = 'poster', label }: { children: ReactNode; kind?:
   const scroll = (direction: number): void => {
     const node = ref.current;
     if (!node) return;
-    node.scrollBy({ left: direction * node.clientWidth * 0.85, behavior: 'smooth' });
+    // A jump, not a glide, under reduced motion (a11y2).
+    node.scrollBy({ left: direction * node.clientWidth * 0.85, behavior: preferredScrollBehavior() });
   };
   return (
     <div className="gum-row-wrap" data-at-start={edges.start ? 'true' : undefined} data-at-end={edges.end ? 'true' : undefined}>

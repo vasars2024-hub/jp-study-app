@@ -1,0 +1,111 @@
+/* gram2: review prompt shapes (cloze / production), the typed answer, per-level
+   progress, and the "grammar due" chip other study surfaces show. */
+
+.gx-review-prompt {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.gx-review-sentence {
+  font-size: 1.15em;
+  line-height: 1.6;
+  margin: 0;
+}
+.gx-review-blank {
+  display: inline-block;
+  min-width: 2.5em;
+  margin: 0 2px;
+  color: var(--muted);
+  border-bottom: 2px solid color-mix(in srgb, var(--text) 45%, transparent);
+  letter-spacing: -0.1em;
+}
+.gx-review-cloze mark {
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.gx-review-answer {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.gx-review-answer input {
+  flex: 1 1 12em;
+  min-width: 0;
+  min-height: 28px;
+  font-size: 1em;
+}
+.gx-review-verdict {
+  margin: 4px 0;
+  font-weight: 600;
+}
+.gx-review-verdict.is-right {
+  color: color-mix(in srgb, #3f9d6b 60%, var(--text));
+}
+.gx-review-verdict.is-wrong {
+  color: color-mix(in srgb, #c0504d 60%, var(--text));
+}
+.gx-review-undo-reveal {
+  min-height: 24px;
+  margin-top: 6px;
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.gx-review-levels {
+  margin-top: 16px;
+}
+.gx-review-levels h3 {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+.gx-review-levels ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.gx-review-level {
+  display: grid;
+  grid-template-columns: auto minmax(60px, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.gx-review-level-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+.gx-review-level-known {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, #3f9d6b 70%, var(--text));
+}
+.gx-review-level-text {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 520px) {
+  .gx-review-level {
+    grid-template-columns: auto minmax(40px, 1fr);
+  }
+}
+
+.gram-due-chip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+  font-size: 13px;
+}
+.gram-due-chip-count {
+  font-weight: 600;
+}

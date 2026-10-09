@@ -26,6 +26,15 @@
  * (`ingestMediaPaths(…, 'recording')`) → Whisper in the study language → the
  * study player. A partial file is only deleted once its MP4 exists; on any
  * failure it stays, and on the next start it is offered for recovery.
+ *
+ * Round 2: a WINDOW can be recorded instead of a region (`startRecorder('window')`,
+ * the topmost foreign window or a picked one; no border, fitted to its first
+ * frame); the finish uses a hardware H.264 encoder when `recorderEncoder.ts`
+ * proves one works here (x264 otherwise, and as the fallback); every MP4 lands
+ * in `recordings-history.json` (open, show, transcribe again, delete to the
+ * Recycle Bin); a missing Whisper model queues the transcription until a
+ * renderer reports a download (`recorder:model-changed`); and the main window
+ * files each recording under its study day in Calendar and Statistics.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,6 +49,7 @@ import {
   type IpcMainEvent,
 } from 'electron';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { refuseWhileLocked } from './lockGuard';
 import { registerDisplayMediaRequester } from './displayMediaBroker';
 import { setRecordingIndicator } from './recordingIndicator';
 import { coverDisplay, pickScreenSource } from './screenSources';
@@ -49,12 +59,14 @@ import { getMainStudyLang } from './studyLanguage';
 import { ingestMediaPaths } from './mediaIngest';
 import { enqueueTranscription, onMainTranscriptionProgress } from './transcriptionJobs';
 import { finalizeRecording, type FinalizeErrorCode, type FinalizeHandle } from './recordingFinalize';
+import { cachedRecorderEncoderReport, detectRecorderEncoders } from './recorderEncoder';
 import {
   DEFAULT_RECORDER_SETTINGS,
   OrderedChunkSink,
   RECORDER_CHANNELS as CH,
   RECORDER_CHUNK_MS,
   RECORDER_DEFAULT_FOLDER_NAME,
+  RECORDER_HISTORY_ACTIONS,
   RECORDER_MIN_REGION,
   RECORDER_PARTIAL_DIR,
   diskSpaceVerdict,
@@ -62,17 +74,25 @@ import {
   freeBytesFromStatfs,
   nextDisplayId,
   normalizePartialMeta,
+  recorderHistoryFromDisk,
   normalizeRecorderSettings,
+  pickActiveWindowSource,
   recordedMs,
   recorderLimitReached,
   recorderPartialId,
+  recorderStudyDay,
   recorderVideoBitrate,
   recorderWantsSystemAudio,
   recordingBaseName,
+  resolveRecorderEncoder,
   resolveRecorderRepeat,
   toGlobal,
   uniqueRecordingFileName,
+  upsertRecorderHistory,
   type CropPx,
+  type RecorderEncoderReport,
+  type RecorderHistoryAction,
+  type RecorderHistoryEntry,
   type RecorderHostConfig,
   type RecorderHostEvent,
   type RecorderHostStartResult,
@@ -84,8 +104,11 @@ import {
   type RecorderSelectInit,
   type RecorderSessionPhase,
   type RecorderSettings,
+  type RecorderSourceKind,
   type RecorderStartMode,
   type RecorderState,
+  type RecorderStudyTagRequest,
+  type RecorderWindowSource,
   type RectLike,
 } from '../shared/regionRecorder';
 
@@ -165,14 +188,28 @@ async function freeBytesAt(dir: string): Promise<number | null> {
 /** Replaced by tests: the free space on the recordings drive. */
 let freeBytesProbe: (dir: string) => Promise<number | null> = freeBytesAt;
 
+/** Replaced by tests: which hardware encoders work here (`recorderEncoder.ts`, cached). */
+let encoderDetector: (force?: boolean) => Promise<RecorderEncoderReport> = (force) => detectRecorderEncoders({ force });
+let lastEncoderReport: RecorderEncoderReport | null = null;
+
+async function detectEncoders(force = false): Promise<RecorderEncoderReport> {
+  const report = await encoderDetector(force);
+  lastEncoderReport = report;
+  return report;
+}
+
 // ---------------------------------------------------------------------------
 // State
 
 interface Session {
   id: string;
+  /** `-1` for a window recording: no monitor going away stops it. */
   displayId: number;
   displayBounds: RectLike;
   region: RectLike;
+  source: RecorderSourceKind;
+  /** The recorded window's title, in window mode. */
+  windowName?: string;
   title: string;
   partialPath: string;
   metaPath: string;
@@ -235,6 +272,10 @@ export function getRecorderState(): RecorderState {
     jobs,
     recoverable: recoverable.filter((r) => !dismissedRecoverable.has(r.id)),
     loopbackSupported: process.platform === 'win32',
+    source: session?.source ?? null,
+    ...(session?.windowName ? { windowName: session.windowName } : {}),
+    encoders: lastEncoderReport ?? cachedRecorderEncoderReport(),
+    waitingForModel: waitingForModelCount(),
   };
 }
 
@@ -348,10 +389,26 @@ function closeSelect(): void {
 }
 
 const PANEL_WIDTH = 360;
+/** How long the hidden host may take to hand back a running recorder. */
+let RECORDER_HOST_START_TIMEOUT_MS = 20_000;
+/** The panel's bottom-right corner on its work area, fixed when it is created. */
+let panelAnchor: { right: number; bottom: number } | null = null;
+/** The height last asked of the panel (see `resizePanel`). */
+let panelHeight = 0;
+
+/** True when every window still open is one of the recorder's own. */
+function onlyRecorderWindowsLeft(): boolean {
+  const ours = new Set<BrowserWindow | null | undefined>([panelWin, frameWin, selectWin, session?.host]);
+  return BrowserWindow.getAllWindows().every((w) => w.isDestroyed() || ours.has(w));
+}
 
 function panelWanted(): boolean {
-  return phase === 'recording' || phase === 'paused' || phase === 'starting'
-    || jobs.length > 0 || getRecorderState().recoverable.length > 0 || phase === 'error';
+  if (phase === 'recording' || phase === 'paused' || phase === 'starting') return true;
+  const wanted = jobs.length > 0 || getRecorderState().recoverable.length > 0 || phase === 'error';
+  if (!wanted) return false;
+  // A job card must not keep the app alive once every app window is closed — only a
+  // recording, or a job still turning the partial into an MP4, may.
+  return !onlyRecorderWindowsLeft() || jobs.some((j) => j.phase === 'finalizing' || j.phase === 'importing');
 }
 
 function ensurePanel(): BrowserWindow {
@@ -359,12 +416,14 @@ function ensurePanel(): BrowserWindow {
   const work = (session ? screen.getAllDisplays().find((d) => d.id === session?.displayId) : null)?.workArea
     ?? screen.getPrimaryDisplay().workArea;
   const height = 120;
+  panelAnchor = { right: Math.round(work.x + work.width - 16), bottom: Math.round(work.y + work.height - 16) };
+  panelHeight = height;
   const win = new BrowserWindow({
     ...baseOverlayOptions(),
     transparent: false,
     backgroundColor: '#1b1b1f',
-    x: Math.round(work.x + work.width - PANEL_WIDTH - 16),
-    y: Math.round(work.y + work.height - height - 16),
+    x: panelAnchor.right - PANEL_WIDTH,
+    y: panelAnchor.bottom - height,
     width: PANEL_WIDTH,
     height,
     focusable: true,
@@ -376,6 +435,11 @@ function ensurePanel(): BrowserWindow {
   wire(win);
   win.webContents.on('did-finish-load', () => sendTo(win, CH.state, getRecorderState()));
   win.once('ready-to-show', () => syncPanel());
+  // `syncPanel` will not show a panel that is still loading, and both events above can
+  // arrive while `isLoading()` is still true (it only clears at did-stop-loading). Measured
+  // live 2026-10-08: the crash-recovery offer at startup stayed hidden for good, because
+  // nothing broadcast after the panel finished loading.
+  win.webContents.on('did-stop-loading', () => syncPanel());
   win.on('closed', () => {
     if (panelWin === win) panelWin = null;
   });
@@ -385,20 +449,40 @@ function ensurePanel(): BrowserWindow {
 
 function syncPanel(): void {
   if (!panelWanted()) {
-    if (panelWin && !panelWin.isDestroyed() && panelWin.isVisible()) panelWin.hide();
+    if (panelWin && !panelWin.isDestroyed()) {
+      // A hidden window still counts for `window-all-closed`: measured live 2026-10-08,
+      // closing Study OS and Blanc after one recording left the process running with
+      // only this panel. When nothing else is open it is destroyed, not hidden.
+      if (onlyRecorderWindowsLeft()) {
+        const win = panelWin;
+        panelWin = null;
+        win.destroy();
+      } else if (panelWin.isVisible()) {
+        panelWin.hide();
+      }
+    }
     return;
   }
   const win = ensurePanel();
   if (!win.isVisible() && win.webContents.isLoading?.() === false) win.showInactive();
 }
 
+/**
+ * Grow or shrink the panel upwards from its fixed bottom-right corner.
+ *
+ * Computed from the anchor and the last height ASKED for, never from `getBounds()`:
+ * Windows hands back a frameless, non-resizable window's bounds a few pixels off what
+ * was set, and the old read-modify-write fed that error back on every 500 ms render.
+ * Measured live 2026-10-08: within three minutes of recording the pill had shrunk to
+ * 32×56 px and walked to y = -9928, off every screen, with Pause and Stop on it.
+ */
 function resizePanel(height: number): void {
   const win = panelWin;
-  if (!win || win.isDestroyed()) return;
-  const b = win.getBounds();
+  if (!win || win.isDestroyed() || !panelAnchor) return;
   const h = Math.round(Math.min(560, Math.max(64, height)));
-  if (h === b.height) return;
-  win.setBounds({ x: b.x, y: b.y + b.height - h, width: b.width, height: h });
+  if (h === panelHeight) return;
+  panelHeight = h;
+  win.setBounds({ x: panelAnchor.right - PANEL_WIDTH, y: panelAnchor.bottom - h, width: PANEL_WIDTH, height: h });
 }
 
 function showFrame(s: Session): void {
@@ -457,7 +541,10 @@ function syncIndicator(): void {
 // Starting
 
 /** The region hotkey, the tray, the Start menu, Blanc: begin, or stop what is running. */
-export async function startRecorder(mode: RecorderStartMode = 'select'): Promise<RecorderState> {
+export async function startRecorder(
+  mode: RecorderStartMode = 'select',
+  options: { sourceId?: string } = {},
+): Promise<RecorderState> {
   loadSettings();
   if (phase === 'recording' || phase === 'paused') {
     await stopRecording();
@@ -469,6 +556,9 @@ export async function startRecorder(mode: RecorderStartMode = 'select'): Promise
     if (session) session.stopWhenStarted = true;
     return getRecorderState();
   }
+  // Stopping stays possible above; starting (the region picker, a new session) does
+  // not while locked. Its panel and frame are hidden by the lock guard meanwhile.
+  if (refuseWhileLocked('window:recorder')) return getRecorderState();
   if (phase === 'selecting') {
     selectWin?.show();
     selectWin?.focus();
@@ -483,11 +573,80 @@ export async function startRecorder(mode: RecorderStartMode = 'select'): Promise
   }
   const display = displayUnderCursor();
   if (mode === 'full') {
-    await beginRecording(display, { x: 0, y: 0, width: display.bounds.width, height: display.bounds.height });
+    await beginRecording(display, { x: 0, y: 0, width: display.bounds.width, height: display.bounds.height }, { source: 'monitor' });
+    return getRecorderState();
+  }
+  if (mode === 'window') {
+    const target = await resolveWindowSource(options.sourceId);
+    if (!target) {
+      failStart('rec2.error.noWindow');
+      return getRecorderState();
+    }
+    await beginRecording(display, { x: 0, y: 0, width: display.bounds.width, height: display.bounds.height }, {
+      source: 'window',
+      window: target,
+    });
     return getRecorderState();
   }
   openSelect(display);
   return getRecorderState();
+}
+
+/** Gum's own windows, which "the active window" must never be. */
+function ownWindowSourceIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      if (!win.isDestroyed()) ids.add(win.getMediaSourceId());
+    } catch {
+      /* torn down */
+    }
+  }
+  return ids;
+}
+
+/** Windows that can be recorded, Gum's own left out, topmost first. */
+export async function listRecordableWindows(thumbnails = true): Promise<RecorderWindowSource[]> {
+  let sources: Electron.DesktopCapturerSource[] = [];
+  try {
+    sources = await desktopCapturer.getSources({
+      types: ['window'],
+      thumbnailSize: thumbnails ? { width: 240, height: 135 } : { width: 0, height: 0 },
+      fetchWindowIcons: false,
+    });
+  } catch {
+    return [];
+  }
+  const own = ownWindowSourceIds();
+  return sources
+    .filter((s) => /^window:/.test(s.id) && !own.has(s.id) && s.name.trim())
+    .slice(0, 60)
+    .map((s) => {
+      let thumbnail = '';
+      try {
+        thumbnail = thumbnails && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : '';
+      } catch {
+        thumbnail = '';
+      }
+      return { id: s.id, name: s.name.slice(0, 200), thumbnail };
+    });
+}
+
+/** The window a window recording should capture: the one asked for, else the topmost foreign one. */
+async function resolveWindowSource(sourceId?: string): Promise<{ id: string; name: string } | null> {
+  let sources: Electron.DesktopCapturerSource[] = [];
+  try {
+    sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } });
+  } catch {
+    return null;
+  }
+  const own = ownWindowSourceIds();
+  if (sourceId) {
+    const asked = sources.find((s) => s.id === sourceId && !own.has(s.id));
+    return asked ? { id: asked.id, name: asked.name } : null;
+  }
+  const picked = pickActiveWindowSource(sources, own);
+  return picked ? { id: picked.id, name: picked.name } : null;
 }
 
 function failStart(key: string, detail?: string): void {
@@ -531,8 +690,13 @@ async function waitForHost(win: BrowserWindow): Promise<boolean> {
   return false;
 }
 
-async function beginRecording(display: Electron.Display, region: RectLike): Promise<void> {
+async function beginRecording(
+  display: Electron.Display,
+  region: RectLike,
+  options: { source?: RecorderSourceKind; window?: { id: string; name: string } } = {},
+): Promise<void> {
   if (phase === 'starting' || phase === 'recording' || phase === 'paused') return;
+  const source: RecorderSourceKind = options.window ? 'window' : options.source ?? 'region';
   if (region.width < RECORDER_MIN_REGION || region.height < RECORDER_MIN_REGION) {
     failStart('recorder.error.regionTooSmall');
     return;
@@ -583,19 +747,31 @@ async function beginRecording(display: Electron.Display, region: RectLike): Prom
   wire(host);
   const wantsSystem = recorderWantsSystemAudio(settings.audio);
   const loopback = wantsSystem && process.platform === 'win32';
+  const wantedWindow = options.window;
   const releaseCapture = registerDisplayMediaRequester(host.webContents, async () => {
+    if (wantedWindow) {
+      // Asked again at grant time: a window can close between the choice and the start.
+      const windows = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } });
+      const win = windows.find((w) => w.id === wantedWindow.id);
+      if (!win) return null;
+      return loopback ? { video: win, audio: 'loopback' } : { video: win };
+    }
     const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 256, height: 256 } });
-    const source = pickScreenSource(sources, screen.getAllDisplays(), display);
-    if (!source) return null;
-    return loopback ? { video: source, audio: 'loopback' } : { video: source };
+    const picked = pickScreenSource(sources, screen.getAllDisplays(), display);
+    if (!picked) return null;
+    return loopback ? { video: picked, audio: 'loopback' } : { video: picked };
   });
 
   const s: Session = {
     id,
-    displayId: display.id,
+    displayId: wantedWindow ? -1 : display.id,
     displayBounds: display.bounds,
     region,
-    title: recordingBaseName(new Date(startedAt)),
+    source,
+    ...(wantedWindow ? { windowName: wantedWindow.name.slice(0, 200) } : {}),
+    title: wantedWindow
+      ? `${recordingBaseName(new Date(startedAt))} ${wantedWindow.name}`.slice(0, 120)
+      : recordingBaseName(new Date(startedAt)),
     partialPath,
     metaPath: path.join(partialDir, `${id}.json`),
     folder,
@@ -646,14 +822,29 @@ async function beginRecording(display: Electron.Display, region: RectLike): Prom
     micGain: settings.micGain,
     videoBitsPerSecond: recorderVideoBitrate(settings.quality, settings.fps),
     chunkMs: RECORDER_CHUNK_MS,
+    ...(wantedWindow ? { fullFrame: true } : {}),
   };
   let result: RecorderHostStartResult | null = null;
   if (up) {
+    let startTimer: NodeJS.Timeout | undefined;
     try {
       // `userGesture: true`: getDisplayMedia wants a user activation, and this start is the user's.
-      result = await host.webContents.executeJavaScript(`window.__gumRecorderStart(${JSON.stringify(config)})`, true);
+      // Bounded: a host page that reloads or dies mid-start leaves this promise unsettled, and
+      // without a deadline the session sat in `starting` for good — pill on "Starting…", the
+      // hotkey and Stop both swallowed (measured live 2026-10-08).
+      result = await Promise.race([
+        host.webContents.executeJavaScript(`window.__gumRecorderStart(${JSON.stringify(config)})`, true) as Promise<RecorderHostStartResult>,
+        new Promise<RecorderHostStartResult>((resolve) => {
+          startTimer = setTimeout(
+            () => resolve({ ok: false, errorKey: 'recorder.error.hostFailed', error: 'the recorder did not start in time' }),
+            RECORDER_HOST_START_TIMEOUT_MS,
+          );
+        }),
+      ]);
     } catch (err) {
       result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+    } finally {
+      if (startTimer) clearTimeout(startTimer);
     }
   }
   if (session !== s) return;
@@ -668,11 +859,14 @@ async function beginRecording(display: Electron.Display, region: RectLike): Prom
   s.mic = result.mic === true;
   if (wantsSystem && loopback && !result.systemAudio) s.systemAudio = 'off';
   s.startedAt = Date.now();
-  settings = { ...settings, lastRegion: { displayId: display.id, ...region } };
-  saveSettings();
+  if (source !== 'window') {
+    settings = { ...settings, lastRegion: { displayId: display.id, ...region } };
+    saveSettings();
+  }
   writeMeta(s, false);
   phase = 'recording';
-  showFrame(s);
+  // A window moves and resizes on its own; a border drawn where it started would lie.
+  if (source !== 'window') showFrame(s);
   s.tick = setInterval(() => recorderTick(), 1000);
   s.diskTick = setInterval(() => void diskTick(), 15_000);
   broadcast();
@@ -694,6 +888,7 @@ function writeMeta(s: Session, complete: boolean): void {
     hasAudio: s.hasAudio,
     recordedMs: recordedMs(s.startedAt, Date.now(), s.pausedTotalMs, s.pausedSince),
     complete,
+    source: s.source,
   };
   try {
     writeJsonAtomicSync(s.metaPath, meta, { space: 0 });
@@ -759,7 +954,8 @@ function onHostEvent(event: RecorderHostEvent): void {
   const s = session;
   if (!s) return;
   if (event.type === 'stopped') s.stoppedSeq?.(event.lastSeq);
-  else if (event.type === 'ended') void stopRecording('recorder.stopped.ended');
+  // A window's track ends when the window closes (or is minimised away by some apps).
+  else if (event.type === 'ended') void stopRecording(s.source === 'window' ? 'rec2.stopped.windowClosed' : 'recorder.stopped.ended');
   else if (event.type === 'error') void stopRecording('recorder.stopped.error');
   else if (event.type === 'levels') sendTo(panelWin, CH.levels, { mic: event.mic, system: event.system });
 }
@@ -848,7 +1044,7 @@ export function stopRecording(reasonKey?: string): Promise<void> {
     const meta = normalizePartialMeta(readJsonSync<unknown>(s.metaPath, null));
     const job = createJob(meta ?? {
       version: 1, id: s.id, startedAt: s.startedAt, title: s.title, folder: s.folder, quality: settings.quality,
-      crop: s.crop, hasAudio: s.hasAudio, recordedMs: durationMs, complete: true,
+      crop: s.crop, hasAudio: s.hasAudio, recordedMs: durationMs, complete: true, source: s.source,
     }, s.partialPath, s.stopReasonKey);
     broadcast();
     void runJob(job.id);
@@ -870,6 +1066,7 @@ function createJob(meta: RecorderPartialMeta, partialPath: string, stopReasonKey
     durationMs: meta.recordedMs,
     hasAudio: null,
     transcript: 'off',
+    source: meta.source ?? 'region',
     ...(stopReasonKey ? { stopReasonKey } : {}),
   };
   jobs = [...jobs.filter((j) => j.id !== job.id), job].slice(-5);
@@ -910,10 +1107,15 @@ function removePartial(partialPath: string): void {
     /* locked: the marker keeps recovery from offering it */
   }
   if (fs.existsSync(partialPath)) return;
-  try {
-    fs.rmSync(partialMetaPathOf(partialPath), { force: true });
-  } catch {
-    /* an orphan sidecar is ignored by recovery */
+  const metaPath = partialMetaPathOf(partialPath);
+  // The sidecar and its last-good copy (`atomicJson` keeps `<file>.bak`), which
+  // was otherwise left behind in `.partial` for every finished recording.
+  for (const file of [metaPath, `${metaPath}.bak`]) {
+    try {
+      fs.rmSync(file, { force: true });
+    } catch {
+      /* an orphan sidecar is ignored by recovery */
+    }
   }
 }
 
@@ -943,11 +1145,16 @@ async function runJob(jobId: string): Promise<void> {
   const output = path.join(folder, name);
   patchJob(jobId, { phase: 'finalizing', progress: 0, errorKey: undefined, errorDetail: undefined });
   let lastSent = 0;
+  // `software` never pays for detection; anything else uses the (cached) probe.
+  const report = settings.encoder === 'software' ? null : await detectEncoders().catch(() => null);
+  const chosen = resolveRecorderEncoder(settings.encoder, report);
   const handle = finalizeRecording({
     input: job.partialPath,
     output,
     crop: meta.crop,
     quality: meta.quality,
+    encoder: chosen.encoder,
+    fitToFirstFrame: meta.source === 'window',
     durationHintSec: meta.recordedMs > 0 ? meta.recordedMs / 1000 : undefined,
     onProgress: (fraction) => {
       const now = Date.now();
@@ -968,12 +1175,36 @@ async function runJob(jobId: string): Promise<void> {
   markPartialFinished(job.partialPath, result.output);
   removePartial(job.partialPath);
   recoverable = recoverable.filter((r) => r.id !== jobId);
+  const durationMs = result.durationSec ? Math.round(result.durationSec * 1000) : job.durationMs;
   patchJob(jobId, {
     phase: 'importing',
     progress: 1,
     outputPath: result.output,
     hasAudio: result.hasAudio,
-    durationMs: result.durationSec ? Math.round(result.durationSec * 1000) : job.durationMs,
+    durationMs,
+    encoder: result.encoder,
+    ...(result.fellBack || chosen.fallback ? { encoderFellBack: true } : {}),
+  });
+  let bytes = 0;
+  try {
+    bytes = fs.statSync(result.output).size;
+  } catch {
+    bytes = 0;
+  }
+  // In the history from the moment the MP4 exists, whatever happens to the import.
+  recordHistory({
+    id: jobId,
+    title: meta.title,
+    outputPath: result.output,
+    createdAt: meta.startedAt,
+    studyDay: recorderStudyDay(meta.startedAt),
+    durationMs,
+    bytes,
+    source: meta.source ?? 'region',
+    hasAudio: result.hasAudio,
+    encoder: result.encoder,
+    transcript: 'off',
+    studyTagged: false,
   });
   let mediaId: string | undefined;
   try {
@@ -982,6 +1213,8 @@ async function runJob(jobId: string): Promise<void> {
   } catch {
     mediaId = undefined;
   }
+  if (mediaId) patchHistory(jobId, { mediaId });
+  void tagStudyDay(jobId);
   if (!mediaId) {
     patchJob(jobId, { phase: 'ready', errorKey: 'recorder.job.error.import' });
     if (settings.autoOpen) void openJob(jobId);
@@ -990,6 +1223,7 @@ async function runJob(jobId: string): Promise<void> {
   patchJob(jobId, { mediaId });
   if (!result.hasAudio) {
     patchJob(jobId, { phase: 'ready', transcript: 'no-audio' });
+    patchHistory(jobId, { transcript: 'no-audio' });
     if (settings.autoOpen) void openJob(jobId);
     return;
   }
@@ -1001,11 +1235,152 @@ async function runJob(jobId: string): Promise<void> {
   await transcribeJob(jobId);
 }
 
+// ---------------------------------------------------------------------------
+// History (`recordings-history.json`): every finished MP4, across restarts
+
+let history: RecorderHistoryEntry[] | null = null;
+
+function historyPath(): string {
+  return path.join(app.getPath('userData'), 'recordings-history.json');
+}
+
+function loadHistory(): RecorderHistoryEntry[] {
+  if (history) return history;
+  try {
+    history = recorderHistoryFromDisk(readJsonSync<unknown>(historyPath(), []));
+  } catch {
+    history = [];
+  }
+  return history;
+}
+
+function saveHistory(): void {
+  try {
+    writeJsonAtomicSync(historyPath(), loadHistory(), { space: 0 });
+  } catch {
+    /* the files are still on disk; only the list is lost */
+  }
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed() || win === session?.host) continue;
+    sendTo(win, CH.historyChanged, loadHistory());
+  }
+}
+
+function recordHistory(entry: RecorderHistoryEntry): void {
+  const existing = loadHistory().find((e) => e.id === entry.id);
+  // A retried finish keeps what the first one already learned (its tag, its media id).
+  history = upsertRecorderHistory(loadHistory(), existing
+    ? { ...entry, studyTagged: existing.studyTagged, ...(existing.mediaId ? { mediaId: existing.mediaId } : {}) }
+    : entry);
+  saveHistory();
+}
+
+function patchHistory(id: string, patch: Partial<RecorderHistoryEntry>): RecorderHistoryEntry | undefined {
+  const entry = loadHistory().find((e) => e.id === id);
+  if (!entry) return undefined;
+  const next = { ...entry, ...patch };
+  history = upsertRecorderHistory(loadHistory(), next);
+  saveHistory();
+  return next;
+}
+
+/** The finished recordings, newest first; ones whose file is gone are marked, not dropped. */
+export function listRecorderHistory(): Array<RecorderHistoryEntry & { missing: boolean }> {
+  return loadHistory().map((entry) => ({ ...entry, missing: !fs.existsSync(entry.outputPath) }));
+}
+
+function waitingForModelCount(): number {
+  const ids = new Set(jobs.filter((j) => j.transcript === 'waiting-model').map((j) => j.id));
+  for (const entry of history ?? []) if (entry.transcript === 'waiting-model') ids.add(entry.id);
+  return ids.size;
+}
+
+async function historyAction(id: string, action: RecorderHistoryAction): Promise<{ ok: boolean; mediaId?: string; errorKey?: string }> {
+  const entry = loadHistory().find((e) => e.id === id);
+  if (!entry) return { ok: false, errorKey: 'rec2.history.error.gone' };
+  if (action === 'show') {
+    shell.showItemInFolder(entry.outputPath);
+    return { ok: true };
+  }
+  if (action === 'open') {
+    if (!fs.existsSync(entry.outputPath)) return { ok: false, errorKey: 'rec2.history.error.missing' };
+    await openRecording(entry.outputPath, entry.mediaId);
+    return { ok: true };
+  }
+  if (action === 'transcribe') {
+    if (!entry.mediaId) return { ok: false, errorKey: 'rec2.history.error.notInLibrary' };
+    const live = jobs.find((j) => j.id === id && j.mediaId);
+    if (live) await transcribeJob(id);
+    else await transcribeHistory(id);
+    return { ok: true };
+  }
+  // delete: to the Recycle Bin / Trash, never unlinked — the confirmation in the UI
+  // is the first safety, the bin the second.
+  if (fs.existsSync(entry.outputPath)) {
+    try {
+      await shell.trashItem(entry.outputPath);
+    } catch {
+      return { ok: false, errorKey: 'rec2.history.error.delete' };
+    }
+  }
+  history = loadHistory().filter((e) => e.id !== id);
+  saveHistory();
+  jobs = jobs.filter((j) => j.id !== id);
+  broadcast();
+  return { ok: true, ...(entry.mediaId ? { mediaId: entry.mediaId } : {}) };
+}
+
+// ---------------------------------------------------------------------------
+// Study day: Calendar and Statistics live in the main window's storage, so that
+// window files the recording (`recorderMainBridge.ts`); main remembers it did.
+
+const studyTagPending = new Map<string, { resolve: (ok: boolean) => void; timer: NodeJS.Timeout }>();
+
+async function tagStudyDay(id: string): Promise<boolean> {
+  if (!loadSettings().studyTag) return false;
+  const entry = loadHistory().find((e) => e.id === id);
+  if (!entry || entry.studyTagged) return false;
+  const win = deps?.getMainWindow() ?? null;
+  if (!win || win.isDestroyed()) return false;
+  const requestId = nextId('t');
+  const request: RecorderStudyTagRequest = {
+    requestId,
+    id: entry.id,
+    title: entry.title,
+    studyDay: entry.studyDay,
+    createdAt: entry.createdAt,
+    seconds: Math.round(entry.durationMs / 1000),
+    outputPath: entry.outputPath,
+    ...(entry.mediaId ? { mediaId: entry.mediaId } : {}),
+  };
+  const ok = await new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      studyTagPending.delete(requestId);
+      resolve(false);
+    }, 8000);
+    studyTagPending.set(requestId, { resolve, timer });
+    sendTo(win, CH.studyTag, request);
+  });
+  if (ok) patchHistory(id, { studyTagged: true });
+  return ok;
+}
+
+/** Recordings not yet on their study day (no main window at the time, or it did not answer). */
+async function retryStudyTags(): Promise<void> {
+  if (!loadSettings().studyTag) return;
+  for (const entry of loadHistory().filter((e) => !e.studyTagged).slice(0, 20)) {
+    if (!(await tagStudyDay(entry.id))) break;
+  }
+}
+
 const modelPending = new Map<string, { resolve: (ready: boolean | null) => void; timer: NodeJS.Timeout }>();
 
-/** Whisper lives in the renderer, so the panel (same origin, same model cache) answers. */
-function askModelReady(lang: string): Promise<boolean | null> {
-  const win = ensurePanel();
+/**
+ * Whisper lives in the renderer, so a renderer of the same origin (same model
+ * cache) answers: `via` when given (the window that just said a model
+ * changed), else the panel.
+ */
+function askModelReady(lang: string, via?: Electron.WebContents | null): Promise<boolean | null> {
   const requestId = nextId('m');
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -1013,40 +1388,116 @@ function askModelReady(lang: string): Promise<boolean | null> {
       resolve(null);
     }, 8000);
     modelPending.set(requestId, { resolve, timer });
+    if (via) {
+      try {
+        if (!via.isDestroyed()) via.send(CH.modelCheck, { requestId, lang });
+      } catch {
+        /* the asker went away: the timer answers null */
+      }
+      return;
+    }
+    const win = ensurePanel();
     const send = (): void => sendTo(win, CH.modelCheck, { requestId, lang });
     if (win.webContents.isLoading?.()) win.webContents.once('did-finish-load', send);
     else send();
   });
 }
 
-async function transcribeJob(jobId: string): Promise<void> {
-  const job = jobs.find((j) => j.id === jobId);
-  if (!job?.mediaId) return;
-  const lang = getMainStudyLang();
-  patchJob(jobId, { phase: 'transcribing', transcript: 'checking' });
-  const ready = await askModelReady(lang);
-  if (ready === false) {
-    // A missing model would make every 30 s chunk time out into an empty transcript.
-    patchJob(jobId, { phase: 'ready', transcript: 'model-missing' });
-    if (settings.autoOpen) void openJob(jobId);
-    return;
-  }
+/** Queue one library item for Whisper in the study language. */
+function enqueueRecordingTranscription(mediaId: string, lang: string): { ok: boolean; error?: string } {
   // Before the library's own subtitle discovery runs (it would queue the same job; duplicates merge).
-  const queued = enqueueTranscription({
-    mediaId: job.mediaId,
+  return enqueueTranscription({
+    mediaId,
     lang,
     // A recording is not a deck: no automatic sentence cards; mining happens in the player.
     cardOptions: { createCards: false, translateToEnglish: false, includeAudio: false },
   });
+}
+
+async function transcribeJob(jobId: string, via?: Electron.WebContents | null, knownReady?: boolean): Promise<void> {
+  const job = jobs.find((j) => j.id === jobId);
+  if (!job?.mediaId) return;
+  const lang = getMainStudyLang();
+  patchJob(jobId, { phase: 'transcribing', transcript: 'checking' });
+  const ready = knownReady ?? await askModelReady(lang, via);
+  if (ready === false) {
+    // A missing model would make every 30 s chunk time out into an empty transcript.
+    // The recording waits instead, and starts on its own once the model is downloaded
+    // (`onModelChanged`) — in this run or, through the history, the next.
+    patchJob(jobId, { phase: 'ready', transcript: 'waiting-model' });
+    patchHistory(jobId, { transcript: 'waiting-model' });
+    if (settings.autoOpen) void openJob(jobId);
+    return;
+  }
+  const queued = enqueueRecordingTranscription(job.mediaId, lang);
   if (!queued.ok) {
     patchJob(jobId, { phase: 'ready', transcript: 'failed', errorDetail: queued.error });
+    patchHistory(jobId, { transcript: 'failed' });
     if (settings.autoOpen) void openJob(jobId);
     return;
   }
   patchJob(jobId, { transcript: 'queued' });
+  patchHistory(jobId, { transcript: 'queued' });
+}
+
+/** A recording that is only in the history (its job card was dismissed, or the app restarted). */
+async function transcribeHistory(id: string, via?: Electron.WebContents | null, knownReady?: boolean): Promise<void> {
+  const entry = loadHistory().find((e) => e.id === id);
+  if (!entry?.mediaId) return;
+  const lang = getMainStudyLang();
+  const ready = knownReady ?? await askModelReady(lang, via ?? deps?.getMainWindow()?.webContents ?? null);
+  if (ready === false) {
+    patchHistory(id, { transcript: 'waiting-model' });
+    broadcast();
+    return;
+  }
+  const queued = enqueueRecordingTranscription(entry.mediaId, lang);
+  patchHistory(id, { transcript: queued.ok ? 'queued' : 'failed' });
+  broadcast();
+}
+
+/**
+ * A renderer saw the Whisper model set change (a download finished anywhere in
+ * the app, or a window just started and says hello). Every recording waiting
+ * for the model is checked once, and started if the model is there now.
+ */
+let modelCheckRunning: Promise<void> | null = null;
+
+async function onModelChanged(via: Electron.WebContents | null): Promise<void> {
+  void retryStudyTags();
+  // Several windows hear the same download (the one that ran it, and every other
+  // through the storage event): one check at a time, and each recording is
+  // re-read just before it starts, so nothing is queued twice.
+  if (modelCheckRunning) await modelCheckRunning.catch(() => undefined);
+  const isWaiting = (state: string | undefined): boolean => state === 'waiting-model' || state === 'model-missing';
+  if (!jobs.some((j) => isWaiting(j.transcript)) && !loadHistory().some((e) => e.transcript === 'waiting-model')) return;
+  const run = (async () => {
+    const ready = await askModelReady(getMainStudyLang(), via);
+    if (ready !== true) return;
+    for (const job of [...jobs]) {
+      if (isWaiting(jobs.find((j) => j.id === job.id)?.transcript)) await transcribeJob(job.id, via, true);
+    }
+    for (const entry of [...loadHistory()]) {
+      if (jobs.some((j) => j.id === entry.id)) continue;
+      if (loadHistory().find((e) => e.id === entry.id)?.transcript === 'waiting-model') await transcribeHistory(entry.id, via, true);
+    }
+  })();
+  modelCheckRunning = run;
+  try {
+    await run;
+  } finally {
+    if (modelCheckRunning === run) modelCheckRunning = null;
+  }
 }
 
 function onTranscriptionProgress(progress: { mediaId: string; phase: string; done: number; total: number }): void {
+  const entry = (history ?? []).find((e) => e.mediaId === progress.mediaId);
+  if (entry) {
+    const next = progress.phase === 'done' ? 'done'
+      : progress.phase === 'error' || progress.phase === 'cancelled' ? 'failed'
+        : progress.phase === 'queued' ? 'queued' : 'running';
+    if (entry.transcript !== next) patchHistory(entry.id, { transcript: next });
+  }
   const job = jobs.find((j) => j.mediaId === progress.mediaId && j.phase === 'transcribing');
   if (!job) return;
   if (progress.phase === 'done') {
@@ -1063,13 +1514,12 @@ function onTranscriptionProgress(progress: { mediaId: string; phase: string; don
 const openPending = new Map<string, { resolve: (reach: string | null) => void; timer: NodeJS.Timeout }>();
 
 /**
- * Open a finished recording in the study player of the main window. When that
- * window has no player (or the player is switched off), the file plays in the
- * system's own player instead, and the job says so.
+ * Open a recording in the study player of the main window. When that window
+ * has no player (or the player is switched off), the file plays in the
+ * system's own player instead. Returns `''` on success in the player,
+ * `'direct'` when it went to the system player, else the system's error.
  */
-async function openJob(jobId: string): Promise<void> {
-  const job = jobs.find((j) => j.id === jobId);
-  if (!job?.outputPath) return;
+async function openRecording(outputPath: string, mediaId?: string): Promise<'' | 'direct' | string> {
   const win = deps?.getMainWindow() ?? null;
   let reach: string | null = null;
   if (win && !win.isDestroyed()) {
@@ -1083,15 +1533,23 @@ async function openJob(jobId: string): Promise<void> {
         resolve(null);
       }, 6000);
       openPending.set(requestId, { resolve, timer });
-      sendTo(win, CH.openInPlayer, { requestId, path: job.outputPath, mediaId: job.mediaId });
+      sendTo(win, CH.openInPlayer, { requestId, path: outputPath, mediaId });
     });
   }
-  if (reach === 'ready') {
+  if (reach === 'ready') return '';
+  const failed = await shell.openPath(outputPath).catch((err: unknown) => String(err));
+  return failed || 'direct';
+}
+
+async function openJob(jobId: string): Promise<void> {
+  const job = jobs.find((j) => j.id === jobId);
+  if (!job?.outputPath) return;
+  const outcome = await openRecording(job.outputPath, job.mediaId);
+  if (outcome === '') {
     patchJob(jobId, { playedDirect: false });
     return;
   }
-  const failed = await shell.openPath(job.outputPath).catch((err: unknown) => String(err));
-  patchJob(jobId, { playedDirect: true, ...(failed ? { errorKey: 'recorder.job.error.open', errorDetail: failed } : {}) });
+  patchJob(jobId, { playedDirect: true, ...(outcome !== 'direct' ? { errorKey: 'recorder.job.error.open', errorDetail: outcome } : {}) });
 }
 
 async function jobAction(jobId: string, action: RecorderJobAction): Promise<RecorderState> {
@@ -1137,7 +1595,18 @@ export function scanRecoverable(): RecorderRecoverable[] {
       } catch {
         continue;
       }
-      if (bytes === 0) continue;
+      if (bytes === 0) {
+        // A start that died before its first chunk (crash, kill): nothing to recover, and
+        // nothing else ever removes it — it used to sit in `.partial` for good.
+        for (const file of [partialPath, path.join(dir, `${id}.json`), path.join(dir, `${id}.json.bak`)]) {
+          try {
+            fs.rmSync(file, { force: true });
+          } catch {
+            /* locked: tried again on the next scan */
+          }
+        }
+        continue;
+      }
       const raw = readJsonSync<unknown>(path.join(dir, `${id}.json`), null);
       if (finishedOutputOf(raw)) {
         // Already finished (the delete after it failed): tidy up instead of offering it again.
@@ -1192,19 +1661,43 @@ export function registerRegionRecorderIpc(): void {
     ['recorder.region', () => void startRecorder('select'), 'Ctrl+Alt+Shift+E'],
     ['recorder.repeatRegion', () => void startRecorder('repeat'), ''],
     ['recorder.stop', () => void stopRecording(), ''],
+    ['recorder.window', () => void startRecorder('window'), ''],
   ] as const) {
     registerGlobalCommand(id, run, { defaultKeys });
   }
 
   ipcMain.handle(CH.getState, () => getRecorderState());
+  ipcMain.handle(CH.detectEncoders, async (_e, force: unknown) => {
+    await detectEncoders(force === true).catch(() => null);
+    broadcast();
+    return getRecorderState();
+  });
+  ipcMain.handle(CH.listWindows, () => listRecordableWindows(true));
+  ipcMain.handle(CH.historyList, () => listRecorderHistory());
+  ipcMain.handle(CH.historyAction, (_e, id: unknown, action: unknown) =>
+    historyAction(String(id ?? ''), RECORDER_HISTORY_ACTIONS.includes(action as RecorderHistoryAction)
+      ? action as RecorderHistoryAction : 'show'));
+  ipcMain.on(CH.modelChanged, (event) => {
+    void onModelChanged(event.sender ?? null);
+  });
+  ipcMain.on(CH.studyTagReply, (_event, reply: { requestId?: string; ok?: boolean }) => {
+    const pending = reply?.requestId ? studyTagPending.get(reply.requestId) : undefined;
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    studyTagPending.delete(String(reply.requestId));
+    pending.resolve(reply.ok === true);
+  });
   ipcMain.handle(CH.setSettings, (_e, patch: unknown) => {
     settings = normalizeRecorderSettings(patch, settings);
     saveSettings();
     broadcast();
     return getRecorderState();
   });
-  ipcMain.handle(CH.start, (_e, mode: unknown) =>
-    startRecorder(mode === 'repeat' || mode === 'full' ? mode : 'select'));
+  ipcMain.handle(CH.start, (_e, mode: unknown, sourceId: unknown) =>
+    startRecorder(
+      mode === 'repeat' || mode === 'full' || mode === 'window' ? mode : 'select',
+      typeof sourceId === 'string' && /^window:[\w:-]{1,80}$/.test(sourceId) ? { sourceId } : {},
+    ));
   ipcMain.handle(CH.stop, async () => {
     if (phase === 'error') {
       // The panel's Dismiss on a failed start.
@@ -1305,6 +1798,10 @@ export function registerRegionRecorderIpc(): void {
 
   onMainTranscriptionProgress(onTranscriptionProgress);
   screen.on('display-removed', onDisplayRemoved);
+  // Any app window closing may leave the panel as the last window (see `syncPanel`).
+  app.on('browser-window-created', (_event, win) => {
+    win.once('closed', () => setImmediate(onAppWindowClosed));
+  });
 
   app.on('before-quit', () => {
     // Quitting mid-recording: close the file so what was recorded is recoverable next time.
@@ -1336,9 +1833,14 @@ function cancelFinalizesOnQuit(): void {
   }
 }
 
+function onAppWindowClosed(): void {
+  if (panelWin && !panelWin.isDestroyed()) syncPanel();
+}
+
 /** After the first paint: offer recordings a crash left unfinished. */
 export function startRegionRecorder(): void {
   loadSettings();
+  loadHistory();
   if (scanRecoverable().length) broadcast();
 }
 
@@ -1350,6 +1852,15 @@ export const __regionRecorderTestables = {
   diskTick,
   onDisplayRemoved,
   cancelFinalizesOnQuit,
+  onAppWindowClosed,
+  setHostStartTimeout: (ms: number): void => {
+    RECORDER_HOST_START_TIMEOUT_MS = ms;
+  },
+  setEncoderDetector: (detector: (force?: boolean) => Promise<RecorderEncoderReport>): void => {
+    encoderDetector = detector;
+  },
+  onModelChanged,
+  retryStudyTags,
   session: (): Session | null => session,
   reset: (): void => {
     if (session) {
@@ -1368,5 +1879,7 @@ export const __regionRecorderTestables = {
     jobRuns.clear();
     dismissedRecoverable.clear();
     closeSelect();
+    history = null;
+    lastEncoderReport = null;
   },
 };

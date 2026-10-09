@@ -203,19 +203,27 @@ export function nextBrowserSort(current: BrowserSort | null, columnId: string): 
   return null; // third click returns to the source's own order
 }
 
+/**
+ * One collator for every comparison. `localeCompare` with options builds (or
+ * looks up) a collator per call, and a 100,000-row sort makes ~1.7 million
+ * calls; the ordering is identical, the setup is paid once.
+ */
+let sortCollator: Intl.Collator | null = null;
+function browserCollator(): Intl.Collator {
+  sortCollator ??= new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+  return sortCollator;
+}
+
 export function sortBrowserRows(rows: BrowserRow[], sort: BrowserSort | null): BrowserRow[] {
   if (!sort) return rows;
   const sign = sort.dir === 'asc' ? 1 : -1;
+  const collator = browserCollator();
   // Stable by construction: index breaks every tie, so re-sorting never shuffles
   // rows the user is looking at.
   return rows
-    .map((row, i) => ({ row, i }))
+    .map((row, i) => ({ row, i, key: row.cells[sort.columnId] ?? '' }))
     .sort((a, b) => {
-      const cmp = (a.row.cells[sort.columnId] ?? '').localeCompare(
-        b.row.cells[sort.columnId] ?? '',
-        undefined,
-        { numeric: true, sensitivity: 'base' },
-      );
+      const cmp = collator.compare(a.key, b.key);
       return cmp !== 0 ? cmp * sign : a.i - b.i;
     })
     .map((x) => x.row);
@@ -236,19 +244,36 @@ export type BrowserSelection =
 
 export const EMPTY_SELECTION: BrowserSelection = { mode: 'explicit', ids: [] };
 
+/**
+ * A Set view of a selection's id list, built once per list. Selections are
+ * immutable values (every change makes a new array), so caching by array
+ * identity is safe — and it turns "is this row selected" from a scan of the
+ * whole list into a lookup. With 50,000 rows selected the grid asked that
+ * question for every visible row, and the bulk tray for every loaded one.
+ */
+const idSets = new WeakMap<readonly string[], Set<string>>();
+function idSet(ids: readonly string[]): Set<string> {
+  let set = idSets.get(ids);
+  if (!set) {
+    set = new Set(ids);
+    idSets.set(ids, set);
+  }
+  return set;
+}
+
 export function isRowSelected(selection: BrowserSelection, noteId: string): boolean {
   return selection.mode === 'explicit'
-    ? selection.ids.includes(noteId)
-    : !selection.except.includes(noteId);
+    ? idSet(selection.ids).has(noteId)
+    : !idSet(selection.except).has(noteId);
 }
 
 export function toggleRowSelection(selection: BrowserSelection, noteId: string): BrowserSelection {
   if (selection.mode === 'explicit') {
-    return selection.ids.includes(noteId)
+    return idSet(selection.ids).has(noteId)
       ? { mode: 'explicit', ids: selection.ids.filter((id) => id !== noteId) }
       : { mode: 'explicit', ids: [...selection.ids, noteId] };
   }
-  return selection.except.includes(noteId)
+  return idSet(selection.except).has(noteId)
     ? { mode: 'all-matching', except: selection.except.filter((id) => id !== noteId) }
     : { mode: 'all-matching', except: [...selection.except, noteId] };
 }
@@ -264,11 +289,18 @@ export function selectRowRange(
   const b = rows.findIndex((r) => r.noteId === toId);
   if (a < 0 || b < 0) return selection;
   const span = rows.slice(Math.min(a, b), Math.max(a, b) + 1).map((r) => r.noteId);
+  // Sets, not `includes`: a shift-click across 20,000 rows was 400 million comparisons.
   if (selection.mode === 'all-matching') {
-    return { mode: 'all-matching', except: selection.except.filter((id) => !span.includes(id)) };
+    const inSpan = new Set(span);
+    return { mode: 'all-matching', except: selection.except.filter((id) => !inSpan.has(id)) };
   }
   const ids = [...selection.ids];
-  for (const id of span) if (!ids.includes(id)) ids.push(id);
+  const have = new Set(ids);
+  for (const id of span) {
+    if (have.has(id)) continue;
+    have.add(id);
+    ids.push(id);
+  }
   return { mode: 'explicit', ids };
 }
 

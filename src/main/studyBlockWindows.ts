@@ -23,6 +23,7 @@
  */
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { refuseWhileLocked } from './lockGuard';
 import path from 'node:path';
 import {
   centreOnWorkArea,
@@ -209,6 +210,8 @@ export function openStudyBlockWindow(
   displayKey?: string,
 ): boolean {
   if (!isHostedDetachBlock(blockId)) return false;
+  // A detached block skips the PIN pad by design (App.tsx), so it never opens locked.
+  if (refuseWhileLocked('window:study-block')) return false;
   const key = mapKey(surface, blockId);
 
   const existing = windows.get(key);

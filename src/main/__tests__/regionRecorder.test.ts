@@ -31,6 +31,7 @@ const h = vi.hoisted(() => ({
   finalizeResult: { ok: true } as Record<string, unknown>,
   finalizedContent: '',
   openPath: vi.fn(async () => ''),
+  readyBeforeLoad: false,
 }));
 
 vi.mock('electron', async () => {
@@ -39,9 +40,10 @@ vi.mock('electron', async () => {
   class FakeWebContents extends EventEmitter {
     id = nextId++;
     sent: Sent[] = [];
+    loading = false;
     mainFrame = { processId: 3, routingId: this.id };
     executeJavaScript = vi.fn(async (code: string) => (code.startsWith('typeof') ? true : h.startResult));
-    isLoading(): boolean { return false; }
+    isLoading(): boolean { return this.loading; }
     send(channel: string, payload: unknown): void {
       this.sent.push({ channel, payload });
       h.onSend?.(this, channel, payload);
@@ -65,7 +67,18 @@ vi.mock('electron', async () => {
     }
     loadURL(url: string): Promise<void> {
       this.url = url;
+      this.webContents.loading = true;
       setTimeout(() => {
+        if (h.readyBeforeLoad) {
+          // Electron's order: ready-to-show and did-finish-load can both come while
+          // `isLoading()` is still true; it clears only at did-stop-loading.
+          this.emit('ready-to-show');
+          this.webContents.emit('did-finish-load');
+          this.webContents.loading = false;
+          this.webContents.emit('did-stop-loading');
+          return;
+        }
+        this.webContents.loading = false;
         this.webContents.emit('did-finish-load');
         this.emit('ready-to-show');
       }, 0);
@@ -158,6 +171,7 @@ import {
   registerRegionRecorderIpc,
   scanRecoverable,
   startRecorder,
+  startRegionRecorder,
 } from '../regionRecorder';
 import type { RecorderState } from '../../shared/regionRecorder';
 
@@ -278,6 +292,59 @@ describe('region recorder', () => {
     expect(getRecorderState().jobs.at(-1)).toMatchObject({ phase: 'ready', transcript: 'done', mediaId: 'media-1' });
   });
 
+  it('leaves nothing of a finished recording in .partial: no sidecar, no sidecar .bak', async () => {
+    await startRecorder('full');
+    const partial = T.session()!.partialPath;
+    chunk(live('regionRecorder=host').at(-1)!, 0, 'x');
+    lastStoppedSeq = 0;
+    await invoke('recorder:stop');
+    await until(() => getRecorderState().jobs.at(-1)?.phase === 'ready' || getRecorderState().jobs.at(-1)?.phase === 'transcribing');
+    const sidecar = partial.replace(/\.webm$/, '.json');
+    expect(fs.existsSync(partial)).toBe(false);
+    expect(fs.existsSync(sidecar)).toBe(false);
+    // atomicJson keeps `<file>.bak`; measured live 2026-10-08 it outlived every finished recording.
+    expect(fs.existsSync(`${sidecar}.bak`)).toBe(false);
+  });
+
+  it('grows the pill from its fixed corner, whatever bounds the OS reports back', async () => {
+    await startRecorder('full');
+    await until(() => live('regionRecorder=panel').length === 1);
+    const panel = live('regionRecorder=panel')[0]! as FakeWin & { bounds: { x: number; y: number; width: number; height: number } };
+    const resize = (height: number): void => {
+      h.listeners.get('recorder:panel-resize')!({ sender: panel.webContents }, height);
+    };
+    // Windows hands back a frameless window's bounds a few px off what was set. The old
+    // read-modify-write fed that error back on every render: measured live, the pill
+    // shrank to 32x56 and walked to y = -9928 within three minutes.
+    panel.getBounds = () => ({ x: panel.bounds.x + 8, y: panel.bounds.y - 8, width: panel.bounds.width - 16, height: panel.bounds.height + 8 });
+    for (let i = 0; i < 50; i += 1) resize(i % 2 ? 90 : 140);
+    resize(140);
+    // Work area 1920x1040, 16 px margin: right edge 1904, bottom edge 1024.
+    expect(panel.bounds).toEqual({ x: 1904 - 360, y: 1024 - 140, width: 360, height: 140 });
+    resize(5000);
+    expect(panel.bounds).toEqual({ x: 1904 - 360, y: 1024 - 560, width: 360, height: 560 });
+    await invoke('recorder:stop');
+  });
+
+  it('a host that never answers the start fails the start instead of staying in "starting"', async () => {
+    const saved = h.startResult;
+    // A host page that reloads mid-start leaves executeJavaScript unsettled (measured live).
+    h.startResult = new Promise(() => undefined) as unknown as Record<string, unknown>;
+    T.setHostStartTimeout(30);
+    try {
+      await startRecorder('full');
+      expect(getRecorderState().phase).toBe('error');
+      expect(getRecorderState().errorKey).toBe('recorder.error.hostFailed');
+      expect(live('regionRecorder=host')).toHaveLength(0);
+      expect(T.session()).toBeNull();
+    } finally {
+      h.startResult = saved;
+      T.setHostStartTimeout(20_000);
+    }
+    await invoke('recorder:stop');
+    expect(getRecorderState().phase).toBe('idle');
+  });
+
   it('stops at the time limit, counting recorded time only', async () => {
     await startRecorder('full');
     const s = T.session()!;
@@ -367,6 +434,21 @@ describe('region recorder', () => {
     expect(fs.existsSync(partial.replace(/\.webm$/, '.json'))).toBe(false);
   });
 
+  it('removes an empty partial a dead start left behind instead of keeping it forever', () => {
+    const dir = path.join(h.userData, 'empty-partials', '.partial');
+    fs.mkdirSync(dir, { recursive: true });
+    const empty = path.join(dir, 'rec-dead-start.webm');
+    fs.writeFileSync(empty, '');
+    const real = path.join(dir, 'rec-crashed.webm');
+    fs.writeFileSync(real, 'webm bytes');
+    return invoke('recorder:set-settings', { folder: path.dirname(dir) }).then(() => {
+      const found = scanRecoverable().map((r) => r.partialPath);
+      expect(found).toContain(real);
+      expect(found).not.toContain(empty);
+      expect(fs.existsSync(empty)).toBe(false);
+    });
+  });
+
   it('never offers a partial that already became an MP4: tidies it instead', async () => {
     h.finalizeResult = { ok: false, error: 'failed' };
     await startRecorder('full');
@@ -416,5 +498,41 @@ describe('region recorder', () => {
     // A second quit signal finds nothing left to kill.
     (willQuit[0]![1] as () => void)();
     expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the crash-recovery offer at startup even when the panel paints before it finishes loading', async () => {
+    for (const w of live('regionRecorder=panel')) (w as unknown as { destroy: () => void }).destroy();
+    const dir = path.join(h.userData, 'startup-recovery', '.partial');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'rec-killed.webm'), 'webm bytes');
+    await invoke('recorder:set-settings', { folder: path.dirname(dir) });
+    h.readyBeforeLoad = true;
+    try {
+      startRegionRecorder();
+      await until(() => live('regionRecorder=panel').length === 1);
+      // Measured live 2026-10-08: the offer existed but its window was never shown.
+      await until(() => live('regionRecorder=panel')[0]!.isVisible());
+      expect(getRecorderState().recoverable.map((r) => path.basename(r.partialPath))).toContain('rec-killed.webm');
+    } finally {
+      h.readyBeforeLoad = false;
+    }
+  });
+
+  // Last: it closes the stand-in for the main window.
+  it('a job card alone never keeps the app running once every app window is closed', async () => {
+    await startRecorder('full');
+    chunk(live('regionRecorder=host').at(-1)!, 0, 'data');
+    lastStoppedSeq = 0;
+    await invoke('recorder:stop');
+    await until(() => getRecorderState().jobs.at(-1)?.phase === 'ready' || getRecorderState().jobs.at(-1)?.phase === 'transcribing');
+    await until(() => live('regionRecorder=panel').length === 1);
+    expect(live('regionRecorder=panel')[0]!.isVisible()).toBe(true);
+
+    // Measured live 2026-10-08: with Study OS and Blanc closed the process stayed up
+    // holding only this panel, so `window-all-closed` never fired.
+    (mainWin as unknown as { destroy: () => void }).destroy();
+    T.onAppWindowClosed();
+    expect(live('regionRecorder=panel')).toHaveLength(0);
+    expect(BrowserWindow.getAllWindows()).toHaveLength(0);
   });
 });

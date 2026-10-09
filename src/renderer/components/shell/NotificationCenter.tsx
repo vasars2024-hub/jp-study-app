@@ -9,13 +9,20 @@ import { Notification, Toggle, useWiredMaterials } from '../ui';
 import {
   clearAll,
   dismiss,
+  dismissMany,
+  dndUntil,
   getNotifications,
   isDnd,
   markAllRead,
+  msUntilHour,
   onNotificationsChanged,
   setDnd,
+  setDndFor,
   type NotificationKind,
 } from '../../notificationStore';
+import { groupNotifications } from './notificationGroups';
+import HelpLink from '../onboarding/HelpLink';
+import './notificationGroups.css';
 import { openExtensionSettings, openShortcutSettings } from '../../extensionBridgeUi';
 import { openSectionSurface } from '../../sectionSurface';
 import { useT } from '../../i18n';
@@ -116,6 +123,9 @@ export default function NotificationCenter() {
 
   if (!open) return null;
   const items = getNotifications();
+  // shell2: grouped by day, identical notices in a row collapsed with a count.
+  const groups = groupNotifications(items);
+  const quietUntil = dndUntil();
 
   return (
     <>
@@ -138,17 +148,58 @@ export default function NotificationCenter() {
             {t('notifications.clearAll')}
           </button>
         </header>
+        <div className="os-notif-quiet" role="group" aria-label={t('shell2.dnd.forLabel')}>
+          <span className="os-notif-quiet-state type-status" aria-live="polite">
+            {quietUntil
+              ? t('shell2.dnd.until', {
+                  time: new Date(quietUntil).toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' }),
+                })
+              : isDnd()
+                ? t('shell2.dnd.onIndefinite')
+                : t('shell2.dnd.offHint')}
+          </span>
+          <button
+            type="button"
+            className="ui-btn ui-btn--sm ui-btn--ghost ui-focusable"
+            onClick={() => setDndFor(60 * 60 * 1000)}
+          >
+            {t('shell2.dnd.hour')}
+          </button>
+          <button
+            type="button"
+            className="ui-btn ui-btn--sm ui-btn--ghost ui-focusable"
+            onClick={() => setDndFor(msUntilHour(8))}
+          >
+            {t('shell2.dnd.morning')}
+          </button>
+          <HelpLink topic="notifications" />
+        </div>
         <div className="os-flyout-body" role="log" aria-label={t('notifications.listLabel')}>
           {items.length === 0 ? (
             <div className="os-notif-empty type-body">{wired ? t('wired.bulletin.empty') : t('notifications.empty')}</div>
           ) : (
-            items.map((n) => {
+            groups.map((group) => (
+            <section key={group.bucket} className="os-notif-group" aria-labelledby={`os-notif-group-${group.bucket}`}>
+              <div className="os-notif-group-head">
+                <h3 id={`os-notif-group-${group.bucket}`} className="os-notif-group-title type-status">
+                  {t(`shell2.notif.group.${group.bucket}`)}
+                </h3>
+                <button
+                  type="button"
+                  className="ui-btn ui-btn--sm ui-btn--ghost ui-focusable"
+                  aria-label={t('shell2.notif.clearGroup', { group: t(`shell2.notif.group.${group.bucket}`) })}
+                  onClick={() => dismissMany(group.ids)}
+                >
+                  {t('shell2.notif.clear')}
+                </button>
+              </div>
+            {group.rows.map(({ item: n, ids, count }) => {
               // A notice posted with catalog keys follows the live language; the
               // stored text is only the fallback for entries without them.
               const title = n.i18n?.title ? t(n.i18n.title, n.i18n.vars) : n.title;
               const message = n.i18n ? t(n.i18n.message, n.i18n.vars) : n.message;
               return (
-              <div key={n.id} className={closingIds.has(n.id) ? 'wired-notif-closing' : undefined}>
+              <div key={n.id} className={closingIds.has(n.id) ? 'wired-notif-closing' : undefined} data-notif-count={count}>
               <Notification
                 title={title}
                 kind={uiKind(n.kind)}
@@ -169,7 +220,7 @@ export default function NotificationCenter() {
                     ? t('notifications.dismissNamed', { title: title || message })
                     : t('notifications.dismiss')
                 }
-                onClose={() => dismissEntry(n.id)}
+                onClose={() => (count > 1 ? dismissMany(ids) : dismissEntry(n.id))}
               >
                 {wired && (
                   <div className="wired-notif-meta">
@@ -186,7 +237,10 @@ export default function NotificationCenter() {
                   </div>
                 )}
                 <span>{message}</span>
-                <div className="os-notif-time type-status">{wired ? new Date(n.ts).toLocaleTimeString(LANG_TAGS[lang]) : timeAgo(n.ts)}</div>
+                <div className="os-notif-time type-status">
+                  {wired ? new Date(n.ts).toLocaleTimeString(LANG_TAGS[lang]) : timeAgo(n.ts)}
+                  {count > 1 ? ` · ${t('shell2.notif.repeat', { count })}` : ''}
+                </div>
                 {n.actionUrl || n.clientAction ? (
                   <div className="os-notif-actions" style={{ marginTop: 8 }}>
                     <button
@@ -230,7 +284,9 @@ export default function NotificationCenter() {
               </Notification>
               </div>
               );
-            })
+            })}
+            </section>
+            ))
           )}
         </div>
       </aside>

@@ -1590,11 +1590,13 @@ html[data-display-links='1'] .linkish {
    frame changes, and the scale variable simply stops being used. Settings →
    Appearance → Pillarbox style writes `data-aero-fill` (pillarboxSettings.ts). */
 :root[data-materials='aero'][data-aero-fill='on'] .os-viewport-frame {
+  /* Pin all four edges AND the size. Never `left/top: auto` here: with
+     `width/height: auto` plus the base rule's `contain: size`, an absolutely
+     positioned box with an auto edge shrink-wraps to its (contained = zero)
+     intrinsic size, collapsing the desktop to 0×0. */
   inset: 0;
-  left: auto;
-  top: auto;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   transform: none;
   outline: none;
   box-shadow: none;
@@ -25739,6 +25741,14 @@ html.lockscreen-widget-root #root {
 .yt-chip.status.removed {
   border-color: color-mix(in srgb, var(--accent, #a33) 55%, transparent);
   color: var(--muted);
+}
+/* Watch progress from the study player's resume store (yt2). */
+.yt-chip.status.resume {
+  border-color: color-mix(in srgb, #4a8fd9 55%, transparent);
+  background: color-mix(in srgb, #4a8fd9 14%, transparent);
+}
+.yt-chip.status.watched {
+  opacity: 0.75;
 }
 .yt-list {
   flex: 1;

@@ -7,3 +7,17 @@
 :root[data-theme='classic-light'] .os-set-advanced-btn.on {
   color: #312e81;
 }
+
+/* set2: "Recently changed" on Settings Home — a heading with its Clear action,
+   and each row's time pushed to the trailing edge. */
+.os-set-home-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.os-set-recent-item > small {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}

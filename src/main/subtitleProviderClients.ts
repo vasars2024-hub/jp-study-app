@@ -431,7 +431,8 @@ export async function jimakuSearchDetailed(
     if (!name || !url) continue;
     const format = formatFromName(name);
     if (!format) {
-      if (isExtractableArchive(name)) archives.push({ name, url });
+      // `.rar` too: Jimaku season packs are uploaded in it (see `RAR_ARCHIVE_EXT`).
+      if (isExtractableArchive(name, { rar: true })) archives.push({ name, url });
       continue;
     }
     out.push({

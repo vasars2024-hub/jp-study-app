@@ -17,6 +17,20 @@ export interface DuplicateCheckResult {
   unreachable?: boolean;
 }
 
+/**
+ * `checkAnkiDuplicates` for an IPC caller (the dictionary's "in Anki" marker):
+ * the arguments arrive untyped from the renderer, so anything that is not a
+ * string list and a deck/note-type pair is treated as empty rather than trusted.
+ */
+export function checkAnkiDuplicatesFromIpc(terms: unknown, target: unknown): Promise<DuplicateCheckResult> {
+  const list = Array.isArray(terms) ? terms.filter((term): term is string => typeof term === 'string') : [];
+  const t = target && typeof target === 'object' ? (target as { deckName?: unknown; modelName?: unknown }) : {};
+  return checkAnkiDuplicates(list, {
+    deckName: typeof t.deckName === 'string' ? t.deckName : '',
+    modelName: typeof t.modelName === 'string' ? t.modelName : '',
+  });
+}
+
 export async function checkAnkiDuplicates(
   terms: readonly string[],
   target: { deckName: string; modelName: string },

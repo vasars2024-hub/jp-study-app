@@ -95,6 +95,18 @@ export default function LockscreenPage() {
             {t('settings.lock.sessionHint')}
           </p>
         )}
+        {/* lock2: what the lock does and, honestly, what it does not. */}
+        <section aria-labelledby="lock2-note-title" style={{ margin: '12px 0 0', fontSize: 12, lineHeight: 1.45 }}>
+          <p id="lock2-note-title" style={{ margin: 0 }}>
+            <strong>{t('lock2.note.title')}</strong>
+          </p>
+          <ul className="muted" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+            <li>{t('lock2.note.covers')}</li>
+            <li>{t('lock2.note.background')}</li>
+            <li>{t('lock2.note.devtools')}</li>
+            <li>{t('lock2.note.limits')}</li>
+          </ul>
+        </section>
       </SettingsCard>
 
       <SettingsCard

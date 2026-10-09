@@ -188,12 +188,19 @@ export interface TypeRound extends RoundBase {
   hint?: string;
   /** Audio-first round: the prompt is spoken, not shown. */
   speak?: boolean;
+  /**
+   * The source card's own recording (a mined clip, a dictionary or VN voice line). A
+   * listening round plays it before falling back to speech synthesis, then to text.
+   */
+  audio?: { audioDataUrl?: string; audioPath?: string };
 }
 
 export interface BuilderRound extends RoundBase {
   kind: 'builder';
   tokens: string[];
   answerTokens: string[];
+  /** On a learner's own sentence: the meaning of the word the sentence was mined for. */
+  hint?: string;
 }
 
 export interface MatchRound extends RoundBase {
@@ -235,11 +242,26 @@ export interface PickContext {
   weak?: ReadonlySet<string>;
   /** Keys dealt so far this session; filled in as rounds are built so none repeats while others remain. */
   used?: Set<string>;
+  /**
+   * i+1 (`shared/gameStudyMix.ts`): item keys of words that are due or still being learned.
+   * Rounds marked in `targetSlots` deal one of these; the others prefer `known` items, so a
+   * session is mostly words the learner knows with a few being learned.
+   */
+  target?: ReadonlySet<string>;
+  known?: ReadonlySet<string>;
+  /** Per round index: true deals a target item. Absent: no mix, the old draw. */
+  targetSlots?: readonly boolean[];
+  /** Sentence keys whose other words are all known: preferred for sentence rounds. */
+  prefer?: ReadonlySet<string>;
+  /** Set per round by `buildGameRound` from `targetSlots`. */
+  slot?: 'target' | 'known';
 }
 
 export interface RoundOutcome {
   correct: boolean;
   mistake?: ArenaMistake;
+  /** Word Match: whether each pair was matched right, so each word is banked on its own. */
+  pairs?: { jp: string; correct: boolean }[];
 }
 
 export interface CompletionScoreInput {
@@ -278,7 +300,26 @@ function choose<T>(pool: readonly T[], seed: number, keyOf: (item: T) => string,
   if (pool.length === 0) return null;
   const used = ctx?.used;
   const fresh = used ? pool.filter((item) => !used.has(keyOf(item))) : [...pool];
-  const base = fresh.length ? fresh : [...pool];
+  let base = fresh.length ? fresh : [...pool];
+  // i+1: a target round deals a due / learning item; the other rounds prefer known ones.
+  // Each narrowing only applies when it leaves something, so a thin deck still plays.
+  const target = ctx?.target;
+  if (ctx?.slot && target && target.size) {
+    const targets = base.filter((item) => target.has(keyOf(item)));
+    const others = base.filter((item) => !target.has(keyOf(item)));
+    if (ctx.slot === 'target' && targets.length) base = targets;
+    else if (ctx.slot === 'known') {
+      const knownSet = ctx.known;
+      const known = knownSet && knownSet.size ? others.filter((item) => knownSet.has(keyOf(item))) : [];
+      if (known.length) base = known;
+      else if (others.length) base = others;
+    }
+  }
+  const prefer = ctx?.prefer;
+  if (prefer && prefer.size) {
+    const preferred = base.filter((item) => prefer.has(keyOf(item)));
+    if (preferred.length) base = preferred;
+  }
   const weakSet = ctx?.weak;
   const seenSet = ctx?.seen;
   const weak = weakSet && weakSet.size ? base.filter((item) => weakSet.has(keyOf(item))) : [];
@@ -546,6 +587,10 @@ export function buildGameRound(
   const pack = content?.pack ?? GAME_PACKS[studyLang];
   const sl = studyLang;
   const seed = mixSeed(sequence, level, hashText(gameId), ctx?.salt ?? 0);
+  // The round's i+1 slot. Spread, not mutated: `used` stays the one shared Set.
+  if (ctx?.targetSlots) {
+    ctx = { ...ctx, slot: ctx.targetSlots[sequence] ? 'target' : 'known' };
+  }
   const base = { gameId, level, sourceLang, studyLang } as const;
   const id = (key: string) => `${gameId}-${ctx?.salt ?? 0}-${sequence}-${key}`;
 
@@ -562,6 +607,8 @@ export function buildGameRound(
       prompt: speak ? '' : mined.masked,
       promptLang: sl,
       jp: mined.sentence,
+      // The card's word, so the answer is evidence about it (its review, or practice).
+      ...(mined.word ? { word: mined.word } : {}),
       reading: mined.reading,
       mineMeaning: mined.hint,
       answer: mined.answer,
@@ -569,6 +616,7 @@ export function buildGameRound(
       inputLang: sl,
       hint: mined.hint,
       speak,
+      ...(speak && mined.audio ? { audio: mined.audio } : {}),
     };
   }
 
@@ -615,6 +663,47 @@ export function buildGameRound(
         // "cat; feline" — either sense is a right answer, not only the whole gloss.
         acceptable: meaningAlternatives(word.meaning),
         inputLang: sourceLang,
+      };
+    }
+  }
+  if (gameId === 'speed-type') {
+    // Production: the meaning is shown, the learner's own word is typed (its reading counts).
+    const word = choose(ownVocab, seed, KEY.vocab, ctx);
+    if (word) {
+      return {
+        ...base,
+        kind: 'type',
+        id: id(word.word),
+        prompt: word.meaning,
+        promptLang: sourceLang,
+        jp: word.word,
+        word: word.word,
+        reading: word.reading,
+        mineMeaning: word.meaning,
+        answer: word.word,
+        acceptable: [word.word, word.reading].filter(Boolean),
+        inputLang: sl,
+      };
+    }
+  }
+  if (gameId === 'sentence-builder') {
+    // The learner's own mined sentences, in phrase-sized pieces, keyed like the cloze rounds.
+    const own = (content?.sentences ?? []).filter((card) => card.pieces && card.pieces.length >= 3 && card.sentence);
+    const card = choose(own, seed, (c) => c.sentence ?? '', ctx);
+    if (card?.pieces && card.sentence) {
+      return {
+        ...base,
+        kind: 'builder',
+        id: id(card.sentence),
+        prompt: card.word,
+        promptLang: sl,
+        jp: card.sentence,
+        word: card.word,
+        reading: card.reading || undefined,
+        mineMeaning: card.meaning,
+        hint: card.meaning,
+        tokens: shuffledDifferent(card.pieces, seed),
+        answerTokens: card.pieces,
       };
     }
   }
@@ -872,8 +961,9 @@ export function evaluateRound(round: GameRound, answer: string | string[] | Reco
   }
 
   const mapping = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
-  const correct = round.pairs.every((pair) => mapping[pair.jp] === pair.meaning);
-  return correct ? { correct } : { correct, mistake: makeMistake(round, JSON.stringify(mapping)) };
+  const pairs = round.pairs.map((pair) => ({ jp: pair.jp, correct: mapping[pair.jp] === pair.meaning }));
+  const correct = pairs.every((pair) => pair.correct);
+  return correct ? { correct, pairs } : { correct, pairs, mistake: makeMistake(round, JSON.stringify(mapping)) };
 }
 
 /**
@@ -981,9 +1071,14 @@ export function gamePoolSize(
       return nearLevel(pack.particles, level);
     case 'counter-quiz':
       return nearLevel(pack.counters, level);
-    case 'sentence-builder':
-    case 'speed-type':
-      return nearLevel(pack.sentences, level);
+    case 'sentence-builder': {
+      const own = (content?.sentences ?? []).filter((card) => card.pieces && card.pieces.length >= 3).length;
+      return own || nearLevel(pack.sentences, level);
+    }
+    case 'speed-type': {
+      const own = (content?.vocab ?? []).length;
+      return own || nearLevel(pack.sentences, level);
+    }
     default:
       return 0;
   }

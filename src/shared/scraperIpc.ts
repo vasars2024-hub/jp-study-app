@@ -95,6 +95,8 @@ export const SCRAPER_CHANNELS = {
   qbitTest: 'scraper:qbitTest',
   qbitTransfers: 'scraper:qbitTransfers',
   qbitSend: 'scraper:qbitSend',
+  /** `.torrent` files → qBittorrent (`qbitAddTorrentFiles`). Not a port method: only the Torrent Manager offers it. */
+  qbitAddTorrentFiles: 'scraper:qbitAddTorrentFiles',
   qbitAction: 'scraper:qbitAction',
   freeSpace: 'scraper:freeSpace',
   startScrape: 'scraper:startScrape',
@@ -263,6 +265,15 @@ export interface ScraperQbitSendInput extends ScraperQbitInput {
    */
   ingest?: import('./mediaIngest').ScraperIngestHandoff;
 }
+
+/** `.torrent` files to add to qBittorrent (read in the renderer, parsed and checked in main). */
+export interface ScraperQbitTorrentFileInput extends ScraperQbitInput {
+  files: Array<{ fileName: string; data: Uint8Array }>;
+  ingest?: import('./mediaIngest').ScraperIngestHandoff;
+}
+
+/** At most this many `.torrent` files in one add. */
+export const QBIT_TORRENT_FILES_MAX = 50;
 
 /** What the Downloads page and Torrent Manager can do to a transfer. */
 export const QBIT_TORRENT_ACTIONS = ['pause', 'resume', 'recheck', 'retry', 'delete'] as const;

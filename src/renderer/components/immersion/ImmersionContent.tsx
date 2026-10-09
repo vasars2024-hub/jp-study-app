@@ -31,6 +31,7 @@ import {
   immersionNavAfter,
   immersionScrollPct,
   immersionStatsId,
+  immersionTotalsByHost,
   isNoVideoCaptureError,
   isRemoteMediaUrl,
   nextImmersionMode,
@@ -87,8 +88,11 @@ import { getTokenizer, tokenizerReady } from '../../tokenizer';
 import { onKnowledgeChanged } from '../../knownWords';
 import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
+import { openMediaWorkspace } from '../../mediaWorkspaceBridge';
+import { youtubeErrorMessage } from '../../../shared/youtubeErrors';
 import { removeImmersionSiteWithConfirm } from './immersionSiteActions';
 import { Select } from '../ui';
+import '../reading/readingEcosystem.css';
 
 export { IMMERSION_MODE_CYCLE, IMMERSION_STARTERS, WK_HIGHLIGHT_CSS };
 export type { ImmersionMode };
@@ -206,6 +210,13 @@ export function useImmersion() {
   const [popup, setPopup] = useState<PopupState>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
+  /** The file the last Capture video saved, until it is opened or dismissed. */
+  const [capturedPath, setCapturedPath] = useState<string | null>(null);
+  const studyCaptured = (): void => {
+    if (!capturedPath) return;
+    openMediaWorkspace({ localFilePath: capturedPath });
+    setCapturedPath(null);
+  };
   /** Slice 70: study lookup on the LIVE guest page, not just Reader Mode. */
   const [liveLookup, setLiveLookup] = useState(true);
   /**
@@ -220,6 +231,8 @@ export function useImmersion() {
   const urlBarRef = useRef<HTMLInputElement>(null);
   const secondsAcc = useRef(0);
   const charsAcc = useRef(0);
+  /** Dictionary lookups on the page since the last flush — banked onto its history row. */
+  const lookupsAcc = useRef(0);
   const activeStatsId = useRef('');
   const activeTitle = useRef('Immersion');
   const pageOpenAt = useRef(Date.now());
@@ -288,9 +301,11 @@ export function useImmersion() {
     if (!id) return;
     const secs = secondsAcc.current;
     const chars = charsAcc.current;
-    if (secs <= 0 && chars <= 0) return;
+    const lookups = lookupsAcc.current;
+    if (secs <= 0 && chars <= 0 && lookups <= 0) return;
     secondsAcc.current = 0;
     charsAcc.current = 0;
+    lookupsAcc.current = 0;
     recordReading(id, activeTitle.current, secs, chars);
     if (chars > 0) recordReadingCharsForGarden({ sourceId: id, chars });
     if (currentUrl) {
@@ -303,6 +318,7 @@ export function useImmersion() {
         title: activeTitle.current,
         seconds: secs,
         chars,
+        ...(lookups > 0 ? { lookups } : {}),
         // How far this page was read, so the rail's progress bar has a number.
         ...(readPctRef.current > 0 ? { completionPct: readPctRef.current } : {}),
         countVisit: false,
@@ -327,7 +343,7 @@ export function useImmersion() {
       if (elapsed > 0 && elapsed < 120 && currentUrl && document.visibilityState === 'visible') {
         secondsAcc.current += elapsed;
       }
-      if (secondsAcc.current >= 2 || charsAcc.current > 0) flushStats();
+      if (secondsAcc.current >= 2 || charsAcc.current > 0 || lookupsAcc.current > 0) flushStats();
     }, STATS_FLUSH_MS);
     return () => {
       window.clearInterval(tick);
@@ -706,6 +722,7 @@ export function useImmersion() {
       setPopup({ kind: 'translate', query: hit.query });
       return;
     }
+    lookupsAcc.current += 1;
     setPopup({ kind: 'dict', query: hit.query, x: hit.x, y: hit.y, context: hit.context });
   };
 
@@ -763,6 +780,7 @@ export function useImmersion() {
         setPopup({ kind: 'translate', query: hit.query });
         return;
       }
+      lookupsAcc.current += 1;
       setPopup({ kind: 'dict', query: hit.query, x: hit.x, y: hit.y, context: hit.context });
     },
     // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
@@ -929,15 +947,23 @@ export function useImmersion() {
         // diagnostic. Neither half is a sentence a reader can act on, so the
         // common case gets the product's own words and everything else keeps
         // the detail but inside a translated frame.
+        const known = youtubeErrorMessage(res.error);
         setStatus(isNoVideoCaptureError(res.error)
           ? t('immersion.captureNoVideo')
-          : t('immersion.captureFailedDetail', { detail: res.error }));
+          : known
+            ? t(known.key, known.vars)
+            : t('immersion.captureFailedDetail', { detail: res.error }));
       } else {
         void window.api.immersionBumpMetrics({ videosCaptured: 1 });
         setStatus(t('immersion.savedToMedia'));
+        // The capture is a video to study: offer the study player (subtitles, auto-pause,
+        // line loop, one-key mining) rather than leaving it to be found in the library.
+        if ('item' in res && res.item?.path) setCapturedPath(res.item.path);
       }
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : t('immersion.captureFailed'));
+      setStatus(e instanceof Error
+        ? t('immersion.captureFailedDetail', { detail: e.message })
+        : t('immersion.captureFailed'));
     } finally {
       setCaptureBusy(false);
     }
@@ -1144,6 +1170,7 @@ export function useImmersion() {
     updateBookmark, removeBookmark, addFolder, removeFolder, clearHistory,
     session, switchTab, newTab, closeTab, rootRef, lang, studyLang,
     captureBusy, railOpen, setRailOpen,
+    capturedPath, setCapturedPath, studyCaptured,
     liveLookup, setLiveLookup,
     showChrome, showReader, showWebview, splitView, showRail,
     readerRef, webviewRef, urlBarRef,
@@ -1476,8 +1503,20 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
       */}
       <div className="sr-only" role="status" aria-live="polite">{status ?? ''}</div>
       {status && (
-        <button type="button" className="immersion-banner status" onClick={() => state.setStatus(null)}>
+        <button
+          type="button"
+          className="immersion-banner status"
+          onClick={() => {
+            state.setStatus(null);
+            state.setCapturedPath(null);
+          }}
+        >
           {status}
+        </button>
+      )}
+      {state.capturedPath && (
+        <button type="button" className="btn primary immersion-study-capture" onClick={state.studyCaptured}>
+          {t('yt2.capture.study')}
         </button>
       )}
 
@@ -1667,6 +1706,9 @@ export function ImmersionStatsCard({ state }: { state: ImmersionState }) {
       off?.();
     };
   }, []);
+  // The per-page history rows have always banked time, characters and (now)
+  // lookups; this is the first place they are added up per SITE and shown.
+  const topSites = useMemo(() => immersionTotalsByHost(state.sites, 3), [state.sites]);
   if (!today) return null;
   const nf = new Intl.NumberFormat(LANG_TAGS[lang]);
   const minutes = (s: number) => nf.format(Math.round(s / 60));
@@ -1681,9 +1723,44 @@ export function ImmersionStatsCard({ state }: { state: ImmersionState }) {
           videos: nf.format(today.videosCaptured),
         })}
       </p>
+      {today.wordsMined > 0 && (
+        <p className="immersion-stats-line muted">
+          {t('read2.immersion.stats.mined', { count: today.wordsMined })}
+        </p>
+      )}
       <p className="immersion-stats-line muted">{t('immersion.stats.week', { minutes: minutes(weekSeconds) })}</p>
+      {topSites.length > 0 && (
+        <>
+          <p className="immersion-stats-line muted">{t('read2.immersion.stats.topSites')}</p>
+          <ul className="immersion-top-sites" aria-label={t('read2.immersion.stats.topSites')}>
+            {topSites.map((row) => (
+              <li key={row.host} data-host={row.host}>
+                <span className="immersion-top-host">{row.host}</span>
+                <span className="immersion-top-figures">
+                  {immersionSiteFigures(row.seconds, row.chars, row.lookups, t, nf)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
+}
+
+/** "12 min · 3,400 chars · 5 lookups" — the lookups part only once there are some. */
+export function immersionSiteFigures(
+  seconds: number,
+  chars: number,
+  lookups: number,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  nf: Intl.NumberFormat,
+): string {
+  const read = t('read2.immersion.site.read', {
+    minutes: nf.format(Math.round(seconds / 60)),
+    chars: nf.format(chars),
+  });
+  return lookups > 0 ? `${read} · ${t('read2.immersion.site.lookups', { count: lookups })}` : read;
 }
 
 /** Bookmarks, with folders and tags — the pages the user chose to keep (audit r2 #12). */
@@ -1858,6 +1935,7 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
   // copy belongs to `ImmersionSitesStatus`, which is the only thing allowed to
   // describe the saved library's state.
   const { t, currentUrl, filteredSites, siteQuery, railView } = state;
+  const siteNumberFormat = useMemo(() => new Intl.NumberFormat(LANG_TAGS[state.lang]), [state.lang]);
   return (
     <div className="immersion-rail">
       <ImmersionStatsCard state={state} />
@@ -1908,6 +1986,9 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
               <span className="immersion-site-meta muted">
                 {s.lang !== 'auto' ? s.lang.toUpperCase() + ' · ' : ''}
                 {t('immersion.visitsCount', { count: s.visitCount })}
+                {s.totalSeconds >= 60 || s.totalChars > 0
+                  ? ` · ${immersionSiteFigures(s.totalSeconds, s.totalChars, s.totalLookups ?? 0, t, siteNumberFormat)}`
+                  : ''}
                 {s.streakDays > 0 ? ` · ${t('immersion.streakDays', { days: s.streakDays })}` : ''}
               </span>
               {s.completionPct > 0 && (

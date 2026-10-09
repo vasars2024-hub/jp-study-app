@@ -1,5 +1,5 @@
 import { app, ipcMain, dialog, protocol, BrowserWindow } from 'electron';
-import { partialDownloadFiles, subtitleIsAutoCaption } from '../shared/youtubeDownloadFiles';
+import { partialDownloadFiles, sidecarWantedLang, subtitleIsAutoCaption } from '../shared/youtubeDownloadFiles';
 import { readWatchLibrary } from './watchLibrary';
 import { readJsonSync, registerJsonFlusher, writeJsonAtomicSync } from './atomicJson';
 import path from 'node:path';
@@ -1746,7 +1746,12 @@ export function registerMediaIpc(): void {
       }
       // A file the library has never seen still deserves the sidecar-file fallback: the
       // workspace can open a path the media database knows nothing about.
-      return pickSubtitleBeside(filePath, item?.lang ?? 'ja') ?? null;
+      //
+      // Ranked for the item's own language, else the STUDY language. This was a fixed
+      // `'ja'`, and yt-dlp downloads never carry `item.lang`, so a Chinese learner's
+      // YouTube video opened on its `.en.vtt` (rank 3) over its `.zh.vtt` (rank 9)
+      // until the discovery sweep happened to index the sidecars.
+      return pickSubtitleBeside(filePath, sidecarWantedLang(item?.lang, getMainStudyLangTag())) ?? null;
     },
   );
 

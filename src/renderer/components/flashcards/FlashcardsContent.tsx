@@ -38,6 +38,7 @@ import {
 } from 'react';
 import { confirmDialog, promptDialog } from '../ui/dialogService';
 import { ContextualSurface } from '../liquid/LiquidSurface';
+import GrammarDueChip from '../grammar/GrammarDueChip';
 import Icon from '../Icons';
 import WindowedStrip from './WindowedStrip';
 import VirtualList from '../VirtualList';
@@ -59,8 +60,9 @@ import {
   filterDeckByBooks,
   groupDeckByBook,
   isLeechCard,
-  LEECH_LAPSE_THRESHOLD,
+  leechThreshold,
   LEECH_QUERY,
+  SUSPENDED_QUERY,
   loadDeck,
   loadDeckFolders,
   onDeckChanged,
@@ -70,11 +72,13 @@ import {
   reviewSessionCards,
   reviewSessionCounts,
   dueDeckCards,
+  aheadDeckCards,
   undoLastReview,
   peekReviewUndo,
   searchDeckCards,
   setBookGroupFolder,
   setDeckCardFolder,
+  setDeckCardsSuspended,
   updateDeckCard,
   updateDeckCardAudioBatch,
   reviewDeckCard,
@@ -88,10 +92,15 @@ import {
   type LocalSrsState,
   type LocalSrsRating,
 } from '../../../shared/localSrs';
-import { previewSchedule } from '../../../shared/flashcardScheduling';
+import { previewScheduleDelays } from '../../../shared/flashcardScheduling';
+import { isInSteps } from '../../../shared/learningSteps';
+import { nextSessionCardId, requeueStepCard } from '../../../shared/reviewSessionQueue';
 import { loadSchedulingConfig } from '../../flashcardScheduling';
+import { useReviewSessionPrefs } from '../../reviewSessionPrefs';
+import ReviewAnswerTimer from './ReviewAnswerTimer';
 import {
   audioReviewPoolStatus,
+  clozeParts,
   orderReviewPlan,
   planFlashcardReview,
   type FlashcardPromptKind,
@@ -153,6 +162,7 @@ import {
   resolveCardScene,
 } from '../../sceneRoundTrip';
 import { srsIntervalLabel } from '../../srsIntervalLabel';
+import { cardBookPosition, openBookAt, type BookPosition } from '../../bookRoundTrip';
 
 export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
 export type OverviewTab = 'dictionary' | 'epub';
@@ -308,13 +318,23 @@ export interface FlashcardsState {
   videoNote: string;
   /** The word of a card the last rating just turned into a leech, or ''. */
   leechNote: string;
+  /** The leech action suspended that card, so it has left the sitting. */
+  leechSuspended: boolean;
+  /** Let the just-suspended leech back into the deck's reviews. */
+  unsuspendLeech: () => void;
   dismissLeechNote: () => void;
+  /** When the card on screen was shown — the answer timer's zero. */
+  cardShownAt: number;
   editLeechMeaning: () => Promise<void>;
   playCurrentInVideo: () => Promise<void>;
   /** Whether a deck card has a local video and a cue time to go back to. */
   cardHasScene: (cardId: string) => boolean;
   /** Open the adopted player at a deck card's line (deck list rows). */
   playCardInVideo: (cardId: string) => Promise<void>;
+  /** Where in a book a card was mined, when the novel reader mined it (`bookRoundTrip.ts`). */
+  cardBookPositionOf: (cardId: string) => BookPosition | null;
+  /** Open the book at the place a card was mined. */
+  openCardInBook: (cardId: string) => void;
   audioBusy: boolean;
   audioCancelling: boolean;
   audioError: string;
@@ -445,9 +465,14 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewMixKeys, setReviewMixKeys] = useState<string[]>([]);
   const [videoNote, setVideoNote] = useState('');
   const [leechNote, setLeechNote] = useState('');
+  const [leechSuspended, setLeechSuspended] = useState(false);
   const leechCardId = useRef('');
+  /** When the card on screen appeared; the gap to its grade is the answer time. */
+  const [cardShownAt, setCardShownAt] = useState(() => Date.now());
   /** When a "Listen now" hand-off asked for a listening sitting to start. */
   const pendingListenRef = useRef(0);
+  /** The Calendar's "Study ahead": the day whose due cards a sitting should start on, and when it asked. */
+  const pendingAheadRef = useRef<{ until: string; at: number } | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
   const [audioCancelling, setAudioCancelling] = useState(false);
   const [audioError, setAudioError] = useState('');
@@ -629,6 +654,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
 
   const current = sessionCards[reviewIndex] ?? null;
   const sessionComplete = sessionCards.length > 0 && masteredIds.size >= sessionCards.length;
+  // A new card on screen (or the same card back after a step or an undo) restarts the timer.
+  const currentShowing = mode === 'review' ? `${current?.id ?? ''}:${current?.srs?.lastReviewedAt ?? 0}` : '';
+  useEffect(() => {
+    setCardShownAt(Date.now());
+  }, [currentShowing]);
 
   /**
    * The dictionary saves a "Review dictionary" sitting draws from. Due cards
@@ -725,6 +755,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   ): void {
     if (!cards.length) return;
     setLeechNote('');
+    setLeechSuspended(false);
     const ordered = orderReviewCards(cards, initialMastered);
     setReviewSource(source);
     // Stamped once per sitting: it is what gives a study-session hand-off a
@@ -827,6 +858,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     reviewIndex: number;
     masteredIds: Set<string>;
     reviewed: number;
+    total: number;
   }>>([]);
   const [undoDepth, setUndoDepth] = useState(0);
 
@@ -837,6 +869,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       reviewIndex,
       masteredIds: new Set(masteredIds),
       reviewed,
+      total,
     });
     if (undoStackRef.current.length > 50) undoStackRef.current.shift();
     setUndoDepth(undoStackRef.current.length);
@@ -852,6 +885,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setUndoDepth(undoStackRef.current.length);
     if (!undone) return;
     setLeechNote('');
+    setLeechSuspended(false);
     setDeck(undone.cards);
     const restored = undone.cards.find((c) => c.id === snapshot.cardId);
     setSessionCards(snapshot.sessionCards.map((c) => (
@@ -860,9 +894,30 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setReviewIndex(snapshot.reviewIndex);
     setMasteredIds(snapshot.masteredIds);
     setReviewed(snapshot.reviewed);
+    setTotal(snapshot.total);
     markExplored(snapshot.cardId);
     markRevealed(snapshot.cardId);
     setFlipped(true);
+  }
+
+  /**
+   * Show whichever card the sitting should show next (`nextSessionCardId`): a
+   * step card whose delay has passed, else the next unanswered card, else the
+   * step card due soonest, early.
+   */
+  function showNextSessionCard(queue: ReviewCard[], answered: Set<string>): void {
+    setSessionCards(queue);
+    const nextId = nextSessionCardId(queue, answered, Date.now());
+    const index = nextId ? queue.findIndex((c) => c.id === nextId) : 0;
+    setReviewIndex(Math.max(0, index));
+    if (nextId) markExplored(nextId);
+  }
+
+  /** Persist one grade for the card on screen; returns its new schedule. */
+  function gradeSessionCard(card: ReviewCard, rating: LocalSrsRating): DeckFlashcard | undefined {
+    const nextDeck = reviewDeckCard(card.id, rating, Date.now(), { durationMs: Date.now() - cardShownAt });
+    setDeck(nextDeck);
+    return nextDeck.find((candidate) => candidate.id === card.id);
   }
 
   function accept(rating: Exclude<LocalSrsRating, 'again'>): void {
@@ -871,30 +926,30 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setLeechNote('');
     if (reviewSource === 'epub') rememberForUndo(card.id);
     if (wiredFx) window.dispatchEvent(new CustomEvent('wired:sync-ok'));
+    setFlipped(false);
+    const reviewedCard = reviewSource === 'epub' ? gradeSessionCard(card, rating) : undefined;
+    const updated = reviewedCard
+      ? sessionCards.map((candidate) => (candidate.id === card.id ? { ...candidate, srs: reviewedCard.srs } : candidate))
+      : sessionCards;
+    // Good on a learning step moves the card one step on, not out of the
+    // sitting: it stays unanswered and comes back when the step has passed.
+    if (isInSteps(reviewedCard?.srs)) {
+      showNextSessionCard(requeueStepCard<ReviewCard>(updated, card.id, masteredIds), masteredIds);
+      return;
+    }
     const nextMastered = new Set(masteredIds);
     nextMastered.add(card.id);
     setMasteredIds(nextMastered);
     setReviewed((n) => n + 1);
-    setFlipped(false);
-    if (reviewSource === 'epub') {
-      const nextDeck = reviewDeckCard(card.id, rating);
-      const reviewedCard = nextDeck.find((candidate) => candidate.id === card.id);
-      setDeck(nextDeck);
-      if (reviewedCard) {
-        setSessionCards((cards) => cards.map((candidate) => (
-          candidate.id === card.id ? { ...candidate, srs: reviewedCard.srs } : candidate
-        )));
-      }
+    const ordered = [
+      ...updated.filter((c) => !nextMastered.has(c.id)),
+      ...updated.filter((c) => nextMastered.has(c.id)),
+    ];
+    if (nextMastered.size >= sessionCards.length) {
+      setSessionCards(ordered);
+      return;
     }
-    setSessionCards((cards) => {
-      const unknown = cards.filter((c) => !nextMastered.has(c.id));
-      const known = cards.filter((c) => nextMastered.has(c.id));
-      return [...unknown, ...known];
-    });
-    if (nextMastered.size >= sessionCards.length) return;
-    setReviewIndex(0);
-    const firstUnknown = sessionCards.find((c) => !nextMastered.has(c.id));
-    if (firstUnknown) markExplored(firstUnknown.id);
+    showNextSessionCard(ordered, nextMastered);
   }
 
   function gotIt(): void {
@@ -913,43 +968,48 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const card = sessionCards[reviewIndex];
     if (!card) return;
     setLeechNote('');
+    setLeechSuspended(false);
     if (reviewSource === 'epub') rememberForUndo(card.id);
     fireCardFx('resync', 260);
-    if (reviewSource === 'epub') {
-      const nextDeck = reviewDeckCard(card.id, 'again');
-      const reviewedCard = nextDeck.find((candidate) => candidate.id === card.id);
-      setDeck(nextDeck);
-      if (reviewedCard && isLeechCard(reviewedCard) && !isLeechCard(card)) {
-        leechCardId.current = reviewedCard.id;
-        setLeechNote(reviewedCard.word || reviewedCard.front || '');
-      }
-      if (reviewedCard) {
-        setSessionCards((cards) => cards.map((candidate) => (
-          candidate.id === card.id ? { ...candidate, srs: reviewedCard.srs } : candidate
-        )));
-      }
-    }
-    if (masteredIds.has(card.id)) {
-      const nextMastered = new Set(masteredIds);
-      nextMastered.delete(card.id);
-      setMasteredIds(nextMastered);
-      setReviewed((n) => Math.max(0, n - 1));
-      setSessionCards((cards) => {
-        const unknown = cards.filter((c) => !nextMastered.has(c.id));
-        const known = cards.filter((c) => nextMastered.has(c.id));
-        return [...unknown, ...known];
-      });
-    } else {
-      setSessionCards((cards) => {
-        const next = [...cards];
-        const [picked] = next.splice(reviewIndex, 1);
-        const knownStart = next.findIndex((c) => masteredIds.has(c.id));
-        const insertAt = knownStart === -1 ? next.length : knownStart;
-        next.splice(insertAt, 0, picked);
-        return next;
-      });
-    }
     setFlipped(false);
+    const reviewedCard = reviewSource === 'epub' ? gradeSessionCard(card, 'again') : undefined;
+    // The review itself says whether it reached a leech point (the threshold,
+    // then every half-threshold), and what the leech action did about it.
+    const leech = reviewedCard ? peekReviewUndo()?.leech : undefined;
+    if (reviewedCard && (leech || (isLeechCard(reviewedCard) && !isLeechCard(card)))) {
+      leechCardId.current = reviewedCard.id;
+      setLeechNote(reviewedCard.word || reviewedCard.front || '');
+    }
+    let updated = reviewedCard
+      ? sessionCards.map((candidate) => (candidate.id === card.id ? { ...candidate, srs: reviewedCard.srs } : candidate))
+      : sessionCards;
+    let answered = masteredIds;
+    if (masteredIds.has(card.id)) {
+      answered = new Set(masteredIds);
+      answered.delete(card.id);
+      setMasteredIds(answered);
+      setReviewed((n) => Math.max(0, n - 1));
+    }
+    if (reviewedCard?.suspended && leech?.suspended) {
+      // Suspended as a leech: it leaves this sitting as well as the deck's reviews.
+      setLeechSuspended(true);
+      updated = updated.filter((candidate) => candidate.id !== card.id);
+      setTotal((n) => Math.max(0, n - 1));
+      if (!updated.length || answered.size >= updated.length) {
+        setSessionCards(updated);
+        return;
+      }
+      showNextSessionCard(updated, answered);
+      return;
+    }
+    showNextSessionCard(requeueStepCard<ReviewCard>(updated, card.id, answered), answered);
+  }
+
+  function unsuspendLeech(): void {
+    if (!leechCardId.current) return;
+    setDeckCardsSuspended([leechCardId.current], false);
+    setDeck(loadDeck());
+    setLeechSuspended(false);
   }
 
   async function editLeechMeaning(): Promise<void> {
@@ -1157,9 +1217,13 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       const card = focus.cardId ? loadDeck().find((entry) => entry.id === focus.cardId) : undefined;
       const folder = focus.folder ?? (card?.folder || null);
       setFolderFilter(folder ?? 'all');
-      setSearch(card ? (card.word || card.front || '').trim() : '');
+      // A Calendar day link (`added:2026-10-07`) narrows the find box; a card link names the card.
+      setSearch(focus.search ?? (card ? (card.word || card.front || '').trim() : ''));
       setOverviewTab('epub');
       setMode('overview');
+      if (focus.review === 'ahead' && focus.aheadUntil) {
+        pendingAheadRef.current = { until: focus.aheadUntil, at: Date.now() };
+      }
       if (focus.review === 'listening') {
         // "Listen now" after a sentence deck: the whole folder, audio first.
         setReviewBookKey('all');
@@ -1187,6 +1251,21 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     pendingListenRef.current = 0;
     startEpubReview();
   }, [epubReviewSessionCandidates, mode, reviewMode, reviewDueOnly, reviewBookKey]);
+
+  // "Study ahead" from the Calendar: the scheduled cards due by the end of that day, now.
+  // Same bound as the listening hand-off, so a stale request never starts a sitting later.
+  useEffect(() => {
+    const pending = pendingAheadRef.current;
+    if (!pending || mode !== 'overview') return;
+    if (Date.now() - pending.at > 15_000) {
+      pendingAheadRef.current = null;
+      return;
+    }
+    const ahead = aheadDeckCards(epubCards, pending.until);
+    if (!ahead.length) return;
+    pendingAheadRef.current = null;
+    startReviewSession(deckToReviewCards(ahead), 'epub');
+  }, [epubCards, mode]);
 
   useEffect(() => {
     if (hideAiStudio && mode === 'ai-studio') setMode('overview');
@@ -1420,11 +1499,23 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     toggleReviewMixKey,
     videoNote,
     leechNote,
+    leechSuspended,
+    unsuspendLeech,
     dismissLeechNote: () => setLeechNote(''),
+    cardShownAt,
     editLeechMeaning,
     playCurrentInVideo,
     cardHasScene,
     playCardInVideo: (cardId: string) => playCardInVideo(cardId, 'list'),
+    cardBookPositionOf: (cardId: string) => {
+      const card = deck.find((candidate) => candidate.id === cardId);
+      return card ? cardBookPosition(card) : null;
+    },
+    openCardInBook: (cardId: string) => {
+      const card = deck.find((candidate) => candidate.id === cardId);
+      const where = card ? cardBookPosition(card) : null;
+      if (where) openBookAt(where);
+    },
     audioBusy,
     audioCancelling,
     audioError,
@@ -1512,9 +1603,19 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
     sessionStartedAt,
   } = state;
 
+  const reviewPrefs = useReviewSessionPrefs();
+
   useEffect(() => {
     if (current?.promptKind === 'listening') void state.playCurrentAudio();
   }, [current?.id, current?.promptKind]);
+
+  // "Play audio on reveal": the answer side speaks for itself, once per reveal.
+  // A listening prompt already played on show, so it is not played twice.
+  useEffect(() => {
+    if (!flipped || !reviewPrefs.autoplayOnReveal || !current) return;
+    if (current.promptKind === 'listening' || !(current.audioDataUrl || current.audioPath)) return;
+    void state.playCurrentAudio();
+  }, [flipped, current?.id, reviewPrefs.autoplayOnReveal]);
 
   // Each strip chip looked its own index up with findIndex: O(n²) per render.
   const sessionIndexById = useMemo(
@@ -1623,10 +1724,12 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
 
   const pct = total ? (reviewed / total) * 100 : 0;
   // One preview through the seam rather than three direct scheduler calls, so
-  // the button labels move when the algorithm setting does.
+  // the button labels move when the algorithm setting does. Delays, not
+  // intervals: a learning step reads as its minutes, not as a zero-day interval.
   const nextIntervals = reviewSource === 'epub'
-    ? previewSchedule(current.srs, loadSchedulingConfig())
+    ? previewScheduleDelays(current.srs, loadSchedulingConfig())
     : null;
+  const stepPhase = isInSteps(current.srs) ? current.srs?.phase : undefined;
   const nextAgainInterval = nextIntervals ? nextIntervals.again : null;
   const nextGoodInterval = nextIntervals ? nextIntervals.good : null;
   const nextHardInterval = nextIntervals ? nextIntervals.hard : null;
@@ -1669,6 +1772,12 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
 
         <p className="flash-review-explored">
           {t('flash.exploredCount', { explored: exploredIds.size, total: sessionCards.length })}
+          {stepPhase && (
+            <span className="flash-step-badge">
+              {t(stepPhase === 'relearning' ? 'srs2.review.relearning' : 'srs2.review.learning')}
+            </span>
+          )}
+          {reviewPrefs.showTimer && <ReviewAnswerTimer startedAt={state.cardShownAt} />}
         </p>
 
         <div className="flash-review-nav" ref={state.stripRef}>
@@ -1752,8 +1861,15 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
           {state.audioError && <span className="flash-audio-error" role="status">{state.audioError}</span>}
           {state.leechNote && (
             <span className="flash-audio-error" role="status">
-              {t('flash.leechNotice', { word: state.leechNote, n: LEECH_LAPSE_THRESHOLD })}
+              {t('flash.leechNotice', { word: state.leechNote, n: leechThreshold() })}
+              {state.leechSuspended && <>{' '}{t('srs2.leech.suspendedNote')}</>}
               {' '}
+              {state.leechSuspended && (
+                <>
+                  <button type="button" className="btn small" onClick={state.unsuspendLeech}>{t('srs2.leech.unsuspend')}</button>
+                  {' '}
+                </>
+              )}
               <button type="button" className="btn small" onClick={() => void state.editLeechMeaning()}>{t('flash.leechEditMeaning')}</button>
               {' '}
               <button type="button" className="btn small" onClick={state.dismissLeechNote}>{t('flash.leechNoticeDismiss')}</button>
@@ -1777,6 +1893,18 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
                 {t('flash.replayAudio')}
               </button>
             </div>
+          ) : !flipped && current.promptKind === 'cloze' && clozeParts(current.sentence, current.word) ? (
+            <>
+              <span className="flash-prompt-kind">{t('srs2.prompt.cloze')}</span>
+              <span className="flash-word flash-cloze-prompt" lang={cardContentLang(current)}>
+                {clozeParts(current.sentence, current.word)?.before}
+                <span className="flash-cloze-gap" role="img" aria-label={t('srs2.prompt.clozeGap')} />
+                {clozeParts(current.sentence, current.word)?.after}
+              </span>
+              <span className="flash-meaning flash-recall-prompt">
+                {current.meaning || current.back || t('flash.noMeaningSaved')}
+              </span>
+            </>
           ) : !flipped && current.promptKind === 'recall' ? (
             <>
               <span className="flash-prompt-kind">{t('flash.prompt.recall')}</span>
@@ -1848,6 +1976,20 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
                 >
                   <Icon name="video" size={13} />
                   {t('flash.playInVideo')}
+                </button>
+              )}
+              {state.cardBookPositionOf(current.id) && (
+                <button
+                  type="button"
+                  className="btn small flash-play-in-video"
+                  data-flash-action="open-in-book"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    state.openCardInBook(current.id);
+                  }}
+                >
+                  <Icon name="bookmark" size={13} />
+                  {t('read2.flash.openInBookShort')}
                 </button>
               )}
               {state.videoNote && <span className="flash-audio-error" role="status">{state.videoNote}</span>}
@@ -2177,6 +2319,10 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     () => filterDeckCards(epubCards, folderFilter).filter(isLeechCard).length,
     [epubCards, folderFilter],
   );
+  const suspendedCount = useMemo(
+    () => filterDeckCards(epubCards, folderFilter).filter((card) => card.suspended === true).length,
+    [epubCards, folderFilter],
+  );
 
   // The source picker's options, built once per deck/folder/filter change: typing
   // in the find box re-renders this view, and the picker does not depend on it.
@@ -2244,6 +2390,8 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     <div className="flash-view flash-view-decks">
       <ContextualSurface className="view-head">
         <p className="muted">{t('flash.overview.intro')}</p>
+        {/* Grammar points due today sit beside the card queue (gram2); silent until grammar review is in use. */}
+        <GrammarDueChip />
         <div className="actions">
           <button className="btn primary" onClick={() => state.openEpubMining('simple')}>
             {t('flash.simpleEpubMining')}
@@ -2421,10 +2569,31 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             <button
               type="button"
               className="btn small flash-search-leeches"
-              title={t('flash.search.leechesTitle', { n: LEECH_LAPSE_THRESHOLD })}
+              title={t('flash.search.leechesTitle', { n: leechThreshold() })}
               onClick={() => state.setSearch(LEECH_QUERY)}
             >
               {t('flash.search.leeches', { n: leechCount })}
+            </button>
+          )}
+          {overviewTab === 'epub' && !search && suspendedCount > 0 && (
+            <button
+              type="button"
+              className="btn small flash-search-leeches"
+              onClick={() => state.setSearch(SUSPENDED_QUERY)}
+            >
+              {t('srs2.suspended.show', { count: suspendedCount })}
+            </button>
+          )}
+          {overviewTab === 'epub' && search.trim().toLowerCase() === SUSPENDED_QUERY && filteredDeck.length > 0 && (
+            <button
+              type="button"
+              className="btn small"
+              onClick={() => {
+                setDeckCardsSuspended(filteredDeck.map((card) => card.id), false);
+                state.setDeck(loadDeck());
+              }}
+            >
+              {t('srs2.suspended.unsuspendAll', { count: filteredDeck.length })}
             </button>
           )}
           {search && (
@@ -2878,6 +3047,18 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                     onClick={() => void state.playCardInVideo(card.id)}
                                   >
                                     <Icon name="video" size={14} />
+                                  </button>
+                                )}
+                                {state.cardBookPositionOf(card.id) && (
+                                  <button
+                                    type="button"
+                                    className="flash-row-x flash-row-play"
+                                    data-flash-action="row-open-in-book"
+                                    title={t('read2.flash.openInBook', { term: card.word })}
+                                    aria-label={t('read2.flash.openInBook', { term: card.word })}
+                                    onClick={() => state.openCardInBook(card.id)}
+                                  >
+                                    <Icon name="bookmark" size={14} />
                                   </button>
                                 )}
                                 <FlashcardFileMenu

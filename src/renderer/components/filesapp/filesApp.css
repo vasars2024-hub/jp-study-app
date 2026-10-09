@@ -1010,6 +1010,40 @@
   border-radius: var(--lq-work-radius);
 }
 
+/* files2: the scan sheet's import shows a bar beside its count. */
+.fa-review-progress-bar {
+  display: block;
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent, currentColor);
+}
+
+/* files2: an empty list offers its next step. */
+.fa-empty-state p {
+  margin: 0 0 var(--lq-space-2);
+}
+
+.fa-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lq-space-2);
+}
+
+/* files2: audio / video play in the pane. */
+.fa-preview-audio {
+  display: block;
+  width: 100%;
+}
+
+.fa-preview-video {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  background: #000;
+  border-radius: var(--lq-work-radius);
+}
+
 .fa-preview-text {
   max-height: 240px;
   margin: 0;

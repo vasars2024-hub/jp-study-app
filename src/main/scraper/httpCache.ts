@@ -114,7 +114,7 @@ export function cachePolicyFrom(
 export function cacheKeyFor(
   method: string,
   url: string,
-  body: string | undefined,
+  body: string | Uint8Array | undefined,
   credentials = '',
 ): string {
   const verb = method.toUpperCase();

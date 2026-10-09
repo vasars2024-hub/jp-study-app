@@ -26,6 +26,9 @@ import {
 import { seedAeroDesktopPersonality } from '../aeroDesktopPersonality';
 import { armLockscreenOnSecretEntry, AERO_ENTRY_LOCKED_EVENT } from '../lockscreenSettings';
 
+/** Ask the mounted trigger to enter Aero (never to leave it). */
+export const SECRET_AERO_ENTER_EVENT = 'shell:enterSecretAero';
+
 const SEQUENCE = 'aero';
 const AERO_SHUTDOWN_THEME_DELAY = 820;
 const STUDY_OS_REBOOT_EVENT = 'shell:studyOsReboot';
@@ -183,6 +186,16 @@ export default function SecretAeroTrigger() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [toggle]);
+
+  // First-run setup's look picker (onb2) is the one other door in. It only ever
+  // ENTERS: a stray event must not toggle a user back out of Aero.
+  useEffect(() => {
+    const onEnter = (): void => {
+      if (loadThemeId() !== AERO_THEME_ID) toggle();
+    };
+    window.addEventListener(SECRET_AERO_ENTER_EVENT, onEnter);
+    return () => window.removeEventListener(SECRET_AERO_ENTER_EVENT, onEnter);
   }, [toggle]);
 
   // Auto-dismiss the confirmation flash.

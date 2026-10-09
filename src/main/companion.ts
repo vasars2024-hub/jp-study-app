@@ -39,6 +39,7 @@ import {
 } from './globalCommands';
 import { lookUpSelection } from './systemDictionary';
 import { openReadingLens } from './readingLens';
+import { refuseWhileLocked } from './lockGuard';
 import {
   buildWheelActions,
   CAPTIONS_CAPTURE_COMMAND_IDS,
@@ -133,6 +134,8 @@ function pushPayload(kind: Kind): void {
 
 function surface(kind: Kind, at: { x: number; y: number }, opts: { focus: boolean }): BrowserWindow | null {
   if (!deps) return null;
+  // The wheel, card preview and notices show lookups and cards (lockGuard.ts).
+  if (refuseWhileLocked(`window:companion-${kind}`)) return null;
   const { width, height } = SIZE[kind];
   const { x, y } = placeFor(kind, at);
   const existing = windows[kind];

@@ -81,6 +81,32 @@ describe('hover engine — latest pointer wins (bug 7)', () => {
   });
 });
 
+describe('hover engine — the character under the pointer, not the caret after it', () => {
+  // Each character is a 20 px box on one line: 猫 0–20, と 20–40, 学 40–60, 校 60–80.
+  // The harness points at x=50, y=50 — inside 学.
+  const glyphBoxes = (win: Window & typeof globalThis & Record<string, unknown>): void => {
+    (win.Range.prototype as unknown as { getClientRects: () => unknown[] }).getClientRects = function (this: Range) {
+      const i = this.startOffset;
+      return [{ left: i * 20, right: i * 20 + 20, top: 40, bottom: 60 }];
+    };
+  };
+
+  it('over the right half of a glyph, the browser caret is after it: still looks up that glyph', async () => {
+    // Measured live in Chrome 2026-10-08: the right half of 猫 in 猫と looked up と.
+    h = await loadContent({ html: '<p id="p">猫と学校</p>', reply: fakeScan(WORDS), beforeScripts: glyphBoxes });
+    h.hover(textNode(h, 'p'), 3); // the caret Chrome reports: after 学
+    await h.waitFor(() => h!.popup());
+    expect(h.popupTerm()).toBe('学校');
+  });
+
+  it('a caret that already sits on the hovered glyph is kept', async () => {
+    h = await loadContent({ html: '<p id="p">猫と学校</p>', reply: fakeScan(WORDS), beforeScripts: glyphBoxes });
+    h.hover(textNode(h, 'p'), 2);
+    await h.waitFor(() => h!.popup());
+    expect(h.popupTerm()).toBe('学校');
+  });
+});
+
 describe('hover engine — forced click path (bug 8)', () => {
   it('key + click looks up even with hover lookup switched off', async () => {
     h = await loadContent({

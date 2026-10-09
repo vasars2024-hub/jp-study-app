@@ -468,7 +468,9 @@ function saveCapturedLines(
     scene: entry.currentScene,
     // A websocket texthooker is a text hook too, so it stays within the stored union.
     source: source === 'clipboard' ? 'clipboard' as const : 'hook' as const,
-  })), () => crypto.randomUUID());
+    // The session has already dropped duplicate deliveries; what is left is the
+    // game really repeating a line, which belongs in the log like any other.
+  })), () => crypto.randomUUID(), Date.now(), { keepRepeats: true });
   const previousIds = new Set(database.captures.map((capture) => capture.id));
   const added = next.captures.filter((capture) => !previousIds.has(capture.id));
   if (added.length) {

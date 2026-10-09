@@ -17,9 +17,10 @@ import {
   LANG_ORDER,
   PLACEHOLDERS,
   TranslateHistoryList,
-  copyText,
+  handleTranslateHotkey,
   useTranslate,
 } from '../translate/TranslateContent';
+import TranslateStudyPanel, { TranslateOptionsBar } from '../translate/TranslateStudyPanel';
 import type { TransLang } from '../../translator';
 
 /**
@@ -55,7 +56,7 @@ export function BlancTranslatePanel() {
   }, [requested, input, setInput, setTab, run]);
 
   return (
-    <div className="blanc-tool-detail">
+    <div className="blanc-tool-detail" onKeyDown={(e) => handleTranslateHotkey(e, state)}>
       <fieldset>
         <legend>{t('blanc.study.translate.direction')}</legend>
         <div className="blanc-command-row">
@@ -92,6 +93,7 @@ export function BlancTranslatePanel() {
           <span className="blanc-segmented">
             <button
               type="button"
+              aria-pressed={state.tab === 'translate'}
               className={state.tab === 'translate' ? 'active' : ''}
               onClick={() => state.setTab('translate')}
             >
@@ -99,6 +101,7 @@ export function BlancTranslatePanel() {
             </button>
             <button
               type="button"
+              aria-pressed={state.tab === 'history'}
               className={state.tab === 'history' ? 'active' : ''}
               onClick={() => state.setTab('history')}
             >
@@ -134,7 +137,13 @@ export function BlancTranslatePanel() {
               value={input}
               onChange={(e) => state.setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void state.run();
+                // IME first: Ctrl+Enter that confirms a conversion is not a submit,
+                // and a submit must not also insert a newline.
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  void state.run();
+                }
               }}
               placeholder={t('blanc.study.translate.inputPlaceholder', { hint: PLACEHOLDERS[source] })}
             />
@@ -145,23 +154,25 @@ export function BlancTranslatePanel() {
               <button type="button" onClick={state.clear} disabled={!input && !output}>
                 {t('blanc.study.clear')}
               </button>
-              {busy && <span className="blanc-note">{msg}</span>}
+              {busy && <span className="blanc-note" role="status">{msg}</span>}
             </div>
-            {error && <p className="blanc-note">{error}</p>}
+            <TranslateOptionsBar state={state} />
+            {error && (
+              <div className="blanc-row-actions">
+                <p className="blanc-note" role="alert">{error}</p>
+                <button type="button" onClick={() => void state.run()} disabled={busy || !input.trim()}>
+                  {t('xlate.retry')}
+                </button>
+              </div>
+            )}
           </fieldset>
 
           <fieldset>
             <legend>{t('translate.pane.outputHeader', { lang: LANG_LABELS[target] })}</legend>
-            <div className="blanc-output" lang={target}>
+            <div className="blanc-output" lang={target} aria-live="polite" aria-atomic="true">
               {output || <span className="blanc-note">{t('translate.outputPlaceholder')}</span>}
             </div>
-            {output && (
-              <div className="blanc-row-actions">
-                <button type="button" onClick={() => void copyText(output)}>
-                  {t('translate.history.copy')}
-                </button>
-              </div>
-            )}
+            <TranslateStudyPanel state={state} />
           </fieldset>
         </>
       )}

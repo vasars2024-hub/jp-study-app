@@ -42,15 +42,26 @@ import { decodeSubtitleBytes } from '../shared/subtitleDecode';
  * A strict subset of `ARCHIVE_EXT` in `subtitleNyaa.ts`, which lists every
  * container a release is *observed* to ship in. The difference is load-bearing:
  * `noSubtitlesReason` tells the user to extract it themselves, and that sentence
- * must stay true for the formats still not handled. 7-Zip reads all of these,
- * but only these three are worth offering — `.rar` needs the unRAR licence
- * carve-out and nothing in the measured index ships subtitles as one.
+ * must stay true for the formats still not handled. 7-Zip reads all of these;
+ * `.rar` is opened only where the caller asks (`isExtractableArchive(name,
+ * { rar: true })`, the Jimaku route) — nothing in the measured Nyaa index ships
+ * subtitles as one, and that route's "extract it yourself" sentence names it.
  */
 export const EXTRACTABLE_ARCHIVE_EXT = new Set(['.7z', '.zip', '.tar']);
 
-/** Whether a file name is a container this module can open. */
-export function isExtractableArchive(fileName: string): boolean {
-  return EXTRACTABLE_ARCHIVE_EXT.has(path.extname(String(fileName ?? '')).toLowerCase());
+/**
+ * `.rar`, opened only where a caller asks for it. The bundled 7-Zip build has
+ * the RAR 1.5–5 decoders (`7zz i` lists `Rar` and `Rar5` with codecs 40301–
+ * 40305), distributed under the unRAR licence's carve-out, which permits
+ * decompression. Jimaku's community uploads include season packs filed as
+ * `.rar`, so the Jimaku route opens them; the Nyaa route keeps its measured set.
+ */
+export const RAR_ARCHIVE_EXT = '.rar';
+
+/** Whether a file name is a container this module can open (`rar: true` adds `.rar`). */
+export function isExtractableArchive(fileName: string, options: { rar?: boolean } = {}): boolean {
+  const ext = path.extname(String(fileName ?? '')).toLowerCase();
+  return EXTRACTABLE_ARCHIVE_EXT.has(ext) || (options.rar === true && ext === RAR_ARCHIVE_EXT);
 }
 
 export interface ExtractedArchiveEntry {

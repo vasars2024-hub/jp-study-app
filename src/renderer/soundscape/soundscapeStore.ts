@@ -141,6 +141,35 @@ export function toggleSoundscape(): void {
   emit();
 }
 
+/**
+ * snd2 — for the focus link: start the current mix (or the given scene first)
+ * without toggling, and report whether anything is now playing. A silent mix
+ * stays silent; this never invents a sound the user did not set up.
+ */
+export function startSoundscape(sceneId?: string): boolean {
+  if (sceneId) {
+    const mix = BUILT_IN_SCENES.find((scene) => scene.id === sceneId)?.mix ?? state.saved.find((saved) => saved.id === sceneId);
+    if (mix) {
+      state = applyMix(state, mix);
+      commit(state);
+    }
+  }
+  start();
+  emit();
+  return playing;
+}
+
+/** snd2 — fade out over `fadeSeconds` and stop; a no-op when nothing plays. */
+export function fadeOutSoundscape(fadeSeconds = 4): void {
+  if (!playing) return;
+  stop(fadeSeconds);
+  emit();
+}
+
+export function isSoundscapePlaying(): boolean {
+  return playing;
+}
+
 export function setSoundscapeMaster(value: number): void {
   commit({ ...state, master: clamp01(value) });
 }

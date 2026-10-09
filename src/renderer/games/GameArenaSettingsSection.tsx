@@ -44,7 +44,30 @@ export default function GameArenaSettingsSection() {
           onChange={(e) => patch({ sounds: e.target.checked })}
           label={t('games.settings.sounds')}
         />
+        <Toggle
+          className="os-toggle"
+          checked={settings.adaptive}
+          onChange={(e) => patch({ adaptive: e.target.checked })}
+          label={t('games2.settings.adaptive')}
+        />
+        <Toggle
+          className="os-toggle"
+          checked={settings.arcadeStudyGate}
+          onChange={(e) => patch({ arcadeStudyGate: e.target.checked })}
+          label={t('games2.settings.arcadeGate')}
+        />
       </div>
+      <p className="muted os-set-hint">{t('games2.settings.arcadeGateHint')}</p>
+
+      <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
+        <Toggle
+          className="os-toggle"
+          checked={settings.gradeDueCards}
+          onChange={(e) => patch({ gradeDueCards: e.target.checked })}
+          label={t('srs3.games.gradeDue')}
+        />
+      </div>
+      <p className="muted os-set-hint">{t('srs3.games.gradeDueHint')}</p>
 
       <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
         <span className="muted">{t('games.settings.sourceLang')}</span>

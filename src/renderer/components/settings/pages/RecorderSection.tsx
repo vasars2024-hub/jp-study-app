@@ -5,24 +5,42 @@
  * `region-recorder.json`); this card reads and writes them over IPC and
  * follows the live state, so a recording started from a shortcut shows here.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useT } from '../../../i18n';
 import { ControlRow, FormRow, Group, Select, Slider, SwitchRow } from '../../ui';
 import {
+  RECORDER_ENCODER_PREFS,
   RECORDER_FPS_CHOICES,
   RECORDER_MAX_MINUTES_LIMIT,
+  RECORDER_QUALITY_PRESETS,
+  recorderEncoderFamily,
+  resolveRecorderEncoder,
   type RecorderAudioSource,
+  type RecorderEncoderPref,
   type RecorderQuality,
   type RecorderSettings,
   type RecorderState,
 } from '../../../../shared/regionRecorder';
 import { COMMAND_CATALOG, effectiveKeys, onShortcutsChanged } from '../../../keyboardShortcuts';
 import { commandLabel } from '../../../commandI18n';
+import { RecordingHistoryList, RecorderWindowStarter } from '../../../recorder/RecordingHistoryList';
 
-const RECORDER_COMMANDS = ['recorder.region', 'recorder.repeatRegion', 'recorder.stop'] as const;
+const RECORDER_COMMANDS = ['recorder.region', 'recorder.repeatRegion', 'recorder.window', 'recorder.stop'] as const;
 const AUDIO: readonly RecorderAudioSource[] = ['system', 'mic', 'both', 'none'];
 const QUALITY: readonly RecorderQuality[] = ['high', 'standard', 'small'];
+
+/** What the encoder choice will actually use here, in words. */
+function encoderStatus(state: RecorderState, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  const report = state.encoders;
+  if (!report) return t('rec2.encoder.notDetected');
+  const usable = report.usable.map((e) => t(`rec2.encoder.${e}`));
+  const resolved = resolveRecorderEncoder(state.settings.encoder, report);
+  const family = recorderEncoderFamily(resolved.encoder);
+  const using = family ? t('rec2.encoder.using', { encoder: t(`rec2.encoder.${family}`) }) : t('rec2.encoder.usingSoftware');
+  const found = usable.length ? t('rec2.encoder.found', { list: usable.join(', ') }) : t('rec2.encoder.noneFound');
+  return `${found} ${using}${resolved.fallback ? ` ${t('rec2.encoder.fallbackNote')}` : ''}`;
+}
 
 function useChords(): Record<string, string> {
   const read = (): Record<string, string> => Object.fromEntries(RECORDER_COMMANDS.map((id) => [id, effectiveKeys(id)]));
@@ -73,6 +91,34 @@ export default function RecorderSection() {
     ],
     [mics, lang],
   );
+  const encoderOptions = useMemo(
+    () => RECORDER_ENCODER_PREFS.map((e) => ({
+      value: e,
+      label: t(e === 'auto' || e === 'software' ? `rec2.encoderPref.${e}` : `rec2.encoder.${e}`),
+    })),
+    [lang],
+  );
+  const qualityOptions = useMemo(
+    () => QUALITY.map((q) => ({ value: q, label: t(`recorder.settings.quality.${q}`) })),
+    [lang],
+  );
+  const [detecting, setDetecting] = useState(false);
+  const detect = (force: boolean): void => {
+    if (typeof window.api?.recorderDetectEncoders !== 'function') return;
+    setDetecting(true);
+    void window.api.recorderDetectEncoders(force)
+      .then((next) => next && setState(next))
+      .catch(() => undefined)
+      .finally(() => setDetecting(false));
+  };
+  // The first look at this card finds out which encoders work here (cached by main).
+  const detectAsked = useRef(false);
+  const needsDetect = !!state && !state.encoders && state.settings.encoder !== 'software';
+  useEffect(() => {
+    if (!needsDetect || detectAsked.current) return;
+    detectAsked.current = true;
+    detect(false);
+  });
 
   if (!state) return null;
   const s = state.settings;
@@ -97,6 +143,7 @@ export default function RecorderSection() {
           {t('recorder.settings.full')}
         </button>
       </ControlRow>
+      <RecorderWindowStarter variant="settings" disabled={busy} />
       <p className="ui-group__desc">{t('recorder.settings.privacy')}</p>
 
       <Group title={t('recorder.settings.group.audio')}>
@@ -144,9 +191,26 @@ export default function RecorderSection() {
       </Group>
 
       <Group title={t('recorder.settings.group.video')}>
-        <FormRow label={t('recorder.settings.quality')} htmlFor="recorder-quality">
+        <FormRow
+          label={t('recorder.settings.quality')}
+          htmlFor="recorder-quality"
+          hint={t('rec2.quality.detail', {
+            crf: RECORDER_QUALITY_PRESETS[s.quality].crf,
+            cq: RECORDER_QUALITY_PRESETS[s.quality].cq,
+            mbps: RECORDER_QUALITY_PRESETS[s.quality].maxrateKbps / 1000,
+          })}
+        >
           <Select id="recorder-quality" value={s.quality} onChange={(e) => update({ quality: e.target.value as RecorderQuality })}
-            options={QUALITY.map((q) => ({ value: q, label: t(`recorder.settings.quality.${q}`) }))} />
+            options={qualityOptions} />
+        </FormRow>
+        <FormRow label={t('rec2.encoder.label')} htmlFor="recorder-encoder" hint={encoderStatus(state, t)}>
+          <ControlRow>
+            <Select id="recorder-encoder" value={s.encoder} onChange={(e) => update({ encoder: e.target.value as RecorderEncoderPref })}
+              options={encoderOptions} />
+            <button type="button" className="btn small" disabled={detecting} onClick={() => detect(true)}>
+              {detecting ? t('rec2.encoder.detecting') : t('rec2.encoder.detect')}
+            </button>
+          </ControlRow>
         </FormRow>
         <FormRow label={t('recorder.settings.fps')} htmlFor="recorder-fps">
           <Select id="recorder-fps" value={String(s.fps)} onChange={(e) => update({ fps: Number(e.target.value) })}
@@ -176,6 +240,15 @@ export default function RecorderSection() {
           checked={s.autoTranscribe} onChange={(e) => update({ autoTranscribe: e.target.checked })} />
         <SwitchRow title={t('recorder.settings.autoOpen')} description={t('recorder.settings.autoOpenDesc')}
           checked={s.autoOpen} onChange={(e) => update({ autoOpen: e.target.checked })} />
+        <SwitchRow title={t('rec2.settings.studyTag')} description={t('rec2.settings.studyTagDesc')}
+          checked={s.studyTag} onChange={(e) => update({ studyTag: e.target.checked })} />
+        {(state.waitingForModel ?? 0) > 0 && (
+          <p className="ui-group__desc" role="status">{t('rec2.settings.waitingModel', { count: state.waitingForModel ?? 0 })}</p>
+        )}
+      </Group>
+
+      <Group title={t('rec2.history.title')} description={t('rec2.history.desc')}>
+        <RecordingHistoryList variant="settings" />
       </Group>
 
       <Group title={t('recorder.settings.group.shortcuts')} description={t('recorder.settings.shortcutsDesc')}>

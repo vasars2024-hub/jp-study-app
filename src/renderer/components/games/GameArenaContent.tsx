@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import './gameArenaLiquid.css';
+import './gameStudy.css';
 import { useCountUp } from '../../motion/hooks';
 import { fireRewardAt } from '../../motion/rewardBurst';
 import { getUserLevel, onLevelChange } from '../../levelService';
@@ -19,16 +20,34 @@ import { LANG_TAGS } from '../../../shared/i18n/core';
 import Icon from '../Icons';
 import { GAME_ICONS } from '../../games/gameIcons';
 import { ContextualSurface } from '../liquid/LiquidSurface';
-import { addDeckCards, loadDeckFolders, onDeckChanged } from '../../flashcardDeck';
+import { addDeckCards, dueDeckCardNow, loadDeckFolders, onDeckChanged } from '../../flashcardDeck';
 import { onLevelListsChanged } from '../../levelLists';
-import { loadArenaContent, levelCoverage } from '../../games/contentStore';
+import { loadArenaContent, levelCoverage, type ArenaContent } from '../../games/contentStore';
 import { mirrorRotation, mirrorTextsFor, type MirrorText } from '../../data/mirrorTexts';
 import { useStudyLanguage } from '../../useStudyLanguage';
 import { useAiReadiness } from '../../aiSetupClient';
 import { handOffToAgent, routeAgentContext } from '../../agentContextHandoff';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import type { StudyLang } from '../../../shared/levelScale';
-import { bankArenaAnswer, bankArenaSession } from '../../games/arenaStudyBridge';
+import {
+  bankArenaAnswer,
+  bankArenaPairs,
+  bankArenaSession,
+  newArenaBankSession,
+  type ArenaBankOutcome,
+  type ArenaBankSession,
+} from '../../games/arenaStudyBridge';
+import { arenaGameDescKey, arenaGameTitleKey } from '../../games/gameTitles';
+import { GAME_ARENA_SELECT_EVENT, takeArenaGameRequest, type ArenaGameRequest } from '../../games/arenaIntent';
+import { markWarmUpDone, todaysWarmUp, WARM_UP_EVENT, warmUpDoneToday } from '../../games/warmUp';
+import {
+  adaptiveTuning,
+  DEFAULT_TUNING,
+  studyMixSlots,
+  summarizeArenaProgress,
+  type AdaptiveTuning,
+} from '../../../shared/gameStudyMix';
+import { cardAudioSource } from '../../cardAudioSource';
 import {
   GAME_LIST_TEMPLATE_CSV,
   GAME_LIST_TEMPLATE_JSON,
@@ -101,14 +120,6 @@ const ARCADE_GAME_IDS: readonly ArcadeGameId[] = [
   ...AERO_ARCADE_IDS,
 ];
 
-/** The Aero-only games reuse the Special page's names for them. */
-const AERO_GAME_KEYS: Partial<Record<GameId, string>> = {
-  'aero-breakout': 'special.game.aero.breakout',
-  'aero-blocks': 'special.game.aero.blocks',
-  'aero-pong': 'special.game.aero.pong',
-  'aero-snake': 'special.game.aero.snake',
-};
-
 function isArcadeGame(id: GameId): id is ArcadeGameId {
   return ARCADE_GAME_IDS.includes(id as ArcadeGameId);
 }
@@ -125,10 +136,46 @@ interface Session extends ArenaSessionState {
   elapsedMs?: number;
   score?: number;
   accuracy?: number;
+  /** The daily warm-up, which marks itself done when it finishes. */
+  warmUp?: boolean;
+  /** Which way recent accuracy moved this session's difficulty, for the HUD note. */
+  tuning?: AdaptiveTuning['reason'];
+  /** The level the rounds were dealt at (adaptive difficulty can move it from the learner's). */
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+}
+
+/** i+1 tiers from `loadArenaContent`: item keys of due / learning words, known words, i+1 sentences. */
+export interface SessionMix {
+  target: readonly string[];
+  known: readonly string[];
+  prefer: readonly string[];
+}
+
+export interface SessionOptions {
+  mix?: SessionMix;
+  tuning?: AdaptiveTuning;
+  /** Rounds, when not the settings' game length (the warm-up is short). */
+  rounds?: number;
+  warmUp?: boolean;
+}
+
+/** A missed word on the post-game review, with what the card can still do about it. */
+interface ReviewRow {
+  word: string;
+  expected: string;
+  answer?: string;
+  cardId?: string;
+  mistake: ArenaMistake;
 }
 
 /** How long an answered round stays on screen before the next one loads. */
 const REVEAL_MS = 900;
+
+/** Badges `stats.ts` awards, which the catalog names (`games2.badge.<id>.label|desc`). */
+const KNOWN_BADGES = new Set(['arena-first-clear', 'arena-ace', 'kanji-scholar', 'grammar-warden', 'flow-master']);
+
+/** Study answers asked before each arcade run (when the setting is on). */
+const ARCADE_GATE_ROUNDS = 3;
 
 /**
  * Badge wall cap. The header's own `games.badgeCount` reads the FULL length, so the overflow
@@ -197,28 +244,42 @@ function addMistakeToDeck(mistake: ArenaMistake, answerLabel: string, folder: st
   ]);
 }
 
+/**
+ * The words a round missed, for the post-game review. A Word Match board names each pair it
+ * got wrong (with that pair's meaning as the expected answer); every other round names its
+ * word. The card id comes from what banking found, so the review knows which can be
+ * brought forward and which can only be mined.
+ */
+function missedRows(round: GameRound, outcome: RoundOutcome, banked: readonly ArenaBankOutcome[]): ReviewRow[] {
+  if (!outcome.mistake) return [];
+  const cardOf = (word: string): string | undefined => banked.find((entry) => entry.word === word.slice(0, 120))?.cardId;
+  if (round.kind === 'match' && outcome.pairs) {
+    const base = outcome.mistake;
+    return outcome.pairs
+      .filter((pair) => !pair.correct)
+      .map((pair) => {
+        const source = round.pairs.find((candidate) => candidate.jp === pair.jp);
+        const meaning = source?.meaning ?? '';
+        return {
+          word: pair.jp,
+          expected: meaning,
+          cardId: cardOf(pair.jp),
+          mistake: { ...base, prompt: pair.jp, expected: meaning, answer: undefined, jp: pair.jp, reading: source?.reading, meaning, word: pair.jp },
+        };
+      });
+  }
+  const word = round.word ?? round.jp;
+  return [{ word, expected: outcome.mistake.expected, answer: outcome.mistake.answer, cardId: cardOf(word), mistake: outcome.mistake }];
+}
+
 function highScoreFor(progress: GameProgressData, gameId: GameId, level: number, sourceLang: string): number | null {
   const key = `${gameId}|${level}|${sourceLang}`;
   return progress.highScores[key]?.score ?? null;
 }
 
-/**
- * Four games test a different skill per study language (kana → pinyin tones /
- * the Cyrillic alphabet; kanji readings → pinyin / stress; particles → Chinese
- * particles / Russian case endings; counters → measure words / number
- * agreement), so they carry their own names there.
- */
-const PER_LANGUAGE_GAMES = new Set<GameId>(['kana-sprint', 'kanji-reading', 'particle-panic', 'counter-quiz']);
-
-function gameTitleKey(id: GameId, lang: StudyLang = 'ja'): string {
-  if (AERO_GAME_KEYS[id]) return `${AERO_GAME_KEYS[id]}.title`;
-  return lang !== 'ja' && PER_LANGUAGE_GAMES.has(id) ? `games.def.${id}.${lang}.title` : `games.def.${id}.title`;
-}
-
-function gameDescKey(id: GameId, lang: StudyLang = 'ja'): string {
-  if (AERO_GAME_KEYS[id]) return `${AERO_GAME_KEYS[id]}.desc`;
-  return lang !== 'ja' && PER_LANGUAGE_GAMES.has(id) ? `games.def.${id}.${lang}.desc` : `games.def.${id}.desc`;
-}
+/** Per-language names and blurbs live in `games/gameTitles.ts`, shared with the Calendar and Statistics. */
+const gameTitleKey = arenaGameTitleKey;
+const gameDescKey = arenaGameDescKey;
 
 /**
  * A fresh session. The salt makes every session a new draw (the seed used to be
@@ -232,12 +293,27 @@ export function makeSession(
   content?: GameContent,
   history?: { seen?: ReadonlySet<string>; weak?: ReadonlySet<string> },
   now = Date.now(),
+  options: SessionOptions = {},
 ): Session {
   const salt = (now ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
-  const rounds = buildSessionRounds(gameId, level, settings.sourceLang, settings.gameLength, content, {
+  const count = options.rounds ?? settings.gameLength;
+  const tuning = options.tuning ?? DEFAULT_TUNING;
+  const mix = options.mix;
+  // i+1: about one round in `targetEvery` deals a due or learning word, the rest known
+  // ones, and sentence rounds prefer sentences whose other words are known.
+  const mixContext = mix && (mix.target.length || mix.prefer.length)
+    ? {
+        target: new Set(mix.target),
+        known: new Set(mix.known),
+        prefer: new Set(mix.prefer),
+        targetSlots: studyMixSlots(count, tuning.targetEvery, mix.target.length > 0, mix.known.length > 0),
+      }
+    : {};
+  const rounds = buildSessionRounds(gameId, level, settings.sourceLang, count, content, {
     salt,
     seen: history?.seen,
     weak: history?.weak,
+    ...mixContext,
   });
   return {
     gameId,
@@ -250,7 +326,10 @@ export function makeSession(
     complete: false,
     reveal: false,
     startedAt: now,
-    timeLimitMs: settings.gameLength * 12_000,
+    level,
+    timeLimitMs: count * tuning.secondsPerRound * 1000,
+    ...(options.warmUp ? { warmUp: true } : {}),
+    ...(tuning.reason ? { tuning: tuning.reason } : {}),
   };
 }
 
@@ -278,6 +357,17 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
   const [arcadeTheme, setArcadeTheme] = useState<ArcadeTheme>(() =>
     preferredArcadeTheme(hasDiscoveredWired(), hasDiscoveredAero()),
   );
+  // One banking memory per session, so a word answered twice is evidence once.
+  const bankRef = useRef<ArenaBankSession>(newArenaBankSession());
+  // What banking did this session, and the words missed: the post-game review reads both.
+  const [bankLog, setBankLog] = useState<ArenaBankOutcome[]>([]);
+  const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
+  const [warmUpDone, setWarmUpDone] = useState(() => warmUpDoneToday());
+  useEffect(() => {
+    const refresh = (): void => setWarmUpDone(warmUpDoneToday());
+    window.addEventListener(WARM_UP_EVENT, refresh);
+    return () => window.removeEventListener(WARM_UP_EVENT, refresh);
+  }, []);
 
   useEffect(() => onGameArenaSettingsChanged(() => setSettings(loadGameArenaSettings())), []);
   useEffect(() => {
@@ -312,7 +402,7 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
       offLists();
     };
   }, []);
-  const content = useMemo<GameContent & { usingFallback: boolean }>(
+  const content = useMemo<ArenaContent & { kana: KanaSelection }>(
     () => ({ ...loadArenaContent(level, settings.material), kana: settings.kana }),
     [level, deckNonce, listsNonce, settings.kana, settings.material, studyLang],
   );
@@ -363,21 +453,81 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
     if (arcadeTheme === 'wired' && !wiredUnlocked) setArcadeTheme(preferredArcadeTheme(wiredUnlocked, aeroUnlocked));
   }, [aeroUnlocked, arcadeTheme, wiredUnlocked]);
 
+  // Adaptive difficulty (`shared/gameStudyMix.ts`): the last sessions of the selected game
+  // move the level (when it is automatic), the share of learning words and the timer.
+  const tuningFor = useCallback(
+    (gameId: GameId): AdaptiveTuning => (settings.adaptive ? adaptiveTuning(progress.recent, gameId) : DEFAULT_TUNING),
+    [progress.recent, settings.adaptive],
+  );
+  const levelFor = (tuning: AdaptiveTuning): 1 | 2 | 3 | 4 | 5 | 6 | 7 =>
+    settings.levelOverride === 'auto'
+      ? (Math.min(7, Math.max(1, level + tuning.levelDelta)) as 1 | 2 | 3 | 4 | 5 | 6 | 7)
+      : level;
+  const selectedTuning = tuningFor(selected);
+
+  /** A fresh session of `gameId`, with i+1 mixing and adaptive difficulty. */
+  const sessionFor = (
+    gameId: FastGameId,
+    source: GameContent & { target?: string[]; known?: string[]; prefer?: string[] } = content,
+    extra: Pick<SessionOptions, 'rounds' | 'warmUp'> = {},
+  ): Session => {
+    bankRef.current = newArenaBankSession();
+    setBankLog([]);
+    setReviewRows([]);
+    const tuning = tuningFor(gameId);
+    return makeSession(gameId, settings, levelFor(tuning), source, historyFor(gameId), Date.now(), {
+      tuning,
+      mix: { target: source.target ?? [], known: source.known ?? [], prefer: source.prefer ?? [] },
+      ...extra,
+    });
+  };
+
+  /** Act on a request from outside the Arena: select the game, and start it when asked. */
+  const applyRequest = (request: ArenaGameRequest & { theme?: ArcadeTheme }): void => {
+    const gameId = request.gameId;
+    if (isArcadeGame(gameId) && !arcadeUnlocked) return;
+    if (!availableGames.some((game) => game.id === gameId)) return;
+    if (request.theme === 'aero' && aeroUnlocked) setArcadeTheme('aero');
+    if (request.theme === 'wired' && wiredUnlocked) setArcadeTheme('wired');
+    setSelected(gameId);
+    if (request.autostart && gameId !== 'mirror-writing' && !isArcadeGame(gameId)) {
+      const source = request.material
+        ? { ...loadArenaContent(level, request.material), kana: settings.kana }
+        : content;
+      setSession(sessionFor(gameId, source, request.rounds ? { rounds: request.rounds } : {}));
+    } else {
+      setSession(null);
+    }
+  };
+
   useEffect(() => {
     const onSelect = (event: Event) => {
-      const detail = (event as CustomEvent<{ gameId?: GameId; theme?: ArcadeTheme }>).detail;
-      const gameId = detail?.gameId;
-      if (!gameId) return;
-      if (isArcadeGame(gameId) && !arcadeUnlocked) return;
-      if (!availableGames.some((game) => game.id === gameId)) return;
-      if (detail?.theme === 'aero' && aeroUnlocked) setArcadeTheme('aero');
-      if (detail?.theme === 'wired' && wiredUnlocked) setArcadeTheme('wired');
-      setSelected(gameId);
-      setSession(null);
+      const detail = (event as CustomEvent<Partial<ArenaGameRequest> & { theme?: ArcadeTheme }>).detail;
+      if (!detail?.gameId) return;
+      // The handoff was parked for a cold open; this mounted Arena answered it.
+      takeArenaGameRequest();
+      applyRequest(detail as ArenaGameRequest & { theme?: ArcadeTheme });
     };
-    window.addEventListener('game-arena:select', onSelect);
-    return () => window.removeEventListener('game-arena:select', onSelect);
-  }, [arcadeUnlocked, availableGames]);
+    window.addEventListener(GAME_ARENA_SELECT_EVENT, onSelect);
+    return () => window.removeEventListener(GAME_ARENA_SELECT_EVENT, onSelect);
+  });
+
+  // A request parked before this Arena mounted (Calendar, Agent, warm-up links).
+  useEffect(() => {
+    const request = takeArenaGameRequest();
+    if (request) applyRequest(request);
+  }, []);
+
+  /** Today's warm-up, from what is due now. Re-read when the deck or the day's state changes. */
+  const warmUp = useMemo(
+    () => todaysWarmUp(studyLang, settings.sounds && hasStudyVoice(studyLang)),
+    [studyLang, deckNonce, warmUpDone, settings.sounds],
+  );
+  const startWarmUp = (): void => {
+    setSelected(warmUp.gameId);
+    const source = { ...loadArenaContent(level, warmUp.material), kana: settings.kana };
+    setSession(sessionFor(warmUp.gameId, source, { rounds: warmUp.rounds, warmUp: true }));
+  };
 
   // Items met before, and items recently missed, for this game in this language.
   const historyFor = useCallback(
@@ -396,7 +546,7 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
 
   const startSelected = (): void => {
     if (selected === 'mirror-writing' || isArcadeGame(selected)) return;
-    setSession(makeSession(selected, settings, level, content, historyFor(selected)));
+    setSession(sessionFor(selected));
   };
 
   // Both call sites are `setSession` updaters, and a React updater must be
@@ -428,7 +578,7 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
     bankedSessionRef.current = session.startedAt;
     recordGameResult({
       gameId: session.gameId,
-      level,
+      level: session.level ?? level,
       sourceLang: settings.sourceLang,
       score: session.score ?? 0,
       accuracy: session.accuracy ?? 0,
@@ -436,6 +586,7 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
     });
     // Session time is study time: it reaches the day's totals in Statistics.
     bankArenaSession(session.startedAt, session.startedAt + (session.elapsedMs ?? 0));
+    if (session.warmUp) markWarmUpDone();
   }, [session?.complete, session?.startedAt]);
 
   // Scoring lands immediately; advancing waits for REVEAL_MS so the player
@@ -444,9 +595,15 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
     // Any answered round counts as "met this item" — coverage measures
     // exposure to the material, not getting it right.
     if (currentRound) {
-      markItemSeen(currentRound.gameId, level, roundItemKey(currentRound), studyLang);
-      // Each answer is study evidence: review log, and the word's card or known level.
-      bankArenaAnswer(currentRound, outcome.correct);
+      markItemSeen(currentRound.gameId, session?.level ?? level, roundItemKey(currentRound), studyLang);
+      // Each answer is study evidence: practice credit (a due card is graded only with the
+      // opt-in setting) — once per word per session. Word Match banks each pair.
+      const banked = currentRound.kind === 'match' && outcome.pairs
+        ? bankArenaPairs(currentRound.studyLang, outcome.pairs, Date.now(), bankRef.current)
+        : [bankArenaAnswer(currentRound, outcome.correct, Date.now(), bankRef.current)];
+      setBankLog((log) => [...log, ...banked]);
+      const missed = missedRows(currentRound, outcome, banked);
+      if (missed.length) setReviewRows((rows) => [...rows, ...missed.filter((row) => !rows.some((r) => r.word === row.word))]);
     }
     setSession((current) => (current ? applyRoundOutcome(current, outcome) : current));
   };
@@ -479,10 +636,39 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
         </div>
         <div className="game-arena-progress" aria-label={t('games.progress')}>
           <span>{t('games.xp', { xp: progress.xp })}</span>
-          <span>{t('games.streak', { streak: progress.streak })}</span>
+          {/* The streak as it stands today: one whose last day is before yesterday is over. */}
+          <span>{t('games.streak', { streak: summarizeArenaProgress({ ...progress, highScores: [] }).streak })}</span>
           <span>{t('games.badgeCount', { count: progress.badges.length })}</span>
         </div>
       </ContextualSurface>
+
+      {/* Today's warm-up: one short game picked by what is due, until it has been played. */}
+      <section className="game-warmup" aria-label={t('games2.warmup.label')}>
+        {warmUpDone ? (
+          <p className="muted">{t('games2.warmup.done')}</p>
+        ) : (
+          <>
+            <p>
+              <b>{t('games2.warmup.title')}</b>{' '}
+              <span className="muted">
+                {t(`games2.warmup.reason.${warmUp.reason}`, {
+                  game: t(gameTitleKey(warmUp.gameId, studyLang)),
+                  count: warmUp.due,
+                  rounds: warmUp.rounds,
+                })}
+              </span>
+            </p>
+            <button
+              type="button"
+              className="btn small primary"
+              onClick={startWarmUp}
+              disabled={!!session && !session.complete}
+            >
+              {t('games2.warmup.start')}
+            </button>
+          </>
+        )}
+      </section>
 
       <div className="game-arena-layout">
         <ContextualSurface as="aside" className="game-list" aria-label={t('games.list')}>
@@ -515,7 +701,12 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
               <p className="muted">{t(gameDescKey(selectedDef.id, studyLang))}</p>
             </div>
             <div className="game-stage-meta">
-              <span>{t('games.level.n', { level })}</span>
+              <span>{t('games.level.n', { level: session?.level ?? levelFor(selectedTuning) })}</span>
+              {(session ? session.tuning : selectedTuning.reason) && (
+                <span className="game-adapt-tag" title={t('games2.adapt.hint')}>
+                  {t(`games2.adapt.${session ? session.tuning : selectedTuning.reason}`)}
+                </span>
+              )}
               <span>{t(`games.lang.${settings.sourceLang}`)}</span>
               <span>{highScore == null ? t('games.noHighScore') : t('games.highScore', { score: highScore })}</span>
             </div>
@@ -538,6 +729,16 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
                   : t('games.coverage.noList')}
               </span>
               {content.usingFallback && <span className="game-fallback-tag">{t('games.coverage.fallback')}</span>}
+              {/* What the session will mix (i+1): mostly known words, some due or learning. */}
+              {(content.queue.due > 0 || content.queue.learning > 0 || content.queue.known > 0) && (
+                <span className="muted game-queue-line">
+                  {t('games2.queue.line', {
+                    due: content.queue.due,
+                    learning: content.queue.learning,
+                    known: content.queue.known,
+                  })}
+                </span>
+              )}
             </ContextualSurface>
           )}
 
@@ -562,11 +763,14 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
           {selected === 'mirror-writing' ? (
             <MirrorWritingPanel settings={settings} level={level} />
           ) : isArcadeGame(selected) ? (
-            <ArcadeGamePanel
+            <ArcadeWithStudyGate
+              key={selected}
               gameId={selected}
               theme={AERO_ARCADE_IDS.includes(selected) ? 'aero' : arcadeTheme}
               level={level}
-              sourceLang={settings.sourceLang}
+              settings={settings}
+              content={content}
+              progress={progress}
               onProgress={() => setProgress(loadGameProgress())}
             />
           ) : (
@@ -590,6 +794,8 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
                             onChange={(e) => saveGameArenaSettings({ material: e.target.value })}
                             options={[
                               { value: 'auto', label: t('games.material.auto') },
+                              { value: 'due', label: t('games2.material.due') },
+                              { value: 'mined-today', label: t('games2.material.minedToday') },
                               ...deckFolders.map((f) => ({ value: `folder:${f}`, label: t('games.material.folder', { name: f }) })),
                               ...gameLists.map((l) => ({ value: `list:${l.id}`, label: t('games.material.list', { name: l.name, count: l.rows.length }) })),
                             ]}
@@ -692,7 +898,9 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
               {session?.complete && (
                 <ResultPanel
                   session={session}
-                  onRestart={() => setSession(makeSession(session.gameId, settings, level, content, historyFor(session.gameId)))}
+                  bankLog={bankLog}
+                  reviewRows={reviewRows}
+                  onRestart={() => setSession(sessionFor(session.gameId))}
                 />
               )}
             </>
@@ -739,8 +947,9 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
                 <span className="motion-badge-glow" aria-hidden="true" />
                 <Icon name="star" size={15} />
                 <span>
-                  <b>{badge.label}</b>
-                  <small>{badge.description}</small>
+                  {/* Stored in English when awarded; named in the UI language when the id is known. */}
+                  <b>{KNOWN_BADGES.has(badge.id) ? t(`games2.badge.${badge.id}.label`) : badge.label}</b>
+                  <small>{KNOWN_BADGES.has(badge.id) ? t(`games2.badge.${badge.id}.desc`) : badge.description}</small>
                 </span>
               </div>
             </div>
@@ -941,11 +1150,6 @@ function TypeRoundPanel({
     setResult(outcome);
     onSubmit(outcome);
   };
-  // Audio rounds speak on their own so the player isn't hunting for a button
-  // before the round can even start; the button is there to hear it again.
-  useEffect(() => {
-    if (round.speak && sounds) speakStudy(round.jp, round.studyLang);
-  }, [round.id]);
   // Voices arrive asynchronously; re-check once they load.
   const [voiceReady, setVoiceReady] = useState(() => hasStudyVoice(round.studyLang));
   useEffect(() => {
@@ -955,16 +1159,58 @@ function TypeRoundPanel({
     window.speechSynthesis.addEventListener?.('voiceschanged', onVoices);
     return () => window.speechSynthesis.removeEventListener?.('voiceschanged', onVoices);
   }, [round.studyLang]);
-  // No voice for the language (or sound off): the round would be unplayable
-  // silence, so it falls back to showing the text.
-  const showListenText = !!round.speak && (!sounds || !voiceReady);
+  // A listening round plays the card's own recording (a mined clip) when it has one,
+  // and synthesised speech otherwise. The recording is read from the media store first.
+  const [clip, setClip] = useState<{ state: 'none' | 'loading' | 'ready' | 'failed'; src?: string }>(
+    () => ({ state: round.speak && round.audio ? 'loading' : 'none' }),
+  );
+  const playerRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (!round.speak || !round.audio) return undefined;
+    let alive = true;
+    void cardAudioSource(round.audio).then((src) => {
+      if (alive) setClip(src ? { state: 'ready', src } : { state: 'failed' });
+    });
+    return () => {
+      alive = false;
+      playerRef.current?.pause();
+    };
+  }, [round.id]);
+  const play = (): void => {
+    if (clip.state === 'ready' && clip.src) {
+      playerRef.current?.pause();
+      const player = new Audio(clip.src);
+      playerRef.current = player;
+      const playing = player.play() as Promise<void> | undefined;
+      // A recording the element refuses (codec, a revoked file) falls back to the voice.
+      playing?.catch?.(() => speakStudy(round.jp, round.studyLang));
+      return;
+    }
+    speakStudy(round.jp, round.studyLang);
+  };
+  // Audio rounds play on their own so the player isn't hunting for a button
+  // before the round can even start; the button is there to hear it again.
+  // A round with a recording waits until it has been read.
+  useEffect(() => {
+    if (!round.speak || !sounds || clip.state === 'loading') return;
+    play();
+  }, [round.id, clip.state]);
+  const canHear = sounds && (clip.state === 'ready' || clip.state === 'loading' || voiceReady);
+  // No recording and no voice for the language (or sound off): the round would be
+  // unplayable silence, so it falls back to showing the text.
+  const showListenText = !!round.speak && !canHear;
   return (
     <div className="game-round">
       <PromptBlock round={round} />
       {round.speak && (
-        <button type="button" className="btn" disabled={!sounds || !voiceReady} onClick={() => speakStudy(round.jp, round.studyLang)}>
+        <button type="button" className="btn" disabled={!canHear || clip.state === 'loading'} onClick={play}>
           <Icon name="volume" size={14} /> {t('games.action.listen')}
         </button>
+      )}
+      {round.speak && canHear && clip.state !== 'loading' && (
+        <p className="muted game-listen-source">
+          {clip.state === 'ready' ? t('games2.listen.recording') : t('games2.listen.synth')}
+        </p>
       )}
       {showListenText && (
         <p className="muted game-listen-fallback">
@@ -1187,8 +1433,193 @@ function MatchRoundPanel({
   );
 }
 
-function ResultPanel({ session, onRestart }: { session: Session; onRestart: () => void }) {
+/**
+ * An arcade game with a study gate in front of each run.
+ *
+ * The eight arcade games (Invaders, Lander, Capsules, Minesweeper and the four Aero ones)
+ * teach nothing on their own. With "Study before arcade runs" on (the default), each run
+ * costs a few answers from the study queue — due and learning words first, banked like any
+ * Arena answer — so the arcade is a reward for studying rather than a break from it. With
+ * the setting off they play exactly as before.
+ */
+function ArcadeWithStudyGate({
+  gameId,
+  theme,
+  level,
+  settings,
+  content,
+  progress,
+  onProgress,
+}: {
+  gameId: ArcadeGameId;
+  theme: ArcadeTheme;
+  level: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  settings: GameArenaSettings;
+  content: ArenaContent & { kana: KanaSelection };
+  progress: GameProgressData;
+  onProgress: () => void;
+}) {
   const { t } = useT();
+  const gated = settings.arcadeStudyGate;
+  const [phase, setPhase] = useState<'quiz' | 'play'>(gated ? 'quiz' : 'play');
+  const [run, setRun] = useState(0);
+  const [runStartedAt, setRunStartedAt] = useState(() => Date.now());
+  useEffect(() => {
+    if (!gated) setPhase('play');
+  }, [gated]);
+  // A run has ended once a result for this game is recorded after it started.
+  const runEnded = phase === 'play'
+    && progress.recent.some((entry) => entry.gameId === gameId && entry.createdAt >= runStartedAt);
+
+  if (phase === 'quiz') {
+    return (
+      <ArcadeStudyGate
+        content={content}
+        settings={settings}
+        level={level}
+        onDone={() => {
+          setPhase('play');
+          setRun((value) => value + 1);
+          setRunStartedAt(Date.now());
+        }}
+      />
+    );
+  }
+  return (
+    <>
+      <ArcadeGamePanel
+        key={run}
+        gameId={gameId}
+        theme={theme}
+        level={level}
+        sourceLang={settings.sourceLang}
+        onProgress={onProgress}
+        restartGated={gated}
+      />
+      {gated && runEnded && (
+        <div className="arcade-gate-again">
+          <button type="button" className="btn primary" onClick={() => setPhase('quiz')}>
+            {t('games2.arcade.again')}
+          </button>
+          <span className="muted">{t('games2.arcade.againHint', { count: ARCADE_GATE_ROUNDS })}</span>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ArcadeStudyGate({
+  content,
+  settings,
+  level,
+  onDone,
+}: {
+  content: ArenaContent & { kana: KanaSelection };
+  settings: GameArenaSettings;
+  level: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  onDone: () => void;
+}) {
+  const { t } = useT();
+  const bank = useRef(newArenaBankSession());
+  // Recall in the learner's own words when the deck has any; their sentences next; the
+  // bundled material for the language otherwise.
+  const [rounds] = useState<GameRound[]>(() => {
+    const game: FastGameId = content.vocab.length
+      ? 'reverse-recall'
+      : content.cloze.length
+        ? 'cloze-blitz'
+        : content.studyLang === 'ja'
+          ? 'kana-sprint'
+          : 'reverse-recall';
+    return buildSessionRounds(game, level, settings.sourceLang, ARCADE_GATE_ROUNDS, content, {
+      salt: Date.now() >>> 0,
+      target: new Set(content.target),
+      known: new Set(content.known),
+      prefer: new Set(content.prefer),
+      targetSlots: studyMixSlots(ARCADE_GATE_ROUNDS, 2, content.target.length > 0, content.known.length > 0),
+    });
+  });
+  const [index, setIndex] = useState(0);
+  const [outcome, setOutcome] = useState<RoundOutcome | null>(null);
+  const round = rounds[index];
+
+  const submit = (answer: RoundOutcome): void => {
+    if (outcome || !round) return;
+    if (round.kind === 'match' && answer.pairs) bankArenaPairs(round.studyLang, answer.pairs, Date.now(), bank.current);
+    else bankArenaAnswer(round, answer.correct, Date.now(), bank.current);
+    setOutcome(answer);
+  };
+
+  useEffect(() => {
+    if (!outcome) return undefined;
+    // A miss stays up longer: the right answer is the lesson.
+    const id = window.setTimeout(() => {
+      if (index + 1 >= rounds.length) {
+        onDone();
+        return;
+      }
+      setIndex((value) => value + 1);
+      setOutcome(null);
+    }, outcome.correct ? REVEAL_MS : REVEAL_MS * 2);
+    return () => window.clearTimeout(id);
+  }, [outcome]);
+
+  if (!round) {
+    // Nothing to ask (should not happen: the bundled pack always fills a round).
+    return (
+      <button type="button" className="btn primary" onClick={onDone}>
+        {t('games2.arcade.play')}
+      </button>
+    );
+  }
+  return (
+    <section className="arcade-gate" aria-label={t('games2.arcade.gateTitle')}>
+      <h4>{t('games2.arcade.gateTitle')}</h4>
+      <p className="muted" role="status">
+        {t('games2.arcade.gateLine', { current: index + 1, total: rounds.length })}
+      </p>
+      <div className={`game-round-shell ${outcome ? (outcome.correct ? 'is-correct' : 'is-wrong') : ''}`.trim()}>
+        {round.kind === 'type' && <TypeRoundPanel key={round.id} round={round} sounds={settings.sounds} onSubmit={submit} />}
+        {round.kind === 'builder' && <BuilderRoundPanel key={round.id} round={round} onSubmit={submit} />}
+        {round.kind === 'match' && <MatchRoundPanel key={round.id} round={round} onSubmit={submit} />}
+      </div>
+    </section>
+  );
+}
+
+function ResultPanel({
+  session,
+  onRestart,
+  bankLog = [],
+  reviewRows = [],
+}: {
+  session: Session;
+  onRestart: () => void;
+  bankLog?: readonly ArenaBankOutcome[];
+  reviewRows?: readonly ReviewRow[];
+}) {
+  const { t } = useT();
+  const { tag: studyTag } = useStudyLanguage();
+  // Per word: brought forward into today's reviews, or mined as a new card.
+  const [handled, setHandled] = useState<Record<string, 'review' | 'mined'>>({});
+  const graded = bankLog.filter((entry) => entry.kind === 'review').length;
+  const practiced = bankLog.filter((entry) => entry.kind === 'practice').length;
+  const reviewNow = (row: ReviewRow): void => {
+    if (!row.cardId) return;
+    dueDeckCardNow(row.cardId);
+    setHandled((current) => ({ ...current, [row.word]: 'review' }));
+  };
+  const mine = (row: ReviewRow): void => {
+    addMistakeToDeck(row.mistake, t('games.mistake.yourAnswer'), t('games.deck.folder'));
+    setHandled((current) => ({ ...current, [row.word]: 'mined' }));
+    window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('games.toast.savedToFlashcards'), kind: 'ok' } }));
+  };
+  const reviewAll = (): void => {
+    for (const row of reviewRows) {
+      if (handled[row.word]) continue;
+      if (row.cardId) reviewNow(row);
+    }
+  };
   // Shared motion hook (Phase 4.5): routes through the motion tokens, so the
   // Animation Velocity slider reaches the score roll and the tick audio comes
   // off the shared sound engine. The Arena's own copy hard-coded 750ms.
@@ -1232,7 +1663,63 @@ function ResultPanel({ session, onRestart }: { session: Session; onRestart: () =
       <button type="button" className="btn primary" onClick={onRestart}>
         {t('games.playAgain')}
       </button>
-      {!!session.mistakes.length && (
+      {/* What the session did to the study queue: due cards graded, practice credited. */}
+      {(graded > 0 || practiced > 0) && (
+        <p className="muted game-result-srs">{t('games2.review.banked', { graded, practiced })}</p>
+      )}
+      {/*
+        The post-game review: every missed word, with what can still be done about it. A
+        word with a card can be brought into today's reviews; a word without one can be
+        mined. Built from what banking found, so a missed word is never offered twice.
+      */}
+      {reviewRows.length > 0 ? (
+        <section className="game-review" aria-label={t('games2.review.title')}>
+          <div className="game-review-head">
+            <h4>{t('games2.review.title')}</h4>
+            {reviewRows.some((row) => row.cardId && !handled[row.word]) && (
+              <button type="button" className="btn small" onClick={reviewAll}>
+                {t('games2.review.reviewAll')}
+              </button>
+            )}
+          </div>
+          <ul className="game-review-list">
+            {reviewRows.map((row) => (
+              <li key={row.word} className="game-mistake">
+                <span>
+                  <b lang={studyTag}>{row.word}</b>
+                  <small>
+                    {t('games2.review.expected', { answer: row.expected })}
+                    {row.answer ? ` · ${t('games2.review.yours', { answer: row.answer })}` : ''}
+                  </small>
+                </span>
+                {handled[row.word] === 'review' ? (
+                  <span className="muted">{t('games2.review.queued')}</span>
+                ) : handled[row.word] === 'mined' ? (
+                  <span className="muted">{t('games2.review.mined')}</span>
+                ) : row.cardId ? (
+                  <button
+                    type="button"
+                    className="btn small"
+                    aria-label={t('games2.review.reviewNowNamed', { word: row.word })}
+                    onClick={() => reviewNow(row)}
+                  >
+                    {t('games2.review.reviewNow')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn small"
+                    aria-label={t('games2.review.mineNamed', { word: row.word })}
+                    onClick={() => mine(row)}
+                  >
+                    {t('games.mineMistake')}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : !!session.mistakes.length && (
         <div className="game-mistakes">
           {session.mistakes.map((mistake, index) => (
             <div key={`${mistake.createdAt}-${index}`} className="game-mistake">

@@ -22,6 +22,7 @@ import {
   parseMokuroPage,
   regionIdFromBox,
   type MokuroBlock,
+  type MokuroBlockKind,
   type MokuroBox,
   type MokuroPage,
 } from '../shared/mokuroTypes';
@@ -36,8 +37,15 @@ import type {
   MangaOcrSplitRequest,
   MangaOcrVolumeProgress,
   MangaOcrVolumeRequest,
+  MangaMokuroImportResult,
   DetectionSensitivity,
 } from '../shared/mangaOcrIpc';
+import {
+  MOKURO_VOLUME_MAX_BYTES,
+  matchMokuroPages,
+  parseMokuroVolume,
+  type MokuroVolume,
+} from '../shared/mokuroVolume';
 import {
   classifyRegionKind,
   guessVertical,
@@ -1879,6 +1887,55 @@ export function cancelMangaVolumeAnalyze(itemId: string): void {
   if (itemId) volumeCancel.add(itemId);
 }
 
+// ----- Mokuro volume import ---------------------------------------------
+
+/**
+ * Write a Mokuro `.mokuro` volume into this item's OCR cache, one page file per
+ * matched library page, in the same schema a scan writes — so the overlay, the
+ * clean-text view, region editing, mining and translation all work on it
+ * without knowing where the boxes came from. No model is needed.
+ *
+ * A page that already had a cache is overwritten (the user asked for this
+ * import); its old translation cache is removed, because those boxes no longer
+ * exist and a stale translation would paint over the wrong bubbles.
+ */
+export async function importMokuroVolume(itemId: string, json: string): Promise<MangaMokuroImportResult> {
+  if (json.length > MOKURO_VOLUME_MAX_BYTES) return { ok: false, reason: 'tooLarge' };
+  let volume: MokuroVolume;
+  try {
+    volume = parseMokuroVolume(JSON.parse(json));
+  } catch {
+    return { ok: false, reason: 'invalid' };
+  }
+  if (!volume.pages.length) return { ok: false, reason: 'noPages' };
+  const stems: string[] = [];
+  for (const url of listMangaPageUrls(itemId)) {
+    const resolved = resolveMediaPath(url);
+    if (resolved && resolved.itemId === itemId) stems.push(resolved.stem);
+  }
+  const match = matchMokuroPages(volume, stems);
+  if (match.matchedBy === 'none' || !match.assignments.length) return { ok: false, reason: 'noMatch' };
+  let existing: string[] = [];
+  try {
+    existing = await fsp.readdir(ocrDir(itemId));
+  } catch {
+    existing = [];
+  }
+  for (const { stem, page } of match.assignments) {
+    await writeCache(itemId, stem, page);
+    for (const name of existing) {
+      if (!name.startsWith(`${stem}.tr.`) || !name.endsWith('.json')) continue;
+      try {
+        await fsp.unlink(path.join(ocrDir(itemId), name));
+      } catch {
+        /* already gone */
+      }
+    }
+  }
+  await refreshMangaOcrMeta(itemId, { broadcast: true });
+  return { ok: true, pages: match.assignments.length, unmatched: match.unmatched, matchedBy: match.matchedBy };
+}
+
 // ----- IPC ---------------------------------------------------------------
 
 export function registerMangaOcrIpc(): void {
@@ -2085,6 +2142,13 @@ export function registerMangaOcrIpc(): void {
   ipcMain.handle('mangaOcr:cancelVolume', (_e, itemId: unknown) => {
     if (typeof itemId === 'string' && itemId) cancelMangaVolumeAnalyze(itemId);
     return { ok: true };
+  });
+
+  ipcMain.handle('mangaOcr:importMokuro', async (_e, itemId: unknown, json: unknown) => {
+    if (typeof itemId !== 'string' || !itemId || typeof json !== 'string') {
+      return { ok: false, reason: 'invalid' } satisfies MangaMokuroImportResult;
+    }
+    return importMokuroVolume(itemId, json);
   });
 
   ipcMain.handle('mangaOcr:refreshMeta', async (_e, itemId: unknown, targetLang: unknown) => {

@@ -24,6 +24,7 @@ import { normalizeStudyLang, studyLangOfText, type StudyLang } from '../../share
 import { cardContentLang, getStudyLang, studyContentLang } from '../studyEnvironment';
 import { glossFor } from '../companionMine';
 import { mineReaderCollectionCard } from '../studyMiningRoutes';
+import { cardBookPosition, openBookAt } from '../bookRoundTrip';
 
 type SortMode = 'newest' | 'oldest' | 'word' | 'frequency';
 type TargetLang = 'en' | 'ru' | 'zh';
@@ -41,6 +42,10 @@ export interface CollectionAddPayload {
    * — a card whose answer was its question.
    */
   lookup?: boolean;
+  /** Where in the book it was mined (`p:<part>:<fraction>`), so the card can open the book there again. */
+  position?: string;
+  /** Whole-book fraction at that place, for display. */
+  percent?: number;
 }
 
 interface Props {
@@ -362,6 +367,8 @@ export default function ReaderCollectionPanel({
     let reading = (pendingAdd.reading ?? '').trim();
     const seedMeaning = (pendingAdd.meaning ?? '').trim();
     const fromLookup = pendingAdd.lookup === true;
+    const position = pendingAdd.position;
+    const percent = pendingAdd.percent;
     onPendingConsumed?.();
     if (!word) return;
 
@@ -414,6 +421,7 @@ export default function ReaderCollectionPanel({
           sentence: sentenceVal,
           bookId,
           bookTitle,
+          ...(position ? { position, percent } : {}),
           studyLang: sourceLang,
           sendToAnki: autoAnki,
           ankiDeck: ankiDeck || undefined,
@@ -985,6 +993,22 @@ export default function ReaderCollectionPanel({
                 <span className="reader-collection-media-badge" title={t('readerCollection.hasScene')}>
                   <Icon name="image" size={12} />
                 </span>
+              )}
+              {cardBookPosition(c) && (
+                <button
+                  type="button"
+                  className="btn small icon-btn"
+                  data-card-jump={c.id}
+                  title={t('read2.novel.jumpToMined', { term: c.word })}
+                  aria-label={t('read2.novel.jumpToMined', { term: c.word })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const where = cardBookPosition(c);
+                    if (where) openBookAt(where);
+                  }}
+                >
+                  <Icon name="bookmark" size={12} />
+                </button>
               )}
               <button
                 type="button"

@@ -1,0 +1,149 @@
+/* Dictionary entry additions: per-corpus frequency chips, "in deck / in Anki"
+   markers, explained part-of-speech tags, the i+1 example standing and the
+   kanji breakdown. Colours follow the badge rule in styles.css: one hue, tinted
+   chip, label mixed toward the palette's own --text so it holds on light and
+   dark palettes alike. */
+
+.dict-freq-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  vertical-align: middle;
+}
+.dict-freq-chip {
+  --dict-badge-hue: #a078c8;
+  display: inline-flex;
+  align-items: stretch;
+  font-size: 10px;
+  line-height: 1.5;
+  border-radius: 5px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--dict-badge-hue) 14%, transparent);
+  color: color-mix(in srgb, var(--dict-badge-hue) 42%, var(--text));
+}
+.dict-freq-chip.is-veryCommon { --dict-badge-hue: #3f9d6b; }
+.dict-freq-chip.is-common { --dict-badge-hue: #3a86c8; }
+.dict-freq-chip.is-uncommon { --dict-badge-hue: #c89a3a; }
+.dict-freq-chip.is-rare { --dict-badge-hue: #b3646e; }
+.dict-freq-chip-src {
+  padding: 0 5px;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--dict-badge-hue) 22%, transparent);
+}
+.dict-freq-chip-rank {
+  padding: 0 5px;
+  font-variant-numeric: tabular-nums;
+}
+.dict-freq-chip-more {
+  padding: 0 5px;
+}
+
+.dict-badge.dict-presence.in-deck {
+  --dict-badge-hue: #3f9d6b;
+  background: color-mix(in srgb, var(--dict-badge-hue) 18%, transparent);
+  color: color-mix(in srgb, var(--dict-badge-hue) 42%, var(--text));
+}
+.dict-badge.dict-presence.in-anki {
+  --dict-badge-hue: #3a86c8;
+  background: color-mix(in srgb, var(--dict-badge-hue) 18%, transparent);
+  color: color-mix(in srgb, var(--dict-badge-hue) 42%, var(--text));
+}
+
+.dict-pos-tag {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: help;
+}
+span.dict-pos-tag {
+  text-decoration: none;
+  cursor: auto;
+}
+
+.dict-deinflect-sep {
+  margin: 0 4px;
+  opacity: 0.6;
+}
+
+.dict-ex-standing {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 10px;
+  border-radius: 5px;
+  color: var(--muted);
+  border: 1px solid color-mix(in srgb, currentcolor 35%, transparent);
+}
+.dict-ex-standing.is-iplus1 {
+  color: color-mix(in srgb, #3f9d6b 55%, var(--text));
+  border-color: color-mix(in srgb, #3f9d6b 45%, transparent);
+}
+
+.dict-entry:focus-visible {
+  outline: 2px solid var(--accent, #3a86c8);
+  outline-offset: 2px;
+}
+
+.dict-kanji {
+  margin: 4px 0;
+}
+.dict-kanji-toggle {
+  min-height: 24px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dict-kanji-toggle[aria-expanded='true'] {
+  color: var(--text);
+}
+.dict-kanji-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.dict-kanji-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.dict-kanji-glyph {
+  min-width: 32px;
+  min-height: 32px;
+  font-size: 22px;
+  line-height: 32px;
+  text-align: center;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: transparent;
+  color: var(--text);
+  padding: 0 4px;
+}
+button.dict-kanji-glyph {
+  cursor: pointer;
+}
+.dict-kanji-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  min-width: 0;
+}
+.dict-kanji-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+}
+.dict-kanji-status {
+  font-size: 12px;
+  margin: 4px 0;
+}

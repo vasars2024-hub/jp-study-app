@@ -12,7 +12,7 @@
  * well-defined) or when the whole source is loaded. With a query active on a
  * paged source the user gets the honest alternative: select the rows found here.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   EMPTY_SELECTION,
@@ -309,12 +309,17 @@ export default function DeckWorkbenchBrowser({
     }),
     [draft, vocab, render, media, sibling, stale],
   );
-  const filtered = useMemo(() => filterBrowserRows(rows, query, schema), [rows, query, schema]);
+  // The field shows every keystroke at once; the filter over a 100,000-row page
+  // runs on the deferred copy, so typing never waits for the previous
+  // keystroke's scan. Everything derived from the result reads the same copy,
+  // so the counts and the rows can never describe two different queries.
+  const appliedQuery = useDeferredValue(query);
+  const filtered = useMemo(() => filterBrowserRows(rows, appliedQuery, schema), [rows, appliedQuery, schema]);
   const shown = useMemo(() => sortBrowserRows(filtered.rows, sort), [filtered, sort]);
   // What the query means in words. Parsed a second time rather than lifted out
   // of `filterBrowserRows`, which returns rows and an error and not the tree —
   // and the parse is cheap next to the filter it already runs on every row.
-  const explain = useMemo(() => explainBrowserQuery(query, schema), [query, schema]);
+  const explain = useMemo(() => explainBrowserQuery(appliedQuery, schema), [appliedQuery, schema]);
   const fieldNames = schema.fieldNames;
   /** The scan's universe: what the filter is showing, and nothing else. */
   const shownIds = useMemo(() => shown.map((row) => row.noteId), [shown]);
@@ -335,7 +340,7 @@ export default function DeckWorkbenchBrowser({
   // With a filter on a paged source, "everything matching" is a claim nobody
   // computed. See the file comment. A query that failed to parse is not a
   // filter at all, so it cannot license a whole-source claim either.
-  const canSelectWholeSource = !filtered.error && (!partial || query.trim() === '');
+  const canSelectWholeSource = !filtered.error && (!partial || appliedQuery.trim() === '');
   /**
    * How many notes the current filter stands for. With no query that is the
    * whole source; with one it is only what the loaded rows matched. The live
@@ -343,7 +348,7 @@ export default function DeckWorkbenchBrowser({
    * "select all 3,221" under a filter showing four rows, and then selected
    * four. A count in a button is a promise about what the click will do.
    */
-  const matchedTotal = query.trim() === '' && !filtered.error ? totalNotes : shown.length;
+  const matchedTotal = appliedQuery.trim() === '' && !filtered.error ? totalNotes : shown.length;
 
   const applySelection = useCallback(
     (next: BrowserSelection) => {

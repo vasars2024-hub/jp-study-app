@@ -14,6 +14,7 @@
 import { BrowserWindow, screen } from 'electron';
 import path from 'node:path';
 import type { VisualNovelReaderSettings } from '../../shared/visualNovel';
+import { refuseWhileLocked } from '../lockGuard';
 
 type RendererUrlFn = (query?: string) => string;
 
@@ -85,6 +86,8 @@ export function openVisualNovelReader(
   settings: VisualNovelReaderSettings,
   onBoundsChanged: (bounds: { x: number; y: number; width: number; height: number }) => void,
 ): void {
+  // Captured lines and lookups are study content (lockGuard.ts).
+  if (refuseWhileLocked('window:vn-reader')) return;
   if (visualNovelId) targetId = visualNovelId;
   broadcastTarget();
   if (reader && !reader.isDestroyed()) {

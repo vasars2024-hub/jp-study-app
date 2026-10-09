@@ -185,11 +185,15 @@ describe('the editor renders the allow-list, not a count of it', () => {
     // has. An editor disabled for `builtIn: true` would reproduce it exactly.
     await mountEditor();
     const lookup = container?.querySelector<HTMLInputElement>('input[data-operation="dictionary.lookup"]');
+    // Grammar explanation has an adapter now (the study coach); the declaration still held
+    // back is the review-scheduling one whose false-success stub was removed.
     const grammar = container?.querySelector<HTMLInputElement>('input[data-operation="dictionary.explain-grammar"]');
+    const schedule = container?.querySelector<HTMLInputElement>('input[data-operation="flashcard.schedule-reviews"]');
     expect(lookup?.disabled).toBe(false);
-    expect(grammar?.disabled).toBe(true);
-    expect(grammar?.checked).toBe(false);
-    expect(grammar?.closest('label')?.getAttribute('title')).toBe('dedicated-analysis-required');
+    expect(grammar?.disabled).toBe(false);
+    expect(schedule?.disabled).toBe(true);
+    expect(schedule?.checked).toBe(false);
+    expect(schedule?.closest('label')?.getAttribute('title')).toBe('false-success-stub-removed');
   });
 });
 
@@ -223,7 +227,9 @@ describe('a narrowing made through the UI survives a restart', () => {
     await editor.toggle(removed);
     await editor.toggle(removed);
 
-    expect(storedTutor().disabledOperations).toEqual(factory.enabledOperations.filter(
+    // An empty delta is stored as no key at all (see `setLocalAgentProfileOperations`); with
+    // every study-tutor operation installed now, the pruned list can be exactly that.
+    expect(storedTutor().disabledOperations ?? []).toEqual(factory.enabledOperations.filter(
       (operation) => !AVAILABLE.has(operation),
     ));
     expect((await afterRestart()).enabledOperations).toEqual(

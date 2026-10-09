@@ -43,10 +43,26 @@ import { formatDuration, getMediaActivityByDay, getStreakRestDates, getStudyDays
 import { loadDeck, onDeckChanged } from '../../flashcardDeck';
 import { localDueForecast } from '../../../shared/reviewForecast';
 import { calendarStudyDay, dueByDate } from '../../../shared/studyActivityHeatmap';
+import { heatLevelsFor } from '../../../shared/calendarDayDetail';
 import { LANG_TAGS } from '../../../shared/i18n/core';
+import { writeLocalStorage } from '../../localStorageWrite';
 import { mediaActivitySummary } from './calendarMediaActivity';
+import { useStreakMarkers } from './calendarDayData';
+import { CalendarDayPanel } from './CalendarDayPanel';
+import { CalendarYearGrid } from './CalendarYearGrid';
 
-export type ViewMode = 'month' | 'week' | 'day' | 'agenda';
+export type ViewMode = 'month' | 'week' | 'day' | 'agenda' | 'year';
+
+/** Per-viewer: whether the month grid shades its days by study (a view preference, not data). */
+const HEATMAP_PREF_KEY = 'jp-calendar-heatmap';
+
+function readHeatmapPref(): boolean {
+  try {
+    return localStorage.getItem(HEATMAP_PREF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 export function toKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -366,6 +382,20 @@ export function useCalendar() {
     [cursor],
   );
   const [modal, setModal] = useState<Partial<EventForm> | null>(null);
+  // The day the day panel describes: follows the month grid's active cell and the year grid's.
+  const [selectedDay, setSelectedDay] = useState(() => toKey(new Date()));
+  const [heatmap, setHeatmapState] = useState(readHeatmapPref);
+  const setHeatmap = (on: boolean): void => {
+    setHeatmapState(on);
+    writeLocalStorage(HEATMAP_PREF_KEY, on ? '1' : '0');
+  };
+  /** Open one day in the month view with the day panel on it (the year grid's Enter). */
+  const openDay = (key: string): void => {
+    if (!key || Number(key.split('-')[0]) < 1000) return;
+    setCursor(fromKey(key));
+    setSelectedDay(key);
+    setMode('month');
+  };
   const [weekStartPref, setWeekStartPref] = useState(() => loadDesktopPrefs().weekStart);
   useEffect(() => onDesktopPrefsChanged((prefs) => setWeekStartPref(prefs.weekStart)), []);
   // Settings ▸ Desktop ▸ Week starts on; "Automatic" follows the UI language's locale.
@@ -375,9 +405,10 @@ export function useCalendar() {
 
   const shift = (dir: 1 | -1) => {
     const d = new Date(cursor);
-    if (mode === 'month') {
-      // Move from day one so dates such as January 31 cannot overflow February.
-      d.setMonth(d.getMonth() + dir, 1);
+    if (mode === 'month' || mode === 'year') {
+      // Move from day one so dates such as January 31 cannot overflow February
+      // (and February 29 cannot overflow into March of a common year).
+      d.setMonth(d.getMonth() + dir * (mode === 'year' ? 12 : 1), 1);
       const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
       d.setDate(Math.min(cursor.getDate(), lastDay));
     } else if (mode === 'week') d.setDate(d.getDate() + dir * 7);
@@ -456,6 +487,7 @@ export function useCalendar() {
       return `${s.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}`;
     }
     if (mode === 'day') return cursor.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    if (mode === 'year') return cursor.toLocaleDateString(locale, { year: 'numeric' });
     return t('calendar.mode.agenda');
     // `t` is intentionally left out of the deps: its identity is stable, `lang`
     // is what actually needs to trigger a redo.
@@ -484,6 +516,7 @@ export function useCalendar() {
     week: t('calendar.mode.week'),
     day: t('calendar.mode.day'),
     agenda: t('calendar.mode.agenda'),
+    year: t('cal2.mode.year'),
   };
 
   return {
@@ -491,6 +524,11 @@ export function useCalendar() {
     weekStart,
     mode,
     setMode,
+    selectedDay,
+    setSelectedDay,
+    heatmap,
+    setHeatmap,
+    openDay,
     cursor,
     today,
     jumpVal,
@@ -519,13 +557,13 @@ export function useCalendar() {
  */
 export function CalendarNav({ state, actions }: { state: CalendarState; actions?: ReactNode }) {
   const { t } = useT();
-  const { mode, setMode, modeLabels, shift, goToday, headerLabel, jumpVal, setJumpVal, jump } = state;
+  const { mode, setMode, modeLabels, shift, goToday, headerLabel, jumpVal, setJumpVal, jump, heatmap, setHeatmap } = state;
   return (
     // Mode switch and date transport: contextual tools, not data. `ContextualSurface` is
     // pixel-inert in Standard and in Blanc, so both hosts keep the toolbar they had.
     <ContextualSurface className="cal-toolbar cal-context-toolbar">
       <div className="cal-modes">
-        {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => (
+        {(['month', 'week', 'day', 'agenda', 'year'] as ViewMode[]).map((m) => (
           <button
             key={m}
             type="button"
@@ -537,6 +575,18 @@ export function CalendarNav({ state, actions }: { state: CalendarState; actions?
           </button>
         ))}
       </div>
+      {mode === 'month' && setHeatmap && (
+        // Shade each day by how much was studied: the year view's colours on the month grid.
+        <button
+          type="button"
+          className={`cal-mode-btn cal-heat-toggle ${heatmap ? 'active' : ''}`}
+          aria-pressed={!!heatmap}
+          onClick={() => setHeatmap(!heatmap)}
+          title={t('cal2.heatmap.hint')}
+        >
+          {t('cal2.heatmap.toggle')}
+        </button>
+      )}
       {mode !== 'agenda' && (
         // The date input makes this subgroup a dense form. Keep it on an opaque anchor while the
         // surrounding mode/transport strip remains contextual; universal toolbar glass would put
@@ -595,7 +645,7 @@ const CALENDAR_DUE_DAYS = 42;
 function MonthGrid({ state }: { state: CalendarState }) {
   const { t, lang } = useT();
   const { cursor, today, monthCells, occsByDay, openNew, openEdit } = state;
-  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [activeKey, setActiveKey] = useState<string | null>(() => state.selectedDay ?? null);
 
   const keys = useMemo(() => monthCells.map(toKey), [monthCells]);
   // One week's dates, used only to name the seven weekday columns.
@@ -623,6 +673,17 @@ function MonthGrid({ state }: { state: CalendarState }) {
   const fallbackKey = keys.includes(toKey(cursor)) ? toKey(cursor) : (keys[0] ?? null);
   const currentKey = activeKey && keys.includes(activeKey) ? activeKey : fallbackKey;
   const cellDomId = (key: string) => `cal-month-cell-${key}`;
+  // The day panel follows the active cell — a click, an arrow key, a month change.
+  const { selectedDay, setSelectedDay } = state;
+  useEffect(() => {
+    if (currentKey && setSelectedDay && selectedDay !== currentKey) setSelectedDay(currentKey);
+  }, [currentKey]);
+  // The current streak's days, and (when switched on) each day shaded by how much was studied.
+  const streakMarks = useStreakMarkers(statsVersion);
+  const heat = useMemo(
+    () => (state.heatmap ? heatLevelsFor(keys, studyByDay) : null),
+    [state.heatmap, keys, studyByDay],
+  );
 
   const move = (delta: number) => {
     const at = currentKey ? keys.indexOf(currentKey) : 0;
@@ -688,6 +749,8 @@ function MonthGrid({ state }: { state: CalendarState }) {
             const isToday = key === toKey(today);
             const dayEvents = occsByDay.get(key) ?? [];
             const isRest = restDates.has(key);
+            const inStreak = !isRest && streakMarks.streak.has(key);
+            const heatLevel = heat?.[key];
             const media = mediaActivitySummary(mediaByDay[key], t, lang, formatDuration);
             const study = calendarStudyDay(key, studyByDay[key], dueByDay, today);
             const studyDone = study && (study.minutes > 0 || study.reviews > 0) ? study : null;
@@ -704,16 +767,19 @@ function MonthGrid({ state }: { state: CalendarState }) {
                 // The date, spelled out, plus the count — "3" alone is not a label.
                 aria-label={`${d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}${
                   dayEvents.length ? `, ${t('calendar.moreCount', { count: dayEvents.length })}` : ''
-                }${isRest ? `, ${t('calendar.restDay')}` : ''}${media ? `, ${media}` : ''}${studyLong ? `, ${studyLong}` : ''}`}
+                }${isRest ? `, ${t('calendar.restDay')}` : ''}${inStreak ? `, ${t('cal2.day.inStreak')}` : ''}${
+                  media ? `, ${media}` : ''}${studyLong ? `, ${studyLong}` : ''}`}
                 className={`cal-month-cell ${inMonth ? '' : 'out'} ${isToday ? 'today' : ''}${
-                  isRest ? ' rest' : ''}${
+                  isRest ? ' rest' : ''}${inStreak ? ' in-streak' : ''}${heat ? ' heat' : ''}${
                   key === currentKey ? ' is-active' : ''
                 }`}
+                data-heat={heatLevel}
                 onClick={() => setActiveKey(key)}
                 onDoubleClick={() => openNew(key)}
               >
                 <div className="cal-month-daynum">
                   {d.getDate()}
+                  {inStreak && <span className="cal-streak-mark" aria-hidden="true" title={t('cal2.day.inStreak')} />}
                   {isRest && <span className="cal-rest-tag">{t('calendar.restDay')}</span>}
                   {media && <span className="cal-media-tag" title={media} aria-hidden="true" />}
                 </div>
@@ -779,8 +845,26 @@ export function CalendarBody({ state }: { state: CalendarState }) {
     openEdit,
   } = state;
 
+  // The day panel needs the live calendar state (a hand-built one in a test has no setter).
+  const withDay = typeof state.setSelectedDay === 'function';
+
   if (mode === 'month') {
-    return <MonthGrid state={state} />;
+    if (!withDay) return <MonthGrid state={state} />;
+    return (
+      <div className="cal-body">
+        <MonthGrid state={state} />
+        <CalendarDayPanel dateKey={state.selectedDay} />
+      </div>
+    );
+  }
+
+  if (mode === 'year') {
+    return (
+      <div className="cal-body cal-body--year">
+        <CalendarYearGrid state={state} />
+        {withDay && <CalendarDayPanel dateKey={state.selectedDay} />}
+      </div>
+    );
   }
 
   if (mode === 'week') {
@@ -812,9 +896,9 @@ export function CalendarBody({ state }: { state: CalendarState }) {
 
   if (mode === 'day') {
     const dayList = occsByDay.get(toKey(cursor)) ?? [];
-    return (
+    const list = (
       <div className="cal-day-list">
-        <DayMediaNote dayKey={toKey(cursor)} />
+        {!withDay && <DayMediaNote dayKey={toKey(cursor)} />}
         {dayList.length === 0 && <p className="muted">{t('calendar.noEventsToday')}</p>}
         {dayList.map((ev) => (
           <button type="button" key={`${ev.id}-${ev.occurrenceDate}`} className="cal-day-row" style={{ borderLeftColor: ev.color }} onClick={() => openEdit(ev)}>
@@ -824,6 +908,13 @@ export function CalendarBody({ state }: { state: CalendarState }) {
           </button>
         ))}
         <button type="button" className="btn small" onClick={() => openNew(toKey(cursor))}>{t('calendar.addEvent')}</button>
+      </div>
+    );
+    if (!withDay) return list;
+    return (
+      <div className="cal-body">
+        {list}
+        <CalendarDayPanel dateKey={toKey(cursor)} />
       </div>
     );
   }

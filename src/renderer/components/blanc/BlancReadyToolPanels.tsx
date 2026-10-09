@@ -28,6 +28,7 @@ import { parseSubtitles, type Cue } from '../../subtitles';
 import { KANJI_RADICALS } from '../../../shared/kanjiRadicals';
 import { useAssets, type AssetView } from '../../assetStore';
 import { useT } from '../../i18n';
+import { localizeYtPlaylistError } from '../../ytPlaylistErrors';
 import { useVisibleInterval } from '../../useVisibleInterval';
 import { LANG_TAGS, type TVars } from '../../../shared/i18n/core';
 import { blancToolLabel } from './blancToolLabels';
@@ -1233,7 +1234,7 @@ export function BlancYoutubePanel() {
 
   useEffect(() => {
     void window.api.ytList().then(applyStore).catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(localizeYtPlaylistError(err instanceof Error ? err.message : String(err), t));
     });
     return window.api.onYtChanged(applyStore);
   }, [applyStore]);
@@ -1247,7 +1248,7 @@ export function BlancYoutubePanel() {
     try {
       await work();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(localizeYtPlaylistError(err instanceof Error ? err.message : String(err), t));
     } finally {
       setBusy('');
     }
@@ -1271,7 +1272,8 @@ export function BlancYoutubePanel() {
     await runYt(t('blanc.ready.youtube.syncing'), async () => {
       const result = await window.api.ytAddPlaylist(trimmed);
       if ('error' in result) {
-        setError(result.error);
+        // Main's refusals and yt-dlp's stderr are English data; said in the UI language.
+        setError(localizeYtPlaylistError(result.error, t));
         return;
       }
       applyStore(result.store);
@@ -1286,7 +1288,7 @@ export function BlancYoutubePanel() {
       const result = await window.api.ytDownloadVideos(ids);
       applyStore(result.store);
       const fail = result.results.find((row) => !row.ok);
-      if (fail?.error) setError(fail.error);
+      if (fail?.error) setError(localizeYtPlaylistError(fail.error, t));
       setSelected(new Set());
     });
   };
@@ -1299,7 +1301,7 @@ export function BlancYoutubePanel() {
         applyStore(await window.api.ytAddToPlanToWatch([video.id]));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(localizeYtPlaylistError(err instanceof Error ? err.message : String(err), t));
     }
   };
 

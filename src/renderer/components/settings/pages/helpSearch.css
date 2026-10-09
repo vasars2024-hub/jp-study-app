@@ -1,0 +1,23 @@
+/* Settings > Help > Search help (onb2). */
+.help-topic-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.help-topic-toggle {
+  text-align: start;
+}
+
+.help-topic-body {
+  margin: 6px 0 4px;
+  padding: 8px 10px;
+  border-inline-start: 2px solid var(--accent, currentColor);
+}
+
+.help-topic-body p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}

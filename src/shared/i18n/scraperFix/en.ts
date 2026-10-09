@@ -78,6 +78,15 @@ export const SCRAPER_FIX_EN: Catalog = {
   'scraperFix.qbit.versionStatus': 'qBittorrent answered {status} to the version request.',
   'scraperFix.qbit.connected': 'Connected to {address}.',
   'scraperFix.qbit.connectedNoSwarm': 'Connected to {address}, but qBittorrent is not connected to any swarm.',
+  // ---- qBittorrent transport and API-key codes (round 2) ----
+  'scraperFix.qbit.unreachable': 'qBittorrent isn\'t reachable at {address}. Is it running with Web UI enabled?',
+  'scraperFix.qbit.hostUnresolved': 'The host {host} could not be resolved.',
+  'scraperFix.qbit.timeout': '{address} did not answer in time. qBittorrent may be busy, or a firewall may be dropping the connection.',
+  'scraperFix.qbit.transport': 'Could not reach qBittorrent at {address}: {detail}',
+  'scraperFix.qbit.loginBackoff': 'The username or password was rejected. Not retrying for {seconds} s, so qBittorrent does not ban this computer.',
+  'scraperFix.qbit.noApiKey': 'No API key is stored for this connection.',
+  'scraperFix.qbit.apiKeyWhitespace': 'The stored API key has spaces at the start or end.',
+  'scraperFix.qbit.apiKeyControlChar': 'The stored API key contains a space or control character, so it is not a usable key.',
   // ---- Seanime acquisition notices (AcquisitionMessageCode) ----
   'scraperFix.acq.autoStarted': 'Seanime auto-downloader started.',
   'scraperFix.acq.autoNotStarted': 'Seanime did not start the auto-downloader.',

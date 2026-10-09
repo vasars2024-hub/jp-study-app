@@ -25,6 +25,7 @@ import type {
   EpisodeRow,
   ScrapeJobEvent,
   ScrapeJobSummary,
+  ScrapePageFailure,
   ScrapeResult,
   ScrapeStage,
   ScrapeStageTiming,
@@ -611,19 +612,33 @@ export function nextPageUrl(
 }
 
 /**
+ * The sentence a job's note carries for pages a site rule could not read.
+ * English, like every note main writes; `localizeScraperJobNote` recognises it.
+ */
+export function pageFailuresNote(failures: readonly ScrapePageFailure[]): string {
+  if (!failures.length) return '';
+  const parts = failures.map((f) => (f.reason === 'status' && f.status
+    ? `page ${f.page} (HTTP ${f.status})`
+    : f.reason === 'empty' ? `page ${f.page} (no rows)` : `page ${f.page} (not reachable)`));
+  return `Could not read ${parts.join(', ')}; the episode list may be incomplete.`;
+}
+
+/**
  * Follows a site rule's next-page link up to `maxPages`, appending each page's
  * rows to page one's. Row positions continue across pages so the positional
  * fallback numbering stays unique. Stops on a repeated URL, another origin, a
- * failed fetch or a page that yields no rows — partial results are kept.
+ * failed fetch or a page that yields no rows — partial results are kept, and
+ * the page that stopped it is returned in `failures` for the job summary.
  */
 async function followNextPages(
   job: Job,
   rule: ScraperSiteRule,
   firstDoc: RuleDocument,
   first: RuleExtraction,
-): Promise<RuleExtraction> {
+): Promise<RuleExtraction & { failures: ScrapePageFailure[] }> {
+  const failures: ScrapePageFailure[] = [];
   const maxPages = Math.min(50, Math.max(1, Math.round(rule.maxPages || 1)));
-  if (maxPages <= 1 || !rule.nextPageSelector?.trim()) return first;
+  if (maxPages <= 1 || !rule.nextPageSelector?.trim()) return { ...first, failures };
   const { settings, request } = job.input;
   const correlationId = job.id;
   const seen = new Set<string>([request.targetUrl]);
@@ -637,26 +652,34 @@ async function followNextPages(
     seen.add(next);
     let response: Awaited<ReturnType<typeof scraperRequest>>;
     try {
-      response = await scraperRequest(next, { correlationId, crawl: true });
+      response = await scraperRequest(next, { correlationId, crawl: true, signal: job.controller.signal });
     } catch (error) {
-      scraperLog('warn', 'engine', `Next page ${next} failed: ${error instanceof Error ? error.message : String(error)}`, { correlationId });
+      if (job.cancelled || isScraperAbortError(error)) throw new Cancelled();
+      const detail = error instanceof Error ? error.message : String(error);
+      scraperLog('warn', 'engine', `Next page ${next} failed: ${detail}`, { correlationId });
+      failures.push({ page, url: next, reason: 'fetch', detail: detail.slice(0, 200) });
       break;
     }
     if (response.status >= 400) {
       scraperLog('warn', 'engine', `Next page ${next} answered ${response.status}; keeping ${rows.length} row(s).`, { correlationId });
+      failures.push({ page, url: next, reason: 'status', status: response.status });
       break;
     }
     doc = new DOMParser().parseFromString(response.body, 'text/html') as unknown as RuleDocument;
     const extraction = extractWithRule(doc, rule, next, {
       ignoreHiddenElements: settings.extraction.ignoreHiddenElements,
     });
-    if (extraction.error || !extraction.rows.length) break;
+    if (extraction.error || !extraction.rows.length) {
+      scraperLog('warn', 'engine', `Next page ${next} matched no rows; keeping ${rows.length} row(s).`, { correlationId });
+      failures.push({ page, url: next, reason: 'empty', ...(extraction.error ? { detail: String(extraction.error).slice(0, 200) } : {}) });
+      break;
+    }
     const offset = rows.length;
     for (const row of extraction.rows) rows.push({ ...row, index: offset + row.index });
     currentUrl = next;
     scraperLog('debug', 'engine', `Page ${page}: ${extraction.rows.length} row(s) from ${next}.`, { correlationId });
   }
-  return { ...first, rows };
+  return { ...first, rows, failures };
 }
 
 async function runWithSiteRule(
@@ -736,10 +759,12 @@ async function runWithSiteRule(
     bytes: 0,
     note: [
       extraction.ok ? '' : 'Some rule checks did not pass.',
+      pageFailuresNote(paged.failures),
       settings.episodeProcessing.detectMissingNumbers
         ? missingEpisodesNote(missingEpisodeNumbers(job.rows))
         : '',
     ].filter(Boolean).join(' '),
+    ...(paged.failures.length ? { pageFailures: paged.failures } : {}),
   };
   job.result = {
     jobId: job.id,

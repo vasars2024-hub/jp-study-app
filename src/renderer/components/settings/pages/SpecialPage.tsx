@@ -38,8 +38,13 @@ import {
 import { nextHistoryEntry } from '../../../secretHistory';
 import { isKnownCommand as isKnownTerminalCommand, runTerminalCommand } from '../../../wiredMechanics/terminalEngine';
 import WiredMechanicsCard from './WiredMechanicsCard';
+import { useThemeSheets } from '../../../theme/useThemeSheets';
+import type { ThemeSheetId } from '../../../theme/themeSheets';
 
 import type { ArcadeGameId } from '../../../games/ArcadeGames';
+
+const AERO_CONSOLE_SHEETS: readonly ThemeSheetId[] = ['aero-apps'];
+const WIRED_CONSOLE_SHEETS: readonly ThemeSheetId[] = ['wired-apps', 'wired-mechanics'];
 
 const WIRED_GAME_MODULES: {
   id: ArcadeGameId;
@@ -153,6 +158,11 @@ export default function SpecialPage() {
   const [activeThemeId, setActiveThemeId] = useState(loadThemeId);
   const [wiredSummonOn, setWiredSummonOn] = useState(() => isSummonPresent('wired'));
   const [aeroSummonOn, setAeroSummonOn] = useState(() => isSummonPresent('aero'));
+  // Both consoles and the depth card are styled by their own material's sheets,
+  // which load with that theme only (theme/themeSheets.ts). This page shows them
+  // in any theme once discovered, so it asks for them itself.
+  useThemeSheets(AERO_CONSOLE_SHEETS, isAeroDiscovered);
+  useThemeSheets(WIRED_CONSOLE_SHEETS, wired || isWiredDiscovered);
 
   // Seeded in an effect rather than useState so the banners re-render in the
   // new language when the UI language changes.

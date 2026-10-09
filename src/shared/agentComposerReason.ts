@@ -27,6 +27,12 @@ export interface AgentComposerState {
   sensitiveConsentRequired: boolean;
   cloudSensitiveConsent: boolean;
   /**
+   * The draft is one of the everyday study requests (`shared/agentStudyCoach.ts`), which are
+   * planned without a model. It lifts only the "no planner" rule: a request the coach can
+   * plan needs no model on disk and no cloud key.
+   */
+  recipeReady?: boolean;
+  /**
    * AI readiness for the selected target (`shared/aiSetup.ts`). Absent until
    * main has answered, and absent blocks nothing: a composer must not flash
    * "set up AI" at a user who is set up while the status is in flight.
@@ -78,7 +84,7 @@ export function agentPlanDisabledReason(s: AgentComposerState): string | undefin
   // model, and saying "write an objective" first sends them the wrong way.
   if (s.setup && !s.setup.aiEnabled) return 'agent.execute.reason.aiOff';
   if (s.setup && !s.setup.agentEnabled) return 'agent.plan.reason.agentDisabled';
-  if (s.setup && !s.setup.plannerReady) {
+  if (s.setup && !s.setup.plannerReady && !s.recipeReady) {
     return s.setup.anythingReady ? 'agent.plan.reason.noPlanner' : AGENT_SETUP_NEEDED_REASON;
   }
   if (s.attachmentReading) return 'agent.execute.reason.attachmentReading';

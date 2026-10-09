@@ -47,7 +47,7 @@ import {
   type FilesWatchImportArrival,
 } from '../../shared/filesApp/watchImport';
 import { FILES_DUPLICATES_CHANNEL, FILES_PREVIEW_CHANNEL } from '../../shared/filesApp/preview';
-import { findIndexDuplicates, previewFilesItem } from './preview';
+import { findIndexDuplicatesAsync, previewFilesItem } from './preview';
 import { ingestPathKey, isIngestCandidatePath, isPathKeyWithin } from '../../shared/mediaIngest';
 
 /** How long a built index is served before the next request rebuilds it. */
@@ -411,9 +411,12 @@ export function registerFilesAppIpc(options: FilesAppIpcOptions = {}): void {
    * The preview pane: one item, resolved by id from the index (never a path
    * from the renderer), read through a reader this app already has.
    */
-  ipcMain.handle(FILES_PREVIEW_CHANNEL, (_e, itemId: unknown) => {
-    const item =
-      typeof itemId === 'string' ? (getFilesIndex().items.find((i) => i.id === itemId) ?? null) : null;
+  ipcMain.handle(FILES_PREVIEW_CHANNEL, async (_e, itemId: unknown) => {
+    // files2: the async index (cached, or joined to the build already running).
+    // The sync one rebuilt the whole index on the main thread once the 15 s
+    // cache had expired, which froze every window for a preview click.
+    const index = typeof itemId === 'string' ? await getFilesIndexAsync() : null;
+    const item = index ? (index.items.find((i) => i.id === itemId) ?? null) : null;
     const toUrl = deps.localFileUrl;
     if (!toUrl) return { kind: 'none', reasonKey: 'filesApp.preview.none.unsupported' };
     return previewFilesItem(item, {
@@ -424,7 +427,10 @@ export function registerFilesAppIpc(options: FilesAppIpcOptions = {}): void {
   });
 
   /** Rows that are the same file twice: one path under two sources, or equal bytes. */
-  ipcMain.handle(FILES_DUPLICATES_CHANNEL, () => findIndexDuplicates(getFilesIndex().items));
+  ipcMain.handle(FILES_DUPLICATES_CHANNEL, async () =>
+    // files2: async index and async sampled digests, yielding as it goes.
+    findIndexDuplicatesAsync((await getFilesIndexAsync()).items),
+  );
 
   /** What is being watched, and how many files are still arriving. */
   ipcMain.handle('filesapp:watch-status', (): FilesWatchStatus => {

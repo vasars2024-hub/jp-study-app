@@ -81,6 +81,7 @@ import WiredBreachOverlay from './shell/WiredBreachOverlay';
 import DesktopLayerHost from './shell/DesktopLayerHost';
 import StartPanel from './shell/StartPanel';
 import StartHereCard from './shell/StartHereCard';
+import { revealActiveTask, wheelScrollDelta } from './shell/taskbarOverflow';
 import { replayTour } from '../onboardingStore';
 import { TOUR_MENU_ID } from '../../shared/onboarding/tourScript';
 import { resetWidgetLayoutWithUndo } from './shell/widgetLayoutReset';
@@ -134,7 +135,7 @@ import { startCompanionOsBridge, stopCompanionOsBridge } from '../environment/co
 import { startAchievementWatcher } from '../environment/achievements';
 import { loadPersonalization, onPersonalizationChanged } from '../osPersonalization';
 import { syncPillarboxWallImage } from '../pillarboxSettings';
-import { getZoomFactor, onZoomChanged } from '../appZoom';
+import { announceViewportChange, getZoomFactor, onZoomChanged } from '../appZoom';
 import { perfSetInteracting } from '../perf/perfHub';
 import {
   addUserWallpaper,
@@ -1114,6 +1115,33 @@ export default function DesktopShell({
     });
   }), []);
 
+  /*
+   * shell2 — the third shape of B4: the OS window itself is resized (un-maximized, snapped to
+   * half a monitor, dragged smaller). Nothing re-fitted then, so windows authored on the larger
+   * desk hung outside the `overflow: hidden` root with no way to reach their title bars until the
+   * next hydrate. The zoom refit above is already the reversible fit (it remembers the authored
+   * rects, so growing back restores them), so a settled resize re-announces the zoom rather than
+   * growing a second fitter. Debounced: a live drag fires dozens of resizes.
+   */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let last = { w: window.innerWidth, h: window.innerHeight };
+    const onResize = (): void => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const next = { w: window.innerWidth, h: window.innerHeight };
+        if (next.w === last.w && next.h === last.h) return;
+        last = next;
+        announceViewportChange();
+      }, 250);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+
   useEffect(() => {
     if (hydrating.current) return;
     // Debounce: a single user action often produces a burst of state updates
@@ -2031,6 +2059,15 @@ export default function DesktopShell({
   const [ctxPos, setCtxPos] = useState<{ x: number; y: number } | null>(null);
   /** Right-click target on a taskbar entry — its own menu, separate from the desk's. */
   const [taskCtx, setTaskCtx] = useState<{ x: number; y: number; win: Win } | null>(null);
+  /**
+   * shell2 — one menu per window, reachable from both places a window shows up: its
+   * taskbar entry and its own title bar. Stable identity, so the memoised window
+   * frame does not re-render on every desk render to receive it.
+   */
+  const openTitleMenu = useCallback((id: string, x: number, y: number) => {
+    const target = winsRef.current.find((candidate) => candidate.id === id);
+    if (target) setTaskCtx({ x, y, win: target });
+  }, []);
   const onDesktopContextMenu = (e: RMouseEvent<HTMLDivElement>) => {
     const t = e.target as HTMLElement;
     if (
@@ -2739,6 +2776,25 @@ export default function DesktopShell({
 
   const topZ = wins.length ? Math.max(...wins.map((w) => w.z)) : 0;
 
+  // shell2 — taskbar overflow: the strip scrolls with a hidden scrollbar, so keep the
+  // window in front visible on it, and let a mouse wheel scroll it (see taskbarOverflow.ts).
+  // Found through the taskbar rather than a ref, so the markup of the strip stays as it was.
+  const activeTaskId = wins.find((w) => w.z === topZ && !w.min)?.id ?? null;
+  useEffect(() => {
+    revealActiveTask(taskbarRef.current?.querySelector<HTMLElement>('.os-task-wins') ?? null);
+  }, [activeTaskId, wins.length]);
+  useEffect(() => {
+    // On the window, not the bar: the taskbar node is re-created by a materials switch.
+    const onWheel = (e: WheelEvent): void => {
+      const strip = (e.target as HTMLElement | null)?.closest?.<HTMLElement>('.os-task-wins');
+      if (!strip || !taskbarRef.current?.contains(strip)) return;
+      const delta = wheelScrollDelta(e.deltaX, e.deltaY, strip.scrollWidth, strip.clientWidth);
+      if (delta !== null) strip.scrollLeft += delta;
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, []);
+
   // §2 app switch: when the focused window changes under wired, send one
   // wm-rail-pulse across the taskbar (one-shot animation retriggered by
   // stamping data-pulse) and let shellSounds route the cue.
@@ -3271,6 +3327,7 @@ export default function DesktopShell({
           deskRef={deskRef}
           noteColor={w.section === 'note' ? notes[w.id]?.color : undefined}
           onNoteColor={w.section === 'note' ? noteColorCache.get(w.id, null) : undefined}
+          onTitleMenu={openTitleMenu}
           {...winHandlerCache.get(w.id, w.section)}
         >
           {w.section === 'note'
@@ -3934,7 +3991,9 @@ export default function DesktopShell({
             aria-label={t('desktop.tray.hiddenIcons')}
             aria-haspopup="dialog"
             aria-expanded={trayOverflowOpen}
-            aria-controls={TRAY_OVERFLOW_ID}
+            // Only while the panel exists (a11y2): a closed popover is unmounted,
+            // and an idref to nothing is an invalid ARIA value.
+            aria-controls={trayOverflowOpen ? TRAY_OVERFLOW_ID : undefined}
             onClick={() => setTrayOverflowOpen((o) => !o)}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -4278,7 +4337,7 @@ function TaskbarClock({
 type ResizeMode = 'corner' | 'right' | 'bottom';
 
 const FloatingWindow = memo(function FloatingWindow({
-  win, animPhase, focused, hidden, deskRef, noteColor, onNoteColor,
+  win, animPhase, focused, hidden, deskRef, noteColor, onNoteColor, onTitleMenu,
   onFocus, onClose, onMinimize, onMaximize, onToggleLiquid, onPopOut, onPatch, children,
 }: {
   win: Win;
@@ -4288,6 +4347,8 @@ const FloatingWindow = memo(function FloatingWindow({
   deskRef: React.RefObject<HTMLDivElement>;
   noteColor?: string;
   onNoteColor?: (color: string) => void;
+  /** shell2: right-click on the title bar opens the same menu as the taskbar entry. */
+  onTitleMenu?: (id: string, x: number, y: number) => void;
   onFocus: () => void;
   onClose: () => void;
   onMinimize: () => void;
@@ -4559,6 +4620,12 @@ const FloatingWindow = memo(function FloatingWindow({
           style={isNote && noteColor && !liquid ? { background: noteColor, borderBottomColor: 'rgba(0,0,0,0.15)' } : undefined}
           onPointerDown={dragStart}
           onDoubleClick={() => canMaximize && onMaximize()}
+          onContextMenu={(e) => {
+            if (!onTitleMenu || (e.target as HTMLElement).closest('button')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            onTitleMenu(win.id, e.clientX, e.clientY);
+          }}
         >
           <span className="fwin-title" style={noteInk}>
             <Icon name={glyph} size={15} style={{ marginRight: 6, verticalAlign: '-2px' }} />

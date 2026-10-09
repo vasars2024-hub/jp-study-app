@@ -31,6 +31,14 @@ export interface LocalSrsState {
   difficulty?: number;
   /** Version 2 only. Read a missing value as `sm2`. */
   algorithm?: LocalSrsAlgorithm;
+  /**
+   * Version 2 only: the card is inside its same-day steps (`learningSteps.ts`).
+   * Absent means a review card, which is every state written before steps
+   * existed — so an old deck reads exactly as it always did.
+   */
+  phase?: 'learning' | 'relearning';
+  /** Index into the learning or relearning step list while `phase` is set. */
+  step?: number;
 }
 
 export const LOCAL_SRS_RELEARN_MINUTES = 10;
@@ -53,6 +61,8 @@ export function isLocalSrsState(value: unknown): value is LocalSrsState {
   if (state.algorithm !== undefined && state.algorithm !== 'sm2' && state.algorithm !== 'fsrs') {
     return false;
   }
+  if (state.phase !== undefined && state.phase !== 'learning' && state.phase !== 'relearning') return false;
+  if (state.step !== undefined && !(Number.isInteger(state.step) && state.step >= 0 && state.step < 100)) return false;
   return (
     (state.version === 1 || state.version === 2) &&
     typeof state.dueAt === 'number' && Number.isFinite(state.dueAt) && state.dueAt >= 0 &&

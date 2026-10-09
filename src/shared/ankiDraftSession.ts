@@ -364,3 +364,53 @@ export function describeSessionProgress(session: AnkiDraftSession): AnkiDraftSes
     error: session.error,
   };
 }
+
+// ----- the "Recent reads" list ------------------------------------------------------
+
+/**
+ * The identity one read of a source is listed under (D26): its path (or query /
+ * local deck) plus its content fingerprint. Reading the same package twice used
+ * to list it twice — every re-read of a deck makes a new session once the last
+ * one is complete — so a few days of work listed one file a dozen times. The
+ * same path with the same fingerprint is one entry; a file whose content changed
+ * is a different import and keeps its own row. Paths compare the way Windows
+ * does: case-insensitively, with either slash.
+ */
+export function recentReadKey(session: AnkiDraftSession): string {
+  const kind = session.sourceKind;
+  const file = session.request.filePath;
+  const where = file
+    ? `path|${file.replace(/\\/g, '/').replace(/\/{2,}/g, '/').toLocaleLowerCase('en-US')}`
+    : `source|${session.request.query ?? ''}|${session.request.deckId ?? ''}`;
+  return `${kind}|${where}|${session.fingerprint ?? ''}`;
+}
+
+export interface RecentRead {
+  /** The newest read of this source — the one the list shows. */
+  session: AnkiDraftSession;
+  /** Ids of older reads of the same source, hidden behind it, newest first. */
+  earlier: string[];
+}
+
+/**
+ * The deduplicated, newest-first "Recent reads" list. Every stored session is
+ * accounted for: shown, or folded under the newer read that hides it, so a
+ * discard can take the whole group instead of letting an older copy surface.
+ */
+export function dedupeRecentReads(sessions: readonly AnkiDraftSession[]): RecentRead[] {
+  const newestFirst = [...sessions].sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+  const owner = new Map<string, RecentRead>();
+  const out: RecentRead[] = [];
+  for (const session of newestFirst) {
+    const key = recentReadKey(session);
+    const existing = owner.get(key);
+    if (existing) {
+      existing.earlier.push(session.id);
+      continue;
+    }
+    const read: RecentRead = { session, earlier: [] };
+    out.push(read);
+    owner.set(key, read);
+  }
+  return out;
+}

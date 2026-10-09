@@ -46,7 +46,10 @@ import { getActiveAgentProfile, underPermissionCeiling } from '../shared/localAg
 import { selectAgentMemoryContext } from '../shared/localAgentMemory';
 import { enqueueAgentTask } from '../shared/localAgentTaskQueue';
 import { initAgentOperationalState } from './agentOperationalClient';
-import { readAgentStepApprovalContext } from './agentStepApprovalClient';
+// Type-only at module level (perf2): the client pulls the central agent tool
+// registry, and through it the grammar corpus. The host installs at boot in
+// every desktop window, so the client is imported when an automation fires.
+import type { AgentStepApprovalContext } from './agentStepApprovalClient';
 import { t as translate } from './i18n';
 import { loadLocalAgentMemory } from './localAgentMemoryStore';
 import { loadLocalAgentProfiles } from './localAgentProfilesStore';
@@ -84,10 +87,11 @@ export async function runScheduledAutomation(
     return { ok: false, code: 'agent-disabled' };
   }
 
-  let authority: ReturnType<typeof readAgentStepApprovalContext>;
+  let authority: AgentStepApprovalContext;
   let profile: ReturnType<typeof getActiveAgentProfile>;
   try {
     await initAgentOperationalState();
+    const { readAgentStepApprovalContext } = await import('./agentStepApprovalClient');
     authority = readAgentStepApprovalContext(translate);
     profile = getActiveAgentProfile(loadLocalAgentProfiles());
   } catch {

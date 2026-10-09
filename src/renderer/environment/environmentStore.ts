@@ -234,6 +234,26 @@ export function saveEnvironment(partial: Partial<EnvironmentSettings>): Environm
   return next;
 }
 
+/*
+ * Whole-environment swaps (entering or leaving the Aero environment) replace the
+ * living layer wholesale. A component that read the OLD environment and writes part
+ * of it back later — the companion layer's idle-time position save, or its flush on
+ * unmount — would otherwise put the previous mode's companions back over the one just
+ * restored (measured: Aero's `c-aero` back in the Study environment ~1 s after Wired
+ * entry). Writers capture the epoch when they read and drop the write if it moved.
+ */
+let swapEpoch = 0;
+
+/** Mark that the whole environment was just replaced (see above). */
+export function markEnvironmentSwapped(): void {
+  swapEpoch += 1;
+}
+
+/** The current swap epoch; compare before writing back something read earlier. */
+export function environmentSwapEpoch(): number {
+  return swapEpoch;
+}
+
 export function bootEnvironment(): void {
   void loadEnvironment();
 }

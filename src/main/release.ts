@@ -11,9 +11,13 @@ import {
   type AppReleaseInfo,
   type ReleaseStatus,
 } from '../shared/release';
+import path from 'node:path';
+import { RELEASE_NOTES_MAX_CHARS, type AppReleaseNotes } from '../shared/appUpdate';
 import { readInstalledExtensionVersion } from './extensionInstall';
 import { logDiagnostic } from './errorLog';
 import { markAppQuitting } from './appLifecycle';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { isConnectionMetered } from './meteredConnection';
 import { createAppUpdateController, detectInstallKind } from './squirrelUpdater';
 
 interface GitHubLatestPayload {
@@ -21,6 +25,7 @@ interface GitHubLatestPayload {
   name?: string;
   body?: string;
   html_url?: string;
+  published_at?: string;
 }
 
 type LatestFetch =
@@ -126,18 +131,56 @@ export function registerReleaseIpc(): void {
 
   // An installed (Squirrel) copy also downloads the update itself and offers
   // "Restart to update"; the portable zip keeps only the check-and-notify above.
+  const lastCheckedFile = path.join(app.getPath('userData'), 'app-update-state.json');
   const updates = createAppUpdateController({
     install: detectInstallKind(process.execPath, app.isPackaged),
     updater: autoUpdater,
-    broadcast: (status) => {
-      for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.isDestroyed()) win.webContents.send('appUpdate:changed', status);
-      }
-    },
+    currentVersion: normalizeVersion(app.getVersion()),
+    broadcast: (status) => sendToAllWindows('appUpdate:changed', status),
+    broadcastDetails: (details) => sendToAllWindows('appUpdate:details', details),
     log: (message) => logDiagnostic('warn', 'update', 'squirrel', message),
     markQuitting: markAppQuitting,
+    // Staged-rollout guard: no automatic ~385 MB download on a metered connection.
+    isMetered: () => isConnectionMetered(),
+    lastCheckedStore: {
+      load: () => {
+        const v = readJsonSync<{ lastCheckedAt?: unknown }>(lastCheckedFile, {}).lastCheckedAt;
+        return typeof v === 'number' && Number.isFinite(v) ? v : null;
+      },
+      save: (at) => writeJsonAtomicSync(lastCheckedFile, { lastCheckedAt: at }),
+    },
   });
   ipcMain.handle('appUpdate:status', () => updates.status());
+  ipcMain.handle('appUpdate:details', () => updates.details());
+  ipcMain.handle('appUpdate:checkNow', () => updates.checkNow());
   ipcMain.handle('appUpdate:restart', () => updates.restart());
+  // Only ever on the user's click (Settings -> Help -> Updates, "Show release notes").
+  ipcMain.handle('appUpdate:releaseNotes', () => fetchReleaseNotes());
   updates.start();
+}
+
+function sendToAllWindows(channel: string, payload: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(channel, payload);
+  }
+}
+
+/** The latest release's notes from the GitHub API, capped; nothing about the user is sent. */
+export async function fetchReleaseNotes(
+  fetchLatest: () => Promise<LatestFetch> = fetchGithubLatestDetailed,
+): Promise<AppReleaseNotes> {
+  const r = await fetchLatest();
+  if (r.kind === 'none') return { ok: false, reason: 'none' };
+  if (r.kind === 'failed') return { ok: false, reason: 'failed' };
+  const version = normalizeVersion(r.data.tag_name ?? '');
+  const body = String(r.data.body ?? '');
+  return {
+    ok: true,
+    version,
+    title: r.data.name?.trim() || (version ? `v${version}` : ''),
+    body: body.slice(0, RELEASE_NOTES_MAX_CHARS),
+    url: r.data.html_url ?? `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`,
+    ...(typeof r.data.published_at === 'string' ? { publishedAt: r.data.published_at } : {}),
+    truncated: body.length > RELEASE_NOTES_MAX_CHARS,
+  };
 }

@@ -40,6 +40,7 @@ import SettingsHome from './SettingsHome';
 import { groupLabelKey, pageMeta } from './settingsRegistry';
 import { useT } from '../../i18n';
 import { pushRecentPage } from './settingsRecent';
+import { markSettingsLinkConsumed, takeRelayedSettingsLink } from '../../settingsDeepLink';
 import type { SettingsController, SettingsPageId, SettingsWallProps } from './types';
 import Icon from '../Icons';
 import {
@@ -233,8 +234,13 @@ export default function SettingsApp(props: SettingsWallProps) {
     const onNav = (ev: Event) => {
       const d = (ev as CustomEvent<{ page?: SettingsPageId; settingId?: string }>).detail;
       if (!d?.page) return;
+      markSettingsLinkConsumed();
       navigate(d.page, d.settingId, { guided: true });
     };
+    // This app is lazy (perf2): a feature's deep link can fire before the first
+    // mount. The boot relay kept it; take it now (settingsDeepLink.ts).
+    const relayed = takeRelayedSettingsLink();
+    if (relayed) navigate(relayed.page as SettingsPageId, relayed.settingId, { guided: true });
     window.addEventListener('settings:navigate', onNav);
     return () => window.removeEventListener('settings:navigate', onNav);
   }, [navigate]);

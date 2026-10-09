@@ -41,6 +41,12 @@ export interface ReaderSettings {
   prettyWrap: boolean;
   /** Force these settings to override the book's own styling. */
   prioritizeStyles: boolean;
+  /**
+   * Apply the book's own CSS — sanitised and scoped (`shared/epubPublisherCss`):
+   * 縦中横, upright text, 傍点, ruby placement, alignment, image sizing.
+   * Optional so settings saved before it existed (and hand-built ones) read as on.
+   */
+  publisherStyles?: boolean;
 
   // ---- Reading mode & layout ----
   /** Paginated (page flip) or one continuous scrolling page. */
@@ -74,6 +80,7 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   vpal: false,
   prettyWrap: false,
   prioritizeStyles: false,
+  publisherStyles: true,
   flow: 'paginated',
   writingMode: 'auto',
   wordHighlight: true,

@@ -40,8 +40,12 @@ export function DigitalClock({ settings, size }: WidgetProps) {
 
 // ---------- Analog clock ----------
 export function AnalogClock({ size }: WidgetProps) {
+  const { lang } = useT();
   const wired = useWiredMaterials();
   const now = useNow(1000);
+  // wid2: hands carry no text, so the face is an image named by the time it
+  // shows (to the minute — a name that changed every second would be noise).
+  const spoken = now.toLocaleTimeString(LANG_TAGS[lang], { hour: 'numeric', minute: '2-digit' });
   const s = now.getSeconds();
   const m = now.getMinutes();
   const h = now.getHours() % 12;
@@ -69,7 +73,7 @@ export function AnalogClock({ size }: WidgetProps) {
   const wedge = `M${cx} ${cy} L${cx} ${cy - sweepR} A${sweepR} ${sweepR} 0 0 1 ${cx + sweepR * Math.sin(Math.PI / 6)} ${cy - sweepR * Math.cos(Math.PI / 6)} Z`;
   return (
     <div className="wgt wgt-clock-analog">
-      <svg viewBox={`0 0 ${cx + r + 10} ${cy + r + 10}`} width="100%" height="100%">
+      <svg viewBox={`0 0 ${cx + r + 10} ${cy + r + 10}`} width="100%" height="100%" role="img" aria-label={spoken}>
         <circle className="wgt-analog-face" cx={cx} cy={cy} r={r} />
         {wired && (
           <g className="wgt-radar" aria-hidden="true">
@@ -144,19 +148,27 @@ export function CalendarWidget() {
   const isToday = (d: number) =>
     d === today.getDate() && view.m === today.getMonth() && view.y === today.getFullYear();
   const openFull = () => window.dispatchEvent(new CustomEvent('os:open', { detail: 'calendar' }));
+  // wid2/a11y2: the whole widget used to be `role="button"`, and a button's
+  // children are presentational — so the two month buttons inside it did not
+  // exist for a screen reader. The keyboard route to the full Calendar is now
+  // the month title itself (a real button, Tab order prev → open → next); a
+  // click anywhere else on the widget still opens it for the pointer.
   return (
-    <div className="wgt wgt-cal" onClick={openFull} role="button" tabIndex={0} title={t('widgets.calendarWidget.openTitle')}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          if (!e.repeat) openFull();
-        }
-      }}>
+    <div className="wgt wgt-cal" onClick={openFull} title={t('widgets.calendarWidget.openTitle')}>
       <div className="wgt-cal-head">
-        <button className="wgt-btn-icon" onClick={(e) => shift(-1, e)} title={t('widgets.calendarWidget.prevMonth')} aria-label={t('widgets.calendarWidget.prevMonth')}>‹</button>
-        <span>{monthLabel}</span>
-        <button className="wgt-btn-icon" onClick={(e) => shift(1, e)} title={t('widgets.calendarWidget.nextMonth')} aria-label={t('widgets.calendarWidget.nextMonth')}>›</button>
+        <button type="button" className="wgt-btn-icon" onClick={(e) => shift(-1, e)} title={t('widgets.calendarWidget.prevMonth')} aria-label={t('widgets.calendarWidget.prevMonth')}>‹</button>
+        <button
+          type="button"
+          className="wgt-cal-open"
+          onClick={(e) => {
+            e.stopPropagation();
+            openFull();
+          }}
+          title={t('widgets.calendarWidget.openTitle')}
+        >
+          <span>{monthLabel}</span>
+        </button>
+        <button type="button" className="wgt-btn-icon" onClick={(e) => shift(1, e)} title={t('widgets.calendarWidget.nextMonth')} aria-label={t('widgets.calendarWidget.nextMonth')}>›</button>
       </div>
       <div className="wgt-cal-grid">
         {weekdays.map((d, i) => (

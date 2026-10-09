@@ -16,6 +16,7 @@ import type { FilesItem } from '../../shared/filesApp/catalog';
 import {
   clipPreviewText,
   findDuplicateGroups,
+  findDuplicateGroupsAsync,
   previewPlanFor,
   type FilesDuplicateGroup,
   type FilesPreview,
@@ -127,4 +128,32 @@ export function sampledFileDigest(filePath: string, sizeBytes: number): string |
 
 export function findIndexDuplicates(items: readonly FilesItem[]): FilesDuplicateGroup[] {
   return findDuplicateGroups(items, sampledFileDigest);
+}
+
+/** files2: `sampledFileDigest` on `fs.promises`, so the reads never block the main process. */
+export async function sampledFileDigestAsync(filePath: string, sizeBytes: number): Promise<string | null> {
+  let handle: fs.promises.FileHandle | null = null;
+  try {
+    handle = await fs.promises.open(filePath, 'r');
+    const hash = crypto.createHash('sha1');
+    hash.update(String(sizeBytes));
+    const head = Buffer.alloc(Math.min(HASH_SAMPLE_BYTES, sizeBytes));
+    await handle.read(head, 0, head.length, 0);
+    hash.update(head);
+    if (sizeBytes > HASH_SAMPLE_BYTES) {
+      const tail = Buffer.alloc(Math.min(HASH_SAMPLE_BYTES, sizeBytes - HASH_SAMPLE_BYTES));
+      await handle.read(tail, 0, tail.length, sizeBytes - tail.length);
+      hash.update(tail);
+    }
+    return hash.digest('hex');
+  } catch {
+    return null;
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+/** files2: what the Duplicates view asks for — same groups, no main-thread stall. */
+export function findIndexDuplicatesAsync(items: readonly FilesItem[]): Promise<FilesDuplicateGroup[]> {
+  return findDuplicateGroupsAsync(items, sampledFileDigestAsync);
 }

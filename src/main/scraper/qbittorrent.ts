@@ -31,11 +31,20 @@ import {
 } from '../../shared/scraperSourceSettings';
 import {
   QBIT_TORRENT_ACTIONS,
+  QBIT_TORRENT_FILES_MAX,
   type ScraperQbitActionInput,
   type ScraperQbitActionReport,
   type ScraperQbitInput,
   type ScraperQbitSendInput,
+  type ScraperQbitTorrentFileInput,
 } from '../../shared/scraperIpc';
+import {
+  encodeMultipart,
+  parseTorrentFile,
+  type MultipartPart,
+  type TorrentFileInfo,
+  type TorrentFileProblem,
+} from './torrentFile';
 import {
   hasRenamePlaceholders,
   infoHashFromMagnet,
@@ -147,6 +156,25 @@ export function qbitTransportMessage(
   config: Pick<ScraperQbittorrentSettings, 'host' | 'port'>,
   error: unknown,
 ): string {
+  return qbitTransportProblem(config, error).message;
+}
+
+/** A failure as main's own sentence plus the language-neutral code the renderer translates. */
+export interface QbitCodedProblem {
+  message: string;
+  messageCode: QbitMessageCode;
+  messageVars?: Record<string, string | number>;
+}
+
+/**
+ * `qbitTransportMessage`, with the code the renderer words in the UI language
+ * (`scraperFix.qbit.<code>`). Main keeps writing `message` (logs, bug reports,
+ * older renderers); it is what a report without a code still shows.
+ */
+export function qbitTransportProblem(
+  config: Pick<ScraperQbittorrentSettings, 'host' | 'port'>,
+  error: unknown,
+): QbitCodedProblem {
   const where = `${config.host}:${config.port}`;
   const raw = error instanceof Error ? error.message : String(error);
   // Node nests the syscall errno on the error; the message is the reliable carrier
@@ -157,17 +185,25 @@ export function qbitTransportMessage(
   if (/ECONNREFUSED/.test(signal)) {
     // A question, not a verdict: "not running" and "Web UI off" are the same
     // socket event, so the sentence asks about both rather than picking one.
-    return mt('scrApp.set.qbitUnreachable', { where });
+    return { message: mt('scrApp.set.qbitUnreachable', { where }), messageCode: 'unreachable', messageVars: { address: where } };
   }
   if (/ENOTFOUND|EAI_AGAIN/.test(signal)) {
-    return `The host ${config.host} could not be resolved.`;
+    return { message: `The host ${config.host} could not be resolved.`, messageCode: 'hostUnresolved', messageVars: { host: config.host } };
   }
   if (/ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ENETUNREACH|abort|timed? ?out/i.test(signal)) {
-    return `${where} did not answer in time. qBittorrent may be busy, or a firewall may be dropping the connection.`;
+    return {
+      message: `${where} did not answer in time. qBittorrent may be busy, or a firewall may be dropping the connection.`,
+      messageCode: 'timeout',
+      messageVars: { address: where },
+    };
   }
   // Anything unrecognised keeps its own text rather than being flattened into a generic
   // failure — but it is anchored to the address, so it is still actionable.
-  return `Could not reach qBittorrent at ${where}: ${raw}`;
+  return {
+    message: `Could not reach qBittorrent at ${where}: ${raw}`,
+    messageCode: 'transport',
+    messageVars: { address: where, detail: raw.slice(0, 200) },
+  };
 }
 
 /** qBittorrent's raw state strings, collapsed onto the vocabulary the UI has. */
@@ -301,18 +337,23 @@ async function resolveApiKey(input: ScraperQbitInput): Promise<string> {
  * value. Header values cannot carry CR/LF or a stray space without either being
  * refused by the HTTP layer or splitting the header, so those are the checks.
  */
-function apiKeyProblem(key: string): string {
-  if (!key) return 'No API key is stored for this connection.';
-  if (key !== key.trim()) return 'The stored API key has leading or trailing whitespace.';
+function apiKeyProblem(key: string): QbitCodedProblem | null {
+  if (!key) return { message: 'No API key is stored for this connection.', messageCode: 'noApiKey' };
+  if (key !== key.trim()) {
+    return { message: 'The stored API key has leading or trailing whitespace.', messageCode: 'apiKeyWhitespace' };
+  }
   // Scanned by code point rather than by regex: a character class spelling out
   // the C0 range trips `no-control-regex`, and the codes say the intent anyway.
   for (const char of key) {
     const code = char.codePointAt(0) ?? 0;
     if (code <= 0x20 || code === 0x7f) {
-      return 'The stored API key contains a space or control character, so it is not a usable key.';
+      return {
+        message: 'The stored API key contains a space or control character, so it is not a usable key.',
+        messageCode: 'apiKeyControlChar',
+      };
     }
   }
-  return '';
+  return null;
 }
 
 interface LoginResult {
@@ -372,12 +413,15 @@ function loginBackoffActive(config: ScraperQbittorrentSettings, password: string
   }
   const remaining = held.until - Date.now();
   if (remaining <= 0) return null;
+  const seconds = Math.ceil(remaining / 1_000);
   return {
     ok: false,
     cookie: '',
     status: 'unauthorized',
-    message: `The username or password was rejected. Not retrying for ${Math.ceil(remaining / 1_000)} s, `
+    message: `The username or password was rejected. Not retrying for ${seconds} s, `
       + 'so qBittorrent does not ban this machine.',
+    messageCode: 'loginBackoff',
+    messageVars: { seconds },
     latencyMs: 0,
   };
 }
@@ -502,7 +546,7 @@ async function attemptLogin(config: ScraperQbittorrentSettings, password: string
       ok: false,
       cookie: '',
       status: 'unreachable',
-      message: qbitTransportMessage(config, error),
+      ...qbitTransportProblem(config, error),
       latencyMs: Date.now() - started,
     };
   }
@@ -531,7 +575,8 @@ async function authed(
   path: string,
   init: {
     method?: string;
-    body?: string;
+    /** Bytes for a multipart upload (`qbitAddTorrentFiles`), else a form string. */
+    body?: string | Uint8Array;
     headers?: Record<string, string>;
     /** Raises the response cap past the 4 MiB scraper default. See `qbitFiles`. */
     maxBytes?: number;
@@ -556,7 +601,7 @@ async function authed(
     const key = await resolveApiKey(input);
     const problem = apiKeyProblem(key);
     if (problem) {
-      return { error: { ok: false, cookie: '', status: 'unauthorized', message: problem, latencyMs: 0 } };
+      return { error: { ok: false, cookie: '', status: 'unauthorized', ...problem, latencyMs: 0 } };
     }
     try {
       const response = await send(apiKeyHeaders(key));
@@ -579,7 +624,7 @@ async function authed(
           ok: false,
           cookie: '',
           status: 'unreachable',
-          message: qbitTransportMessage(input.config, error),
+          ...qbitTransportProblem(input.config, error),
           latencyMs: 0,
         },
       };
@@ -610,7 +655,7 @@ async function authed(
         ok: false,
         cookie: '',
         status: 'unreachable',
-        message: qbitTransportMessage(input.config, error),
+        ...qbitTransportProblem(input.config, error),
         latencyMs: 0,
       },
     };
@@ -628,7 +673,7 @@ async function authed(
  * status at all (qBittorrent answers 403 to an anonymous request) proves the
  * address is live, and only a transport error means it is not.
  */
-async function qbitUnreachableReason(config: ScraperQbittorrentSettings): Promise<string | null> {
+async function qbitUnreachableReason(config: ScraperQbittorrentSettings): Promise<QbitCodedProblem | null> {
   const base = qbitBaseUrl(config);
   try {
     await scraperRequest(`${base}/api/v2/app/version`, {
@@ -639,7 +684,7 @@ async function qbitUnreachableReason(config: ScraperQbittorrentSettings): Promis
     });
     return null;
   } catch (error) {
-    return qbitTransportMessage(config, error);
+    return qbitTransportProblem(config, error);
   }
 }
 
@@ -660,28 +705,24 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
   // A key authenticates on its own, so a missing username is only a problem in
   // password mode. Asking for one in key mode was the fastest way to make a
   // working key look broken.
-  let credentialProblem = '';
-  let credentialCode: QbitMessageCode | undefined;
+  let credentialProblem: QbitCodedProblem | null = null;
   if (mode === 'apiKey') {
     credentialProblem = apiKeyProblem(await resolveApiKey(input));
   } else if (!config.username) {
-    credentialProblem = 'No username is set.';
-    credentialCode = 'noUsername';
+    credentialProblem = { message: 'No username is set.', messageCode: 'noUsername' };
   } else if (!(await resolvePassword(input))) {
-    credentialProblem = 'No password is stored for this account.';
-    credentialCode = 'noPassword';
+    credentialProblem = { message: 'No password is stored for this account.', messageCode: 'noPassword' };
   }
   if (credentialProblem) {
     // Reachability first: a missing password is not the problem to report
     // while nothing is listening at the address at all.
     const unreachable = await qbitUnreachableReason(config);
     return unreachable
-      ? { status: 'unreachable', version: '', message: unreachable, latencyMs: 0, authMode: mode }
+      ? { status: 'unreachable', version: '', ...unreachable, latencyMs: 0, authMode: mode }
       : {
         status: 'unauthorized',
         version: '',
-        message: credentialProblem,
-        ...(credentialCode ? { messageCode: credentialCode } : {}),
+        ...credentialProblem,
         latencyMs: 0,
         authMode: mode,
       };
@@ -1116,6 +1157,124 @@ async function sendToQbit(
     failed: details.filter((d) => d.outcome === 'failed').length,
     details,
   };
+}
+
+/** Why a `.torrent` was not sent, as main's sentence (the renderer words the code). */
+const TORRENT_FILE_PROBLEM: Record<TorrentFileProblem, string> = {
+  empty: 'The file is empty.',
+  'too-large': 'The file is too large to be a .torrent.',
+  'not-bencode': 'The file is not a .torrent (it is not bencoded).',
+  'no-info': 'The file has no torrent metadata (no info dictionary).',
+  'no-name': 'The torrent names no file or folder.',
+  'no-pieces': 'The torrent carries no piece hashes.',
+};
+
+/**
+ * Add `.torrent` files: each is parsed first (a non-torrent is refused here, by
+ * name, rather than by qBittorrent's bare `Fails.`), then all are sent in one
+ * multipart `torrents/add` with the same options a magnet add carries. The
+ * report is per file and settled by info hash exactly as a magnet batch is.
+ */
+export async function qbitAddTorrentFiles(rawInput: ScraperQbitTorrentFileInput): Promise<QbitSendReport & { infoHashes: string[] }> {
+  const input = normalizeQbitInput(rawInput);
+  const files = (Array.isArray(rawInput.files) ? rawInput.files : []).slice(0, QBIT_TORRENT_FILES_MAX);
+  const details: QbitSendReport['details'] = [];
+  const parsed: Array<{ fileName: string; data: Uint8Array; info: Extract<TorrentFileInfo, { ok: true }> }> = [];
+  for (const file of files) {
+    const fileName = String(file?.fileName ?? '').slice(0, 260) || 'file.torrent';
+    const data = file?.data instanceof Uint8Array ? file.data : null;
+    const info = data ? parseTorrentFile(data) : ({ ok: false, problem: 'empty' } as const);
+    if (!info.ok || !data) {
+      const problem = info.ok ? 'empty' : info.problem;
+      details.push({ name: fileName, outcome: 'skipped', reason: TORRENT_FILE_PROBLEM[problem], reasonCode: `torrentFile.${problem}` });
+      continue;
+    }
+    if (parsed.some((p) => p.info.infoHash === info.infoHash)) {
+      details.push({ name: info.name, outcome: 'skipped', reason: 'The same torrent was chosen twice.', reasonCode: 'torrentFile.duplicate' });
+      continue;
+    }
+    parsed.push({ fileName, data, info });
+  }
+  const report = (infoHashes: string[]) => ({
+    sent: details.filter((d) => d.outcome === 'sent').length,
+    skipped: details.filter((d) => d.outcome === 'skipped').length,
+    failed: details.filter((d) => d.outcome === 'failed').length,
+    details,
+    infoHashes,
+  });
+  if (!input.config.enabled) {
+    for (const p of parsed) details.push({ name: p.info.name, outcome: 'failed', reason: 'qBittorrent is not enabled.' });
+    return report([]);
+  }
+  if (!parsed.length) return report([]);
+
+  const ingest = normalizeIngestHandoff(rawInput.ingest);
+  const form = buildAddForm(input.config, parsed.map(() => ''), {
+    savePath: ingest?.savePath,
+    extraTags: ingest ? ingestTagsForHint(ingest.hint) : undefined,
+  });
+  form.delete('urls');
+  const parts: MultipartPart[] = [
+    ...parsed.map((p) => ({ name: 'torrents', fileName: p.fileName.replace(/(\.torrent)?$/i, '.torrent'), contentType: 'application/x-bittorrent', data: p.data })),
+    ...[...form.entries()].map(([name, value]) => ({ name, value })),
+  ];
+  const multipart = encodeMultipart(parts);
+  // Rows shaped like index rows, so a 5.2 partial result is settled by hash as a magnet batch is.
+  const rows: TorrentRow[] = parsed.map((p) => ({
+    id: `torrent-file:${p.info.infoHash}`,
+    infoHash: p.info.infoHash,
+    name: p.info.name,
+    releaseGroup: '',
+    resolution: '',
+    seeders: -1,
+    leechers: -1,
+    availability: 0,
+    tracker: p.info.trackers[0] ?? '',
+    sizeBytes: p.info.totalBytes,
+    ageDays: 0,
+    fileCount: p.info.fileCount,
+    subtitleLanguages: [],
+    isBatch: p.info.fileCount > 1,
+    magnet: `magnet:?xt=urn:btih:${p.info.infoHash}`,
+  }));
+  const response = await authed(input, '/api/v2/torrents/add', {
+    method: 'POST',
+    headers: { 'content-type': multipart.contentType },
+    body: multipart.body,
+  });
+  const accepted: TorrentRow[] = [];
+  if ('error' in response) {
+    for (const row of rows) details.push({ name: row.name, outcome: 'failed', reason: response.error.message });
+    scraperLog('error', 'qbit', `Adding .torrent files failed: ${response.error.message}`);
+  } else if (response.status === 200 && !(parseAddOutcome(response.body)) && isLegacyAddRefusal(response.body)) {
+    const already = await presentHashes(input).catch(() => new Set<string>());
+    const generic = addFailureReason(response.status, response.body);
+    for (const row of rows) {
+      details.push({ name: row.name, outcome: 'failed', reason: already.has(row.infoHash) ? 'Already in qBittorrent.' : generic });
+    }
+  } else if (response.status === 200) {
+    const settled = settleAddedRows(rows, parseAddOutcome(response.body));
+    details.push(...settled);
+    settled.forEach((detail, index) => {
+      if (detail.outcome === 'sent') accepted.push(rows[index]);
+    });
+    scraperLog('info', 'qbit', `Added ${accepted.length} of ${rows.length} .torrent file(s) to qBittorrent.`);
+  } else {
+    const already = response.status === 409 ? await presentHashes(input).catch(() => new Set<string>()) : new Set<string>();
+    const generic = addFailureReason(response.status, response.body);
+    for (const row of rows) {
+      details.push({ name: row.name, outcome: 'failed', reason: already.has(row.infoHash) ? 'Already in qBittorrent.' : generic });
+    }
+    scraperLog('error', 'qbit', `Adding .torrent files failed: ${generic}`);
+  }
+  if (ingest && accepted.length) {
+    emitAcquisitionHandoff({
+      target: 'qbittorrent',
+      rows: accepted.map((row) => ({ id: row.id, name: row.name, infoHash: row.infoHash })),
+      ingest,
+    });
+  }
+  return report(accepted.map((row) => row.infoHash));
 }
 
 /**

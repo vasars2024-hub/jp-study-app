@@ -25,6 +25,15 @@ export interface SourceCard {
   reading: string;
   meaning: string;
   sentence?: string;
+  /** The card's own recording, for listening rounds. */
+  audioDataUrl?: string;
+  audioPath?: string;
+  /**
+   * The sentence in phrase-sized pieces (a content word with the particles and endings
+   * that follow it), for Sentence Builder on the learner's own sentences. Absent when the
+   * sentence could not be split, or would make too few or too many pieces.
+   */
+  pieces?: string[];
 }
 
 export interface VocabItem {
@@ -45,6 +54,10 @@ export interface ClozeItem {
   hint: string;
   /** Full original sentence, revealed after answering. */
   sentence: string;
+  /** The card's word (dictionary form): what an answer is evidence about. */
+  word?: string;
+  /** The card's recording, when it has one. */
+  audio?: { audioDataUrl?: string; audioPath?: string };
 }
 
 /** The blank rendered in a cloze sentence. */
@@ -148,6 +161,15 @@ export function clozeFromCard(
     reading: surface === word ? clean(card.reading) : clean(readingOf?.(surface)),
     hint: clean(card.meaning),
     sentence,
+    word,
+    ...(card.audioDataUrl || card.audioPath
+      ? {
+          audio: {
+            ...(card.audioDataUrl ? { audioDataUrl: card.audioDataUrl } : {}),
+            ...(card.audioPath ? { audioPath: card.audioPath } : {}),
+          },
+        }
+      : {}),
   };
 }
 

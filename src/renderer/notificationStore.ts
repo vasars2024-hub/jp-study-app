@@ -76,21 +76,78 @@ export function unreadCount(): number {
   return items.reduce((n, x) => (x.read ? n : n + 1), 0);
 }
 
-export function isDnd(): boolean {
+/**
+ * `jp-os-dnd` holds `'1'` (on until turned off), `'0'` (off), or — shell2 —
+ * `'until:<epoch ms>'` for a timed quiet period. One key, so a build that only
+ * knows `'1'`/`'0'` reads a timed value as off rather than as stuck on.
+ */
+function readDndRaw(): string | null {
   try {
-    return localStorage.getItem(LS_DND) === '1';
+    return localStorage.getItem(LS_DND);
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function setDnd(on: boolean): void {
+/** When a timed Do not disturb ends, or null (off, or on with no end). */
+export function dndUntil(now = Date.now()): number | null {
+  const raw = readDndRaw();
+  if (!raw?.startsWith('until:')) return null;
+  const until = Number(raw.slice('until:'.length));
+  return Number.isFinite(until) && until > now ? until : null;
+}
+
+export function isDnd(now = Date.now()): boolean {
+  const raw = readDndRaw();
+  if (raw === '1') return true;
+  return dndUntil(now) !== null;
+}
+
+function writeDnd(value: string): void {
   try {
-    localStorage.setItem(LS_DND, on ? '1' : '0');
+    localStorage.setItem(LS_DND, value);
   } catch {
     /* ignore */
   }
   window.dispatchEvent(new CustomEvent(EVENT));
+}
+
+export function setDnd(on: boolean): void {
+  writeDnd(on ? '1' : '0');
+}
+
+let dndExpiryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Quiet for `ms` from now; the badge and pop-ups come back by themselves. */
+export function setDndFor(ms: number, now = Date.now()): void {
+  const until = now + Math.max(0, Math.round(ms));
+  writeDnd(`until:${until}`);
+  if (dndExpiryTimer) clearTimeout(dndExpiryTimer);
+  // Tell the bell and the center when the period ends in this session; a later
+  // session reads the expiry from the value itself.
+  dndExpiryTimer = setTimeout(() => {
+    dndExpiryTimer = null;
+    window.dispatchEvent(new CustomEvent(EVENT));
+  }, until - now + 50);
+}
+
+/** Milliseconds until the next local `hour`:00 (for "until tomorrow morning"). */
+export function msUntilHour(hour: number, now = new Date()): number {
+  const next = new Date(now);
+  next.setHours(hour, 0, 0, 0);
+  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+/**
+ * Whether a transient pop-up should be shown now. Do not disturb holds back
+ * the informational ones; errors, warnings and anything asking the user to
+ * act (an Undo) still interrupt, because hiding those loses something.
+ */
+export function shouldShowToast(kind: string | undefined, hasAction: boolean, now = Date.now()): boolean {
+  if (!isDnd(now)) return true;
+  if (hasAction) return true;
+  return kind === 'err' || kind === 'error' || kind === 'warn' || kind === 'warning';
 }
 
 export interface NotifyInput {
@@ -137,6 +194,16 @@ export function notify(input: NotifyInput): ShellNotification {
 
 export function dismiss(id: number): void {
   items = items.filter((n) => n.id !== id);
+  persist();
+}
+
+/** Dismiss several at once (a collapsed row, or one day's group). */
+export function dismissMany(ids: readonly number[]): void {
+  if (ids.length === 0) return;
+  const drop = new Set(ids);
+  const next = items.filter((n) => !drop.has(n.id));
+  if (next.length === items.length) return;
+  items = next;
   persist();
 }
 

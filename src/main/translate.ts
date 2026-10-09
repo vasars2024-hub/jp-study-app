@@ -19,8 +19,12 @@ import {
   looksLikeSenseHintEcho,
   parseBatchJson,
   sanitizeSenseHints,
+  sanitizeTranslateStyle,
+  splitTranslationSentences,
   type TranslateBatchItem,
+  type TranslateSegment,
   type TranslateSenseHint,
+  type TranslateStyle,
 } from '../shared/translateCore';
 import {
   classifyTranslateError,
@@ -482,11 +486,7 @@ function friendlyError(err: unknown): string {
 }
 
 function sentences(text: string): string[] {
-  return text
-    .replace(/\r/g, '')
-    .split(/(?<=[。．！？!?\n])/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return splitTranslationSentences(text);
 }
 
 /**
@@ -635,11 +635,12 @@ async function translateSentence(
   source: TransLang,
   target: TransLang,
   hints?: readonly TranslateSenseHint[],
+  style: TranslateStyle = 'natural',
 ): Promise<string> {
   const s = await ensureSession();
   const raw = await promptWithTimeout(
     s,
-    buildSentencePrompt(text, source, target, hints),
+    buildSentencePrompt(text, source, target, hints, style),
     400,
     SENTENCE_PROMPT_TIMEOUT_MS,
   );
@@ -817,7 +818,26 @@ async function translateText(
   onPartial?: (progress: number) => void,
   hints?: readonly TranslateSenseHint[],
 ): Promise<string> {
-  if (!text.trim()) return text;
+  return (await translateTextDetailed(text, source, target, onPartial, hints)).text;
+}
+
+/**
+ * The passage translation plus the sentence pairs it was built from.
+ *
+ * The model already translates one sentence at a time; the alignment used to be
+ * thrown away by the final `join`. Keeping it is what lets the Translate view
+ * show source and translation side by side, sentence by sentence, and mine one
+ * sentence rather than the whole paste.
+ */
+export async function translateTextDetailed(
+  text: string,
+  source: TransLang,
+  target: TransLang,
+  onPartial?: (progress: number) => void,
+  hints?: readonly TranslateSenseHint[],
+  style: TranslateStyle = 'natural',
+): Promise<{ text: string; segments: TranslateSegment[] }> {
+  if (!text.trim()) return { text, segments: [] };
   // A missing or unrecognized code used to fall into the `source === target`
   // branch below — `undefined === undefined` — and the source text came back as
   // a successful translation. A caller that misnames these fields (`from`/`to`
@@ -832,18 +852,19 @@ async function translateText(
       `Translation needs a known source and target language; got source="${source}" target="${target}".`,
     );
   }
-  if (source === target) return text;
+  if (source === target) return { text, segments: [] };
 
   const parts = sentences(text);
-  if (parts.length === 0) return '';
+  if (parts.length === 0) return { text: '', segments: [] };
 
   const out: string[] = [];
+  const segments: TranslateSegment[] = [];
   let translatedCount = 0;
   for (let i = 0; i < parts.length; i++) {
     // Hints apply to every sentence of the passage: a pin is recorded against a
     // headword, not an offset, so a word pinned once is pinned wherever the
     // splitter happens to have cut.
-    const translated = await enqueue(() => translateSentence(parts[i], source, target, hints));
+    const translated = await enqueue(() => translateSentence(parts[i], source, target, hints, style));
     // An untranslatable sentence is dropped rather than back-filled with its
     // own source text: a Japanese clause sitting inside an English paragraph
     // reads as part of the translation.
@@ -851,12 +872,13 @@ async function translateText(
       out.push(translated);
       translatedCount += 1;
     }
+    segments.push({ source: parts[i], target: translated });
     onPartial?.((i + 1) / parts.length);
   }
   if (translatedCount === 0) {
     throw new Error('The translation model returned no usable output for this text.');
   }
-  return out.join(' ');
+  return { text: out.join(' '), segments };
 }
 
 /**
@@ -896,16 +918,17 @@ export function registerTranslateIpc(): void {
         source: string;
         target: string;
         senseHints?: unknown;
+        style?: unknown;
       },
-    ): Promise<{ ok: boolean; text?: string; error?: string }> => {
+    ): Promise<{ ok: boolean; text?: string; segments?: TranslateSegment[]; error?: string }> => {
       try {
         // Sanitized rather than trusted: the hints reach the prompt verbatim, so
         // an unbounded list from a renderer would crowd out the passage itself.
         const hints = sanitizeSenseHints(req.senseHints);
-        const text = await translateText(req.text, req.source, req.target, (progress) => {
+        const { text, segments } = await translateTextDetailed(req.text, req.source, req.target, (progress) => {
           e.sender.send('translate:partial', { id: req.id, progress });
-        }, hints);
-        return { ok: true, text };
+        }, hints, sanitizeTranslateStyle(req.style));
+        return segments.length ? { ok: true, text, segments } : { ok: true, text };
       } catch (err) {
         console.error('[translate]', err);
         const errorKey = friendlyErrorKey(err);

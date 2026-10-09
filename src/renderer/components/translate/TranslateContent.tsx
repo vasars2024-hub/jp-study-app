@@ -11,7 +11,7 @@
  * genuinely shared parts are extracted — the hook and the history list. Nothing
  * here may import `AppChrome`/`MenuBar`/`StatusBar`.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { translateTo, onModelProgress, type TransLang } from '../../translator';
 import { getStudyLang } from '../../studyEnvironment';
 import {
@@ -20,8 +20,17 @@ import {
   loadTranslationHistory,
   onTranslationHistoryChanged,
   removeTranslationHistory,
+  togglePinTranslationHistory,
   type TranslationHistoryEntry,
 } from '../../translationHistory';
+import { writeLocalStorage } from '../../localStorageWrite';
+import type { TranslateSegment, TranslateStyle } from '../../../shared/translateCore';
+import {
+  acceptClipboardPassage,
+  alignTranslation,
+  searchTranslationHistory,
+  translationMineFields,
+} from '../../../shared/translateWorkbench';
 import { appendNotebookEvent, saveTranslationNote } from '../../notebookTimeline';
 import { createDeckFolder } from '../../flashcardDeck';
 import { mineToStudy } from '../../studyMining';
@@ -72,6 +81,41 @@ export interface TranslateController {
   history: TranslationHistoryEntry[];
   rerunEntry: (e: TranslationHistoryEntry) => void;
   mineEntry: (e: TranslationHistoryEntry) => void;
+  /** The finished translation as sentence pairs (one pair when it cannot be split honestly). */
+  segments: TranslateSegment[];
+  /** Natural or literal rendering; remembered across sessions. */
+  style: TranslateStyle;
+  setStyle: (s: TranslateStyle) => void;
+  /** Translate the history row again with the model, in its own direction. */
+  retranslateEntry: (e: TranslationHistoryEntry) => void;
+  togglePin: (e: TranslationHistoryEntry) => void;
+  /** Mine the finished translation (the whole passage) as a sentence card. */
+  mineResult: () => void;
+  /** Mine one aligned sentence. */
+  mineSegment: (s: TranslateSegment) => void;
+  /** Copy the finished translation; announces the result. */
+  copyResult: () => void;
+  /** Translate whatever new source-language text lands on the clipboard. */
+  clipboardWatch: boolean;
+  setClipboardWatch: (on: boolean) => void;
+}
+
+/** Remembered Translate preferences. Read raw; written through the guarded writer. */
+const STYLE_KEY = 'jp-translate-style-v1';
+const CLIPBOARD_WATCH_KEY = 'jp-translate-clipboard-watch-v1';
+/** How often the clipboard watcher asks main for the clipboard while it is on. */
+export const CLIPBOARD_WATCH_INTERVAL_MS = 1200;
+
+function readPref(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function toast(message: string, kind: 'ok' | 'warn' | 'err' = 'ok'): void {
+  window.dispatchEvent(new CustomEvent('os:toast', { detail: { message, kind } }));
 }
 
 export function useTranslate(): TranslateController {
@@ -90,6 +134,10 @@ export function useTranslate(): TranslateController {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [history, setHistory] = useState<TranslationHistoryEntry[]>(() => loadTranslationHistory());
+  const [reported, setReported] = useState<TranslateSegment[] | null>(null);
+  const [style, setStyleState] = useState<TranslateStyle>(() => (readPref(STYLE_KEY) === 'literal' ? 'literal' : 'natural'));
+  const [clipboardWatch, setClipboardWatchState] = useState(() => readPref(CLIPBOARD_WATCH_KEY) === '1');
+  const styleRef = useRef(style);
   const startedRef = useRef(false);
   const requestRef = useRef(0);
   const offModelRef = useRef<(() => void) | null>(null);
@@ -150,15 +198,22 @@ export function useTranslate(): TranslateController {
       setOutput(input);
     }
     setTranslatedInput('');
+    setReported(null);
   }
 
-  const run = useCallback(async () => {
-    const text = input.trim();
+  /**
+   * Translate `raw` in the given direction. `run` is this for the pane's own
+   * text; a history re-run and the clipboard watcher pass theirs explicitly, so
+   * they never race a state update that has not rendered yet.
+   */
+  const translateText = useCallback(async (raw: string, from: TransLang, to: TransLang) => {
+    const text = raw.trim();
     if (!text) return;
     const request = ++requestRef.current;
     setError('');
     setOutput('');
     setTranslatedInput('');
+    setReported(null);
     setState('loading');
     setMsg(t('translate.msg.loadingModel'));
     startedRef.current = false;
@@ -174,20 +229,25 @@ export function useTranslate(): TranslateController {
     });
 
     try {
-      const result = await translateTo(text, source, target, (prog) => {
+      let segments: TranslateSegment[] | null = null;
+      const result = await translateTo(text, from, to, (prog) => {
         if (request !== requestRef.current) return;
         startedRef.current = true;
         setState('translating');
         setMsg(t('translate.msg.translating', { pct: Math.round(prog * 100) }));
+      }, undefined, {
+        style: styleRef.current,
+        onSegments: (s) => { segments = s; },
       });
       if (request !== requestRef.current) return;
       setOutput(result);
       setTranslatedInput(text);
+      setReported(segments);
       setState('done');
       setMsg('');
       appendTranslationHistory({
-        sourceLang: source,
-        targetLang: target,
+        sourceLang: from,
+        targetLang: to,
         sourceText: text,
         resultText: result,
         origin: 'app',
@@ -210,7 +270,9 @@ export function useTranslate(): TranslateController {
         offModelRef.current = null;
       }
     }
-  }, [input, source, target, t]);
+  }, [t]);
+
+  const run = useCallback(() => translateText(input, source, target), [translateText, input, source, target]);
 
   function rerunEntry(e: TranslationHistoryEntry) {
     setSource(e.sourceLang as TransLang);
@@ -218,37 +280,81 @@ export function useTranslate(): TranslateController {
     setInput(e.sourceText);
     setOutput(e.resultText);
     setTranslatedInput(e.sourceText);
+    setReported(null);
     setTab('translate');
     setState('done');
   }
 
-  function mineEntry(e: TranslationHistoryEntry) {
+  function retranslateEntry(e: TranslationHistoryEntry) {
+    setSource(e.sourceLang as TransLang);
+    setTarget(e.targetLang as TransLang);
+    setInput(e.sourceText);
+    setTab('translate');
+    void translateText(e.sourceText, e.sourceLang as TransLang, e.targetLang as TransLang);
+  }
+
+  function togglePin(e: TranslationHistoryEntry) {
+    togglePinTranslationHistory(e.id);
+  }
+
+  function mineText(sourceText: string, resultText: string, sourceLang: string) {
+    if (!sourceText.trim() || !resultText.trim()) return;
     // The folder is named in the UI language, like every folder the app creates for the learner.
     const folder = t('translate.deckFolder');
     createDeckFolder(folder);
     // Through the one mining gateway (studyMining.ts): it dedupes a second mine
     // of the same line, stamps the study language and keeps the card's identity,
     // which a bare addDeckCards did not — mining twice made two cards.
-    const word = e.sourceText.slice(0, 80);
-    const sentence = e.sourceText.slice(0, 2000);
     void mineToStudy({
-      word,
-      meaning: e.resultText.slice(0, 400),
-      sentence,
+      ...translationMineFields(sourceText, resultText),
       source: 'import',
       sourceId: 'translate',
       folder,
-      // A translated passage is a sentence card, never one word's evidence.
-      ...(word.length > 16 || /[\s。．！？!?]/.test(word) ? { studyKind: 'sentence' as const } : {}),
-      studyLang: studyLangFromTag(e.sourceLang) ?? studyLangOfText(e.sourceText, getStudyLang()),
+      studyLang: studyLangFromTag(sourceLang) ?? studyLangOfText(sourceText, getStudyLang()),
       notify: false,
     }).then((result) => {
       // Mining used to succeed silently; say where the card went (or that it was already there).
-      const message = result.created
-        ? t('translate.history.mined', { folder })
-        : t('polish.mine.alreadyInDeck');
-      window.dispatchEvent(new CustomEvent('os:toast', { detail: { message, kind: 'ok' } }));
-    }).catch(() => undefined);
+      toast(result.created ? t('translate.history.mined', { folder }) : t('polish.mine.alreadyInDeck'));
+    }).catch(() => toast(t('xlate.mine.failed'), 'err'));
+  }
+
+  function mineEntry(e: TranslationHistoryEntry) {
+    mineText(e.sourceText, e.resultText, e.sourceLang);
+  }
+
+  function mineResult() {
+    if (state !== 'done' || !translatedInput || !output) {
+      toast(t('xlate.mine.nothing'), 'warn');
+      return;
+    }
+    mineText(translatedInput, output, source);
+  }
+
+  function mineSegment(segment: TranslateSegment) {
+    mineText(segment.source, segment.target, source);
+  }
+
+  function copyResult() {
+    if (!output) return;
+    void copyText(output).then((ok) => toast(ok ? t('xlate.copied') : t('xlate.copyFailed'), ok ? 'ok' : 'err'));
+  }
+
+  /**
+   * Switching natural/literal on a finished translation re-translates it — the
+   * toggle is "show me the other rendering", DeepL's alternatives in one click.
+   * The ref is written first so the re-run already uses the new style.
+   */
+  function setStyle(next: TranslateStyle) {
+    if (next === styleRef.current) return;
+    styleRef.current = next;
+    setStyleState(next);
+    writeLocalStorage(STYLE_KEY, next);
+    if (state === 'done' && translatedInput) void translateText(translatedInput, source, target);
+  }
+
+  function setClipboardWatch(on: boolean) {
+    setClipboardWatchState(on);
+    writeLocalStorage(CLIPBOARD_WATCH_KEY, on ? '1' : '0');
   }
 
   function clear() {
@@ -258,10 +364,63 @@ export function useTranslate(): TranslateController {
     setInput('');
     setOutput('');
     setTranslatedInput('');
+    setReported(null);
     setError('');
     setMsg('');
     setState('idle');
   }
+
+  const segments = useMemo(
+    () => (state === 'done' ? alignTranslation(translatedInput, output, reported) : []),
+    [state, translatedInput, output, reported],
+  );
+
+  // The clipboard watcher (Migaku / Yomitan's clipboard monitor). Asks main for
+  // the clipboard on an interval while it is on — the IPC read works whether or
+  // not this window has focus, which is the whole point: the learner copies a
+  // line in their browser and the translation is waiting when they look back.
+  // The first read only seeds `last`, so turning it on never translates
+  // whatever happened to be on the clipboard already.
+  const watchRef = useRef({ input, output, source, translateText });
+  watchRef.current = { input, output, source, translateText };
+  useEffect(() => {
+    if (!clipboardWatch) return;
+    const read = window.api?.clipboardReadText;
+    if (typeof read !== 'function') return;
+    let alive = true;
+    let last: string | null = null;
+    const tick = async (): Promise<void> => {
+      let raw = '';
+      try {
+        raw = (await read()) ?? '';
+      } catch {
+        return;
+      }
+      if (!alive) return;
+      if (last === null) {
+        last = raw.trim();
+        return;
+      }
+      const cur = watchRef.current;
+      const accepted = acceptClipboardPassage(raw, {
+        last,
+        currentInput: cur.input,
+        currentOutput: cur.output,
+        sourceLang: cur.source,
+      });
+      last = raw.trim();
+      if (!accepted) return;
+      setTab('translate');
+      setInput(accepted);
+      void cur.translateText(accepted, cur.source, target);
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), CLIPBOARD_WATCH_INTERVAL_MS);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [clipboardWatch, target]);
 
   return {
     tab,
@@ -284,14 +443,57 @@ export function useTranslate(): TranslateController {
     history,
     rerunEntry,
     mineEntry,
+    segments,
+    style,
+    setStyle,
+    retranslateEntry,
+    togglePin,
+    mineResult,
+    mineSegment,
+    copyResult,
+    clipboardWatch,
+    setClipboardWatch,
   };
 }
 
-export async function copyText(text: string): Promise<void> {
+/**
+ * The workbench's own keys, handled on the surface's root so they work from
+ * the source pane, the result and the aligned list alike: Alt+M mines the
+ * finished translation, Alt+C copies it. (Ctrl+Enter stays on the textarea,
+ * where it has always been.) IME composition is left alone.
+ */
+export function handleTranslateHotkey(
+  e: {
+    key: string;
+    code?: string;
+    altKey: boolean;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    shiftKey: boolean;
+    nativeEvent?: { isComposing?: boolean; keyCode?: number };
+    preventDefault: () => void;
+  },
+  state: Pick<TranslateController, 'mineResult' | 'copyResult'>,
+): boolean {
+  if (e.nativeEvent?.isComposing || e.nativeEvent?.keyCode === 229) return false;
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
+  const key = e.code === 'KeyM' || e.key.toLowerCase() === 'm'
+    ? 'm'
+    : e.code === 'KeyC' || e.key.toLowerCase() === 'c' ? 'c' : '';
+  if (!key) return false;
+  e.preventDefault();
+  if (key === 'm') state.mineResult();
+  else state.copyResult();
+  return true;
+}
+
+/** Copy to the clipboard; resolves false when the write was refused. */
+export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }
 
@@ -310,6 +512,10 @@ export function TranslateHistoryList({
   onOpenNotebook: (noteId: string) => void;
 }) {
   const { t, lang } = useT();
+  const [query, setQuery] = useState('');
+  const shown = useMemo(() => searchTranslationHistory(state.history, query), [state.history, query]);
+  const pinnedCount = useMemo(() => state.history.filter((e) => e.pinned).length, [state.history]);
+  const clearable = state.history.length - pinnedCount;
 
   if (state.history.length === 0) {
     return (
@@ -323,13 +529,25 @@ export function TranslateHistoryList({
   return (
     <>
       <div className="tr-history-actions">
+        <input
+          type="search"
+          className="tr-history-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t('xlate.history.searchPlaceholder')}
+          aria-label={t('xlate.history.search')}
+        />
         <button
           type="button"
           className="btn ghost"
+          disabled={clearable === 0}
+          title={clearable === 0 ? t('xlate.history.onlyPinned') : undefined}
           onClick={() => {
             void confirmDialog({
               title: t('translate.history.clearConfirmTitle'),
-              message: t('translate.history.clearConfirmBody', { count: state.history.length }),
+              message: pinnedCount
+                ? t('xlate.history.clearKeepsPinned', { count: clearable, pinned: pinnedCount })
+                : t('translate.history.clearConfirmBody', { count: state.history.length }),
               confirmLabel: t('translate.history.clear'),
               danger: true,
             }).then((ok) => {
@@ -340,8 +558,11 @@ export function TranslateHistoryList({
           {t('translate.history.clear')}
         </button>
       </div>
+      {shown.length === 0 && (
+        <p className="tr-history-nomatch muted" role="status">{t('xlate.history.noMatch', { query: query.trim() })}</p>
+      )}
       <ul className="tr-history-list">
-        {state.history.map((e) => {
+        {shown.map((e) => {
           /*
            * Every row's five buttons carried the same five words as every other
            * row's. Measured live 2026-09-06 on the user's own 52-entry history:
@@ -358,15 +579,25 @@ export function TranslateHistoryList({
           const subject = e.sourceText.replace(/\s+/g, ' ').trim().slice(0, 40);
           const named = (key: string): string => `${t(key)} — ${subject}`;
           return (
-            <li key={e.id} className="tr-history-item">
+            <li key={e.id} className={`tr-history-item${e.pinned ? ' is-pinned' : ''}`}>
               <div className="tr-history-meta muted">
                 {/* A bare toLocaleString() follows the OS locale, not the UI language,
                     so every one of these history stamps read US-style in a ru desktop. */}
+                {e.pinned ? `${t('xlate.history.pinnedTag')} · ` : ''}
                 {e.sourceLang} → {e.targetLang} · {new Date(e.ts).toLocaleString(LANG_TAGS[lang])} · {t(`translate.history.origin.${e.origin}`)}
               </div>
-              <p className="tr-history-src">{e.sourceText}</p>
-              <p className="tr-history-dst muted">{e.resultText}</p>
+              <p className="tr-history-src" lang={e.sourceLang}>{e.sourceText}</p>
+              <p className="tr-history-dst muted" lang={e.targetLang}>{e.resultText}</p>
               <div className="tr-history-item-actions">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-pressed={!!e.pinned}
+                  aria-label={named(e.pinned ? 'xlate.history.unpin' : 'xlate.history.pin')}
+                  onClick={() => state.togglePin(e)}
+                >
+                  {t(e.pinned ? 'xlate.history.unpin' : 'xlate.history.pin')}
+                </button>
                 <button
                   type="button"
                   className="btn ghost"
@@ -378,8 +609,18 @@ export function TranslateHistoryList({
                 <button
                   type="button"
                   className="btn ghost"
-                  aria-label={named('translate.history.rerun')}
+                  aria-label={named('xlate.history.open')}
+                  title={t('xlate.history.openHint')}
                   onClick={() => state.rerunEntry(e)}
+                >
+                  {t('xlate.history.open')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-label={named('translate.history.rerun')}
+                  title={t('xlate.history.rerunHint')}
+                  onClick={() => state.retranslateEntry(e)}
                 >
                   {t('translate.history.rerun')}
                 </button>

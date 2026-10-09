@@ -15,6 +15,7 @@ import {
 import { AERO_THEME_ID } from '../theme/frutiger-aero';
 import { WIRED_ARCHIVE_THEME_ID } from '../theme/wired-archive';
 import { loadThemeId } from '../theme';
+import { useLockBlockedToasts } from '../lockBlockedNotice';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'] as const;
 
@@ -42,6 +43,8 @@ export default function Lockscreen({
   widgetMode?: boolean;
 }) {
   const { t, lang } = useT();
+  // Shortcuts, tray rows and extension requests main refused while locked.
+  useLockBlockedToasts();
   const aeroMode = !widgetMode && isAeroLockscreen();
   const wiredMode = !widgetMode && isWiredLockscreen();
   // Aero logon extras: ease-of-access (high-contrast, larger type on this

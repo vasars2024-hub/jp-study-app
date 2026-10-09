@@ -188,6 +188,13 @@ export default function VideoCoreMiningPanel({
   const [decks, setDecks] = React.useState<string[]>([]);
   const [busy, setBusy] = React.useState<'screenshot' | 'audio' | 'clip' | 'mine' | 'undo' | null>(null);
   const [message, setMessage] = React.useState('');
+  /**
+   * History id of the card THIS panel just created. The "already mined" banner reads the
+   * history, and a successful mine appends to it — so without this the panel's own fresh
+   * card was immediately reported back as a duplicate under "Saved to your deck". Cleared
+   * by the next mine attempt and by a change of line, so a real repeat still warns.
+   */
+  const [freshMineEntryId, setFreshMineEntryId] = React.useState<string | null>(null);
   // The panel is an absolute overlay on the video. It has always been open, always this
   // tall, and always in the way; collapsing it is the difference between a study player
   // and a form sitting on top of one.
@@ -221,6 +228,7 @@ export default function VideoCoreMiningPanel({
     });
     autoTranslationRef.current = translationText;
     setMessage('');
+    setFreshMineEntryId(null);
     // `translationText` is deliberately not a dependency: it lands after the draft for a
     // cue whose translation is still being produced, and re-running here would rebuild the
     // draft and discard any capture or edit already made against that line. The effect
@@ -489,6 +497,9 @@ export default function VideoCoreMiningPanel({
     if (!beginCueMine(lineIdentity)) return;
     setBusy('mine');
     setMessage(announce ? t('mediaWorkspace.mining.mining') : '');
+    // A new attempt is no longer "the card I just made": if the line is already in the
+    // history, the banner says so while this attempt runs.
+    setFreshMineEntryId(null);
     try {
       if (announce) working = await completeDraft(working, lineCue, request?.target);
       if (sameLine) setDraft(working);
@@ -503,6 +514,9 @@ export default function VideoCoreMiningPanel({
       // the mined markers built on it) records all of them.
       const entry = createVideoCoreMiningOutcomeEntry(working, mined.anki, result, mined.error);
       setHistory((current) => appendVideoCoreMiningHistory(current, entry));
+      // Only a card this attempt created is exempt from the banner; finding an existing
+      // card (`created: false`) is exactly the repeat the banner exists to report.
+      setFreshMineEntryId(mined.created ? entry.id : null);
       if (mined.created) {
         try {
           recordMediaMined(1);
@@ -621,9 +635,11 @@ export default function VideoCoreMiningPanel({
    *
    * Pure lookup over history already in state: no Anki call, no I/O, nothing that could
    * stutter playback. Deliberately computed from `selectedCue` rather than the live `cue`
-   * so it tracks the card actually being previewed.
+   * so it tracks the card actually being previewed. The entry this panel's own last mine
+   * just created is not "already mined" — that is the success the message reports.
    */
-  const alreadyMined = findMinedCueEntry(history, source, selectedCue);
+  const minedEntry = findMinedCueEntry(history, source, selectedCue);
+  const alreadyMined = minedEntry && minedEntry.id !== freshMineEntryId ? minedEntry : undefined;
 
   // "Line 3 · 0:12–0:15": the line's number and its place in the video. The track number
   // and raw milliseconds it used to print meant nothing to a learner (audit 2026-09-23).

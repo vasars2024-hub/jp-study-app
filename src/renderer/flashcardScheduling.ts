@@ -18,9 +18,20 @@ import {
 
 const CONFIG_KEY = 'jp-flashcard-scheduling-v1';
 
+/**
+ * The parsed setting, keyed on the raw stored text. The leech predicate reads
+ * the threshold once per card in a deck-wide filter, and re-parsing the JSON for
+ * each of 10,000 cards is the kind of cost this repo keeps measuring.
+ */
+let memo: { raw: string | null; config: SchedulingConfig } | null = null;
+
 export function loadSchedulingConfig(): SchedulingConfig {
   try {
-    return normalizeSchedulingConfig(JSON.parse(localStorage.getItem(CONFIG_KEY) ?? 'null'));
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (memo && memo.raw === raw) return memo.config;
+    const config = normalizeSchedulingConfig(JSON.parse(raw ?? 'null'));
+    memo = { raw, config };
+    return config;
   } catch {
     return DEFAULT_SCHEDULING_CONFIG;
   }
@@ -28,10 +39,13 @@ export function loadSchedulingConfig(): SchedulingConfig {
 
 export function saveSchedulingConfig(next: Partial<SchedulingConfig>): SchedulingConfig {
   const normalized = normalizeSchedulingConfig({ ...loadSchedulingConfig(), ...next });
+  // `fsrsWeights: undefined` in `next` is how a caller clears a personal fit.
+  if ('fsrsWeights' in next && next.fsrsWeights === undefined) delete normalized.fsrsWeights;
   try {
     localStorage.setItem(CONFIG_KEY, JSON.stringify(normalized));
   } catch {
     /* A locked store still gets session-local settings. */
   }
+  memo = null;
   return normalized;
 }

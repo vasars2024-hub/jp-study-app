@@ -19,6 +19,7 @@ import {
   useStats,
 } from '../stats/StatsContent';
 import { formatDuration } from '../../stats';
+import { StatsGames } from '../stats/StatsGames';
 
 /**
  * Pillar 0 fix for the `stats` tab bail-out, which mounted `StatisticsView`
@@ -79,6 +80,8 @@ export function BlancStatisticsPanel() {
         <legend>{t('stats.wk.title')}</legend>
         <WordKnowledge />
       </fieldset>
+
+      <StatsGames />
     </div>
   );
 }

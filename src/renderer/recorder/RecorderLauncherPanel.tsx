@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
 import { formatRecorderClock, recordedMs, type RecorderState } from '../../shared/regionRecorder';
+import { RecordingHistoryList, RecorderWindowStarter } from './RecordingHistoryList';
 
 export default function RecorderLauncherPanel() {
   const { t } = useT();
@@ -40,6 +41,7 @@ export default function RecorderLauncherPanel() {
           {t('recorder.settings.full')}
         </button>
       </div>
+      <RecorderWindowStarter variant="blanc" disabled={busy} />
       {busy && state?.startedAt && (
         <p>{t('recorder.tool.recording', { time: formatRecorderClock(recordedMs(state.startedAt, now, state.pausedTotalMs, state.pausedSince)) })}</p>
       )}
@@ -60,6 +62,8 @@ export default function RecorderLauncherPanel() {
           ))}
         </ul>
       ) : null}
+      <h3>{t('rec2.history.title')}</h3>
+      <RecordingHistoryList variant="blanc" limit={8} />
     </section>
   );
 }

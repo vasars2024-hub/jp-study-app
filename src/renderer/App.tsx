@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { LiquidLoading } from './components/liquid/LiquidLoading';
 import DesktopShell from './components/DesktopShell';
 import { parseDetachTarget } from '../shared/studyDetach';
@@ -9,7 +9,6 @@ import ConsentScreen from './components/ConsentScreen';
 import AppSection from './components/AppSection';
 import CommandPalette from './components/CommandPalette';
 import ClipboardHistoryPanel from './components/ClipboardHistoryPanel';
-import FocusShell from './components/FocusShell';
 import type { LibraryItem } from '../shared/types';
 import type { DesktopWinSection } from '../shared/desktop';
 import { popoutLabel, popoutSectionFromSearch } from './popoutLabels';
@@ -33,6 +32,9 @@ import Lockscreen from './components/Lockscreen';
 // leave the entry chunk's preload list (audit robust #6).
 const NovelReader = lazy(() => import('./views/NovelReader'));
 const MangaReader = lazy(() => import('./views/MangaReader'));
+// Focus Mode is a mode, not the shell (perf2): it pulls the Anki workbench and
+// the review views (~1.6 MB of source) that a desktop boot never shows.
+const FocusShell = lazy(() => import('./components/FocusShell'));
 
 // Lazy since Blanc got its own entry point (BLANC_REFINEMENT_PLAN.md Pillar 1).
 // The Blanc window now loads blanc.html, so this branch is only a fallback for
@@ -50,6 +52,13 @@ const DetachedStudyBlock = lazy(() => import('../media/DetachedStudyBlock'));
 const BlancLockscreen = lazy(() =>
   import('./components/blanc/BlancShell').then((m) => ({ default: m.BlancLockscreen })),
 );
+// onb2: first-run setup and the first-steps checklist. Lazy — a profile that has
+// finished setup never downloads either chunk; the boot graph carries only the
+// small `firstRunSetup` record reader.
+const FirstRunSetup = lazy(() => import('./components/onboarding/FirstRunSetup'));
+const FirstStepsChecklist = lazy(() => import('./components/onboarding/FirstStepsChecklist'));
+import { firstRunSetupPending, firstStepsChecklistVisible, onFirstRunChanged } from './firstRunSetup';
+import { TELEMETRY_CONSENT_DECIDED_EVENT, telemetryConsentPending } from '../shared/stats';
 import ToastHost from './components/ToastHost';
 import { useFilesWatchAutoImport } from './components/filesapp/filesWatchAutoImport';
 import { getAssignment, onDesktopChanged } from './desktopState';
@@ -163,6 +172,25 @@ export default function App() {
   );
   // Watched folders import into the main window only; see the hook's header.
   useFilesWatchAutoImport(!popout && !secondary && !detachedBlock);
+  // onb2 — first-run setup waits for the consent card, and holds the tour until
+  // it closes. Both re-read on every change so Help's "Run setup again" (also
+  // from a popped-out Settings, via `storage`) re-opens it here.
+  const [setupPending, setSetupPending] = useState(firstRunSetupPending);
+  const [checklistVisible, setChecklistVisible] = useState(() => firstStepsChecklistVisible());
+  const [consentPending, setConsentPending] = useState(telemetryConsentPending);
+  useEffect(
+    () =>
+      onFirstRunChanged(() => {
+        setSetupPending(firstRunSetupPending());
+        setChecklistVisible(firstStepsChecklistVisible());
+      }),
+    [],
+  );
+  useEffect(() => {
+    const onDecided = (): void => setConsentPending(false);
+    window.addEventListener(TELEMETRY_CONSENT_DECIDED_EVENT, onDecided);
+    return () => window.removeEventListener(TELEMETRY_CONSENT_DECIDED_EVENT, onDecided);
+  }, []);
   const popoutPresentable = popout != null && canPresentLiquid(popout, 'popout');
   const popoutLiquid = popoutPresentable && popoutPresentation?.mode === 'liquid';
   const togglePopoutLiquid = useCallback(() => {
@@ -180,7 +208,13 @@ export default function App() {
     !isBlancWindow() &&
     !isCompanionHostWindow();
 
-  const handleLockscreenUnlocked = useCallback(() => {
+  // Mirrors `locked` synchronously, so an unlock this window did itself and the
+  // `lockscreen:unlocked` broadcast that follows it run the unlock steps once.
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+  /** Everything an unlock does in THIS window, without telling main. */
+  const applyUnlockedLocally = useCallback(() => {
+    lockedRef.current = false;
     markLockscreenUnlocked();
     const pendingAeroBoot = consumePendingAeroBoot();
     const pendingWiredBoot = consumePendingWiredBoot();
@@ -193,14 +227,17 @@ export default function App() {
       }
     }
     setLocked(false);
-    // Ensure the main window is visible if a prior floating lock widget hid it.
-    void window.api.lockscreenUnlock();
     if (pendingAeroBoot) {
       window.dispatchEvent(new CustomEvent('shell:softReboot'));
     } else if (pendingWiredBoot) {
       requestWiredArchiveEntryBoot();
     }
   }, []);
+  const handleLockscreenUnlocked = useCallback(() => {
+    applyUnlockedLocally();
+    // Ensure the main window is visible if a prior floating lock widget hid it.
+    void window.api.lockscreenUnlock();
+  }, [applyUnlockedLocally]);
 
   useEffect(() => onFocusModeChanged(setFocusModeState), []);
   useEffect(() => onBlancModeChanged(setBlanc), []);
@@ -288,11 +325,18 @@ export default function App() {
       })
       .catch(() => undefined);
     const off = window.api.onLockscreenLocked?.(() => setLocked(true));
+    // Unlocked from another lock surface (the floating PIN widget, Blanc): main
+    // lifted its lock, so this window's own PIN pad goes too (lock2). Before,
+    // arming from the widget left this pad up and asked for the PIN twice.
+    const offUnlocked = window.api.onLockscreenUnlocked?.(() => {
+      if (lockedRef.current) applyUnlockedLocally();
+    });
     return () => {
       alive = false;
       off?.();
+      offUnlocked?.();
     };
-  }, [popout, secondary, detachedBlock]);
+  }, [popout, secondary, detachedBlock, applyUnlockedLocally]);
 
   // Main's study bridges — extension mining into the local deck, the Whisper
   // requests, transcript cards, and the extension's known-word / level /
@@ -471,10 +515,12 @@ export default function App() {
   if (focusMode && !popout && !secondary) {
     return (
       <>
-        <FocusShell
-          initialBook={reading}
-          onInitialBookConsumed={() => setReading(null)}
-        />
+        <Suspense fallback={<LiquidLoading layout="study" />}>
+          <FocusShell
+            initialBook={reading}
+            onInitialBookConsumed={() => setReading(null)}
+          />
+        </Suspense>
         <GlobalDictionaryOverlay />
         <ToastHost />
       </>
@@ -578,12 +624,24 @@ export default function App() {
       <ToastHost />
       {/* Phase-2 MEDIA workspace (adopted library/lists). Self-hides unless the sidecar is enabled. */}
       <MediaWorkspaceHost />
+      {checklistVisible && !setupPending && (
+        <Suspense fallback={null}>
+          <FirstStepsChecklist />
+        </Suspense>
+      )}
+      {setupPending && !consentPending && (
+        <Suspense fallback={null}>
+          <FirstRunSetup />
+        </Suspense>
+      )}
       {/*
         First-boot guided tour (Phase 9.5 / audit T1). Self-hides once completed
         or skipped. Mounted last so its spotlight layers over the shell, and
         outside the `locked` gate so it never competes with the lock screen.
+        Held while first-run setup is open; setup's last step decides whether
+        it runs at all.
       */}
-      <TourOverlay />
+      <TourOverlay holdForSetup={setupPending} />
     </>
   );
 }

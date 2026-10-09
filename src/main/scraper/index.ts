@@ -23,6 +23,7 @@ import {
   type ScraperQbitActionReport,
   type ScraperQbitInput,
   type ScraperQbitSendInput,
+  type ScraperQbitTorrentFileInput,
   type ScraperSchedulerState,
   type ScraperSchedulerSyncInput,
   type ScraperStartInput,
@@ -68,7 +69,7 @@ import { previousEpisodeIds, recordJob, storedResult, storedSummaries } from './
 import { downloadsFreeSpace, listDownloads } from './downloads';
 import { listExports, writeExport, type WriteExportRequest } from './exports';
 import { listPlugins } from './plugins';
-import { qbitSend, qbitTest, qbitTorrentAction, qbitTransfers } from './qbittorrent';
+import { qbitAddTorrentFiles, qbitSend, qbitTest, qbitTorrentAction, qbitTransfers } from './qbittorrent';
 import { noteJobEvent, runScheduleNow, startScheduler, syncScheduler } from './scheduler';
 import { probeHttp } from './http';
 import { onScraperLog, recentScraperLogs, scraperLog } from './logBus';
@@ -266,6 +267,11 @@ export function registerScraperIpc(): void {
   ipcMain.handle(
     SCRAPER_CHANNELS.qbitSend,
     async (_event, input: ScraperQbitSendInput): Promise<QbitSendReport> => qbitSend(input),
+  );
+
+  ipcMain.handle(
+    SCRAPER_CHANNELS.qbitAddTorrentFiles,
+    async (_event, input: ScraperQbitTorrentFileInput) => qbitAddTorrentFiles(input),
   );
 
   // Pause, resume, recheck, retry and remove act on the user's real client —

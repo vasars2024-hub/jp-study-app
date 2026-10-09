@@ -303,6 +303,89 @@ export function knowledgeCounts(): Record<WkLevel, number> {
   return out;
 }
 
+/**
+ * Every stored entry with its source, for the bulk manager (kw2). Unlike
+ * `listKnownEntries`, a hand-pinned "New" (`{ l: 0, m: 1 }`) is included: it is
+ * a decision the user made and must be able to find and undo.
+ */
+export function listKnowledgeEntries(): Array<{ word: string; level: WkLevel; manual: boolean }> {
+  return Object.entries(db()).map(([word, e]) => ({ word, level: e.l, manual: e.m === 1 }));
+}
+
+/**
+ * Set many words to one level by hand, in one write and one change event (an
+ * Anki-sized selection would otherwise persist and emit once per word). Words
+ * already at that level by hand are left alone. Returns how many changed.
+ */
+export function bulkSetLevels(words: readonly string[], level: WkLevel): number {
+  const d = db();
+  const touched: string[] = [];
+  for (const raw of words) {
+    const word = raw.trim();
+    if (!word) continue;
+    const current = d[word];
+    if (current?.m === 1 && current.l === level) continue;
+    d[word] = { l: level, m: 1 };
+    touched.push(word);
+  }
+  if (touched.length) {
+    persist();
+    emit(touched);
+  }
+  return touched.length;
+}
+
+/** `clearManualLevel` for many words at once: one write, one event. Returns how many changed. */
+export function bulkClearManual(words: readonly string[]): number {
+  const d = db();
+  const touched: string[] = [];
+  for (const word of words) {
+    const current = d[word];
+    if (!current?.m) continue;
+    if (!current.l) delete d[word];
+    else d[word] = { l: current.l };
+    touched.push(word);
+  }
+  if (touched.length) {
+    persist();
+    emit(touched);
+  }
+  return touched.length;
+}
+
+/**
+ * Import a word list at `level`, by hand (an import is a deliberate statement
+ * about what the learner knows). A word already at or above that level keeps
+ * what it has — importing "known" never demotes, and importing "learning" never
+ * pulls a known word back down.
+ */
+export function importKnownWords(
+  words: readonly string[],
+  level: Exclude<WkLevel, 0>,
+): { added: number; raised: number; kept: number } {
+  const d = db();
+  const touched: string[] = [];
+  let added = 0;
+  let raised = 0;
+  let kept = 0;
+  for (const raw of new Set(words.map((w) => w.trim()).filter(Boolean))) {
+    const current = d[raw];
+    if (current && current.l >= level) {
+      kept += 1;
+      continue;
+    }
+    if (current && current.l > 0) raised += 1;
+    else added += 1;
+    d[raw] = { l: level, m: 1 };
+    touched.push(raw);
+  }
+  if (touched.length) {
+    persist();
+    emit(touched);
+  }
+  return { added, raised, kept };
+}
+
 /** Snapshot of lemma → level for Notebook / export (excludes level 0). */
 export function listKnownEntries(): Array<{ word: string; level: WkLevel }> {
   return Object.entries(db())

@@ -10,7 +10,17 @@
 
 import type { DictEntry, DictResult, DictSense, DeinflectionInfo } from '../../shared/types';
 import { sanitizeDictHtml } from '../../shared/dictHtmlSanitize';
+import { withoutFormsSenses } from '../../shared/dictFormsSense';
 import type { LookupEntry, LookupResult, LookupSense } from './dictService';
+
+/**
+ * The entries a popup should show: JMdict's flattened "forms" table is not a
+ * meaning (see `shared/dictFormsSense.ts`), so its sense — or the whole row,
+ * when that was all it held — is dropped here, for every caller at once.
+ */
+function displayableEntries(entries: readonly LookupEntry[]): LookupEntry[] {
+  return entries.map((entry) => withoutFormsSenses(entry)).filter((entry): entry is LookupEntry => entry !== null);
+}
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
@@ -118,7 +128,7 @@ export function lookupResultToDictResult(result: LookupResult): DictResult {
     : undefined;
   return {
     query: result.query,
-    entries: result.entries.map((entry) => toLegacyEntry(entry, result.query)),
+    entries: displayableEntries(result.entries).map((entry) => toLegacyEntry(entry, result.query)),
     ...(character ? { character } : {}),
     ...(deinflection ? { deinflection } : {}),
     ...(isApproximate(result) ? { approximate: true } : {}),
@@ -167,7 +177,7 @@ function toLegacyEntriesByGlossLang(entry: LookupEntry, query?: string): DictEnt
 export function lookupResultToPerLanguageDictResult(result: LookupResult): DictResult {
   return {
     ...lookupResultToDictResult(result),
-    entries: result.entries.flatMap((entry) => toLegacyEntriesByGlossLang(entry, result.query)),
+    entries: displayableEntries(result.entries).flatMap((entry) => toLegacyEntriesByGlossLang(entry, result.query)),
   };
 }
 

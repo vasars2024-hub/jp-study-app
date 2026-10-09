@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { AnkiStatus, DictEntry, DictResult, ExampleSentence } from '../../shared/types';
 import type { StudyProfile } from '../../shared/profiles';
 import {
@@ -61,6 +61,20 @@ import EntryExplain from './lexicon/EntryExplain';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
 import UsageLabels, { entryUsageTags } from './lexicon/UsageLabels';
 import WordKnowledge from './lexicon/WordKnowledge';
+import EntryPitch from './lexicon/EntryPitch';
+import EntryFrequencies from './lexicon/EntryFrequencies';
+import KanjiBreakdown from './lexicon/KanjiBreakdown';
+import { posTagKey } from '../dictPosTags';
+import {
+  checkAnkiPresence,
+  deckPresenceByWord,
+  resetAnkiPresenceCache,
+  withAnkiDuplicates,
+  type EntryPresence,
+} from '../dictEntryPresence';
+import { FLASHCARD_DECK_EVENT, loadDeck } from '../flashcardDeck';
+import { exampleCoverage, rankByCoverage, type ExampleCoverage } from '../exampleCoverage';
+import { studyTokens, studyTokensReady } from '../studyTokens';
 
 type TFn = (key: string) => string;
 
@@ -96,6 +110,35 @@ const REASON_KEY: Record<string, string> = {
 function reasonLabel(reason: string, t: TFn): string {
   const key = REASON_KEY[reason];
   return key ? t(key) : reason;
+}
+
+/**
+ * A sense's part-of-speech codes as tags, each explained in a tooltip and its
+ * accessible name (`dictPosTags.ts`). A code with no explanation is shown as the
+ * dictionary wrote it.
+ */
+function PosTags({ codes, t }: { codes: readonly string[]; t: TFn }) {
+  return (
+    <span className="dict-pos">
+      {codes.map((code, i) => {
+        const key = posTagKey(code);
+        const label = key ? t(key) : '';
+        return (
+          <span key={`${code}-${i}`}>
+            {i > 0 && ', '}
+            {label ? (
+              <abbr className="dict-pos-tag" title={label}>
+                {code}
+                <span className="sr-only"> ({label})</span>
+              </abbr>
+            ) : (
+              <span className="dict-pos-tag">{code}</span>
+            )}
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 /** Word-level bases: dictionary gloss first, Qwen only as the fail-switch. */
@@ -387,6 +430,42 @@ export default function DictionaryResults({
    */
   const [exModelPct, setExModelPct] = useState<number | null>(null);
   const recordedLookupRef = useRef('');
+  /** Bumped when the local deck changes, so the "in deck" markers re-read it. */
+  const [deckTick, setDeckTick] = useState(0);
+  /** Live Anki duplicate verdicts for the words on screen, keyed by the word set asked about. */
+  const [ankiDup, setAnkiDup] = useState<{ key: string; duplicates: Record<string, boolean> }>({ key: '', duplicates: {} });
+  const entriesRef = useRef<HTMLDivElement>(null);
+  /** Position (in the shown list) of the entry that holds the list's one tab stop. */
+  const [activeEntry, setActiveEntry] = useState(0);
+
+  /**
+   * Keyboard travel between entries, the way Yomitan's popup moves between terms.
+   * On an entry itself: ArrowUp/ArrowDown, Home/End. From a control inside an entry
+   * (Add, star, audio): Alt+ArrowUp/ArrowDown, so plain arrows keep their usual
+   * meaning there. The list keeps one tab stop (roving `tabIndex`).
+   */
+  function onEntriesKeyDown(e: ReactKeyboardEvent<HTMLDivElement>): void {
+    const host = entriesRef.current;
+    if (!host) return;
+    const items = Array.from(host.children).filter(
+      (el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains('dict-entry'),
+    );
+    const target = e.target as HTMLElement;
+    const current = target.closest<HTMLElement>('.dict-entry');
+    const index = current ? items.indexOf(current) : -1;
+    if (index < 0) return;
+    const onEntry = target === current;
+    const arrow = e.key === 'ArrowDown' || e.key === 'ArrowUp';
+    if (!(onEntry && (arrow || e.key === 'Home' || e.key === 'End')) && !(e.altKey && arrow)) return;
+    let next = index;
+    if (e.key === 'ArrowDown') next = Math.min(items.length - 1, index + 1);
+    else if (e.key === 'ArrowUp') next = Math.max(0, index - 1);
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = items.length - 1;
+    e.preventDefault();
+    setActiveEntry(next);
+    items[next].focus();
+  }
 
   /**
    * How many entries this lookup asks for, keyed to the query it belongs to.
@@ -417,6 +496,7 @@ export default function DictionaryResults({
     setExError('');
     setSelectedEx(new Set());
     setExTrans({});
+    setActiveEntry(0);
     if (!query.trim()) return;
     const lookup =
       // The word's own language: unpinned, a Russian word was answered by the
@@ -453,6 +533,11 @@ export default function DictionaryResults({
   // show up here too — the overlay is a view of one store, not a second one.
   useEffect(() => onKnowledgeChanged(() => setKnowledgeTick((n) => n + 1)), []);
   useEffect(() => onStudyLangChanged(setStudyLang), []);
+  useEffect(() => {
+    const bump = (): void => setDeckTick((n) => n + 1);
+    window.addEventListener(FLASHCARD_DECK_EVENT, bump);
+    return () => window.removeEventListener(FLASHCARD_DECK_EVENT, bump);
+  }, []);
 
   // Refresh cached Anki status when the heartbeat reconnects or collection loads.
   useEffect(
@@ -783,6 +868,8 @@ export default function DictionaryResults({
     // One toast for the whole Add. The save above created the card; this call
     // only joined Anki to it, so its own `created` is always false.
     notifyMined({ ...mined, created: saved.created || mined.created });
+    // The verdicts the "in Anki" markers were drawn from are out of date now.
+    resetAnkiPresenceCache();
     switch (mined.anki) {
       case 'added':
         setAddState((p) => ({ ...p, [i]: 'added' }));
@@ -832,15 +919,51 @@ export default function DictionaryResults({
     setExError('');
     setSelectedEx(new Set());
     setExTrans({});
-    const fetchLimit = Math.max(exDisplay, maxExampleCountNeeded(active.anki.exampleCounts));
+    const wanted = Math.max(exDisplay, maxExampleCountNeeded(active.anki.exampleCounts));
+    // When the sentences can be ranked, ask for a wider pool so the shown ones are the
+    // most comprehensible of several rather than the first few in corpus order.
+    const fetchLimit = lang === studyLang && studyTokensReady(lang) ? Math.min(30, Math.max(wanted * 3, 12)) : wanted;
     const r = await window.api.searchExamples(query, fetchLimit, lang);
     if (r.error) {
       setExState('error');
       setExError(r.error);
       return;
     }
-    setExamples(r.examples);
+    setExamples(rankExamples(r.examples));
     setExState('done');
+  }
+
+  /**
+   * The words an example is "about": the query, the dictionary form it resolved to and
+   * the headwords on screen. They are the +1 of i+1, so they never count as unknown.
+   */
+  function exampleTargets(): Set<string> {
+    const out = new Set<string>();
+    for (const value of [query, result?.deinflection?.term, ...(result?.entries ?? []).flatMap((e) => [e.word, e.reading])]) {
+      const v = (value ?? '').trim();
+      if (v) out.add(v);
+    }
+    return out;
+  }
+
+  /**
+   * How much of `sentence` the learner knows, or null when it cannot be measured: the
+   * knowledge store is keyed to the study language, so a sentence in another language
+   * is not scored, and Japanese needs kuromoji built (it never forces the load here).
+   */
+  function coverageOf(sentence: string, targets: ReadonlySet<string>): ExampleCoverage | null {
+    if (lang !== studyLang || !studyTokensReady(lang)) return null;
+    try {
+      return exampleCoverage(studyTokens(sentence, lang), targets, getLevel);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Examples with the most comprehensible (i+1) first; corpus order when none can be scored. */
+  function rankExamples(list: ExampleSentence[]): ExampleSentence[] {
+    const targets = exampleTargets();
+    return rankByCoverage(list, (ex) => coverageOf(ex.jp, targets));
   }
 
   function toggleExample(i: number) {
@@ -878,7 +1001,8 @@ export default function DictionaryResults({
     let lastError = '';
     for (const candidate of candidates) {
       const r = await window.api.searchExamples(candidate, limit, lang);
-      if (r.examples.length > 0) return { examples: r.examples };
+      // Ranked as the panel ranks them, so an automatic pick mines the i+1 sentence.
+      if (r.examples.length > 0) return { examples: rankExamples(r.examples) };
       if (r.error) lastError = r.error;
     }
     return { examples: [], error: lastError };
@@ -1026,6 +1150,51 @@ export default function DictionaryResults({
   }, [entries, gradable, knowledgeTick]);
 
   /**
+   * "In deck / in Anki" for each headword on screen, before anything is added. Same
+   * rule as `knowledge` above: above the `showSetup` early return. The deck is read
+   * synchronously; Anki is asked (read-only) only while it is connected.
+   */
+  const presenceWords = useMemo(() => [...new Set(entries.map((entry) => entry.word))], [entries]);
+  const presenceKey = `${lang}\u0000${presenceWords.join('\u0001')}`;
+  const deckPresence = useMemo(
+    () => deckPresenceByWord(loadDeck(), presenceWords, lang),
+    // `deckTick` is the deck subscription.
+    [presenceWords, lang, deckTick],
+  );
+  const ankiConnected = anki?.connected === true;
+  const ankiDeckName = active.anki.deckName;
+  const ankiModelName = active.anki.modelName;
+  useEffect(() => {
+    if (!ankiConnected || !presenceWords.length) return undefined;
+    let alive = true;
+    void checkAnkiPresence(presenceWords, { deckName: ankiDeckName, modelName: ankiModelName }).then((duplicates) => {
+      if (alive) setAnkiDup({ key: presenceKey, duplicates });
+    });
+    return () => {
+      alive = false;
+    };
+    // `deckTick`: an Add from here (or anywhere) changes what Anki holds.
+  }, [ankiConnected, presenceKey, ankiDeckName, ankiModelName, deckTick]);
+  const presence: Map<string, EntryPresence> = useMemo(
+    () => (ankiDup.key === presenceKey ? withAnkiDuplicates(deckPresence, ankiDup.duplicates) : deckPresence),
+    [deckPresence, ankiDup, presenceKey],
+  );
+
+  /** i+1 standing of each loaded example; recomputed when a grade changes the store. */
+  const exampleStanding = useMemo(() => {
+    const out = new Map<string, ExampleCoverage>();
+    if (exState !== 'done' || !examples.length) return out;
+    const targets = exampleTargets();
+    for (const ex of examples) {
+      const coverage = coverageOf(ex.jp, targets);
+      if (coverage) out.set(ex.jp, coverage);
+    }
+    return out;
+    // `exampleTargets`/`coverageOf` read `query`, `result`, `lang` and `studyLang`,
+    // all listed; `knowledgeTick` re-reads the knowledge store.
+  }, [examples, exState, query, result, lang, studyLang, knowledgeTick]);
+
+  /**
    * Every variant gets the way back, not only the popup.
    *
    * This panel replaces the whole result list, and on the page variant its only control used to
@@ -1096,8 +1265,15 @@ export default function DictionaryResults({
               term: result.deinflection.term,
             })}
           </span>
-          <span className="dict-deinflection-reasons">
-            {result.deinflection.reasons.map((r) => reasonLabel(r, t)).join(' · ')}
+          {/* Each step of the chain as its own tag, innermost first — 食べさせられた is
+              causative › passive › past of 食べる — rather than one run-on line. */}
+          <span className="dict-deinflection-reasons" role="list" aria-label={t('dict2.deinflect.steps')}>
+            {result.deinflection.reasons.map((r, i) => (
+              <span key={`${r}-${i}`} role="listitem" className="dict-deinflect-step">
+                {i > 0 && <span className="dict-deinflect-sep" aria-hidden="true">›</span>}
+                {reasonLabel(r, t)}
+              </span>
+            ))}
           </span>
         </div>
       )}
@@ -1119,11 +1295,22 @@ export default function DictionaryResults({
       )}
       {hiddenGlossEntries > 0 && <p className="dict-gloss-hidden muted">{t('readerUi.gloss.otherHidden')}</p>}
 
-      <div className="dict-entries">
-        {shownEntries.map(({ entry, index: i }) => {
+      <div className="dict-entries" ref={entriesRef} onKeyDown={onEntriesKeyDown}>
+        {shownEntries.map(({ entry, index: i }, position) => {
           const saved = savedSet.has(entry.word);
+          const here = presence.get(entry.word);
           return (
-            <div className="dict-entry" key={i}>
+            <div
+              className="dict-entry"
+              key={i}
+              role="article"
+              aria-label={entry.reading && entry.reading !== entry.word ? `${entry.word} ${entry.reading}` : entry.word}
+              // One tab stop for the whole list; arrows move between entries (see onEntriesKeyDown).
+              tabIndex={position === Math.min(activeEntry, shownEntries.length - 1) ? 0 : -1}
+              onFocus={(e) => {
+                if (e.target === e.currentTarget) setActiveEntry(position);
+              }}
+            >
               <div className="dict-entry-head">
                 <span className="dict-word" lang={contentLang}>
                   {entry.word}
@@ -1141,20 +1328,21 @@ export default function DictionaryResults({
                 {entry.isCommon && (
                   <span className="dict-badge common">{t('dict.results.common')}</span>
                 )}
+                {/* JLPT only where the source carried one (Jisho); never estimated. */}
                 {entry.jlpt[0] && <span className="dict-badge jlpt">{entry.jlpt[0]}</span>}
-                {entry.frequency != null && (
+                {/* One chip per installed frequency corpus, or the merged rank as before. */}
+                <EntryFrequencies entry={entry} lang={lang} />
+                {here?.inDeck && (
                   <span
-                    className="dict-badge freq"
-                    title={
-                      entry.frequencySource
-                        ? t('dict.results.freqTitleSourced', { source: entry.frequencySource })
-                        : t('dict.results.freqTitle')
-                    }
+                    className="dict-badge dict-presence in-deck"
+                    title={here.ankiPending ? t('dict2.presence.deckPendingTitle') : t('dict2.presence.deckTitle')}
                   >
-                    #{entry.frequency}
-                    {entry.frequencySource && (
-                      <span className="dict-freq-source">{entry.frequencySource}</span>
-                    )}
+                    {t('dict2.presence.inDeck')}
+                  </span>
+                )}
+                {here?.inAnki && (
+                  <span className="dict-badge dict-presence in-anki" title={t('dict2.presence.ankiTitle')}>
+                    {t('dict2.presence.inAnki')}
                   </span>
                 )}
                 <button
@@ -1187,7 +1375,9 @@ export default function DictionaryResults({
                   />
                 )}
               </div>
-              {renderPitch ? renderPitch(entry) : entry.pitchHtml && (
+              {/* Japanese: the contour with its downstep number for every reading
+                  (`EntryPitch`), on the page as well as in the popup. */}
+              {renderPitch ? renderPitch(entry) : lang === 'ja' ? <EntryPitch entry={entry} /> : entry.pitchHtml && (
                 <div className="dict-pitch" lang="ja">
                   <span className="dict-pitch-label">{t('dict.results.pitch')}</span>
                   <span
@@ -1218,9 +1408,7 @@ export default function DictionaryResults({
                 <ol className="dict-senses">
                   {entry.senses.slice(0, 6).map((s, j) => (
                     <li key={j}>
-                      {s.partsOfSpeech.length > 0 && (
-                        <span className="dict-pos">{s.partsOfSpeech.join(', ')}</span>
-                      )}
+                      {s.partsOfSpeech.length > 0 && <PosTags codes={s.partsOfSpeech} t={t} />}
                       <UsageLabels tags={s.tags} />
                       {s.definitions.join('; ')}
                     </li>
@@ -1228,6 +1416,7 @@ export default function DictionaryResults({
                 </ol>
               )}
               {entry.source && <div className="dict-source muted">{entry.source}</div>}
+              <KanjiBreakdown word={entry.word} lang={lang} onLookup={onLookup} />
               <button
                 className={`dict-add lq-hit ${addState[i] === 'added' || addState[i] === 'dup' || addState[i] === 'queued' || addState[i] === 'saved' ? 'done' : ''}`}
                 disabled={addState[i] === 'adding' || addState[i] === 'translating'}
@@ -1417,6 +1606,7 @@ export default function DictionaryResults({
                 </div>
               )}
               <p className="dict-ex-hint muted">{t('dict.results.exHint')}</p>
+              {exampleStanding.size > 0 && <p className="dict-ex-hint muted">{t('dict2.ex.rankedHint')}</p>}
               <ul className="dict-ex-list">
                 {examples.slice(0, displayCount).map((ex, i) => (
                   <li
@@ -1435,6 +1625,17 @@ export default function DictionaryResults({
                     <span className="dict-ex-jp" lang={contentLang}>
                       {ex.jp}
                     </span>
+                    {(() => {
+                      const standing = exampleStanding.get(ex.jp);
+                      if (!standing) return null;
+                      return standing.unknown === 0 ? (
+                        <span className="dict-ex-standing is-iplus1" title={t('dict2.ex.iPlusOneTitle')}>
+                          {t('dict2.ex.iPlusOne')}
+                        </span>
+                      ) : (
+                        <span className="dict-ex-standing">{t('dict2.ex.unknown', { count: standing.unknown })}</span>
+                      );
+                    })()}
                     {exLangs
                       .filter((code) => code !== exSource)
                       .map((code) => {

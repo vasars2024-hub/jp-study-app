@@ -214,15 +214,73 @@ export function buildStrictPrompt(
   );
 }
 
+/**
+ * How the interactive Translate surface asks for its rendering.
+ *
+ * `natural` is the prompt every caller has always sent. `literal` is the
+ * learner's "show me the structure" rendering (DeepL's alternative / Migaku's
+ * literal gloss): the same one-line instruction with one clause added, so the
+ * small model's instruction-following stays where it is strongest — at the end.
+ */
+export type TranslateStyle = 'natural' | 'literal';
+
+export function sanitizeTranslateStyle(value: unknown): TranslateStyle {
+  return value === 'literal' ? 'literal' : 'natural';
+}
+
+/**
+ * One sentence of a passage and what it became.
+ *
+ * `target` is empty when the model gave nothing usable for that sentence: the
+ * joined translation drops it (a source clause inside target prose reads as part
+ * of the translation), but the aligned view must still show which sentence it was.
+ */
+export interface TranslateSegment {
+  source: string;
+  target: string;
+}
+
+/**
+ * The passage splitter the sentence-by-sentence translator uses. Shared so the
+ * renderer's aligned view can split a passage exactly as the model saw it.
+ */
+export function splitTranslationSentences(text: string): string[] {
+  return text
+    .replace(/\r/g, '')
+    .split(/(?<=[。．！？!?\n])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Coerce an IPC-supplied segment list into the shape the aligned view trusts.
+ * Anything malformed yields `null` so the caller falls back to its own split.
+ */
+export function sanitizeTranslateSegments(value: unknown): TranslateSegment[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const out: TranslateSegment[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return null;
+    const item = raw as Record<string, unknown>;
+    if (typeof item.source !== 'string' || typeof item.target !== 'string') return null;
+    out.push({ source: item.source, target: item.target });
+  }
+  return out;
+}
+
 export function buildSentencePrompt(
   text: string,
   source: string,
   target: string,
   hints?: readonly TranslateSenseHint[],
+  style: TranslateStyle = 'natural',
 ): string {
+  const how = style === 'literal'
+    ? 'as literally as possible, keeping the original word order and structure where the target language allows. '
+    : '';
   return (
     `/no_think\n${buildSenseHintBlock(hints)}` +
-    `Translate the following ${langLabel(source)} text to ${langLabel(target)}. ` +
+    `Translate the following ${langLabel(source)} text to ${langLabel(target)}${how ? ` ${how}` : '. '}` +
     `Output ONLY the translation, nothing else.\n\nText: ${text}`
   );
 }

@@ -37,6 +37,7 @@ import {
   type Rectangle,
 } from 'electron';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { deferWhileLocked } from './lockGuard';
 import { installDisplayMediaBroker, registerDisplayMediaRequester } from './displayMediaBroker';
 import { setRecordingIndicator } from './recordingIndicator';
 import { encodeWavToMp3 } from './captionAudioEncode';
@@ -924,6 +925,8 @@ function syncOverlayVisibility(): void {
   if (!win || win.isDestroyed()) return;
   const want = overlayOpen || drafts.length > 0 || notices.length > 0;
   if (want && !win.isVisible()) {
+    // Captions and drafted cards are study content: shown again after the unlock.
+    if (deferWhileLocked('captions-overlay', syncOverlayVisibility)) return;
     // Never steal focus from the video being watched.
     win.showInactive();
   } else if (!want && win.isVisible()) {

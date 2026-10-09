@@ -77,6 +77,7 @@ import {
 } from '../../../shared/listeningTraining';
 import { evaluateDictation } from '../../evaluateDictation';
 import { openMediaWorkspace } from '../../mediaWorkspaceBridge';
+import { localizeYtPlaylistError } from '../../ytPlaylistErrors';
 import { findSubtitleMatches, wrapSubtitleMatch } from '../../../shared/subtitleSearch';
 import { youtubeDownloadDisabledReason } from '../../../shared/mediaVideoActionReason';
 import { useDeferredText, GLOBAL_SEARCH_COMMIT_MS } from '../../views/GlobalSearchField';
@@ -977,7 +978,9 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       // A refusal that carries a key is localised; the raw English `error` is
       // still the fallback, because most of main/media.ts's failures predate
       // the key and have none.
-      setYtError(r.errorKey ? t(r.errorKey, r.errorParams) : r.error);
+      // A keyless one is yt-dlp's own English stderr: mapped to a catalog message
+      // where it is a known failure, framed in the UI language where it is not.
+      setYtError(r.errorKey ? t(r.errorKey, r.errorParams) : localizeYtPlaylistError(r.error, t));
       return;
     }
     setYtUrl('');
@@ -985,6 +988,10 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     // to re-parse it here through the bare `parseSubtitles`, which meant a
     // dual-language YouTube track kept both languages on screen.
     loadOpened(r);
+    // Straight into the study player, as Open file does: the download was the
+    // request to watch it, and the player is where auto-pause, line loop and
+    // one-key mining live. Loading it into this hook alone stopped one click short.
+    openMediaWorkspace({ localFilePath: r.item.path });
     if (!r.subtitle) {
       if (ytSubLang !== 'none')
         setSubStatus(t('media.subs.noneFoundGenerating'));
@@ -1024,7 +1031,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
           applySubtitleFile(fetched.name, fetched.text);
           return;
         }
-        setSubStatus(fetched.error || t('media.subStatus.fetchFailed'));
+        setSubStatus(fetched.error ? localizeYtPlaylistError(fetched.error, t) : t('media.subStatus.fetchFailed'));
       } catch (e) {
         setSubStatus(msg(e));
       }

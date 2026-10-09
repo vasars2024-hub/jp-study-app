@@ -40,6 +40,18 @@ export interface MalDownloadTarget {
   posterUrl: string;
   /** What the catalogue says exists, which is not always what is listed. */
   totalUnits: number;
+  /**
+   * The season this entry is, as release groups number it (`S02E05`), when its
+   * titles say so — or 1 when it has no earlier TV season. `null` = unknown.
+   * Optional: results built before season mapping existed carry none.
+   */
+  seasonNumber?: number | null;
+  /**
+   * Episodes in the TV seasons before this one, so `number + absoluteOffset` is
+   * the absolute episode number (`One Piece - 1071`). `null` when the prequel
+   * chain could not be read in full — never guessed.
+   */
+  absoluteOffset?: number | null;
 }
 
 /**
@@ -84,6 +96,17 @@ export interface MalDownloadUnit {
    */
   owned?: boolean;
   source: MalDownloadUnitSource | null;
+  /**
+   * The same episode counted from the series' first TV episode (`number` plus
+   * every earlier TV season), when the catalogue's prequel chain says so and it
+   * differs from `number`. Releases of long-runners are numbered this way.
+   */
+  absoluteNumber?: number;
+  /**
+   * The episode counted from the start of its season when this entry is a later
+   * part of a split season (`S03E13` for part 2's first episode).
+   */
+  seasonEpisode?: number;
 }
 
 export const MAL_SELECTION_MODES = ['all', 'range', 'latest', 'custom'] as const;
@@ -377,6 +400,12 @@ export interface MalReleasePlanOptions {
    * thing — never episode 7. Only the caller knows which case it is in.
    */
   singleUnitTitle?: boolean;
+  /**
+   * The entry's season (`MalDownloadTarget.seasonNumber`). A release that names
+   * another season (`S01E05` when this is season 2) is refused; one that names
+   * none may still match by the unit's absolute number.
+   */
+  seasonNumber?: number | null;
 }
 
 /**
@@ -453,8 +482,9 @@ export function planMalReleases(
   // batch. Asking `every(byName) || every(byRange)` instead rejects the very
   // common release that names some episodes outright and leaves the rest to its
   // declared range, because it satisfies neither test on its own.
+  const season = options.seasonNumber ?? null;
   const coversUnit = (batch: MalRelease, unit: MalDownloadUnit): boolean =>
-    releaseCoversEpisode(batch.name, unit.number) || coveredByBatchRange(batch.name, unit.number);
+    releaseCoversUnit(batch.name, unit, season) || batchRangeCoversUnit(batch.name, unit, season);
 
   const wholeBatch = ordered.length > 0
     ? batches.find((batch) => ordered.every((unit) => coversUnit(batch, unit))) ?? null
@@ -474,7 +504,7 @@ export function planMalReleases(
     // A release that names the episode outright wins over an unnumbered one
     // even when the unnumbered one ranks higher, so the widened match is a
     // fallback rather than a reordering of the list the user would expect.
-    const single = singles.find((release) => releaseCoversEpisode(release.name, unit.number))
+    const single = singles.find((release) => releaseCoversUnit(release.name, unit, season))
       ?? singles.find(unnumbered);
     if (single) return { unit, release: single, viaBatch: false };
     const batch = batches.find((release) => coversUnit(release, unit)) ?? batches.find(unnumbered);
@@ -512,6 +542,202 @@ export function coveredByBatchRange(name: string, number: number): boolean {
     if (number >= low && number <= high) return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Seasons and absolute numbering
+// ---------------------------------------------------------------------------
+//
+// MyAnimeList and AniList give every season (often every cour) its own entry,
+// numbered from 1. Release groups do not agree: SubsPlease writes
+// `Show S2 - 05`, Erai-raws `Show 2nd Season - 05`, BD groups `S02E05`, and
+// long-runners plus some groups count from the series' first episode
+// (`Show - 30`). An entry therefore carries the season its titles name and the
+// episodes of the TV seasons before it, and a unit matches a release by
+// whichever of its numbers that release uses — but never a release that names
+// a different season.
+
+const KANJI_DIGITS: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+const ROMAN: Record<string, number> = { II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8 };
+
+function kanjiNumber(text: string): number | null {
+  if (/^\d+$/.test(text)) return Number(text);
+  if (text === '十') return 10;
+  if (text.length === 2 && text[0] === '十') return 10 + (KANJI_DIGITS[text[1]] ?? 0);
+  return KANJI_DIGITS[text] ?? null;
+}
+
+const sane = (n: number | null): number | null => (n !== null && Number.isInteger(n) && n >= 1 && n <= 30 ? n : null);
+
+/**
+ * The season a catalogue title names: `Season 2`, `2nd Season`, `S2`,
+ * `第2期` / `第二期`, a trailing `II`/`III`. `null` when it names none ("Final
+ * Season" and "Part 2" name no number of their own).
+ */
+export function inferSeasonNumber(...titles: readonly string[]): number | null {
+  for (const raw of titles) {
+    const title = String(raw ?? '').normalize('NFKC');
+    if (!title.trim()) continue;
+    const patterns: RegExp[] = [
+      /\bseason\s*(\d{1,2})\b/i,
+      /\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/i,
+      /(?:^|[\s:])S(\d{1,2})(?=$|[\s:)\]-])/,
+    ];
+    for (const pattern of patterns) {
+      const m = pattern.exec(title);
+      const n = sane(m ? Number(m[1]) : null);
+      if (n) return n;
+    }
+    const kanji = /第\s*([0-9一二三四五六七八九十]{1,3})\s*期/.exec(title);
+    if (kanji) {
+      const n = sane(kanjiNumber(kanji[1]));
+      if (n) return n;
+    }
+    // A trailing roman numeral, unless it is a part (`Part II`) or a cour.
+    const roman = /(?:^|\s)(II|III|IV|V|VI|VII|VIII)\s*$/.exec(title.replace(/[:\s]+$/, ''));
+    if (roman && !/\b(?:part|cour)\s+(?:II|III|IV|V|VI|VII|VIII)\s*$/i.test(title)) {
+      const n = sane(ROMAN[roman[1]] ?? null);
+      if (n) return n;
+    }
+  }
+  return null;
+}
+
+/**
+ * The season a RELEASE name says it is: `S02E05`, `S2 - 05`, `Season 2`,
+ * `2nd Season`, `第2期`. `null` when it names none. Resolution, codec and CRC32
+ * tags are blanked first, so `[S1A2B3C4]` is no season.
+ */
+export function releaseSeasonNumber(name: string): number | null {
+  const text = maskReleaseNoise(foldReleaseWidth(String(name ?? '').normalize('NFKC')));
+  const patterns: RegExp[] = [
+    /\bS(\d{1,2})[\s._-]*E\d/i,
+    /(?:^|[\s._\-[(])S(\d{1,2})(?=$|[\s._\-\])])/i,
+    /\b(\d{1,2})(?:st|nd|rd|th)[\s._-]+season\b/i,
+    // No hyphen between: `2nd Season - 05` is episode 5 of season 2, not season 5.
+    /\bseason[\s._]*(\d{1,2})\b/i,
+  ];
+  for (const pattern of patterns) {
+    const m = pattern.exec(text);
+    const n = sane(m ? Number(m[1]) : null);
+    if (n) return n;
+  }
+  const kanji = /第\s*([0-9一二三四五六七八九十]{1,3})\s*期/.exec(text);
+  return kanji ? sane(kanjiNumber(kanji[1])) : null;
+}
+
+/** One earlier entry in the prequel chain, nearest first. */
+export interface MalPrequelEntry {
+  /** The catalogue's format: `TV`, `TV_SHORT`, `MOVIE`, `OVA`, `ONA`, `SPECIAL`… */
+  format: string;
+  /** Declared episodes; 0 = unknown (still airing). */
+  episodes: number;
+  titles: readonly string[];
+}
+
+export interface MalSeasonMapping {
+  seasonNumber: number | null;
+  /** Episodes of earlier parts of this same season (a split cour), else 0. */
+  seasonOffset: number;
+  /** Episodes of every earlier TV entry; null when one of them has no count, or the chain is incomplete. */
+  absoluteOffset: number | null;
+}
+
+const isTvFormat = (format: string): boolean => /^(tv|tv_short|tv short)$/i.test(String(format ?? '').trim());
+
+/**
+ * What an entry's titles and prequel chain say about its numbering.
+ *
+ * Only TV entries count toward the absolute number: a movie or an OVA between
+ * two seasons is not in the episode count release groups use. The season comes
+ * from the entry's own titles; without one, an entry with no earlier TV entry is
+ * season 1 and anything else is unknown (`null`) — a season count from the
+ * chain would call "Season 3 Part 2" season 4.
+ */
+export function mapSeasonEpisodes(
+  targetTitles: readonly string[],
+  prequels: readonly MalPrequelEntry[],
+  chainComplete = true,
+): MalSeasonMapping {
+  const tv = prequels.filter((p) => isTvFormat(p.format));
+  const named = inferSeasonNumber(...targetTitles);
+  const seasonNumber = named ?? (chainComplete && tv.length === 0 ? 1 : null);
+  let absoluteOffset: number | null = chainComplete ? 0 : null;
+  if (absoluteOffset !== null) {
+    for (const entry of tv) {
+      const n = Math.trunc(Number(entry.episodes));
+      if (!Number.isFinite(n) || n <= 0) {
+        absoluteOffset = null;
+        break;
+      }
+      absoluteOffset += n;
+    }
+  }
+  // The nearest TV entries that name the SAME season are earlier cours of it.
+  let seasonOffset = 0;
+  if (seasonNumber !== null && seasonNumber > 0) {
+    for (const entry of tv) {
+      if (inferSeasonNumber(...entry.titles) !== seasonNumber) break;
+      const n = Math.trunc(Number(entry.episodes));
+      if (!Number.isFinite(n) || n <= 0) {
+        seasonOffset = 0;
+        break;
+      }
+      seasonOffset += n;
+    }
+  }
+  return { seasonNumber, seasonOffset, absoluteOffset };
+}
+
+/** A unit's alternative numbers under a mapping (only the ones that differ from `number`). */
+export function withSeasonNumbers(unit: MalDownloadUnit, mapping: MalSeasonMapping): MalDownloadUnit {
+  if (!Number.isInteger(unit.number) || unit.number < 0) return unit;
+  const absolute = mapping.absoluteOffset && mapping.absoluteOffset > 0 ? unit.number + mapping.absoluteOffset : undefined;
+  const seasonEpisode = mapping.seasonOffset > 0 ? unit.number + mapping.seasonOffset : undefined;
+  return {
+    ...unit,
+    ...(absolute !== undefined ? { absoluteNumber: absolute } : {}),
+    ...(seasonEpisode !== undefined ? { seasonEpisode } : {}),
+  };
+}
+
+/** A release that numbers by part names it (`Part 2`, `Cour 2`, `第2クール`). */
+const PART_MARKER = /\b(?:part|cour)[\s._-]*\d|第\s*\d+\s*クール/i;
+
+/**
+ * Whether a release name carries one unit, by whichever numbering it uses.
+ *
+ * With no season and no alternative numbers this is exactly
+ * `releaseCoversEpisode(name, unit.number)`. Otherwise:
+ *
+ * - a release naming ANOTHER season is refused outright;
+ * - a release naming THIS season matches the season-relative number — for a
+ *   later cour (`seasonEpisode`), `S03E13`; the cour-relative `number` only
+ *   when the release says which part it is;
+ * - a release naming no season matches `number` (as before) or the absolute
+ *   number (`Show - 30` for season 2 episode 5 of a 25-episode first season).
+ */
+export function releaseCoversUnit(name: string, unit: MalDownloadUnit, seasonNumber?: number | null): boolean {
+  const relSeason = releaseSeasonNumber(name);
+  if (relSeason !== null && seasonNumber != null && relSeason !== seasonNumber) return false;
+  if (relSeason !== null && unit.seasonEpisode !== undefined) {
+    if (releaseCoversEpisode(name, unit.seasonEpisode)) return true;
+    return PART_MARKER.test(name) && releaseCoversEpisode(name, unit.number);
+  }
+  if (releaseCoversEpisode(name, unit.number)) return true;
+  if (relSeason === null && unit.absoluteNumber !== undefined && releaseCoversEpisode(name, unit.absoluteNumber)) return true;
+  return false;
+}
+
+/** `coveredByBatchRange`, unit-aware in the same way as `releaseCoversUnit`. */
+export function batchRangeCoversUnit(name: string, unit: MalDownloadUnit, seasonNumber?: number | null): boolean {
+  const relSeason = releaseSeasonNumber(name);
+  if (relSeason !== null && seasonNumber != null && relSeason !== seasonNumber) return false;
+  if (relSeason !== null && unit.seasonEpisode !== undefined) {
+    return coveredByBatchRange(name, unit.seasonEpisode) || (PART_MARKER.test(name) && coveredByBatchRange(name, unit.number));
+  }
+  if (coveredByBatchRange(name, unit.number)) return true;
+  return relSeason === null && unit.absoluteNumber !== undefined && coveredByBatchRange(name, unit.absoluteNumber);
 }
 
 // ---------------------------------------------------------------------------

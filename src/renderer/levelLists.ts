@@ -78,6 +78,15 @@ function toLemma(expr: string): string {
 }
 
 /**
+ * A list's words as knowledge-store keys (lemmas), the way `listProgress` reads
+ * them — so the known-words manager can filter "words on my N3 list" by the same
+ * keys the store holds.
+ */
+export function levelListWordKeys(list: Pick<LevelList, 'words'>): Set<string> {
+  return new Set(list.words.map(toLemma));
+}
+
+/**
  * Parse a pasted blob into a word list. One entry per line; the word is the
  * first tab/comma-separated cell (so "食べる\tたべる\tto eat" or CSV rows work),
  * then its first whitespace token. De-duplicates, preserves order.

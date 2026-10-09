@@ -55,6 +55,24 @@ const HANDOFFS = {
    * Audit F22. Raising the timeout re-tunes the race; the handoff removes it.
    */
   grammarPractice: { key: 'jp-pending-grammar-practice', backing: 'session' },
+  /*
+   * "Review grammar now" from Flashcards, the Calendar and Statistics (`grammarDue.ts`).
+   * Same lazy-chunk race as `grammarPractice`, same `session` reasoning.
+   */
+  grammarReview: { key: 'jp-pending-grammar-review', backing: 'session' },
+  /*
+   * "Play this game" from the Calendar's day view, the warm-up and the Agent. Same race as
+   * `grammarPractice`: the Arena is a lazy chunk, so a bare event after `os:open` reached
+   * nobody on a cold open. `session`: a game request is about now.
+   */
+  gameArenaSelect: { key: 'jp-pending-game-arena-select', backing: 'session' },
+  /*
+   * "Open in book" from a mined card (`bookRoundTrip.ts`): the reader takes the
+   * position once the book has loaded. `local` for the same reason as the Files
+   * hand-offs — the opening window may be another renderer — and `take` on load
+   * clears it.
+   */
+  novelOpenAt: { key: 'jp-pending-novel-open-at', backing: 'local' },
 } as const satisfies Record<string, { key: string; backing: Backing }>;
 
 export type PendingHandoff = keyof typeof HANDOFFS;

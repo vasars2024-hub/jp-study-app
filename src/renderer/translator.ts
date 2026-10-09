@@ -2,7 +2,12 @@
 // One shared model serves the Translate view, readers, media subtitles, and
 // Anki mining field translation.
 
-import type { TranslateSenseHint } from '../shared/translateCore';
+import {
+  sanitizeTranslateSegments,
+  type TranslateSegment,
+  type TranslateSenseHint,
+  type TranslateStyle,
+} from '../shared/translateCore';
 import { t } from './i18n';
 
 export interface ModelProgress {
@@ -75,12 +80,20 @@ export function translate(
  * omitted entirely when absent, so every existing caller sends the exact
  * request it sent before sense pinning existed.
  */
+export interface TranslateRunOptions {
+  /** `literal` asks for the structure-preserving rendering. Omitted = natural. */
+  style?: TranslateStyle;
+  /** Receives the sentence pairs when main reports them (the aligned view). */
+  onSegments?: (segments: TranslateSegment[]) => void;
+}
+
 export function translateTo(
   text: string,
   source: TransLang,
   target: TransLang,
   onProgress?: (p: number) => void,
   senseHints?: readonly TranslateSenseHint[],
+  options?: TranslateRunOptions,
 ): Promise<string> {
   ensureIpcHooks();
   const id = nextId++;
@@ -95,10 +108,14 @@ export function translateTo(
       source,
       target,
       ...(senseHints?.length ? { senseHints: [...senseHints] } : {}),
+      // Only sent when it changes the prompt, so every existing request is unchanged.
+      ...(options?.style === 'literal' ? { style: 'literal' as const } : {}),
     })
     .then((res) => {
       // Errors main words itself arrive with a catalog key and are said in the UI language.
       if (!res.ok) throw new Error(res.errorKey ? t(res.errorKey) : res.error ?? t('translate.error.failed'));
+      const segments = sanitizeTranslateSegments(res.segments);
+      if (segments) options?.onSegments?.(segments);
       return res.text ?? '';
     })
     .finally(() => partialListeners.delete(onPartial));

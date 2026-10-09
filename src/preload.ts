@@ -483,6 +483,12 @@ const api = {
     targetLang?: string,
   ): Promise<import('./shared/types').LibraryItem['ocrMeta'] | null> =>
     ipcRenderer.invoke('mangaOcr:refreshMeta', itemId, targetLang ?? 'en'),
+  /** Import a Mokuro `.mokuro` volume file (its JSON text) into this item's OCR cache. */
+  mangaOcrImportMokuro: (
+    itemId: string,
+    json: string,
+  ): Promise<import('./shared/mangaOcrIpc').MangaMokuroImportResult> =>
+    ipcRenderer.invoke('mangaOcr:importMokuro', itemId, json),
   onMangaOcrVolumeProgress: (
     cb: (p: import('./shared/mangaOcrIpc').MangaOcrVolumeProgress) => void,
   ): (() => void) => {
@@ -841,6 +847,12 @@ const api = {
     ipcRenderer.invoke('anki:addNote', req),
   ankiKnownWords: (): Promise<{ ok: boolean; error?: string; words?: Record<string, number> }> =>
     ipcRenderer.invoke('anki:knownWords'),
+  /** Which terms the target deck/note type already holds (AnkiConnect `canAddNotes`). Read-only. */
+  ankiCheckDuplicates: (
+    terms: string[],
+    target: { deckName: string; modelName: string },
+  ): Promise<{ ok: boolean; duplicates: Record<string, boolean>; error?: string; unreachable?: boolean }> =>
+    ipcRenderer.invoke('anki:checkDuplicates', terms, target),
 
   // Study profiles (multi-language)
   profileGet: (): Promise<ProfileSnapshot & { legacyMigrated: boolean }> =>
@@ -1456,6 +1468,12 @@ const api = {
     ipcRenderer.on('lockscreen:locked', handler);
     return () => ipcRenderer.removeListener('lockscreen:locked', handler);
   },
+  /** Something was refused because Gum is locked (main/lockGuard.ts): toast it on the lock screen. */
+  onLockscreenBlocked: (cb: (notice: { kind: string; action: string }) => void): (() => void) => {
+    const handler = (_e: unknown, notice: { kind: string; action: string }): void => cb(notice);
+    ipcRenderer.on('lockscreen:blocked', handler);
+    return () => ipcRenderer.removeListener('lockscreen:blocked', handler);
+  },
 
   // Imported companion sprite packs (main/companionPacks.ts). The import opens a
   // native picker in main; the renderer never hands main a path to read.
@@ -1587,6 +1605,16 @@ const api = {
     ipcRenderer.on('appUpdate:changed', handler);
     return () => ipcRenderer.removeListener('appUpdate:changed', handler);
   },
+  /** Settings -> Help -> Updates: version, channel, last check, state, error code. */
+  appUpdateDetails: (): Promise<import('./shared/appUpdate').AppUpdateDetails> => ipcRenderer.invoke('appUpdate:details'),
+  appUpdateCheckNow: (): Promise<import('./shared/appUpdate').AppUpdateDetails> => ipcRenderer.invoke('appUpdate:checkNow'),
+  /** GitHub release notes; only ever called from a click. */
+  appUpdateReleaseNotes: (): Promise<import('./shared/appUpdate').AppReleaseNotes> => ipcRenderer.invoke('appUpdate:releaseNotes'),
+  onAppUpdateDetails: (cb: (details: import('./shared/appUpdate').AppUpdateDetails) => void): (() => void) => {
+    const handler = (_e: unknown, details: import('./shared/appUpdate').AppUpdateDetails): void => cb(details);
+    ipcRenderer.on('appUpdate:details', handler);
+    return () => ipcRenderer.removeListener('appUpdate:details', handler);
+  },
 
   // Remote Resources catalogue (fetched from GitHub, cached in userData)
   catalogGet: (): Promise<import('./shared/resourcesCatalog').ResourcesCatalog | null> =>
@@ -1694,7 +1722,16 @@ const api = {
     target: string;
     /** Reader-pinned word senses the model must honour (see shared/translateCore). */
     senseHints?: import('./shared/translateCore').TranslateSenseHint[];
-  }): Promise<{ ok: boolean; text?: string; error?: string; errorKey?: string }> =>
+    /** `literal` asks for a structure-preserving rendering; omitted is natural. */
+    style?: import('./shared/translateCore').TranslateStyle;
+  }): Promise<{
+    ok: boolean;
+    text?: string;
+    /** The sentence pairs the passage was translated as, for the aligned view. */
+    segments?: import('./shared/translateCore').TranslateSegment[];
+    error?: string;
+    errorKey?: string;
+  }> =>
     ipcRenderer.invoke('translate:run', req),
   translateRunBatch: (req: {
     items: Array<{ id: string; text: string; source: string; target: string }>;
@@ -3694,7 +3731,35 @@ const api = {
   ): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:set-settings', patch),
   recorderStart: (
     mode: import('./shared/regionRecorder').RecorderStartMode = 'select',
-  ): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:start', mode),
+    sourceId?: string,
+  ): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:start', mode, sourceId),
+  recorderDetectEncoders: (force = false): Promise<import('./shared/regionRecorder').RecorderState> =>
+    ipcRenderer.invoke('recorder:detect-encoders', force),
+  recorderListWindows: (): Promise<import('./shared/regionRecorder').RecorderWindowSource[]> =>
+    ipcRenderer.invoke('recorder:list-windows'),
+  recorderHistory: (): Promise<Array<import('./shared/regionRecorder').RecorderHistoryEntry & { missing: boolean }>> =>
+    ipcRenderer.invoke('recorder:history-list'),
+  recorderHistoryAction: (
+    id: string,
+    action: import('./shared/regionRecorder').RecorderHistoryAction,
+  ): Promise<{ ok: boolean; mediaId?: string; errorKey?: string }> => ipcRenderer.invoke('recorder:history-action', id, action),
+  onRecorderHistoryChanged: (
+    cb: (entries: import('./shared/regionRecorder').RecorderHistoryEntry[]) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, entries: import('./shared/regionRecorder').RecorderHistoryEntry[]): void => cb(entries);
+    ipcRenderer.on('recorder:history-changed', handler);
+    return () => ipcRenderer.removeListener('recorder:history-changed', handler);
+  },
+  /** A Whisper model was downloaded or removed in this window (or the window just started). */
+  recorderModelChanged: (): void => ipcRenderer.send('recorder:model-changed'),
+  /** Main window: put a finished recording on its study day (answered with recorderStudyTagReply). */
+  onRecorderStudyTag: (cb: (request: import('./shared/regionRecorder').RecorderStudyTagRequest) => void): (() => void) => {
+    const handler = (_e: unknown, request: import('./shared/regionRecorder').RecorderStudyTagRequest): void => cb(request);
+    ipcRenderer.on('recorder:study-tag', handler);
+    return () => ipcRenderer.removeListener('recorder:study-tag', handler);
+  },
+  recorderStudyTagReply: (reply: { requestId: string; ok: boolean }): void =>
+    ipcRenderer.send('recorder:study-tag-reply', reply),
   recorderStop: (): Promise<import('./shared/regionRecorder').RecorderState> => ipcRenderer.invoke('recorder:stop'),
   recorderPause: (paused: boolean): Promise<import('./shared/regionRecorder').RecorderState> =>
     ipcRenderer.invoke('recorder:pause', paused),
@@ -4122,6 +4187,10 @@ const api = {
     input: import('./shared/scraperIpc').ScraperQbitSendInput,
   ): Promise<import('./shared/scraperResults').QbitSendReport> =>
     ipcRenderer.invoke(SCRAPER_CHANNELS.qbitSend, input),
+  scraperQbitAddTorrentFiles: (
+    input: import('./shared/scraperIpc').ScraperQbitTorrentFileInput,
+  ): Promise<import('./shared/scraperResults').QbitSendReport & { infoHashes: string[] }> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.qbitAddTorrentFiles, input),
   scraperQbitAction: (
     input: import('./shared/scraperIpc').ScraperQbitActionInput,
   ): Promise<import('./shared/scraperIpc').ScraperQbitActionReport> =>

@@ -259,3 +259,67 @@ describe('the file itself', () => {
     expect(store.summarizeDraftSessions().map((row) => row.session.id)).toEqual([second.id]);
   });
 });
+
+/** D26: "Recent reads" listed the same file once per read. */
+describe('recent reads are one row per path + fingerprint', () => {
+  /** A complete read, so the next begin starts a new session instead of reusing it. */
+  function completedRead(filePath: string, fingerprint: string, nowMs: number): string {
+    vi.setSystemTime(nowMs);
+    const session = store.beginDraftSession({
+      ...CSV_REQUEST,
+      request: { kind: 'csv', filePath, noteLimit: 500 },
+      fingerprint,
+    });
+    store.recordDraftSessionPage(session.id, { offset: 0, count: 10, totalNotes: 10 });
+    return session.id;
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('folds repeated reads of the same file, newest first, and counts what it folded', () => {
+    vi.useFakeTimers();
+    const first = completedRead('C:/Downloads/deck.txt', 'fp-1', 1_000);
+    const second = completedRead('C:\\Downloads\\DECK.txt', 'fp-1', 2_000);
+    const third = completedRead('C:/Downloads/deck.txt', 'fp-1', 3_000);
+    const other = completedRead('C:/Downloads/other.txt', 'fp-9', 2_500);
+    expect(store.listDraftSessions()).toHaveLength(4);
+    const rows = store.summarizeDraftSessions();
+    expect(rows.map((row) => row.session.id)).toEqual([third, other]);
+    expect(rows[0].earlierReads).toBe(2);
+    expect(rows[1].earlierReads).toBe(0);
+    expect([first, second]).not.toContain(rows[0].session.id);
+  });
+
+  it('keeps a changed file (same path, new fingerprint) as its own row', () => {
+    vi.useFakeTimers();
+    completedRead('C:/Downloads/deck.txt', 'fp-1', 1_000);
+    const changed = completedRead('C:/Downloads/deck.txt', 'fp-2', 2_000);
+    const rows = store.summarizeDraftSessions();
+    expect(rows).toHaveLength(2);
+    expect(rows[0].session.id).toBe(changed);
+  });
+
+  it('discarding the visible row discards the reads folded under it, so none resurfaces', () => {
+    vi.useFakeTimers();
+    completedRead('C:/Downloads/deck.txt', 'fp-1', 1_000);
+    const newest = completedRead('C:/Downloads/deck.txt', 'fp-1', 2_000);
+    const other = completedRead('C:/Downloads/other.txt', 'fp-9', 1_500);
+    expect(store.deleteDraftSession(newest)).toBe(true);
+    restart();
+    expect(store.summarizeDraftSessions().map((row) => row.session.id)).toEqual([other]);
+    expect(store.listDraftSessions()).toHaveLength(1);
+  });
+
+  it('keeps at most a few older reads per file, so one file cannot evict the rest', () => {
+    vi.useFakeTimers();
+    const kept = completedRead('C:/Downloads/keep.txt', 'fp-k', 500);
+    for (let i = 0; i < store.MAX_RETAINED_SESSIONS + 6; i += 1) {
+      completedRead('C:/Downloads/deck.txt', 'fp-1', 1_000 + i);
+    }
+    const ids = store.listDraftSessions().map((s) => s.id);
+    expect(ids).toContain(kept);
+    expect(ids).toHaveLength(2 + store.MAX_EARLIER_READS_PER_SOURCE);
+  });
+});

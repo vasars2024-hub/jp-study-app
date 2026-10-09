@@ -12,7 +12,7 @@
 // at the root for the whole tree). Unknown values fall through unchanged: a
 // build newer than its catalog shows the raw value, never a dotted key.
 
-import { t } from '../../i18n';
+import { getUiLang, t } from '../../i18n';
 import type { TVars } from '../../../shared/i18n/core';
 import {
   SCRAPER_BUILTIN_PROFILE_TEXT,
@@ -133,8 +133,26 @@ const NOTE_MISSING = /Missing episode numbers?: ([\d, ]+?)(?:, \+(\d+) more)?\./
  * (`engine.ts`, `missingEpisodesNote`). Known sentences are translated in
  * place; anything else is kept as written.
  */
+const NOTE_PAGES = /Could not read (.+?); the episode list may be incomplete\./;
+const NOTE_PAGE_PART = /page (\d+) \((?:HTTP (\d{3})|(no rows)|not reachable)\)/g;
+
+/** `engine.ts` `pageFailuresNote`, part by part, in the UI language. */
+function localizePageFailures(list: string): string {
+  const parts = [...list.matchAll(NOTE_PAGE_PART)].map((m) => (m[2]
+    ? t('scr2.note.pageStatus', { page: m[1], status: m[2] })
+    : m[3] ? t('scr2.note.pageEmpty', { page: m[1] }) : t('scr2.note.pageUnreachable', { page: m[1] })));
+  let joined = parts.join(', ');
+  try {
+    joined = new Intl.ListFormat(getUiLang(), { style: 'narrow', type: 'unit' }).format(parts);
+  } catch {
+    /* an engine without ListFormat keeps the comma list */
+  }
+  return t('scr2.note.pagesFailed', { list: joined });
+}
+
 export function localizeScraperJobNote(note: string): string {
   let text = note.replace(NOTE_RULE_CHECKS, () => t('scraperFix.ui.note.ruleChecks'));
+  text = text.replace(NOTE_PAGES, (_all, list: string) => localizePageFailures(list));
   text = text.replace(NOTE_MISSING, (_all, list: string, more?: string) =>
     more
       ? t('scraperFix.ui.note.missingMore', { list, more })

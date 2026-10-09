@@ -12,7 +12,7 @@
  * is imported from `ui/dialogService` directly rather than the `ui` barrel so
  * Blanc's bundle never pulls the chrome in transitively.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
 import { confirmDialog } from '../ui/dialogService';
 import {
@@ -29,6 +29,7 @@ import {
 } from '../../stats';
 import { buildStudyHeatmap, gameAnswersByDay } from '../../../shared/studyActivityHeatmap';
 import './statsActivity.css';
+import ImmersionSitesStats from './ImmersionSitesStats';
 import {
   mediaWorkspaceHostIsMounted,
   readContinueWatching,
@@ -46,6 +47,7 @@ import { localDueForecast, type LocalDueForecast } from '../../../shared/reviewF
 import { getActiveProfile, onProfileChanged } from '../../profileState';
 import { syncKnowledgeFromAnki } from '../../ankiSync';
 import { LevelMeter } from '../LevelMeter';
+import GrammarDueChip from '../grammar/GrammarDueChip';
 import {
   getActiveStudyLang,
   getLevelEstimate,
@@ -74,6 +76,9 @@ import {
   type MediaPathRef,
   type ShowStatRow,
 } from '../../../shared/statsShowTitles';
+
+/** Loaded when opened (kw2): the bulk manager is a tool, not part of the page's first paint. */
+const KnownWordsManager = lazy(() => import('../knownWords/KnownWordsManager'));
 
 /**
  * YYYY-MM-DD → single weekday initial (M T W … / 月 火 水 … / П В С …) for the
@@ -353,6 +358,8 @@ export function StatsGrammar() {
           <span className="stats-card-lbl">{t('stats.grammar.known')}</span>
         </div>
       </div>
+      {/* gram2: what the grammar review queue owes today, with a way into it. */}
+      <GrammarDueChip className="stats-grammar-due" />
       {rows ? (
         <div className="stats-grammar-levels" role="list">
           {rows.map((row) => {
@@ -520,6 +527,7 @@ export function WordKnowledge() {
   } | null>(null);
 
   useEffect(() => onKnowledgeChanged(() => setCounts(knowledgeCounts())), []);
+  const [manageOpen, setManageOpen] = useState(false);
 
   const total = counts[1] + counts[2] + counts[3];
   const sync = async () => {
@@ -596,6 +604,20 @@ export function WordKnowledge() {
             {t('common.close')}
           </button>
         </div>
+      )}
+      {/* kw2: the whole store, in bulk — filter, set, reset to automatic, import, export, coverage. */}
+      <button
+        type="button"
+        className="btn small kw2-manage-toggle"
+        aria-expanded={manageOpen}
+        onClick={() => setManageOpen((open) => !open)}
+      >
+        {t('kw2.manage')}
+      </button>
+      {manageOpen && (
+        <Suspense fallback={<p className="muted">{t('kw2.loading')}</p>}>
+          <KnownWordsManager />
+        </Suspense>
       )}
     </section>
   );
@@ -797,6 +819,7 @@ export function StatsChart({ state }: { state: StatsState }) {
       <ReadingSpeedChart recent={state.summary.recent} />
       <ReviewsGamesChart recent={state.summary.recent} games={games} />
       <StatsStudyHeatmap games={games} />
+      <ImmersionSitesStats />
     </>
   );
 }

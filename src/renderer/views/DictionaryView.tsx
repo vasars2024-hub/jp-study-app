@@ -9,6 +9,19 @@ import { useT } from '../i18n';
 import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
 import { DICTIONARY_QUERY_EVENT, onOpenIntent, takeDictionaryQuery } from '../openIntents';
 import { getStudyLang, onStudyLangChanged, setStudyLang, STUDY_LANG_KEY } from '../studyEnvironment';
+import { clearLookupHistory, loadLookupHistory, onLookupHistoryChanged, type LookupHistoryEntry } from '../lookupHistory';
+
+/** Recent lookups shown as chips; the store keeps more (Notebook reads all of them). */
+const RECENT_CHIPS = 10;
+
+/** The current language's most recent lookups, newest first, one chip per dictionary form. */
+export function recentLookupChips(
+  history: readonly LookupHistoryEntry[],
+  lang: DictLang,
+  limit = RECENT_CHIPS,
+): LookupHistoryEntry[] {
+  return history.filter((entry) => entry.lang === lang).slice(0, limit);
+}
 
 /** @deprecated Prefer STUDY_LANG_KEY / getStudyLang — kept for external imports. */
 export const DICT_LANG_KEY = STUDY_LANG_KEY;
@@ -27,9 +40,12 @@ export default function DictionaryView() {
   const [query, setQuery] = useState('');
   const [lookupAttempt, setLookupAttempt] = useState(0);
   const [savedSearches, setSavedSearches] = useState<DictionarySavedSearch[]>(loadDictionarySavedSearches);
+  const [history, setHistory] = useState<LookupHistoryEntry[]>(loadLookupHistory);
   const acceptingHandoffRef = useRef(false);
 
   useEffect(() => onStudyLangChanged(setLang), []);
+  // Every lookup (here, in the popup, in a reader) lands in one store; follow it.
+  useEffect(() => onLookupHistoryChanged(() => setHistory(loadLookupHistory())), []);
 
   /**
    * The receiving end of `shared/lexiconHandoff.ts`: a word captured by the
@@ -217,20 +233,73 @@ export default function DictionaryView() {
       <ContextualSurface className="dict-saved-searches" aria-label={t('dict.saved.title')}>
         <div className="dict-saved-searches-head">
           <span className="muted">{t('dict.saved.title')}</span>
-          {query && (
-            <button className="btn" type="button" onClick={() => setSavedSearches(saveDictionarySearch({ query, lang }))}>
-              {t('dict.saved.save')}
-            </button>
-          )}
+          {query && (() => {
+            // A toggle, and it says so: saving a search that is already saved used
+            // to look like it did something and leave the list unchanged.
+            const isSaved = savedSearches.some(
+              (saved) => saved.lang === lang && saved.query.toLocaleLowerCase() === query.toLocaleLowerCase(),
+            );
+            return (
+              <button
+                className="btn"
+                type="button"
+                aria-pressed={isSaved}
+                onClick={() =>
+                  setSavedSearches(isSaved ? removeDictionarySavedSearch({ query, lang }) : saveDictionarySearch({ query, lang }))
+                }
+              >
+                {isSaved ? t('dict2.saved.savedToggle') : t('dict.saved.save')}
+              </button>
+            );
+          })()}
         </div>
         {savedSearches.length > 0 && (
           <div className="dict-saved-search-list">
             {savedSearches.map((saved) => (
               <span className="dict-saved-search" key={`${saved.lang}:${saved.query}`}>
-                <button className="btn" type="button" onClick={() => runSavedSearch(saved)}>{saved.query}</button>
-                <button className="btn" type="button" aria-label={t('dict.saved.remove')} onClick={() => setSavedSearches(removeDictionarySavedSearch(saved))}>×</button>
+                <button className="btn" type="button" lang={saved.lang} onClick={() => runSavedSearch(saved)}>{saved.query}</button>
+                <button
+                  className="btn"
+                  type="button"
+                  aria-label={t('dict2.saved.removeNamed', { query: saved.query })}
+                  title={t('dict.saved.remove')}
+                  onClick={() => setSavedSearches(removeDictionarySavedSearch(saved))}
+                >
+                  ×
+                </button>
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Recent lookups: every lookup made anywhere (popup, reader, this page) in this
+            dictionary's language, one chip per dictionary form, newest first. Same
+            navigation-shortcut region as the saved searches, so it shares their surface. */}
+        {recentLookupChips(history, langKey).length > 0 && (
+          <div className="dict-recent" role="group" aria-label={t('dict2.history.title')}>
+            <div className="dict-saved-searches-head">
+              <span className="muted">{t('dict2.history.title')}</span>
+              <button className="btn" type="button" onClick={() => clearLookupHistory()}>
+                {t('dict2.history.clear')}
+              </button>
+            </div>
+            <div className="dict-saved-search-list">
+              {recentLookupChips(history, langKey).map((entry) => (
+                <button
+                  key={`${entry.lang}:${entry.lemma}`}
+                  className="btn dict-recent-chip"
+                  type="button"
+                  lang={entry.lang}
+                  title={[entry.reading, entry.meaning].filter(Boolean).join(' — ') || undefined}
+                  onClick={() => openRelatedWord(entry.lemma)}
+                >
+                  {entry.lemma}
+                  {entry.count > 1 && (
+                    <span className="muted dict-recent-count"> {t('dict2.history.times', { count: entry.count })}</span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </ContextualSurface>

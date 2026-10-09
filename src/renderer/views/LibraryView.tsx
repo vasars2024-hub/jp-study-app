@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
 } from 'react';
@@ -50,11 +51,15 @@ import { useCoverArt } from '../utils/coverArt';
 import {
   DEFAULT_LIBRARY_LAYOUT,
   LIBRARY_LAYOUTS,
+  compareRecentlyRead,
   drawerState,
+  groupLibraryBySeries,
   libraryHostedActions,
+  nextRowIndex,
   resolveSelection,
   type LibraryLayout,
 } from '../utils/libraryShelf';
+import ContinueReadingShelf, { LibraryProgressCell } from '../components/reading/ContinueReadingShelf';
 import { setHandoffJson, takeHandoff } from '../pendingHandoff';
 import {
   ReadingCanvas,
@@ -88,6 +93,7 @@ interface Props {
 type FolderFilter = 'all' | 'unfiled' | string;
 
 type LibrarySort =
+  | 'recent'
   | 'date-desc'
   | 'date-asc'
   | 'title'
@@ -96,7 +102,7 @@ type LibrarySort =
   | 'level'
   | 'source';
 
-type LibraryGroup = 'none' | 'lang' | 'level' | 'source';
+type LibraryGroup = 'none' | 'lang' | 'level' | 'source' | 'series';
 type InboxLangFilter = 'all' | 'ja' | 'zh' | 'en' | 'unknown';
 
 function hostOf(url: string | undefined): string {
@@ -672,6 +678,8 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
         }
         case 'level':
           return levelSortKey(a, bookLevels[a.id]) - levelSortKey(b, bookLevels[b.id]);
+        case 'recent':
+          return compareRecentlyRead(a, b);
         case 'source':
           return hostOf(a.inboxMeta?.sourceUrl ?? a.sourcePath).localeCompare(
             hostOf(b.inboxMeta?.sourceUrl ?? b.sourcePath),
@@ -697,6 +705,14 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
 
   const groupedVisible = useMemo(() => {
     if (groupBy === 'none') return [{ key: '', items: visible }];
+    if (groupBy === 'series') {
+      // Series headings are the books' own names (study content); only the
+      // trailing "no series" bucket is UI text.
+      return groupLibraryBySeries(visible).map((group) => ({
+        key: group.name || t('read2.library.series.standalone'),
+        items: group.items,
+      }));
+    }
     const map = new Map<string, LibraryItem[]>();
     for (const it of visible) {
       const key = inboxGroupKey(it, groupBy, bookLevels[it.id]);
@@ -707,7 +723,27 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     return [...map.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, groupItems]) => ({ key, items: groupItems }));
-  }, [visible, groupBy, bookLevels]);
+    // `lang`, not `t`: the "no series" label is translated inside this memo.
+  }, [visible, groupBy, bookLevels, lang]);
+
+  /**
+   * "Continue reading" is a view of the whole library, not of the current
+   * folder or filter — but only on the unfiltered "All" view, where it cannot
+   * be mistaken for a filter result.
+   */
+  const showContinueShelf = active === 'all' && langFilter === 'all' && levelFilter === 'all';
+
+  /** Arrow keys walk the list rows; Enter still opens, Space still selects. */
+  const onListRowKeyDown = useCallback((e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.target !== e.currentTarget) return;
+    const rows = [
+      ...(e.currentTarget.closest('[data-library-rows]')?.querySelectorAll<HTMLButtonElement>('[data-library-row]') ?? []),
+    ];
+    const next = nextRowIndex(e.key, rows.indexOf(e.currentTarget), rows.length);
+    if (next === null) return;
+    e.preventDefault();
+    rows[next]?.focus();
+  }, []);
 
   const hasLevelFilters = useMemo(
     () =>
@@ -1304,6 +1340,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as LibrarySort)}
               >
+                <option value="recent">{t('read2.library.sort.recent')}</option>
                 <option value="date-desc">{t('library.sort.dateDesc')}</option>
                 <option value="date-asc">{t('library.sort.dateAsc')}</option>
                 <option value="title">{t('library.sort.title')}</option>
@@ -1322,6 +1359,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 onChange={(e) => setGroupBy(e.target.value as LibraryGroup)}
               >
                 <option value="none">{t('library.group.none')}</option>
+                <option value="series">{t('read2.library.group.series')}</option>
                 <option value="lang">{t('library.group.lang')}</option>
                 <option value="level">{t('library.group.level')}</option>
                 <option value="source">{t('library.group.source')}</option>
@@ -1381,6 +1419,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
               </div>
             ) : layout === 'grid' ? (
               <div className="aero-library-shelf">
+                {showContinueShelf && <ContinueReadingShelf items={items} onOpen={onOpen} t={t} lang={lang} />}
                 {groupedVisible.map((group) => (
                   <div key={group.key || 'flat'} className="lib-group">
                     {groupBy !== 'none' && group.key ? (
@@ -1406,7 +1445,9 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 ))}
               </div>
             ) : (
-              <div className="aero-library-table" role="table" aria-label={t('library.table.aria')}>
+              <>
+              {showContinueShelf && <ContinueReadingShelf items={items} onOpen={onOpen} t={t} lang={lang} />}
+              <div className="aero-library-table" role="table" aria-label={t('library.table.aria')} data-library-rows="">
                 <div className="aero-library-row aero-library-row-head" role="row">
                   <span>{t('library.table.title')}</span>
                   <span>{t('library.table.type')}</span>
@@ -1421,7 +1462,6 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                       </div>
                     ) : null}
                     {group.items.map((it) => {
-                  const pct = Math.round((it.progress?.percent ?? 0) * 100);
                   const selected = selectedItem?.id === it.id;
                   return (
                     <button
@@ -1429,9 +1469,11 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                       type="button"
                       className={`aero-library-row ${selected ? 'active' : ''}`}
                       aria-pressed={selected}
+                      data-library-row={it.id}
                       onClick={() => setSelectedId(it.id)}
                       onDoubleClick={() => onOpen(it)}
                       onKeyDown={(e) => {
+                        onListRowKeyDown(e);
                         if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
                         e.preventDefault();
                         e.stopPropagation();
@@ -1450,7 +1492,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                       <span>
                         {levelChipLabel(it) ?? libraryKindLabel(it, t)}
                       </span>
-                      <span>{pct > 0 ? `${pct}%` : t('library.progress.notStarted')}</span>
+                      <LibraryProgressCell item={it} t={t} />
                       <span>
                         {it.folder && folders.includes(it.folder) ? it.folder : t('library.filter.unfiled')}
                       </span>
@@ -1460,6 +1502,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                   </div>
                 ))}
               </div>
+              </>
             )}
           </main>
 
@@ -1645,6 +1688,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           onChange={(e) => setSortBy(e.target.value as LibrarySort)}
           aria-label={t('library.sort.label')}
         >
+          <option value="recent">{t('read2.library.sort.recent')}</option>
           <option value="date-desc">{t('library.sort.dateDesc')}</option>
           <option value="date-asc">{t('library.sort.dateAsc')}</option>
           <option value="title">{t('library.sort.title')}</option>
@@ -1664,6 +1708,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           aria-label={t('library.group.label')}
         >
           <option value="none">{t('library.group.none')}</option>
+          <option value="series">{t('read2.library.group.series')}</option>
           <option value="lang">{t('library.group.lang')}</option>
           <option value="level">{t('library.group.level')}</option>
           <option value="source">{t('library.group.source')}</option>
@@ -1769,8 +1814,9 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           scroll="page"
           aria-label={t('library.table.aria')}
         >
+        {showContinueShelf && <ContinueReadingShelf items={items} onOpen={onOpen} t={t} lang={lang} />}
         {layout === 'list' ? (
-          <div className="lib-list-groups">
+          <div className="lib-list-groups" data-library-rows="">
             {groupedVisible.map((group) => (
               <div key={group.key || 'flat'} className="lib-group">
                 {groupBy !== 'none' && group.key ? (
@@ -1786,7 +1832,6 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                     <span>{t('library.table.folder')}</span>
                   </div>
                   {group.items.map((it) => {
-                    const pct = Math.round((it.progress?.percent ?? 0) * 100);
                     return (
                       <button
                         key={it.id}
@@ -1797,6 +1842,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                         onClick={() => setSelectedId(it.id)}
                         onDoubleClick={() => onOpen(it)}
                         onKeyDown={(e) => {
+                          onListRowKeyDown(e);
                           if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
                           e.preventDefault();
                           e.stopPropagation();
@@ -1813,7 +1859,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                           <span title={it.title}>{it.title}</span>
                         </span>
                         <span>{levelChipLabel(it) ?? libraryKindLabel(it, t)}</span>
-                        <span>{pct > 0 ? `${pct}%` : t('library.progress.notStarted')}</span>
+                        <LibraryProgressCell item={it} t={t} />
                         <span>
                           {it.folder && folders.includes(it.folder) ? it.folder : t('library.filter.unfiled')}
                         </span>

@@ -134,8 +134,23 @@
       }
       .actions button:hover { background: var(--panel-2); }
       .rec-row { display: flex; gap: 6px; margin: 8px 0 4px; }
-      .rec-row button { flex: 1; }
-      #rec-stop { background: #c62828; color: #fff; }
+      /* Styled like the action buttons above: unstyled, these four rendered as
+         white OS-default buttons in the dark popup (seen in Chrome, 2026-10-08). */
+      .rec-row button {
+        flex: 1;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        padding: 7px 6px;
+        cursor: pointer;
+        background: var(--panel);
+        color: var(--text);
+        font: inherit;
+        font-size: 11.5px;
+        line-height: 1.25;
+        transition: background 0.12s ease;
+      }
+      .rec-row button:hover { background: var(--panel-2); }
+      #rec-stop { background: #c62828; color: #fff; border-color: transparent; }
       .rec-item { display: flex; gap: 6px; align-items: center; font-size: 12px; margin: 4px 0; }
       .rec-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .mode-row {

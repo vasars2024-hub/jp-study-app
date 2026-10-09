@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import DictionaryResults, { type DictLang } from './DictionaryResults';
-import PitchAccentContour from './lexicon/PitchAccentContour';
-import { cachedPitch, fetchPitch } from '../pitchLookupCache';
+import EntryPitch from './lexicon/EntryPitch';
 import type { DictEntry } from '../../shared/types';
-import type { PitchLookup } from '../../shared/pitchAccent';
 import {
   clearManualLevel, getLevel, isManualLevel, setLevel, WK_LEVELS, type WkLevel,
 } from '../knownWords';
@@ -62,49 +60,10 @@ interface Props {
 const POPUP_W = 340;
 
 /**
- * One entry's pitch accent, drawn as its contour with the downstep number.
- *
- * The structured data comes through `dict:pitch` (the same accessor the flashcard
- * contour and Blanc's pitch panel read), via `pitchLookupCache`: one request per
- * term|reading for the session, so re-rendering the popup or reopening it on the same
- * word never asks twice, and once main has said no pitch dictionary is installed no
- * entry asks at all. Until the reply arrives — or when it carries nothing drawable —
- * the HTML row main attached (if any) stands in, so the row never blinks out; with
- * neither, nothing is rendered.
+ * One entry's pitch accent, drawn as its contour with the downstep number — the shared
+ * `EntryPitch`, which the Dictionary page now draws too.
  */
-function PopupEntryPitch({ entry }: { entry: DictEntry }) {
-  const { t } = useT();
-  const key = `${entry.word}|${entry.reading}`;
-  // Keyed, so a row reused for the next word never shows the previous word's contour.
-  const [fetched, setFetched] = useState<{ key: string; value: PitchLookup } | null>(null);
-  const reply = fetched?.key === key ? fetched.value : cachedPitch(entry.word, entry.reading);
-
-  useEffect(() => {
-    if (!entry.word || cachedPitch(entry.word, entry.reading)) return undefined;
-    let alive = true;
-    void fetchPitch(entry.word, entry.reading).then((value) => {
-      if (alive && value) setFetched({ key: `${entry.word}|${entry.reading}`, value });
-    });
-    return () => {
-      alive = false;
-    };
-  }, [entry.word, entry.reading]);
-
-  const drawable = reply?.available ? reply.entries.filter((e) => e.positions.length > 0) : [];
-  if (!drawable.length && !entry.pitchHtml) return null;
-  return (
-    <div className="dict-pitch" lang="ja" data-pitch-source={drawable.length ? 'contour' : 'html'}>
-      <span className="dict-pitch-label">{t('dict.results.pitch')}</span>
-      {drawable.length ? (
-        <PitchAccentContour word={entry.word} reading={entry.reading} lang="ja" entries={drawable} showDownstep />
-      ) : (
-        <span className="dict-pitch-pattern" dangerouslySetInnerHTML={{ __html: entry.pitchHtml ?? '' }} />
-      )}
-    </div>
-  );
-}
-
-const renderPopupPitch = (entry: DictEntry) => <PopupEntryPitch entry={entry} />;
+const renderPopupPitch = (entry: DictEntry) => <EntryPitch entry={entry} />;
 
 export default function DictionaryPopup({
   query,

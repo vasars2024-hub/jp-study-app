@@ -25,6 +25,17 @@ export function estimateReadingMinutes(
   return Math.ceil(Math.max(0, remainingChars) / speed);
 }
 
+/**
+ * One span's speed — this session, or one book's whole tally — in characters
+ * per minute, rounded. Null until a minute of reading has been measured: a
+ * speed from twenty seconds is noise, and showing it would be a number that
+ * jumps around rather than one a reader can track.
+ */
+export function spanCharsPerMinute(seconds: number, chars: number): number | null {
+  if (!Number.isFinite(seconds) || !Number.isFinite(chars) || seconds < 60 || chars <= 0) return null;
+  return Math.round((chars * 60) / seconds);
+}
+
 /** Measured characters per minute, weighted by reading time. */
 export function readingCharsPerMinute(
   recent: readonly { seconds: number; chars: number }[],

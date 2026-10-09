@@ -10,6 +10,10 @@ import {
 import { loadSaved, onSavedChanged, type SavedWord } from '../savedWords';
 import { knowledgeCounts } from '../knownWords';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
+import { studyLangTag } from '../../shared/studyLang';
+import { getStudyLang } from '../studyEnvironment';
+import { useNow } from './hooks';
 
 /**
  * Live stats summary — refreshes whenever the reader **or the media player** records
@@ -141,22 +145,35 @@ export function TodayStudyTime({ size }: WidgetProps) {
 
 // ---------- Reading progress (14-day sparkline) ----------
 export function ReadingProgress() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const s = useStatsSummary();
   const max = Math.max(1, ...s.recent.map((d) => d.seconds));
+  const recentTotal = s.recent.reduce((sum, d) => sum + Math.max(0, d.seconds), 0);
+  // wid2: the bars' hover text printed the raw ISO key ("2026-10-08"); a day
+  // the user reads is a localized date. The strip itself is one image with a
+  // spoken summary, so a screen reader is not walked through 14 unlabeled boxes.
+  const dayLabel = (key: string): string => {
+    const [y, m, d] = key.split('-').map(Number);
+    if (!y || !m || !d) return key;
+    return new Date(y, m - 1, d).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' });
+  };
   return (
     <div className="wgt wgt-reading">
       <div className="wgt-reading-top">
         <span className="wgt-stat-value sm">{formatDuration(s.totalSeconds)}</span>
         <span className="wgt-stat-label">{t('widgets.readingProgress.totalReading')}</span>
       </div>
-      <div className="wgt-spark">
+      <div
+        className="wgt-spark"
+        role="img"
+        aria-label={t('wid2.readingSpark.aria', { days: s.recent.length, total: formatDuration(recentTotal) })}
+      >
         {s.recent.map((d) => (
           <div
             key={d.date}
             className={`wgt-spark-bar ${d.seconds > 0 ? '' : 'empty'}`}
             style={{ height: `${Math.max(4, (d.seconds / max) * 100)}%` }}
-            title={`${d.date}: ${formatDuration(d.seconds)}`}
+            title={`${dayLabel(d.date)}: ${formatDuration(d.seconds)}`}
           />
         ))}
       </div>
@@ -191,7 +208,17 @@ export function VocabularyProgress() {
         <span className="wgt-stat-value sm">{learned}</span>
         <span className="wgt-stat-label">{t('widgets.vocabProgress.familiarPlusWords')}</span>
       </div>
-      <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${pct}%` }} /></div>
+      {/* wid2: the bar is the widget's headline ratio; say it, not only paint it. */}
+      <div
+        className="wgt-progress"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pct)}
+        aria-label={t('widgets.vocabProgress.familiarPlusWords')}
+      >
+        <div className="wgt-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
       <ul className="wgt-vocab-rows">
         {rows.map((r) => (
           <li key={r.label}>
@@ -210,6 +237,9 @@ export function WordOfTheDay() {
   const { t } = useT();
   const [saved, setSaved] = useState<SavedWord[]>(() => loadSaved());
   useEffect(() => onSavedChanged(() => setSaved(loadSaved())), []);
+  // wid2: a widget left open overnight kept yesterday's word — nothing
+  // re-rendered it at midnight. A minute tick is enough to roll over.
+  const today = useNow(60_000);
   if (saved.length === 0) {
     return (
       <div className="wgt wgt-wotd">
@@ -218,13 +248,14 @@ export function WordOfTheDay() {
     );
   }
   // Deterministic pick that rotates at local midnight, not UTC midnight.
-  const today = new Date();
   const dayNum = Math.round(new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 86400000);
   const w = saved[dayNum % saved.length];
+  // The saved list is per study language, so its words are in that language.
+  const contentLang = studyLangTag(getStudyLang());
   return (
     <div className="wgt wgt-wotd">
-      <div className="wgt-wotd-word" lang="ja">{w.word}</div>
-      {w.reading && <div className="wgt-wotd-reading" lang="ja">{w.reading}</div>}
+      <div className="wgt-wotd-word" lang={contentLang}>{w.word}</div>
+      {w.reading && <div className="wgt-wotd-reading" lang={contentLang}>{w.reading}</div>}
       <div className="wgt-wotd-meaning">{w.meaning}</div>
     </div>
   );

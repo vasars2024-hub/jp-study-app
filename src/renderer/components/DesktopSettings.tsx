@@ -2,7 +2,8 @@
  * Study OS Settings app — adapter.
  * UI lives in `./settings/SettingsApp` (search, grouped nav, cards, home, shortcuts).
  */
-import SettingsApp from './settings/SettingsApp';
+import { lazy, Suspense } from 'react';
+import { LiquidLoading } from './liquid/LiquidLoading';
 import type { SettingsWallProps, WallChoice } from './settings/types';
 import { bootPersonalization, savePersonalization } from '../osPersonalization';
 import { bootDesktopPrefs } from '../desktopPrefs';
@@ -31,6 +32,18 @@ export function bootOsLook(): void {
   }
 }
 
+/**
+ * Lazy (perf2). `main.tsx` imports this module for `bootOsLook` alone, and the
+ * static import here used to drag the whole Settings app — every page, the
+ * agent tool registry behind the AI page, and through it the ~2 MB grammar
+ * corpus — into every window's boot. AppSection already loads it this way.
+ */
+const SettingsApp = lazy(() => import('./settings/SettingsApp'));
+
 export default function DesktopSettings(props: SettingsWallProps) {
-  return <SettingsApp {...props} />;
+  return (
+    <Suspense fallback={<LiquidLoading layout="study" />}>
+      <SettingsApp {...props} />
+    </Suspense>
+  );
 }

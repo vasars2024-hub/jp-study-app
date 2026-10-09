@@ -307,7 +307,12 @@
   async function loadCfg() {
     try {
       const data = await safeStorageGet(['jpStudySettings']);
+      const hadFurigana = cfg.furigana === true;
       cfg = SET ? SET.normalize(data.jpStudySettings || {}) : { ...cfg, ...(data.jpStudySettings || {}) };
+      // Furigana is painted with the word status: a change from the options page
+      // repaints an open page now, not at its next scroll (rubies stayed on, or
+      // never came, until then — measured live 2026-10-08).
+      if ((cfg.furigana === true) !== hadFurigana) scheduleTint();
       fabCollapsed = cfg.fabStartCollapsed;
       rebuildFab();
       ensureImmersionHeartbeat();
@@ -334,13 +339,44 @@
   function caretFromPoint(x, y) {
     if (document.caretRangeFromPoint) {
       const range = document.caretRangeFromPoint(x, y);
-      if (range) return { node: range.startContainer, offset: range.startOffset };
+      if (range) return charUnderPoint({ node: range.startContainer, offset: range.startOffset }, x, y);
     }
     if (document.caretPositionFromPoint) {
       const pos = document.caretPositionFromPoint(x, y);
-      if (pos && pos.offsetNode) return { node: pos.offsetNode, offset: pos.offset };
+      if (pos && pos.offsetNode) return charUnderPoint({ node: pos.offsetNode, offset: pos.offset }, x, y);
     }
     return null;
+  }
+
+  /**
+   * A caret is a boundary, not a character: over the right half of a glyph the
+   * browser answers the boundary AFTER it, so pointing at the right half of 猫 in
+   * 猫と looked up と (measured live in Chrome, 2026-10-08). When the character
+   * at the caret is not under the pointer but the one before it is, that one is
+   * the hovered character.
+   */
+  function charUnderPoint(hit, x, y) {
+    const node = hit.node;
+    if (!node || node.nodeType !== Node.TEXT_NODE || !(hit.offset > 0)) return hit;
+    const contains = (i) => {
+      if (i < 0 || i >= node.length) return false;
+      try {
+        const r = document.createRange();
+        r.setStart(node, i);
+        r.setEnd(node, i + 1);
+        const rects = r.getClientRects ? r.getClientRects() : [];
+        for (let k = 0; k < rects.length; k += 1) {
+          const b = rects[k];
+          if (x >= b.left && x <= b.right && y >= b.top && y <= b.bottom) return true;
+        }
+      } catch {
+        /* a detached node or an offset inside a surrogate pair */
+      }
+      return false;
+    };
+    if (contains(hit.offset)) return hit;
+    if (contains(hit.offset - 1)) return { node, offset: hit.offset - 1 };
+    return hit;
   }
 
   /** Characters of block text kept on each side of the hovered node. */
@@ -752,6 +788,8 @@
     const startY = e.clientY;
     const rect = el.getBoundingClientRect();
     const move = (ev) => {
+      // A popup placed above the word is anchored by `bottom`; dragging owns `top`.
+      el.style.bottom = 'auto';
       el.style.left = `${Math.max(4, rect.left + ev.clientX - startX)}px`;
       el.style.top = `${Math.max(4, rect.top + ev.clientY - startY)}px`;
     };
@@ -782,25 +820,63 @@
     if (popup) popup.classList.toggle('pinned', popupPinned);
   }
 
+  /** Below this the popup is too short to read; the word may then be partly covered. */
+  const POPUP_MIN_HEIGHT = 140;
+
+  /**
+   * Where the popup goes for a word at `anchor`. Pure, so it is testable without
+   * layout. Below the word when the popup fits there, else above, else on the
+   * roomier side with its max-height shrunk to that side's space — so the
+   * hovered word stays visible even in a short window (an 805 px tall browser
+   * used to get a 560 px popup clamped to the top edge, right over the word).
+   * Above is anchored by `bottom`, so a popup that grows later (a tab with more
+   * content) grows away from the word rather than over it.
+   */
+  function planPopupPlacement({ anchor, viewportWidth, viewportHeight, width, naturalHeight, maxCap }) {
+    const pad = 8;
+    const gap = 6;
+    const w = Math.max(0, Math.min(width, viewportWidth - pad * 2));
+    const a = anchor;
+    let left = a.left;
+    if (left + w + pad > viewportWidth) left = Math.max(pad, a.right - w);
+    left = Math.min(Math.max(pad, left), viewportWidth - w - pad);
+    const cap = Math.min(Math.floor(viewportHeight * 0.72), maxCap);
+    const want = Math.min(cap, naturalHeight > 0 ? naturalHeight : 320);
+    const below = Math.floor(viewportHeight - a.bottom - gap - pad);
+    const above = Math.floor(a.top - gap - pad);
+    let side;
+    if (want <= below) side = 'below';
+    else if (want <= above) side = 'above';
+    else side = below >= above ? 'below' : 'above';
+    const room = side === 'below' ? below : above;
+    const maxHeight = Math.max(Math.min(POPUP_MIN_HEIGHT, cap), Math.min(cap, room));
+    return side === 'below'
+      ? { side, left, width: w, maxHeight, top: Math.round(a.bottom + gap), bottom: null }
+      : { side, left, width: w, maxHeight, top: null, bottom: Math.round(viewportHeight - (a.top - gap)) };
+  }
+
   /**
    * Anchor the popup to the word (below it, left-aligned), flipping above when
    * it would clip — like Yomitan/10ten — rather than to wherever the cursor was.
    */
   function positionPopup(el, x, y, anchor) {
-    const pad = 8;
-    const w = Math.min(cfg.popupWidth, window.innerWidth - pad * 2);
-    const maxH = Math.min(Math.floor(window.innerHeight * 0.72), 560);
-    el.style.maxHeight = `${maxH}px`;
-    el.style.width = `${w}px`;
     const a = anchor || { left: x, right: x, top: y - 8, bottom: y + 8 };
-    let left = a.left;
-    if (left + w + pad > window.innerWidth) left = Math.max(pad, a.right - w);
-    left = Math.min(Math.max(pad, left), window.innerWidth - w - pad);
-    const estH = Math.min(maxH, el.offsetHeight || 320);
-    let top = a.bottom + 6;
-    if (top + estH + pad > window.innerHeight) top = Math.max(pad, a.top - estH - 6);
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
+    // The height it wants, not the height the last max-height allowed it.
+    el.style.maxHeight = 'none';
+    const plan = planPopupPlacement({
+      anchor: a,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      width: cfg.popupWidth,
+      naturalHeight: el.offsetHeight,
+      maxCap: 560,
+    });
+    el.style.maxHeight = `${plan.maxHeight}px`;
+    el.style.width = `${plan.width}px`;
+    el.style.left = `${plan.left}px`;
+    el.style.top = plan.top == null ? 'auto' : `${plan.top}px`;
+    el.style.bottom = plan.bottom == null ? 'auto' : `${plan.bottom}px`;
+    el.dataset.side = plan.side;
   }
 
   function setActiveTab(tab) {
@@ -3111,12 +3187,47 @@
     return typeof tok.k === 'number' ? tok.k : -1;
   }
 
+  /* Kana, without ヵ/ヶ: those read as counters (一ヶ月) and belong with the kanji. */
+  const RUBY_KANA_RE = /[ぁ-ゖァ-ヴー]/;
+
+  function rubyToHiragana(s) {
+    return String(s || '').replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+  }
+
+  /**
+   * The reading laid over the surface so the ruby sits on the kanji only:
+   * 飲み + のみ → [飲|の][み], 話し合う + はなしあう → [話|はな][し][合|あ][う].
+   * The surface's kana runs are anchors matched against the reading; each kanji
+   * run takes what lies between them. Null for a surface with no kanji (nothing
+   * to annotate); one whole-word segment when the reading does not fit the
+   * surface (an irregular reading), which is what the popup used to show.
+   */
+  function rubySegments(surface, reading) {
+    const runs = [];
+    for (const ch of String(surface || '')) {
+      const kana = RUBY_KANA_RE.test(ch);
+      const last = runs[runs.length - 1];
+      if (last && last.kana === kana) last.text += ch;
+      else runs.push({ text: ch, kana });
+    }
+    if (!runs.some((r) => !r.kana)) return null;
+    const hira = rubyToHiragana(reading);
+    const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = runs.map((r) => (r.kana ? escape(rubyToHiragana(r.text)) : '(.+?)')).join('');
+    const m = new RegExp(`^${pattern}$`, 'u').exec(hira);
+    if (!m) return [{ text: String(surface), reading: String(reading) }];
+    let group = 1;
+    return runs.map((r) => (r.kana ? { text: r.text } : { text: r.text, reading: m[group++] }));
+  }
+
   /** Split `node` around each ruby token; the pieces keep their tokens (no re-annotation). */
   function wsInjectRuby(node, tokens, rubyToks) {
     let remaining = tokens.slice();
     for (const t of rubyToks.slice().sort((a, b) => b.o - a.o)) {
       const text = node.nodeValue || '';
       if (t.o + t.n > text.length || !node.parentNode) continue;
+      const segments = rubySegments(text.slice(t.o, t.o + t.n), t.r);
+      if (!segments) continue;
       const word = node.splitText(t.o);
       const rest = word.splitText(t.n);
       const cut = t.o + t.n;
@@ -3126,11 +3237,18 @@
       const ruby = document.createElement('ruby');
       ruby.setAttribute('data-gum-ruby', '');
       word.parentNode.insertBefore(ruby, word);
-      ruby.appendChild(word);
-      const rt = document.createElement('rt');
-      rt.textContent = t.r;
-      ruby.appendChild(rt);
-      wsNodeTokens.set(word, { text: word.nodeValue, tokens: [{ ...t, o: 0, ruby: true }] });
+      // One base/annotation pair per segment: okurigana gets an empty <rt>, so
+      // のみ sits over 飲 and nothing sits over み. Every base keeps the word's
+      // token (its own length) so the whole word is still coloured.
+      word.remove();
+      for (const seg of segments) {
+        const base = document.createTextNode(seg.text);
+        ruby.appendChild(base);
+        const rt = document.createElement('rt');
+        rt.textContent = seg.reading || '';
+        ruby.appendChild(rt);
+        wsNodeTokens.set(base, { text: seg.text, tokens: [{ ...t, o: 0, n: seg.text.length, ruby: true }] });
+      }
     }
     wsNodeTokens.set(node, { text: node.nodeValue, tokens: remaining });
   }
@@ -4670,6 +4788,8 @@
       currentHit: () => currentHit,
       lastHoverLatencyMs: () => lastHoverLatencyMs,
       sanitizeDictHtml,
+      planPopupPlacement,
+      rubySegments,
     };
   }
 

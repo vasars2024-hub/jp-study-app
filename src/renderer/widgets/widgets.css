@@ -1,5 +1,20 @@
 /* Round-2 widget additions. The base widget styles are in styles.css. */
 
+/* Calendar (wid2): the month title is the button that opens the full Calendar,
+   so it must still read as the plain title it replaced. */
+.wgt-cal-open {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.wgt-cal-open:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
 /* System meters: the reading is the content; the title bar names the widget. */
 .wgt-sys-value {
   font-size: 18px;

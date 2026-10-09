@@ -148,6 +148,24 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     descKey: 'settings.nav.visualizer.desc',
     advanced: true,
   },
+  // set2: System held eight pages, the rail's longest run, and two of them are
+  // about outside services rather than this machine. They are their own group
+  // now, ahead of System. Page ids, keys and every registry entry's own `group`
+  // are unchanged; the search breadcrumb reads the page's group (pageMeta).
+  {
+    id: 'ai',
+    labelKey: 'settings.nav.ai',
+    icon: 'chat',
+    group: 'Connections',
+    descKey: 'settings.nav.ai.desc',
+  },
+  {
+    id: 'api-keys',
+    labelKey: 'settings.nav.apiKeys',
+    icon: 'lock',
+    group: 'Connections',
+    descKey: 'settings.nav.apiKeys.desc',
+  },
   {
     id: 'special',
     labelKey: 'settings.nav.special',
@@ -174,20 +192,6 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'download',
     group: 'System',
     descKey: 'settings.nav.fileDrops.desc',
-  },
-  {
-    id: 'ai',
-    labelKey: 'settings.nav.ai',
-    icon: 'chat',
-    group: 'System',
-    descKey: 'settings.nav.ai.desc',
-  },
-  {
-    id: 'api-keys',
-    labelKey: 'settings.nav.apiKeys',
-    icon: 'lock',
-    group: 'System',
-    descKey: 'settings.nav.apiKeys.desc',
   },
   {
     id: 'display',
@@ -387,6 +391,27 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     pageId: 'special',
     group: 'System',
     discovered: 'aero',
+  },
+  // set2: the two study-mechanics cards of the secret shells, gated exactly like
+  // their neighbours: Aero's renders under `isAeroDiscovered`; WIRED's under
+  // `(wired || isWiredDiscovered)`, which is ungated for the reason
+  // `wired-archive` above gives.
+  {
+    id: 'aero-mechanics',
+    titleKey: 'aeroMech.settings.title',
+    descKey: 'aeroMech.settings.desc',
+    keywords: ['memory defragmenter', 'defrag', 'vocabulary update', 'balloon tips', 'screensaver', 'welcome center', 'aero mechanics'],
+    pageId: 'special',
+    group: 'System',
+    discovered: 'aero',
+  },
+  {
+    id: 'wired-mechanics',
+    titleKey: 'wiredMech.settings.title',
+    descKey: 'wiredMech.settings.desc',
+    keywords: ['layer descent', 'depth', 'signal decrypt', 'intercept', 'tty', 'wired mechanics', 'unlocks'],
+    pageId: 'special',
+    group: 'System',
   },
 
   // Wallpaper
@@ -1348,7 +1373,41 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     id: 'updates',
     titleKey: 'help.update.title',
     descKey: 'help.update.desc',
-    keywords: ['updates', 'update', 'check for updates', 'version', 'release'],
+    keywords: ['updates', 'update', 'check for updates', 'version', 'release', 'about', 'release notes', 'restart to update', 'channel'],
+    pageId: 'help',
+    group: 'System',
+  },
+  // set2: two Help cards existed only for someone already on the Help page.
+  {
+    id: 'help-shortcuts',
+    titleKey: 'help.shortcuts.title',
+    descKey: 'help.shortcuts.desc',
+    keywords: ['keyboard shortcuts', 'shortcut list', 'cheat sheet', 'hotkeys', 'keys', 'player keys'],
+    pageId: 'help',
+    group: 'System',
+  },
+  {
+    id: 'help-assistant',
+    titleKey: 'help.assistant.title',
+    descKey: 'help.assistant.desc',
+    keywords: ['ask settings', 'settings assistant', 'where is', 'find a setting', 'help me find', 'question'],
+    pageId: 'help',
+    group: 'System',
+  },
+  // onb2: help search over "how do I…" topics, and re-running first-run setup.
+  {
+    id: 'help-search',
+    titleKey: 'onb2.helpSearch.title',
+    descKey: 'onb2.helpSearch.desc',
+    keywords: ['help', 'search help', 'how do i', 'faq', 'guide', 'topics', 'documentation'],
+    pageId: 'help',
+    group: 'System',
+  },
+  {
+    id: 'first-run-setup',
+    titleKey: 'onb2.helpCard.title',
+    descKey: 'onb2.helpCard.desc',
+    keywords: ['setup', 'first run', 'getting started', 'wizard', 'checklist', 'onboarding', 'download dictionary'],
     pageId: 'help',
     group: 'System',
   },
@@ -1949,6 +2008,7 @@ const GROUP_LABEL_KEY: Record<string, string> = {
   Desktop: 'settings.group.desktop',
   Study: 'settings.group.study',
   Media: 'settings.group.media',
+  Connections: 'set2.group.connections',
   System: 'settings.group.system',
 };
 

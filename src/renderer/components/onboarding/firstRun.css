@@ -1,0 +1,530 @@
+/* First-run setup (onb2) and the first-steps checklist. Loaded only with
+   their lazy chunks, never at boot. Palette tokens only, so every theme and
+   the high-contrast / forced-colors modes carry through. */
+
+.frs-root {
+  position: fixed;
+  inset: 0;
+  z-index: 98500; /* above shell chrome, below the tour (99000) */
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(6 8 14 / 62%);
+}
+
+.frs-card {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 100%);
+  max-height: calc(100vh - 32px);
+  color: var(--text, #e8e8ef);
+  background: var(--panel, #1b1b21);
+  border: 1px solid var(--control-border, #3a3a44);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 50%);
+  overflow: hidden;
+}
+
+.frs-head {
+  padding: 18px 22px 8px;
+}
+
+.frs-progress {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.frs-steps {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.frs-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border: 1px solid var(--control-border, #3a3a44);
+  border-radius: 999px;
+  opacity: 0.55;
+}
+
+.frs-step-dot.is-done {
+  opacity: 0.85;
+  color: var(--accent, #d84a68);
+}
+
+.frs-step-dot.is-current {
+  opacity: 1;
+  color: var(--accent, #d84a68);
+  border-color: var(--accent, #d84a68);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #d84a68) 25%, transparent);
+}
+
+.frs-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.frs-title:focus {
+  outline: none;
+}
+
+.frs-title:focus-visible {
+  outline: 2px solid var(--accent, #d84a68);
+  outline-offset: 3px;
+}
+
+.frs-intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  opacity: 0.86;
+}
+
+.frs-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px 22px;
+  overflow-y: auto;
+}
+
+.frs-fieldset {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.frs-legend {
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.frs-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.frs-choice-list {
+  display: grid;
+  gap: 6px;
+}
+
+.frs-choice,
+.frs-theme {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: inherit;
+  text-align: start;
+  background: color-mix(in srgb, var(--text, #e8e8ef) 4%, transparent);
+  border: 1px solid var(--control-border, #3a3a44);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+}
+
+.frs-choice--row {
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.frs-choice:hover,
+.frs-theme:hover {
+  border-color: color-mix(in srgb, var(--accent, #d84a68) 60%, var(--control-border, #3a3a44));
+}
+
+.frs-choice.is-selected,
+.frs-theme.is-selected {
+  border-color: var(--accent, #d84a68);
+  box-shadow: inset 0 0 0 1px var(--accent, #d84a68);
+  background: color-mix(in srgb, var(--accent, #d84a68) 12%, transparent);
+}
+
+.frs-choice:focus-visible,
+.frs-theme:focus-visible {
+  outline: 2px solid var(--accent, #d84a68);
+  outline-offset: 2px;
+}
+
+.frs-choice-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.frs-choice-desc {
+  font-size: 12px;
+  opacity: 0.78;
+  overflow-wrap: anywhere;
+}
+
+.frs-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.frs-check input {
+  margin-top: 2px;
+  min-width: 16px;
+  min-height: 16px;
+}
+
+.frs-check.is-disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.frs-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
+.frs-note--error {
+  color: var(--danger, #e5484d);
+  opacity: 1;
+}
+
+.frs-note--ok {
+  color: var(--success, #3fb950);
+  opacity: 1;
+}
+
+.frs-points {
+  margin: 0 0 12px;
+  padding-inline-start: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.frs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.frs-dl-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.frs-dl-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--control-border, #3a3a44);
+  border-radius: var(--radius-md, 8px);
+}
+
+.frs-dl-row.is-ready {
+  border-color: color-mix(in srgb, var(--success, #3fb950) 50%, var(--control-border, #3a3a44));
+}
+
+.frs-dl-main {
+  display: grid;
+  flex: 1 1 260px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.frs-dl-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.frs-dl-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.frs-dl-desc,
+.frs-dl-status {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.frs-dl-status.is-error {
+  color: var(--danger, #e5484d);
+  opacity: 1;
+}
+
+.frs-dl-bar {
+  display: block;
+  height: 6px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text, #e8e8ef) 12%, transparent);
+  border-radius: 999px;
+}
+
+.frs-dl-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent, #d84a68);
+  transition: width 200ms ease;
+}
+
+.frs-dl-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--success, #3fb950);
+}
+
+.frs-dl-actions .btn {
+  color: var(--text, #e8e8ef);
+}
+
+.frs-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.frs-theme-preview {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  margin-bottom: 4px;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid rgb(0 0 0 / 25%);
+}
+
+.frs-tp-window {
+  position: absolute;
+  left: 14%;
+  top: 16%;
+  width: 52%;
+  height: 52%;
+  border-radius: 4px;
+}
+
+.frs-tp-window--back {
+  left: 38%;
+  top: 28%;
+  opacity: 0.75;
+}
+
+.frs-tp-bar {
+  position: absolute;
+  inset: auto 0 0;
+  height: 14%;
+}
+
+/* Each preview is an illustration of the look, not a live render. */
+.frs-theme-preview--study-os {
+  background: linear-gradient(160deg, #1d2b26, #11171a);
+}
+.frs-theme-preview--study-os .frs-tp-window { background: #24312c; border: 1px solid #3c5148; }
+.frs-theme-preview--study-os .frs-tp-bar { background: #0d1311; }
+
+.frs-theme-preview--aero {
+  background: linear-gradient(170deg, #7fd3f7, #2f8fd8 55%, #3cb371);
+}
+.frs-theme-preview--aero .frs-tp-window {
+  background: linear-gradient(180deg, rgb(255 255 255 / 75%), rgb(210 235 255 / 55%));
+  border: 1px solid rgb(255 255 255 / 85%);
+  border-radius: 6px;
+}
+.frs-theme-preview--aero .frs-tp-bar { background: linear-gradient(180deg, rgb(20 60 110 / 85%), rgb(10 30 60 / 90%)); }
+
+.frs-theme-preview--wired {
+  background: repeating-linear-gradient(0deg, #0b0b0b 0 3px, #141414 3px 4px);
+}
+.frs-theme-preview--wired .frs-tp-window { background: #120c0c; border: 1px solid #c4382f; border-radius: 0; }
+.frs-theme-preview--wired .frs-tp-bar { background: #1c0d0b; border-top: 1px solid #c4382f; }
+
+.frs-theme-preview--blanc {
+  background: #f4f1ea;
+}
+.frs-theme-preview--blanc .frs-tp-window { background: #ffffff; border: 1px solid #ddd6c8; }
+.frs-theme-preview--blanc .frs-tp-window--back { display: none; }
+.frs-theme-preview--blanc .frs-tp-bar { display: none; }
+
+.frs-summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+.frs-summary dt {
+  opacity: 0.7;
+}
+
+.frs-summary dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.frs-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 22px 16px;
+  border-top: 1px solid var(--control-border, #3a3a44);
+}
+
+.frs-foot-left,
+.frs-foot-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.frs-quiet {
+  background: transparent;
+}
+
+.frs-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- First five minutes checklist -------------------------------------- */
+
+.fsc-root {
+  position: fixed;
+  left: 16px;
+  bottom: calc(var(--taskbar-h, 48px) + 12px);
+  z-index: 9000;
+  width: min(300px, calc(100vw - 32px));
+  color: var(--text, #e8e8ef);
+  background: var(--panel, #1b1b21);
+  border: 1px solid var(--control-border, #3a3a44);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 40%);
+}
+
+.fsc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 8px 12px;
+}
+
+.fsc-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fsc-count {
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.fsc-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fsc-icon-btn:hover,
+.fsc-icon-btn:focus-visible {
+  background: color-mix(in srgb, var(--text, #e8e8ef) 10%, transparent);
+}
+
+.fsc-meter {
+  display: block;
+  height: 4px;
+  margin: 0 12px 6px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text, #e8e8ef) 12%, transparent);
+  border-radius: 999px;
+}
+
+.fsc-meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent, #d84a68);
+}
+
+.fsc-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0 8px 8px;
+  list-style: none;
+}
+
+.fsc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.fsc-item.is-done .fsc-item-text {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.fsc-item-mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--accent, #d84a68);
+}
+
+.fsc-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fsc-done {
+  margin: 0;
+  padding: 0 12px 10px;
+  font-size: 12px;
+}

@@ -14,7 +14,7 @@
  * The paired HTML entry is `blanc.html`; `vite.renderer.config.ts` emits both,
  * and `main.ts` points the Blanc window at it.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import BlancShell, { BlancLockscreen } from './components/blanc/BlancShell';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
@@ -36,7 +36,7 @@ import { startAiSetupSync } from './aiSetupClient';
 import { installBlancConsoleCapture } from './blancConsole';
 import { installNotificationCapture } from './notificationStore';
 import { clearOnExitIfConfigured } from './clipboardHistory';
-import { markLockscreenUnlocked, shouldShowLockscreen } from './lockscreenSettings';
+import { markLockscreenUnlocked, shouldShowLockscreen, syncLockscreenToMain } from './lockscreenSettings';
 import { initAgentOperationalState } from './agentOperationalClient';
 import { awaitStartupRestore } from './startupRestore';
 
@@ -147,6 +147,31 @@ void import('./blancBackgroundJobs')
 
 function BlancRoot() {
   const [locked, setLocked] = useState(() => shouldShowLockscreen());
+
+  // Main owns the lock (main/lockscreenPin.ts, lockGuard.ts). Blanc used to read
+  // only its own session flag, so a lock armed elsewhere — the Study OS "lock now",
+  // Secret OS entry, a Blanc-only launch main had not adopted yet — never reached
+  // it. Mirror the settings to main (adopted once, as Study OS does), take on a
+  // lock main holds or arms later, and drop it when another window unlocks.
+  useEffect(() => {
+    syncLockscreenToMain(undefined, shouldShowLockscreen());
+    let alive = true;
+    void window.api?.lockscreenIsLocked?.()
+      .then((mainLocked) => {
+        if (alive && mainLocked) setLocked(true);
+      })
+      .catch(() => undefined);
+    const offLocked = window.api?.onLockscreenLocked?.(() => setLocked(true));
+    const offUnlocked = window.api?.onLockscreenUnlocked?.(() => {
+      markLockscreenUnlocked();
+      setLocked(false);
+    });
+    return () => {
+      alive = false;
+      offLocked?.();
+      offUnlocked?.();
+    };
+  }, []);
 
   const onUnlocked = useCallback(() => {
     markLockscreenUnlocked();

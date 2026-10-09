@@ -39,6 +39,7 @@ import {
   type YoutubeReason,
 } from '../../../shared/youtubeDiscovery';
 import type { StudyLevel } from '../../../shared/mediaDiscovery';
+import { youtubeErrorMessage } from '../../../shared/youtubeErrors';
 import {
   addToShortlist,
   loadYoutubeShortlist,
@@ -46,6 +47,16 @@ import {
   removeFromShortlist,
   type YoutubeShortlistEntry,
 } from '../../discoveryShortlistStore';
+
+/**
+ * yt-dlp's English stderr, said in the UI language where it is a failure the app
+ * knows (private, age-gated, rate-limited, offline...). Anything else stays as the
+ * detail inside the translated frame the caller already renders.
+ */
+export function knownYtDetail(raw: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  const known = youtubeErrorMessage(raw);
+  return known ? t(known.key, known.vars) : raw;
+}
 
 /** The wire states, plus the two only a console has: nothing asked, and in flight. */
 export type YoutubeLoadState = YoutubeFetchState | 'idle' | 'loading';
@@ -576,7 +587,7 @@ export function YoutubeDiscoveryResults({ state }: { state: YoutubeDiscoveryStat
   } else if (view === 'results' && loadState === 'error') {
     body = (
       <div className="disc-placeholder disc-placeholder-error">
-        {t('ytDiscovery.state.error')}{message ? ` — ${message}` : ''}
+        {t('ytDiscovery.state.error')}{message ? ` — ${knownYtDetail(message, t)}` : ''}
       </div>
     );
   } else if (view === 'results' && loadState === 'idle') {
@@ -795,7 +806,7 @@ export function YoutubeDiscoveryInspector({ state }: { state: YoutubeDiscoverySt
       {probeError && probeError.videoId === candidate.videoId ? (
         <p className="disc-insp-note disc-insp-error" role="alert">
           {probeError.message
-            ? t('ytDiscovery.notice.probeFailedDetail', { detail: probeError.message })
+            ? t('ytDiscovery.notice.probeFailedDetail', { detail: knownYtDetail(probeError.message, t) })
             : t('ytDiscovery.notice.probeFailed')}
         </p>
       ) : null}

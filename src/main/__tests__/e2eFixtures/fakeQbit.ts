@@ -21,6 +21,28 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { placeMedia } from './media';
+import { parseTorrentFile } from '../../scraper/torrentFile';
+
+/** The parts of a multipart/form-data body (enough of RFC 7578 for qBittorrent's add form). */
+function parseMultipart(body: Buffer, boundary: string): Array<{ name: string; fileName?: string; data: Buffer }> {
+  const marker = Buffer.from(`--${boundary.replace(/^"|"$/g, '')}`);
+  const out: Array<{ name: string; fileName?: string; data: Buffer }> = [];
+  let at = body.indexOf(marker);
+  while (at >= 0) {
+    const start = at + marker.length;
+    if (body.subarray(start, start + 2).toString() === '--') break;
+    const next = body.indexOf(marker, start);
+    if (next < 0) break;
+    const part = body.subarray(start + 2, next - 2); // skip CRLF after the marker and before the next
+    const split = part.indexOf('\r\n\r\n');
+    const head = part.subarray(0, split).toString();
+    const name = /name="([^"]*)"/.exec(head)?.[1] ?? '';
+    const fileName = /filename="([^"]*)"/.exec(head)?.[1];
+    out.push({ name, ...(fileName !== undefined ? { fileName } : {}), data: part.subarray(split + 4) });
+    at = next;
+  }
+  return out;
+}
 
 export interface FakeTorrent {
   hash: string;
@@ -114,9 +136,12 @@ export async function startFakeQbit(opts: FakeQbitOptions): Promise<FakeQbit> {
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://qbit.invalid');
+    const chunks: Buffer[] = [];
     let raw = '';
-    req.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+    req.on('data', (chunk: Buffer) => { chunks.push(chunk); });
     req.on('end', () => {
+      const bytes = Buffer.concat(chunks);
+      raw = bytes.toString();
       calls.push(`${req.method} ${url.pathname}`);
       const json = (value: unknown) => {
         res.writeHead(200, { 'content-type': 'application/json' });
@@ -176,10 +201,31 @@ export async function startFakeQbit(opts: FakeQbitOptions): Promise<FakeQbit> {
             text(200, 'Fails.');
             return;
           }
-          const form = new URLSearchParams(raw);
+          // `.torrent` files arrive as multipart/form-data `torrents` parts.
+          const multipart = /multipart\/form-data;\s*boundary=(.+)$/i.exec(req.headers['content-type'] ?? '');
+          const parts = multipart ? parseMultipart(bytes, multipart[1]) : [];
+          const form = multipart
+            ? new URLSearchParams(parts.filter((p) => !p.fileName).map((p) => [p.name, p.data.toString()]))
+            : new URLSearchParams(raw);
           const requested = form.get('savepath') || '';
           const localDir = requested && !opts.reportedSavePath ? requested : opts.defaultSavePath;
           const added: string[] = [];
+          for (const part of parts.filter((p) => p.name === 'torrents')) {
+            const info = parseTorrentFile(part.data);
+            if (!info.ok) continue;
+            fs.mkdirSync(localDir, { recursive: true });
+            torrents.set(info.infoHash, {
+              hash: info.infoHash,
+              name: info.name,
+              localDir,
+              category: form.get('category') ?? '',
+              tags: form.get('tags') ?? '',
+              state: 'downloading',
+              progress: 0,
+              size: fs.statSync(opts.mediaPath).size,
+            });
+            added.push(info.infoHash);
+          }
           for (const magnet of (form.get('urls') ?? '').split(/\r?\n/).filter(Boolean)) {
             const hash = (/btih:([0-9a-zA-Z]+)/.exec(magnet)?.[1] ?? '').toLowerCase();
             if (!hash) continue;

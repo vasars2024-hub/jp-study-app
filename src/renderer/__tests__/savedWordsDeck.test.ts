@@ -73,8 +73,21 @@ describe('saved words on the deck', () => {
     addSaved({ word: '猫', reading: 'ねこ', meaning: 'cat', addedAt: 0 });
     addSaved({ word: '犬', reading: 'いぬ', meaning: 'dog', addedAt: 0 });
     const cat = loadSavedCards().find((card) => card.word === '猫')!;
-    for (let i = 0; i < 8; i++) reviewDeckCard(cat.id, 'again');
+    // Real lapses, as Anki counts them: an Again on a card in REVIEW state, with
+    // a successful relearning answer in between. Agains on a new or relearning
+    // card are not lapses, so eight Agains in a row never made a leech.
+    const dueOf = (): number => loadDeck().find((card) => card.id === cat.id)!.srs!.dueAt;
+    let at = Date.now() - 400 * 86_400_000;
+    reviewDeckCard(cat.id, 'good', at);
+    for (let i = 0; i < 8; i++) {
+      at = dueOf();
+      reviewDeckCard(cat.id, 'again', at);
+      at = dueOf();
+      reviewDeckCard(cat.id, 'good', at);
+    }
     const leech = loadDeck().find((card) => card.id === cat.id)!;
+    expect(leech.srs?.lapses).toBe(8);
+    expect(leech.tags).toContain('leech');
     addDeckCardsTracked([
       { ...leech, word: '鳥', source: 'epub' },
       { ...leech, word: 'cat', studyLang: 'en' },

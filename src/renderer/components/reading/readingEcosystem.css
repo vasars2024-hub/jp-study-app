@@ -1,0 +1,134 @@
+/* Reading ecosystem additions: the Library's Continue reading shelf and list
+   progress bars, the reader's live speed readout, and the Immersion site stats.
+   Colours come from the theme's own tokens, so every material set re-skins
+   them without a rule of its own. */
+
+.lib-continue {
+  margin: 0 0 12px;
+}
+.lib-continue-head {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+}
+.lib-continue-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(168px, 220px);
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 4px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.lib-continue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lib-continue-card:hover,
+.lib-continue-card:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.lib-continue-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-continue-meta {
+  font-size: 11px;
+}
+
+.lib-progress-bar {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+.lib-progress-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.lib-list-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.lib-list-progress > .lib-progress-bar {
+  flex: 1 1 auto;
+  min-width: 24px;
+}
+
+/* Novel reader: live reading speed and this book's totals, in the footer. */
+.reader-speed {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Statistics: Immersion reading per site. */
+.stats-immersion-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.stats-immersion-table th,
+.stats-immersion-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+.stats-immersion-table th:first-child {
+  overflow: hidden;
+  max-width: 220px;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+.stats-immersion-table thead th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Immersion: per-site totals in the stats card. */
+.immersion-top-sites {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+.immersion-top-sites li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+.immersion-top-sites .immersion-top-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.immersion-top-sites .immersion-top-figures {
+  flex: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

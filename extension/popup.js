@@ -615,3 +615,14 @@ recPendingEl.addEventListener('click', async (e) => {
 void (async () => {
   await Promise.all([refreshStatus(), refreshPage(), refreshRecent(), refreshModes(), refreshRecorder()]);
 })();
+
+/**
+ * While a recording runs or one is still on its way to Gum, keep the row live:
+ * the Stop label carried a clock frozen at "0:00", and a recording the app had
+ * already finished stayed listed as "waiting" with Upload/Discard on it for as
+ * long as the popup stayed open (seen in Chrome, 2026-10-08).
+ */
+const RECORDER_TICK_MS = 1000;
+setInterval(() => {
+  if (!recStopBtn.hidden || !recPendingEl.hidden) void refreshRecorder();
+}, RECORDER_TICK_MS);

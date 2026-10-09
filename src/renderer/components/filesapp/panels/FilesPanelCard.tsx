@@ -17,6 +17,7 @@
  * colour, and no `os-set-*` class, so nothing here inherits Settings chrome.
  */
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
 
 export interface FilesPanelCardProps {
   /**
@@ -45,8 +46,10 @@ export function FilesPanelCard({
   const titleId = useId();
 
   useEffect(() => {
-    if (!focused || !ref.current) return;
-    ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!focused || !ref.current) return undefined;
+    // The shared helper (a11y2): it jumps instead of gliding under reduced
+    // motion, and lands the card even where this renderer refuses smooth scroll.
+    return scrollIntoViewReliably(ref.current, { block: 'nearest' });
   }, [focused]);
 
   return (

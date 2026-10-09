@@ -16,6 +16,14 @@ import type { LocalSrsRating } from './localSrs';
  */
 export type ReviewLogMode = 'review' | 'learn' | 'test' | 'write' | 'grammar' | 'game';
 
+/**
+ * Where a `review` row came from when it was not a review surface. `game`: a
+ * Game Arena answer that graded a due card (only with the opt-in setting). Such
+ * a row moved the schedule, but a multiple-choice pick is not a recall test, so
+ * it is kept out of FSRS training and out of true-retention figures.
+ */
+export type ReviewLogSource = 'game';
+
 export interface ReviewLogEntry {
   id: string;
   /** Epoch ms of the answer. */
@@ -34,7 +42,27 @@ export interface ReviewLogEntry {
   intervalDays?: number;
   /** First time the card was ever reviewed. */
   isNew?: boolean;
+  /**
+   * Milliseconds from the card being shown to the grade, capped like Anki's
+   * answer timer (`REVIEW_ANSWER_CAP_MS`). Absent on rows written before the
+   * timer existed and on surfaces that do not time answers.
+   */
+  durationMs?: number;
+  /** Set when the row was not written by a review surface (see `ReviewLogSource`). */
+  source?: ReviewLogSource;
 }
+
+/**
+ * A real recall test on a review surface: what true retention and the FSRS
+ * optimiser may read. Practice rows (`learn`, `test`, `game`, ...) and reviews
+ * graded from a game are not.
+ */
+export function isRecallReview(entry: Pick<ReviewLogEntry, 'mode' | 'source'>): boolean {
+  return entry.mode === 'review' && entry.source === undefined;
+}
+
+/** Longest answer a review row records: one idle minute is not one minute of study. */
+export const REVIEW_ANSWER_CAP_MS = 60_000;
 
 /** Bound on stored rows: roughly a year of heavy daily review. */
 export const REVIEW_LOG_LIMIT = 50_000;
@@ -67,6 +95,9 @@ export function normalizeReviewLogEntry(value: unknown): ReviewLogEntry | null {
   if (prev !== undefined) entry.prevIntervalDays = prev;
   if (next !== undefined) entry.intervalDays = next;
   if (raw.isNew === true) entry.isNew = true;
+  const duration = finite(raw.durationMs);
+  if (duration !== undefined && duration >= 0) entry.durationMs = Math.min(REVIEW_ANSWER_CAP_MS, Math.round(duration));
+  if (raw.source === 'game') entry.source = 'game';
   return entry;
 }
 
@@ -162,7 +193,7 @@ export function summarizeReviewLog(
       bucket.reviews += 1;
       if (entry.correct) bucket.passed += 1;
       reviews += 1;
-      if (!entry.isNew && (entry.prevIntervalDays ?? 0) >= 1) {
+      if (isRecallReview(entry) && !entry.isNew && (entry.prevIntervalDays ?? 0) >= 1) {
         matureReviews += 1;
         if (entry.correct) maturePassed += 1;
       }

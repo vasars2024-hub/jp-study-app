@@ -56,12 +56,17 @@ export type AgentToolOperationId =
   | 'study.open-context'
   | 'study.stats-summary'
   | 'study.known-words'
+  | 'study.recommend-next'
+  | 'study.cards-from-text'
+  | 'study.quiz-mined-today'
+  | 'study.plan-week'
   | 'dictionary.lookup'
   | 'dictionary.explain-grammar'
   | 'dictionary.analyze-sentence'
   | 'dictionary.search-knowledge'
   | 'calendar.list'
   | 'calendar.schedule-session'
+  | 'calendar.schedule-sessions'
   | 'calendar.create-reminder'
   | 'calendar.delete-event'
   | 'settings.read'
@@ -134,6 +139,8 @@ const REQUIRED_ARGUMENTS: Partial<Record<AgentToolOperationId, readonly string[]
   'dictionary.analyze-sentence': ['term'],
   'dictionary.search-knowledge': ['query'],
   'calendar.schedule-session': ['title', 'date'],
+  'calendar.schedule-sessions': ['sessions'],
+  'study.cards-from-text': ['text'],
   'calendar.create-reminder': ['title', 'date'],
   'calendar.delete-event': ['id'],
   'settings.change-preference': ['key', 'value'],
@@ -184,6 +191,22 @@ const ARGUMENT_HINTS: Partial<Record<AgentToolOperationId, Readonly<Record<strin
   },
   'calendar.schedule-session': {
     reminder: "Optional notification: 'at', '5m', '15m', '30m', '1h', '1d' before. Default 'none'.",
+  },
+  'calendar.schedule-sessions': {
+    sessions: '[{ title, date: YYYY-MM-DD, startTime: HH:MM, endTime: HH:MM }], up to 14. Usually the output of study.plan-week.',
+  },
+  'study.cards-from-text': {
+    text: 'The study-language text to find unknown words in (up to 2000 characters).',
+    limit: 'Most words to propose. Default 12, capped at 25.',
+  },
+  'study.plan-week': {
+    startTime: "HH:MM to start each session. Default '19:00'.",
+  },
+  'dictionary.analyze-sentence': {
+    term: 'One sentence in the study language.',
+  },
+  'dictionary.explain-grammar': {
+    term: 'A grammar pattern (e.g. 〜ている) or a sentence that uses it.',
   },
 };
 
@@ -266,12 +289,19 @@ export const AGENT_TOOL_OPERATIONS: readonly AgentToolOperationDefinition[] = [
   operation('study.open-context', 'study', 'Open the media Study context', 'limited-actions'),
   operation('study.stats-summary', 'study', 'Read study statistics', 'read-only'),
   operation('study.known-words', 'study', 'Read known-word counts or one word\'s level', 'read-only'),
+  operation('study.recommend-next', 'study', 'Recommend what to study now', 'read-only'),
+  operation('study.cards-from-text', 'study', 'Find unknown words in a text to make cards', 'read-only'),
+  operation('study.quiz-mined-today', 'study', 'Quiz the words mined today in the Game Arena', 'limited-actions'),
+  operation('study.plan-week', 'study', 'Plan a week of study sessions', 'read-only'),
   operation('dictionary.lookup', 'dictionary', 'Look up a word', 'read-only'),
   operation('dictionary.explain-grammar', 'dictionary', 'Explain grammar', 'read-only'),
   operation('dictionary.analyze-sentence', 'dictionary', 'Analyze a sentence', 'read-only'),
   operation('dictionary.search-knowledge', 'dictionary', 'Search local knowledge', 'read-only'),
   operation('calendar.list', 'calendar', 'List calendar entries', 'read-only'),
   operation('calendar.schedule-session', 'calendar', 'Schedule a study session', 'limited-actions'),
+  // Several events in one step: confirmed on its own, so a week of sessions is never added
+  // by the same click that ran the step before it.
+  operation('calendar.schedule-sessions', 'calendar', 'Schedule several study sessions', 'limited-actions', 'major-change'),
   operation('calendar.create-reminder', 'calendar', 'Create a reminder', 'limited-actions'),
   operation('calendar.delete-event', 'calendar', 'Delete a calendar event', 'full-automation', 'delete-data'),
   operation('settings.read', 'settings', 'Read settings', 'read-only'),

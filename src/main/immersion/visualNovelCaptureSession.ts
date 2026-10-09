@@ -60,6 +60,10 @@ const RECONNECT_MIN_MS = 1_500;
 const RECONNECT_MAX_MS = 15_000;
 /** A test session ends itself; it exists to answer "is my hooker wired up?". */
 export const TEST_CAPTURE_MS = 60_000;
+/** The same text again from the same hook inside this window is the hook re-firing, not the game. */
+export const SAME_SOURCE_BURST_MS = 400;
+/** How long the other pipe of a two-source hooker may lag behind with its copy of a line. */
+export const CROSS_SOURCE_ECHO_MS = 3_000;
 
 export function createCaptureSession(deps: CaptureSessionDeps) {
   const now = deps.now ?? Date.now;
@@ -76,9 +80,18 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
   let reconnectDelay = RECONNECT_MIN_MS;
   let testTimer: unknown = null;
   let generation = 0;
-  /** The last text seen from ANY source, so a hooker wired to both is not captured twice. */
+  /**
+   * The last ACCEPTED line, its source and the other sources that have since
+   * echoed it. A hooker wired to both pipes delivers every line twice (once per
+   * source), so the first echo from another source is dropped; a burst of the
+   * same text from the SAME source is a hook re-firing and is dropped too. Any
+   * other repeat is the game really saying the line again ("はい。" twice in a
+   * row) and is kept, which a flat "same text within 3 s" rule used to lose.
+   */
   let lastText = '';
   let lastTextAt = 0;
+  let lastSource: VisualNovelCaptureSource | null = null;
+  let echoedBy = new Set<VisualNovelCaptureSource>();
 
   const publish = (patch: Partial<VisualNovelCaptureState>): VisualNovelCaptureState => {
     state = { ...state, ...patch };
@@ -86,12 +99,24 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     return state;
   };
 
+  /** True when `collapsed` is a duplicate delivery of the line just accepted, not a new reading of it. */
+  const isEchoOfLastLine = (collapsed: string, source: VisualNovelCaptureSource): boolean => {
+    if (collapsed !== lastText || lastSource === null) return false;
+    const elapsed = now() - lastTextAt;
+    if (source === lastSource) return elapsed < SAME_SOURCE_BURST_MS;
+    if (elapsed >= CROSS_SOURCE_ECHO_MS || echoedBy.has(source)) return false;
+    echoedBy.add(source);
+    return true;
+  };
+
   const receive = (text: string, source: VisualNovelCaptureSource): void => {
     if (!state.active || !isCapturableText(text)) return;
     const collapsed = text.replace(/\s+/g, '');
-    if (collapsed === lastText && now() - lastTextAt < 3_000) return;
+    if (isEchoOfLastLine(collapsed, source)) return;
     lastText = collapsed;
     lastTextAt = now();
+    lastSource = source;
+    echoedBy = new Set();
     const line = parseVisualNovelTextBox(text);
     if (!line) return;
     let added = 1;
@@ -209,6 +234,8 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
         lastClipboard = '';
       }
       lastText = '';
+      lastSource = null;
+      echoedBy = new Set();
       reconnectDelay = RECONNECT_MIN_MS;
       state = {
         ...idleVisualNovelCaptureState(),

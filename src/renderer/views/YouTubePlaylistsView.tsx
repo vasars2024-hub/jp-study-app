@@ -36,6 +36,14 @@ import {
   type YtVideo,
 } from '../../shared/ytPlaylists';
 import { setHandoff } from '../pendingHandoff';
+import { requestMediaCenterPlay } from '../mediaCenterIntent';
+import type { MediaItem } from '../../shared/types';
+import {
+  normalizeVideoCoreResumePositions,
+  VIDEO_CORE_RESUME_STORAGE_KEY,
+  type VideoCoreResumePosition,
+} from '../../shared/videoCoreStudy';
+import { formatResumeClock, ytWatchState, type YtWatchState } from '../../shared/ytWatchProgress';
 
 const ROW_H = 64;
 const SUB_OPTS: YtSubLang[] = ['ja', 'zh', 'en', 'ru'];
@@ -104,16 +112,63 @@ function CommitInput({
   );
 }
 
-function openInVideoPlayer(mediaItemId: string, whisperLang?: YtStudyLang): void {
-  if (whisperLang === 'ja' || whisperLang === 'zh') {
+/**
+ * Play a downloaded video in the study player, in one step, resuming where the
+ * learner stopped.
+ *
+ * This used to park the id in a session handoff and open the Video tab, which
+ * read it only when it MOUNTED and then showed a status card with a second
+ * "Open in workspace" button — so from an already-open Media Center, or a
+ * popped-out YouTube window, Open loaded nothing, and otherwise it took two
+ * clicks to reach the player that has auto-pause, line loop and one-key mining.
+ * `requestMediaCenterPlay` is the app's "play this file" path (the one a dropped
+ * file takes): parked until a Media Center takes it, live if one is mounted, and
+ * the player resumes from its own resume store.
+ *
+ * The study language follows the playlist's (subtitles, dictionary and known
+ * words are per study language) — but it is said, not done silently.
+ */
+async function openInVideoPlayer(
+  mediaItemId: string,
+  whisperLang: YtStudyLang | undefined,
+  known: MediaItem | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): Promise<void> {
+  if ((whisperLang === 'ja' || whisperLang === 'zh') && getStudyLang() !== whisperLang) {
     setStudyLang(whisperLang);
+    window.dispatchEvent(new CustomEvent('os:toast', {
+      detail: { message: t(`yt2.studyLangSwitched.${whisperLang}`), kind: 'ok' },
+    }));
   }
+  let item = known;
+  if (!item) {
+    try {
+      const items = await window.api.listMedia();
+      item = Array.isArray(items) ? items.find((candidate) => candidate.id === mediaItemId) : undefined;
+    } catch {
+      item = undefined;
+    }
+  }
+  if (item) {
+    requestMediaCenterPlay(item);
+    return;
+  }
+  // The library no longer knows the id: the old route at least lands on the Video tab,
+  // which says the file is missing rather than doing nothing.
   try {
     setHandoff('mediaId', mediaItemId);
   } catch {
     /* ignore */
   }
   window.dispatchEvent(new CustomEvent('os:open', { detail: 'video' }));
+}
+
+function readResumePositions(): VideoCoreResumePosition[] {
+  try {
+    return normalizeVideoCoreResumePositions(JSON.parse(localStorage.getItem(VIDEO_CORE_RESUME_STORAGE_KEY) ?? '[]'));
+  } catch {
+    return [];
+  }
 }
 
 export default function YouTubePlaylistsView() {
@@ -149,6 +204,57 @@ export default function YouTubePlaylistsView() {
   const playlists = store.playlists ?? [];
   const videos = store.videos ?? [];
   const planToWatchIds = store.planToWatchIds ?? [];
+
+  // Watch progress: the library items the downloads became, and the player's resume store.
+  // Re-read when the window regains focus — the learner watches in the player window and
+  // comes back here — and whenever the set of downloaded videos changes.
+  const [mediaById, setMediaById] = useState<Map<string, MediaItem>>(() => new Map());
+  const [resumePositions, setResumePositions] = useState<VideoCoreResumePosition[]>(() => readResumePositions());
+  const downloadedKey = useMemo(
+    () => videos.filter((v) => v.downloaded && v.mediaItemId).map((v) => v.mediaItemId).join('|'),
+    [videos],
+  );
+  useEffect(() => {
+    let alive = true;
+    const refreshWatch = (): void => {
+      setResumePositions(readResumePositions());
+      if (!downloadedKey || typeof window.api?.listMedia !== 'function') return;
+      void window.api.listMedia()
+        .then((items) => {
+          if (alive && Array.isArray(items)) setMediaById(new Map(items.map((item) => [item.id, item])));
+        })
+        .catch(() => undefined);
+    };
+    refreshWatch();
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') refreshWatch();
+    };
+    window.addEventListener('focus', refreshWatch);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      alive = false;
+      window.removeEventListener('focus', refreshWatch);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [downloadedKey]);
+  const watchByVideoId = useMemo(() => {
+    const out = new Map<string, YtWatchState>();
+    for (const v of videos) {
+      if (!v.downloaded || !v.mediaItemId) continue;
+      const state = ytWatchState({
+        item: mediaById.get(v.mediaItemId),
+        ytDurationSec: v.durationSec,
+        positions: resumePositions,
+      });
+      if (state) out.set(v.id, state);
+    }
+    return out;
+  }, [videos, mediaById, resumePositions]);
+  const playlistLangById = useMemo(() => new Map(playlists.map((p) => [p.id, p.lang])), [playlists]);
+  const openVideo = (v: YtVideo): void => {
+    if (!v.mediaItemId) return;
+    void openInVideoPlayer(v.mediaItemId, playlistLangById.get(v.playlistId), mediaById.get(v.mediaItemId), t);
+  };
 
   const runNewsRefresh = useCallback(async (): Promise<void> => {
     setBusy(t('yt.news.checking'));
@@ -458,7 +564,7 @@ export default function YouTubePlaylistsView() {
 
   const onRowActivate = (v: YtVideo): void => {
     if (v.downloaded && v.mediaItemId) {
-      openInVideoPlayer(v.mediaItemId, playlist?.lang);
+      openVideo(v);
       return;
     }
     toggleSelect(v.id, true);
@@ -594,6 +700,7 @@ export default function YouTubePlaylistsView() {
       [!v.downloaded, t('yt.why.notLogged')],
       [!v.mediaItemId, t('yt.why.noMedia')],
     );
+    const watch = watchByVideoId.get(v.id);
     return (
       <div
         className={`yt-row${selected ? ' selected' : ''}${isVideoUnlogged(v) ? ' unlogged' : ''}${highlightId === v.id ? ' yt-row-highlight' : ''}`}
@@ -644,6 +751,19 @@ export default function YouTubePlaylistsView() {
             </span>
           ) : null}
           {v.transcribed ? <span className="yt-chip status tr">{t('yt.chip.transcribed')}</span> : null}
+          {watch?.kind === 'watched' ? (
+            <span className="yt-chip status watched">{t('yt2.chip.watched')}</span>
+          ) : null}
+          {watch?.kind === 'resume' ? (
+            <span
+              className="yt-chip status resume"
+              title={watch.fraction != null
+                ? t('yt2.chip.resumeHint', { time: formatResumeClock(watch.positionSec), pct: Math.round(watch.fraction * 100) })
+                : undefined}
+            >
+              {t('yt2.chip.resume', { time: formatResumeClock(watch.positionSec) })}
+            </span>
+          ) : null}
         </div>
         <div className="yt-row-actions" onClick={(e) => e.stopPropagation()}>
           <button
@@ -667,9 +787,11 @@ export default function YouTubePlaylistsView() {
           <button
             type="button"
             className="btn ghost small"
-            title={whyOpen ?? t('yt.action.open')}
+            title={whyOpen ?? (watch?.kind === 'resume'
+              ? t('yt2.action.resumeAt', { time: formatResumeClock(watch.positionSec) })
+              : t('yt.action.open'))}
             disabled={!!whyOpen}
-            onClick={() => v.mediaItemId && openInVideoPlayer(v.mediaItemId, playlist?.lang)}
+            onClick={() => openVideo(v)}
           >
             <Icon name="player" size={14} />
           </button>

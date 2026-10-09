@@ -37,6 +37,7 @@ type BoolKey =
   | 'vpal'
   | 'prettyWrap'
   | 'prioritizeStyles'
+  | 'publisherStyles'
   | 'hideFurigana'
   | 'wordHighlight'
   | 'hyperlinksEnabled';
@@ -68,6 +69,7 @@ const TOGGLES: { key: BoolKey; labelKey: string }[] = [
   { key: 'vpal', labelKey: 'settings.reader.toggle.vpal' },
   { key: 'prettyWrap', labelKey: 'settings.reader.toggle.prettyWrap' },
   { key: 'prioritizeStyles', labelKey: 'settings.reader.toggle.prioritizeStyles' },
+  { key: 'publisherStyles', labelKey: 'read2.novel.publisherStyles' },
   { key: 'hideFurigana', labelKey: 'settings.reader.toggle.hideFurigana' },
   { key: 'wordHighlight', labelKey: 'settings.reader.toggle.wordHighlight' },
   { key: 'hyperlinksEnabled', labelKey: 'settings.reader.toggle.hyperlinks' },

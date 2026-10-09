@@ -28,6 +28,9 @@ import {
   SelectorTesterPage,
 } from '../components/scraper/pages/ToolPages';
 import type { ScraperController } from '../components/scraper/types';
+import { SCRAPER_NAV } from '../components/scraper/scraperPages';
+import { setUiLang } from '../i18n';
+import { ensureCatalog } from '../../shared/i18n/catalogs';
 
 const PAGES: ReadonlyArray<readonly [string, ComponentType]> = [
   ['dashboard', DashboardPage],
@@ -125,6 +128,54 @@ afterEach(async () => {
   host.remove();
   localStorage.clear();
   vi.restoreAllMocks();
+});
+
+async function mount(id: string, Page: ComponentType): Promise<void> {
+  await act(async () => {
+    root = createRoot(host);
+    root.render(
+      createElement(
+        ScraperPortProvider,
+        { value: createMockScraperPort() },
+        createElement(ScraperProvider, { value: controller(id) }, createElement(Page)),
+      ),
+    );
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+describe('Scraper pages — coverage and language (round 2)', () => {
+  it('this smoke test covers every page the rail can open', () => {
+    expect(PAGES.map(([id]) => id).sort()).toEqual(SCRAPER_NAV.map((page) => page.id).sort());
+  });
+
+  it.each(PAGES)('%s renders in Russian with no raw catalog key', async (id, Page) => {
+    await ensureCatalog('ru');
+    setUiLang('ru');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      await mount(id, Page);
+      expect(host.querySelector('.scr-page')).not.toBeNull();
+      expect(host.textContent ?? '').not.toMatch(/\b(?:scr2|scraperFix|scrApp|scraperDrawer)\.[\w.-]+/);
+    } finally {
+      setUiLang('en');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  });
+
+  it('the Torrent Manager offers .torrent files when the bridge can add them', async () => {
+    (window as unknown as { api: unknown }).api = { scraperQbitAddTorrentFiles: vi.fn() };
+    try {
+      await mount('torrents', TorrentManagerPage);
+      const card = host.querySelector('[data-scr-card="qbit-torrent-files"]');
+      expect(card).not.toBeNull();
+      expect(card?.querySelector('input[type="file"][accept*=".torrent"]')).not.toBeNull();
+    } finally {
+      delete (window as { api?: unknown }).api;
+    }
+  });
 });
 
 describe('Scraper pages — each one renders', () => {

@@ -42,6 +42,7 @@ import { __clientPlatform__ } from '@/types/constants';
 import type { SeanimeConnection } from '../shared/seanime';
 import type { MediaWorkspacePlaybackRequest } from '../shared/mediaWorkspace';
 import { describeDirectstreamAbort, describeLocalOpenFailure } from '../shared/playbackFailure';
+import { youtubeIdentityFromPath } from '../shared/youtubeDownloadFiles';
 import {
   DIRECTSTREAM_MEDIA_REPORT_ONLY,
   DIRECTSTREAM_MEDIA_SILENCE_MS,
@@ -603,6 +604,9 @@ function ledgerTitleForPlayback(playbackInfo: VideoCore_VideoPlaybackInfo): stri
     return episode != null ? `${mediaTitle} — ${episode}` : mediaTitle;
   }
   const path = playbackInfo.localFile?.path ?? '';
+  // A YouTube download is named `Title [videoId].ext`; Statistics shows the title.
+  const youtube = youtubeIdentityFromPath(path);
+  if (youtube) return youtube.title;
   return path.split(/[\\/]/).pop() || playbackInfo.episode?.displayTitle || '';
 }
 

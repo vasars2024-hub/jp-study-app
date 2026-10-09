@@ -146,9 +146,23 @@ export interface LockGate {
   record(): LockRecord | null;
 }
 
-export function createLockGate(store: LockRecordStore): LockGate {
+/**
+ * `onChange` hears every transition after creation (armed, lifted, adopted) —
+ * main.ts hands it to the lock guard (`lockGuard.ts`) so arming hides content
+ * windows and lifting restores them. The state at creation is not a transition.
+ */
+export function createLockGate(store: LockRecordStore, onChange?: (locked: boolean) => void): LockGate {
   let record = asLockRecord(store.read());
-  let locked = Boolean(record?.enabled && record.pinHash);
+  let lockedState = Boolean(record?.enabled && record.pinHash);
+  const setLocked = (next: boolean) => {
+    if (next === lockedState) return;
+    lockedState = next;
+    try {
+      onChange?.(next);
+    } catch {
+      /* a listener's failure never changes the lock */
+    }
+  };
   const save = (next: LockRecord) => {
     record = next;
     try {
@@ -158,29 +172,29 @@ export function createLockGate(store: LockRecordStore): LockGate {
     }
   };
   return {
-    isLocked: () => locked,
+    isLocked: () => lockedState,
     lock() {
-      if (record?.enabled && record.pinHash) locked = true;
-      return locked;
+      if (record?.enabled && record.pinHash) setLocked(true);
+      return lockedState;
     },
     syncConfig(config, rendererLocked) {
       const next = asLockRecord(config);
-      if (!next) return { ok: false, locked };
+      if (!next) return { ok: false, locked: lockedState };
       if (!record) {
         save(next);
-        locked = next.enabled && rendererLocked === true;
-        return { ok: true, locked };
+        setLocked(next.enabled && rendererLocked === true);
+        return { ok: true, locked: lockedState };
       }
-      if (locked) return { ok: false, locked };
+      if (lockedState) return { ok: false, locked: lockedState };
       save(next);
-      return { ok: true, locked };
+      return { ok: true, locked: lockedState };
     },
     verify(pin, legacyStored, now = Date.now()) {
       // A profile main never saw: adopt the renderer's stored value once.
       if (!record && isStorablePinHash(legacyStored)) save({ enabled: true, pinHash: legacyStored });
       const res = verifyPinAttempt(pin, record?.pinHash || undefined, now);
       if (res.ok) {
-        locked = false;
+        setLocked(false);
         if (res.upgradedHash && record) save({ ...record, pinHash: res.upgradedHash });
       }
       return res;

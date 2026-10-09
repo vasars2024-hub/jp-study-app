@@ -1,0 +1,177 @@
+/* Translate workbench: options row, aligned sentences, grammar points. Shared by
+   Study OS's TranslateView and Blanc's panel, so it uses theme tokens only. */
+
+.xlate-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 8px 0;
+}
+
+.xlate-watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.xlate-study {
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.xlate-study-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.xlate-study-keys {
+  font-size: 0.85em;
+}
+
+.xlate-legend {
+  margin: 0;
+  font-size: 0.85em;
+}
+
+.xlate-align {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.xlate-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, rgb(127 127 127 / 0.25));
+  border-radius: 8px;
+}
+
+.xlate-pair:hover,
+.xlate-pair:focus-within {
+  border-color: var(--accent, #4aa3ff);
+}
+
+.xlate-src,
+.xlate-dst {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.xlate-line {
+  font-size: 1.15em;
+  line-height: 2;
+}
+
+.xlate-dst {
+  margin: 0;
+  align-self: center;
+  line-height: 1.5;
+}
+
+.xlate-pair-actions,
+.xlate-grammar-detail {
+  grid-column: 1 / -1;
+}
+
+.xlate-pair-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.xlate-line .wk-new {
+  text-decoration: underline dotted var(--accent, #4aa3ff);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.xlate-line .wk-learning {
+  text-decoration: underline dotted color-mix(in srgb, var(--accent, #4aa3ff) 45%, transparent);
+  text-underline-offset: 4px;
+}
+
+.xlate-line [data-surface] {
+  cursor: pointer;
+}
+
+.xlate-line [data-surface]:hover {
+  background: color-mix(in srgb, var(--accent, #4aa3ff) 18%, transparent);
+  border-radius: 3px;
+}
+
+.xlate-grammar-detail p {
+  margin: 4px 0 0;
+}
+
+.xlate-grammar h3 {
+  margin: 8px 0 6px;
+  font-size: 1em;
+}
+
+.xlate-grammar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.xlate-grammar-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--border, rgb(127 127 127 / 0.35));
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.xlate-grammar-chip:hover,
+.xlate-grammar-chip:focus-visible {
+  border-color: var(--accent, #4aa3ff);
+}
+
+.xlate-grammar-level {
+  font-size: 0.8em;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent, #4aa3ff) 20%, transparent);
+}
+
+.tr-history-actions:has(.tr-history-search) {
+  gap: 8px;
+  align-items: center;
+}
+
+.tr-history-search {
+  flex: 1 1 180px;
+  min-width: 0;
+  min-height: 28px;
+}
+
+.tr-history-item.is-pinned {
+  border-inline-start: 3px solid var(--accent, #4aa3ff);
+}
+
+@media (max-width: 640px) {
+  .xlate-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

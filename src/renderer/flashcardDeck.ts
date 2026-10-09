@@ -49,9 +49,11 @@ import {
 import type { FlashcardReviewMode } from '../shared/flashcardReview';
 import {
   adaptStateForAlgorithm,
+  isLeechLapse,
   migrateSrsState,
   resetSrsState,
   scheduleReview,
+  type ScheduleOptions,
 } from '../shared/flashcardScheduling';
 import { loadSchedulingConfig } from './flashcardScheduling';
 
@@ -128,6 +130,12 @@ export interface DeckFlashcard {
   studyLang?: string;
   /** When the card was first reviewed — drives the new-cards-per-day cap. */
   introducedAt?: number;
+  /**
+   * Kept out of every review sitting until the user lets it back in — what a
+   * leech becomes when the leech action is "suspend". The schedule is kept, so
+   * unsuspending resumes it rather than starting over.
+   */
+  suspended?: boolean;
 }
 
 export type DeckFolderFilter = 'all' | 'unfiled' | string;
@@ -169,7 +177,7 @@ import { getTokenizer, tokenizeSync, tokenizerReady } from './tokenizer';
 import { withoutAnkiOwned } from './ankiSchedulingOwner';
 import { getActiveProfile } from './profileState';
 import { appendReviewLog, removeReviewLogEntry } from './reviewLog';
-import type { ReviewLogEntry } from '../shared/reviewLog';
+import { REVIEW_ANSWER_CAP_MS, type ReviewLogEntry, type ReviewLogSource } from '../shared/reviewLog';
 
 /** Stable localStorage key shared with read-only Files catalogue consumers. */
 export const FLASHCARD_DECK_STORAGE_KEY = 'jp-flashcard-deck';
@@ -1148,6 +1156,25 @@ export function setDeckCardKnown(id: string, known: boolean): DeckFlashcard[] {
 }
 
 /**
+ * "Add to review now" (the Game Arena's post-game review): bring a scheduled card's due
+ * time forward to `now`, so it is in today's reviews. Nothing else about its schedule
+ * changes — the next real review grades it as usual. A card with no schedule is already
+ * due by definition and is left as it is. Returns whether a card moved.
+ */
+export function dueDeckCardNow(id: string, now = Date.now()): boolean {
+  const store = readStore();
+  const index = store.cards.findIndex((card) => card.id === id);
+  if (index < 0) return false;
+  const card = store.cards[index];
+  if (!card.srs || !Number.isFinite(card.srs.dueAt) || card.srs.dueAt <= now) return false;
+  const next: DeckFlashcard = { ...card, srs: { ...card.srs, dueAt: now } };
+  store.cards = store.cards.map((entry, i) => (i === index ? next : entry));
+  if (canWriteHot()) writeStoreHot(store, [next]);
+  else writeStore(store);
+  return true;
+}
+
+/**
  * The known-word key a review may speak for, or null.
  *
  * Only single-word cards: a sentence, grammar or kanji card is not evidence
@@ -1302,6 +1329,37 @@ export interface DeckReviewUndo {
   knowledge?: { word: string; previous: WkLevel };
   /** Levels a sentence-card review moved (may fill in after the tokenizer loads). */
   sentenceKnowledge?: Array<{ word: string; previous: WkLevel }>;
+  /** Set when this review made the card a leech: what the leech action did. */
+  leech?: { tagged: boolean; suspended: boolean };
+}
+
+/** What a review surface knows about one answer beyond its rating. */
+export interface DeckReviewDetails {
+  /** Milliseconds from the card being shown to the grade. Capped when logged. */
+  durationMs?: number;
+  /** Not a review surface (a Game Arena answer): kept out of FSRS training and true retention. */
+  source?: ReviewLogSource;
+}
+
+/** The tag a leech gets, as in Anki. */
+export const LEECH_TAG = 'leech';
+
+/**
+ * Reviews already due on each day from `now`, for load balancing. Built only
+ * when spreading is switched on, once per graded card.
+ */
+function dueLoadFor(cards: readonly DeckFlashcard[], now: number): (dayOffset: number) => number {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const from = start.getTime();
+  const perDay = new Map<number, number>();
+  for (const card of cards) {
+    const due = card.srs?.dueAt;
+    if (card.suspended || typeof due !== 'number' || !Number.isFinite(due) || due < from) continue;
+    const offset = Math.floor((due - from) / (24 * 60 * 60 * 1000));
+    perDay.set(offset, (perDay.get(offset) ?? 0) + 1);
+  }
+  return (dayOffset) => perDay.get(dayOffset) ?? 0;
 }
 
 const REVIEW_UNDO_LIMIT = 50;
@@ -1317,22 +1375,42 @@ export function reviewDeckCard(
   id: string,
   rating: LocalSrsRating,
   reviewedAt = Date.now(),
+  details: DeckReviewDetails = {},
 ): DeckFlashcard[] {
   const store = readStore();
   const index = store.cards.findIndex((card) => card.id === id);
   if (index < 0) return store.cards;
   const previous = store.cards[index];
+  const config = loadSchedulingConfig();
+  // Fuzz is seeded from the card id; the load map is only built when the user
+  // asked for reviews to be spread.
+  const options: ScheduleOptions = config.fuzz
+    ? { fuzzKey: id, dueLoad: dueLoadFor(store.cards, reviewedAt) }
+    : {};
   const next: DeckFlashcard = {
     ...previous,
     known: rating !== 'again' || undefined,
     // Through the seam, never a scheduler directly: the algorithm setting
     // stops meaning anything on whichever path skips it.
-    srs: scheduleReview(previous.srs, rating, loadSchedulingConfig(), reviewedAt),
+    srs: scheduleReview(previous.srs, rating, config, reviewedAt, options),
     // First review ever: this card now counts against today's new-card cap.
     ...(previous.srs === undefined && previous.introducedAt === undefined
       ? { introducedAt: reviewedAt }
       : {}),
   };
+  // A lapse that reaches a leech point tags the card and, when the user chose
+  // it, suspends it. Undo restores both (it restores the whole previous card's
+  // tag list and suspension).
+  let leech: DeckReviewUndo['leech'];
+  const lapses = next.srs?.lapses ?? 0;
+  if (lapses > (previous.srs?.lapses ?? 0) && isLeechLapse(lapses, config.leechThreshold)) {
+    const tags = previous.tags ?? [];
+    const tagged = !tags.includes(LEECH_TAG);
+    if (tagged) next.tags = [...tags, LEECH_TAG];
+    const suspended = config.leechAction === 'suspend' && !previous.suspended;
+    if (suspended) next.suspended = true;
+    leech = { tagged, suspended };
+  }
   store.cards = store.cards.map((card, i) => (i === index ? next : card));
   // One card changed: write that card durably now, the whole deck later.
   if (canWriteHot()) writeStoreHot(store, [next]);
@@ -1371,8 +1449,12 @@ export function reviewDeckCard(
     prevIntervalDays: previous.srs?.intervalDays ?? 0,
     intervalDays: next.srs?.intervalDays ?? 0,
     ...(previous.srs === undefined ? { isNew: true } : {}),
+    ...(typeof details.durationMs === 'number' && Number.isFinite(details.durationMs) && details.durationMs >= 0
+      ? { durationMs: Math.min(REVIEW_ANSWER_CAP_MS, Math.round(details.durationMs)) }
+      : {}),
+    ...(details.source ? { source: details.source } : {}),
   });
-  reviewUndoStack.push({ cardId: id, word: next.word, rating, previous, log, knowledge, sentenceKnowledge });
+  reviewUndoStack.push({ cardId: id, word: next.word, rating, previous, log, knowledge, sentenceKnowledge, leech });
   if (reviewUndoStack.length > REVIEW_UNDO_LIMIT) reviewUndoStack = reviewUndoStack.slice(-REVIEW_UNDO_LIMIT);
   return store.cards;
 }
@@ -1396,6 +1478,13 @@ export function undoLastReview(): { undo: DeckReviewUndo; cards: DeckFlashcard[]
     if (undo.previous.introducedAt === undefined) delete next.introducedAt;
     if (next.known === undefined) delete next.known;
     if (next.srs === undefined) delete next.srs;
+    // The leech action is part of the review, so it is taken back with it.
+    if (undo.leech?.tagged) {
+      const tags = (next.tags ?? []).filter((tag) => tag !== LEECH_TAG);
+      if (tags.length) next.tags = tags;
+      else delete next.tags;
+    }
+    if (undo.leech?.suspended) delete next.suspended;
     restored = next;
     return next;
   });
@@ -1711,14 +1800,16 @@ export function reviewSessionCards(
  * editor validated and nothing ever read. The allowance is deck-wide: cards
  * introduced today in one folder use up the same daily budget as another.
  */
-export function dueDeckCards<T extends { srs?: unknown; ankiNoteId?: number; ankiExported?: boolean; ankiPending?: boolean; ankiDuplicate?: boolean }>(
+export function dueDeckCards<T extends { srs?: unknown; ankiNoteId?: number; ankiExported?: boolean; ankiPending?: boolean; ankiDuplicate?: boolean; suspended?: boolean }>(
   cards: readonly T[],
   now = Date.now(),
   newPerDay: number | undefined = getActiveProfile().deckParams.newPerDay,
   introducedToday: number = introducedTodayCount(now),
 ): T[] {
   // "Anki owns scheduling": a card with an Anki twin is reviewed there only.
-  return limitNewCards(filterLocalReviewsDue(withoutAnkiOwned(cards), now), newPerDay, introducedToday);
+  // A suspended card (a leech the user chose to park) is due nowhere.
+  const live = withoutAnkiOwned(cards).filter((card) => !card.suspended);
+  return limitNewCards(filterLocalReviewsDue(live, now), newPerDay, introducedToday);
 }
 
 let introducedMemo: { cards: readonly DeckFlashcard[]; from: number; stamps: number[] } | null = null;
@@ -1787,12 +1878,90 @@ export function reviewSessionCounts(
 /** Lapses at which a card counts as a leech (Anki's default threshold). */
 export const LEECH_LAPSE_THRESHOLD = 8;
 
+/** The user's leech threshold (Settings), defaulting to Anki's eight. */
+export function leechThreshold(): number {
+  return loadSchedulingConfig().leechThreshold;
+}
+
 export function isLeechCard(card: Pick<DeckFlashcard, 'srs'>): boolean {
-  return (card.srs?.lapses ?? 0) >= LEECH_LAPSE_THRESHOLD;
+  return (card.srs?.lapses ?? 0) >= leechThreshold();
 }
 
 /** What the find box holds while it is narrowed to leeches. */
 export const LEECH_QUERY = 'is:leech';
+/** What the find box holds while it is narrowed to suspended cards. */
+export const SUSPENDED_QUERY = 'is:suspended';
+
+/**
+ * Suspend or unsuspend cards. The schedule is untouched either way, so a card
+ * let back in picks up where it was. Returns how many cards actually changed.
+ */
+export function setDeckCardsSuspended(ids: readonly string[], suspended: boolean): number {
+  const wanted = new Set(ids);
+  const store = readStore();
+  const changed: DeckFlashcard[] = [];
+  store.cards = store.cards.map((card) => {
+    if (!wanted.has(card.id) || Boolean(card.suspended) === suspended) return card;
+    const next: DeckFlashcard = { ...card };
+    if (suspended) next.suspended = true;
+    else delete next.suspended;
+    changed.push(next);
+    return next;
+  });
+  if (changed.length) {
+    if (canWriteHot()) writeStoreHot(store, changed);
+    else writeStore(store);
+  }
+  return changed.length;
+}
+
+/**
+ * `added:2026-10-07`, `reviewed:2026-10-07`, `due:2026-10-09` — the deck narrowed to one local
+ * day. The Calendar's day view links here ("show these cards"), and the same words typed in
+ * the find box do the same thing. `due:` is every scheduled card due by the end of that day.
+ */
+export const DECK_DATE_QUERY = /^(added|reviewed|due):(\d{4}-\d{2}-\d{2})$/;
+export type DeckDateQueryKind = 'added' | 'reviewed' | 'due';
+
+function localDateKeyOf(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** The end (exclusive) of a local `YYYY-MM-DD`, in epoch ms. */
+export function endOfLocalDay(dateKey: string): number {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, (d || 1) + 1).getTime();
+}
+
+export function deckCardMatchesDate(
+  card: Pick<DeckFlashcard, 'addedAt' | 'srs'>,
+  kind: DeckDateQueryKind,
+  dateKey: string,
+): boolean {
+  if (kind === 'added') return Number.isFinite(card.addedAt) && localDateKeyOf(card.addedAt) === dateKey;
+  const srs = card.srs;
+  if (!srs || typeof srs !== 'object') return false;
+  if (kind === 'reviewed') {
+    return Number.isFinite(srs.lastReviewedAt) && srs.lastReviewedAt > 0 && localDateKeyOf(srs.lastReviewedAt) === dateKey;
+  }
+  return Number.isFinite(srs.dueAt) && srs.dueAt < endOfLocalDay(dateKey);
+}
+
+/**
+ * "Study ahead": the scheduled cards due by the end of `dateKey`, soonest first, without the
+ * cards Anki schedules. New cards are not included — studying ahead brings reviews forward,
+ * it does not spend tomorrow's new-card allowance today.
+ */
+export function aheadDeckCards<T extends Pick<DeckFlashcard, 'srs' | 'ankiNoteId' | 'ankiExported' | 'ankiPending' | 'ankiDuplicate' | 'suspended'>>(
+  cards: readonly T[],
+  dateKey: string,
+): T[] {
+  const until = endOfLocalDay(dateKey);
+  return withoutAnkiOwned(cards)
+    .filter((card) => !card.suspended && card.srs && Number.isFinite(card.srs.dueAt) && card.srs.dueAt < until)
+    .sort((a, b) => (a.srs?.dueAt ?? 0) - (b.srs?.dueAt ?? 0));
+}
 
 /**
  * Substring search across every field a user can read on a card, so typing a
@@ -1804,7 +1973,13 @@ export const LEECH_QUERY = 'is:leech';
 export function searchDeckCards(cards: DeckFlashcard[], query: string): DeckFlashcard[] {
   const q = query.normalize('NFKC').trim().toLowerCase();
   if (!q) return cards;
-  if (q === LEECH_QUERY) return cards.filter(isLeechCard);
+  if (q === LEECH_QUERY) {
+    const threshold = leechThreshold();
+    return cards.filter((card) => (card.srs?.lapses ?? 0) >= threshold);
+  }
+  if (q === SUSPENDED_QUERY) return cards.filter((card) => card.suspended === true);
+  const dated = DECK_DATE_QUERY.exec(q);
+  if (dated) return cards.filter((c) => deckCardMatchesDate(c, dated[1] as DeckDateQueryKind, dated[2]));
   return cards.filter((c) =>
     [c.word, c.reading, c.meaning, c.front, c.back, c.sentence, c.bookTitle].some((field) =>
       field ? field.normalize('NFKC').toLowerCase().includes(q) : false,

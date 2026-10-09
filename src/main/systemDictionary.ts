@@ -38,6 +38,7 @@ import {
 } from 'electron';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { refuseWhileLocked } from './lockGuard';
 import {
   captureSelection,
   noteCompanionLookup,
@@ -198,6 +199,8 @@ export function lookUpText(
 ): boolean {
   const query = text.slice(0, 500);
   if (!query.trim()) return false;
+  // A dictionary popup over another app is study content (lockGuard.ts).
+  if (refuseWhileLocked('window:lookup')) return false;
   pendingQuery = query;
   pendingContext = contextFor(opts.source, opts.mode ?? 'auto');
   noteCompanionLookup({

@@ -12,6 +12,7 @@ import {
 import { DEFAULT_THEME_ID, loadThemeId, onThemeChanged, setTheme } from './theme/engine';
 import { AERO_THEME_ID } from './theme/frutiger-aero';
 import { WIRED_ARCHIVE_THEME_ID } from './theme/wired-archive';
+import { applyAeroEnvironment, restoreStudyEnvironmentAfterAero } from './aeroEnvironment';
 
 export type WiredArchivePhase =
   | 'inactive'
@@ -364,16 +365,27 @@ export function resolveWiredExit(choice: WiredExitChoice): void {
   window.dispatchEvent(new CustomEvent(SHUTDOWN_SOUND_EVENT));
   after(reducedMotion ? 240 : 900, () => {
     if (state.sequenceId !== id) return;
-    setTheme(choice === 'restore' ? loadWiredRestoreTheme() : AERO_THEME_ID);
+    const next = choice === 'restore' ? loadWiredRestoreTheme() : AERO_THEME_ID;
+    // Back into Aero means Aero's living layer (bubbles, its assistant, its walls),
+    // not the Study one Wired ran on. Without this Aero came back on the Study
+    // environment and then saved those values as its own snapshot.
+    if (next === AERO_THEME_ID) applyAeroEnvironment(false);
+    setTheme(next);
     soundEngine.stopAll();
     publish({ phase: 'inactive', canSkip: false, messageKey: 'wired.lifecycle.inactive' });
   });
 }
 
 function enterWiredArchive(): void {
+  const from = loadThemeId();
   // Capture where they came from BEFORE switching, so the breach prompt can
   // offer to put it back.
-  rememberWiredRestoreTheme(loadThemeId());
+  rememberWiredRestoreTheme(from);
+  // Wired runs on the Study OS living layer. Straight from Aero, put it back FIRST,
+  // explicitly, rather than trusting the theme bridge's listener to run (and to run
+  // before Wired's first frame): Aero's bubbles and assistant stayed on screen in
+  // Wired until it was left (2026-10 hardware run). Idempotent with that bridge.
+  if (from === AERO_THEME_ID) restoreStudyEnvironmentAfterAero();
   setTheme(WIRED_ARCHIVE_THEME_ID);
   if (armLockscreenOnWiredEntry()) {
     window.dispatchEvent(new CustomEvent(AERO_ENTRY_LOCKED_EVENT));

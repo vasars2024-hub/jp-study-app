@@ -1,0 +1,261 @@
+/*
+ * The Calendar's day panel, year heatmap, month heat shading and streak marks.
+ *
+ * Theme tokens only, so Standard, Aero, Wired and Blanc each paint it in their own palette.
+ * The panel is a work surface (it holds buttons that open things), so it takes the opaque
+ * panel paint and no Liquid material.
+ */
+
+.cal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Side by side once the window has room for both; stacked below that. */
+@container (min-width: 900px) {
+  .cal-body:has(> .cal-day-panel) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+    align-items: start;
+  }
+  .cal-body > .cal-day-panel {
+    position: sticky;
+    top: 0;
+    max-height: 100%;
+    overflow: auto;
+  }
+}
+
+.cal-day-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--panel-2);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cal-day-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.cal-day-head h3 {
+  margin: 0;
+  font-size: 14px;
+  flex: 1 1 auto;
+}
+.cal-day-badge {
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+}
+.cal-day-badge.is-streak {
+  border-color: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.cal-day-badge.is-rest {
+  font-style: italic;
+}
+
+.cal-day-section h4 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.cal-day-section p {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+}
+.cal-day-empty {
+  margin: 0;
+}
+
+.cal-day-actions,
+.cal-day-reminder,
+.cal-day-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.cal-day-export {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.cal-day-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.cal-day-time input {
+  min-height: 28px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--text);
+}
+.cal-day-hint,
+.cal-day-status {
+  font-size: 11px;
+  margin: 0;
+}
+.cal-day-status:empty {
+  display: none;
+}
+
+.cal-day-list-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cal-day-list-rows > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.cal-day-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.cal-day-row-text b {
+  font-weight: 500;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-day-row-text small {
+  font-size: 11px;
+}
+
+.cal-day-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(40px, 1fr);
+  gap: 3px 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.cal-day-bars > li {
+  display: contents;
+}
+.cal-day-bars i {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--accent);
+  transform-origin: left center;
+}
+
+/* Month grid: the current streak's days carry a small accent bar beside the date. */
+.cal-streak-mark {
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  margin-inline-start: 6px;
+  border-radius: 2px;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+/* Month grid heat shading: the year view's levels, as a tint under the day's contents. */
+.cal-month-cell.heat[data-heat='1'] { background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+.cal-month-cell.heat[data-heat='2'] { background: color-mix(in srgb, var(--accent) 24%, var(--panel-2)); }
+.cal-month-cell.heat[data-heat='3'] { background: color-mix(in srgb, var(--accent) 38%, var(--panel-2)); }
+.cal-month-cell.heat[data-heat='4'] { background: color-mix(in srgb, var(--accent) 54%, var(--panel-2)); }
+
+/* Year mode: twelve month blocks of day squares. */
+.cal-year-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+  gap: 12px;
+  outline: none;
+}
+.cal-year-grid:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cal-year-month {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cal-year-month-name {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.cal-year-dow,
+.cal-year-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.cal-year-dow span {
+  font-size: 9px;
+  color: var(--muted);
+  text-align: center;
+}
+.cal-year-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.cal-year-cell.is-blank {
+  visibility: hidden;
+  cursor: default;
+}
+.cal-year-cell[data-level='1'] { background: color-mix(in srgb, var(--accent) 22%, var(--panel-2)); }
+.cal-year-cell[data-level='2'] { background: color-mix(in srgb, var(--accent) 42%, var(--panel-2)); }
+.cal-year-cell[data-level='3'] { background: color-mix(in srgb, var(--accent) 64%, var(--panel-2)); }
+.cal-year-cell[data-level='4'] { background: var(--accent); }
+.cal-year-cell.today {
+  border-color: var(--text);
+}
+.cal-year-cell.is-active {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+/* Aero: the body takes the grid's slot between the toolbar and the window's bottom edge. */
+:root[data-materials='aero'] .aero-calendar .cal-body {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+:root[data-materials='aero'] .aero-calendar .cal-body > .cal-month-grid,
+:root[data-materials='aero'] .aero-calendar .cal-body > .cal-day-list {
+  height: auto;
+  min-height: 420px;
+  overflow: visible;
+  padding: 0;
+}
+:root[data-materials='aero'] .aero-calendar .cal-body > .cal-day-panel {
+  position: static;
+  max-height: none;
+}

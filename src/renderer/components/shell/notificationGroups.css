@@ -1,0 +1,36 @@
+/* Notification center: day groups and timed Do not disturb (shell2). */
+.os-notif-quiet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 8px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.os-notif-quiet-state {
+  flex: 1 1 140px;
+  min-width: 0;
+  opacity: 0.8;
+}
+
+.os-notif-group + .os-notif-group {
+  margin-top: 10px;
+}
+
+.os-notif-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0 6px;
+}
+
+.os-notif-group-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}

@@ -14,7 +14,7 @@
  *
  * Nothing here may import `AppChrome`/`MenuBar`/`StatusBar`.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import Icon from '../Icons';
 import VirtualList from '../VirtualList';
 import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface';
@@ -59,6 +59,12 @@ import { useT } from '../../i18n';
 import { useWiredMaterials } from '../ui/AppChrome';
 import WiredOscilloscope from '../wired/WiredOscilloscope';
 import { useMusicMining } from './useMusicMining';
+import MusicStudyBar from './MusicStudyBar';
+import DictionaryPopup from '../DictionaryPopup';
+import { useMusicStudyPrefs } from '../../musicStudyPrefs';
+
+// music2: known-word colouring brings the tokenizer, so the coloured line loads on demand.
+const MusicLyricText = lazy(() => import('./MusicLyricText'));
 import {
   musicCueReplaySec,
   musicCueStepSec,
@@ -910,6 +916,26 @@ export function MusicYoutubeRow({ state }: { state: MusicState }) {
   );
 }
 
+/**
+ * music2 — the lyric lookup's popup, for hosts that render the pane but not the popup.
+ *
+ * The pane is `data-dict-owner`, so the global overlay deliberately skips it, and only
+ * Blanc rendered `state.popup` (with these same props): in the Media Center a click on a
+ * lyric set the popup state and nothing ever drew it.
+ */
+export function MusicLookupPopup({ state }: { state: MusicState }) {
+  if (!state.popup) return null;
+  return (
+    <DictionaryPopup
+      query={state.popup.query}
+      context={state.activeCueText}
+      x={state.popup.x}
+      y={state.popup.y}
+      onClose={() => state.setPopup(null)}
+    />
+  );
+}
+
 /** Karaoke lyrics pane, including click-to-look-up wiring. */
 export function MusicLyricsPane({ state }: { state: MusicState }) {
   const { t } = useT();
@@ -918,6 +944,18 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
   // Slice 17: music joins the study loop video already had. The card goes through the same
   // draft/request/history path, so a mined lyric appears in Review with no extra wiring.
   const mining = useMusicMining(ps.current ?? null);
+  // music2: the lyric study switches (pause after line, repeat, colour, reading aid).
+  const studyPrefs = useMusicStudyPrefs();
+  const colourLines = studyPrefs.knownHighlight || studyPrefs.readingAid;
+  /** One lyric line's text: coloured by knowledge when asked, plain otherwise. */
+  const lyricText = (text: string): ReactElement =>
+    colourLines ? (
+      <Suspense fallback={<span className="music-line-text">{text}</span>}>
+        <MusicLyricText text={text} knownHighlight={studyPrefs.knownHighlight} readingAid={studyPrefs.readingAid} />
+      </Suspense>
+    ) : (
+      <span className="music-line-text">{text}</span>
+    );
 
   /**
    * Slice 20 — cue navigation, in the shape video already uses.
@@ -1121,6 +1159,20 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
           </button>
         </div>
       )}
+      {ps.current && (lyrics.kind === 'synced' || lyrics.kind === 'plain') && (
+        <MusicStudyBar
+          cues={studyCues}
+          trackKey={ps.current.id}
+          seek={player.seek}
+          mineDisabled={mining.outcome.kind === 'busy' || mining.outcome.kind === 'recording'}
+          onMineCurrent={() => {
+            // The line being sung now; nothing to mine between lines or on a plain sheet.
+            if (lyrics.kind !== 'synced' || activeIndex < 0) return;
+            const c = lyrics.cues[activeIndex];
+            if (c) void mining.mine({ index: activeIndex, text: c.text, startSec: c.start, endSec: c.end }, 'synced', ps.time ?? 0);
+          }}
+        />
+      )}
       {(lyrics.kind === 'synced' || lyrics.kind === 'plain') && lyrics.source && (
         <p className="muted music-lyrics-source">
           {t(`music.lyricsSource.${lyrics.source}`)}
@@ -1139,7 +1191,7 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
             onDoubleClick={() => player.seek(c.start)}
             title={t('music.doubleClickJump')}
           >
-            <span className="music-line-text">{c.text}</span>
+            {lyricText(c.text)}
             {mineButton({ index: i, text: c.text, startSec: c.start, endSec: c.end }, 'synced')}
           </div>
         ))}
@@ -1148,7 +1200,7 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
           <p className="muted music-plain-note">{t('music.notSynced')}</p>
           {lyrics.lines.map((l, i) => (
             <div key={i} className="music-line plain">
-              <span className="music-line-text">{l}</span>
+              {lyricText(l)}
               {/* No timestamp exists for a plain line, so provenance records the listening
                   position instead — see shared/musicMining.ts. */}
               {mineButton({ index: i, text: l }, 'plain')}

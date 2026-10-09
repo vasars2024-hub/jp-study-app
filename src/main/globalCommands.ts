@@ -44,6 +44,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { LOCK_SAFE_COMMANDS, refuseWhileLocked } from './lockGuard';
 import {
   chordToAccelerator,
   GLOBAL_COMMAND_DEFAULTS,
@@ -182,6 +183,9 @@ function release(entry: Entry): void {
 function fire(id: string): void {
   const handler = entries.get(id)?.handler;
   if (!handler) return;
+  // The one chokepoint for chords, tray rows, the radial wheel and the IPC: while
+  // locked only the commands that bring the lock UI forward run (lockGuard.ts).
+  if (!LOCK_SAFE_COMMANDS.has(id) && refuseWhileLocked(`command:${id}`)) return;
   try {
     const out = handler();
     if (out && typeof (out as Promise<void>).catch === 'function') {

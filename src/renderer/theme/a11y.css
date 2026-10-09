@@ -102,7 +102,19 @@ html[data-text-size='xlarge'] { font-size: 125%; }
    anything drawn with background images, box-shadows or translucent glass
    disappears: Aero buttons lost their edges, focus rings drawn with
    box-shadow vanished, and frosted panels had no border at all. These rules
-   put the core chrome back in system colours. */
+   put the core chrome back in system colours.
+
+   a11y2: the first version gave EVERY button, tab, menu item and option a
+   1px ButtonText border, so a toolbar of icon buttons became a row of boxes
+   and every list row was outlined. Two facts make that unnecessary:
+     - an element that already draws a border keeps it here; the UA maps its
+       colour to the system palette by itself (that is `.btn`, inputs, cards);
+     - the UA already drops box-shadow and text-shadow in this mode.
+   So only controls whose edge WAS a fill get one (the `.ui-btn` family and
+   styled fields), lists and menus show state the Windows way (Highlight fill
+   with HighlightText), and the few drawings whose colour is the information
+   (heatmaps, swatches, sparklines) opt out with `forced-color-adjust: none`
+   and get a CanvasText edge so they stay readable on any contrast theme. */
 @media (forced-colors: active) {
   :root {
     --focus-ring-color: Highlight;
@@ -112,43 +124,78 @@ html[data-text-size='xlarge'] { font-size: 125%; }
     outline: 2px solid Highlight !important;
     outline-offset: 2px;
   }
-  button,
-  [role='button'],
-  .btn,
-  select,
-  input,
-  textarea,
-  [role='tab'],
-  [role='menuitem'],
-  [role='option'] {
+  /* Command buttons and fields whose boundary was a fill or gradient. */
+  .ui-btn,
+  :where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='hidden'])),
+  :where(select, textarea) {
     border: 1px solid ButtonText;
-    forced-color-adjust: auto;
+  }
+  /* Everything clickable shows hover in the system's own way instead of a box. */
+  :where(button, [role='button'], .ui-icon-btn):hover:not(:disabled, [aria-disabled='true']) {
+    color: Highlight;
+  }
+  .ui-btn:hover:not(:disabled, [aria-disabled='true']) {
+    border-color: Highlight;
+  }
+  /* Rows in menus, listboxes, tab strips, trees and grids: state as a fill. */
+  :where([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'], [role='option'], [role='treeitem']):is(:hover, :focus-visible),
+  :where([role='option'], [role='treeitem'], [role='gridcell'], [role='row'])[aria-selected='true'],
+  :where([role='menuitemcheckbox'], [role='menuitemradio'])[aria-checked='true'],
+  :where([role='tab'])[aria-selected='true'] {
+    background: Highlight;
+    color: HighlightText;
+  }
+  /* Toggle buttons and the current page/item: an inset outline, which reads on
+     any shape without moving layout. */
+  :where([aria-pressed='true'], [aria-current]:not([aria-current='false'])) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
   button:disabled,
   .btn:disabled,
+  .ui-btn:disabled,
   [aria-disabled='true'] {
     border-color: GrayText;
     color: GrayText;
   }
-  [aria-pressed='true'],
-  [aria-selected='true'],
-  [aria-checked='true'],
-  [aria-current]:not([aria-current='false']) {
-    outline: 2px solid Highlight;
-    outline-offset: -2px;
-  }
+  /* Floating surfaces whose edge was a shadow or glass. */
   [role='dialog'],
+  [role='alertdialog'],
   [role='menu'],
   [role='listbox'],
   [role='tooltip'],
   .ui-popover,
-  .ui-dialog {
+  .ui-dialog,
+  .ui-menu,
+  .os-flyout {
     border: 1px solid CanvasText;
   }
-  /* Glass and gradient backgrounds carry no information here. */
-  * {
-    text-shadow: none !important;
-    box-shadow: none !important;
+  /* Colour IS the content here: keep the author's colours, add an edge. */
+  .wgt-heat-cell,
+  .stats-heatmap-cell,
+  .heatmap-svg,
+  .wgt-spark-bar,
+  .scr-spark,
+  .os-theme-swatch-preview,
+  .os-wall-swatch,
+  .os-wall-user-swatch,
+  .pl-swatch,
+  .reader-anno-swatch,
+  .lens-read-swatch,
+  .scr-swatch {
+    forced-color-adjust: none;
+  }
+  .wgt-heat-cell,
+  .stats-heatmap-cell,
+  .os-theme-swatch-preview,
+  .os-wall-swatch,
+  .os-wall-user-swatch,
+  .pl-swatch,
+  .reader-anno-swatch,
+  .lens-read-swatch,
+  .scr-swatch {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
   }
   /* Icons drawn with currentColor keep following the system text colour. */
   svg {

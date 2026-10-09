@@ -125,6 +125,23 @@ describe('word status (WP8)', () => {
     await h.waitFor(() => rangesText(h!, 'gum-wk-0').includes('猫'));
   });
 
+  it('follows the furigana setting on an open page, both ways, without a reload or a scroll', async () => {
+    // Measured live in Chrome 2026-10-08: switching furigana off in the options left all
+    // 14 rubies on the open article; nothing repainted until the page scrolled.
+    h = await loadContent({
+      html: '<p id="a">猫が好きで学校へ。</p>',
+      reply: fakeAnnotate,
+      settings: { version: 3, furigana: true },
+      storage: { [`jpLearn:${ORIGIN}`]: true },
+    });
+    await h.waitFor(() => h!.document.querySelectorAll('ruby[data-gum-ruby]').length === 2);
+    h.changeSettings({ version: 3, furigana: false });
+    await h.waitFor(() => h!.document.querySelectorAll('ruby[data-gum-ruby]').length === 0);
+    expect(h.document.getElementById('a')!.textContent).toBe('猫が好きで学校へ。');
+    h.changeSettings({ version: 3, furigana: true });
+    await h.waitFor(() => h!.document.querySelectorAll('ruby[data-gum-ruby]').length === 2);
+  });
+
   it('leaves the page alone without the setting (furigana is opt-in)', async () => {
     h = await loadContent({
       html: '<p id="a">猫が好き。</p>',

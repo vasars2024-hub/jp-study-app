@@ -7,6 +7,7 @@
 //   /robots.txt                 Disallows /private/.
 //   /shows/gum-test-show        Episode table, two per page, `?page=2` and a
 //                               `rel=next` link (also `a.next`) to follow.
+//   /shows/broken-pages         Page 1 as above; its page 2 answers 503.
 //   /sjis/header                Shift_JIS, charset in the Content-Type header.
 //   /sjis/meta                  Shift_JIS, charset only in <meta http-equiv>.
 //   /sjis/meta-charset          Shift_JIS, charset only in <meta charset>.
@@ -110,6 +111,19 @@ export async function startFixtureSite(opts: { mediaPath: string }): Promise<Fix
           : '';
         html(`<!doctype html><html><head><title>${SHOW} — エピソード一覧</title></head>`
           + `<body><table class="eps">${rowsHtml(eps, base)}</table>${next}</body></html>`);
+        return;
+      }
+      case '/shows/broken-pages': {
+        // Page 1 links to page 2, which the server cannot serve (round 2: the
+        // job summary must say so instead of only logging it).
+        const page = Number(url.searchParams.get('page') ?? '1');
+        if (page !== 1) {
+          res.writeHead(503, { 'content-type': 'text/plain' });
+          res.end('down');
+          return;
+        }
+        html(`<!doctype html><html><head><title>${SHOW}</title></head><body><table class="eps">${rowsHtml(EPISODES.slice(0, 2), base)}</table>`
+          + '<nav><a rel="next" href="/shows/broken-pages?page=2">next</a></nav></body></html>');
         return;
       }
       case '/sjis/header':

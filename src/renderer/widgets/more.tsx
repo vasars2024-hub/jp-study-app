@@ -69,8 +69,9 @@ export function WorldClock({ settings, setSettings }: WidgetProps) {
         })}
       </ul>
       <div className="wgt-row wgt-world-add">
-        <input placeholder={t('widgets.worldClock.labelPlaceholder')} value={label} onChange={(e) => setLabel(e.target.value)} />
-        <input placeholder={t('widgets.worldClock.areaPlaceholder')} value={tz} onChange={(e) => setTz(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        {/* wid2: a placeholder vanishes on the first keystroke, so it is a poor name. */}
+        <input placeholder={t('widgets.worldClock.labelPlaceholder')} aria-label={t('widgets.worldClock.labelPlaceholder')} value={label} onChange={(e) => setLabel(e.target.value)} />
+        <input placeholder={t('widgets.worldClock.areaPlaceholder')} aria-label={t('widgets.worldClock.areaPlaceholder')} value={tz} onChange={(e) => setTz(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
         <button className="wgt-btn-icon" onClick={add} title={t('widgets.worldClock.addZone')} aria-label={t('widgets.worldClock.addZone')}>+</button>
       </div>
     </div>
@@ -141,10 +142,17 @@ function last7(): string[] {
   return out;
 }
 export function HabitTracker({ settings, setSettings }: WidgetProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const habits = readSetting<Habit[]>(settings, 'habits', []);
   const [draft, setDraft] = useState('');
+  // wid2: the seven days are recomputed each minute, so a tracker left open
+  // overnight moves on to the new day instead of ticking yesterday's box.
+  useNow(60_000);
   const days = last7();
+  const dayName = (key: string): string => {
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(LANG_TAGS[lang], { weekday: 'short', month: 'short', day: 'numeric' });
+  };
   const write = (next: Habit[]) => setSettings({ habits: next });
   const add = () => {
     const text = draft.trim();
@@ -180,8 +188,12 @@ export function HabitTracker({ settings, setSettings }: WidgetProps) {
               {days.map((d) => (
                 <button
                   key={d}
+                  type="button"
                   className={`wgt-habit-day ${h.days[d] ? 'on' : ''}`}
-                  title={d}
+                  // wid2: the tick was a colour only; it is a toggle, and says so.
+                  aria-pressed={!!h.days[d]}
+                  aria-label={t('wid2.habit.dayAria', { habit: h.text, day: dayName(d) })}
+                  title={dayName(d)}
                   onClick={() => toggle(h.id, d)}
                 >
                   {Number(d.slice(-2))}
@@ -204,7 +216,7 @@ export function HabitTracker({ settings, setSettings }: WidgetProps) {
  * total, because a single figure would hide which activity produced it.
  */
 export function LearningHeatmap() {
-  const { t } = useT();
+  const { t, lang } = useT();
   // It read the summary once at mount and never again, so a day's reading or
   // reviews did not show until the widget was remounted.
   const [s, setS] = useState(() => getSummary());
@@ -227,9 +239,21 @@ export function LearningHeatmap() {
     if (sec <= 0) return (d.reviews ?? 0) > 0 ? 1 : 0;
     return Math.min(4, Math.ceil((sec / max) * 4));
   };
+  // wid2: hover text named days by their storage key ("2026-10-08"); and the
+  // grid of bare boxes is one image with a count a screen reader can speak.
+  const dayLabel = (key: string): string => {
+    const [y, m, dd] = key.split('-').map(Number);
+    if (!y || !m || !dd) return key;
+    return new Date(y, m - 1, dd).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' });
+  };
+  const activeDays = s.recent.filter((d) => level(d) > 0).length;
   return (
     <div className="wgt wgt-heatmap">
-      <div className="wgt-heatmap-grid">
+      <div
+        className="wgt-heatmap-grid"
+        role="img"
+        aria-label={t('wid2.heatmap.aria', { active: activeDays, days: s.recent.length })}
+      >
         {s.recent.map((d) => (
           <div
             key={d.date}
@@ -237,11 +261,11 @@ export function LearningHeatmap() {
             title={
               d.watchSeconds > 0
                 ? t('widgets.heatmap.cellSplit', {
-                    date: d.date,
+                    date: dayLabel(d.date),
                     read: formatDuration(d.seconds),
                     watched: formatDuration(d.watchSeconds),
                   })
-                : `${d.date}: ${formatDuration(d.seconds)}`
+                : `${dayLabel(d.date)}: ${formatDuration(d.seconds)}`
             }
           />
         ))}

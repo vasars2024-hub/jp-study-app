@@ -69,9 +69,26 @@ export function canRecorderJobTransition(from: RecorderJobPhase, to: RecorderJob
 
 export type RecorderAudioSource = 'system' | 'mic' | 'both' | 'none';
 export type RecorderQuality = 'high' | 'standard' | 'small';
+/**
+ * Which H.264 encoder finishes a recording. `auto` takes the first hardware
+ * encoder the bundled ffmpeg lists AND a probe encode proves usable on this
+ * machine (NVIDIA, then Intel, then AMD), else x264 on the CPU.
+ */
+export type RecorderEncoderPref = 'auto' | 'software' | 'nvenc' | 'qsv' | 'amf';
+export type RecorderHardwareEncoder = Exclude<RecorderEncoderPref, 'auto' | 'software'>;
 
 export const RECORDER_AUDIO_SOURCES: readonly RecorderAudioSource[] = ['system', 'mic', 'both', 'none'];
 export const RECORDER_QUALITIES: readonly RecorderQuality[] = ['high', 'standard', 'small'];
+export const RECORDER_ENCODER_PREFS: readonly RecorderEncoderPref[] = ['auto', 'software', 'nvenc', 'qsv', 'amf'];
+/** Hardware encoders in the order `auto` tries them. */
+export const RECORDER_HARDWARE_ENCODERS: readonly RecorderHardwareEncoder[] = ['nvenc', 'qsv', 'amf'];
+/** The ffmpeg encoder name behind each choice. */
+export const RECORDER_FFMPEG_ENCODER: Record<RecorderHardwareEncoder | 'software', string> = {
+  software: 'libx264',
+  nvenc: 'h264_nvenc',
+  qsv: 'h264_qsv',
+  amf: 'h264_amf',
+};
 export const RECORDER_FPS_CHOICES: readonly number[] = [15, 24, 30, 60];
 
 /** Below this a drag is a stray click, in DIP — the Reading Lens's floor too. */
@@ -112,6 +129,10 @@ export interface RecorderSettings {
   autoTranscribe: boolean;
   autoOpen: boolean;
   lastRegion: RecorderRegionMemory | null;
+  /** The encoder that turns the WebM into the MP4 (see `RecorderEncoderPref`). */
+  encoder: RecorderEncoderPref;
+  /** File each recording under the day it was made in Calendar, and count its length as study time. */
+  studyTag: boolean;
 }
 
 export const DEFAULT_RECORDER_SETTINGS: RecorderSettings = {
@@ -126,6 +147,8 @@ export const DEFAULT_RECORDER_SETTINGS: RecorderSettings = {
   autoTranscribe: true,
   autoOpen: true,
   lastRegion: null,
+  encoder: 'auto',
+  studyTag: true,
 };
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
@@ -157,6 +180,7 @@ export function normalizeRecorderSettings(patch: unknown, base: RecorderSettings
   const pick = <T>(key: string, ok: (v: unknown) => v is T, fallback: T): T => (key in p && ok(p[key]) ? p[key] as T : fallback);
   const isAudio = (v: unknown): v is RecorderAudioSource => RECORDER_AUDIO_SOURCES.includes(v as RecorderAudioSource);
   const isQuality = (v: unknown): v is RecorderQuality => RECORDER_QUALITIES.includes(v as RecorderQuality);
+  const isEncoder = (v: unknown): v is RecorderEncoderPref => RECORDER_ENCODER_PREFS.includes(v as RecorderEncoderPref);
   const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
   const isString = (v: unknown): v is string => typeof v === 'string';
   const fps = 'fps' in p ? Number(p.fps) : base.fps;
@@ -174,6 +198,8 @@ export function normalizeRecorderSettings(patch: unknown, base: RecorderSettings
     autoTranscribe: pick('autoTranscribe', isBool, base.autoTranscribe),
     autoOpen: pick('autoOpen', isBool, base.autoOpen),
     lastRegion: 'lastRegion' in p ? normalizeRecorderRegion(p.lastRegion) : base.lastRegion,
+    encoder: pick('encoder', isEncoder, base.encoder ?? 'auto'),
+    studyTag: pick('studyTag', isBool, base.studyTag ?? true),
   };
 }
 
@@ -186,18 +212,167 @@ export function recorderWantsMic(audio: RecorderAudioSource): boolean {
   return audio === 'mic' || audio === 'both';
 }
 
+/**
+ * What each quality step means, as numbers. One table so the CPU and the
+ * hardware encoders are told the same thing in their own dialect:
+ *
+ * - `crf`: x264's constant rate factor (lower is better and bigger);
+ * - `cq`: the constant-quality level the hardware encoders take (NVENC `-cq`,
+ *   Quick Sync `-global_quality`, AMF `-qp_i/-qp_p`). Hardware encoders spend
+ *   more bits for the same number, so it sits a step above `crf`;
+ * - `maxrateKbps`: a ceiling on the MP4's video bitrate (a 4K region at "high"
+ *   would otherwise be enormous), with a VBV buffer of twice that;
+ * - `webmBitrate`: MediaRecorder's target for the intermediate WebM at 30 fps.
+ *   It is re-encoded afterwards, so this errs generous: what it loses cannot
+ *   be won back;
+ * - `audioKbps`: AAC in the MP4.
+ */
+export interface RecorderQualityPreset {
+  crf: number;
+  cq: number;
+  maxrateKbps: number;
+  webmBitrate: number;
+  audioKbps: number;
+}
+
+export const RECORDER_QUALITY_PRESETS: Record<RecorderQuality, RecorderQualityPreset> = {
+  high: { crf: 18, cq: 19, maxrateKbps: 16_000, webmBitrate: 16_000_000, audioKbps: 192 },
+  standard: { crf: 23, cq: 25, maxrateKbps: 8_000, webmBitrate: 10_000_000, audioKbps: 160 },
+  small: { crf: 28, cq: 31, maxrateKbps: 3_000, webmBitrate: 5_000_000, audioKbps: 128 },
+};
+
+function presetOf(quality: RecorderQuality): RecorderQualityPreset {
+  return RECORDER_QUALITY_PRESETS[quality] ?? RECORDER_QUALITY_PRESETS.standard;
+}
+
 /** x264 CRF per quality step (lower is better and bigger). */
 export function recorderCrf(quality: RecorderQuality): number {
-  return quality === 'high' ? 18 : quality === 'small' ? 28 : 23;
+  return presetOf(quality).crf;
+}
+
+/** MediaRecorder's target bitrate for the intermediate WebM, scaled by frame rate. */
+export function recorderVideoBitrate(quality: RecorderQuality, fps: number): number {
+  return Math.round(presetOf(quality).webmBitrate * Math.min(2, Math.max(0.5, fps / 30)));
+}
+
+/** The ffmpeg video-encoder arguments for one encoder at one quality step. */
+export function recorderVideoEncodeArgs(encoder: string, quality: RecorderQuality): string[] {
+  const p = presetOf(quality);
+  const rate = ['-maxrate', `${p.maxrateKbps}k`, '-bufsize', `${p.maxrateKbps * 2}k`];
+  switch (encoder) {
+    case 'h264_nvenc':
+      // `-b:v 0` lets `-cq` alone decide (constant quality); the ceiling still holds.
+      return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'vbr', '-cq', String(p.cq), '-b:v', '0', ...rate, '-pix_fmt', 'yuv420p'];
+    case 'h264_qsv':
+      // ICQ mode: Quick Sync refuses a VBV ceiling together with it, so none is sent.
+      return ['-c:v', 'h264_qsv', '-preset', 'veryfast', '-global_quality', String(p.cq), '-look_ahead', '0', '-pix_fmt', 'nv12'];
+    case 'h264_amf':
+      return ['-c:v', 'h264_amf', '-quality', 'balanced', '-rc', 'cqp', '-qp_i', String(p.cq), '-qp_p', String(p.cq), '-pix_fmt', 'yuv420p'];
+    case 'libx264':
+      return ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', String(p.crf), '-pix_fmt', 'yuv420p', ...rate];
+    default:
+      // An encoder this table does not know is asked for by name, with only the
+      // ceiling: if ffmpeg cannot use it, the finish falls back to x264.
+      return ['-c:v', /^[\w-]{1,40}$/.test(encoder) ? encoder : 'libx264', '-pix_fmt', 'yuv420p', ...rate];
+  }
+}
+
+/** The encoder names in `ffmpeg -encoders` output (`" V....D h264_nvenc  NVIDIA NVENC…"`). */
+export function parseFfmpegEncoderList(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const m = /^\s*[VAS][.A-Z]{5}\s+(\S+)/.exec(line);
+    if (m && m[1] !== '=') out.add(m[1]);
+  }
+  return out;
+}
+
+/** What this machine's encoders can do: listed by ffmpeg, and proven by a probe encode. */
+export interface RecorderEncoderReport {
+  /** Hardware encoders the bundled ffmpeg was built with. */
+  listed: RecorderHardwareEncoder[];
+  /** Of those, the ones a probe encode succeeded with here. */
+  usable: RecorderHardwareEncoder[];
+  probedAt: number;
 }
 
 /**
- * MediaRecorder's target bitrate for the intermediate WebM. It is re-encoded
- * afterwards, so this errs generous: what it loses cannot be won back.
+ * The ffmpeg encoder a preference resolves to, given what was detected. A named
+ * hardware encoder that is not usable here falls back to x264 rather than
+ * failing the recording; `fallback` says so.
  */
-export function recorderVideoBitrate(quality: RecorderQuality, fps: number): number {
-  const base = quality === 'high' ? 16_000_000 : quality === 'small' ? 5_000_000 : 10_000_000;
-  return Math.round(base * Math.min(2, Math.max(0.5, fps / 30)));
+export function resolveRecorderEncoder(
+  pref: RecorderEncoderPref,
+  report: Pick<RecorderEncoderReport, 'usable'> | null,
+): { encoder: string; hardware: boolean; fallback: boolean } {
+  const usable = new Set(report?.usable ?? []);
+  if (pref === 'software') return { encoder: 'libx264', hardware: false, fallback: false };
+  if (pref === 'auto') {
+    const first = RECORDER_HARDWARE_ENCODERS.find((e) => usable.has(e));
+    return first
+      ? { encoder: RECORDER_FFMPEG_ENCODER[first], hardware: true, fallback: false }
+      : { encoder: 'libx264', hardware: false, fallback: false };
+  }
+  return usable.has(pref)
+    ? { encoder: RECORDER_FFMPEG_ENCODER[pref], hardware: true, fallback: false }
+    : { encoder: 'libx264', hardware: false, fallback: true };
+}
+
+/** The hardware family behind an ffmpeg encoder name, or null for the CPU encoder. */
+export function recorderEncoderFamily(encoder: string | undefined): RecorderHardwareEncoder | null {
+  if (encoder === 'h264_nvenc') return 'nvenc';
+  if (encoder === 'h264_qsv') return 'qsv';
+  if (encoder === 'h264_amf') return 'amf';
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Level meters
+
+/** Below this the meter reads empty (dBFS). */
+export const RECORDER_METER_FLOOR_DB = -60;
+/** How fast a falling meter drops, in dB per second (it rises at once). */
+export const RECORDER_METER_RELEASE_DB_PER_S = 24;
+/** How long the peak marker holds before it falls with the meter. */
+export const RECORDER_METER_PEAK_HOLD_MS = 1200;
+
+/**
+ * An RMS amplitude (0–1, as the host's analyser reports it, which already
+ * carries a ×3 display gain) as a meter fraction on a dB scale: a linear bar
+ * shows speech as a flicker in its bottom fifth. `-60 dB` and below is empty.
+ */
+export function recorderMeterFraction(rms: number): number {
+  if (!Number.isFinite(rms) || rms <= 0) return 0;
+  const db = 20 * Math.log10(Math.min(1, rms));
+  return Math.min(1, Math.max(0, (db - RECORDER_METER_FLOOR_DB) / -RECORDER_METER_FLOOR_DB));
+}
+
+export interface RecorderMeterState {
+  /** 0–1, what the bar shows. */
+  level: number;
+  /** 0–1, the held peak marker. */
+  peak: number;
+  peakAt: number;
+  /** The input reached full scale within the hold time. */
+  clipping: boolean;
+}
+
+export const EMPTY_RECORDER_METER: RecorderMeterState = { level: 0, peak: 0, peakAt: 0, clipping: false };
+
+/**
+ * One meter step: instant attack, a steady release (so a meter neither jitters
+ * nor drops to nothing between syllables), and a peak marker that holds.
+ */
+export function stepRecorderMeter(prev: RecorderMeterState, rms: number, now: number, lastAt: number): RecorderMeterState {
+  const target = recorderMeterFraction(rms);
+  const dt = Math.max(0, Math.min(1000, now - lastAt));
+  const fall = (RECORDER_METER_RELEASE_DB_PER_S * dt / 1000) / -RECORDER_METER_FLOOR_DB;
+  const level = target >= prev.level ? target : Math.max(target, prev.level - fall);
+  const held = now - prev.peakAt < RECORDER_METER_PEAK_HOLD_MS;
+  const peak = level >= prev.peak ? level : held ? prev.peak : Math.max(level, prev.peak - fall);
+  const peakAt = level >= prev.peak ? now : prev.peakAt;
+  const clipped = Number.isFinite(rms) && rms >= 0.999;
+  return { level, peak, peakAt, clipping: clipped || (prev.clipping && held) };
 }
 
 // ---------------------------------------------------------------------------
@@ -232,11 +407,59 @@ export const RECORDER_CHANNELS = {
   // The main window opens a finished recording in the study player.
   openInPlayer: 'recorder:open-in-player',
   openInPlayerReply: 'recorder:open-in-player-reply',
+  // Encoders (Settings).
+  detectEncoders: 'recorder:detect-encoders',
+  // Windows that can be recorded ("record a window").
+  listWindows: 'recorder:list-windows',
+  // Finished recordings, kept across restarts.
+  historyList: 'recorder:history-list',
+  historyAction: 'recorder:history-action',
+  /** main → renderers: the history changed. */
+  historyChanged: 'recorder:history-changed',
+  /** A renderer saw a Whisper model finish downloading (or be removed). */
+  modelChanged: 'recorder:model-changed',
+  /** main → the main window: put this recording on its study day; answered with the reply. */
+  studyTag: 'recorder:study-tag',
+  studyTagReply: 'recorder:study-tag-reply',
 } as const;
 
-export type RecorderStartMode = 'select' | 'repeat' | 'full';
+/**
+ * `window`: the topmost window that is not one of Gum's own (the one in front
+ * when the shortcut was pressed), or the window `sourceId` names.
+ */
+export type RecorderStartMode = 'select' | 'repeat' | 'full' | 'window';
 export type RecorderJobAction = 'open' | 'show' | 'transcribe' | 'retry' | 'dismiss';
 export type RecorderRecoveryAction = 'finish' | 'show' | 'dismiss';
+export type RecorderHistoryAction = 'open' | 'show' | 'transcribe' | 'delete';
+export const RECORDER_HISTORY_ACTIONS: readonly RecorderHistoryAction[] = ['open', 'show', 'transcribe', 'delete'];
+
+/** A window that can be recorded, as `desktopCapturer` names it. */
+export interface RecorderWindowSource {
+  /** `window:<handle>:0`. */
+  id: string;
+  name: string;
+  /** A small PNG data URL, or `''`. */
+  thumbnail: string;
+}
+
+/**
+ * The window "record the active window" means: the first of `sources` that is
+ * not one of Gum's own windows.
+ *
+ * `desktopCapturer.getSources({ types: ['window'] })` lists windows top to bottom
+ * in z-order on Windows (it walks `EnumWindows`), so the first foreign window is
+ * the one that was in front when the shortcut was pressed — a global shortcut
+ * does not move focus. Elsewhere the order is the platform's; the panel names
+ * the window it chose, so a wrong guess is visible at once.
+ */
+export function pickActiveWindowSource<S extends { id: string; name: string }>(
+  sources: readonly S[],
+  ownIds: ReadonlySet<string>,
+  ownNames: readonly string[] = [],
+): S | null {
+  const names = new Set(ownNames.map((n) => n.trim()).filter(Boolean));
+  return sources.find((s) => /^window:/.test(s.id) && !ownIds.has(s.id) && !names.has(s.name.trim()) && s.name.trim() !== '') ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // Geometry
@@ -409,6 +632,14 @@ export interface RecorderFinalizeArgsInput {
   crop?: CropPx | null;
   hasAudio: boolean;
   quality: RecorderQuality;
+  /** The ffmpeg video encoder (`libx264` when absent). */
+  encoder?: string;
+  /**
+   * Letterbox every frame into this size. A recorded WINDOW can be resized
+   * while it records, and an H.264 encoder cannot change size mid-stream, so
+   * window recordings are fitted to their first frame's size.
+   */
+  fit?: SizeLike | null;
 }
 
 /**
@@ -417,9 +648,14 @@ export interface RecorderFinalizeArgsInput {
  * which yuv420p requires. Progress is written to stdout (`-progress pipe:1`).
  */
 export function recorderFinalizeArgs(o: RecorderFinalizeArgsInput): string[] {
+  const fitW = o.fit ? floorEven(o.fit.width) : 0;
+  const fitH = o.fit ? floorEven(o.fit.height) : 0;
   const vf = o.crop
     ? `crop=${o.crop.width}:${o.crop.height}:${o.crop.x}:${o.crop.y}`
-    : 'crop=trunc(iw/2)*2:trunc(ih/2)*2:0:0';
+    : fitW >= 2 && fitH >= 2
+      ? `scale=${fitW}:${fitH}:force_original_aspect_ratio=decrease,pad=${fitW}:${fitH}:(ow-iw)/2:(oh-ih)/2,setsar=1`
+      : 'crop=trunc(iw/2)*2:trunc(ih/2)*2:0:0';
+  const audioKbps = RECORDER_QUALITY_PRESETS[o.quality]?.audioKbps ?? 160;
   return [
     '-hide_banner', '-nostats', '-loglevel', 'error', '-y',
     '-fflags', '+genpts',
@@ -427,8 +663,8 @@ export function recorderFinalizeArgs(o: RecorderFinalizeArgsInput): string[] {
     '-map', '0:v:0',
     ...(o.hasAudio ? ['-map', '0:a:0'] : []),
     '-vf', vf,
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', String(recorderCrf(o.quality)), '-pix_fmt', 'yuv420p',
-    ...(o.hasAudio ? ['-c:a', 'aac', '-b:a', '160k'] : ['-an']),
+    ...recorderVideoEncodeArgs(o.encoder ?? 'libx264', o.quality),
+    ...(o.hasAudio ? ['-c:a', 'aac', '-b:a', `${audioKbps}k`] : ['-an']),
     '-movflags', '+faststart',
     '-progress', 'pipe:1',
     o.output,
@@ -624,13 +860,23 @@ export type RecorderTranscriptState =
   | 'done'
   | 'failed'
   | 'model-missing'
+  /** The speech model is not downloaded; transcription starts on its own once it is. */
+  | 'waiting-model'
   | 'no-audio';
+
+/** What was recorded: a drawn region, a whole monitor, or one window. */
+export type RecorderSourceKind = 'region' | 'monitor' | 'window';
 
 export interface RecorderJob {
   id: string;
   createdAt: number;
   title: string;
   phase: RecorderJobPhase;
+  source?: RecorderSourceKind;
+  /** The ffmpeg encoder that made the MP4, once it exists. */
+  encoder?: string;
+  /** The hardware encoder failed on this recording and x264 finished it. */
+  encoderFellBack?: boolean;
   /** 0–1 while finalizing. */
   progress: number;
   partialPath: string;
@@ -675,6 +921,14 @@ export interface RecorderState {
   recoverable: RecorderRecoverable[];
   /** System-audio loopback only exists on Windows. */
   loopbackSupported: boolean;
+  /** What the live session records (null when idle). */
+  source?: RecorderSourceKind | null;
+  /** The recorded window's title, in window mode. */
+  windowName?: string;
+  /** The last encoder detection, once one ran in this process. */
+  encoders?: RecorderEncoderReport | null;
+  /** Recordings waiting for the speech model before they are transcribed. */
+  waitingForModel?: number;
 }
 
 /** What the overlay is told when it opens over a display. */
@@ -702,6 +956,8 @@ export interface RecorderHostConfig {
   micGain: number;
   videoBitsPerSecond: number;
   chunkMs: number;
+  /** Record every frame whole (a window): no region, no crop. */
+  fullFrame?: boolean;
 }
 
 export interface RecorderHostStartResult {
@@ -739,6 +995,8 @@ export interface RecorderPartialMeta {
   recordedMs: number;
   /** Set once the recording stopped cleanly. */
   complete: boolean;
+  /** Absent in partials written before window recording existed: a region. */
+  source?: RecorderSourceKind;
 }
 
 export function normalizePartialMeta(raw: unknown): RecorderPartialMeta | null {
@@ -766,5 +1024,115 @@ export function normalizePartialMeta(raw: unknown): RecorderPartialMeta | null {
     hasAudio: r.hasAudio === true,
     recordedMs: Number.isFinite(Number(r.recordedMs)) ? Math.max(0, Number(r.recordedMs)) : 0,
     complete: r.complete === true,
+    ...(r.source === 'window' || r.source === 'monitor' || r.source === 'region' ? { source: r.source } : {}),
   };
+}
+
+// ---------------------------------------------------------------------------
+// History: finished recordings, kept across restarts
+
+/** Entries kept; the oldest go first (the files stay on disk). */
+export const RECORDER_HISTORY_LIMIT = 200;
+
+export interface RecorderHistoryEntry {
+  id: string;
+  title: string;
+  outputPath: string;
+  mediaId?: string;
+  /** When the recording started (ms epoch). */
+  createdAt: number;
+  /** The local calendar day it was made on, `YYYY-MM-DD`: its study day. */
+  studyDay: string;
+  durationMs: number;
+  bytes: number;
+  source: RecorderSourceKind;
+  hasAudio: boolean;
+  encoder?: string;
+  transcript: RecorderTranscriptState;
+  /** Put on its study day in Calendar and Statistics (once, by the main window). */
+  studyTagged: boolean;
+}
+
+/** A local-time `YYYY-MM-DD`, the key Calendar and Statistics file days under. */
+export function recorderStudyDay(at: number): string {
+  const d = new Date(Number.isFinite(at) ? at : 0);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+const TRANSCRIPT_STATES: readonly RecorderTranscriptState[] = [
+  'off', 'checking', 'queued', 'running', 'done', 'failed', 'model-missing', 'waiting-model', 'no-audio',
+];
+
+/** One untrusted history row (a hand-edited JSON file), or null when unusable. */
+export function normalizeRecorderHistoryEntry(raw: unknown): RecorderHistoryEntry | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== 'string' || !/^[\w-]{3,80}$/.test(r.id)) return null;
+  if (typeof r.outputPath !== 'string' || !r.outputPath.trim()) return null;
+  const createdAt = Number(r.createdAt);
+  if (!Number.isFinite(createdAt) || createdAt <= 0) return null;
+  const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : 0);
+  const transcript = TRANSCRIPT_STATES.includes(r.transcript as RecorderTranscriptState)
+    ? r.transcript as RecorderTranscriptState
+    : 'off';
+  return {
+    id: r.id,
+    title: typeof r.title === 'string' && r.title.trim() ? r.title.slice(0, 200) : recordingBaseName(new Date(createdAt)),
+    outputPath: r.outputPath,
+    ...(typeof r.mediaId === 'string' && r.mediaId ? { mediaId: r.mediaId } : {}),
+    createdAt,
+    studyDay: typeof r.studyDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.studyDay) ? r.studyDay : recorderStudyDay(createdAt),
+    durationMs: num(r.durationMs),
+    bytes: num(r.bytes),
+    source: r.source === 'window' || r.source === 'monitor' ? r.source : 'region',
+    hasAudio: r.hasAudio === true,
+    ...(typeof r.encoder === 'string' && /^[\w-]{1,40}$/.test(r.encoder) ? { encoder: r.encoder } : {}),
+    transcript,
+    studyTagged: r.studyTagged === true,
+  };
+}
+
+/**
+ * The history as read from disk at start: a transcription that was mid-flight
+ * when the app closed did not finish, so it reads as failed (and can be run
+ * again) rather than as running forever.
+ */
+export function recorderHistoryFromDisk(raw: unknown): RecorderHistoryEntry[] {
+  return normalizeRecorderHistory(raw).map((entry) => (
+    entry.transcript === 'checking' || entry.transcript === 'queued' || entry.transcript === 'running'
+      ? { ...entry, transcript: 'failed' as const }
+      : entry));
+}
+
+/** A whole history file: valid rows, newest first, one per id, capped. */
+export function normalizeRecorderHistory(raw: unknown): RecorderHistoryEntry[] {
+  const rows = Array.isArray(raw) ? raw : [];
+  const seen = new Set<string>();
+  const out: RecorderHistoryEntry[] = [];
+  for (const row of rows) {
+    const entry = normalizeRecorderHistoryEntry(row);
+    if (!entry || seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    out.push(entry);
+  }
+  return out.sort((a, b) => b.createdAt - a.createdAt).slice(0, RECORDER_HISTORY_LIMIT);
+}
+
+/** Add or replace one row, keeping the file's order and cap. */
+export function upsertRecorderHistory(list: readonly RecorderHistoryEntry[], entry: RecorderHistoryEntry): RecorderHistoryEntry[] {
+  return normalizeRecorderHistory([entry, ...list.filter((e) => e.id !== entry.id)]);
+}
+
+/** What the main window is asked to file under a study day. */
+export interface RecorderStudyTagRequest {
+  requestId: string;
+  id: string;
+  title: string;
+  /** `YYYY-MM-DD`. */
+  studyDay: string;
+  createdAt: number;
+  /** Recorded seconds, counted as study time on that day. */
+  seconds: number;
+  outputPath: string;
+  mediaId?: string;
 }

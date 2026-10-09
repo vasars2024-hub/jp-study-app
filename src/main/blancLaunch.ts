@@ -58,11 +58,30 @@ export interface BlancLaunchDeps {
   describeWindow: (win: BrowserWindow) => { role: AppProcessRole; title: string };
 }
 
+/**
+ * Send to every window whose renderer can still receive it.
+ *
+ * `win.isDestroyed()` alone is not enough: these broadcasts run from a closing
+ * window's own teardown (`webContents` 'destroyed', the main window's 'closed'),
+ * where `getAllWindows()` still lists that window but its webContents is already
+ * gone, and `send` throws "Object has been destroyed". Measured live 2026-10-08:
+ * closing the Study OS window raised that as an uncaught main-process exception
+ * and the "Gum ran into a problem" dialog appeared on every ordinary close.
+ */
+function sendToLiveWindows(channel: string, payload: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+      win.webContents.send(channel, payload);
+    } catch {
+      /* torn down between the check and the send */
+    }
+  }
+}
+
 /** Tell every renderer whether a Study OS window is alive (Blanc listens). */
 export function broadcastStudyOsAlive(alive: boolean): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('blanc:study-os-alive', alive);
-  }
+  sendToLiveWindows('blanc:study-os-alive', alive);
 }
 
 /**
@@ -80,9 +99,7 @@ export function isStudyOsJobsReady(): boolean {
 
 /** Tell every renderer whether a Study OS window has its background jobs installed (Blanc listens). */
 export function broadcastStudyOsJobsReady(ready: boolean = isStudyOsJobsReady()): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('blanc:study-os-jobs-ready', ready);
-  }
+  sendToLiveWindows('blanc:study-os-jobs-ready', ready);
 }
 
 function markStudyOsJobsReady(sender: WebContents): void {

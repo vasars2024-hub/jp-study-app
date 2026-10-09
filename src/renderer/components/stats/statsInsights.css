@@ -1,0 +1,149 @@
+/* Review insights (StatsReviewInsights / StatsBarChart). Own class names: the 14-day chart's
+   `stats-bar-*` classes are counted by other tests and must not change meaning. */
+
+.stats2-insights {
+  container-type: inline-size;
+}
+
+.stats2-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.stats2-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stats2-range select {
+  min-height: 28px;
+}
+
+.stats2-figure {
+  margin: 16px 0 0;
+}
+
+.stats2-title {
+  font-weight: 650;
+  margin-bottom: 6px;
+}
+
+.stats2-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 120px;
+  padding-bottom: 18px;
+  overflow: hidden;
+}
+
+.stats2-col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 2px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.stats2-track {
+  display: flex;
+  flex-direction: column-reverse;
+  height: 100%;
+  justify-content: flex-start;
+  border-radius: 2px 2px 0 0;
+  background: color-mix(in srgb, var(--text, #222) 6%, transparent);
+}
+
+.stats2-seg {
+  width: 100%;
+  min-height: 1px;
+}
+
+.stats2-axis {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--text-muted, #667085);
+}
+
+/* Five series, told apart by lightness as well as hue so greyscale still separates them. */
+.stats2-seg-0 { background: var(--stats2-c0, #4f7cff); }
+.stats2-seg-1 { background: var(--stats2-c1, #2fa37c); }
+.stats2-seg-2 { background: var(--stats2-c2, #1d4f91); }
+.stats2-seg-3 { background: var(--stats2-c3, #d9902f); }
+.stats2-seg-4 { background: var(--stats2-c4, #9c5bd1); }
+
+.stats2-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.stats2-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stats2-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.stats2-data {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.stats2-data > summary {
+  cursor: pointer;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.stats2-data table,
+.stats2-decks table {
+  border-collapse: collapse;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats2-data th,
+.stats2-data td,
+.stats2-decks th,
+.stats2-decks td {
+  padding: 2px 8px;
+  text-align: right;
+  border-bottom: 1px solid color-mix(in srgb, var(--text, #222) 10%, transparent);
+}
+
+.stats2-data th[scope='row'],
+.stats2-decks th[scope='row'] {
+  text-align: left;
+  font-weight: 500;
+}
+
+.stats2-decks {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.stats2-decks caption {
+  text-align: left;
+  font-weight: 650;
+  padding-bottom: 4px;
+}

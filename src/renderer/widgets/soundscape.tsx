@@ -30,6 +30,13 @@ import {
   toggleSoundscape,
   type SoundscapeSnapshot,
 } from '../soundscape/soundscapeStore';
+import {
+  focusSoundSecondsOn,
+  loadFocusSoundscape,
+  onFocusSoundscapeChanged,
+  saveFocusSoundscape,
+  type FocusSoundscapeSettings,
+} from '../soundscape/focusSoundscape';
 
 const percent = (value: number): number => Math.round(value * 100);
 
@@ -46,6 +53,16 @@ export function SoundscapeWidget() {
   const [, setClock] = useState(0);
 
   useEffect(() => subscribeSoundscape(setSnap), []);
+  const [focus, setFocus] = useState<FocusSoundscapeSettings>(() => loadFocusSoundscape());
+  useEffect(() => onFocusSoundscapeChanged(setFocus), []);
+  // Re-read on every mixer change and once a minute: the tally moves while sound plays.
+  const [focusMinutes, setFocusMinutes] = useState(() => Math.floor(focusSoundSecondsOn() / 60));
+  useEffect(() => {
+    const read = (): void => setFocusMinutes(Math.floor(focusSoundSecondsOn() / 60));
+    read();
+    const handle = setInterval(read, 60_000);
+    return () => clearInterval(handle);
+  }, [snap.playing]);
 
   // The remaining time is derived from the clock, so re-render while a timer runs.
   const timerRunning = snap.timerEndsAt !== null;
@@ -226,6 +243,64 @@ export function SoundscapeWidget() {
               aria-label={t('soundscape.music.volume')}
             />
           </div>
+        </div>
+
+        {/* snd2: the mixer follows Pomodoro work blocks and Focus Mode (focusSoundscape.ts). */}
+        <div className="wgt-sound-group wgt-sound-focus" role="group" aria-label={t('snd2.focus.heading')}>
+          <div className="wgt-sound-heading">{t('snd2.focus.heading')}</div>
+          <Toggle
+            checked={focus.enabled}
+            onChange={(event) => saveFocusSoundscape({ enabled: event.target.checked })}
+            label={t('snd2.focus.enable')}
+          />
+          {focus.enabled && (
+            <>
+              <Select
+                className="wgt-sound-scene"
+                aria-label={t('snd2.focus.scene')}
+                value={focus.sceneId}
+                onChange={(event) => saveFocusSoundscape({ sceneId: event.target.value })}
+              >
+                <option value="">{t('snd2.focus.currentMix')}</option>
+                <optgroup label={t('soundscape.scene.builtIn')}>
+                  {BUILT_IN_SCENES.map((scene) => (
+                    <option key={scene.id} value={scene.id}>
+                      {t(scene.labelKey)}
+                    </option>
+                  ))}
+                </optgroup>
+                {state.saved.length > 0 && (
+                  <optgroup label={t('soundscape.scene.saved')}>
+                    {state.saved.map((mix) => (
+                      <option key={mix.id} value={mix.id}>
+                        {mix.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </Select>
+              <Toggle
+                checked={focus.withPomodoro}
+                onChange={(event) => saveFocusSoundscape({ withPomodoro: event.target.checked })}
+                label={t('snd2.focus.pomodoro')}
+              />
+              <Toggle
+                checked={focus.withFocusMode}
+                onChange={(event) => saveFocusSoundscape({ withFocusMode: event.target.checked })}
+                label={t('snd2.focus.focusMode')}
+              />
+              <Toggle
+                checked={focus.fadeOnBreak}
+                onChange={(event) => saveFocusSoundscape({ fadeOnBreak: event.target.checked })}
+                label={t('snd2.focus.fadeOnBreak')}
+              />
+            </>
+          )}
+          {focusMinutes > 0 && (
+            <div className="wgt-sound-duck" role="status">
+              {t('snd2.focus.today', { minutes: focusMinutes })}
+            </div>
+          )}
         </div>
       </div>
 

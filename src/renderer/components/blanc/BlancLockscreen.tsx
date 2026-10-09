@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { getUiLang, useT } from '../../i18n';
 import { verifyLockscreenPin } from '../../lockscreenSettings';
+import { useLockBlockedToasts } from '../../lockBlockedNotice';
 
 function useMinuteClock(): Date {
   const [now, setNow] = useState(() => new Date());
@@ -24,6 +25,7 @@ function useMinuteClock(): Date {
  */
 export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
   const { t } = useT();
+  useLockBlockedToasts();
   const [digits, setDigits] = useState('');
   const [error, setError] = useState('');
   const now = useMinuteClock();

@@ -88,8 +88,33 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
     //
     // A capture failure must NEVER lose the card: the mine proceeds without audio. That is
     // why this is a separate try, and why the outcome distinguishes `withAudio`.
+    // music2: a local song is cut from the FILE (ffmpeg, the same route video uses) —
+    // instant, and the music keeps playing instead of jumping back to replay the line.
+    // Recording off the element remains the fallback for streams and failed cuts.
+    const filePath = kind === 'synced' ? current.path?.trim() : '';
+    if (filePath && typeof window.api?.extractAudioClip === 'function') {
+      try {
+        const result = await window.api.extractAudioClip({
+          filePath,
+          startSec: cue.startMs / 1000,
+          endSec: cue.endMs / 1000,
+        });
+        if (result.ok && result.base64) {
+          draft = withVideoCoreMiningAsset(draft, 'audio', {
+            base64: result.base64,
+            asset: {
+              filename: `jp-music-cue-${cue.index}-${cue.startMs}.mp3`,
+              mimeType: result.mimeType ?? 'audio/mpeg',
+              bytes: result.bytes ?? 0,
+            },
+          });
+        }
+      } catch {
+        // Fall through to recording, below.
+      }
+    }
     const media = kind === 'synced' ? getLeaderAudioElement() : null;
-    if (media) {
+    if (media && !draft.audioBase64) {
       setOutcome({ kind: 'recording', index: line.index });
       try {
         const captured = await recordCueAudio(media, {

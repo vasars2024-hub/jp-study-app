@@ -9,7 +9,7 @@ import {
   type FocusEvent,
   type KeyboardEvent,
 } from 'react';
-import { groupLabelKey, SETTINGS_SEARCH_SUGGESTIONS, searchSettings } from './settingsRegistry';
+import { groupLabelKey, pageMeta, SETTINGS_SEARCH_SUGGESTIONS, searchSettings } from './settingsRegistry';
 import { getRecentQueries, pushRecentQuery } from './settingsRecent';
 import type { SettingsPageId, SettingsRegistryEntry } from './types';
 import Icon from '../Icons';
@@ -244,7 +244,10 @@ const SettingsSearch = forwardRef<
                 >
                   <span className="os-set-search-item-title">{t(r.titleKey)}</span>
                   <span className="os-set-search-item-path muted">
-                    {t(groupLabelKey(r.group))} · {(r.descKey && t(r.descKey)) || r.pageId}
+                    {/* The rail's group for the destination page (set2), so a hit
+                        says where it will land; the entry's own `group` is the
+                        fallback for a page that left the rail (Files). */}
+                    {t(groupLabelKey(pageMeta(r.pageId)?.group || r.group))} · {(r.descKey && t(r.descKey)) || r.pageId}
                   </span>
                 </button>
               ))

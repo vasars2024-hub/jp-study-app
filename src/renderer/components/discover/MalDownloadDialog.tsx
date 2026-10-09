@@ -625,6 +625,9 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
           // `units`, not `selected`: the question is whether the title has one
           // episode, not whether one is ticked right now.
           singleUnitTitle: units.length === 1,
+          // A season-2 entry must not take `S01E05`; its units also match the
+          // absolute numbers long-runners are released under (`malUnits.ts`).
+          seasonNumber: target.seasonNumber ?? null,
         });
       setReleases(pickingReleases
         ? rankMalReleases(rows, { preferredResolution: resolution ? `${resolution}p` : '' })

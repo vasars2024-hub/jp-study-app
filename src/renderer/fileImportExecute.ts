@@ -66,6 +66,11 @@ export interface ImportHooks {
   onPlayMedia?: (item: MediaItem) => void;
 }
 
+/** One path, compared the way Windows compares them: slashes and case do not matter. */
+function mediaPathKey(p: string): string {
+  return String(p ?? '').replace(/\\/g, '/').toLowerCase();
+}
+
 export const IMPORT_REFUSE_FAILED = 'fileDrop.toast.failed';
 export const IMPORT_REFUSE_NO_DESTINATION = 'fileDrop.toast.noDestination';
 export const IMPORT_REFUSE_EMPTY_FOLDER = 'fileDrop.toast.emptyFolder';
@@ -131,15 +136,24 @@ export async function executeImport(
         ? await window.api.fileDropFolderFiles(subject.path)
         : [subject.path];
       if (!paths.length) return refuse(IMPORT_REFUSE_EMPTY_FOLDER);
-      const items = await window.api.addMediaPaths(paths);
+      // `media:addPaths` answers with the WHOLE library, not what this import added. Read
+      // as "what was added", it played nothing once the library held a second title, and
+      // its Undo removed every item in the library. So the import's own rows are picked
+      // out by path, and Undo only reverses the ones that did not exist before.
+      const before = await (window.api.listMedia?.() ?? Promise.resolve([] as MediaItem[])).catch(
+        () => [] as MediaItem[],
+      );
+      const existed = new Set((before ?? []).map((i) => i.id));
+      const library = (await window.api.addMediaPaths(paths)) ?? [];
+      const wanted = new Set(paths.map(mediaPathKey));
+      const imported = library.filter((i) => wanted.has(mediaPathKey(i.path)));
       hooks.onOpenSection?.('player');
       // "→ Media player" used to add the file and leave the library open on the grid.
-      const added = items ?? [];
-      if (!subject.isDirectory && added.length === 1 && added[0].kind === 'video') hooks.onPlayMedia?.(added[0]);
+      if (!subject.isDirectory && imported.length === 1 && imported[0].kind === 'video') hooks.onPlayMedia?.(imported[0]);
       return {
         targetId: target,
         libraryIds: [],
-        mediaIds: (items ?? []).map((i) => i.id),
+        mediaIds: imported.filter((i) => !existed.has(i.id)).map((i) => i.id),
       };
     }
     case 'wallpaper': {

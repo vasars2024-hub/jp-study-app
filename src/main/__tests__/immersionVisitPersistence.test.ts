@@ -48,6 +48,14 @@ describe('persisted arrivals versus reading accumulations', () => {
     expect(readSites().sites[0]).toMatchObject({ visitCount: 1, totalSeconds: 5 });
   });
 
+  it('banks dictionary lookups per page, ignoring nonsense counts', () => {
+    recordVisitFromBridge({ url, seconds: 5, lookups: 2, countVisit: false });
+    recordVisitFromBridge({ url, seconds: 5, lookups: 3, countVisit: false });
+    recordVisitFromBridge({ url, lookups: -4, countVisit: false });
+    recordVisitFromBridge({ url, lookups: Number.NaN, countVisit: false });
+    expect(readSites().sites[0]).toMatchObject({ totalSeconds: 10, totalLookups: 5 });
+  });
+
   it('rejects a malformed URL without rewriting the last saved sites', () => {
     recordVisitFromBridge({ url });
     const before = readSites();

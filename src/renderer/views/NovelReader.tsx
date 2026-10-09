@@ -50,8 +50,13 @@ import { addBookmark, loadBookmarks, removeBookmark, type Bookmark } from '../bo
 import { getSummary, onStatsChanged, recordReading } from '../stats';
 import { activeReadingSeconds, creditReadingProgress, READING_IDLE_MS } from '../readingCredit';
 import { chapterCharsRemaining, estimateReadingMinutes } from '../../shared/readingTime';
+import { isReaderInteraction } from '../readerActivity';
+import { BOOK_OPEN_AT_EVENT, bookLocation, takeBookOpenAt, type BookPosition } from '../bookRoundTrip';
+import ReaderSpeedReadout from '../components/reading/ReaderSpeedReadout';
+import { readerNotesMarkdown } from '../../shared/readerNotesExport';
 import { scrollIntoViewReliably } from '../utils/reliableScroll';
 import { loadEpub, type LoadedEpub } from '../epubLoader';
+import { PUBLISHER_CSS_SCOPE } from '../../shared/epubPublisherCss';
 import { loadPdf } from '../pdfLoader';
 import {
   buildDocumentCaptureTarget,
@@ -938,7 +943,12 @@ export default function NovelReader({ item, onClose }: Props) {
           restored?.kind === 'part' ? { part: restored.part, frac: restored.fraction } : null;
         let pi = 0;
         let lf = 0;
-        if (savedLoc && savedLoc.part < handle.chapters.length) {
+        // "Open in book" from a mined card wins over the saved place, once.
+        const openAt = parseLoc(takeBookOpenAt(item.id) ?? undefined);
+        if (openAt && openAt.part < handle.chapters.length) {
+          pi = openAt.part;
+          lf = openAt.frac;
+        } else if (savedLoc && savedLoc.part < handle.chapters.length) {
           pi = savedLoc.part;
           lf = savedLoc.frac;
         } else {
@@ -1646,7 +1656,18 @@ export default function NovelReader({ item, onClose }: Props) {
 
   // ----- reading time + characters → statistics -----
   const [recentReading, setRecentReading] = useState(() => getSummary().recent);
-  useEffect(() => onStatsChanged(() => setRecentReading(getSummary().recent)), []);
+  /** This book's all-time tally (seconds, characters) — the per-book half of the speed readout. */
+  const [bookStat, setBookStat] = useState(() => getSummary().books.find((b) => b.id === item.id) ?? null);
+  useEffect(() => onStatsChanged(() => {
+    const summary = getSummary();
+    setRecentReading(summary.recent);
+    setBookStat(summary.books.find((b) => b.id === item.id) ?? null);
+  }), [item.id]);
+  /** This session's credited reading, updated on every flush (20 s, focus loss, idle resume). */
+  const sessionReadRef = useRef({ seconds: 0, chars: 0 });
+  const [sessionRead, setSessionRead] = useState({ seconds: 0, chars: 0 });
+  /** The reader's own root: only activity INSIDE it keeps the reading clock running. */
+  const readerRootRef = useRef<HTMLDivElement>(null);
   const chapterMinutesLeft = loaded
     ? estimateReadingMinutes(
       chapterCharsRemaining(loaded.chapters, loaded.toc, part, localFracRef.current),
@@ -1663,7 +1684,12 @@ export default function NovelReader({ item, onClose }: Props) {
       if (!activeReadingRef.current) secs = 0;
       const chars = pendingCharsRef.current;
       pendingCharsRef.current = 0;
-      if (secs > 0 || chars > 0) recordReading(item.id, titleRef.current, secs, chars);
+      if (secs > 0 || chars > 0) {
+        recordReading(item.id, titleRef.current, secs, chars);
+        const session = sessionReadRef.current;
+        sessionReadRef.current = { seconds: session.seconds + secs, chars: session.chars + chars };
+        setSessionRead(sessionReadRef.current);
+      }
       // A PDF has no EPUB pages for the garden to count, so its text grows it instead.
       if (sourceIsPdfRef.current && chars > 0) recordReadingCharsForGarden({ sourceId: item.id, chars });
     };
@@ -1684,9 +1710,14 @@ export default function NovelReader({ item, onClose }: Props) {
     const onFocus = () => setActive(true);
     const onBlur = () => setActive(false);
     const onVis = () => setActive(!document.hidden);
-    // Any sign of a reader at the keyboard keeps the reading clock running.
+    // Any sign of a reader at the keyboard keeps the reading clock running —
+    // but only activity in THIS reader. The listener sits on the window (in the
+    // capture phase, so nothing can swallow it), and it used to count every
+    // event there: typing in another pane, scrolling a sidebar or moving the
+    // mouse over the desktop shell all kept a book "being read".
     let lastMark = 0;
-    const onInteract = () => {
+    const onInteract = (event: Event) => {
+      if (!isReaderInteraction(event, readerRootRef.current)) return;
       const now = Date.now();
       if (now - lastMark < 1000) return;
       lastMark = now;
@@ -2104,7 +2135,13 @@ export default function NovelReader({ item, onClose }: Props) {
         return;
       }
       if (!word) return;
-      setPendingAdd({ word, sentence: sentence || undefined });
+      setPendingAdd({
+        word,
+        sentence: sentence || undefined,
+        ...(linkViewRef.current
+          ? {}
+          : { position: bookLocation(partRef.current, localFracRef.current), percent: curGlobalRef.current }),
+      });
       setCollectionOpen(true);
     },
     [],
@@ -2520,7 +2557,15 @@ export default function NovelReader({ item, onClose }: Props) {
     const word = current.query.slice(0, 80);
     const sentence = current.kind === 'dict' ? current.context : current.query.slice(0, 200);
     // A dictionary popup's word: the panel fills its reading and meaning from the dictionary.
-    setPendingAdd({ word, sentence: sentence || undefined, lookup: current.kind === 'dict' });
+    // The page in view rides along, so the card can open the book here again.
+    setPendingAdd({
+      word,
+      sentence: sentence || undefined,
+      lookup: current.kind === 'dict',
+      ...(linkViewRef.current
+        ? {}
+        : { position: bookLocation(partRef.current, localFracRef.current), percent: curGlobalRef.current }),
+    });
     setCollectionOpen(true);
   }, []);
 
@@ -2638,6 +2683,41 @@ export default function NovelReader({ item, onClose }: Props) {
     [item.id],
   );
 
+  /** Bookmarks and highlights as Markdown on the clipboard (`shared/readerNotesExport`). */
+  const copyReaderNotes = useCallback(async () => {
+    const toc = loadedRef.current?.toc ?? [];
+    const markdown = readerNotesMarkdown({
+      title: titleRef.current,
+      bookmarks,
+      highlights: annotations,
+      chapterOf: (partIndex) => [...toc].reverse().find((entry) => entry.chapterIndex <= partIndex)?.label ?? '',
+      headings: { bookmarks: t('novel.tool.bookmarks'), highlights: t('read2.novel.highlights') },
+    });
+    if (!markdown) return;
+    try {
+      await navigator.clipboard.writeText(markdown);
+      showToast({ message: t('read2.novel.notesCopied', { count: bookmarks.length + annotations.length }) });
+    } catch {
+      showToast({ message: t('read2.novel.notesCopyFailed') });
+    }
+    // `lang`, not `t`: the headings are translated inside.
+  }, [bookmarks, annotations, lang]);
+
+  // "Open in book" while this book is already open: jump in place and claim the
+  // request, so `openBookAt` does not also re-open it through the Library.
+  useEffect(() => {
+    const onOpenAt = (event: Event) => {
+      const detail = (event as CustomEvent<BookPosition>).detail;
+      const book = loadedRef.current;
+      if (!detail || detail.bookId !== item.id || !book) return;
+      const target = parseLoc(detail.loc);
+      if (!target || target.part >= book.chapters.length) return;
+      event.preventDefault();
+      goTo(target.part, target.frac);
+    };
+    window.addEventListener(BOOK_OPEN_AT_EVENT, onOpenAt);
+    return () => window.removeEventListener(BOOK_OPEN_AT_EVENT, onOpenAt);
+  }, [item.id, goTo]);
   // ----- styles -----
   const theme = THEMES[settings.theme] ?? THEMES.light;
   const injectedCss = useMemo(() => {
@@ -2649,6 +2729,12 @@ export default function NovelReader({ item, onClose }: Props) {
       '.novel-content ::selection { background: #6c7bff; color: #fff; }',
     ].join('\n');
   }, [settings, theme.link, size.h]);
+
+  // The book's own CSS, already sanitised and scoped to `.epub-pub` by the
+  // loader (`shared/epubPublisherCss`). Off with the reader setting, and never
+  // on an imported article, which has no book behind it.
+  const publisherCss = settings.publisherStyles !== false ? loaded?.publisherCss ?? '' : '';
+  const pubClass = publisherCss ? ` ${PUBLISHER_CSS_SCOPE.slice(1)}` : '';
 
   const vm = Math.round(((size.h || 0) * settings.sideMargin) / 100); // vertical modes: top/bottom
   const hm = Math.round(((size.w || 0) * settings.sideMargin) / 100); // horizontal paged: sides
@@ -2879,9 +2965,20 @@ export default function NovelReader({ item, onClose }: Props) {
       // already renders the title, and keeping both would stack two headings —
       // the commonest way a migration adds chrome while claiming to remove it.
       actions: (
-        <button className="btn small primary" onClick={addCurrent}>
-          {t('novel.tool.addBookmark')}
-        </button>
+        <>
+          <button
+            type="button"
+            className="btn small"
+            title={t('read2.novel.exportNotesTitle')}
+            disabled={!bookmarks.length && !annotations.length}
+            onClick={() => void copyReaderNotes()}
+          >
+            {t('read2.novel.exportNotes')}
+          </button>
+          <button className="btn small primary" onClick={addCurrent}>
+            {t('novel.tool.addBookmark')}
+          </button>
+        </>
       ),
       content:
         bookmarks.length === 0 ? (
@@ -3080,10 +3177,12 @@ export default function NovelReader({ item, onClose }: Props) {
   return (
     <AppChrome menus={readerMenus} status={readerStatus} className="aero-reader-chrome">
     <div
+      ref={readerRootRef}
       className={`reader${aero ? ' aero-reader' : ''}${presentation.liquid ? ' reader-liquid' : ''}`}
       data-presentation={presentation.dataPresentation}
     >
       <style>{injectedCss}</style>
+      {publisherCss && !linkView ? <style data-publisher-css="">{publisherCss}</style> : null}
       {/*
         The reader's two chrome strips are transport, not work: the bar is
         navigation plus contextual tools, the footer is a chapter jump and a
@@ -3431,7 +3530,7 @@ export default function NovelReader({ item, onClose }: Props) {
                 <div
                   key={`p${part}`}
                   ref={contentRef}
-                  className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                  className={`novel-content novel-translate-${translateMode} ${wkClass}${pubClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
                   style={contentStyle}
                   lang={bookContentLang}
                   dangerouslySetInnerHTML={chapterHtml[part] ?? EMPTY_HTML}
@@ -3440,7 +3539,7 @@ export default function NovelReader({ item, onClose }: Props) {
                 <div
                   key="scrollwin"
                   ref={contentRef}
-                  className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                  className={`novel-content novel-translate-${translateMode} ${wkClass}${pubClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
                   style={contentStyle}
                   lang={bookContentLang}
                 >
@@ -3516,6 +3615,7 @@ export default function NovelReader({ item, onClose }: Props) {
         {chapterMinutesLeft !== null && (
           <span className="muted">{t('novel.reader.minutesLeft', { count: chapterMinutesLeft })}</span>
         )}
+        <ReaderSpeedReadout session={sessionRead} book={bookStat} t={t} lang={lang} />
         <span className="reader-pct muted">{Math.round((seek ?? progress) * 100)}%</span>
       </ContextualSurface>
 

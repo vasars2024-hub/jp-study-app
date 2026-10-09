@@ -148,9 +148,13 @@ async function start(config: RecorderHostConfig): Promise<RecorderHostStartResul
     width: Number(settings.width) || Math.round(config.displaySize.width * window.devicePixelRatio),
     height: Number(settings.height) || Math.round(config.displaySize.height * window.devicePixelRatio),
   };
-  const crop = regionToCropPx(config.region, config.displaySize, frameSize);
+  // A window is recorded whole: there is no region on it to map, and its frame
+  // size follows the window (ffmpeg fits it to the first frame afterwards).
+  const crop = config.fullFrame
+    ? { x: 0, y: 0, width: Math.max(2, frameSize.width), height: Math.max(2, frameSize.height) }
+    : regionToCropPx(config.region, config.displaySize, frameSize);
   if (!crop) return fail('recorder.error.regionTooSmall');
-  const full = isFullFrameCrop(crop, frameSize);
+  const full = config.fullFrame === true || isFullFrameCrop(crop, frameSize);
   const cropped = full ? null : await liveCrop(video, crop);
 
   // Audio: the loopback from the display stream, the microphone, mixed with a gain each.

@@ -118,7 +118,10 @@ describe('the study surface is one column layout, not four anchored panels', () 
     // The count stopped at the map's own closing brace and not at the end of the
     // component, so the two `toContain`s below mean what they say.
     expect(map, 'the block map ran past its own closing brace').not.toContain('<StudyDocks');
-    expect(map).toContain('<VideoCoreMiningPanel');
+    // The mining panel is built once as `miningPanel` (shared by the cardEditor and
+    // cardPreview blocks, never both at once) and only placed through the map.
+    expect(overlay).toMatch(/const miningPanel = \(\s*<VideoCoreMiningPanel/);
+    expect(map).toMatch(/cardEditor:\s*miningPanel/);
     expect(map).toContain('<VideoCoreTranscriptPanel');
     expect(overlay).toContain('<StudyDocks renderers={blockRenderers} />');
 

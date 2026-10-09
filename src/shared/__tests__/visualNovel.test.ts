@@ -311,6 +311,19 @@ describe('visual novel database', () => {
     });
   });
 
+  it('keeps a line the game repeats when the capture is live (keepRepeats)', () => {
+    const entry = createVisualNovelEntry({ title: 'Live' }, 'vn-live', 1000);
+    const base = upsertVisualNovelEntry(createEmptyVisualNovelDatabase(), entry);
+    let nextId = 0;
+    const once = appendVisualNovelCaptures(base, [
+      { visualNovelId: entry.id, japanese: 'はい。', speaker: 'A', scene: 's', source: 'hook' },
+    ], () => `live-${++nextId}`, 2000, { keepRepeats: true });
+    const twice = appendVisualNovelCaptures(once, [
+      { visualNovelId: entry.id, japanese: 'はい。', speaker: 'A', scene: 's', source: 'hook' },
+    ], () => `live-${++nextId}`, 3000, { keepRepeats: true });
+    expect(twice.captures.map((capture) => capture.id)).toEqual(['live-2', 'live-1']);
+  });
+
   it('updates translation and context while preserving capture identity, then removes it', () => {
     const entry = createVisualNovelEntry({ title: 'Assist' }, 'vn-assist', 1000);
     const captured = appendVisualNovelCapture(

@@ -18,6 +18,7 @@ import { loadWindowWithRetry } from './bootLoad';
 import { desktopStore } from './desktop';
 import { mt } from './i18n';
 import { applyBoundsVerified } from './windowBounds';
+import { deferWhileLocked, refuseWhileLocked } from './lockGuard';
 import {
   displayForKey,
   listDisplays,
@@ -231,6 +232,8 @@ const spawnedWindows = new Map<DesktopIndex, BrowserWindow>();
 
 /** Open (or raise) a standalone window showing one desktop. */
 export function openSpawnedDesktop(index: DesktopIndex): boolean {
+  // A torn-off desktop is Study OS content: never opened or raised while locked.
+  if (refuseWhileLocked('window:desktop-spawned')) return false;
   const existing = spawnedWindows.get(index);
   if (existing && !existing.isDestroyed()) {
     if (existing.isMinimized()) existing.restore();
@@ -325,6 +328,9 @@ function placeDesktopWindow(win: BrowserWindow, display: DisplaySummary, key: st
  * current state rather than from what changed.
  */
 export function syncDesktopWindows(): void {
+  // Secondary desktops render Study OS without a PIN pad of their own, so while
+  // locked the reconcile waits for the unlock (lockGuard.ts); live ones are hidden.
+  if (deferWhileLocked('desktop-windows', syncDesktopWindows)) return;
   const store = desktopStore();
   const displays = listDisplays();
   const mainKey = mainDisplayKey();

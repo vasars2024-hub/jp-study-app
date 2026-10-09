@@ -25,9 +25,25 @@ export interface GameArenaSettings {
   /**
    * What the fast games draw from: `auto` is the bundled pack plus the deck and
    * every imported list; `folder:<name>` is one flashcard deck folder;
-   * `list:<id>` is one imported word list — "make a game from my list".
+   * `list:<id>` is one imported word list — "make a game from my list"; `due` is
+   * the cards due now and the ones still being learned; `mined-today` is the
+   * cards added today.
    */
   material: string;
+  /**
+   * Before each arcade run, answer a few cards from the study queue (the arcade
+   * games teach nothing on their own; this is what makes a run study).
+   */
+  arcadeStudyGate: boolean;
+  /** Raise or lower the level and the share of learning words from recent accuracy. */
+  adaptive: boolean;
+  /**
+   * Let a right/wrong game answer on a DUE deck card grade it (Good / Again).
+   * Off by default: a game answer is practice, and a multiple-choice pick is
+   * not a recall test. Even when on, Anki-owned and suspended cards are never
+   * graded, and the graded row is kept out of FSRS training and true retention.
+   */
+  gradeDueCards: boolean;
 }
 
 const KEY = 'jp-game-arena-settings-v1';
@@ -43,6 +59,9 @@ export const DEFAULT_GAME_ARENA_SETTINGS: GameArenaSettings = {
   mirrorApiKey: '',
   kana: DEFAULT_KANA_SELECTION,
   material: 'auto',
+  arcadeStudyGate: true,
+  adaptive: true,
+  gradeDueCards: false,
 };
 
 function validSourceLang(value: unknown): value is SourceLang {
@@ -71,7 +90,10 @@ function sanitizeKana(value: unknown): KanaSelection {
 }
 
 function validMaterial(value: unknown): value is string {
-  return value === 'auto' || (typeof value === 'string' && /^(folder|list):.+/.test(value));
+  return value === 'auto'
+    || value === 'due'
+    || value === 'mined-today'
+    || (typeof value === 'string' && /^(folder|list):.+/.test(value));
 }
 
 function validLevelOverride(value: unknown): value is ArenaLevelOverride {
@@ -93,6 +115,9 @@ export function loadGameArenaSettings(): GameArenaSettings {
       mirrorApiKey: typeof parsed.mirrorApiKey === 'string' ? parsed.mirrorApiKey : '',
       kana: sanitizeKana(parsed.kana),
       material: validMaterial(parsed.material) ? parsed.material : 'auto',
+      arcadeStudyGate: typeof parsed.arcadeStudyGate === 'boolean' ? parsed.arcadeStudyGate : DEFAULT_GAME_ARENA_SETTINGS.arcadeStudyGate,
+      adaptive: typeof parsed.adaptive === 'boolean' ? parsed.adaptive : DEFAULT_GAME_ARENA_SETTINGS.adaptive,
+      gradeDueCards: parsed.gradeDueCards === true,
     };
   } catch {
     return DEFAULT_GAME_ARENA_SETTINGS;

@@ -66,7 +66,7 @@ export default function CalendarView() {
     {
       id: 'view',
       label: t('calendar.aero.menu.view'),
-      items: (['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => ({
+      items: (['month', 'week', 'day', 'agenda', 'year'] as ViewMode[]).map((m) => ({
         id: m,
         label: modeLabels[m],
         onSelect: () => setMode(m),
@@ -119,7 +119,7 @@ export default function CalendarView() {
             <span>{t('calendar.newEvent')}</span>
           </button>
           <div className="aero-cal-pane-title">{t('calendar.aero.views')}</div>
-          {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => (
+          {(['month', 'week', 'day', 'agenda', 'year'] as ViewMode[]).map((m) => (
             <button
               key={m}
               type="button"

@@ -15,11 +15,32 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AppUpdateStateKind, AppUpdateStatus, InstallKind } from '../shared/appUpdate';
+import {
+  classifyUpdateError,
+  type AppUpdateDetails,
+  type AppUpdateErrorCode,
+  type AppUpdateStateKind,
+  type AppUpdateStatus,
+  type InstallKind,
+} from '../shared/appUpdate';
 import { GITHUB_OWNER, GITHUB_REPO } from '../shared/release';
 import { updateExePath } from './squirrelEvents';
 
 export const SQUIRREL_FEED_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download`;
+
+/**
+ * The repository `forge.config.ts` hands MakerSquirrel as `remoteReleases`, so
+ * `make` downloads the previous release and writes a `-delta.nupkg` beside the
+ * full one. It is the repo URL, not the feed: Squirrel's SyncReleases treats a
+ * github.com URL as `owner/repo` and asks the GitHub API for its latest release.
+ * `squirrelFeed.test.ts` pins forge.config.ts to this value.
+ */
+export const SQUIRREL_REMOTE_RELEASES_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
+
+/** What Update.exe actually fetches first: `<feed>/RELEASES`. */
+export function squirrelReleasesUrl(feedUrl: string = SQUIRREL_FEED_URL): string {
+  return `${feedUrl.replace(/\/+$/, '')}/RELEASES`;
+}
 
 /** Squirrel holds a lock on the install for a while after `--squirrel-firstrun`. */
 export const FIRST_CHECK_DELAY_MS = 60_000;
@@ -63,13 +84,29 @@ export interface AppUpdateControllerDeps {
    */
   markQuitting?: () => void;
   setTimer?: (fn: () => void, ms: number, repeat: boolean) => void;
+  /** The running version, for the update panel. */
+  currentVersion?: string;
+  /** Every change, in the panel's richer shape (`appUpdate:details`). */
+  broadcastDetails?: (details: AppUpdateDetails) => void;
+  /**
+   * Staged-rollout guard: true = Windows reports a metered connection, so the
+   * AUTOMATIC check (which downloads the whole package) is skipped; null = cannot
+   * tell, which checks as before. "Check now" never asks — it is the user's call.
+   */
+  isMetered?: () => Promise<boolean | null>;
+  /** Where the last check time survives a restart. */
+  lastCheckedStore?: { load(): number | null; save(at: number): void };
+  now?: () => number;
 }
 
 export interface AppUpdateController {
   status(): AppUpdateStatus;
+  details(): AppUpdateDetails;
   /** Wire the updater and arm the checks. A no-op unless installed. */
   start(): void;
   check(): void;
+  /** The user pressed "Check now": no metered guard. Returns the new details. */
+  checkNow(): AppUpdateDetails;
   /** Quit and apply a downloaded update. `false` when there is none to apply. */
   restart(): boolean;
 }
@@ -78,29 +115,100 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
   let state: AppUpdateStateKind = 'idle';
   let version: string | undefined;
   let started = false;
+  let error: AppUpdateErrorCode | undefined;
+  let downloadStartedAt: number | undefined;
+  let skippedMetered = false;
+  let lastCheckedAt: number | null = (() => {
+    try {
+      return deps.lastCheckedStore?.load() ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  const now = deps.now ?? Date.now;
 
   const status = (): AppUpdateStatus => ({ install: deps.install, state, ...(version ? { version } : {}) });
+  const details = (): AppUpdateDetails => ({
+    ...status(),
+    current: deps.currentVersion ?? '',
+    channel: 'stable',
+    feedUrl: deps.feedUrl ?? SQUIRREL_FEED_URL,
+    lastCheckedAt,
+    ...(state === 'downloading' && downloadStartedAt ? { downloadStartedAt } : {}),
+    ...(state === 'error' ? { error: error ?? 'unknown' } : {}),
+    ...(skippedMetered ? { skippedMetered: true } : {}),
+  });
+  const pushDetails = () => {
+    try {
+      deps.broadcastDetails?.(details());
+    } catch {
+      /* a closed window */
+    }
+  };
   const set = (next: AppUpdateStateKind, nextVersion?: string) => {
     state = next;
     if (nextVersion !== undefined) version = nextVersion;
+    if (next !== 'error') error = undefined;
+    if (next === 'downloading') downloadStartedAt = now();
     deps.broadcast(status());
+    pushDetails();
+  };
+  const fail = (message: string) => {
+    error = classifyUpdateError(message);
+    set('error');
   };
 
   const check = () => {
     if (deps.install !== 'installed' || !started) return;
     // Once downloaded, Squirrel has staged it; another check would only re-download.
     if (state === 'checking' || state === 'downloading' || state === 'downloaded') return;
+    lastCheckedAt = now();
+    try {
+      deps.lastCheckedStore?.save(lastCheckedAt);
+    } catch {
+      /* the time is still right for this session */
+    }
     try {
       deps.updater.checkForUpdates();
     } catch (err) {
-      deps.log?.(`[update] check failed: ${err instanceof Error ? err.message : String(err)}`);
-      set('error');
+      const message = err instanceof Error ? err.message : String(err);
+      deps.log?.(`[update] check failed: ${message}`);
+      fail(message);
+      return;
     }
+    pushDetails();
+  };
+
+  /** Timer-driven: asks the metered guard first when there is one. */
+  const autoCheck = () => {
+    if (!deps.isMetered) {
+      check();
+      return;
+    }
+    void deps.isMetered().then(
+      (metered) => {
+        if (metered === true) {
+          skippedMetered = true;
+          deps.log?.('[update] automatic check skipped: metered connection');
+          pushDetails();
+          return;
+        }
+        skippedMetered = false;
+        check();
+      },
+      () => check(),
+    );
   };
 
   return {
     status,
+    details,
     check,
+    checkNow() {
+      skippedMetered = false;
+      check();
+      return details();
+    },
     start() {
       if (deps.install !== 'installed' || started) return;
       started = true;
@@ -116,9 +224,10 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
       });
       u.on('error', (err: unknown) => {
         // The usual cause is a release without RELEASES/nupkg assets, or offline.
-        // Silent to the user: the GitHub notice path still covers a newer release.
-        deps.log?.(`[update] ${err instanceof Error ? err.message : String(err)}`);
-        if (state !== 'downloaded') set('error');
+        // The panel shows it translated (`upd2.error.<code>`); no toast.
+        const message = err instanceof Error ? err.message : String(err);
+        deps.log?.(`[update] ${message}`);
+        if (state !== 'downloaded') fail(message);
       });
       try {
         u.setFeedURL({ url: deps.feedUrl ?? SQUIRREL_FEED_URL });
@@ -131,8 +240,8 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
         const t = repeat ? setInterval(fn, ms) : setTimeout(fn, ms);
         t.unref?.();
       });
-      timer(check, FIRST_CHECK_DELAY_MS, false);
-      timer(check, CHECK_INTERVAL_MS, true);
+      timer(autoCheck, FIRST_CHECK_DELAY_MS, false);
+      timer(autoCheck, CHECK_INTERVAL_MS, true);
     },
     restart() {
       if (state !== 'downloaded') return false;

@@ -1142,7 +1142,7 @@ export default function DeckWorkbench() {
                 <p className="muted">{t('ankiWorkbench.sessions.none')}</p>
               ) : (
                 <ul className="deck-workbench-sessions">
-                  {sessions.map(({ session, progress: p }) => (
+                  {sessions.map(({ session, progress: p, earlierReads }) => (
                     <li key={session.id}>
                       <span>
                         {t(`ankiWorkbench.sessions.status.${p.status}`)} — {session.label}
@@ -1153,6 +1153,11 @@ export default function DeckWorkbench() {
                           total: p.totalNotes ?? '?',
                         })}
                       </span>
+                      {/* D26: one row per file, however often it was read; the
+                          older reads it stands for are counted, not listed. */}
+                      {(earlierReads ?? 0) > 0 && (
+                        <span className="muted">{t('wb2.sessions.earlier', { count: earlierReads ?? 0 })}</span>
+                      )}
                       {/* Every button in this list carried only its own verb, so a
                           screen reader heard "Discard" once per session with nothing
                           to tell them apart — measured live at 24 rows / 58 buttons /

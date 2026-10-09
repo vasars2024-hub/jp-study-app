@@ -146,6 +146,56 @@ const signing = SIGN_CERT_FILE
   ? { certificateFile: SIGN_CERT_FILE, certificatePassword: SIGN_CERT_PASSWORD }
   : undefined;
 
+/**
+ * Delta packages (docs/RELEASING.md). With `remoteReleases`, electron-winstaller runs
+ * Squirrel's SyncReleases first, which downloads the previous release's RELEASES and
+ * full nupkg into the output folder; `--releasify` then writes `<id>-<v>-delta.nupkg`
+ * beside the new full one, and an installed copy downloads only the difference.
+ *
+ * It is the REPO url, not the feed: SyncReleases treats a github.com url as
+ * `owner/repo` and asks the GitHub API for the latest release (`GITHUB_TOKEN`, when
+ * set, is passed as `remoteToken` for the rate limit). `SQUIRREL_REMOTE_RELEASES_URL`
+ * in src/main/squirrelUpdater.ts must equal it; `squirrelFeed.test.ts` pins the two.
+ *
+ * SyncReleases fails the whole make when there is nothing to sync, which is the case
+ * until the first Squirrel release exists (v1.0.0 and v1.0.1 shipped zips only). So
+ * the `preMake` hook below probes the update feed's RELEASES first and enables deltas
+ * only when a previous Squirrel release is actually there.
+ *   GUM_SQUIRREL_DELTA=off      never sync (a full package only)
+ *   GUM_SQUIRREL_DELTA=require  fail the make when no previous release can be synced
+ *   GUM_SQUIRREL_REMOTE_RELEASES=<url>  sync from somewhere else (a local folder server)
+ */
+const SQUIRREL_REMOTE_RELEASES = 'https://github.com/vasars2024-hub/jp-study-app';
+const SQUIRREL_FEED = `${SQUIRREL_REMOTE_RELEASES}/releases/latest/download`;
+/** Decided in `preMake`, read by the Squirrel maker's config fetcher (it runs later). */
+let squirrelDeltaBase: string | undefined;
+
+async function resolveSquirrelDeltaBase(): Promise<string | undefined> {
+  const mode = (process.env.GUM_SQUIRREL_DELTA ?? '').trim().toLowerCase();
+  if (mode === 'off' || mode === '0' || mode === 'false') {
+    console.log('[squirrel] GUM_SQUIRREL_DELTA=off: full package only, no delta');
+    return undefined;
+  }
+  const override = process.env.GUM_SQUIRREL_REMOTE_RELEASES?.trim();
+  if (override) return override;
+  let reason: string;
+  try {
+    const res = await fetch(`${SQUIRREL_FEED}/RELEASES`, { redirect: 'follow', signal: AbortSignal.timeout(20_000) });
+    if (res.ok && /-full\.nupkg/i.test(await res.text())) {
+      console.log(`[squirrel] previous release found at ${SQUIRREL_FEED}: building a delta package`);
+      return SQUIRREL_REMOTE_RELEASES;
+    }
+    reason = `RELEASES answered ${res.status}`;
+  } catch (err) {
+    reason = err instanceof Error ? err.message : String(err);
+  }
+  if (mode === 'require') {
+    throw new Error(`[squirrel] GUM_SQUIRREL_DELTA=require but no previous Squirrel release could be read (${reason})`);
+  }
+  console.warn(`[squirrel] no previous Squirrel release to diff against (${reason}): full package only`);
+  return undefined;
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     icon: 'assets/icon',
@@ -183,7 +233,17 @@ const config: ForgeConfig = {
       return true;
     },
   },
-  rebuildConfig: {},
+  // better-sqlite3 v13 ships N-API/ABI-stable prebuilds that load in Electron 42
+  // as-is, so skip the native rebuild: it needs Visual Studio build tools and
+  // would only replace a working binary. (@electron/rebuild `ignoreModules`.)
+  rebuildConfig: { ignoreModules: ['better-sqlite3'] },
+  hooks: {
+    // Before any maker's config is resolved: is there a previous Squirrel release to
+    // build a delta against? (See SQUIRREL_REMOTE_RELEASES above.)
+    preMake: async () => {
+      squirrelDeltaBase = await resolveSquirrelDeltaBase();
+    },
+  },
   makers: [
     // The Windows installer: per-user (no admin), Start-menu + desktop shortcut,
     // an uninstaller in Settings > Apps, and in-place updates (squirrelUpdater.ts).
@@ -204,6 +264,15 @@ const config: ForgeConfig = {
       iconUrl: 'https://raw.githubusercontent.com/vasars2024-hub/jp-study-app/master/assets/icon.ico',
       noMsi: true,
       ...(signing ?? {}),
+      // Getters, not values: MakerSquirrel spreads this object inside make(), which runs
+      // after the `preMake` hook decided whether a previous release exists. Undefined
+      // = no SyncReleases, a full package only.
+      get remoteReleases(): string | undefined {
+        return squirrelDeltaBase;
+      },
+      get remoteToken(): string | undefined {
+        return squirrelDeltaBase ? process.env.GITHUB_TOKEN?.trim() || undefined : undefined;
+      },
     }),
     // The portable build, unchanged: extract anywhere, run jp-study-app.exe.
     new MakerZIP({}, ['win32', 'darwin']),

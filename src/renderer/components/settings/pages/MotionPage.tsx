@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
+import ResetSectionButton from '../ResetSectionButton';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import { formatDecimal } from '../../shell/localeFormat';
@@ -232,17 +233,17 @@ export default function MotionPage() {
         title={t('settings.motion.reset.title')}
         description={t('settings.motion.reset.desc')}
       >
-        <button
-          type="button"
+        <ResetSectionButton
+          settingId="motion-reset"
+          section={t('settings.nav.motion')}
+          label={t('settings.motion.reset.action')}
           className="btn small"
-          onClick={() => {
+          onReset={() => {
             setM(resetMotionPrefs());
             setPreviewFill(0.35);
             setPreviewScore(0);
           }}
-        >
-          {t('settings.motion.reset.action')}
-        </button>
+        />
         <p className="muted os-set-hint">
           {/* A number, not `toFixed(2)` — see core.ts:62; a string skips Intl. */}
           {t('settings.motion.effective', {

@@ -886,11 +886,22 @@ export function appendVisualNovelCapture(
   return appendVisualNovelCaptures(database, [input], () => id, now);
 }
 
+export interface AppendVisualNovelCapturesOptions {
+  /**
+   * A LIVE capture (hook, texthooker, clipboard) is a log of what the game
+   * showed, so a line the game says again is kept; the capture session has
+   * already dropped duplicate deliveries. An import keeps the default and
+   * skips any line already in the scene, so re-importing a script is a no-op.
+   */
+  keepRepeats?: boolean;
+}
+
 export function appendVisualNovelCaptures(
   database: VisualNovelDatabase,
   inputs: readonly VisualNovelCaptureInput[],
   createId: () => string,
   now = Date.now(),
+  options: AppendVisualNovelCapturesOptions = {},
 ): VisualNovelDatabase {
   const normalized = normalizeVisualNovelDatabase(database);
   const entryIds = new Set(normalized.entries.map((entry) => entry.id));
@@ -909,7 +920,7 @@ export function appendVisualNovelCaptures(
     });
     if (!capture) continue;
     const key = `${capture.visualNovelId}\u0000${capture.speaker}\u0000${capture.japanese}\u0000${capture.scene}`;
-    if (existing.has(key)) continue;
+    if (!options.keepRepeats && existing.has(key)) continue;
     existing.add(key);
     captures.push(capture);
   }

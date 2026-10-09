@@ -14,6 +14,13 @@ import {
 } from './main/appLifecycle';
 import { resolveSavedPlacement, trackWindowState } from './main/windowState';
 import { createLockGate, registerLockscreenPinIpc, type LockGate } from './main/lockscreenPin';
+import {
+  createLockGuard,
+  installLockGuard,
+  refuseWhileLocked,
+  type LockBlockNotice,
+  type LockGuard,
+} from './main/lockGuard';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, listLibraryItems, onLibraryItemsAdded } from './main/library';
 import { loadAfterCacheClear, loadWindowWithRetry, loadWithRetry } from './main/bootLoad';
 import { registerReadingListsIpc } from './main/readingListsIpc';
@@ -161,10 +168,8 @@ import {
 } from './main/osHotkeyHelper';
 import {
   legacyChordResult,
-  listGlobalCommands,
   registerGlobalCommand,
   registerGlobalCommandsIpc,
-  runGlobalCommand,
   setGlobalCommandChord,
   stopGlobalCommands,
 } from './main/globalCommands';
@@ -286,15 +291,65 @@ let lockGateInstance: LockGate | null = null;
 function lockGate(): LockGate {
   if (!lockGateInstance) {
     const file = path.join(app.getPath('userData'), 'lockscreen-lock.json');
-    lockGateInstance = createLockGate({
-      read: () => readJsonSync<unknown>(file, null) as ReturnType<LockGate['record']>,
-      write: (record) => writeJsonAtomicSync(file, record),
-    });
+    lockGateInstance = createLockGate(
+      {
+        read: () => readJsonSync<unknown>(file, null) as ReturnType<LockGate['record']>,
+        write: (record) => writeJsonAtomicSync(file, record),
+      },
+      // Arming hides every content window; a verified PIN restores them (lockGuard.ts).
+      (locked) => (locked ? lockGuard.engage() : lockGuard.release()),
+    );
   }
   return lockGateInstance;
 }
 function isAppLocked(): boolean {
   return lockGate().isLocked();
+}
+
+/**
+ * The lock as a main-process gate (main/lockGuard.ts). Lock surfaces: the PIN
+ * widget, and the two windows whose renderer draws its own PIN pad (Study OS
+ * main, Blanc). Every other window is content and is hidden while locked.
+ */
+const lockGuard: LockGuard<BrowserWindow> = createLockGuard<BrowserWindow>({
+  isLocked: isAppLocked,
+  roleOf: (win) => {
+    if (win === lockscreenWindow) return 'lock';
+    if (win === mainWindow || win === blancWindow) return 'gated';
+    return 'content';
+  },
+  windows: () => BrowserWindow.getAllWindows(),
+  notifyBlocked: (notice) => notifyLockBlocked(notice),
+  devToolsAllowed: !app.isPackaged,
+  log: (message) => logDiagnostic('info', 'lock', 'gate', message),
+});
+installLockGuard(lockGuard as unknown as LockGuard);
+app.on('browser-window-created', (_event, win) => lockGuard.adopt(win));
+app.on('web-contents-created', (_event, contents) => lockGuard.adoptWebContents(contents));
+
+/**
+ * A shortcut, tray row or extension request refused while locked: say so on the
+ * lock screen. A user-pressed command also brings the PIN pad forward, so the
+ * refusal is seen; an extension request never pulls the app to the front.
+ */
+function notifyLockBlocked(notice: LockBlockNotice): void {
+  const visibleSurfaces = (): BrowserWindow[] =>
+    [lockscreenWindow, mainWindow, blancWindow].filter(
+      (w): w is BrowserWindow => Boolean(w && !w.isDestroyed() && w.isVisible()),
+    );
+  let targets = visibleSurfaces();
+  if (!targets.length && notice.kind !== 'extension') {
+    showLockUiIfLocked();
+    targets = visibleSurfaces();
+  }
+  for (const win of targets) {
+    const send = () => {
+      if (!win.isDestroyed()) win.webContents.send('lockscreen:blocked', notice);
+    };
+    // A window the lock UI just created is still loading; its listener is not up yet.
+    if (win.webContents.isLoading()) win.webContents.once('did-finish-load', () => setTimeout(send, 1200));
+    else send();
+  }
 }
 
 /** Files Windows opened with Gum (fileOpenRouter.ts); paths before ready wait here. */
@@ -1309,6 +1364,8 @@ function registerBlancIpc(): void {
  * that only wraps the craft panel (no full-screen black canvas).
  */
 function createMiniWidgetWindow(size?: { width?: number; height?: number }): void {
+  // The Mini widget is study content and hides the main window: never while locked.
+  if (refuseWhileLocked('window:mini')) return;
   const width = Math.min(
     MINI_MAX_W,
     Math.max(MINI_MIN_W, Math.round(size?.width ?? MINI_DEFAULT_W)),
@@ -1651,6 +1708,9 @@ function createPopoutWindow(requested: string): boolean {
   // and the Agent all hand this a section id that may predate gate 7b.
   const section = LEGACY_WIN_SECTION_ALIASES[requested] ?? requested;
   if (!POPOUT_SECTIONS.has(section)) return false;
+  // Locked: no pop-out opens or is raised (the Agent, a layout restore, the IPC);
+  // `--open=` launches queue in `pendingOpenSection` instead and open on unlock.
+  if (refuseWhileLocked(`window:popout:${section}`)) return false;
   const existing = popoutWindows.get(section);
   if (existing && !existing.isDestroyed()) {
     if (existing.isMinimized()) existing.restore();
@@ -1857,7 +1917,8 @@ function registerPopoutIpc(): void {
   // one-window-per-section rule. The gate's own allowlist in
   // `shared/agentNavigation.ts` mirrors this set and is tested against it.
   setAgentNavigationOpener(openAgentNavigationDestination);
-  if (pendingOpenSection) {
+  // Locked at boot: the queued pop-out stays queued; `lockscreen:unlock` opens it.
+  if (pendingOpenSection && !isAppLocked()) {
     createPopoutWindow(pendingOpenSection);
     pendingOpenSection = null;
   }
@@ -2212,7 +2273,10 @@ app.whenReady().then(async () => {
   setTimeout(runAfterFirstPaint, 8000);
   // Cold-start `--open=library` (etc.): main boots for services, then open the pop-out.
   const coldOpen = argvOpenSection(process.argv);
-  if (coldOpen) createPopoutWindow(coldOpen);
+  if (coldOpen) {
+    if (isAppLocked()) pendingOpenSection = coldOpen;
+    else createPopoutWindow(coldOpen);
+  }
   // Cold-start "Open with Gum": the Study OS renderer drains these once mounted.
   fileOpenRouter.open([...earlyOpenPaths.splice(0), ...filePathsFromArgv(process.argv)]);
   afterFirstPaint(() => {
@@ -2265,12 +2329,15 @@ app.on('before-quit', () => {
  */
 function installAppTrayItems(): void {
   setAppTrayItems(() => {
-    const recorder = listGlobalCommands().find((s) => /^(recorder|record)\./.test(s.id) && s.hasHandler && s.available);
     return [
-      { label: mt('polish.tray.openBlanc'), click: () => createBlancWindow() },
-      // Feature-detected: offered only once the region recorder registers its command.
-      // TODO(main session): the recorder agent should register `recorder.region` as a global command.
-      ...(recorder ? [{ label: mt('polish.tray.recordRegion'), click: () => void runGlobalCommand(recorder.id) }] : []),
+      {
+        label: mt('polish.tray.openBlanc'),
+        click: () => {
+          if (!refuseWhileLocked('tray:openBlanc')) createBlancWindow();
+        },
+      },
+      // No "Record a region" row here: the companion half of this menu
+      // (systemDictionary.ts) already runs `recorder.region`, and both rows showed.
       {
         label: mt('polish.tray.keepRunning'),
         type: 'checkbox' as const,

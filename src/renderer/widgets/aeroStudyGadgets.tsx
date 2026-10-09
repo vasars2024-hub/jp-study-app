@@ -23,6 +23,16 @@ import { dueDeckCards, type DeckFlashcard } from '../flashcardDeck';
 import { loadAeroMechSettings, openAeroMechApp } from '../aeroMechanics/aeroMechSettings';
 import { openSectionSurface } from '../sectionSurface';
 import { wantsStillness } from '../aeroMechanics/aeroMechEnv';
+import { useThemeSheets } from '../theme/useThemeSheets';
+import { normalizeStudyLang, studyLangTag } from '../../shared/studyLang';
+import { getStudyLang } from '../studyEnvironment';
+import type { ThemeSheetId } from '../theme/themeSheets';
+
+/**
+ * Their base layout lives in aero-mechanics.css, which now loads with Aero only
+ * (theme/themeSheets.ts) — so in every other theme the gadget asks for it.
+ */
+const GADGET_SHEETS: readonly ThemeSheetId[] = ['aero-mechanics'];
 
 const SWEEP = 240;
 
@@ -71,6 +81,7 @@ function Dial({ value, size, label, readout, tone }: {
 
 export function ReviewMeterGadget({ size }: WidgetProps) {
   const { t, lang } = useT();
+  useThemeSheets(GADGET_SHEETS);
   const deck = useAeroDeck(true);
   const meters = useStudyMeters(true);
   const due = useMemo(() => {
@@ -132,6 +143,7 @@ function slidePool(cards: readonly DeckFlashcard[]): DeckFlashcard[] {
 
 export function WordSlideShowGadget({ settings, setSettings }: WidgetProps) {
   const { t } = useT();
+  useThemeSheets(GADGET_SHEETS);
   const deck = useAeroDeck(true, 5 * 60_000);
   const pool = useMemo(() => slidePool(deck.cards), [deck.cards]);
   const [index, setIndex] = useState(() => Math.floor(Math.random() * 1000));
@@ -154,12 +166,15 @@ export function WordSlideShowGadget({ settings, setSettings }: WidgetProps) {
     );
   }
   const card = pool[((index % pool.length) + pool.length) % pool.length];
+  // wid2: the card's own study language (a mined Chinese or Russian card is not
+  // Japanese), so glyph shapes and screen-reader voices follow the content.
+  const contentLang = studyLangTag(normalizeStudyLang(card.studyLang ?? getStudyLang()));
   return (
     <div className="wgt aero-slides">
       <div key={still ? undefined : card.id} className="aero-slides-frame">
-        <div className="aero-slides-word" lang="ja">{card.word}</div>
-        {card.reading && card.reading !== card.word && <div className="aero-slides-reading" lang="ja">{card.reading}</div>}
-        {card.sentence && <div className="aero-slides-sentence" lang="ja">{card.sentence}</div>}
+        <div className="aero-slides-word" lang={contentLang}>{card.word}</div>
+        {card.reading && card.reading !== card.word && <div className="aero-slides-reading" lang={contentLang}>{card.reading}</div>}
+        {card.sentence && <div className="aero-slides-sentence" lang={contentLang}>{card.sentence}</div>}
         {card.meaning && <div className="aero-slides-meaning">{card.meaning}</div>}
       </div>
       <div className="aero-slides-controls">

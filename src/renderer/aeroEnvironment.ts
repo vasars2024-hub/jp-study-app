@@ -4,6 +4,7 @@
  */
 import {
   loadEnvironment,
+  markEnvironmentSwapped,
   onEnvironmentChanged,
   saveEnvironment,
   stripRetiredWalls,
@@ -167,10 +168,33 @@ export function loadAeroRestoreTheme(fallback: string = DEFAULT_THEME_ID): strin
   return fallback !== AERO_THEME_ID ? fallback : DEFAULT_THEME_ID;
 }
 
+/**
+ * Whether the live environment is currently Aero's. `'0'` once the Study environment has
+ * been put back; `'1'` while Aero's is applied; absent on profiles from before the flag
+ * (treated as applied, which is the old behaviour). It makes the restore idempotent:
+ * Wired entry restores explicitly, and the theme bridge then sees Aero → Wired too — a
+ * second restore would snapshot the STUDY environment as Aero's and lose Aero's.
+ */
+const AERO_ENV_ACTIVE_KEY = 'jp-aero-environment-active-v1';
+
+function setAeroEnvironmentApplied(applied: boolean): void {
+  writeLocalStorage(AERO_ENV_ACTIVE_KEY, applied ? '1' : '0');
+}
+
+export function isAeroEnvironmentApplied(): boolean {
+  try {
+    return localStorage.getItem(AERO_ENV_ACTIVE_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
 /** Enter Aero: back up Study OS env, apply Aero env (seed wallpaper on first discovery). */
 export function applyAeroEnvironment(firstDiscovery: boolean): EnvironmentSettings {
   const studyEnv = loadEnvironment();
   backupStudyEnvironment(studyEnv);
+  markEnvironmentSwapped();
+  setAeroEnvironmentApplied(true);
 
   let aeroEnv = loadSavedAeroEnvironment();
   if (!aeroEnv || firstDiscovery) {
@@ -188,12 +212,20 @@ export function applyAeroEnvironment(firstDiscovery: boolean): EnvironmentSettin
   return next;
 }
 
-/** Exit Aero: persist Aero env and restore the backed-up Study OS environment. */
+/**
+ * Exit Aero: persist Aero env and restore the backed-up Study OS environment.
+ * A no-op when the Study environment is already back (see `AERO_ENV_ACTIVE_KEY`).
+ */
 export function restoreStudyEnvironmentAfterAero(): EnvironmentSettings {
+  if (!isAeroEnvironmentApplied()) return loadEnvironment();
   saveAeroEnvironmentSnapshot(loadEnvironment());
+  setAeroEnvironmentApplied(false);
   const study = loadStudyEnvironmentBackup();
-  if (study) return saveEnvironment(study);
-  return loadEnvironment();
+  if (!study) return loadEnvironment();
+  // Before the write, so a companion layer re-rendering on this change already knows
+  // its Aero list is stale and never writes it back over the Study one.
+  markEnvironmentSwapped();
+  return saveEnvironment(study);
 }
 
 /** Cold launch while Aero theme is active — ensure Aero wallpaper/env is present. */
@@ -201,6 +233,8 @@ export function bootAeroEnvironmentIfNeeded(isAeroTheme: boolean): void {
   if (!isAeroTheme) return;
   const aero = loadSavedAeroEnvironment();
   if (aero) {
+    markEnvironmentSwapped();
+    setAeroEnvironmentApplied(true);
     saveEnvironment(refreshSecretWallpaperRefs(aero));
     return;
   }
@@ -228,7 +262,10 @@ export function installAeroEnvironmentBridge(): void {
   // Keep the Aero snapshot in sync while Secret OS is active so Companions Off
   // (and other living-layer edits) survive the next Aero entry.
   onEnvironmentChanged((env) => {
-    if (loadThemeId() === AERO_THEME_ID) {
+    // Only while Aero's own environment is live: Aero reached without it (an old
+    // profile, a Wired exit before that path applied it) must not save Study values
+    // as Aero's.
+    if (loadThemeId() === AERO_THEME_ID && isAeroEnvironmentApplied()) {
       saveAeroEnvironmentSnapshot(env);
     }
   });

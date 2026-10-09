@@ -118,6 +118,12 @@ function findSiteByUrl(store: ImmersionSitesStore, url: string): ImmersionSite |
   return store.sites.find((s) => siteKey(s.url) === key);
 }
 
+/** Lookups banked by one flush: a whole, bounded count, whatever the caller sent. */
+function lookupDelta(input: ImmersionVisitInput): number {
+  const n = Number(input.lookups);
+  return Number.isFinite(n) && n > 0 ? Math.min(10_000, Math.floor(n)) : 0;
+}
+
 function upsertVisit(input: ImmersionVisitInput): ImmersionSite {
   const url = normalizeImmersionUrl(input.url);
   if (!url) throw new Error('Invalid URL');
@@ -145,6 +151,7 @@ function upsertVisit(input: ImmersionVisitInput): ImmersionSite {
       lastStreakDay: streak.lastStreakDay,
       totalSeconds: Math.max(0, input.seconds ?? 0),
       totalChars: Math.max(0, input.chars ?? 0),
+      ...(lookupDelta(input) > 0 ? { totalLookups: lookupDelta(input) } : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -159,6 +166,7 @@ function upsertVisit(input: ImmersionVisitInput): ImmersionSite {
     site.lastStreakDay = streak.lastStreakDay;
     if (typeof input.seconds === 'number') site.totalSeconds += Math.max(0, input.seconds);
     if (typeof input.chars === 'number') site.totalChars += Math.max(0, input.chars);
+    if (lookupDelta(input) > 0) site.totalLookups = (site.totalLookups ?? 0) + lookupDelta(input);
     if (typeof input.completionPct === 'number') {
       site.completionPct = Math.min(100, Math.max(site.completionPct, input.completionPct));
     }

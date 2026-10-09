@@ -67,6 +67,13 @@ export interface StudyContextRef {
   cueStartSec?: number;
   cueEndSec?: number;
   sentence?: string;
+  /**
+   * A card mined in the novel reader: where in the book (`mediaId` is then the
+   * library book id). The reader's own locator (`p:<part>:<fraction>`, the
+   * bookmark format) and the whole-book fraction for display. See `bookRoundTrip.ts`.
+   */
+  bookLocation?: string;
+  bookPercent?: number;
   sessionId?: string;
   returnTarget?: {
     section: 'video' | 'flashcards' | 'anki' | 'study';

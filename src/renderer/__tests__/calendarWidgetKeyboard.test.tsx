@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { CalendarWidget } from '../widgets/productivity';
+import { auditAria } from './helpers/ariaAudit';
 
 let root: Root | undefined;
 const opened = vi.fn();
@@ -25,35 +26,40 @@ async function mount() {
   root = createRoot(host);
   await act(async () => root?.render(<CalendarWidget />));
   window.addEventListener('os:open', opened);
-  return host.querySelector<HTMLElement>('[role="button"]')!;
+  return host.querySelector<HTMLElement>('.wgt-cal')!;
 }
 
+/**
+ * wid2: the widget used to be one `role="button"` holding the month buttons,
+ * which made those buttons presentational — invisible to a screen reader. The
+ * keyboard route to Calendar is now the month title, a real button between the
+ * two month arrows; the rest of the widget stays clickable for the pointer.
+ */
 describe('calendar widget keyboard activation', () => {
-  it.each(['Enter', ' '])('opens Calendar with %j and prevents scrolling', async (key) => {
+  it('opens Calendar from the month title, a real button between the arrows', async () => {
     const widget = await mount();
-    widget.focus();
-    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
-    await act(async () => { widget.dispatchEvent(event); });
+    const buttons = [...widget.querySelectorAll('button')];
+    expect(buttons.map((b) => b.className)).toEqual(['wgt-btn-icon', 'wgt-cal-open', 'wgt-btn-icon']);
+    await act(async () => buttons[1].click());
     expect(opened).toHaveBeenCalledOnce();
     expect((opened.mock.calls[0][0] as CustomEvent).detail).toBe('calendar');
-    expect(event.defaultPrevented).toBe(true);
-    widget.dispatchEvent(new KeyboardEvent('keydown', { key, repeat: true, bubbles: true }));
+  });
+
+  it('leaves month buttons alone, and a pointer click elsewhere still opens Calendar', async () => {
+    const widget = await mount();
+    const next = widget.querySelectorAll('button')[2];
+    const label = widget.querySelector('.wgt-cal-head span')!;
+    const initialMonth = label.textContent;
+    await act(async () => { next.click(); });
+    expect(label.textContent).not.toBe(initialMonth);
+    expect(opened).not.toHaveBeenCalled();
+    await act(async () => { (widget.querySelector('.wgt-cal-grid') as HTMLElement).click(); });
     expect(opened).toHaveBeenCalledOnce();
   });
 
-  it('leaves month buttons and shortcut chords alone', async () => {
+  it('nests no control inside another (the month arrows are real to assistive tech)', async () => {
     const widget = await mount();
-    const next = widget.querySelectorAll('button')[1];
-    const label = widget.querySelector('.wgt-cal-head span')!;
-    const initialMonth = label.textContent;
-    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
-    next.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(false);
-    await act(async () => { next.click(); });
-    expect(label.textContent).not.toBe(initialMonth);
-    for (const modifier of ['ctrlKey', 'altKey', 'metaKey', 'shiftKey']) {
-      widget.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, [modifier]: true }));
-    }
-    expect(opened).not.toHaveBeenCalled();
+    expect(widget.getAttribute('role')).toBeNull();
+    expect(auditAria(widget)).toEqual([]);
   });
 });

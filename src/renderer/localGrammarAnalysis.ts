@@ -150,6 +150,47 @@ export function sentenceHasLocalGrammarPoint(raw: string, lang: string, pointId:
   return annotations.some((annotation) => annotation.grammarId === pointId);
 }
 
+/**
+ * Where the offline highlighter colours `pointId` in `raw`: the normalized sentence and
+ * the point's spans in it (empty when it does not claim the point there). The same
+ * claim as `sentenceHasLocalGrammarPoint`, with offsets, for surfaces that mark the
+ * pattern inside a sentence ("seen in your media").
+ *
+ * A literal pre-check skips the whole-library pass for the overwhelming majority of
+ * sentences, which cannot contain the point at all — a deck of thousands of cards is
+ * scanned per grammar point opened.
+ */
+export function localGrammarPointSpans(
+  raw: string,
+  lang: string,
+  pointId: string,
+): { sentence: string; spans: Array<{ start: number; end: number }> } {
+  const sentence = normalizeAnalysisText(raw);
+  if (!sentence) return { sentence, spans: [] };
+  if (lang === 'zh' || lang === 'ru') {
+    const entry = framesFor(lang).find((candidate) => candidate.point.id === pointId);
+    if (!entry) return { sentence, spans: [] };
+    // Lower-cased: Russian frames match whole words in any case (Если бы … / если бы …).
+    const haystack = (lang === 'zh' ? toSimplifiedForMatch(sentence) : sentence).toLowerCase();
+    if (!entry.alternatives.some((parts) => parts.every((part) => haystack.includes(part.toLowerCase())))) {
+      return { sentence, spans: [] };
+    }
+  } else {
+    const entry = libraryFor(lang).find((candidate) => candidate.point.id === pointId);
+    if (!entry || !sentence.includes(entry.core)) return { sentence, spans: [] };
+  }
+  const key = `${lang}::${sentence}`;
+  const annotations = resultCache.has(key)
+    ? resultCache.get(key)?.annotations ?? []
+    : libraryAnnotations(sentence, lang);
+  return {
+    sentence,
+    spans: annotations
+      .filter((annotation) => annotation.grammarId === pointId)
+      .map((annotation) => ({ start: annotation.start, end: annotation.end })),
+  };
+}
+
 /** Chinese / Russian spans, placed by offset and kept in reading order without overlaps. */
 function frameAnnotations(sentence: string, lang: MatchLang): SentenceAnnotation[] {
   const haystack = lang === 'zh' ? toSimplifiedForMatch(sentence) : sentence;

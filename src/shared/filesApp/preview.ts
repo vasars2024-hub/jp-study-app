@@ -40,6 +40,22 @@ export function previewPlanFor(item: { kind: string; path: string }): FilesPrevi
   return null;
 }
 
+const AUDIO_PREVIEW = new Set(['.mp3', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.flac', '.wav', '.weba']);
+const VIDEO_PREVIEW = new Set(['.mp4', '.m4v', '.webm', '.mkv', '.mov']);
+
+/**
+ * files2 — audio and video play in the pane itself, through the player's own
+ * `playfile://` route (`media:fileUrl`, which serves ranges, so a scrub works).
+ * Kept apart from `previewPlanFor` because main never reads these: the
+ * renderer asks for the stream URL and lets the media element do the rest.
+ */
+export function mediaPreviewKind(filePath: string): 'audio' | 'video' | null {
+  const ext = extOf(filePath);
+  if (AUDIO_PREVIEW.has(ext)) return 'audio';
+  if (VIDEO_PREVIEW.has(ext)) return 'video';
+  return null;
+}
+
 /** Cut to the preview budget on a character boundary, saying whether it cut. */
 export function clipPreviewText(text: string, max = FILES_PREVIEW_MAX_CHARS): { text: string; truncated: boolean } {
   const chars = Array.from(text);
@@ -77,6 +93,48 @@ function pathKey(raw: string): string {
  * `null` hash (unreadable file) keeps a row out of every content group rather
  * than grouping all unreadable files together.
  */
+/**
+ * files2 — the same grouping with an ASYNC digest, for main.
+ *
+ * The sync version hashed up to 2,000 files (128 KB each) in one go on the
+ * main process: on a big library that is a quarter of a gigabyte of
+ * synchronous reads, during which every window of the app stops answering.
+ * Here each digest is awaited (main backs it with `fs.promises`), and the
+ * loop yields to the event loop every `yieldEvery` files, so IPC, painting
+ * in other windows and the watchers keep running while duplicates are found.
+ * The result is identical to `findDuplicateGroups` for the same digests.
+ */
+export async function findDuplicateGroupsAsync(
+  items: readonly FilesDuplicateInput[],
+  hashOf: (path: string, sizeBytes: number) => Promise<string | null>,
+  options: { maxHashed?: number; yieldEvery?: number; yieldNow?: () => Promise<void> } = {},
+): Promise<FilesDuplicateGroup[]> {
+  const memo = new Map<string, string | null>();
+  // Pass 1: collect every (path, size) the sync algorithm would hash, in its
+  // own order and within its own budget, by running it with a recording digest.
+  const wanted: Array<{ path: string; size: number }> = [];
+  findDuplicateGroups(
+    items,
+    (path, size) => {
+      wanted.push({ path, size });
+      return null;
+    },
+    { maxHashed: options.maxHashed },
+  );
+  const yieldEvery = Math.max(1, options.yieldEvery ?? 16);
+  const yieldNow = options.yieldNow ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  for (let i = 0; i < wanted.length; i += 1) {
+    const { path, size } = wanted[i];
+    const key = `${size}|${path}`;
+    if (!memo.has(key)) memo.set(key, await hashOf(path, size));
+    if ((i + 1) % yieldEvery === 0) await yieldNow();
+  }
+  // Pass 2: the real grouping, answered from the digests already read.
+  return findDuplicateGroups(items, (path, size) => memo.get(`${size}|${path}`) ?? null, {
+    maxHashed: options.maxHashed,
+  });
+}
+
 export function findDuplicateGroups(
   items: readonly FilesDuplicateInput[],
   hashOf: (path: string, sizeBytes: number) => string | null,

@@ -90,6 +90,27 @@ function layoutRoot(root: HTMLElement, z: number): void {
   root.style.overflow = 'hidden';
 }
 
+/**
+ * Windows whose page coordinates ARE screen coordinates must never be zoomed.
+ *
+ * The Region Recorder's picker draws the box at the pointer's `clientX/Y`, which
+ * stay in unzoomed viewport pixels, while a `left: x` inside the zoomed #root
+ * paints at `x * zoom`. Measured live 2026-10-08 at the default 80 %: a drag from
+ * (400,200) to (1040,560) recorded the right 640×360 region but drew the box at
+ * (320,160)–(832,448), so the rectangle the user saw was not the one recorded.
+ * The border window (`frame`) outlines a screen rectangle the same way.
+ */
+export function zoomForWindow(search: string, saved: number): { zoom: number; followResize: boolean } {
+  let kind: string | null = null;
+  try {
+    kind = new URLSearchParams(search).get('regionRecorder');
+  } catch {
+    kind = null;
+  }
+  if (kind === 'select' || kind === 'frame') return { zoom: UNZOOMED, followResize: false };
+  return { zoom: saved, followResize: true };
+}
+
 /** Apply a zoom factor to the whole app without persisting it. */
 export function applyZoom(factor: number): void {
   const z = clampZoom(factor);
@@ -145,6 +166,18 @@ export function onZoomChanged(cb: (z: number) => void): () => void {
   const handler = (e: Event): void => cb((e as CustomEvent<number>).detail);
   window.addEventListener(EVENT, handler);
   return () => window.removeEventListener(EVENT, handler);
+}
+
+/**
+ * shell2: re-announce the current zoom so layout listeners re-fit. Resizing the
+ * OS window changes the layout viewport exactly the way a zoom step does (the
+ * desktop's B4 note), and the desktop's refit already answers this event — so
+ * a resize reuses that one, reversible fit instead of growing a second one.
+ * Listeners that only mirror the value (the Settings slider) see no change.
+ */
+export function announceViewportChange(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<number>(EVENT, { detail: loadZoom() }));
 }
 
 let resizeHooked = false;

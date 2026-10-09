@@ -75,6 +75,8 @@ import { recordEpubPageRead } from '../readingGardenProgress';
 import { createMangaReadingTracker, mokuroPageCharCount } from '../mangaReadingStats';
 import { getStudyLang } from '../studyEnvironment';
 import { mineToStudy } from '../studyMining';
+import { importMokuroFile } from '../mangaMokuroImport';
+import { mangaMineImage } from '../mangaMineImage';
 
 type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
 
@@ -256,6 +258,11 @@ export default function MangaReader({ item, onClose }: Props) {
    * never shown.
    */
   const [volumeNotice, setVolumeNotice] = useState<{ kind: 'warning' | 'error'; text: string } | null>(null);
+  /** The last `.mokuro` import's outcome, and a stamp that reloads the page's cache after one. */
+  const [mokuroNotice, setMokuroNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [mokuroImportStamp, setMokuroImportStamp] = useState(0);
+  const [mokuroBusy, setMokuroBusy] = useState(false);
+  const mokuroInputRef = useRef<HTMLInputElement>(null);
   const [pageRangeFrom, setPageRangeFrom] = useState(1);
   const [pageRangeTo, setPageRangeTo] = useState(1);
   const [chapterRangeFrom, setChapterRangeFrom] = useState(1);
@@ -547,20 +554,25 @@ export default function MangaReader({ item, onClose }: Props) {
   // two can't run heavy ONNX inference over the same page at once.
   useEffect(() => {
     const url = pages[idx];
-    if (!url || !engineReady) return;
+    if (!url) return;
     let cancelled = false;
     void (async () => {
+      // The cache is read WITHOUT the engine too: a page imported from a Mokuro
+      // `.mokuro` file has its boxes and text on disk and needs no model to show.
       const page = await window.api.mangaOcrLoadCache(item.id, url);
       if (cancelled) return;
       if (!page) {
+        if (!engineReady) return;
         if (autoTranslateRef.current && !volumeBusyRef.current && !autoVolumeStartedRef.current) {
           const scanned = await scanRef.current?.(false);
           if (!cancelled && scanned) await translateRef.current?.(scanned);
         }
         return;
       }
+      mediaUrlRef.current = url;
       setMokuroPage(page);
       setOcrText(pageToOcrText(page));
+      setOcrIsFallback(false);
       setOcrStatus('done');
       setOcrOpen(true);
       const target = targetLangRef.current;
@@ -570,7 +582,7 @@ export default function MangaReader({ item, onClose }: Props) {
         setTranslatedPage(null);
         setShowTranslated(false);
         // OCR is cached but this page was never translated — do it now.
-        if (autoTranslateRef.current && !volumeBusyRef.current && !autoVolumeStartedRef.current) {
+        if (engineReady && autoTranslateRef.current && !volumeBusyRef.current && !autoVolumeStartedRef.current) {
           await translateRef.current?.(page);
         }
         return;
@@ -588,7 +600,7 @@ export default function MangaReader({ item, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [pages, idx, item.id, engineReady]);
+  }, [pages, idx, item.id, engineReady, mokuroImportStamp]);
 
   useEffect(() => {
     return window.api.onMangaOcrVolumeProgress((p) => {
@@ -882,6 +894,30 @@ export default function MangaReader({ item, onClose }: Props) {
     mangaSettings.detectionSensitivity,
     targetLang,
   ]);
+
+  /** Import a Mokuro `.mokuro` volume picked by the user, then show the current page from it. */
+  const importMokuro = useCallback(
+    async (file: File | undefined) => {
+      if (!file || mokuroBusy) return;
+      setMokuroBusy(true);
+      setMokuroNotice(null);
+      try {
+        const outcome = await importMokuroFile(item.id, file, t);
+        setMokuroNotice({ ok: outcome.ok, text: outcome.message });
+        if (outcome.ok) {
+          setTranslatedPage(null);
+          setShowTranslated(false);
+          setFillByRegion({});
+          ensureTextOverlayMode();
+          setMokuroImportStamp((n) => n + 1);
+        }
+      } finally {
+        setMokuroBusy(false);
+        if (mokuroInputRef.current) mokuroInputRef.current.value = '';
+      }
+    },
+    [item.id, mokuroBusy, t, ensureTextOverlayMode],
+  );
 
   const analyzeEntireManga = useCallback(async () => {
     if (!pages.length) return;
@@ -1671,6 +1707,19 @@ export default function MangaReader({ item, onClose }: Props) {
    * a 760px prose measure clamp would letterbox every page and silently override
    * a setting they changed on purpose.
    */
+  /** "Import .mokuro": works with or without the OCR engine (see the picker in the toolbar). */
+  const mokuroImportButton = (
+    <button
+      type="button"
+      className="btn small"
+      data-mokuro-import=""
+      title={t('read2.manga.mokuro.importTitle')}
+      disabled={mokuroBusy || volumeBusy || !pages.length}
+      onClick={() => mokuroInputRef.current?.click()}
+    >
+      {mokuroBusy ? t('read2.manga.mokuro.importing') : t('read2.manga.mokuro.import')}
+    </button>
+  );
   const ocrPanelCompact = !(sidePanel || modelsMissing || !mokuroPage);
   const readingTools: ReadingCanvasTool[] = [];
   if (ocrOpen) {
@@ -1792,6 +1841,7 @@ export default function MangaReader({ item, onClose }: Props) {
                     {t('manga.ocr.volumeAnalyze')}
                   </button>
                 )}
+                {mokuroImportButton}
                 <div className="manga-translate-range">
                   <div className="manga-translate-range-actions">
                     <button
@@ -1981,9 +2031,29 @@ export default function MangaReader({ item, onClose }: Props) {
                 >
                   {ocrStatus === 'scanning' ? t('manga.ocr.scanning') : t('manga.ocr.rescan')}
                 </button>
+                {mokuroImportButton}
               </>
             )}
+            {/* The picker itself serves both branches: a Mokuro volume brings its
+                own boxes and text, so importing one needs no OCR model at all. Its
+                button sits in the Volume group with the engine, loose without it. */}
+            <input
+              ref={mokuroInputRef}
+              type="file"
+              accept=".mokuro,.json,application/json"
+              hidden
+              aria-label={t('read2.manga.mokuro.importTitle')}
+              onChange={(e) => void importMokuro(e.target.files?.[0])}
+            />
           </div>
+          {mokuroNotice && (
+            <div className={`ocr-msg${mokuroNotice.ok ? '' : ' ocr-error'}`} role={mokuroNotice.ok ? 'status' : 'alert'}>
+              <span>{mokuroNotice.text}</span>
+              <button type="button" className="btn small" onClick={() => setMokuroNotice(null)}>
+                {t('common.close')}
+              </button>
+            </div>
+          )}
 
           {translateError && (
             <div className="ocr-msg ocr-error" role="alert">
@@ -2468,14 +2538,23 @@ export default function MangaReader({ item, onClose }: Props) {
             onMine={() => {
               const query = popup.query;
               const sentence = popup.context;
-              void mineToStudy({
-                word: query,
-                sentence,
-                source: 'reader',
-                sourceId: item.id,
-                sourceTitle: item.title,
-                studyLang: studyLangOfText(sentence || query, getStudyLang()),
-              }).catch(() => undefined);
+              const pageIndex = idx;
+              const pageUrl = pages[idx];
+              // The bubble the word came from, cropped with a margin of art, goes on
+              // the card as its picture — read before the popup closes, the page with it.
+              const page = mokuroPage;
+              void (async () => {
+                const image = await mangaMineImage(pageUrl, page, sentence, query, item.id, pageIndex);
+                await mineToStudy({
+                  word: query,
+                  sentence,
+                  source: 'reader',
+                  sourceId: item.id,
+                  sourceTitle: item.title,
+                  studyLang: studyLangOfText(sentence || query, getStudyLang()),
+                  ...(image ? { image } : {}),
+                });
+              })().catch(() => undefined);
               setPopup(null);
             }}
             onClose={() => setPopup(null)}

@@ -242,6 +242,23 @@ export interface ScrapeJobSummary {
    * back-filled.
    */
   stageTimings?: ScrapeStageTiming[];
+  /**
+   * Pages after the first that a site rule could not read (a failed fetch, an
+   * error status, a page that matched no rows), in the order they were tried.
+   * The rows of the pages before still count; this is what says the list may be
+   * short. Absent when every page was read (and on jobs recorded before it).
+   */
+  pageFailures?: ScrapePageFailure[];
+}
+
+export interface ScrapePageFailure {
+  /** 2 for the first page after the one the user named. */
+  page: number;
+  url: string;
+  /** `status` with the HTTP status, `fetch` (network/robots/guard), or `empty` (no rows). */
+  reason: 'status' | 'fetch' | 'empty';
+  status?: number;
+  detail?: string;
 }
 
 export type ScrapeJobEvent =
@@ -332,7 +349,18 @@ export type QbitMessageCode =
   | 'noSessionCookie'
   | 'versionStatus'
   | 'connected'
-  | 'connectedNoSwarm';
+  | 'connectedNoSwarm'
+  // Transport failures (`qbitTransportProblem`), `{address}` / `{host}` / `{detail}`.
+  | 'unreachable'
+  | 'hostUnresolved'
+  | 'timeout'
+  | 'transport'
+  // A refused password is not retried for a while (`{seconds}`), so qBittorrent does not ban this machine.
+  | 'loginBackoff'
+  // API-key format problems, found before any request is made.
+  | 'noApiKey'
+  | 'apiKeyWhitespace'
+  | 'apiKeyControlChar';
 
 export interface QbitStatusReport {
   status: 'not-configured' | 'connected' | 'unauthorized' | 'unreachable' | 'unknown';
@@ -370,7 +398,13 @@ export interface QbitSendReport {
   sent: number;
   skipped: number;
   failed: number;
-  details: { name: string; outcome: 'sent' | 'skipped' | 'failed'; reason: string }[];
+  details: {
+    name: string;
+    outcome: 'sent' | 'skipped' | 'failed';
+    reason: string;
+    /** Language-neutral code for `reason` where one exists (`torrentFile.<problem>`); the renderer translates it. */
+    reasonCode?: string;
+  }[];
 }
 
 export interface SystemStats {

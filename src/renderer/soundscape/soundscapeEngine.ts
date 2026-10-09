@@ -1082,6 +1082,15 @@ function createNoiseBuffer(ctx: AudioContext, color: NoiseColor): AudioBuffer {
       const w = i / overlap;
       data[i] = scratch[i] * Math.sqrt(w) + scratch[length + i] * Math.sqrt(1 - w);
     }
+    // snd2: measured offline, the brown integrator wanders past full scale
+    // (peak 1.38 in a seeded render). Scale only a bed that exceeds 0.98, so a
+    // normal one keeps its level and a loud draw can never clip on its own.
+    let top = 0;
+    for (let i = 0; i < length; i++) top = Math.max(top, Math.abs(data[i]));
+    if (top > 0.98) {
+      const scale = 0.98 / top;
+      for (let i = 0; i < length; i++) data[i] *= scale;
+    }
   }
   return buffer;
 }

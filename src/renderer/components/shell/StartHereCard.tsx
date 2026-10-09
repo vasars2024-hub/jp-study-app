@@ -15,6 +15,8 @@ import Icon, { type IconName } from '../Icons';
 import { useT } from '../../i18n';
 import { shouldRunTour } from '../../onboardingStore';
 import { writeLocalStorage } from '../../localStorageWrite';
+import { effectiveKeys, formatKeysDisplay } from '../../keyboardShortcuts';
+import './emptyDeskHint.css';
 
 export const START_HERE_DISMISSED_KEY = 'jp-study.startHere.dismissed.v1';
 
@@ -57,7 +59,17 @@ export default function StartHereCard({
     return () => window.clearInterval(id);
   }, [tourDone, dismissed]);
 
-  if (dismissed || !tourDone || !desktopEmpty) return null;
+  if (!tourDone || !desktopEmpty) return null;
+  // shell2: after the card is dismissed an empty desk said nothing at all. One
+  // quiet line names the two ways in that always work, with the live binding.
+  if (dismissed) {
+    const keys = formatKeysDisplay(effectiveKeys('nav.palette'));
+    return (
+      <p className="os-empty-desk-hint" role="note">
+        {keys ? t('shell2.emptyDesk.hint', { keys }) : t('shell2.emptyDesk.hintNoKey')}
+      </p>
+    );
+  }
 
   const dismiss = (): void => {
     writeLocalStorage(START_HERE_DISMISSED_KEY, '1');

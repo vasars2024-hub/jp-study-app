@@ -7,6 +7,7 @@ import { BrowserWindow, ipcMain, screen, app, powerMonitor } from 'electron';
 import path from 'node:path';
 import { loadWindowWithRetry } from './bootLoad';
 import { listDisplays, onDisplaysChanged, unionDisplayBounds } from './displays';
+import { deferWhileLocked } from './lockGuard';
 
 let host: BrowserWindow | null = null;
 let latestState: unknown = null;
@@ -144,6 +145,8 @@ function createHostWindow(): BrowserWindow {
 
 export function openCompanionHost(mode?: 'primary' | 'all'): void {
   if (mode === 'primary' || mode === 'all') spanMode = mode;
+  // Locked (lockGuard.ts): the desktop pets come back once the app is unlocked.
+  if (deferWhileLocked('companion-host', () => openCompanionHost(spanMode))) return;
   if (host && !host.isDestroyed()) {
     placeHost(host, spanMode);
     host.showInactive();
