@@ -77,4 +77,14 @@ export const LOCK_UPDATE_UI_JA: Catalog = {
   'upd2.restart.notNow': '今はしない',
   'upd2.unsaved.recording': '進行中の画面録画',
   'upd2.unsaved.recording-finalize': '保存中の録画',
+  // Eager (see ./en.ts); moved from ../updateUi3.
+  'upd2.error.checksum':
+    'ダウンロードした更新が公開されたチェックサムと一致しなかったため、破棄しました。もう一度お試しください。再び起きる場合は GitHub からインストーラーをダウンロードしてください。',
+  'upd2.error.disk': '更新に必要な空きディスク容量が足りません。空き容量を増やしてからもう一度お試しください。',
+  'upd2.unsaved.note-editor': '編集中でまだ保存していないノート',
+  'upd2.unsaved.card-editor': '編集中でまだ保存していないカード',
+  'upd2.unsaved.writing-correction': '作成中の文章添削',
+  'upd2.unsaved.review-session': '進行中の復習セッション',
+  'upd2.unsaved.snip': 'カードに変換中のスニップ',
+  'upd2.unsaved.ai-job': '実行中の AI ジョブ',
 };

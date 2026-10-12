@@ -71,4 +71,21 @@ export const LOCK3_UI_ZH: Catalog = {
   'lock3.settings.study.answer': '输入 PIN 前先回答一张卡片',
   'lock3.settings.study.answerNote':
     '先出现一张来自你卡组的选择题卡片。设置了 PIN 时，之后仍需输入 PIN；没有 PIN 时，这只是启动时的学习习惯，而不是锁。',
+  // lock4: a longer PIN (4-12 digits) or a passphrase. Eager with the rest of the
+  // lock: the lock screen draws before any lazy pack could load.
+  'lock4.pad.enter': '确定',
+  'lock4.pad.enterLabel': '用此 PIN 解锁',
+  'lock4.prompt.pin': '输入 PIN，然后按 Enter',
+  'lock4.prompt.passphrase': '输入密码短语',
+  'lock4.passphrase.label': '密码短语',
+  'lock4.tooShort': '太短：PIN 至少 4 位数字，密码短语至少 6 个字符。',
+  'lock4.settings.kind.label': '密码类型',
+  'lock4.settings.kind.pin': 'PIN（4 到 12 位数字）',
+  'lock4.settings.kind.passphrase': '密码短语',
+  'lock4.settings.kind.hintPin': '4 位 PIN 在输入第 4 位时即解锁。更长的 PIN 更难被猜到；输入后按 Enter。',
+  'lock4.settings.kind.hintPassphrase': '6 到 64 个字符，至少包含一个非数字字符。中间的空格有效，首尾的空格会被忽略。',
+  'lock4.settings.needPin': '请输入 4 到 12 位数字的 PIN。',
+  'lock4.settings.needPassphrase': '密码短语需要 6 到 64 个字符，且至少包含一个非数字字符。',
+  'lock4.blanc.hint': '4 到 12 位数字的 PIN，或 6 个字符以上的密码短语。',
+  'lock4.blanc.unlock': '解锁',
 };

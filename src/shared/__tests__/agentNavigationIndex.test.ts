@@ -260,6 +260,30 @@ describe('agent navigation index — the controls the settings registry had miss
  * and a tie refuses. So each case below is a word this slice deliberately left
  * out of a new entry's terms, asserted to still resolve exactly where it did.
  */
+describe('agent navigation index — the Settings > Lockscreen cards (lock4)', () => {
+  const card = (controlId: string) => ({ section: 'settings', page: 'lockscreen', controlId, highlight: true });
+
+  it.each([
+    ['I forgot my pin', 'lockscreen-recovery'],
+    ['where is my recovery code', 'lockscreen-recovery'],
+    ['lock automatically when I am away', 'lockscreen-auto'],
+    ['auto lock', 'lockscreen-auto'],
+    ['idle timeout', 'lockscreen-auto'],
+    ['show a card on the lockscreen', 'lockscreen-study'],
+    ['lock screen study', 'lockscreen-study'],
+    ['cards due on the lockscreen', 'lockscreen-study'],
+    ['use a passphrase', 'lockscreen-pin'],
+    ['set a longer pin', 'lockscreen-pin'],
+  ])('routes %j to lockscreen/%s', (query, controlId) => {
+    expect(destinationFor(query)).toEqual(card(controlId));
+  });
+
+  it('leaves the words the older lockscreen cards answer to where they were', () => {
+    expect(destinationFor('lockscreen passcode')).toEqual(card('lockscreen-pin'));
+    expect(destinationFor('lockscreen look')).toEqual(card('lockscreen-tint'));
+  });
+});
+
 describe('agent navigation index — words a new entry deliberately did not claim', () => {
   it.each([
     // `weather` mentions rain and snow; Particles keeps them.

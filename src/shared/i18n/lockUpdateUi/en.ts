@@ -83,4 +83,16 @@ export const LOCK_UPDATE_UI_EN: Catalog = {
   'upd2.restart.notNow': 'Not now',
   'upd2.unsaved.recording': 'the screen recording in progress',
   'upd2.unsaved.recording-finalize': 'a recording that is still being saved',
+  // Moved here from ../updateUi3 when that became a lazy pack: a failed download's
+  // reason and what a restart would cut short stay eager — the restart warning is a
+  // toast that must never wait on a chunk, in Blanc too.
+  'upd2.error.checksum':
+    'The downloaded update did not match its published checksum, so it was thrown away. Try again; if it happens again, download the installer from GitHub.',
+  'upd2.error.disk': 'There is not enough free disk space for the update. Free some space, then try again.',
+  'upd2.unsaved.note-editor': 'a note you are editing that is not saved yet',
+  'upd2.unsaved.card-editor': 'a card you are editing that is not saved yet',
+  'upd2.unsaved.writing-correction': 'a writing correction that is still being written',
+  'upd2.unsaved.review-session': 'the review session in progress',
+  'upd2.unsaved.snip': 'a snip that is still being turned into cards',
+  'upd2.unsaved.ai-job': 'an AI job that is still running',
 };

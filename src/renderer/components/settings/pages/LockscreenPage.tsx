@@ -5,6 +5,7 @@ import {
   clearLockscreenPin,
   clearLockscreenSession,
   hasLockscreenPin,
+  isValidPin,
   loadLockscreen,
   lockGumNow,
   newLockscreenRecoveryCode,
@@ -19,10 +20,37 @@ import {
   type LockscreenStudyMode,
 } from '../../../lockscreenSettings';
 import { AUTO_LOCK_IDLE_CHOICES, DEFAULT_AUTO_LOCK, type AutoLockOptions } from '../../../../shared/lockStatus';
+import { LOCK_PASSPHRASE_MAX_CHARS, LOCK_PIN_MAX_DIGITS, type LockSecretKind } from '../../../../shared/lockSecret';
 import { useT } from '../../../i18n';
 
 const NOTE_STYLE = { margin: '8px 0 0', fontSize: 12, lineHeight: 1.45 } as const;
-const PIN_INPUT_STYLE = { width: 120, letterSpacing: '0.35em', textAlign: 'center', padding: '6px 8px' } as const;
+const PIN_INPUT_STYLE = { width: 140, letterSpacing: '0.35em', textAlign: 'center', padding: '6px 8px' } as const;
+const PASSPHRASE_INPUT_STYLE = { width: 220, padding: '6px 8px' } as const;
+
+/** lock4: the field for a PIN (digits only, up to 12) or a passphrase (any text). */
+function secretInputProps(kind: 'pin' | 'passphrase', value: string, set: (v: string) => void) {
+  return kind === 'passphrase'
+    ? {
+        type: 'password',
+        inputMode: 'text' as const,
+        maxLength: LOCK_PASSPHRASE_MAX_CHARS,
+        spellCheck: false,
+        value,
+        style: PASSPHRASE_INPUT_STYLE,
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => set(e.target.value),
+      }
+    : {
+        type: 'password',
+        inputMode: 'numeric' as const,
+        maxLength: LOCK_PIN_MAX_DIGITS,
+        value,
+        placeholder: '••••',
+        style: PIN_INPUT_STYLE,
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => set(e.target.value.replace(/\D/g, '').slice(0, LOCK_PIN_MAX_DIGITS)),
+      };
+}
+
+const asFieldKind = (k: LockSecretKind): 'pin' | 'passphrase' => (k === 'passphrase' ? 'passphrase' : 'pin');
 
 /**
  * Settings -> Lockscreen. lock3: main owns the PIN, so every change that weakens
@@ -43,6 +71,10 @@ export default function LockscreenPage() {
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [autoLock, setAutoLock] = useState<AutoLockOptions>({ ...DEFAULT_AUTO_LOCK });
+  /** lock4: what the NEW secret is (a PIN of 4-12 digits, or a passphrase). */
+  const [newKind, setNewKind] = useState<'pin' | 'passphrase'>(() => asFieldKind(loadLockscreen().secretKind));
+  /** The CURRENT secret's field follows main's record (mirrored in `cfg`). */
+  const currentKind = asFieldKind(cfg.secretKind);
 
   useEffect(
     () =>
@@ -81,7 +113,7 @@ export default function LockscreenPage() {
     }
     if (res.retryAfterMs) flash(t('lockscreen.retryIn', { count: Math.max(1, Math.ceil(res.retryAfterMs / 1000)) }));
     else if (res.error === 'wrong-pin') flash(currentPin ? t('lock3.settings.wrongCurrent') : t('lock3.settings.currentNeeded'));
-    else if (res.error === 'invalid') flash(t('settings.lock.msg.needFour'));
+    else if (res.error === 'invalid') flash(newKind === 'passphrase' ? t('lock4.settings.needPassphrase') : t('lock4.settings.needPin'));
     else flash(t('settings.lock.msg.saveFail'));
     return false;
   };
@@ -91,15 +123,17 @@ export default function LockscreenPage() {
     });
 
   const savePin = () => {
-    if (!/^\d{4}$/.test(pinDraft)) {
-      flash(t('settings.lock.msg.needFour'));
+    // lock4: a PIN is 4-12 digits; a passphrase is 6-64 characters, not all digits.
+    const draftOk = isValidPin(pinDraft) && (newKind === 'pin' ? /^[0-9]+$/.test(pinDraft) : !/^[0-9]+$/.test(pinDraft.trim()));
+    if (!draftOk) {
+      flash(newKind === 'passphrase' ? t('lock4.settings.needPassphrase') : t('lock4.settings.needPin'));
       return;
     }
     if (pinDraft !== pinConfirm) {
       flash(t('settings.lock.msg.mismatch'));
       return;
     }
-    if (hasPin && !/^\d{4}$/.test(currentPin)) {
+    if (hasPin && !isValidPin(currentPin)) {
       flash(t('lock3.settings.currentNeeded'));
       return;
     }
@@ -114,7 +148,7 @@ export default function LockscreenPage() {
   };
 
   const clearPin = () => {
-    if (!/^\d{4}$/.test(currentPin)) {
+    if (!isValidPin(currentPin)) {
       flash(t('lock3.settings.currentNeeded'));
       return;
     }
@@ -132,7 +166,7 @@ export default function LockscreenPage() {
       flash(t('settings.lock.msg.needBeforeEnable'));
       return;
     }
-    if (!on && !/^\d{4}$/.test(currentPin)) {
+    if (!on && !isValidPin(currentPin)) {
       flash(t('lock3.settings.currentNeeded'));
       return;
     }
@@ -142,7 +176,7 @@ export default function LockscreenPage() {
   };
 
   const newRecovery = () => {
-    if (!/^\d{4}$/.test(currentPin)) {
+    if (!isValidPin(currentPin)) {
       flash(t('lock3.settings.currentNeeded'));
       return;
     }
@@ -179,14 +213,8 @@ export default function LockscreenPage() {
         {t('lock3.settings.currentPin')}
       </span>
       <input
-        type="password"
-        inputMode="numeric"
         autoComplete="current-password"
-        maxLength={4}
-        value={currentPin}
-        placeholder="••••"
-        style={PIN_INPUT_STYLE}
-        onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        {...secretInputProps(currentKind, currentPin, setCurrentPin)}
       />
     </label>
   );
@@ -242,36 +270,55 @@ export default function LockscreenPage() {
         <div className="os-viz-row" style={{ flexWrap: 'wrap', gap: 8, alignItems: 'flex-end', marginBottom: hasPin ? 10 : 0 }}>
           {currentField}
         </div>
+        {/* lock4: a PIN of 4-12 digits, or a passphrase. Native radios: arrow keys move
+            between them and a screen reader hears the group's name. */}
+        <div
+          role="radiogroup"
+          aria-labelledby="lock4-kind-label"
+          aria-describedby="lock4-kind-hint"
+          className="os-viz-row"
+          style={{ flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 6 }}
+        >
+          <span id="lock4-kind-label" className="muted" style={{ fontSize: 11 }}>
+            {t('lock4.settings.kind.label')}
+          </span>
+          {(
+            [
+              ['pin', 'lock4.settings.kind.pin'],
+              ['passphrase', 'lock4.settings.kind.passphrase'],
+            ] as const
+          ).map(([id, labelKey]) => (
+            <label key={id} className="os-check-row" style={{ minHeight: 24 }}>
+              <input
+                type="radio"
+                name="lock4-secret-kind"
+                value={id}
+                checked={newKind === id}
+                onChange={() => {
+                  setNewKind(id);
+                  setPinDraft('');
+                  setPinConfirm('');
+                }}
+              />
+              <span>{t(labelKey)}</span>
+            </label>
+          ))}
+        </div>
+        <p id="lock4-kind-hint" className="muted" style={{ margin: '0 0 8px', fontSize: 12, lineHeight: 1.45 }}>
+          {newKind === 'passphrase' ? t('lock4.settings.kind.hintPassphrase') : t('lock4.settings.kind.hintPin')}
+        </p>
         <div className="os-viz-row" style={{ flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
             <span className="muted" style={{ fontSize: 11 }}>
               {t('settings.lock.newPasscode')}
             </span>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="new-password"
-              maxLength={4}
-              value={pinDraft}
-              placeholder="••••"
-              style={PIN_INPUT_STYLE}
-              onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, '').slice(0, 4))}
-            />
+            <input autoComplete="new-password" {...secretInputProps(newKind, pinDraft, setPinDraft)} />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
             <span className="muted" style={{ fontSize: 11 }}>
               {t('settings.lock.confirm')}
             </span>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="new-password"
-              maxLength={4}
-              value={pinConfirm}
-              placeholder="••••"
-              style={PIN_INPUT_STYLE}
-              onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
-            />
+            <input autoComplete="new-password" {...secretInputProps(newKind, pinConfirm, setPinConfirm)} />
           </label>
           <button type="button" className="btn small primary" onClick={savePin}>
             {hasPin ? t('settings.lock.update') : t('settings.lock.save')}

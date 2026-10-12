@@ -574,7 +574,11 @@ function loadFlows() {
  * it (tools/e2e/world.cjs) — only when a flow that needs it runs.
  */
 function worldOptionsFor(flows) {
-  return { ai: args.includes('--world-ai') || flows.some((flow) => Boolean(flow.world && flow.world.ai)) };
+  return {
+    ai: args.includes('--world-ai') || flows.some((flow) => Boolean(flow.world && flow.world.ai)),
+    // An "installed" copy against the fake feed (Gum's own update downloader, a stand-in Update.exe).
+    updateInstall: flows.some((flow) => Boolean(flow.world && flow.world.updateInstall)),
+  };
 }
 
 /** Loopback port -> who listens there (the harness's fakes and the app's own servers). */

@@ -7,6 +7,7 @@ import {
   type LexiconNote,
 } from '../../../shared/lexiconNotes';
 import { useT } from '../../i18n';
+import { useUnsavedWork } from '../../unsavedWork';
 import './entryNote.css';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -95,6 +96,7 @@ export default function EntryNote({ word, reading, lang }: Props) {
   }, [word, reading, lang]);
 
   const dirty = text !== saved.note || tagField !== saved.tags;
+  useUnsavedWork('note-editor', loaded && dirty);
 
   /** Only after a write the database confirmed — announcing an attempt would imply it landed. */
   function announce(): void {

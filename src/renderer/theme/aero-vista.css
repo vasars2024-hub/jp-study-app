@@ -284,8 +284,9 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  /* lock4: 32px, so it stays above the 24px floor on screen at the 80% app zoom. */
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid rgba(0, 32, 70, 0.8);
   border-radius: 50%;

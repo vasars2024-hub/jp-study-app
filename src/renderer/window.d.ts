@@ -915,7 +915,7 @@ declare global {
       lockscreenSetAutoLock?(options: Partial<import('../shared/lockStatus').AutoLockOptions>): Promise<import('../shared/lockStatus').LockMutationResult>;
       lockscreenVerifyPin?(pin: string, stored: string): Promise<{ ok: boolean; retryAfterMs?: number; upgradedHash?: string }>;
       onLockscreenUnlocked(cb: () => void): () => void;
-      lockscreenSyncConfig?(config: { enabled: boolean; pinHash: string }, rendererLocked: boolean): Promise<{ ok: boolean; locked: boolean }>;
+      lockscreenSyncConfig?(config: { enabled: boolean; pinHash: string; secretKind?: string }, rendererLocked: boolean): Promise<{ ok: boolean; locked: boolean }>;
       lockscreenLock?(): Promise<{ locked: boolean }>;
       lockscreenIsLocked?(): Promise<boolean>;
       onLockscreenLocked?(cb: () => void): () => void;
@@ -985,8 +985,12 @@ declare global {
       onAppUpdateChanged?(cb: (status: import('../shared/appUpdate').AppUpdateStatus) => void): () => void;
       appUpdateDetails?(): Promise<import('../shared/appUpdate').AppUpdateDetails>;
       appUpdateCheckNow?(): Promise<import('../shared/appUpdate').AppUpdateDetails>;
-      appUpdateReleaseNotes?(): Promise<import('../shared/appUpdate').AppReleaseNotes>;
+      appUpdateReleaseNotes?(opts?: { version?: string }): Promise<import('../shared/appUpdate').AppReleaseNotes>;
       onAppUpdateDetails?(cb: (details: import('../shared/appUpdate').AppUpdateDetails) => void): () => void;
+      appUpdateCancelDownload?(): Promise<boolean>;
+      appUpdateOpenLink?(url: string): Promise<boolean>;
+      appUpdateWhatsNew?(action: 'announced' | 'dismissed'): Promise<import('../shared/appUpdate').AppUpdateDetails>;
+      reportUnsavedWork?(kinds: readonly import('../shared/appUpdate').AppUpdateUnsavedKind[]): void;
       catalogGet():Promise<import('../shared/resourcesCatalog').ResourcesCatalog | null>;
       catalogRefresh(): Promise<
         import('../shared/resourcesCatalog').CatalogResult<

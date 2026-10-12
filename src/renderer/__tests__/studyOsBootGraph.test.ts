@@ -52,6 +52,19 @@ const STUDY_OS_SOURCE_CEILING = 8_600_000;
 // Blanc over; put back the same day by making those strings a lazy i18n pack
 // (`shared/i18n/catalogs.ts`, "Lazily merged packs"). The English catalog is
 // static in every window, so a string in it is boot cost everywhere.
+// Raised to 4_206_000 on 2026-10-12 by lock4 (+6.6 KB measured, HEAD was 4_198_104):
+// Blanc's own lock screen gained the longer-PIN / passphrase field and its strings,
+// which must be eager — the lock draws before any lazy chunk may load. The secret
+// helpers live in the small `shared/lockSecret.ts` so `lockStatus.ts` stays type-only.
+// Raised to 4_210_000 the same day by upd3 (+3.3 KB): `shared/i18n/updateUi3`, the
+// Updates panel's strings, then merged into the eager catalogs.
+// Back to 4_200_000 the same day (4_208_411 -> 4_167_322 measured) without touching
+// lock4, which stays eager: the upd3 strings became a lazy pack (prefix `upd3.`)
+// that main.tsx loads before first paint and Blanc, which has no Updates panel, never
+// loads at boot; the `upd2.*` restart-warning and download-error strings they carried
+// stayed eager (`i18n/lockUpdateUi`). And two modules only a shortcut needs left
+// Blanc's static graph: `readerSettings` (the word-highlight shortcut imports it on
+// use) and `extensionBridgeUi` (the refused-shortcut toast's action).
 const BLANC_SOURCE_CEILING = 4_200_000;
 
 describe('Study OS startup import graph', () => {
@@ -106,6 +119,25 @@ describe('Study OS startup import graph', () => {
       }
     }
     expect([...misses]).toEqual([]);
+  });
+
+  it('loads the Updates strings before first paint in Study OS, and names none in Blanc', async () => {
+    // upd3 is a lazy pack (`shared/i18n/catalogs.ts`). Study OS shows it at once (the
+    // notification center's "What's new", the Updates panel), so main.tsx awaits it
+    // before rendering; Blanc never loads it at boot, so no Blanc boot module may name
+    // one of its keys — that string would render as a placeholder.
+    const main = stripComments(readFileSync(ENTRY, 'utf8'));
+    expect(main).toMatch(/ensureUiPack\('upd3'\)/);
+    const { UPDATE3_UI_EN } = await import('../../shared/i18n/updateUi3/en');
+    const misses: string[] = [];
+    for (const file of walkImportGraph(BLANC_ENTRY).files.keys()) {
+      if (!/\.(t|j)sx?$/.test(file) || /[\\/]i18n[\\/]/.test(file)) continue;
+      const code = stripComments(readFileSync(file, 'utf8'));
+      for (const m of code.matchAll(/['"`](upd3\.[\w.-]*)/g)) {
+        if (UPDATE3_UI_EN[m[1]] !== undefined || m[1].endsWith('.')) misses.push(`${rel(file)}: ${m[1]}`);
+      }
+    }
+    expect(misses).toEqual([]);
   });
 
   it('keeps Blanc under its source-byte ceiling too', () => {

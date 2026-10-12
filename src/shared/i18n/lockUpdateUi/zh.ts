@@ -74,4 +74,13 @@ export const LOCK_UPDATE_UI_ZH: Catalog = {
   'upd2.restart.notNow': '暂不',
   'upd2.unsaved.recording': '正在进行的屏幕录制',
   'upd2.unsaved.recording-finalize': '仍在保存的录制',
+  // Eager (see ./en.ts); moved from ../updateUi3.
+  'upd2.error.checksum': '下载的更新与发布的校验和不一致，已被丢弃。请重试；如果再次出现，请从 GitHub 下载安装程序。',
+  'upd2.error.disk': '磁盘可用空间不足，无法下载更新。请释放一些空间后重试。',
+  'upd2.unsaved.note-editor': '正在编辑但尚未保存的笔记',
+  'upd2.unsaved.card-editor': '正在编辑但尚未保存的卡片',
+  'upd2.unsaved.writing-correction': '仍在生成的写作批改',
+  'upd2.unsaved.review-session': '正在进行的复习',
+  'upd2.unsaved.snip': '仍在转换为卡片的截图',
+  'upd2.unsaved.ai-job': '仍在运行的 AI 任务',
 };

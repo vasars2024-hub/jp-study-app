@@ -55,6 +55,7 @@ import {
   type SnipToastPayload,
 } from '../shared/snipToCards';
 import { normalizeStudyLang } from '../shared/studyLang';
+import { holdUnsavedWork } from './unsavedWork';
 
 interface SnipDeps {
   rendererUrl: (query?: string) => string;
@@ -324,9 +325,11 @@ async function acceptImage(image: Electron.NativeImage): Promise<void> {
   if (isKnownHash(hash)) return;
   sessionHashes.add(hash);
   // One snip at a time: OCR is heavy, and two snips in a row keep their order.
+  // Queued or being read, a snip is something "Restart to update" would cut short.
+  const releaseUnsaved = holdUnsavedWork('snip');
   chain = chain.then(() => processSnip(image, png, hash)).catch((err) => {
     console.error('[snipToCards] snip failed', err);
-  });
+  }).finally(releaseUnsaved);
   await chain;
 }
 

@@ -1,4 +1,5 @@
-import { app, autoUpdater, BrowserWindow, ipcMain } from 'electron';
+import { app, autoUpdater, BrowserWindow, ipcMain, shell } from 'electron';
+import fs from 'node:fs';
 import {
   classifyRelease,
   compareVersions,
@@ -12,6 +13,7 @@ import {
 } from '../shared/release';
 import path from 'node:path';
 import {
+  APP_UPDATE_UNSAVED_KINDS,
   DEFAULT_APP_UPDATE_PREFS,
   RELEASE_NOTES_MAX_CHARS,
   sanitizeAppUpdatePrefs,
@@ -19,6 +21,8 @@ import {
   type AppUpdatePrefs,
   type AppUpdateUnsavedKind,
 } from '../shared/appUpdate';
+import { isReleaseVersion } from '../shared/release';
+import { isProjectGithubUrl } from '../shared/releaseMarkdown';
 import { getRecorderState } from './regionRecorder';
 import { readInstalledExtensionVersion } from './extensionInstall';
 import { logDiagnostic } from './errorLog';
@@ -26,8 +30,13 @@ import { markAppQuitting } from './appLifecycle';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { isConnectionMetered } from './meteredConnection';
 import { isE2eHeadless } from './e2eHeadless';
-import { fetchChannelRelease, resolveUpdateFeed, type FeedFetch, type UpdateFeed } from './releaseFeed';
-import { createAppUpdateController, detectInstallKind } from './squirrelUpdater';
+import { fetchChannelRelease, fetchTaggedRelease, resolveUpdateFeed, updateDownloadBase, type FeedFetch, type UpdateFeed } from './releaseFeed';
+import { createAppUpdateController, detectInstallKind, type UpdateDownloaderLike, type UpdaterLike } from './squirrelUpdater';
+import { updateExePath } from './squirrelEvents';
+import { clearStaging, latestFullVersion, parseSquirrelReleases, startUpdateDownload } from './updateDownloader';
+import { createHarnessSquirrel, E2E_UPDATE_INSTALL_ENV } from './updateHarnessSquirrel';
+import { historyForPanel, noteRunningVersion, readUpdateHistory, type UpdateHistoryState } from './updateHistory';
+import { forgetWindowUnsavedWork, listUnsavedWork, setWindowUnsavedWork } from './unsavedWork';
 
 /**
  * The feed, decided once: GitHub normally; under the headless harness the fake
@@ -116,20 +125,36 @@ async function fetchLatestRelease(): Promise<AppReleaseInfo | null> {
 
 /**
  * What a restart right now would lose, as `AppUpdateUnsavedKind` codes the
- * panel translates. Everything else Gum edits is written as it changes (decks,
- * the CSV editor, the deck workbench, the Anki outbox), so a recording is what
- * a restart can actually cut short.
+ * panel translates: the recorder (main's own state) plus whatever every window
+ * and main-process job has reported to the registry (main/unsavedWork.ts) — an
+ * open note or card edit, a review part-way through, a snip or AI job running.
+ * Decks, the CSV editor, the deck workbench and the Anki outbox are written as
+ * they change, so they never need to be listed.
  */
 function unsavedWorkKinds(): AppUpdateUnsavedKind[] {
-  const out: AppUpdateUnsavedKind[] = [];
+  const held = new Set<AppUpdateUnsavedKind>(listUnsavedWork());
   try {
     const recorder = getRecorderState();
-    if (recorder.phase === 'starting' || recorder.phase === 'recording' || recorder.phase === 'paused') out.push('recording');
-    if (recorder.jobs.some((job) => job.phase === 'finalizing' || job.phase === 'importing')) out.push('recording-finalize');
+    if (recorder.phase === 'starting' || recorder.phase === 'recording' || recorder.phase === 'paused') held.add('recording');
+    if (recorder.jobs.some((job) => job.phase === 'finalizing' || job.phase === 'importing')) held.add('recording-finalize');
   } catch {
     /* recorder not initialised: nothing of it to lose */
   }
-  return out;
+  return APP_UPDATE_UNSAVED_KINDS.filter((kind) => held.has(kind));
+}
+
+/** Windows whose reports are cleared when they go away (hooked once each). */
+const unsavedReporters = new Set<number>();
+
+/** The installed copy's own version per Squirrel (`<root>\packages\RELEASES`); null = unknown. */
+function localSquirrelVersion(execPath: string): string | null {
+  try {
+    const text = fs.readFileSync(path.join(path.dirname(updateExePath(execPath)), 'packages', 'RELEASES'), 'utf8');
+    const entries = parseSquirrelReleases(text);
+    return entries ? latestFullVersion(entries) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function registerReleaseIpc(): void {
@@ -142,10 +167,53 @@ export function registerReleaseIpc(): void {
   const stateFile = path.join(app.getPath('userData'), 'app-update-state.json');
   const readState = () => readJsonSync<Record<string, unknown>>(stateFile, {});
   const writeState = (patch: Record<string, unknown>) => writeJsonAtomicSync(stateFile, { ...readState(), ...patch });
+  const currentVersion = normalizeVersion(app.getVersion());
+
+  // Update history + "What's new": noted once per start, before any window asks.
+  let history: UpdateHistoryState = readUpdateHistory(readState());
+  try {
+    const noted = noteRunningVersion(history, currentVersion, Date.now());
+    if (noted.changed) {
+      history = { history: noted.history, whatsNew: noted.whatsNew };
+      writeState({ history: history.history, whatsNew: history.whatsNew });
+    }
+  } catch (err) {
+    logDiagnostic('warn', 'update', 'history', err instanceof Error ? err.message : String(err));
+  }
+
+  // The headless harness can stand in for an installed copy (its fake feed, a
+  // stand-in Update.exe, staging in the temp profile); nothing else can.
+  const harnessInstall = isE2eHeadless() && process.env[E2E_UPDATE_INSTALL_ENV] === '1' && updateFeed().source === 'override';
+  const install = harnessInstall ? 'installed' : detectInstallKind(process.execPath, app.isPackaged);
+  const updater: UpdaterLike = harnessInstall ? createHarnessSquirrel(autoUpdater, currentVersion) : autoUpdater;
+  // Beside Squirrel's own packages (Local AppData, not the roaming profile).
+  const stagingDir = harnessInstall
+    ? path.join(app.getPath('userData'), 'update-staging')
+    : path.join(path.dirname(updateExePath(process.execPath)), 'packages', 'gum-staged');
+  const downloader: UpdateDownloaderLike = {
+    start: ({ release, fullOnly, onProgress }) => {
+      const baseUrl = updateDownloadBase(updateFeed(), release) ?? '';
+      return startUpdateDownload({
+        baseUrl,
+        stagingDir,
+        localVersion: harnessInstall ? null : localSquirrelVersion(process.execPath),
+        currentVersion,
+        fullOnly,
+        onProgress,
+        userAgent: `Gum/${currentVersion}`,
+        ...(harnessInstall ? { retryDelaysMs: [200, 400] } : {}),
+      });
+    },
+    clear: () => clearStaging(stagingDir),
+  };
   const updates = createAppUpdateController({
-    install: detectInstallKind(process.execPath, app.isPackaged),
-    updater: autoUpdater,
-    currentVersion: normalizeVersion(app.getVersion()),
+    install,
+    updater,
+    currentVersion,
+    downloader,
+    history: () => ({ history: historyForPanel(history), whatsNew: history.whatsNew }),
+    // The harness never checks on a timer: a run checks when a flow presses the button.
+    ...(harnessInstall ? { setTimer: () => undefined } : {}),
     broadcast: (status) => sendToAllWindows('appUpdate:changed', status),
     broadcastDetails: (details) => sendToAllWindows('appUpdate:details', details),
     log: (message) => logDiagnostic('warn', 'update', 'squirrel', message),
@@ -173,8 +241,50 @@ export function registerReleaseIpc(): void {
   ipcMain.handle('appUpdate:restart', (_e, opts?: unknown) =>
     updates.requestRestart(Boolean(opts && typeof opts === 'object' && (opts as { force?: unknown }).force === true)));
   ipcMain.handle('appUpdate:setPrefs', (_e, patch: unknown) => updates.setPrefs(sanitizeAppUpdatePrefs(patch, updates.prefs())));
-  // Only ever on the user's click (Settings -> Help -> Updates, "Show release notes").
-  ipcMain.handle('appUpdate:releaseNotes', () => fetchReleaseNotes());
+  ipcMain.handle('appUpdate:cancelDownload', () => updates.cancelDownload());
+  // Only ever on the user's click (Settings -> Help -> Updates, "Show release notes",
+  // or "What's new" asking for the running version's notes).
+  ipcMain.handle('appUpdate:releaseNotes', (_e, opts?: unknown) => {
+    const v = opts && typeof opts === 'object' ? (opts as { version?: unknown }).version : undefined;
+    return typeof v === 'string' && isReleaseVersion(v)
+      ? fetchReleaseNotes(() => fetchTaggedRelease(updateFeed(), v))
+      : fetchReleaseNotes();
+  });
+  // A link in rendered release notes: this project's GitHub pages only.
+  ipcMain.handle('appUpdate:openLink', async (_e, url: unknown): Promise<boolean> => {
+    if (!isProjectGithubUrl(url)) return false;
+    await shell.openExternal(url as string);
+    return true;
+  });
+  // "What's new": the notice was posted (once), or the user dismissed the card.
+  ipcMain.handle('appUpdate:whatsNew', (_e, action: unknown) => {
+    if (history.whatsNew && (action === 'announced' || action === 'dismissed')) {
+      history = { ...history, whatsNew: action === 'dismissed' ? null : { ...history.whatsNew, announced: true } };
+      try {
+        writeState({ whatsNew: history.whatsNew });
+      } catch (err) {
+        logDiagnostic('warn', 'update', 'history', err instanceof Error ? err.message : String(err));
+      }
+    }
+    return updates.refresh();
+  });
+  // Unsaved work from every window, as a whole list per window (main/unsavedWork.ts).
+  ipcMain.on('unsavedWork:report', (event, kinds: unknown) => {
+    const sender = event.sender;
+    const id = sender.id;
+    if (!setWindowUnsavedWork(id, kinds) || unsavedReporters.has(id)) return;
+    unsavedReporters.add(id);
+    const forget = () => {
+      forgetWindowUnsavedWork(id);
+      unsavedReporters.delete(id);
+    };
+    sender.once('destroyed', forget);
+    sender.once('render-process-gone', forget);
+    // A reload starts the page over: its drafts are gone, and it reports again.
+    sender.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) forgetWindowUnsavedWork(id);
+    });
+  });
   updates.start();
 }
 

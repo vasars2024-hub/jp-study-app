@@ -178,6 +178,14 @@ const FEED_REPO = 'vasars2024-hub/jp-study-app';
  * every update check here through `GUM_UPDATE_FEED_URL` (honoured only under the harness),
  * so a run never asks the real api.github.com. Stable answers this build's own version;
  * the release list adds a newer pre-release for the beta channel. Every hit is recorded.
+ *
+ * Downloads (main/updateDownloader.ts): `<base>/download/<tag>/RELEASES` and the
+ * `-full.nupkg` it names — a deterministic fake package, served in throttled chunks with
+ * HTTP Range support (206), so a flow can watch real byte progress, cancel and resume.
+ * The FIRST whole-file request is cut off part-way (`dropAfter`), so a run also proves the
+ * automatic retry resumes with a Range instead of starting over. `/releases/tags/<tag>`
+ * answers "What's new" for one version. `downloads` records every package request with
+ * its Range header and status.
  */
 async function startUpdateFeed() {
   const version = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8')).version;
@@ -187,7 +195,18 @@ async function startUpdateFeed() {
   const stable = {
     tag_name: `v${version}`,
     name: `Gum ${version} (E2E feed)`,
-    body: `- E2E stable notes\n<script>alert("not html")</script>`,
+    body: [
+      '- E2E stable notes',
+      '<script>alert("not html")</script>',
+      '',
+      '## Highlights',
+      '',
+      '- **Bold words**, *italic words* and `inline code`',
+      `- [Project issue](https://github.com/${FEED_REPO}/issues/1)`,
+      '- [Elsewhere](https://evil.example/phish)',
+      '',
+      '<img src=x onerror="alert(1)">',
+    ].join('\n'),
     html_url: page(`v${version}`),
     published_at: '2026-10-01T00:00:00Z',
     prerelease: false,
@@ -195,6 +214,57 @@ async function startUpdateFeed() {
   };
   const pre = { ...stable, tag_name: `v${beta}`, name: `Gum ${beta} (E2E feed)`, body: '- E2E beta notes', html_url: page(`v${beta}`), prerelease: true };
   const draft = { ...stable, tag_name: 'v99.0.0', name: 'never shown', draft: true };
+  // The beta's Squirrel package: Squirrel spells SemVer 1, so 1.1.0-beta.1 is 1.1.0-beta1.
+  const squirrelBeta = beta.replace(/-(.*)$/, (_m, pre) => `-${pre.replace(/\./g, '')}`);
+  const pkgName = `gum-${squirrelBeta}-full.nupkg`;
+  const pkg = Buffer.alloc(4 * 1024 * 1024);
+  for (let off = 0, n = 0; off < pkg.length; n++) {
+    const block = crypto.createHash('sha256').update(`gum-e2e-package-${n}`).digest();
+    off += block.copy(pkg, off);
+  }
+  const pkgSha1 = crypto.createHash('sha1').update(pkg).digest('hex').toUpperCase();
+  const releasesText = `${pkgSha1} ${pkgName} ${pkg.length}`;
+  const CHUNK = 64 * 1024;
+  const CHUNK_MS = 60;
+  /** The first whole-file GET is cut off after this many bytes (once). */
+  const dropAfter = 1024 * 1024;
+  let dropped = false;
+  const downloads = [];
+  const servePackage = (req, res) => {
+    const range = /^bytes=(\d+)-$/.exec(String(req.headers.range ?? ''));
+    const start = range ? Number(range[1]) : 0;
+    if (start >= pkg.length) {
+      downloads.push({ range: req.headers.range ?? null, status: 416 });
+      res.writeHead(416, { 'content-range': `bytes */${pkg.length}` });
+      return res.end();
+    }
+    const status = range ? 206 : 200;
+    const cut = !range && !dropped;
+    if (cut) dropped = true;
+    downloads.push({ range: req.headers.range ?? null, status, cut });
+    res.writeHead(status, {
+      'content-type': 'application/octet-stream',
+      'content-length': String(pkg.length - start),
+      'accept-ranges': 'bytes',
+      ...(range ? { 'content-range': `bytes ${start}-${pkg.length - 1}/${pkg.length}` } : {}),
+    });
+    let at = start;
+    const timer = setInterval(() => {
+      if (res.destroyed) return clearInterval(timer);
+      if (cut && at - start >= dropAfter) {
+        clearInterval(timer);
+        return res.destroy();
+      }
+      const end = Math.min(pkg.length, at + CHUNK);
+      res.write(pkg.subarray(at, end));
+      at = end;
+      if (at >= pkg.length) {
+        clearInterval(timer);
+        res.end();
+      }
+    }, CHUNK_MS);
+    res.on('close', () => clearInterval(timer));
+  };
   const hits = [];
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://feed.invalid');
@@ -206,6 +276,13 @@ async function startUpdateFeed() {
     };
     if (url.pathname === `/repos/${FEED_REPO}/releases/latest`) return json(200, stable);
     if (url.pathname === `/repos/${FEED_REPO}/releases`) return json(200, [draft, pre, stable]);
+    if (url.pathname === `/repos/${FEED_REPO}/releases/tags/v${version}`) return json(200, stable);
+    if (url.pathname === `/repos/${FEED_REPO}/releases/tags/v${beta}`) return json(200, pre);
+    if (url.pathname === `/repos/${FEED_REPO}/download/v${beta}/RELEASES`) {
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      return res.end(releasesText);
+    }
+    if (url.pathname === `/repos/${FEED_REPO}/download/v${beta}/${pkgName}`) return servePackage(req, res);
     return json(404, { message: 'Not Found' });
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -216,6 +293,9 @@ async function startUpdateFeed() {
     version,
     beta,
     hits,
+    /** The beta's fake Squirrel package, as RELEASES describes it. */
+    pkg: { name: pkgName, size: pkg.length, sha1: pkgSha1, dropAfter },
+    downloads,
     close: () => new Promise((resolve) => {
       server.closeAllConnections();
       server.close(() => resolve());
@@ -485,6 +565,9 @@ async function startWorld(dir, options = {}) {
         GUM_E2E_SCREEN_IMAGE: screen.file,
         // Every update check (boot notifier, "Check now", release notes) reads this fake.
         GUM_UPDATE_FEED_URL: updateFeed.base,
+        // A flow that opts in (`world: { updateInstall: true }`) gets an "installed" copy:
+        // Gum's own downloader against this feed, and a stand-in Update.exe (headless only).
+        ...(options.updateInstall ? { GUM_E2E_UPDATE_INSTALL: '1' } : {}),
       };
     },
     /** Files written into the fresh profile before the app first starts. */
@@ -496,6 +579,14 @@ async function startWorld(dir, options = {}) {
         JSON.stringify({ schemaVersion: 1, ankiUrl: anki.url, legacyMigrated: true }, null, 2),
       );
       if (ai) writeAiPreset(profileDir, ai);
+      // Update history: this profile last ran an older Gum, so the build under test
+      // starts as an update and arms "What's new" (main/updateHistory.ts).
+      if (options.updateInstall) {
+        fs.writeFileSync(
+          path.join(profileDir, 'app-update-state.json'),
+          JSON.stringify({ history: [{ version: '0.9.0', at: Date.UTC(2026, 8, 1) }] }, null, 2),
+        );
+      }
     },
     /** Which fake ports are whose (the report names loopback ports by owner). */
     ports() {

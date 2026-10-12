@@ -23,7 +23,6 @@ import { t, getUiLang } from './i18n';
 import { ensureCatalog } from '../shared/i18n/catalogs';
 import { notify } from './notificationStore';
 import { writeLocalStorageJson } from './localStorageWrite';
-import { openShortcutSettings } from './extensionBridgeUi';
 import type { GlobalCommandStatus } from '../shared/globalCommands';
 
 const REPORTED_KEY = 'jp-global-shortcut-refusals-v1';
@@ -55,6 +54,10 @@ export function globalShortcutNoticeKey(failures: readonly Pick<GlobalCommandSta
  * for an id outside it (a feature's own command) is not the Shortcuts page's to
  * report. Resolves once the notice (if any) has been posted.
  */
+function openShortcutSettingsLazily(): void {
+  void import('./extensionBridgeUi').then((m) => m.openShortcutSettings());
+}
+
 export async function reportGlobalShortcutFailures(
   list: readonly GlobalCommandStatus[] | null | undefined,
   chords: Record<string, string>,
@@ -91,7 +94,8 @@ export async function reportGlobalShortcutFailures(
         kind: 'warn',
         // Already in the Notification Center (translatable), not a second frozen copy.
         record: false,
-        action: { label: t('shortcut.notice.refused.open'), run: openShortcutSettings },
+        // Loaded on click: the navigation bridge is not boot cost (Blanc boots this module).
+        action: { label: t('shortcut.notice.refused.open'), run: openShortcutSettingsLazily },
       },
     }),
   );

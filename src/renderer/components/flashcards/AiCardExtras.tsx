@@ -28,6 +28,7 @@ import { useT } from '../../i18n';
 import { cardContentLang } from '../../studyEnvironment';
 import { AiStudyStatus, AiSuggestionBadge, useAiStudyRequest } from '../ai/aiStudyRequest';
 import { checkExampleSentences, knownWordSample, type CheckedExample } from './aiExampleCheck';
+import { useUnsavedWork } from '../../unsavedWork';
 
 interface Candidate extends CheckedExample {
   origin: CardExampleSentence['origin'];
@@ -72,6 +73,8 @@ export default function AiCardExtras({
   const [corpusState, setCorpusState] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle');
   const [status, setStatus] = useState('');
   const [editing, setEditing] = useState<{ field: NoteField; text: string } | null>(null);
+  // A card field open in the edit box: "Restart to update" lists it.
+  useUnsavedWork('card-editor', editing !== null);
 
   useEffect(() => {
     setCandidates([]);

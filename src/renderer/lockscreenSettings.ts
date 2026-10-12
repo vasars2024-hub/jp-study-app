@@ -13,6 +13,7 @@
  * own presentation choices and never weaken the PIN.
  */
 import type { AutoLockOptions, LockMutationResult, LockStatus } from '../shared/lockStatus';
+import { normalizeLockSecret, normalizeLockSecretKind, type LockSecretKind } from '../shared/lockSecret';
 import { t } from './i18n';
 
 export interface LockscreenSettings {
@@ -20,6 +21,8 @@ export interface LockscreenSettings {
   enabled: boolean;
   /** Mirror of main's PIN hash (empty = not set). */
   pinHash: string;
+  /** lock4: mirror of the secret's kind (which field to draw first). */
+  secretKind: LockSecretKind;
   /**
    * Soft accent for the lock panel. `auto` derives it from the live `--accent`
    * (written inline on <html> by osPersonalization) and the active theme's `--bg`,
@@ -56,6 +59,7 @@ export const AERO_ENTRY_LOCKED_EVENT = 'shell:aeroEntryLocked';
 const DEFAULTS: LockscreenSettings = {
   enabled: false,
   pinHash: '',
+  secretKind: 'pin4',
   tint: 'auto',
   study: 'count',
   answerToUnlock: false,
@@ -74,8 +78,9 @@ export function decodePin(hash: string): string | null {
   }
 }
 
+/** lock4: 4-12 digits or a passphrase (main checks again). */
 export function isValidPin(pin: string): boolean {
-  return /^\d{4}$/.test(pin);
+  return normalizeLockSecret(pin) !== null;
 }
 
 export function loadLockscreen(): LockscreenSettings {
@@ -86,6 +91,7 @@ export function loadLockscreen(): LockscreenSettings {
     return {
       enabled: !!p.enabled,
       pinHash: typeof p.pinHash === 'string' ? p.pinHash : '',
+      secretKind: normalizeLockSecretKind(p.secretKind),
       tint: LOCKSCREEN_TINTS.includes(p.tint as LockscreenTint)
         ? (p.tint as LockscreenTint)
         : DEFAULTS.tint,
@@ -139,7 +145,12 @@ export function saveLockscreen(
 function applyMainStatus(status: LockStatus | null | undefined): LockscreenSettings {
   if (!status) return loadLockscreen();
   const cur = loadLockscreen();
-  return writeLockscreen({ ...cur, enabled: status.enabled, pinHash: status.pinHash });
+  return writeLockscreen({
+    ...cur,
+    enabled: status.enabled,
+    pinHash: status.pinHash,
+    secretKind: normalizeLockSecretKind(status.secretKind),
+  });
 }
 
 /** Ask main for the lock's state and refresh the mirror. Null without a bridge. */
@@ -161,7 +172,7 @@ export async function refreshLockscreenMirror(): Promise<LockStatus | null> {
 export function syncLockscreenToMain(s: LockscreenSettings = loadLockscreen(), rendererLocked = false): void {
   try {
     const sync = typeof window !== 'undefined' ? window.api?.lockscreenSyncConfig : undefined;
-    void sync?.({ enabled: s.enabled, pinHash: s.pinHash }, rendererLocked).catch(() => undefined);
+    void sync?.({ enabled: s.enabled, pinHash: s.pinHash, secretKind: s.secretKind }, rendererLocked).catch(() => undefined);
   } catch {
     /* no bridge (tests, a harness) */
   }
@@ -401,6 +412,22 @@ export function onLockscreenChanged(cb: (s: LockscreenSettings) => void): () => 
   };
   window.addEventListener(EVENT, h);
   return () => window.removeEventListener(EVENT, h);
+}
+
+/** lock4: the secret's kind, from main (answers while locked); else the mirror's. */
+export async function readLockscreenSecretKind(): Promise<LockSecretKind> {
+  try {
+    const status = await window.api?.lockscreenStatus?.();
+    if (status && typeof status === 'object' && status.hasPin) {
+      const kind = normalizeLockSecretKind(status.secretKind);
+      // A stale mirror is corrected, so the next first frame is right too.
+      if (kind !== loadLockscreen().secretKind) applyMainStatus(status);
+      return kind;
+    }
+  } catch {
+    /* no bridge: the mirror decides */
+  }
+  return loadLockscreen().secretKind;
 }
 
 export function hasLockscreenPin(): boolean {

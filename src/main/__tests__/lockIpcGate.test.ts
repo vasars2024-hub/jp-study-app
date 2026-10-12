@@ -21,6 +21,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  HELD_DRAIN_CONCURRENCY,
+  HELD_SLOT_RELEASE_MS,
   installIpcLockGate,
   ipcChannelOpenWhileLocked,
   IPC_LOCKED_MESSAGE,
@@ -346,5 +348,122 @@ describe('behaviour', () => {
     expect(gate.refusedSinceUnlock()).toEqual(['library:list']);
     unlock();
     expect(gate.refusedSinceUnlock()).toEqual([]);
+  });
+});
+
+describe('lock4: the drain after an unlock', () => {
+  /** A handler that stays pending until the test settles it. */
+  function deferredHandler() {
+    const started: number[] = [];
+    const settle = new Map<number, (v: unknown) => void>();
+    const fn = (_e: unknown, n: unknown) => {
+      started.push(n as number);
+      return new Promise((resolve) => settle.set(n as number, resolve));
+    };
+    return { fn, started, settle };
+  }
+
+  it('runs held invokes in call order, at most HELD_DRAIN_CONCURRENCY at a time', async () => {
+    const { ipc, state, gate, unlock } = makeGate();
+    const h = deferredHandler();
+    ipc.handle('deck:load', h.fn);
+    state.locked = true;
+    const calls = Array.from({ length: 10 }, (_, i) => ipc.handlers.get('deck:load')!(sender(), i) as Promise<unknown>);
+    unlock();
+    expect(h.started).toEqual([0, 1, 2, 3].slice(0, HELD_DRAIN_CONCURRENCY));
+    expect(gate.heldInvokes()).toBe(10 - HELD_DRAIN_CONCURRENCY);
+    // One settles: exactly one more starts, the next in line.
+    h.settle.get(1)!('one');
+    await tick();
+    expect(h.started).toEqual([0, 1, 2, 3, 4]);
+    // Settle everything as it starts; every caller gets its own answer, in order.
+    for (let round = 0; round < 10; round += 1) {
+      for (const n of [...h.started]) h.settle.get(n)?.(`r${n}`);
+      await tick();
+    }
+    expect(h.started).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    await expect(Promise.all(calls)).resolves.toEqual(['r0', 'one', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'r9']);
+    expect(gate.heldInvokes()).toBe(0);
+  });
+
+  it('a send is delivered in its place in line, and a superseded duplicate is dropped', async () => {
+    const { ipc, state, unlock } = makeGate();
+    const order: string[] = [];
+    const h = deferredHandler();
+    ipc.handle('deck:load', (e, n) => {
+      order.push(`invoke${n as number}`);
+      return h.fn(e, n);
+    });
+    ipc.on('player:publish', (_e: unknown, snap: unknown) => void order.push(`send:${String(snap)}`));
+    state.locked = true;
+    const calls: Promise<unknown>[] = [];
+    for (let i = 0; i < HELD_DRAIN_CONCURRENCY; i += 1) calls.push(ipc.handlers.get('deck:load')!(sender(), i) as Promise<unknown>);
+    ipc.emit('player:publish', sender(1), 'old');
+    calls.push(ipc.handlers.get('deck:load')!(sender(), 99) as Promise<unknown>);
+    ipc.emit('player:publish', sender(1), 'new'); // supersedes 'old': only this one is delivered
+    unlock();
+    // The slots are full, so nothing behind invoke 3 has run yet.
+    expect(order).toEqual(['invoke0', 'invoke1', 'invoke2', 'invoke3']);
+    h.settle.get(0)!(0);
+    await tick();
+    expect(order).toEqual(['invoke0', 'invoke1', 'invoke2', 'invoke3', 'invoke99', 'send:new']);
+    for (const n of [1, 2, 3, 99]) h.settle.get(n)!(n);
+    await Promise.all(calls);
+  });
+
+  it('a call made after the unlock waits behind the held ones instead of overtaking them', async () => {
+    const { ipc, state, unlock } = makeGate();
+    const h = deferredHandler();
+    ipc.handle('deck:load', h.fn);
+    state.locked = true;
+    for (let i = 0; i < HELD_DRAIN_CONCURRENCY + 2; i += 1) void ipc.handlers.get('deck:load')!(sender(), i);
+    unlock();
+    const late = ipc.handlers.get('deck:load')!(sender(), 50);
+    expect(late).toBeInstanceOf(Promise);
+    expect(h.started).not.toContain(50);
+    for (let round = 0; round < 6; round += 1) {
+      for (const n of [...h.started]) h.settle.get(n)?.(n);
+      await tick();
+    }
+    expect(h.started.at(-1)).toBe(50);
+    await expect(late).resolves.toBe(50);
+    // Line empty again: straight through, synchronously.
+    expect(ipc.handlers.get('deck:load')!(sender(), 7)).toBeInstanceOf(Promise);
+    expect(h.started.at(-1)).toBe(7);
+  });
+
+  it('a handler that never settles gives its slot up, so the line keeps moving', async () => {
+    vi.useFakeTimers();
+    try {
+      const { ipc, state, unlock } = makeGate();
+      const h = deferredHandler();
+      ipc.handle('deck:load', h.fn);
+      state.locked = true;
+      for (let i = 0; i < HELD_DRAIN_CONCURRENCY + 1; i += 1) void ipc.handlers.get('deck:load')!(sender(), i);
+      unlock();
+      expect(h.started).toHaveLength(HELD_DRAIN_CONCURRENCY);
+      await vi.advanceTimersByTimeAsync(HELD_SLOT_RELEASE_MS + 10);
+      expect(h.started).toHaveLength(HELD_DRAIN_CONCURRENCY + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a re-lock in the middle of the drain stops it; the rest waits for the next unlock', async () => {
+    const { ipc, state, gate, unlock } = makeGate();
+    const h = deferredHandler();
+    ipc.handle('deck:load', h.fn);
+    state.locked = true;
+    for (let i = 0; i < HELD_DRAIN_CONCURRENCY + 3; i += 1) void ipc.handlers.get('deck:load')!(sender(), i);
+    unlock();
+    expect(h.started).toHaveLength(HELD_DRAIN_CONCURRENCY);
+    state.locked = true;
+    h.settle.get(0)!(0);
+    await tick();
+    expect(h.started).toHaveLength(HELD_DRAIN_CONCURRENCY); // locked again: nothing new starts
+    expect(gate.heldInvokes()).toBe(3);
+    expect(state.deferred.size).toBe(1);
+    unlock();
+    expect(h.started).toHaveLength(HELD_DRAIN_CONCURRENCY + 1);
   });
 });

@@ -40,6 +40,8 @@ export type NotificationClientAction =
   | 'open-calendar'
   | 'open-shortcuts'
   | 'restart-to-update'
+  /** upd3: open Settings -> Help -> Updates, where "What's new" is (renderer/releaseCheck.ts). */
+  | 'whats-new'
   /** risk4: start the CC-CEDICT download (renderer/cedictMissingPrompt.ts). */
   | 'download-cedict';
 

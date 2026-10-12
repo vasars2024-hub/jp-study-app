@@ -6,9 +6,9 @@
 // enforces that and will fail if anything under src/main or src/renderer
 // reaches for this module.
 //
-// The lazy packs (`../aiPack`, `../pass6Pack`) are merged in here the way the loader merges
-// them at runtime (in place, an eager key wins), so the key checks see every
-// string the app can show. Only tooling and tests load this module, and the
+// The lazy packs (`../aiPack`, `../pass6Pack`, `../updateUi3`) are merged in here the
+// way the loader merges them at runtime (in place, an eager key wins), so the key
+// checks see every string the app can show. Only tooling and tests load this module, and the
 // vitest setup (`../testing/mergeLazyPacks.ts`) has already done the same merge.
 //
 // Legitimate consumers:
@@ -24,6 +24,10 @@ import { PASS6_PACK_EN } from '../pass6Pack/en';
 import { PASS6_PACK_JA } from '../pass6Pack/ja';
 import { PASS6_PACK_RU } from '../pass6Pack/ru';
 import { PASS6_PACK_ZH } from '../pass6Pack/zh';
+import { UPDATE3_UI_EN } from '../updateUi3/en';
+import { UPDATE3_UI_JA } from '../updateUi3/ja';
+import { UPDATE3_UI_RU } from '../updateUi3/ru';
+import { UPDATE3_UI_ZH } from '../updateUi3/zh';
 import { en } from './en';
 import { ja } from './ja';
 import { ru } from './ru';
@@ -43,6 +47,10 @@ mergePack(en, PASS6_PACK_EN);
 mergePack(ja, PASS6_PACK_JA);
 mergePack(zh, PASS6_PACK_ZH);
 mergePack(ru, PASS6_PACK_RU);
+mergePack(en, UPDATE3_UI_EN);
+mergePack(ja, UPDATE3_UI_JA);
+mergePack(zh, UPDATE3_UI_ZH);
+mergePack(ru, UPDATE3_UI_RU);
 
 export const CATALOGS: Record<UiLang, Catalog> = { en, ja, zh, ru };
 

@@ -9,6 +9,15 @@
  * `out/make/squirrel.windows/x64/`: `RELEASES`, the `-full.nupkg`, and the Setup
  * exe for new users (README "Publishing a release"). No update server.
  *
+ * With a `downloader` (main/updateDownloader.ts, wired in main/release.ts) Gum
+ * fetches RELEASES and the package itself — byte progress, Cancel, a Range resume,
+ * SHA1 + size checked against RELEASES — into a staging folder beside Squirrel's
+ * packages, then points `autoUpdater` at that folder: Update.exe reads a local
+ * directory as a release source, copies the verified package and applies it.
+ * Electron's Windows `autoUpdater` exposes neither progress nor cancel, so this is
+ * the only way to show either. A RELEASES the downloader does not handle (absolute
+ * URLs) falls back to Squirrel downloading by itself, as before.
+ *
  * Only an installed copy updates itself. The zip build has no Update.exe beside it,
  * so it keeps the existing behaviour — `release.ts` checks GitHub and the renderer
  * posts a notice linking the release page — and this module stays idle.
@@ -21,17 +30,22 @@ import {
   sanitizeAppUpdatePrefs,
   type AppUpdateChannel,
   type AppUpdateDetails,
+  type AppUpdateDownload,
   type AppUpdateErrorCode,
+  type AppUpdateHistoryEntry,
+  type AppUpdatePaused,
   type AppUpdatePrefs,
   type AppUpdateRestartResult,
   type AppUpdateStateKind,
   type AppUpdateStatus,
   type AppUpdateUnsavedKind,
+  type AppUpdateWhatsNew,
   type InstallKind,
 } from '../shared/appUpdate';
-import { compareVersions, GITHUB_OWNER, GITHUB_REPO } from '../shared/release';
+import { compareVersions, GITHUB_OWNER, GITHUB_REPO, type FeedRelease } from '../shared/release';
 import { squirrelFeedForRelease, type FeedFetch } from './releaseFeed';
 import { updateExePath } from './squirrelEvents';
+import type { UpdateDownloadErrorCode, UpdateDownloadJob, UpdateDownloadProgress } from './updateDownloader';
 
 export const SQUIRREL_FEED_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download`;
 
@@ -115,7 +129,37 @@ export interface AppUpdateControllerDeps {
   resolveRelease?: (channel: AppUpdateChannel) => Promise<FeedFetch>;
   /** What a restart would cut short (a recording); a restart asks first when it is not empty. */
   unsavedWork?: () => AppUpdateUnsavedKind[];
+  /**
+   * Gum's own download (main/updateDownloader.ts): byte progress, cancel, resume,
+   * SHA1 check, then the staging folder is handed to Squirrel as a local feed.
+   * Without it (or for a RELEASES it cannot handle) Squirrel downloads by itself.
+   */
+  downloader?: UpdateDownloaderLike;
+  /** Versions this copy has run and a pending "What's new" (main/updateHistory.ts). */
+  history?: () => { history: AppUpdateHistoryEntry[]; whatsNew: AppUpdateWhatsNew | null };
 }
+
+export interface UpdateDownloaderLike {
+  start(request: {
+    release: FeedRelease;
+    channel: AppUpdateChannel;
+    /** Ignore delta packages (Squirrel failed to apply them). */
+    fullOnly: boolean;
+    onProgress: (progress: UpdateDownloadProgress) => void;
+  }): UpdateDownloadJob;
+  /** Remove the staging folder (Squirrel has copied the packages, or they are stale). */
+  clear(): void;
+}
+
+/** Progress reaches the panel at most this often (phase changes go at once). */
+export const PROGRESS_PUSH_MS = 250;
+
+const DOWNLOAD_ERROR_CODES: Record<Exclude<UpdateDownloadErrorCode, 'canceled' | 'unsupported'>, AppUpdateErrorCode> = {
+  network: 'network',
+  checksum: 'checksum',
+  'no-feed': 'no-feed',
+  disk: 'disk',
+};
 
 export interface AppUpdateController {
   status(): AppUpdateStatus;
@@ -135,6 +179,14 @@ export interface AppUpdateController {
   prefs(): AppUpdatePrefs;
   /** Change channel / skipped version. A channel change forgets the last check's answer. */
   setPrefs(patch: Partial<AppUpdatePrefs>): AppUpdateDetails;
+  /**
+   * Stop Gum's own download; what has arrived stays on disk and "Check now"
+   * resumes it. `false` when there is nothing cancellable (Squirrel's own
+   * download, verifying, or already handed to Update.exe).
+   */
+  cancelDownload(): boolean;
+  /** Re-send the details (the history or "What's new" changed). */
+  refresh(): AppUpdateDetails;
 }
 
 export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpdateController {
@@ -165,19 +217,46 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
   /** Bumped by a channel change, so a feed answer for the old channel is dropped. */
   let checkEpoch = 0;
 
+  // Gum's own download (deps.downloader).
+  let download: AppUpdateDownload | undefined;
+  let activeJob: UpdateDownloadJob | null = null;
+  let activeRelease: FeedRelease | null = null;
+  /** Why the running job is being cancelled: the user (keep it for Resume) or a channel change. */
+  let cancelReason: 'user' | 'channel' | null = null;
+  let paused: AppUpdatePaused | undefined;
+  let partialBytes: number | undefined;
+  /** Set while Update.exe applies a staged download: its events mean that, not a new check. */
+  let handoff: { version: string; deltas: boolean; fullOnly: boolean } | null = null;
+  let lastProgressPush = 0;
+
+  const historyNow = () => {
+    try {
+      return deps.history?.() ?? null;
+    } catch {
+      return null;
+    }
+  };
+
   const status = (): AppUpdateStatus => ({ install: deps.install, state, ...(version ? { version } : {}) });
-  const details = (): AppUpdateDetails => ({
-    ...status(),
-    current: deps.currentVersion ?? '',
-    channel: prefs.channel,
-    feedUrl: activeFeed,
-    lastCheckedAt,
-    skippedVersion: prefs.skippedVersion,
-    ...(latestVersion ? { latestVersion } : {}),
-    ...(state === 'downloading' && downloadStartedAt ? { downloadStartedAt } : {}),
-    ...(state === 'error' ? { error: error ?? 'unknown' } : {}),
-    ...(skippedMetered ? { skippedMetered: true } : {}),
-  });
+  const details = (): AppUpdateDetails => {
+    const h = historyNow();
+    return {
+      ...status(),
+      current: deps.currentVersion ?? '',
+      channel: prefs.channel,
+      feedUrl: activeFeed,
+      lastCheckedAt,
+      skippedVersion: prefs.skippedVersion,
+      ...(latestVersion ? { latestVersion } : {}),
+      ...(state === 'downloading' && downloadStartedAt ? { downloadStartedAt } : {}),
+      ...(state === 'downloading' && download ? { download: { ...download } } : {}),
+      ...(state === 'error' ? { error: error ?? 'unknown' } : {}),
+      ...(state === 'error' && partialBytes ? { partialBytes } : {}),
+      ...(state === 'idle' && paused ? { paused: { ...paused } } : {}),
+      ...(skippedMetered ? { skippedMetered: true } : {}),
+      ...(h ? { history: h.history, whatsNew: h.whatsNew } : {}),
+    };
+  };
   const pushDetails = () => {
     try {
       deps.broadcastDetails?.(details());
@@ -186,16 +265,108 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
     }
   };
   const set = (next: AppUpdateStateKind, nextVersion?: string) => {
+    if (next === 'downloading' && state !== 'downloading') downloadStartedAt = now();
     state = next;
     if (nextVersion !== undefined) version = nextVersion;
     if (next !== 'error') error = undefined;
-    if (next === 'downloading') downloadStartedAt = now();
+    if (next !== 'downloading') download = undefined;
+    lastProgressPush = now();
     deps.broadcast(status());
     pushDetails();
   };
   const fail = (message: string) => {
     error = classifyUpdateError(message);
     set('error');
+  };
+
+  const onProgress = (job: UpdateDownloadJob | null, p: UpdateDownloadProgress) => {
+    if (!job || job !== activeJob || !download || state !== 'downloading') return;
+    const phaseChanged = p.phase !== download.phase;
+    download = { ...download, phase: p.phase, received: p.received, total: p.total };
+    const at = now();
+    if (phaseChanged || at - lastProgressPush >= PROGRESS_PUSH_MS || (p.total !== null && p.received >= p.total)) {
+      lastProgressPush = at;
+      pushDetails();
+    }
+  };
+
+  /** Squirrel downloads by itself (no downloader, or a RELEASES it cannot handle). */
+  const squirrelDownloads = (release: FeedRelease | null) => {
+    const feed = squirrelFeedForRelease(stableFeed, prefs.channel, release);
+    if (feed !== activeFeed) {
+      try {
+        deps.updater.setFeedURL({ url: feed });
+        activeFeed = feed;
+      } catch (err) {
+        fail(err instanceof Error ? err.message : String(err));
+        return;
+      }
+    }
+    askSquirrel();
+  };
+
+  const startOwnDownload = (release: FeedRelease, fullOnly: boolean) => {
+    const downloader = deps.downloader!;
+    paused = undefined;
+    partialBytes = undefined;
+    cancelReason = null;
+    handoff = null;
+    activeRelease = release;
+    download = { phase: 'manifest', version: release.version, received: 0, total: null };
+    set('downloading');
+    // `set` clears `download` for other states only; it is still ours here.
+    let job: UpdateDownloadJob | null = null;
+    try {
+      job = downloader.start({ release, channel: prefs.channel, fullOnly, onProgress: (p) => onProgress(job, p) });
+    } catch (err) {
+      fail(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    activeJob = job;
+    const started = job;
+    void started.done.then((r) => {
+      if (started !== activeJob) return;
+      activeJob = null;
+      const reason = cancelReason;
+      cancelReason = null;
+      if (r.ok) {
+        handoff = { version: release.version, deltas: r.deltas, fullOnly };
+        download = { phase: 'installing', version: release.version, received: r.bytes, total: r.bytes, ...(r.deltas ? { deltas: true } : {}) };
+        lastProgressPush = now();
+        pushDetails();
+        try {
+          // Update.exe reads a local directory as a release source: it copies the
+          // verified packages into packages\ and applies them.
+          deps.updater.setFeedURL({ url: r.stagingDir });
+          activeFeed = r.stagingDir;
+          deps.updater.checkForUpdates();
+        } catch (err) {
+          handoff = null;
+          fail(err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
+      if (r.code === 'canceled') {
+        if (reason === 'user') {
+          paused = { version: release.version, received: r.received, total: r.total };
+          deps.log?.(`[update] download of ${release.version} paused at ${r.received} bytes`);
+        }
+        set('idle');
+        return;
+      }
+      // Not a byte arrived: Update.exe's own client (WinINet, the system proxy and its
+      // credentials) may still get through where Gum's could not, so it gets one try.
+      if (r.code === 'unsupported' || (r.code === 'network' && r.received === 0)) {
+        deps.log?.(`[update] ${r.message}; leaving the download to Squirrel`);
+        download = undefined;
+        squirrelDownloads(release);
+        return;
+      }
+      deps.log?.(`[update] download failed: ${r.message}`);
+      partialBytes = r.received > 0 && r.code === 'network' ? r.received : undefined;
+      error = DOWNLOAD_ERROR_CODES[r.code];
+      set('error');
+    });
   };
 
   const check = () => {
@@ -249,17 +420,11 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
           set('idle');
           return;
         }
-        const feed = squirrelFeedForRelease(stableFeed, prefs.channel, answer.release);
-        if (feed !== activeFeed) {
-          try {
-            deps.updater.setFeedURL({ url: feed });
-            activeFeed = feed;
-          } catch (err) {
-            fail(err instanceof Error ? err.message : String(err));
-            return;
-          }
+        if (deps.downloader) {
+          startOwnDownload(answer.release, false);
+          return;
         }
-        askSquirrel();
+        squirrelDownloads(answer.release);
       },
       (err: unknown) => {
         if (epoch !== checkEpoch) return;
@@ -282,6 +447,8 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
 
   /** Timer-driven: asks the metered guard first when there is one. */
   const autoCheck = () => {
+    // The user cancelled a download: only they resume it ("Check now").
+    if (paused) return;
     if (!deps.isMetered) {
       check();
       return;
@@ -307,6 +474,8 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
     check,
     checkNow() {
       skippedMetered = false;
+      // "Resume": the download continues from the bytes already on disk.
+      paused = undefined;
       check();
       return details();
     },
@@ -314,13 +483,38 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
       if (deps.install !== 'installed' || started) return;
       started = true;
       const u = deps.updater;
-      u.on('checking-for-update', () => set('checking'));
-      u.on('update-available', () => set('downloading'));
-      u.on('update-not-available', () => set('idle'));
+      // While a staged download is being applied, Update.exe's "checking" and
+      // "available" are steps of that, not a new check: the panel stays on "installing".
+      u.on('checking-for-update', () => {
+        if (!handoff) set('checking');
+      });
+      u.on('update-available', () => {
+        if (!handoff) set('downloading');
+      });
+      u.on('update-not-available', () => {
+        if (handoff) {
+          deps.log?.(`[update] Update.exe found nothing to apply in the staged ${handoff.version}`);
+          handoff = null;
+          deps.downloader?.clear();
+          error = 'no-feed';
+          set('error');
+          return;
+        }
+        set('idle');
+      });
       u.on('before-quit-for-update', () => deps.markQuitting?.());
       u.on('update-downloaded', (...args: unknown[]) => {
         // (event, releaseNotes, releaseName, …) — on Windows only releaseName is set.
         const name = typeof args[2] === 'string' && args[2].trim() ? args[2].trim() : undefined;
+        const staged = handoff;
+        handoff = null;
+        if (staged) {
+          // Squirrel has copied the packages into packages\; the staging copy is spare.
+          deps.downloader?.clear();
+          // The release's own version (`1.2.0-beta.1`), not Squirrel's SemVer 1 spelling of it.
+          set('downloaded', staged.version || name);
+          return;
+        }
         set('downloaded', name);
       });
       u.on('error', (err: unknown) => {
@@ -328,6 +522,15 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
         // The panel shows it translated (`upd2.error.<code>`); no toast.
         const message = err instanceof Error ? err.message : String(err);
         deps.log?.(`[update] ${message}`);
+        const staged = handoff;
+        handoff = null;
+        if (staged && staged.deltas && !staged.fullOnly && activeRelease && state === 'downloading') {
+          // Update.exe falls back to the full package when deltas fail to apply;
+          // the staging folder has only the deltas, so fetch the full one and hand over again.
+          deps.log?.('[update] the delta packages did not apply; downloading the full package');
+          startOwnDownload(activeRelease, true);
+          return;
+        }
         if (state !== 'downloaded') fail(message);
       });
       try {
@@ -379,8 +582,25 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
         // The last answer was another channel's; a feed answer still on its way is too.
         checkEpoch += 1;
         latestVersion = undefined;
+        paused = undefined;
+        if (activeJob && download?.phase !== 'installing') {
+          // Its download too: the other channel's release is a different package.
+          cancelReason = 'channel';
+          activeJob.cancel();
+        }
         if (state === 'checking' && deps.resolveRelease) set('idle');
       }
+      pushDetails();
+      return details();
+    },
+    cancelDownload() {
+      if (!activeJob || state !== 'downloading' || !download) return false;
+      if (download.phase !== 'manifest' && download.phase !== 'package') return false;
+      cancelReason = 'user';
+      activeJob.cancel();
+      return true;
+    },
+    refresh() {
       pushDetails();
       return details();
     },

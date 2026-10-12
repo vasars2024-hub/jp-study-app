@@ -22757,6 +22757,75 @@ html.lockscreen-widget-root #root {
   text-transform: uppercase;
   color: var(--lock-win11-muted);
 }
+/* lock4: a passphrase replaces the dots and the pad on the Study OS and widget skins. */
+.lockscreen-pass-form {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: min(100%, 300px);
+  margin-bottom: 22px;
+}
+.lockscreen-pass-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--lock-win11-text, #fff);
+  font: inherit;
+  font-size: 1rem;
+}
+.lockscreen-pass-input::placeholder {
+  color: var(--lock-win11-muted, rgba(255, 255, 255, 0.7));
+}
+.lockscreen-pass-input:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.lockscreen-pass-input[aria-invalid='true'] {
+  border-color: #ff8a9e;
+}
+.lockscreen-pass-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--lock-win11-text, #fff);
+  cursor: pointer;
+}
+.lockscreen-pass-go:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.24);
+}
+.lockscreen-pass-go:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.lockscreen-pass-go:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.lockscreen-pass-form.is-compact {
+  width: 100%;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.lockscreen-pass-form.is-compact .lockscreen-pass-input {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #fff;
+}
+.lockscreen-pass-form.is-compact .lockscreen-pass-go {
+  width: 28px;
+  min-height: 28px;
+}
 .reduce-motion .lockscreen.lockscreen-win11.is-unlocking,
 .reduce-motion .lockscreen.is-shake.lockscreen-win11 .lockscreen-win11-dots {
   animation: none;

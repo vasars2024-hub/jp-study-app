@@ -116,6 +116,8 @@ const fakes = vi.hoisted(() => {
     createFromPath: () => fakeImage(640, 360),
   };
   const screen = { getAllDisplays: () => [{ id: 2528732444 }] };
+  // lock4: an emitter with the real idle reading the harness may override.
+  const powerMonitor = Object.assign(new FakeEmitter(), { getSystemIdleTime: () => 3 });
   const ipcHandlers = new Map<string, (...a: unknown[]) => unknown>();
   const ipcMain = {
     handle: (ch: string, fn: (...a: unknown[]) => unknown) => ipcHandlers.set(ch, fn),
@@ -123,7 +125,7 @@ const fakes = vi.hoisted(() => {
   };
   return {
     app, shell, dialog, globalShortcut, Notification, Menu, BrowserWindow, FakeEmitter, autoUpdater,
-    clipboard, desktopCapturer, nativeImage, screen, ipcMain, ipcHandlers,
+    clipboard, desktopCapturer, nativeImage, screen, ipcMain, ipcHandlers, powerMonitor,
   };
 });
 
@@ -140,6 +142,7 @@ vi.mock('electron', () => ({
   desktopCapturer: fakes.desktopCapturer,
   nativeImage: fakes.nativeImage,
   screen: fakes.screen,
+  powerMonitor: fakes.powerMonitor,
   ipcMain: fakes.ipcMain,
   session: { defaultSession: null },
 }));
@@ -404,6 +407,41 @@ function fakeSession() {
     new Promise((resolve) => state.beforeRequest!({ url }, resolve));
   return { ses, state, route };
 }
+
+describe('lock4: the power monitor, driven by the harness', () => {
+  it('is refused outside headless mode', async () => {
+    const mod = await freshModule();
+    mod.initE2eHeadless({ env: {}, argv: [], isPackaged: false });
+    const heard = vi.fn();
+    fakes.powerMonitor.on('suspend', heard);
+    expect(mod.e2ePower({ event: 'suspend' }).ok).toBe(false);
+    expect(heard).not.toHaveBeenCalled();
+  });
+
+  it('emits suspend / lock-screen on the real powerMonitor and overrides the idle time', async () => {
+    const mod = await freshModule();
+    mod.initE2eHeadless({ env: { GUM_E2E_HEADLESS: '1' }, argv: [], isPackaged: false });
+    const sleep = vi.fn();
+    const winL = vi.fn();
+    fakes.powerMonitor.on('suspend', sleep);
+    fakes.powerMonitor.on('lock-screen', winL);
+    expect(mod.e2ePower({ event: 'suspend' }).ok).toBe(true);
+    expect(mod.e2ePower({ event: 'lock-screen' }).ok).toBe(true);
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(winL).toHaveBeenCalledTimes(1);
+    // Only the two events auto-lock arms on; nothing that would wake other listeners.
+    expect(mod.e2ePower({ event: 'resume' })).toMatchObject({ ok: false });
+    expect(fakes.powerMonitor.getSystemIdleTime()).toBe(3);
+    expect(mod.e2ePower({ idleSeconds: 3_600 }).ok).toBe(true);
+    expect(fakes.powerMonitor.getSystemIdleTime()).toBe(3_600);
+    expect(mod.e2ePower({ idleSeconds: -1 })).toMatchObject({ ok: false });
+    expect(mod.e2ePower({ idleSeconds: null }).ok).toBe(true);
+    expect(fakes.powerMonitor.getSystemIdleTime()).toBe(3); // back to the real value
+    const status = mod.e2eHeadlessStatus() as { power: { fired: Array<{ event: string }> }; calls: Array<{ api: string }> };
+    expect(status.power.fired.map((f) => f.event)).toEqual(['suspend', 'lock-screen']);
+    expect(status.calls.map((c) => c.api)).toContain('powerMonitor.emit');
+  });
+});
 
 describe('isolation: the owner\'s services, clipboard, screen and files', () => {
   afterAll(async () => {

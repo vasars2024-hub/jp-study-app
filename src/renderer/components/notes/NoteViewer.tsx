@@ -20,6 +20,7 @@ import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
 import NoteBody from './NoteBody';
 import { getStudyLang } from '../../studyEnvironment';
+import { useUnsavedWork } from '../../unsavedWork';
 
 // Writing help (docs/AI_AUDIT.md N19): loaded only when a note is being edited.
 const WritingCorrection = lazy(() => import('../speak/WritingCorrection'));
@@ -37,6 +38,8 @@ export function NoteViewer({
   const [title, setTitle] = useState(entry.title);
   const [body, setBody] = useState(entry.detail ?? '');
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
+  // "Restart to update" lists an edit that Save has not written yet.
+  useUnsavedWork('note-editor', editing && (title !== current.title || body !== (current.detail ?? '')));
 
   const save = (): void => {
     const next = updateNotebookEntry(current.id, { title: title.trim() || current.title, detail: body });

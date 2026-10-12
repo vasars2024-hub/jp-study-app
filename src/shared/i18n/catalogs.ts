@@ -137,13 +137,17 @@ export function resetCatalogsForTest(): void {
 // "no such key" (show the key, which is a bug). `i18nLazyPacks.test.ts` keeps
 // every pack key under its prefixes or in the eager catalog.
 
-export type I18nPackId = 'ai' | 'pass6';
+export type I18nPackId = 'ai' | 'pass6' | 'upd3';
 
 /** Key prefixes owned by each pack. A key under one is never in an eager catalog by accident. */
 export const I18N_PACK_PREFIXES: Readonly<Record<I18nPackId, readonly string[]>> = {
   ai: ['aiStudy.', 'aiImmerse.', 'aiTutor.', 'aiAgent.', 'aiProv.', 'aiError.', 'aiFix.', 'aiSpeak.'],
   // Soundscape/widget/shortcut strings; main.tsx loads them before first paint.
   pass6: ['snd6.', 'wid6.', 'kbd6.'],
+  // The Updates panel's download / history / "What's new" strings (../updateUi3).
+  // main.tsx loads them before first paint. Blanc has no Updates panel and loads them
+  // only to post the "What's new" notice (releaseCheck.ts), never at boot.
+  upd3: ['upd3.'],
 };
 
 const PACK_IDS = Object.keys(I18N_PACK_PREFIXES) as I18nPackId[];
@@ -172,6 +176,17 @@ function importPack(pack: I18nPackId, lang: UiLang): Promise<Catalog> {
           return import('./pass6Pack/ru').then((m) => m.PASS6_PACK_RU);
         default:
           return import('./pass6Pack/en').then((m) => m.PASS6_PACK_EN);
+      }
+    case 'upd3':
+      switch (lang) {
+        case 'ja':
+          return import('./updateUi3/ja').then((m) => m.UPDATE3_UI_JA);
+        case 'zh':
+          return import('./updateUi3/zh').then((m) => m.UPDATE3_UI_ZH);
+        case 'ru':
+          return import('./updateUi3/ru').then((m) => m.UPDATE3_UI_RU);
+        default:
+          return import('./updateUi3/en').then((m) => m.UPDATE3_UI_EN);
       }
   }
 }

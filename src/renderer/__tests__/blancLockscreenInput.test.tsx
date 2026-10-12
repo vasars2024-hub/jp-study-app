@@ -20,6 +20,9 @@ vi.mock('../lockscreenSettings', () => ({
   loadLockscreen: () => ({ enabled: true, pinHash: 'scrypt1:a:b', tint: 'auto', study: 'off', answerToUnlock: false }),
   markLockscreenUnlocked: () => undefined,
   recoverLockscreen: async () => ({ ok: false, settings: {} }),
+  // lock4: a mirror without a kind is the classic 4-digit PIN; main is asked on mount.
+  readLockscreenSecretKind: async () => 'pin4',
+  isValidPin: (pin: string) => pin.length >= 4,
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

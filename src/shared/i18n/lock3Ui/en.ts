@@ -84,4 +84,20 @@ export const LOCK3_UI_EN: Catalog = {
   'lock3.settings.study.answer': 'Answer a card before the PIN',
   'lock3.settings.study.answerNote':
     'A multiple-choice card from your deck comes first. With a PIN, the PIN is still required afterwards. Without a PIN, this is a study habit at launch, not a lock.',
+  // lock4 (eager: the lock draws before a lazy pack could load).
+  'lock4.pad.enter': 'Enter',
+  'lock4.pad.enterLabel': 'Unlock with this PIN',
+  'lock4.prompt.pin': 'Enter your PIN, then press Enter',
+  'lock4.prompt.passphrase': 'Enter your passphrase',
+  'lock4.passphrase.label': 'Passphrase',
+  'lock4.tooShort': 'Too short: a PIN has at least 4 digits, a passphrase at least 6 characters.',
+  'lock4.settings.kind.label': 'Type of passcode',
+  'lock4.settings.kind.pin': 'PIN (4 to 12 digits)',
+  'lock4.settings.kind.passphrase': 'Passphrase',
+  'lock4.settings.kind.hintPin': 'A 4-digit PIN unlocks as soon as the fourth digit is typed. A longer PIN is harder to guess; press Enter after it.',
+  'lock4.settings.kind.hintPassphrase': '6 to 64 characters, at least one of them not a digit. Spaces inside it count; spaces at either end are ignored.',
+  'lock4.settings.needPin': 'Enter a PIN of 4 to 12 digits.',
+  'lock4.settings.needPassphrase': 'A passphrase needs 6 to 64 characters, at least one of them not a digit.',
+  'lock4.blanc.hint': 'A PIN of 4 to 12 digits, or a passphrase of 6 or more characters.',
+  'lock4.blanc.unlock': 'Unlock',
 };

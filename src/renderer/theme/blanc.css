@@ -1743,6 +1743,18 @@ html.blanc-shell body {
   background: #f4f7fa;
 }
 
+/* lock4 */
+.blanc-lock input.is-passphrase {
+  letter-spacing: normal;
+  font-size: 16px;
+}
+
+.blanc-lock-submit {
+  min-height: 32px;
+  margin-top: 14px;
+  padding: 4px 18px;
+}
+
 .mono-blocks {
   align-items: center;
   min-height: 100%;

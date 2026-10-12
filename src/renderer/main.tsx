@@ -444,10 +444,13 @@ if (container) {
     // Pass-6 strings (Soundscape, widgets, shortcuts) are a lazy pack so Blanc
     // never parses them; the desk shows them at once, so they are in before paint.
     const pass6Strings = ensureUiPack('pass6');
+    // Same for the Updates strings (upd3): an update notice, the download progress
+    // and the restart warning never wait on a chunk here, and Blanc's boot never parses them.
+    const upd3Strings = ensureUiPack('upd3');
     // The ordered theme-sheet slot (see bootThemeSheets above) is in before any
     // window paints its first React frame.
     await themeSheetsReady;
-    await pass6Strings;
+    await Promise.all([pass6Strings, upd3Strings]);
     // Every window — the Reading Lens and the dictionary overlay too — hides its
     // AI entry points from the first paint when "Use AI features" is off.
     startAiSetupSync();

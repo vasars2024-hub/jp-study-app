@@ -892,6 +892,8 @@ export const en: Catalog = {
   ...MEDIA5_EN,
   ...PLANNER_UI_EN,
   ...SNIP_UI_EN,
+  // The Updates panel's upd3 strings are a lazy pack too (../updateUi3); Study OS
+  // loads it before first paint, Blanc never shows them.
 
   // Settings navigation
   'settings.appTitle': 'Settings',
@@ -1971,7 +1973,7 @@ export const en: Catalog = {
   'settings.lock.msg.mismatch': 'Passcodes do not match.',
   'settings.lock.msg.saveFail': 'Could not save passcode.',
   'settings.lock.msg.saved': 'Passcode saved.',
-  'settings.lock.msg.needBeforeEnable': 'Set a 4-digit passcode before enabling.',
+  'settings.lock.msg.needBeforeEnable': 'Set a passcode before enabling.',
   'settings.lock.msg.enabled': 'Lockscreen enabled — required on next launch.',
   'settings.lock.msg.disabled': 'Lockscreen disabled.',
   'settings.lock.msg.cleared': 'Passcode cleared. Lockscreen turned off.',
@@ -3770,7 +3772,7 @@ export const en: Catalog = {
   'search.lockscreen': 'Lockscreen',
   'search.lockscreen.desc': 'Require a passcode when Gum launches',
   'search.lockscreenPin': 'Lockscreen passcode',
-  'search.lockscreenPin.desc': 'Set or change the 4-digit PIN',
+  'search.lockscreenPin.desc': 'Set or change the PIN or passphrase',
   'search.lockscreenTint': 'Lockscreen look',
   'search.lockscreenTint.desc': 'Tint behind the PIN panel',
   'search.profile': 'Study profile',
@@ -10034,7 +10036,7 @@ export const en: Catalog = {
   'blanc.settings.resetMemory': 'Reset Blanc memory',
   'blanc.settings.lockscreen': 'Lockscreen',
   'blanc.settings.changePin': 'Change PIN',
-  'blanc.settings.newPin': '4 digit PIN',
+  'blanc.settings.newPin': 'New PIN or passphrase',
   'blanc.settings.savePin': 'Save PIN',
   'blanc.settings.clearPin': 'Clear PIN',
   'blanc.settings.pinCleared': 'PIN cleared.',
@@ -10105,7 +10107,7 @@ export const en: Catalog = {
   'blanc.settings.resetCategoryDone': 'Reset {category} settings.',
   'blanc.settings.pinFourDigits': 'PIN must be exactly four digits.',
   'blanc.settings.pinSaved': 'PIN saved.',
-  'blanc.settings.pinFirst': 'Set a 4 digit PIN first.',
+  'blanc.settings.pinFirst': 'Set a PIN or passphrase first.',
   'blanc.settings.lockEnabled': 'Lockscreen enabled.',
   'blanc.settings.lockDisabled': 'Lockscreen disabled.',
 

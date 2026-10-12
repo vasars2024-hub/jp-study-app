@@ -26,9 +26,25 @@
  *    does not shorten a wait, and moving it back is clamped to the ceiling.
  *  - Auto-lock preferences (idle minutes, on sleep, on screen lock) live in the
  *    same record, so a renderer cannot turn them off while locked.
+ *
+ * lock4:
+ *  - The secret may be a 4-digit PIN (every PIN before lock4), a 4-12 digit
+ *    PIN, or a passphrase (`shared/lockStatus.ts` `normalizeLockSecret`). All
+ *    are hashed with the same scrypt parameters and share the one backoff; a
+ *    4-digit PIN normalizes to itself, so existing hashes keep matching. The
+ *    record keeps only the KIND (which field to draw), never a length.
+ *  - Moving the clock forward while Gum is CLOSED no longer shortens a wait.
+ *    Each write stores the gate's wall time and the system uptime next to the
+ *    deadline (`seenAt` / `seenUptimeMs`). On the next start the wait still owed
+ *    is shortened only by the time BOTH clocks agree has passed: uptime is the
+ *    tick count since boot and cannot be set without admin rights, and after a
+ *    reboot only the new boot's uptime is provable. See `remainingAfterRestart`.
+ *    When a wait ends inside a session the record is rewritten, so a later
+ *    reboot owes nothing.
  */
 import { ipcMain } from 'electron';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { uptime as osUptime } from 'node:os';
 import { performance } from 'node:perf_hooks';
 import {
   DEFAULT_AUTO_LOCK,
@@ -37,6 +53,7 @@ import {
   type LockMutationResult,
   type LockStatus,
 } from '../shared/lockStatus';
+import { lockSecretKindOf, normalizeLockSecret, normalizeLockSecretKind, type LockSecretKind } from '../shared/lockSecret';
 
 const PREFIX = 'scrypt1';
 const KEY_LEN = 32;
@@ -57,12 +74,14 @@ export const FREE_ATTEMPTS = 5;
 export const BASE_LOCKOUT_MS = 30_000;
 export const MAX_LOCKOUT_MS = 5 * 60_000;
 
-export function isValidLockPin(pin: unknown): pin is string {
-  return typeof pin === 'string' && /^\d{4}$/.test(pin);
+/** A PIN (4-12 digits) or a passphrase, in any form `normalizeLockSecret` accepts. */
+export function isValidLockSecret(secret: unknown): secret is string {
+  return normalizeLockSecret(secret) !== null;
 }
 
+/** scrypt of the normalized secret (a 4-digit PIN normalizes to itself). */
 export function hashPin(pin: string, salt: Buffer = randomBytes(16)): string {
-  const hash = scryptSync(pin, salt, KEY_LEN, SCRYPT_OPTS);
+  const hash = scryptSync(normalizeLockSecret(pin) ?? pin, salt, KEY_LEN, SCRYPT_OPTS);
   return `${PREFIX}:${salt.toString('base64')}:${hash.toString('base64')}`;
 }
 
@@ -92,13 +111,15 @@ function scryptMatches(secret: string, stored: string): boolean {
   return timingSafeEqual(actual, expected);
 }
 
-/** Constant-time check of `pin` against a stored value (hashed or legacy). */
+/** Constant-time check of a PIN or passphrase against a stored value (hashed or legacy). */
 export function pinMatches(pin: string, stored: string): boolean {
-  if (!isValidLockPin(pin) || !stored) return false;
-  if (isScryptPinHash(stored)) return scryptMatches(pin, stored);
+  const secret = normalizeLockSecret(pin);
+  if (!secret || !stored) return false;
+  if (isScryptPinHash(stored)) return scryptMatches(secret, stored);
+  // The legacy encoding only ever held 4 digits.
   const legacy = decodeLegacyPin(stored);
-  if (!legacy) return false;
-  return timingSafeEqual(Buffer.from(legacy), Buffer.from(pin));
+  if (!legacy || secret.length !== legacy.length) return false;
+  return timingSafeEqual(Buffer.from(legacy), Buffer.from(secret));
 }
 
 // ---- Recovery code ----------------------------------------------------------
@@ -234,7 +255,7 @@ export function checkPinAttempt(
   now = Date.now(),
 ): { result: PinVerifyResult; attempts: LockAttempts } {
   const step = checkSecretAttempt(
-    () => typeof stored === 'string' && isValidLockPin(pin) && pinMatches(pin, stored),
+    () => typeof stored === 'string' && isValidLockSecret(pin) && pinMatches(pin, stored),
     attempts,
     now,
   );
@@ -283,6 +304,12 @@ export interface LockRecord {
   recoveryHash?: string;
   /** lock3: when main arms the lock by itself. */
   autoLock?: AutoLockOptions;
+  /** lock4: which field the lock screens draw. Absent = the 4-digit PIN of every older record. */
+  secretKind?: LockSecretKind;
+  /** lock4: the gate's wall time when this was written (the anchor for `lockedUntil`). */
+  seenAt?: number;
+  /** lock4: the system uptime (ms since boot) when this was written. */
+  seenUptimeMs?: number;
 }
 
 export const LOCK_RECORD_VERSION = 2;
@@ -307,7 +334,47 @@ function asLockRecord(v: unknown): LockRecord | null {
   const pinHash = isStorablePinHash(r.pinHash) ? r.pinHash : '';
   // A recovery code exists only alongside a PIN: it is the way back to one.
   const recoveryHash = pinHash && typeof r.recoveryHash === 'string' && isScryptPinHash(r.recoveryHash) ? r.recoveryHash : '';
-  return { enabled: r.enabled === true && pinHash !== '', pinHash, recoveryHash, autoLock: normalizeAutoLock(r.autoLock) };
+  // A legacy (reversible) value only ever held 4 digits, whatever the field says.
+  const secretKind = pinHash && isScryptPinHash(pinHash) ? normalizeLockSecretKind(r.secretKind) : 'pin4';
+  return {
+    enabled: r.enabled === true && pinHash !== '',
+    pinHash,
+    recoveryHash,
+    autoLock: normalizeAutoLock(r.autoLock),
+    secretKind,
+  };
+}
+
+/**
+ * lock4 — how much of the wait owed when the record was written is still owed
+ * now, given the wall time and the system uptime that passed since.
+ *
+ * Only time that BOTH clocks agree has passed counts: the wall clock (which can
+ * be moved forward while Gum is closed) and the uptime (the tick count since
+ * boot, which cannot be set without admin rights). An uptime smaller than at the
+ * write means a reboot; then only the new boot's uptime is provably past. The
+ * result is never shorter than the truth allows, and never longer than the wait
+ * owed at the write (a clock moved BACK costs nothing extra). Should uptime leave
+ * out sleep on some system, a sleep during the wait is simply not credited.
+ */
+export function remainingAfterRestart(
+  owedAtWrite: number,
+  wallElapsed: number,
+  uptimeAtWrite: number,
+  uptimeNow: number,
+): number {
+  const owed = Math.max(0, Math.min(owedAtWrite, MAX_LOCKOUT_MS));
+  if (owed === 0) return 0;
+  const uptimeElapsed = uptimeNow >= uptimeAtWrite ? uptimeNow - uptimeAtWrite : uptimeNow;
+  const provable = Math.max(0, Math.min(wallElapsed, uptimeElapsed));
+  return Math.max(0, owed - provable);
+}
+
+const finiteNonNegative = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+/** System uptime in ms (Windows: the tick count since boot). */
+export function systemUptimeMs(): number {
+  return osUptime() * 1000;
 }
 
 /**
@@ -316,7 +383,7 @@ function asLockRecord(v: unknown): LockRecord | null {
  * format-2 record whose fields are missing or malformed was edited, and is worth
  * the ceiling, not a reset.
  */
-export function attemptsFromRecord(v: unknown, now: number): LockAttempts {
+export function attemptsFromRecord(v: unknown, now: number, uptimeNow?: number): LockAttempts {
   if (!v || typeof v !== 'object') return ceilingAttempts(now);
   const r = v as Partial<LockRecord>;
   if (r.v === undefined && r.failures === undefined && r.lockedUntil === undefined) return { ...NO_ATTEMPTS };
@@ -329,6 +396,16 @@ export function attemptsFromRecord(v: unknown, now: number): LockAttempts {
   ) {
     return ceilingAttempts(now);
   }
+  // lock4: an anchor that is there but malformed was edited, like the fields above.
+  const hasAnchor = r.seenAt !== undefined || r.seenUptimeMs !== undefined;
+  if (hasAnchor && (!finiteNonNegative(r.seenAt) || !finiteNonNegative(r.seenUptimeMs))) return ceilingAttempts(now);
+  if (lockedUntil === 0) return { failures, lockedUntil: 0 };
+  if (hasAnchor && uptimeNow !== undefined && Number.isFinite(uptimeNow)) {
+    const seenAt = r.seenAt as number;
+    const left = remainingAfterRestart(lockedUntil - seenAt, now - seenAt, r.seenUptimeMs as number, uptimeNow);
+    return { failures, lockedUntil: left > 0 ? now + left : 0 };
+  }
+  // A record from before lock4 (no anchor): the wall clock decides, clamped.
   return { failures, lockedUntil: Math.min(lockedUntil, now + MAX_LOCKOUT_MS) };
 }
 
@@ -373,11 +450,39 @@ export interface LockGate {
  *
  * `clock` defaults to `anchoredClock()`: wall time at start, monotonic after.
  */
+export interface LockGateOptions {
+  /** System uptime in ms (lock4's restart anchor). Defaults to `os.uptime()`. */
+  uptimeMs?: () => number;
+  /**
+   * Run `fn` once after `ms` (lock4: rewrite the anchor when a wait ends, so a
+   * later reboot owes nothing). Defaults to an unref'd `setTimeout`.
+   */
+  setTimer?: (fn: () => void, ms: number) => unknown;
+  clearTimer?: (handle: unknown) => void;
+}
+
+const defaultSetTimer = (fn: () => void, ms: number): unknown => {
+  const handle = setTimeout(fn, ms);
+  (handle as { unref?: () => void }).unref?.();
+  return handle;
+};
+
 export function createLockGate(
   store: LockRecordStore,
   onChange?: (locked: boolean) => void,
   clock: () => number = anchoredClock(),
+  options: LockGateOptions = {},
 ): LockGate {
+  const uptime = (): number | undefined => {
+    try {
+      const v = (options.uptimeMs ?? systemUptimeMs)();
+      return Number.isFinite(v) && v >= 0 ? v : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const setTimer = options.setTimer ?? defaultSetTimer;
+  const clearTimer = options.clearTimer ?? ((h: unknown) => clearTimeout(h as ReturnType<typeof setTimeout>));
   let raw: unknown = null;
   let damaged = false;
   try {
@@ -388,7 +493,11 @@ export function createLockGate(
   }
   let record = asLockRecord(raw);
   // A damaged file is never a reset: whatever it held, entry starts at the ceiling.
-  let attempts: LockAttempts = damaged ? ceilingAttempts(clock()) : record ? attemptsFromRecord(raw, clock()) : { ...NO_ATTEMPTS };
+  let attempts: LockAttempts = damaged
+    ? ceilingAttempts(clock())
+    : record
+      ? attemptsFromRecord(raw, clock(), uptime())
+      : { ...NO_ATTEMPTS };
   let lockedState = Boolean(record?.enabled && record.pinHash);
   const setLocked = (next: boolean) => {
     if (next === lockedState) return;
@@ -399,6 +508,7 @@ export function createLockGate(
       /* a listener's failure never changes the lock */
     }
   };
+  let waitTimer: unknown = null;
   const save = (next: LockRecord) => {
     const pinHash = next.pinHash;
     record = {
@@ -406,11 +516,42 @@ export function createLockGate(
       pinHash,
       recoveryHash: pinHash ? next.recoveryHash ?? '' : '',
       autoLock: normalizeAutoLock(next.autoLock),
+      secretKind: pinHash ? normalizeLockSecretKind(next.secretKind) : 'pin4',
     };
+    const at = clock();
+    const up = uptime();
     try {
-      store.write({ ...record, v: LOCK_RECORD_VERSION, failures: attempts.failures, lockedUntil: attempts.lockedUntil });
+      store.write({
+        ...record,
+        v: LOCK_RECORD_VERSION,
+        failures: attempts.failures,
+        lockedUntil: attempts.lockedUntil,
+        // lock4: the anchor a restart measures the rest of the wait from.
+        ...(up !== undefined ? { seenAt: at, seenUptimeMs: up } : {}),
+      });
     } catch {
       /* kept in memory for this session */
+    }
+    // When the wait ends inside this session, write once more: the record then
+    // owes nothing, so a reboot (whose uptime proves little) costs no extra wait.
+    if (waitTimer !== null) {
+      try {
+        clearTimer(waitTimer);
+      } catch {
+        /* already gone */
+      }
+      waitTimer = null;
+    }
+    if (attempts.lockedUntil > at) {
+      const until = attempts.lockedUntil;
+      try {
+        waitTimer = setTimer(() => {
+          waitTimer = null;
+          if (attempts.lockedUntil === until && record) save(record);
+        }, until - at + 50);
+      } catch {
+        waitTimer = null;
+      }
     }
   };
   const status = (): LockStatus => ({
@@ -419,6 +560,7 @@ export function createLockGate(
     hasPin: Boolean(record?.pinHash),
     hasRecovery: Boolean(record?.pinHash && record.recoveryHash),
     autoLock: normalizeAutoLock(record?.autoLock),
+    secretKind: record?.pinHash ? normalizeLockSecretKind(record.secretKind) : 'pin4',
     pinHash: record?.pinHash ?? '',
   });
   const result = (ok: boolean, extra: Partial<Omit<LockMutationResult, 'ok' | 'status'>> = {}): LockMutationResult => ({
@@ -435,7 +577,7 @@ export function createLockGate(
     const stored = record?.pinHash;
     if (!stored) return null;
     const before = attempts;
-    const step = checkSecretAttempt(() => isValidLockPin(current) && pinMatches(current, stored), attempts, now);
+    const step = checkSecretAttempt(() => isValidLockSecret(current) && pinMatches(current, stored), attempts, now);
     attempts = step.attempts;
     if (step.ok) {
       if (before.failures !== 0 || before.lockedUntil !== 0) save(base());
@@ -456,7 +598,8 @@ export function createLockGate(
       if (record) return { ok: false, locked: lockedState };
       // Only the PIN and the launch flag are adopted; never a recovery code or
       // auto-lock preferences a renderer made up.
-      const next: LockRecord = { enabled: parsed.enabled, pinHash: parsed.pinHash };
+      // The secret's kind is only which field to draw; adopting it weakens nothing.
+      const next: LockRecord = { enabled: parsed.enabled, pinHash: parsed.pinHash, secretKind: parsed.secretKind };
       const lockedNow = next.enabled && rendererLocked === true;
       // Main has no record but a renderer is showing a lock: the file was
       // removed (or never written). Either way it is worth the ceiling.
@@ -467,7 +610,9 @@ export function createLockGate(
     },
     setPin(current, nextPin, now = clock()) {
       if (lockedState) return result(false, { error: 'locked' });
-      if (!isValidLockPin(nextPin)) return result(false, { error: 'invalid' });
+      const secret = normalizeLockSecret(nextPin);
+      const kind = secret ? lockSecretKindOf(secret) : null;
+      if (!secret || !kind) return result(false, { error: 'invalid' });
       const refused = checkCurrent(current, now);
       if (refused) return refused;
       const cur = base();
@@ -477,7 +622,8 @@ export function createLockGate(
       const recoveryCode = firstPin || !cur.recoveryHash ? generateRecoveryCode() : undefined;
       save({
         ...cur,
-        pinHash: hashPin(nextPin),
+        pinHash: hashPin(secret),
+        secretKind: kind,
         recoveryHash: recoveryCode ? hashRecoveryCode(recoveryCode) : cur.recoveryHash,
       });
       return result(true, recoveryCode ? { recoveryCode } : {});

@@ -625,7 +625,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     id: 'lockscreen-pin',
     titleKey: 'search.lockscreenPin',
     descKey: 'search.lockscreenPin.desc',
-    keywords: ['pin', 'passcode', 'password', '4 digit', 'lock'],
+    keywords: ['pin', 'passcode', 'password', '4 digit', 'lock', 'passphrase', 'longer pin'],
     pageId: 'lockscreen',
     group: 'Desktop',
   },

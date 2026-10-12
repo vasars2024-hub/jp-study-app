@@ -104,6 +104,13 @@ const FORBIDDEN_FILES: Array<[RegExp, string]> = [
   [/\/ocr\.ts$/, 'the OCR stack'],
   // The optional AI features' strings: a lazy i18n pack, merged on first use.
   [/\/i18n\/aiPack\//, 'the lazy AI strings pack'],
+  // The Updates panel's strings (upd3): a lazy pack Study OS loads before paint. Blanc
+  // has no Updates panel; releaseCheck.ts loads it only to post a "What's new" notice.
+  [/\/i18n\/updateUi3\//, 'the lazy Updates strings pack'],
+  // Reached only from a shortcut handler and a toast action, which load them on use
+  // (keyboardShortcuts.ts, globalShortcutNotice.ts).
+  [/\/renderer\/readerSettings\.ts$/, 'the reader settings (word-highlight shortcut loads them)'],
+  [/\/renderer\/extensionBridgeUi\.ts$/, 'the app-section bridge (refused-shortcut toast loads it)'],
 ];
 
 const FORBIDDEN_PACKAGES: Array<[RegExp, string]> = [

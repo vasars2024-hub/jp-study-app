@@ -52,6 +52,7 @@ import {
   Menu,
   nativeImage,
   Notification,
+  powerMonitor,
   screen,
   session,
   shell,
@@ -1419,6 +1420,61 @@ export function initE2eHeadless(input: E2eHeadlessInput = {
   return true;
 }
 
+// ---- powerMonitor (lock4) ------------------------------------------------------------
+//
+// Auto-lock (`lockAutoArm.ts`) listens to Electron's real `powerMonitor`. The harness
+// cannot put the owner's PC to sleep, lock their Windows session or stop them typing,
+// so it drives the same object instead: an event is EMITTED on the real powerMonitor
+// (exactly what Electron's native side does when Windows reports it, so every listener
+// main registered hears it), and the system idle time the auto-lock poll reads can be
+// overridden. Nothing here reaches Windows. Only the two events auto-lock arms on are
+// allowed; `resume` / `unlock-screen` would only wake things the harness does not test.
+
+const E2E_POWER_EVENTS: readonly string[] = ['suspend', 'lock-screen'];
+
+let idleOverrideSeconds: number | null = null;
+let idlePatched = false;
+const powerFired: Array<{ event: string; ts: number }> = [];
+
+export interface E2ePowerRequest {
+  /** `suspend` or `lock-screen`, emitted on the real powerMonitor. */
+  event?: unknown;
+  /** Seconds `powerMonitor.getSystemIdleTime()` answers from now on; null = the real value. */
+  idleSeconds?: unknown;
+}
+
+export function e2ePowerStatus(): Record<string, unknown> {
+  return { idleOverrideSeconds, fired: [...powerFired] };
+}
+
+/** The debug bridge's `/e2e` action `power`. Refused unless headless mode is on. */
+export function e2ePower(req: E2ePowerRequest): { ok: boolean; error?: string; power: Record<string, unknown> } {
+  if (!active) return { ok: false, error: 'e2e headless mode is off', power: e2ePowerStatus() };
+  if (req.idleSeconds !== undefined) {
+    const v = req.idleSeconds;
+    if (v !== null && (typeof v !== 'number' || !Number.isFinite(v) || v < 0)) {
+      return { ok: false, error: 'idleSeconds must be a number >= 0 or null', power: e2ePowerStatus() };
+    }
+    if (!idlePatched) {
+      const real = powerMonitor.getSystemIdleTime.bind(powerMonitor);
+      patch(powerMonitor, 'getSystemIdleTime', () => idleOverrideSeconds ?? real(), 'powerMonitor.getSystemIdleTime');
+      idlePatched = true;
+    }
+    idleOverrideSeconds = v as number | null;
+    record('powerMonitor.idleOverride', idleOverrideSeconds ?? 'real');
+  }
+  if (req.event !== undefined) {
+    const event = String(req.event);
+    if (!E2E_POWER_EVENTS.includes(event)) {
+      return { ok: false, error: `event must be one of ${E2E_POWER_EVENTS.join(', ')}`, power: e2ePowerStatus() };
+    }
+    powerFired.push({ event, ts: Date.now() });
+    record('powerMonitor.emit', event);
+    (powerMonitor as unknown as { emit(e: string): boolean }).emit(event);
+  }
+  return { ok: true, power: e2ePowerStatus() };
+}
+
 /** Queue the result the next OS dialog of that kind returns (debug bridge `/e2e`). */
 export function queueE2eDialogResult(kind: E2eDialogKind, result: unknown): void {
   dialogQueue[kind].push(result);
@@ -1429,6 +1485,7 @@ export function clearE2eRecords(): void {
   violations.length = 0;
   network.length = 0;
   loopbackLog.length = 0;
+  powerFired.length = 0;
 }
 
 /** The isolation half of the status: what is stubbed, and every loopback connection seen. */
@@ -1473,6 +1530,7 @@ export function e2eHeadlessStatus(): Record<string, unknown> {
     network: [...network],
     shortcuts: [...shortcutCallbacks.keys()],
     tray: e2eTrayItems(),
+    power: e2ePowerStatus(),
     pendingDialogs: { open: dialogQueue.open.length, save: dialogQueue.save.length, message: dialogQueue.message.length },
     windows,
     visibleWindows: windows.filter((w) => w.visible).length,

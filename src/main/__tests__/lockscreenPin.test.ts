@@ -15,12 +15,14 @@ import {
   hashRecoveryCode,
   LOCK_RECORD_VERSION,
   hashPin,
+  isValidLockSecret,
   isScryptPinHash,
   lockoutMs,
   MAX_LOCKOUT_MS,
   normalizeRecoveryCode,
   pinMatches,
   recoveryCodeMatches,
+  remainingAfterRestart,
   resetPinAttemptsForTests,
   verifyPinAttempt,
   type LockRecord,
@@ -211,7 +213,7 @@ describe('lock3: PIN changes need the current PIN, through the shared backoff', 
     gate.syncConfig({ enabled: false, pinHash: '' });
     gate.setPin(null, '2468');
     const status = gate.status() as unknown as Record<string, unknown>;
-    expect(Object.keys(status).sort()).toEqual(['autoLock', 'enabled', 'hasPin', 'hasRecovery', 'locked', 'pinHash']);
+    expect(Object.keys(status).sort()).toEqual(['autoLock', 'enabled', 'hasPin', 'hasRecovery', 'locked', 'pinHash', 'secretKind']);
     expect(JSON.stringify(status)).not.toContain(gate.record()!.recoveryHash!);
   });
 
@@ -321,15 +323,19 @@ describe('persisted attempt backoff (risk4)', () => {
 
   it('a restart is not a reset: the count and the deadline survive a new gate', () => {
     const { s, store } = memoryStore({ enabled: true, pinHash: hashPin('2468') });
-    const first = createLockGate(store, undefined, () => T0);
+    // lock4: the restart anchor reads the uptime too; a real second passes on both clocks.
+    let up = 600_000;
+    const opts = { uptimeMs: () => up, setTimer: () => null };
+    const first = createLockGate(store, undefined, () => T0, opts);
     for (let i = 0; i < FREE_ATTEMPTS - 1; i += 1) expect(first.verify('1111', undefined, T0).ok).toBe(false);
     expect(s.value?.failures).toBe(FREE_ATTEMPTS - 1);
     // "Restart": a fresh gate over the same file gets no fresh free guesses.
-    const second = createLockGate(store, undefined, () => T0);
+    const second = createLockGate(store, undefined, () => T0, opts);
     expect(second.attempts().failures).toBe(FREE_ATTEMPTS - 1);
     expect(second.verify('1111', undefined, T0).retryAfterMs).toBe(BASE_LOCKOUT_MS);
     expect(s.value?.lockedUntil).toBe(T0 + BASE_LOCKOUT_MS);
-    const third = createLockGate(store, undefined, () => T0 + 1_000);
+    up += 1_000;
+    const third = createLockGate(store, undefined, () => T0 + 1_000, opts);
     const res = third.verify('2468', undefined, T0 + 1_000);
     expect(res.ok).toBe(false);
     expect(res.retryAfterMs).toBe(BASE_LOCKOUT_MS - 1_000);
@@ -397,5 +403,148 @@ describe('persisted attempt backoff (risk4)', () => {
     expect(gate.syncConfig({ enabled: true, pinHash: hashPin('1212') }, false)).toEqual({ ok: true, locked: false });
     expect(gate.attempts()).toEqual({ failures: 0, lockedUntil: 0 });
     expect(s.value?.failures).toBe(0);
+  });
+});
+
+describe('lock4: longer PINs and passphrases', () => {
+  const T0 = 9_000_000;
+
+  it('accepts 4-12 digits or a 6-64 character passphrase, nothing else', () => {
+    for (const ok of ['1234', '12345', '123456789012', 'correct horse', 'пароль-7', 'ねこがすき猫', '  spaced out  ']) {
+      expect({ ok, valid: isValidLockSecret(ok) }).toEqual({ ok, valid: true });
+    }
+    for (const bad of ['123', '1234567890123', 'abc12', '', '      ', 'x'.repeat(65), 'tab\there', 1234, null]) {
+      expect({ bad, valid: isValidLockSecret(bad) }).toEqual({ bad, valid: false });
+    }
+  });
+
+  it('an existing 4-digit hash (and a legacy value) keeps matching', () => {
+    const before = hashPin('2580');
+    expect(pinMatches('2580', before)).toBe(true);
+    expect(pinMatches(' 2580 ', before)).toBe(true); // trimmed like every secret
+    expect(pinMatches('25800', before)).toBe(false);
+    expect(pinMatches('2580', legacy('2580'))).toBe(true);
+    expect(pinMatches('25801', legacy('2580'))).toBe(false);
+  });
+
+  it('a passphrase is hashed the same way (scrypt), normalized to NFC and trimmed', () => {
+    const stored = hashPin('café au lait');
+    expect(isScryptPinHash(stored)).toBe(true);
+    expect(stored).not.toContain('café');
+    expect(pinMatches('café au lait', stored)).toBe(true); // decomposed é
+    expect(pinMatches('  café au lait ', stored)).toBe(true);
+    expect(pinMatches('Café au lait', stored)).toBe(false); // case matters
+  });
+
+  it('the gate stores the kind (never the length), and a change of kind keeps the recovery code', () => {
+    const { s, store } = memoryStore(null);
+    const gate = createLockGate(store, undefined, () => T0, { uptimeMs: () => 1, setTimer: () => null });
+    gate.syncConfig({ enabled: false, pinHash: '' });
+    expect(gate.status().secretKind).toBe('pin4');
+    const first = gate.setPin(null, '24680135');
+    expect(first.ok).toBe(true);
+    expect(first.status.secretKind).toBe('pin');
+    expect(JSON.stringify(s.value)).not.toMatch(/"length"|24680135/);
+    const recovery = s.value?.recoveryHash;
+    expect(gate.setPin('24680135', 'a long passphrase').status.secretKind).toBe('passphrase');
+    expect(s.value?.recoveryHash).toBe(recovery);
+    expect(gate.setPin(null, 'abc')).toMatchObject({ ok: false, error: 'invalid' });
+    expect(gate.setPin('a long passphrase', '1357').status.secretKind).toBe('pin4');
+    expect(gate.clearPin('1357').status.secretKind).toBe('pin4');
+  });
+
+  it('a passphrase unlocks, and misses share the one persisted backoff', () => {
+    const { s, store } = memoryStore({ enabled: true, pinHash: hashPin('river stone 9'), secretKind: 'passphrase' });
+    const gate = createLockGate(store, undefined, () => T0, { uptimeMs: () => 1, setTimer: () => null });
+    expect(gate.isLocked()).toBe(true);
+    expect(gate.status().secretKind).toBe('passphrase');
+    for (let i = 0; i < FREE_ATTEMPTS; i += 1) expect(gate.verify('river stone 8', undefined, T0).ok).toBe(false);
+    expect(s.value?.failures).toBe(FREE_ATTEMPTS);
+    expect(gate.verify('river stone 9', undefined, T0 + 1).retryAfterMs).toBe(BASE_LOCKOUT_MS - 1);
+    expect(gate.verify('river stone 9', undefined, T0 + BASE_LOCKOUT_MS).ok).toBe(true);
+    expect(gate.isLocked()).toBe(false);
+  });
+
+  it('a kind field on a legacy (reversible) value is ignored: it is a 4-digit PIN', () => {
+    const gate = createLockGate(memoryStore({ enabled: true, pinHash: legacy('1212'), secretKind: 'passphrase' }).store, undefined, () => T0);
+    expect(gate.status().secretKind).toBe('pin4');
+  });
+});
+
+describe('lock4: the clock moved forward while Gum was closed', () => {
+  const T0 = 40_000_000;
+  const HOUR = 3_600_000;
+
+  /** A gate that set the 5-minute wait at T0, at uptime `up0`. */
+  function lockedOut(up0: number) {
+    const { s, store } = memoryStore({ v: 2, enabled: true, pinHash: hashPin('2468'), failures: CEILING_FAILURES - 1, lockedUntil: 0 });
+    const gate = createLockGate(store, undefined, () => T0, { uptimeMs: () => up0, setTimer: () => null });
+    gate.verify('1111', undefined, T0);
+    expect(s.value?.lockedUntil).toBe(T0 + MAX_LOCKOUT_MS);
+    expect(s.value).toMatchObject({ seenAt: T0, seenUptimeMs: up0 });
+    return { s, store };
+  }
+
+  it('a jump forward with no matching uptime shortens nothing', () => {
+    const { store } = lockedOut(10 * HOUR);
+    // Gum closed, the Windows clock moved a day ahead, Gum opened 20 s later.
+    const gate = createLockGate(store, undefined, () => T0 + 24 * HOUR, { uptimeMs: () => 10 * HOUR + 20_000, setTimer: () => null });
+    expect(gate.verify('2468', undefined, T0 + 24 * HOUR).retryAfterMs).toBe(MAX_LOCKOUT_MS - 20_000);
+  });
+
+  it('time that really passed (both clocks agree) still counts', () => {
+    const { store } = lockedOut(10 * HOUR);
+    const gate = createLockGate(store, undefined, () => T0 + 120_000, { uptimeMs: () => 10 * HOUR + 120_000, setTimer: () => null });
+    expect(gate.verify('2468', undefined, T0 + 120_000).retryAfterMs).toBe(MAX_LOCKOUT_MS - 120_000);
+    const later = createLockGate(store, undefined, () => T0 + HOUR, { uptimeMs: () => 11 * HOUR, setTimer: () => null });
+    expect(later.verify('2468', undefined, T0 + HOUR).ok).toBe(true);
+  });
+
+  it('after a reboot only the uptime of the new boot is provable', () => {
+    const { store } = lockedOut(10 * HOUR);
+    // Rebooted (uptime now smaller than at the write) and the clock moved a day ahead.
+    const gate = createLockGate(store, undefined, () => T0 + 24 * HOUR, { uptimeMs: () => 60_000, setTimer: () => null });
+    expect(gate.verify('2468', undefined, T0 + 24 * HOUR).retryAfterMs).toBe(MAX_LOCKOUT_MS - 60_000);
+  });
+
+  it('a clock moved back costs no more than the wait that was owed', () => {
+    const { store } = lockedOut(10 * HOUR);
+    const gate = createLockGate(store, undefined, () => T0 - 6 * HOUR, { uptimeMs: () => 10 * HOUR + 30_000, setTimer: () => null });
+    expect(gate.verify('2468', undefined, T0 - 6 * HOUR).retryAfterMs).toBe(MAX_LOCKOUT_MS);
+  });
+
+  it('a wait that ended in the session is rewritten, so a later reboot owes nothing', () => {
+    const { s, store } = memoryStore({ enabled: true, pinHash: hashPin('2468') });
+    let wall = T0;
+    let up = 10 * HOUR;
+    const timers: Array<{ fn: () => void; ms: number }> = [];
+    const gate = createLockGate(store, undefined, () => wall, { uptimeMs: () => up, setTimer: (fn, ms) => timers.push({ fn, ms }) });
+    for (let i = 0; i < FREE_ATTEMPTS; i += 1) gate.verify('1111');
+    expect(timers.at(-1)?.ms).toBeGreaterThanOrEqual(BASE_LOCKOUT_MS);
+    wall += BASE_LOCKOUT_MS + 100;
+    up += BASE_LOCKOUT_MS + 100;
+    timers.at(-1)!.fn();
+    expect(s.value?.seenAt).toBe(wall);
+    // Reboot, clock unchanged: nothing is owed.
+    const after = createLockGate(store, undefined, () => wall + 5_000, { uptimeMs: () => 1_000, setTimer: () => null });
+    expect(after.attempts().lockedUntil).toBe(0);
+    expect(after.verify('2468').ok).toBe(true);
+  });
+
+  it('an edited anchor is worth the ceiling; a record without one keeps the old rule', () => {
+    const pinHash = hashPin('1111');
+    const base = { v: 2, enabled: true, pinHash, failures: 6, lockedUntil: T0 + 60_000 };
+    expect(attemptsFromRecord({ ...base, seenAt: 'x', seenUptimeMs: 5 }, T0, 5)).toEqual({ failures: CEILING_FAILURES, lockedUntil: T0 + MAX_LOCKOUT_MS });
+    expect(attemptsFromRecord({ ...base, seenAt: T0 }, T0, 5)).toEqual({ failures: CEILING_FAILURES, lockedUntil: T0 + MAX_LOCKOUT_MS });
+    expect(attemptsFromRecord(base, T0 + 10_000, 5)).toEqual({ failures: 6, lockedUntil: T0 + 60_000 });
+  });
+
+  it('remainingAfterRestart: the pure rule', () => {
+    expect(remainingAfterRestart(60_000, 3 * HOUR, 1_000, 11_000)).toBe(50_000); // uptime says 10 s
+    expect(remainingAfterRestart(60_000, 5_000, 1_000, 3 * HOUR)).toBe(55_000); // wall says 5 s
+    expect(remainingAfterRestart(60_000, 3 * HOUR, 9 * HOUR, 20_000)).toBe(40_000); // reboot: 20 s of this boot
+    expect(remainingAfterRestart(10 * MAX_LOCKOUT_MS, 0, 0, 0)).toBe(MAX_LOCKOUT_MS); // never above the ceiling
+    expect(remainingAfterRestart(60_000, -HOUR, 0, HOUR)).toBe(60_000); // clock moved back
+    expect(remainingAfterRestart(-5, HOUR, 0, HOUR)).toBe(0);
   });
 });

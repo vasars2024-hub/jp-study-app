@@ -10,6 +10,7 @@ import {
   type CompanionDraft,
   type CompanionMineOutcome,
 } from '../../../shared/companion';
+import { useUnsavedWork } from '../../unsavedWork';
 import './companion.css';
 
 /**
@@ -44,6 +45,8 @@ export default function CardPreview() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState('');
   const closeTimer = useRef<number | null>(null);
+  // The overlay's card fields open for editing, not added yet.
+  useUnsavedWork('card-editor', Boolean(draft) && editing && phase !== 'adding');
 
   const take = useCallback((next: CompanionDraft | null) => {
     if (closeTimer.current) window.clearTimeout(closeTimer.current);

@@ -82,6 +82,7 @@ import {
   aiFeaturesEnabled,
 } from './aiFeatureGate';
 import { getAiProviderHealth } from './providerRuntime';
+import { holdUnsavedWork } from './unsavedWork';
 
 // ---- the feature specs -----------------------------------------------------
 
@@ -391,6 +392,8 @@ export async function runAiStudyFeature<Req extends { requestId?: string; refres
 
   const controller = new AbortController();
   const requestId = request.requestId;
+  // "Restart to update" lists an AI request still being answered.
+  const releaseUnsaved = holdUnsavedWork(spec.feature === 'writingCorrection' || spec.feature === 'journalGrade' ? 'writing-correction' : 'ai-job');
   if (requestId) {
     inFlight.get(requestId)?.abort();
     inFlight.set(requestId, controller);
@@ -425,6 +428,7 @@ export async function runAiStudyFeature<Req extends { requestId?: string; refres
     };
   } finally {
     if (requestId && inFlight.get(requestId) === controller) inFlight.delete(requestId);
+    releaseUnsaved();
   }
 }
 

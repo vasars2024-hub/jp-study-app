@@ -110,7 +110,10 @@ export const AGENT_SETTINGS_GUIDED_TARGETS = {
   'desktop-layout': ['icons', 'icon-recommended', 'taskbar', 'start-menu', 'session'],
   shortcuts: ['os-hotkey', 'global-lookup', 'shortcuts'],
   mini: ['mini-enable', 'mini-apps', 'mini-routines', 'mini-look'],
-  lockscreen: ['lockscreen-enable', 'lockscreen-pin', 'lockscreen-tint'],
+  lockscreen: [
+    'lockscreen-enable', 'lockscreen-pin', 'lockscreen-recovery', 'lockscreen-auto',
+    'lockscreen-study', 'lockscreen-tint',
+  ],
   study: [
     'focus-mode', 'focus-lock', 'focus-default-tab', 'focus-distractions',
     'focus-auto-enter', 'level', 'game-arena', 'profile', 'dictionary',

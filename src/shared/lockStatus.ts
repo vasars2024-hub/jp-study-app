@@ -3,6 +3,7 @@
  * only writer), the preload bridge and the renderer's Settings / lock screen.
  * Nothing secret lives here: never the recovery hash, never a PIN.
  */
+import type { LockSecretKind } from './lockSecret';
 
 export interface AutoLockOptions {
   /** Lock after this many minutes without keyboard or mouse input anywhere on the PC. 0 = never. */
@@ -32,6 +33,8 @@ export interface LockStatus {
   hasPin: boolean;
   hasRecovery: boolean;
   autoLock: AutoLockOptions;
+  /** lock4: which field the lock screens draw (`pin4` when there is no PIN). */
+  secretKind: LockSecretKind;
   /** The renderer mirror's copy (it seeds a profile whose lock file was lost). */
   pinHash: string;
 }

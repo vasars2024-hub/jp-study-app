@@ -14,6 +14,8 @@ import {
   GITHUB_API_REPO_BASE,
   GITHUB_OWNER,
   GITHUB_REPO,
+  isReleaseVersion,
+  normalizeVersion,
   parseFeedRelease,
   pickChannelRelease,
   type FeedRelease,
@@ -70,16 +72,10 @@ export function rateLimitOf(
   return { limited: true, ...(retryAt && retryAt > now ? { retryAt } : {}) };
 }
 
-/** The release `channel` follows, from the feed. Never throws. */
-export async function fetchChannelRelease(
-  feed: UpdateFeed,
-  channel: ReleaseChannel,
-  fetchImpl: FetchLike = fetch as unknown as FetchLike,
-  now: () => number = Date.now,
-  timeoutMs = FEED_TIMEOUT_MS,
-): Promise<FeedFetch> {
-  if (!feed.apiBase) return { kind: 'failed', reason: 'disabled' };
-  const url = channel === 'beta' ? `${feed.apiBase}/releases?per_page=30` : `${feed.apiBase}/releases/latest`;
+type JsonFetch = { kind: 'ok'; body: unknown } | { kind: 'none' } | { kind: 'failed'; reason: ReleaseUnavailableReason; retryAt?: number };
+
+/** One GET of the feed's JSON, with GitHub's headers, a timeout and the rate-limit reading. */
+async function getFeedJson(url: string, fetchImpl: FetchLike, now: () => number, timeoutMs: number): Promise<JsonFetch> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
@@ -100,22 +96,73 @@ export async function fetchChannelRelease(
     const limit = rateLimitOf(res, now());
     if (limit.limited) return { kind: 'failed', reason: 'rate-limited', ...(limit.retryAt ? { retryAt: limit.retryAt } : {}) };
     if (!res.ok) return { kind: 'failed', reason: 'http' };
-    let body: unknown;
     try {
-      body = await res.json();
+      return { kind: 'ok', body: await res.json() };
     } catch {
       return { kind: 'failed', reason: ctl.signal.aborted ? 'offline' : 'invalid' };
     }
-    if (channel === 'beta') {
-      if (Array.isArray(body) && body.length === 0) return { kind: 'none' };
-      const picked = pickChannelRelease(body, 'beta');
-      return picked ? { kind: 'ok', release: picked } : { kind: 'failed', reason: 'invalid' };
-    }
-    const release = parseFeedRelease(body);
-    return release ? { kind: 'ok', release } : { kind: 'failed', reason: 'invalid' };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** The release `channel` follows, from the feed. Never throws. */
+export async function fetchChannelRelease(
+  feed: UpdateFeed,
+  channel: ReleaseChannel,
+  fetchImpl: FetchLike = fetch as unknown as FetchLike,
+  now: () => number = Date.now,
+  timeoutMs = FEED_TIMEOUT_MS,
+): Promise<FeedFetch> {
+  if (!feed.apiBase) return { kind: 'failed', reason: 'disabled' };
+  const url = channel === 'beta' ? `${feed.apiBase}/releases?per_page=30` : `${feed.apiBase}/releases/latest`;
+  const got = await getFeedJson(url, fetchImpl, now, timeoutMs);
+  if (got.kind !== 'ok') return got;
+  const body = got.body;
+  if (channel === 'beta') {
+    if (Array.isArray(body) && body.length === 0) return { kind: 'none' };
+    const picked = pickChannelRelease(body, 'beta');
+    return picked ? { kind: 'ok', release: picked } : { kind: 'failed', reason: 'invalid' };
+  }
+  const release = parseFeedRelease(body);
+  return release ? { kind: 'ok', release } : { kind: 'failed', reason: 'invalid' };
+}
+
+/**
+ * One release by its version (`/releases/tags/v<version>`, then without the `v`):
+ * "What's new" reads the notes of the version that is running now, whichever
+ * channel it came from. Never throws.
+ */
+export async function fetchTaggedRelease(
+  feed: UpdateFeed,
+  version: string,
+  fetchImpl: FetchLike = fetch as unknown as FetchLike,
+  now: () => number = Date.now,
+  timeoutMs = FEED_TIMEOUT_MS,
+): Promise<FeedFetch> {
+  if (!feed.apiBase) return { kind: 'failed', reason: 'disabled' };
+  const bare = normalizeVersion(version);
+  if (!isReleaseVersion(bare)) return { kind: 'failed', reason: 'invalid' };
+  for (const tag of [`v${bare}`, bare]) {
+    const got = await getFeedJson(`${feed.apiBase}/releases/tags/${encodeURIComponent(tag)}`, fetchImpl, now, timeoutMs);
+    if (got.kind === 'none') continue;
+    if (got.kind !== 'ok') return got;
+    const release = parseFeedRelease(got.body);
+    return release && release.version === bare ? { kind: 'ok', release } : { kind: 'failed', reason: 'invalid' };
+  }
+  return { kind: 'none' };
+}
+
+/**
+ * Where Gum's own downloader reads a release's `RELEASES` and packages: the
+ * release's tag pinned (GitHub redirects these to its asset storage), or the
+ * harness's fake. null = checks are off.
+ */
+export function updateDownloadBase(feed: UpdateFeed, release: FeedRelease): string | null {
+  if (!feed.apiBase) return null;
+  const tag = encodeURIComponent(release.tag);
+  if (feed.source === 'override') return `${feed.apiBase}/download/${tag}`;
+  return `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/${tag}`;
 }
 
 /**

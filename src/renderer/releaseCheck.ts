@@ -1,7 +1,8 @@
 import { compareVersions } from '../shared/release';
-import { t } from './i18n';
+import { ensureUiPack, t } from './i18n';
 import { notify } from './notificationStore';
 import { showOsToast } from './components/ToastHost';
+import { openAppSection } from './extensionBridgeUi';
 import type { AppUpdateStatus } from '../shared/appUpdate';
 
 const SEEN_APP_KEY = 'jp-release-seen-version';
@@ -138,7 +139,8 @@ export function announceDownloadedUpdate(status: AppUpdateStatus): boolean {
 
 /**
  * The toast's "Restart": main refuses while a restart would cut something short
- * (a recording). Then the user is told what, and offered "Restart anyway".
+ * (a recording, an unsaved edit or review in any window, a snip or AI job — see
+ * renderer/unsavedWork.ts). Then the user is told what, and offered "Restart anyway".
  */
 export async function restartToUpdate(): Promise<void> {
   const api = window.api.appUpdateRestart;
@@ -150,6 +152,41 @@ export async function restartToUpdate(): Promise<void> {
     label: t('upd2.restart.anyway'),
     run: () => void api({ force: true }).catch(() => undefined),
   });
+}
+
+/**
+ * After an update, once: a notice in the center ("Gum was updated to X") whose
+ * button opens Settings -> Help -> Updates, where "What's new" waits until it is
+ * dismissed. Main records that it was posted, so a later start does not post it again.
+ */
+export async function announceWhatsNew(): Promise<boolean> {
+  const api = window.api;
+  if (!api.appUpdateDetails || !api.appUpdateWhatsNew) return false;
+  const details = await api.appUpdateDetails().catch(() => null);
+  const whatsNew = details?.whatsNew;
+  if (!whatsNew || whatsNew.announced) return false;
+  // The upd3 strings are a lazy pack: Study OS has it before paint, Blanc (no Updates
+  // panel) loads it only here. Composed after it lands, never as a placeholder.
+  await ensureUiPack('upd3');
+  notify({
+    id: `whats-new-${whatsNew.version}`,
+    title: t('upd3.whatsNew.noticeTitle', { version: whatsNew.version }),
+    message: t('upd3.whatsNew.noticeBody'),
+    kind: 'info',
+    source: 'release',
+    clientAction: 'whats-new',
+    i18n: { title: 'upd3.whatsNew.noticeTitle', message: 'upd3.whatsNew.noticeBody', vars: { version: whatsNew.version } },
+  });
+  await api.appUpdateWhatsNew('announced').catch(() => undefined);
+  return true;
+}
+
+/** Settings -> Help -> Updates, where "What's new" waits (the notice's button). */
+export function openUpdateSettings(): void {
+  openAppSection('settings');
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('settings:navigate', { detail: { page: 'help', settingId: 'updates' } }));
+  }, 80);
 }
 
 let watchingUpdates = false;
@@ -167,6 +204,7 @@ function watchInstalledUpdates(): void {
 /** Fire-and-forget check shortly after the desktop boots. */
 export function startReleaseCheck(): void {
   watchInstalledUpdates();
+  void announceWhatsNew().catch(() => undefined);
   const run = () => {
     void checkForAppRelease();
   };

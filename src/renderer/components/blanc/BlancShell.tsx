@@ -144,11 +144,13 @@ import { keysOrUnset, withShortcut } from '../../shortcutHints';
 import {
   clearLockscreenPin,
   hasLockscreenPin,
+  isValidPin,
   loadLockscreen,
   setLockscreenEnabled,
   setLockscreenPin,
   type LockscreenChange,
 } from '../../lockscreenSettings';
+import { LOCK_PASSPHRASE_MAX_CHARS } from '../../../shared/lockSecret';
 import { getActiveProfile } from '../../profileState';
 import { loadSaved, type SavedWord } from '../../savedWords';
 import { loadLookupHistory, type LookupHistoryEntry } from '../../lookupHistory';
@@ -3920,11 +3922,15 @@ function BlancSettingsPanel({
           ? t('lock3.settings.wrongCurrent')
           : t('lock3.settings.currentNeeded')
         : res.error === 'invalid'
-          ? t('blanc.settings.pinFourDigits')
+          ? t('lock4.blanc.hint')
           : t('settings.lock.msg.saveFail');
 
   const savePin = (): void => {
-    if (pinSet && currentPin.length !== 4) {
+    if (!isValidPin(pin)) {
+      setPinMsg(t('lock4.blanc.hint'));
+      return;
+    }
+    if (pinSet && !isValidPin(currentPin)) {
       setPinMsg(t('lock3.settings.currentNeeded'));
       return;
     }
@@ -3951,7 +3957,7 @@ function BlancSettingsPanel({
       setLockOn(false);
       return;
     }
-    if (!on && currentPin.length !== 4) {
+    if (!on && !isValidPin(currentPin)) {
       setPinMsg(t('lock3.settings.currentNeeded'));
       return;
     }
@@ -3967,7 +3973,7 @@ function BlancSettingsPanel({
   };
 
   const clearPin = (): void => {
-    if (currentPin.length !== 4) {
+    if (!isValidPin(currentPin)) {
       setPinMsg(t('lock3.settings.currentNeeded'));
       return;
     }
@@ -4060,31 +4066,34 @@ function BlancSettingsPanel({
           {pinSet && (
             <input
               type="password"
-              inputMode="numeric"
               autoComplete="current-password"
-              maxLength={4}
+              maxLength={LOCK_PASSPHRASE_MAX_CHARS}
+              spellCheck={false}
               value={currentPin}
               aria-label={t('lock3.settings.currentPin')}
               placeholder={t('lock3.settings.currentPin')}
-              onChange={(event) => setCurrentPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
+              onChange={(event) => setCurrentPin(event.target.value)}
             />
           )}
           <input
             type="password"
-            inputMode="numeric"
-            maxLength={4}
+            autoComplete="new-password"
+            maxLength={LOCK_PASSPHRASE_MAX_CHARS}
+            spellCheck={false}
             value={pin}
             aria-label={pinSet ? t('blanc.settings.changePin') : t('blanc.settings.newPin')}
+            aria-describedby="blanc-lock-secret-hint"
             placeholder={pinSet ? t('blanc.settings.changePin') : t('blanc.settings.newPin')}
-            onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
+            onChange={(event) => setPin(event.target.value)}
           />
-          <button type="button" onClick={savePin} disabled={pin.length !== 4}>
+          <button type="button" onClick={savePin} disabled={!isValidPin(pin)}>
             {t('blanc.settings.savePin')}
           </button>
           <button type="button" onClick={clearPin} disabled={!pinSet}>
             {t('blanc.settings.clearPin')}
           </button>
         </div>
+        <p id="blanc-lock-secret-hint" className="blanc-note">{t('lock4.blanc.hint')}</p>
         <label className="blanc-check">
           <input type="checkbox" checked={lockOn} onChange={(event) => toggleLock(event.target.checked)} />
           <span>{t('blanc.settings.requirePin')}</span>

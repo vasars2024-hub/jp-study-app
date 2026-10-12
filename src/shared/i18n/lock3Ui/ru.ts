@@ -80,4 +80,21 @@ export const LOCK3_UI_RU: Catalog = {
   'lock3.settings.study.answer': 'Ответить на карточку перед PIN',
   'lock3.settings.study.answerNote':
     'Сначала появляется карточка с вариантами ответа из вашей колоды. Если PIN задан, после неё всё равно нужен PIN. Без PIN это учебная привычка при запуске, а не блокировка.',
+  // lock4: a longer PIN (4-12 digits) or a passphrase. Eager with the rest of the
+  // lock: the lock screen draws before any lazy pack could load.
+  'lock4.pad.enter': 'Ввод',
+  'lock4.pad.enterLabel': 'Разблокировать этим PIN',
+  'lock4.prompt.pin': 'Введите PIN и нажмите Enter',
+  'lock4.prompt.passphrase': 'Введите парольную фразу',
+  'lock4.passphrase.label': 'Парольная фраза',
+  'lock4.tooShort': 'Слишком коротко: в PIN не меньше 4 цифр, в парольной фразе не меньше 6 символов.',
+  'lock4.settings.kind.label': 'Тип кода',
+  'lock4.settings.kind.pin': 'PIN (от 4 до 12 цифр)',
+  'lock4.settings.kind.passphrase': 'Парольная фраза',
+  'lock4.settings.kind.hintPin': 'PIN из 4 цифр снимает блокировку сразу после четвёртой цифры. Более длинный PIN труднее подобрать; после него нажмите Enter.',
+  'lock4.settings.kind.hintPassphrase': 'От 6 до 64 символов, хотя бы один не цифра. Пробелы внутри учитываются, пробелы по краям игнорируются.',
+  'lock4.settings.needPin': 'Введите PIN от 4 до 12 цифр.',
+  'lock4.settings.needPassphrase': 'Парольная фраза должна содержать от 6 до 64 символов, хотя бы один не цифру.',
+  'lock4.blanc.hint': 'PIN от 4 до 12 цифр или парольная фраза от 6 символов.',
+  'lock4.blanc.unlock': 'Разблокировать',
 };

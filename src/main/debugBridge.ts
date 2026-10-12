@@ -26,6 +26,7 @@ import {
   clickE2eTrayItem,
   e2eClipboard,
   e2eHeadlessStatus,
+  e2ePower,
   fireE2eShortcut,
   isE2eHeadless,
   queueE2eDialogResult,
@@ -1225,7 +1226,8 @@ async function handle(
      * headless mode is on, so nothing here can change a developer's normal instance.
      *
      * Body: `{ action: 'status' | 'clear' | 'queueDialog' | 'fireShortcut' | 'clickTray' |
-     * 'clipboard' | 'setScreenImage', kind?, result?, accelerator?, label?, set?, path? }`.
+     * 'clipboard' | 'setScreenImage' | 'power', kind?, result?, accelerator?, label?, set?, path?,
+     * event?, idleSeconds? }`.
      */
     case '/e2e': {
       if (!isE2eHeadless()) return { code: 409, body: { ok: false, error: 'e2e headless mode is off' } };
@@ -1253,6 +1255,13 @@ async function handle(
       } else if (action === 'setScreenImage') {
         // What every synthetic screen shows from now on (a PNG path; '' = plain grey).
         if (!setE2eScreenImage(String(body.path ?? ''))) return { code: 400, body: { ok: false, error: `unreadable image ${String(body.path)}` } };
+      } else if (action === 'power') {
+        // lock4: auto-lock's real inputs. `event` ('suspend' | 'lock-screen') is emitted on
+        // Electron's own powerMonitor, as Windows' notification would be; `idleSeconds`
+        // (null = real) is what getSystemIdleTime answers to the auto-lock poll. Nothing
+        // reaches Windows: the PC does not sleep and its session does not lock.
+        const res = e2ePower({ event: body.event, idleSeconds: body.idleSeconds });
+        if (!res.ok) return { code: 400, body: res };
       } else if (action !== 'status') {
         return { code: 400, body: { ok: false, error: `unknown action ${action}` } };
       }

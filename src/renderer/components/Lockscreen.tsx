@@ -7,11 +7,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import {
+  isValidPin,
   loadLockscreen,
   markLockscreenUnlocked,
+  readLockscreenSecretKind,
   verifyLockscreenPinDetailed,
   type LockscreenSettings,
 } from '../lockscreenSettings';
+import { LOCK_PASSPHRASE_MAX_CHARS, LOCK_PIN_MAX_DIGITS, normalizeLockSecretKind, type LockSecretKind } from '../../shared/lockSecret';
 import { AERO_THEME_ID } from '../theme/frutiger-aero';
 import { WIRED_ARCHIVE_THEME_ID } from '../theme/wired-archive';
 import { loadThemeId } from '../theme';
@@ -21,6 +24,9 @@ import { showOsToast } from './ToastHost';
 import { LockscreenChallenge, LockscreenRecovery, LockscreenStudyPanel, type LockscreenVariant } from './LockscreenStudy';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'] as const;
+/** lock4: a 4-12 digit PIN has no fixed length to submit at, so the pad gets an Enter key. */
+const KEYS_LONG = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'ok', '0', 'del'] as const;
+type PadKey = (typeof KEYS)[number] | (typeof KEYS_LONG)[number];
 
 function isAeroLockscreen(): boolean {
   if (typeof document === 'undefined') return false;
@@ -56,10 +62,29 @@ export default function Lockscreen({
   const [easeMode, setEaseMode] = useState(false);
   const [dozing, setDozing] = useState(false);
   const [cfg] = useState<LockscreenSettings>(() => loadLockscreen());
+  /**
+   * lock4: what the secret is — the 4-digit pad (submits on the fourth digit),
+   * a 4-12 digit PIN (the pad gains an Enter key) or a passphrase (a text field
+   * on every skin). The mirror draws the first frame; main's answer follows.
+   */
+  const [kind, setKind] = useState<LockSecretKind>(() => normalizeLockSecretKind(cfg.secretKind));
+  useEffect(() => {
+    let alive = true;
+    void readLockscreenSecretKind().then((next) => {
+      if (alive) setKind(next);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const maxDigits = kind === 'pin4' ? 4 : LOCK_PIN_MAX_DIGITS;
+  const padKeys: readonly PadKey[] = kind === 'pin' ? KEYS_LONG : KEYS;
   const [digits, setDigits] = useState('');
   const [password, setPassword] = useState('');
   const [shake, setShake] = useState(false);
   const [error, setError] = useState(false);
+  /** A longer PIN or a passphrase submitted below its minimum: said, never sent to main. */
+  const [tooShort, setTooShort] = useState(false);
   // Wired lockscreen: amber flash per failure; red is reserved for 3+ failures.
   const [failCount, setFailCount] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
@@ -117,8 +142,8 @@ export default function Lockscreen({
   }, [wiredMode]);
 
   useEffect(() => {
-    if ((aeroMode || wiredMode) && pinActive) passwordRef.current?.focus();
-  }, [aeroMode, wiredMode, pinActive]);
+    if ((aeroMode || wiredMode || kind === 'passphrase') && pinActive) passwordRef.current?.focus();
+  }, [aeroMode, wiredMode, pinActive, kind]);
   // The challenge's buttons go away when it is passed: keep focus in the lock.
   useEffect(() => {
     if (stage !== 'pin') return;
@@ -221,7 +246,14 @@ export default function Lockscreen({
 
   const tryUnlock = useCallback(
     (pin: string) => {
-      if (pin.length !== 4) return;
+      if (kind === 'pin4') {
+        if (pin.length !== 4) return;
+      } else if (!isValidPin(pin)) {
+        // Below the minimum (or empty): say so here; main's counter never sees it.
+        if (pin.length > 0) setTooShort(true);
+        return;
+      }
+      setTooShort(false);
       // Main checks the hash (and backs off after repeated misses), so this is async.
       void verifyLockscreenPinDetailed(pin).then((res) => {
         if (!res.ok) {
@@ -234,30 +266,38 @@ export default function Lockscreen({
         onUnlocked();
       });
     },
-    [fail, onUnlocked],
+    [fail, onUnlocked, kind],
   );
 
   const press = useCallback(
-    (key: (typeof KEYS)[number]) => {
+    (key: PadKey) => {
       if (unlocking || shake || waiting) return;
       if (key === '') return;
+      if (key === 'ok') {
+        tryUnlock(digits);
+        return;
+      }
       if (key === 'del') {
         setDigits((d) => d.slice(0, -1));
         setError(false);
+        setTooShort(false);
         return;
       }
+      setTooShort(false);
       setDigits((d) => {
-        if (d.length >= 4) return d;
+        if (d.length >= maxDigits) return d;
         const next = d + key;
-        if (next.length === 4) window.setTimeout(() => tryUnlock(next), 80);
+        // Only the classic 4-digit PIN submits by itself; a longer one waits for Enter.
+        if (kind === 'pin4' && next.length === 4) window.setTimeout(() => tryUnlock(next), 80);
         return next;
       });
     },
-    [unlocking, shake, waiting, tryUnlock],
+    [unlocking, shake, waiting, tryUnlock, digits, maxDigits, kind],
   );
 
   useEffect(() => {
-    if (aeroMode || wiredMode || !pinActive) return;
+    // A passphrase is typed into its own field: no window-level digit capture.
+    if (aeroMode || wiredMode || !pinActive || kind === 'passphrase') return;
     const onKey = (e: KeyboardEvent) => {
       if (unlocking) return;
       if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -266,21 +306,83 @@ export default function Lockscreen({
         press('del');
         return;
       }
+      if (e.key === 'Enter' && kind === 'pin') {
+        // Enter on a focused pad key activates that key instead.
+        if (e.target instanceof HTMLButtonElement) return;
+        e.preventDefault();
+        e.stopPropagation();
+        press('ok');
+        return;
+      }
       if (/^\d$/.test(e.key)) {
         e.preventDefault();
         e.stopPropagation();
-        press(e.key as (typeof KEYS)[number]);
+        press(e.key as PadKey);
       }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [press, unlocking, aeroMode, wiredMode, pinActive]);
+  }, [press, unlocking, aeroMode, wiredMode, pinActive, kind]);
 
   const submitPassword = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (unlocking || shake || waiting) return;
-    tryUnlock(password.replace(/\D/g, '').slice(0, 4));
+    tryUnlock(kind === 'passphrase' ? password : password.replace(/\D/g, '').slice(0, maxDigits));
   };
+  /** The password field every skin draws for a passphrase (and Aero / WIRED for any PIN). */
+  const secretFieldProps = {
+    type: 'password',
+    value: password,
+    maxLength: kind === 'passphrase' ? LOCK_PASSPHRASE_MAX_CHARS : maxDigits,
+    inputMode: kind === 'passphrase' ? ('text' as const) : ('numeric' as const),
+    autoComplete: 'off',
+    spellCheck: false,
+    disabled: unlocking || waiting,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      setPassword(kind === 'passphrase' ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, maxDigits));
+      setError(false);
+      setTooShort(false);
+    },
+  };
+  /** What the PIN-pad skins say above the pad (or the passphrase field). */
+  const enterPrompt = (classic: string): string =>
+    tooShort
+      ? t('lock4.tooShort')
+      : kind === 'passphrase'
+        ? t('lock4.prompt.passphrase')
+        : kind === 'pin'
+          ? t('lock4.prompt.pin')
+          : classic;
+  // A longer PIN shows as many dots as typed (never fewer than four): its length is not known.
+  const dotCount = kind === 'pin4' ? 4 : Math.max(4, digits.length);
+  const goArrow = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 12h13M12.5 6.5 18 12l-5.5 5.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  /** win11 / widget: a passphrase replaces the dots and the pad with one field. */
+  const passphraseForm = (promptId: string) => (
+    <form className={`lockscreen-pass-form${widgetMode ? ' is-compact' : ''}`} onSubmit={submitPassword}>
+      <input
+        ref={passwordRef}
+        className="lockscreen-pass-input"
+        {...secretFieldProps}
+        placeholder={t('lock4.passphrase.label')}
+        aria-label={t('lock4.passphrase.label')}
+        aria-invalid={error || tooShort || undefined}
+        aria-describedby={promptId}
+      />
+      <button
+        type="submit"
+        className="lockscreen-pass-go"
+        disabled={unlocking || waiting}
+        aria-label={t('lockscreen.aria.signIn')}
+        title={t('lockscreen.aria.signIn')}
+      >
+        {goArrow}
+      </button>
+    </form>
+  );
 
   // Formatted in the *UI* language, not the OS locale. `[]` fell back to the
   // system locale, so every skin printed `Wed, Aug 5` under a Russian or
@@ -300,6 +402,56 @@ export default function Lockscreen({
     </>
   );
   const challenge = stage === 'challenge' ? <LockscreenChallenge variant={variant} onPassed={finishChallenge} /> : null;
+
+  /**
+   * The Study OS (win11) and widget skins: the prompt, then the dots and the pad
+   * for a PIN, or one passphrase field. `p` is the skin's class prefix.
+   */
+  const pinEntry = (p: 'lockscreen' | 'lockscreen-win11', promptId: string, promptText: string) => (
+    <>
+      <p id={promptId} className={`${p}-prompt${error || tooShort ? ' is-error' : ''}`} role="status">
+        {retryText ?? promptText}
+      </p>
+      {kind === 'passphrase' ? (
+        passphraseForm(promptId)
+      ) : (
+        <>
+          <span className="sr-only" role="status">{t('a11y3.lock.digits', { count: digits.length })}</span>
+          <div className={`${p}-dots`} aria-hidden>
+            {Array.from({ length: dotCount }, (_, i) => (
+              <span key={i} className={`${p}-dot${i < digits.length ? ' is-filled' : ''}${error ? ' is-error' : ''}`} />
+            ))}
+          </div>
+          <div className={`${p}-pad`}>
+            {padKeys.map((key, i) => {
+              if (key === '') {
+                return <span key={`empty-${i}`} className={`${p}-key is-spacer`} aria-hidden />;
+              }
+              if (key === 'del' || key === 'ok') {
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`${p}-key is-action`}
+                    title={key === 'del' ? t('lockscreen.delete') : t('lock4.pad.enterLabel')}
+                    disabled={unlocking || waiting}
+                    onClick={() => press(key)}
+                  >
+                    {key === 'del' ? t('lockscreen.del') : t('lock4.pad.enter')}
+                  </button>
+                );
+              }
+              return (
+                <button key={key} type="button" className={`${p}-key`} disabled={unlocking || waiting} onClick={() => press(key)}>
+                  {key}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </>
+  );
 
   if (wiredMode) {
     return (
@@ -342,24 +494,22 @@ export default function Lockscreen({
               <input
                 id="wired-access-code"
                 ref={passwordRef}
-                type="password"
-                value={password}
-                maxLength={4}
-                inputMode="numeric"
-                autoComplete="off"
-                disabled={unlocking || waiting}
-                aria-label={t('lockscreen.aria.accessCode')}
-                onChange={(e) => {
-                  setPassword(e.target.value.replace(/\D/g, '').slice(0, 4));
-                  setError(false);
-                }}
+                {...secretFieldProps}
+                aria-label={kind === 'passphrase' ? t('lock4.passphrase.label') : t('lockscreen.aria.accessCode')}
+                aria-invalid={error || tooShort || undefined}
+                aria-describedby="lockscreen-wired-status"
               />
               <button type="submit" disabled={unlocking || waiting}>
                 {t('lockscreen.wired.auth')}
               </button>
             </div>
-            <p className="lockscreen-wired-status" role="status">
-              {retryText ?? (error ? t('lockscreen.wired.denied') : t('lockscreen.wired.clearance'))}
+            <p id="lockscreen-wired-status" className="lockscreen-wired-status" role="status">
+              {retryText ??
+                (tooShort
+                  ? t('lock4.tooShort')
+                  : error
+                    ? t('lockscreen.wired.denied')
+                    : t('lockscreen.wired.clearance'))}
             </p>
           </form>
           )}
@@ -404,30 +554,19 @@ export default function Lockscreen({
             <form className="lockscreen-aero-form" onSubmit={submitPassword}>
               <input
                 ref={passwordRef}
-                type="password"
                 className="lockscreen-aero-pass"
-                value={password}
-                maxLength={4}
-                inputMode="numeric"
-                autoComplete="off"
-                disabled={unlocking || waiting}
-                placeholder={t('lockscreen.aria.password')}
-                aria-label={t('lockscreen.aria.password')}
-                aria-invalid={showIncorrect || undefined}
+                {...secretFieldProps}
+                placeholder={kind === 'passphrase' ? t('lock4.passphrase.label') : t('lockscreen.aria.password')}
+                aria-label={kind === 'passphrase' ? t('lock4.passphrase.label') : t('lockscreen.aria.password')}
+                aria-invalid={showIncorrect || tooShort || undefined}
                 aria-describedby="lockscreen-aero-status"
-                onChange={(e) => {
-                  setPassword(e.target.value.replace(/\D/g, '').slice(0, 4));
-                  setError(false);
-                }}
               />
               <button type="submit" className="lockscreen-aero-go" disabled={unlocking || waiting} aria-label={t('lockscreen.aria.signIn')}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M5 12h13M12.5 6.5 18 12l-5.5 5.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {goArrow}
               </button>
             </form>
             <p id="lockscreen-aero-status" className="lockscreen-aero-status" role="status" aria-live="polite">
-              {retryText ?? (showIncorrect ? t('lockscreen.xp.incorrect') : '')}
+              {retryText ?? (tooShort ? t('lock4.tooShort') : showIncorrect ? t('lockscreen.xp.incorrect') : '')}
             </p>
             </>
             )}
@@ -499,51 +638,9 @@ export default function Lockscreen({
           <div className="lockscreen-date muted">{date}</div>
           {clockSr}
           {challenge}
-          {stage === 'pin' && !recoveryOpen && (
-          <>
-          <p className={`lockscreen-prompt${error ? ' is-error' : ''}`} role="status">
-            {retryText ?? (error ? t('lockscreen.widget.wrong') : t('lockscreen.widget.enter'))}
-          </p>
-          <span className="sr-only" role="status">{t('a11y3.lock.digits', { count: digits.length })}</span>
-          <div className="lockscreen-dots" aria-hidden>
-            {[0, 1, 2, 3].map((i) => (
-              <span key={i} className={`lockscreen-dot${i < digits.length ? ' is-filled' : ''}${error ? ' is-error' : ''}`} />
-            ))}
-          </div>
-          <div className="lockscreen-pad">
-            {KEYS.map((key, i) => {
-              if (key === '') {
-                return <span key={`empty-${i}`} className="lockscreen-key is-spacer" aria-hidden />;
-              }
-              if (key === 'del') {
-                return (
-                  <button
-                    key="del"
-                    type="button"
-                    className="lockscreen-key is-action"
-                    title={t('lockscreen.delete')}
-                    disabled={unlocking || waiting}
-                    onClick={() => press('del')}
-                  >
-                    {t('lockscreen.del')}
-                  </button>
-                );
-              }
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className="lockscreen-key"
-                  disabled={unlocking || waiting}
-                  onClick={() => press(key)}
-                >
-                  {key}
-                </button>
-              );
-            })}
-          </div>
-          </>
-          )}
+          {stage === 'pin' &&
+            !recoveryOpen &&
+            pinEntry('lockscreen', 'lockscreen-widget-prompt', error ? t('lockscreen.widget.wrong') : enterPrompt(t('lockscreen.widget.enter')))}
           {stage === 'pin' && studyExtras}
         </div>
       </div>
@@ -582,51 +679,9 @@ export default function Lockscreen({
         <div className="lockscreen-win11-name">{t('lockscreen.user')}</div>
         {clockSr}
         {challenge}
-        {stage === 'pin' && !recoveryOpen && (
-        <>
-        <p className={`lockscreen-win11-prompt${error ? ' is-error' : ''}`} role="status">
-          {retryText ?? (error ? t('lockscreen.win11.incorrect') : t('lockscreen.win11.enter'))}
-        </p>
-        <span className="sr-only" role="status">{t('a11y3.lock.digits', { count: digits.length })}</span>
-        <div className="lockscreen-win11-dots" aria-hidden>
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={`lockscreen-win11-dot${i < digits.length ? ' is-filled' : ''}${error ? ' is-error' : ''}`} />
-          ))}
-        </div>
-        <div className="lockscreen-win11-pad">
-          {KEYS.map((key, i) => {
-            if (key === '') {
-              return <span key={`empty-${i}`} className="lockscreen-win11-key is-spacer" aria-hidden />;
-            }
-            if (key === 'del') {
-              return (
-                <button
-                  key="del"
-                  type="button"
-                  className="lockscreen-win11-key is-action"
-                  title={t('lockscreen.delete')}
-                  disabled={unlocking || waiting}
-                  onClick={() => press('del')}
-                >
-                  {t('lockscreen.del')}
-                </button>
-              );
-            }
-            return (
-              <button
-                key={key}
-                type="button"
-                className="lockscreen-win11-key"
-                disabled={unlocking || waiting}
-                onClick={() => press(key)}
-              >
-                {key}
-              </button>
-            );
-          })}
-        </div>
-        </>
-        )}
+        {stage === 'pin' &&
+          !recoveryOpen &&
+          pinEntry('lockscreen-win11', 'lockscreen-win11-prompt', error ? t('lockscreen.win11.incorrect') : enterPrompt(t('lockscreen.win11.enter')))}
         {stage === 'pin' && studyExtras}
       </div>
     </div>

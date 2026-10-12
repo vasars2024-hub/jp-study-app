@@ -1523,7 +1523,7 @@ const api = {
     ipcRenderer.invoke('lockscreen:verifyPin', pin, stored),
   /** Mirror the lock settings to main, which owns the lock (ignored while locked). */
   lockscreenSyncConfig: (
-    config: { enabled: boolean; pinHash: string },
+    config: { enabled: boolean; pinHash: string; secretKind?: string },
     rendererLocked: boolean,
   ): Promise<{ ok: boolean; locked: boolean }> => ipcRenderer.invoke('lockscreen:syncConfig', config, rendererLocked),
   /** Arm main's lock (Secret OS / Wired entry). */
@@ -1701,13 +1701,24 @@ const api = {
   /** Settings -> Help -> Updates: version, channel, last check, state, error code. */
   appUpdateDetails: (): Promise<import('./shared/appUpdate').AppUpdateDetails> => ipcRenderer.invoke('appUpdate:details'),
   appUpdateCheckNow: (): Promise<import('./shared/appUpdate').AppUpdateDetails> => ipcRenderer.invoke('appUpdate:checkNow'),
-  /** GitHub release notes; only ever called from a click. */
-  appUpdateReleaseNotes: (): Promise<import('./shared/appUpdate').AppReleaseNotes> => ipcRenderer.invoke('appUpdate:releaseNotes'),
+  /** GitHub release notes (the channel's latest, or one `version`'s); only ever called from a click. */
+  appUpdateReleaseNotes: (opts?: { version?: string }): Promise<import('./shared/appUpdate').AppReleaseNotes> =>
+    ipcRenderer.invoke('appUpdate:releaseNotes', opts),
   onAppUpdateDetails: (cb: (details: import('./shared/appUpdate').AppUpdateDetails) => void): (() => void) => {
     const handler = (_e: unknown, details: import('./shared/appUpdate').AppUpdateDetails): void => cb(details);
     ipcRenderer.on('appUpdate:details', handler);
     return () => ipcRenderer.removeListener('appUpdate:details', handler);
   },
+  /** Stop Gum's own update download; "Check now" resumes it. */
+  appUpdateCancelDownload: (): Promise<boolean> => ipcRenderer.invoke('appUpdate:cancelDownload'),
+  /** A link in rendered release notes; main opens only this project's GitHub pages. */
+  appUpdateOpenLink: (url: string): Promise<boolean> => ipcRenderer.invoke('appUpdate:openLink', url),
+  /** "What's new": its one-time notice was posted, or the user dismissed it. */
+  appUpdateWhatsNew: (action: 'announced' | 'dismissed'): Promise<import('./shared/appUpdate').AppUpdateDetails> =>
+    ipcRenderer.invoke('appUpdate:whatsNew', action),
+  /** This window's unsaved work, the whole list each time (main/unsavedWork.ts). */
+  reportUnsavedWork: (kinds: readonly import('./shared/appUpdate').AppUpdateUnsavedKind[]): void =>
+    ipcRenderer.send('unsavedWork:report', [...kinds]),
 
   // Remote Resources catalogue (fetched from GitHub, cached in userData)
   catalogGet: (): Promise<import('./shared/resourcesCatalog').ResourcesCatalog | null> =>

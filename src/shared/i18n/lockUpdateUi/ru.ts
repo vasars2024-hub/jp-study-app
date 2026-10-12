@@ -80,4 +80,14 @@ export const LOCK_UPDATE_UI_RU: Catalog = {
   'upd2.restart.notNow': 'Не сейчас',
   'upd2.unsaved.recording': 'идущую запись экрана',
   'upd2.unsaved.recording-finalize': 'запись, которая ещё сохраняется',
+  // Eager (see ./en.ts); moved from ../updateUi3.
+  'upd2.error.checksum':
+    'Загруженное обновление не совпало с опубликованной контрольной суммой и было удалено. Попробуйте снова; если ошибка повторится, скачайте установщик с GitHub.',
+  'upd2.error.disk': 'Недостаточно свободного места на диске для обновления. Освободите место и попробуйте снова.',
+  'upd2.unsaved.note-editor': 'редактируемую заметку, которая ещё не сохранена',
+  'upd2.unsaved.card-editor': 'редактируемую карточку, которая ещё не сохранена',
+  'upd2.unsaved.writing-correction': 'проверку текста, которая ещё готовится',
+  'upd2.unsaved.review-session': 'идущее повторение',
+  'upd2.unsaved.snip': 'снимок, который ещё превращается в карточки',
+  'upd2.unsaved.ai-job': 'задачу ИИ, которая ещё выполняется',
 };

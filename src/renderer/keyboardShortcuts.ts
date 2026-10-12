@@ -6,7 +6,6 @@
 // alternatives (Space|Enter), profiles, import/export. One global keydown +
 // mousedown listener dispatches everything.
 
-import { toggleWordHighlight } from './readerSettings';
 import { next as musicNext, prev as musicPrev, toggle as musicToggle, setVolume, getState } from './playerBus';
 import { performUndo, canUndo, peekUndo } from './actionHistory';
 import { bumpZoom, setZoom, ZOOM_DEFAULT, ZOOM_STEP } from './appZoom';
@@ -2226,7 +2225,9 @@ function builtinHandler(id: string): Handler | null {
     case 'nav.open.city':
       return () => void openApp('city');
     case 'reader.toggleWordHighlight':
-      return () => void toggleWordHighlight();
+      // Dynamic: reader settings (and the highlight CSS they carry) are not boot cost
+      // for every window that installs shortcuts — Blanc's among them.
+      return () => void import('./readerSettings').then((m) => m.toggleWordHighlight());
     case 'clipboard.open':
       return () => void window.dispatchEvent(new CustomEvent('clipboard:open'));
     case 'app.toggle':

@@ -111,7 +111,10 @@ module.exports = {
     const retimed = await poll(ctx, `(() => { const e = JSON.parse(localStorage.getItem(${JSON.stringify(STORE)}) || '[]').find((x) => x.id === ${JSON.stringify(oneOff?.id ?? '')}); return e && e.startTime === '10:15' ? { start: e.startTime, end: e.endTime } : null; })()`, 5000);
     result.check('Alt+ArrowDown in the week grid moves it 15 minutes, keeping its length', retimed?.start === '10:15' && retimed?.end === '11:45', retimed);
     // The grid's own keys: one tab stop, arrows pick a slot, Enter opens the editor there.
-    await ev(`document.querySelector('.cal-wk[role=grid]').focus()`);
+    // The moved event's chip takes focus back once its re-render settles (focus follows the
+    // event), so wait until the grid itself holds focus before sending the grid's keys.
+    const gridFocused = await poll(ctx, `(() => { const g = document.querySelector('.cal-wk[role=grid]'); if (!g) return null; if (document.activeElement !== g) g.focus(); return document.activeElement === g || null; })()`, 5000);
+    result.check('the week grid itself holds focus before its keys are sent', gridFocused === true);
     await ctx.request('/key', { window: 'main', key: 'ArrowDown' });
     await ctx.request('/key', { window: 'main', key: 'Enter' });
     const slotEditor = await poll(ctx, `(() => { const m = document.querySelector('.cal-modal[role=dialog]'); if (!m) return null; return m.querySelectorAll('input[type=time]')[0]?.value || 'no-time'; })()`, 5000);

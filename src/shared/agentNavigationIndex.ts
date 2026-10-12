@@ -249,7 +249,13 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'mini', controlId: 'mini-routines', titleKey: 'search.miniRoutines', terms: ['mini routines'] },
   { section: 'settings', page: 'mini', controlId: 'mini-look', titleKey: 'settings.mini.look.title', terms: ['mini look'] },
   { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-enable', titleKey: 'search.lockscreen', terms: ['lockscreen', 'lock', 'pin', 'passcode', 'password', 'security', 'login'] },
-  { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-pin', titleKey: 'search.lockscreenPin', terms: ['lockscreen passcode', 'pin', 'passcode', 'password', '4 digit', 'lock'] },
+  { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-pin', titleKey: 'search.lockscreenPin', terms: ['lockscreen passcode', 'pin', 'passcode', 'password', '4 digit', 'lock', 'passphrase', 'longer pin'] },
+  // lock4: the three cards lock3 added to the page. Each claims only phrases (or words)
+  // no older entry answers to, so "pin" / "lock" keep resolving where they did. No
+  // term carries a stopword: the query drops those, so such a term could never match.
+  { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-recovery', titleKey: 'lock3.settings.recovery.title', terms: ['recovery code', 'forgot pin', 'forgot passcode', 'recovery'] },
+  { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-auto', titleKey: 'lock3.settings.auto.title', terms: ['lock automatically', 'auto lock', 'idle lock', 'idle', 'timeout'] },
+  { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-study', titleKey: 'lock3.settings.study.title', terms: ['lock screen study', 'lockscreen card', 'answer unlock', 'card due lockscreen'] },
   { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-tint', titleKey: 'search.lockscreenTint', terms: ['lockscreen look', 'lockscreen', 'tint', 'look', 'theme'] },
   { section: 'settings', page: 'study', controlId: 'focus-mode', titleKey: 'search.focusMode', terms: ['focus mode', 'focus', 'reader', 'distraction', 'study', 'minimal', 'epub'] },
   { section: 'settings', page: 'study', controlId: 'focus-lock', titleKey: 'search.focusLock', terms: ['focus lock timer', 'focus', 'lock', 'timer', 'pomodoro', 'commit', 'distraction', 'exit'] },

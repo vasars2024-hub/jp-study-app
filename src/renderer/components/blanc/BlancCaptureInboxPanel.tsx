@@ -21,6 +21,7 @@ import {
   type CaptureItem,
 } from './blancCaptureInbox';
 import { loadBlancMechSettings } from './blancMechSettings';
+import { useUnsavedWork } from '../../unsavedWork';
 // Lazy with this chunk: the overlays' sheet is not startup CSS.
 import '../../theme/blanc-mechanics-overlays.css';
 
@@ -111,6 +112,15 @@ export function CaptureTriageList({ onTriaged, autoFocus = true, extraHint }: Tr
   const wrapRef = useRef<HTMLDivElement>(null);
   const safeIndex = items.length ? Math.min(index, items.length - 1) : -1;
   const selected = safeIndex >= 0 ? items[safeIndex] : null;
+  // A card's fields changed in the edit form and not saved: "Restart to update" says so.
+  const editedItem = editing ? items.find((item) => item.id === editing.id) : undefined;
+  useUnsavedWork(
+    'card-editor',
+    Boolean(editing && (!editedItem
+      || editing.text !== editedItem.text
+      || editing.reading !== (editedItem.reading ?? '')
+      || editing.meaning !== (editedItem.meaning ?? ''))),
+  );
   const dateFormat = useMemo(
     () => new Intl.DateTimeFormat(LANG_TAGS[lang], { dateStyle: 'short', timeStyle: 'short' }),
     [lang],

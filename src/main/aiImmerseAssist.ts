@@ -99,6 +99,7 @@ import {
   aiFeaturesEnabled,
 } from './aiFeatureGate';
 import { getAiProviderHealth } from './providerRuntime';
+import { holdUnsavedWork } from './unsavedWork';
 
 // ---- the reply shapes ------------------------------------------------------------
 
@@ -465,6 +466,8 @@ async function runFeature<Req extends { requestId?: string; refresh?: boolean },
 
   const controller = new AbortController();
   const requestId = request.requestId;
+  // "Restart to update" lists an AI request still being answered.
+  const releaseUnsaved = holdUnsavedWork('ai-job');
   if (requestId) {
     inFlight.get(requestId)?.abort();
     inFlight.set(requestId, controller);
@@ -501,6 +504,7 @@ async function runFeature<Req extends { requestId?: string; refresh?: boolean },
     };
   } finally {
     if (requestId && inFlight.get(requestId) === controller) inFlight.delete(requestId);
+    releaseUnsaved();
   }
 }
 

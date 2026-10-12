@@ -74,4 +74,21 @@ export const LOCK3_UI_JA: Catalog = {
   'lock3.settings.study.answer': 'PIN の前にカードに答える',
   'lock3.settings.study.answerNote':
     '最初にデッキから選択式のカードが出題されます。PIN がある場合は、その後に PIN も必要です。PIN がない場合は起動時の学習習慣であり、ロックではありません。',
+  // lock4: a longer PIN (4-12 digits) or a passphrase. Eager with the rest of the
+  // lock: the lock screen draws before any lazy pack could load.
+  'lock4.pad.enter': '確定',
+  'lock4.pad.enterLabel': 'この PIN でロックを解除',
+  'lock4.prompt.pin': 'PIN を入力して Enter を押してください',
+  'lock4.prompt.passphrase': 'パスフレーズを入力してください',
+  'lock4.passphrase.label': 'パスフレーズ',
+  'lock4.tooShort': '短すぎます。PIN は 4 桁以上、パスフレーズは 6 文字以上です。',
+  'lock4.settings.kind.label': 'パスコードの種類',
+  'lock4.settings.kind.pin': 'PIN（4〜12 桁）',
+  'lock4.settings.kind.passphrase': 'パスフレーズ',
+  'lock4.settings.kind.hintPin': '4 桁の PIN は 4 桁目を入力した時点で解除されます。長い PIN ほど推測されにくくなります。入力後に Enter を押してください。',
+  'lock4.settings.kind.hintPassphrase': '6〜64 文字で、数字以外の文字を 1 つ以上含めてください。途中の空白は有効で、前後の空白は無視されます。',
+  'lock4.settings.needPin': '4〜12 桁の PIN を入力してください。',
+  'lock4.settings.needPassphrase': 'パスフレーズは 6〜64 文字で、数字以外の文字を 1 つ以上含める必要があります。',
+  'lock4.blanc.hint': '4〜12 桁の PIN、または 6 文字以上のパスフレーズ。',
+  'lock4.blanc.unlock': 'ロック解除',
 };

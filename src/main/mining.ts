@@ -101,6 +101,7 @@ import {
 import { aiCredentialsUsable, readAiProviderSecret, writeAiProviderSecret } from './credentials/ai';
 import { AiProviderRuntimeError, getAiProviderHealthReport } from './providerRuntime';
 import { getAiSetupStore } from './aiSetupStore';
+import { holdUnsavedWork } from './unsavedWork';
 
 interface FrequencyDictionaryFile {
   summary: FrequencyDictionarySummary;
@@ -181,12 +182,15 @@ const activeAiGenerations = new Set<AbortController>();
 async function withGenerationSignal<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
   activeAiGenerations.add(controller);
+  // "Restart to update" lists a Card Studio run in progress.
+  const releaseUnsaved = holdUnsavedWork('ai-job');
   try {
     return await run(controller.signal);
   } catch (error) {
     throw localizedAiError(controller.signal.aborted ? new AiProviderRuntimeError('Cancelled.', 'cancelled') : error);
   } finally {
     activeAiGenerations.delete(controller);
+    releaseUnsaved();
   }
 }
 

@@ -14,11 +14,17 @@
  *  - each skin (Study OS, Aero, WIRED, Blanc) draws its clock, the study panel and the
  *    "Forgot your PIN?" link; WIRED ticks seconds;
  *  - "answer a card to unlock" comes before the PIN pad, and the PIN is still needed;
- *  - the recovery code unlocks once and removes the PIN.
+ *  - the recovery code unlocks once and removes the PIN;
+ *  - lock4: auto-lock through Electron's REAL powerMonitor: the harness (debug bridge
+ *    `/e2e` action `power`, headless only) emits `suspend` / `lock-screen` on it and
+ *    overrides the system idle time the 15 s auto-lock poll reads. Nothing reaches
+ *    Windows: the PC never sleeps and the session is never locked;
+ *  - lock4: an 8-digit PIN (the pad gains an Enter key) and a passphrase typed on the
+ *    keyboard into a labelled field on every skin (Study OS, WIRED, Aero, Blanc).
  *
- * Not drivable here (no hook in the harness): real sleep / Win+L / system idle for
- * auto-lock (powerMonitor), and a moved Windows clock. Those are unit-tested
- * (lockAutoArm.test.ts, lockscreenPin.test.ts "clock changes").
+ * Not drivable here: a Windows clock moved while Gum is closed (the harness may not
+ * change the system clock). That is unit-tested (lockscreenPin.test.ts "lock4: the
+ * clock moved forward while Gum was closed").
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -221,6 +227,144 @@ module.exports = {
     result.note(`card mode, after the challenge: card of the day ${cardOfDay ? 'shown' : 'absent (empty deck)'}`);
     await unlockWith(PIN2);
     await ev(`(() => { const s = JSON.parse(localStorage.getItem('jp-study-lockscreen-v1') || '{}'); s.answerToUnlock = false; s.study = 'count'; localStorage.setItem('jp-study-lockscreen-v1', JSON.stringify(s)); return true; })()`);
+
+    // --- 7b. Auto-lock through Electron's REAL powerMonitor (lock4) -----------------------
+    // The harness emits `suspend` / `lock-screen` on the real powerMonitor object (what
+    // Windows' notification makes Electron do) and overrides the idle time the auto-lock
+    // poll reads. Nothing reaches Windows: the PC does not sleep, its session is not locked.
+    // The idle reading is pinned to 0 first, so the owner walking away mid-run cannot
+    // trip the 1-minute idle lock early and make a check below pass by accident.
+    await ctx.e2e('power', { idleSeconds: 0 });
+    const autoOn = await ev(`window.api.lockscreenSetAutoLock({ idleMinutes: 1, onSleep: true, onScreenLock: true })`, { await: true });
+    result.check('auto-lock is set in main (idle 1 min, on sleep, on Windows lock)', autoOn?.ok === true && autoOn?.status?.autoLock?.onSleep === true && autoOn?.status?.autoLock?.onScreenLock === true, autoOn?.status?.autoLock);
+    const lockedNow = () => pollAsync(ctx, `(async () => (await window.api.lockscreenIsLocked()) === true || null)()`, 8000).catch(() => null);
+    const logSays = async (mark, needle) => {
+      for (let i = 0; i < 20; i++) {
+        if (mainLog().slice(mark).includes(needle)) return true;
+        await ctx.sleep(150);
+      }
+      return false;
+    };
+    let mark = mainLog().length;
+    const suspend = await ctx.e2e('power', { event: 'suspend' });
+    const bySleep = await lockedNow();
+    result.check('a powerMonitor "suspend" arms the lock (auto-lock: sleep)', suspend.ok === true && Boolean(bySleep) && (await logSays(mark, 'auto-lock: sleep')), { suspend: suspend.ok, power: suspend.power });
+    await poll(ctx, `!!document.querySelector('.lockscreen[role=dialog]') || null`, 10000);
+    result.check('...and the PIN pad comes up', true);
+    await unlockWith(PIN2);
+    await ev(`window.api.lockscreenSetAutoLock({ onSleep: false })`, { await: true });
+    await ctx.e2e('power', { event: 'suspend' });
+    await ctx.sleep(1200);
+    result.check('with "on sleep" off, a suspend leaves Gum unlocked', (await isLocked()) === false);
+    mark = mainLog().length;
+    const winL = await ctx.e2e('power', { event: 'lock-screen' });
+    const byWinL = await lockedNow();
+    result.check('a powerMonitor "lock-screen" (Win+L) arms the lock (auto-lock: screen-lock)', winL.ok === true && Boolean(byWinL) && (await logSays(mark, 'auto-lock: screen-lock')));
+    await unlockWith(PIN2);
+    // Idle: the real 15 s poll reads the (overridden) system idle time.
+    mark = mainLog().length;
+    const idle = await ctx.e2e('power', { idleSeconds: 61 });
+    const byIdle = await pollAsync(ctx, `(async () => (await window.api.lockscreenIsLocked()) === true || null)()`, 25000, 500).catch(() => null);
+    result.check('61 s of system idle with "after 1 minute" set: the auto-lock poll arms the lock (auto-lock: idle)', idle.ok === true && Boolean(byIdle) && (await logSays(mark, 'auto-lock: idle')), idle.power);
+    // Back to "nobody idle" BEFORE the unlock, or the next poll locks again at once.
+    await ctx.e2e('power', { idleSeconds: 0 });
+    await unlockWith(PIN2);
+    const autoOff = await ev(`window.api.lockscreenSetAutoLock({ idleMinutes: 0, onSleep: false, onScreenLock: false })`, { await: true });
+    await ctx.e2e('power', { idleSeconds: null });
+    result.check('auto-lock off again; Gum unlocked', autoOff?.ok === true && (await isLocked()) === false);
+    const refused = await ctx.e2e('power', { event: 'resume' });
+    result.check('the harness only fires the two events auto-lock arms on', refused.ok === false, refused.error);
+
+    // --- 7c. A longer PIN (lock4): the pad gains an Enter key ------------------------------
+    const LONG = '24681357';
+    const toLong = await ev(`window.api.lockscreenSetPin(${JSON.stringify(PIN2)}, ${JSON.stringify(LONG)})`, { await: true });
+    result.check('an 8-digit PIN is accepted by main (kind "pin", the recovery code kept)', toLong?.ok === true && toLong?.status?.secretKind === 'pin' && toLong?.status?.hasRecovery === true, toLong?.status);
+    await ev(`window.api.lockscreenLock()`, { await: true });
+    const longPad = await poll(ctx, `(() => { const pad = document.querySelector('.lockscreen-win11-pad'); const enter = pad && [...pad.querySelectorAll('button')].find((b) => b.textContent === 'Enter'); return enter ? enter.getBoundingClientRect().height : null; })()`, 10000);
+    result.check('Study OS lock: the pad has an Enter key (>= 24 px) for a longer PIN', Number(longPad) >= 24, longPad);
+    await typePin(LONG);
+    result.check('typing 8 digits does not submit by itself', (await isLocked()) === true);
+    const dots = await ev(`document.querySelectorAll('.lockscreen-win11-dot.is-filled').length`);
+    result.check('...and shows 8 filled dots', dots === 8, dots);
+    await ctx.request('/key', { window: 'main', key: 'Enter' });
+    const longOpen = await pollAsync(ctx, `(async () => (await window.api.lockscreenIsLocked()) === false || null)()`, 10000).catch(() => null);
+    result.check('Enter submits the longer PIN and unlocks', Boolean(longOpen));
+
+    // --- 7d. A passphrase (lock4): every skin draws a labelled text field -------------------
+    const PASS = 'river stone 9';
+    const toPass = await ev(`window.api.lockscreenSetPin(${JSON.stringify(LONG)}, ${JSON.stringify(PASS)})`, { await: true });
+    result.check('a passphrase is accepted by main (kind "passphrase")', toPass?.ok === true && toPass?.status?.secretKind === 'passphrase', toPass?.status);
+    const mirror = await ev(`JSON.parse(localStorage.getItem('jp-study-lockscreen-v1') || '{}')`);
+    // Set through the bridge, not Settings, so the mirror's kind is stale on purpose: the lock
+    // screens below must take the kind from main, not from this window's copy.
+    result.check('the renderer mirror never holds the passphrase (and its kind is stale: not "passphrase" yet)', mirror?.secretKind !== 'passphrase' && !JSON.stringify(mirror).includes('river'), { secretKind: mirror?.secretKind });
+    const typeSecret = async (text, win = 'main') => {
+      await ctx.request('/type', { window: win, text });
+      await ctx.request('/key', { window: win, key: 'Enter' });
+      await ctx.sleep(700);
+    };
+    const passSkins = [
+      ['studyos', null, '.lockscreen-pass-input'],
+      ['wired', 'wired', '#wired-access-code'],
+      ['aero', 'aero', '.lockscreen-aero-pass'],
+    ];
+    for (const [label, material, field] of passSkins) {
+      if (material) await ev(`(document.documentElement.setAttribute('data-materials', ${JSON.stringify(material)}), true)`);
+      await ev(`window.api.lockscreenLock()`, { await: true });
+      // The first frame draws from this window's (stale) mirror; main's answer follows a
+      // moment later. Wait for the passphrase field, then for the entrance animation.
+      await poll(ctx, `(() => { const f = document.querySelector(${JSON.stringify(field)}); return f && f.inputMode === 'text' ? true : null; })()`, 10000).catch(() => null);
+      await ctx.sleep(900);
+      const info = await poll(ctx, `(() => { const f = document.querySelector(${JSON.stringify(field)}); if (!f) return null; const go = f.form && f.form.querySelector('button[type=submit]'); return { label: f.getAttribute('aria-label'), mode: f.inputMode, max: f.maxLength, focused: document.activeElement === f, go: go ? Math.min(go.getBoundingClientRect().width, go.getBoundingClientRect().height) : 0, goName: go ? (go.getAttribute('aria-label') || go.textContent.trim()) : '', sheet: go ? getComputedStyle(go).borderTopLeftRadius === '50%' : false, pad: !!document.querySelector('.lockscreen-win11-pad, .lockscreen-pad') }; })()`, 10000);
+      // Setting `data-materials` by hand does not load Aero's lazy sheet (aero-vista.css: the
+      // round 32 px orb). Then the orb is an unstyled button and its size says nothing about
+      // the real skin; the CSS floor is hitTargetFloor24's job. Said, not hidden.
+      const sizeOk = info?.go >= 24 || (label === 'aero' && info?.sheet === false);
+      if (label === 'aero' && info?.sheet === false) result.note(`aero: lazy theme sheet not loaded by the attribute; orb measured unstyled (${info?.go} px), size left to hitTargetFloor24`);
+      result.check(`${label} lock: a focused, labelled passphrase field (text, 64 chars) with a named >= 24 px submit, no digit pad`, info?.label === 'Passphrase' && info?.mode === 'text' && info?.max === 64 && info?.focused === true && sizeOk && Boolean(info?.goName) && info?.pad === false, info);
+      await typeSecret('river stone 8');
+      result.check(`${label} lock: a wrong passphrase does not unlock`, (await isLocked()) === true);
+      await ctx.sleep(400);
+      await ctx.shot(`passphrase-${label}`);
+      await typeSecret(PASS);
+      const open = await pollAsync(ctx, `(async () => (await window.api.lockscreenIsLocked()) === false || null)()`, 10000).catch(() => null);
+      result.check(`${label} lock: the passphrase typed on the keyboard (Enter) unlocks`, Boolean(open));
+      if (material) await ev(`(document.documentElement.removeAttribute('data-materials'), true)`);
+      await poll(ctx, `!document.querySelector('.lockscreen[role=dialog]') || null`, 8000);
+      if (!material) {
+        const fixed = await ev(`JSON.parse(localStorage.getItem('jp-study-lockscreen-v1') || '{}').secretKind`);
+        result.check('the lock screen corrected the stale mirror from main (next first frame is right)', fixed === 'passphrase', fixed);
+      }
+    }
+    // Blanc: its own lock, the same passphrase.
+    await ctx.e2e('clickTray', { label: 'Open Blanc' });
+    let blancP = null;
+    for (let i = 0; i < 60 && !blancP; i++) {
+      blancP = (await status()).windows.find((w) => /blanc/i.test(w.url)) ?? null;
+      if (!blancP) await ctx.sleep(250);
+    }
+    if (blancP) {
+      for (let i = 0; i < 40; i++) {
+        const r = await ctx.request('/eval', { window: blancP.id, js: `document.readyState === 'complete' && !!document.querySelector('#root > *')` });
+        if (r.ok && r.result) break;
+        await ctx.sleep(400);
+      }
+      await ev(`window.api.lockscreenLock()`, { await: true });
+      let blancInfo = null;
+      for (let i = 0; i < 40 && !blancInfo; i++) {
+        const r = await ctx.request('/eval', { window: blancP.id, js: `(() => { const f = document.querySelector('.blanc-lock input.is-passphrase'); const b = document.querySelector('.blanc-lock-submit'); if (!f || !b) return null; return { label: f.closest('label')?.textContent?.trim() || '', mode: f.inputMode, focused: document.activeElement === f, button: Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height), dots: !!document.querySelector('.blanc-lock-dots') }; })()` });
+        blancInfo = r.ok ? r.result : null;
+        if (!blancInfo) await ctx.sleep(250);
+      }
+      result.check('Blanc lock: a labelled, focused passphrase field and an Unlock button (>= 24 px), no dots', Boolean(blancInfo) && /Passphrase/.test(blancInfo.label) && blancInfo.mode === 'text' && blancInfo.focused === true && blancInfo.button >= 24 && blancInfo.dots === false, blancInfo);
+      await ctx.shot('passphrase-blanc', { window: blancP.id });
+      await typeSecret(PASS, blancP.id);
+      const blancOpen = await pollAsync(ctx, `(async () => (await window.api.lockscreenIsLocked()) === false || null)()`, 10000).catch(() => null);
+      result.check('Blanc lock: the passphrase (Enter) unlocks', Boolean(blancOpen));
+      await ctx.request('/eval', { window: blancP.id, js: 'window.close(), true' }).catch(() => null);
+    } else {
+      result.check('Blanc opened for the passphrase check', false);
+    }
 
     // --- 8. Recovery code: unlocks once, removes the PIN ---------------------------------
     await ev(`window.api.lockscreenLock()`, { await: true });

@@ -27,6 +27,10 @@ import { PASS6_PACK_EN } from '../pass6Pack/en';
 import { PASS6_PACK_JA } from '../pass6Pack/ja';
 import { PASS6_PACK_RU } from '../pass6Pack/ru';
 import { PASS6_PACK_ZH } from '../pass6Pack/zh';
+import { UPDATE3_UI_EN } from '../updateUi3/en';
+import { UPDATE3_UI_JA } from '../updateUi3/ja';
+import { UPDATE3_UI_RU } from '../updateUi3/ru';
+import { UPDATE3_UI_ZH } from '../updateUi3/zh';
 
 const PACKS: Array<[I18nPackId, UiLang, Catalog, Catalog]> = [
   ['ai', 'en', en, AI_PACK_EN],
@@ -37,6 +41,10 @@ const PACKS: Array<[I18nPackId, UiLang, Catalog, Catalog]> = [
   ['pass6', 'ja', ja, PASS6_PACK_JA],
   ['pass6', 'zh', zh, PASS6_PACK_ZH],
   ['pass6', 'ru', ru, PASS6_PACK_RU],
+  ['upd3', 'en', en, UPDATE3_UI_EN],
+  ['upd3', 'ja', ja, UPDATE3_UI_JA],
+  ['upd3', 'zh', zh, UPDATE3_UI_ZH],
+  ['upd3', 'ru', ru, UPDATE3_UI_RU],
 ];
 
 for (const [id, lang, catalog, pack] of PACKS) {

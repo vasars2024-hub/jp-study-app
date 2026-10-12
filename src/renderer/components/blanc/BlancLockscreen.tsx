@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { getUiLang, useT } from '../../i18n';
-import { loadLockscreen, markLockscreenUnlocked, verifyLockscreenPinDetailed } from '../../lockscreenSettings';
+import {
+  isValidPin,
+  loadLockscreen,
+  markLockscreenUnlocked,
+  readLockscreenSecretKind,
+  verifyLockscreenPinDetailed,
+} from '../../lockscreenSettings';
+import { LOCK_PASSPHRASE_MAX_CHARS, LOCK_PIN_MAX_DIGITS, normalizeLockSecretKind, type LockSecretKind } from '../../../shared/lockSecret';
 import { useLockBlockedToasts } from '../../lockBlockedNotice';
 import { trapTab } from '../ui/focusTrap';
 import { showOsToast } from '../ToastHost';
@@ -25,6 +32,7 @@ function useMinuteClock(): Date {
  * target check — so every digit was entered twice and a correct PIN typed
  * normally could never unlock. The window path now ignores keys whose target
  * is an editable field, the same rule Study OS's lockscreen follows.
+ * lock4: only a 4-digit PIN submits itself; a longer one or a passphrase uses Enter.
  */
 export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
   const { t } = useT();
@@ -37,6 +45,21 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
   // lock3: the same study step and recovery as Study OS's lock screen.
   const [cfg] = useState(() => loadLockscreen());
   const hasPin = Boolean(cfg.pinHash);
+  const [kind, setKind] = useState<LockSecretKind>(() => normalizeLockSecretKind(cfg.secretKind));
+  const kindRef = useRef(kind);
+  kindRef.current = kind;
+  useEffect(() => {
+    let alive = true;
+    void readLockscreenSecretKind().then((next) => {
+      if (alive) setKind(next);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const maxDigits = kind === 'pin4' ? 4 : LOCK_PIN_MAX_DIGITS;
+  const maxDigitsRef = useRef(maxDigits);
+  maxDigitsRef.current = maxDigits;
   const [stage, setStage] = useState<'challenge' | 'pin'>(() => (cfg.answerToUnlock ? 'challenge' : 'pin'));
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const pinActiveRef = useRef(stage === 'pin' && !recoveryOpen);
@@ -66,7 +89,13 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
   };
 
   const submit = (pin: string): void => {
-    if (pin.length !== 4) return;
+    if (kind === 'pin4') {
+      if (pin.length !== 4) return;
+    } else if (!isValidPin(pin)) {
+      // Too short: never spends one of main's attempts.
+      if (pin.length > 0) setError(t('lock4.tooShort'));
+      return;
+    }
     void Promise.resolve(verifyLockscreenPinDetailed(pin)).then((res) => {
       if (!res.ok) {
         setDigits('');
@@ -84,6 +113,8 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
   // The keydown listener registers once; it reaches the latest `submit` here.
   const submitRef = useRef(submit);
   submitRef.current = submit;
+  const digitsRef = useRef(digits);
+  digitsRef.current = digits;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -102,11 +133,18 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
       ) {
         return;
       }
+      // A passphrase is typed into its own field only.
+      if (kindRef.current === 'passphrase') return;
+      if (event.key === 'Enter' && kindRef.current === 'pin' && !(target instanceof HTMLButtonElement)) {
+        event.preventDefault();
+        submitRef.current(digitsRef.current);
+        return;
+      }
       if (/^\d$/.test(event.key)) {
         setDigits((prev) => {
-          if (prev.length >= 4) return prev;
+          if (prev.length >= maxDigitsRef.current) return prev;
           const next = prev + event.key;
-          if (next.length === 4) window.setTimeout(() => submitRef.current(next), 40);
+          if (kindRef.current === 'pin4' && next.length === 4) window.setTimeout(() => submitRef.current(next), 40);
           return next;
         });
         setError('');
@@ -148,31 +186,49 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
         </div>
         {stage === 'challenge' && <LockscreenChallenge variant="blanc" onPassed={finishChallenge} />}
         {stage === 'pin' && !recoveryOpen && (
-          <>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit(digits);
+            }}
+          >
             <label>
-              {t('blanc.tb.pinLabel')}
+              {kind === 'passphrase' ? t('lock4.passphrase.label') : t('blanc.tb.pinLabel')}
               <input
                 ref={inputRef}
                 autoFocus
                 type="password"
-                inputMode="numeric"
-                maxLength={4}
+                className={kind === 'passphrase' ? 'is-passphrase' : undefined}
+                inputMode={kind === 'passphrase' ? 'text' : 'numeric'}
+                maxLength={kind === 'passphrase' ? LOCK_PASSPHRASE_MAX_CHARS : maxDigits}
+                autoComplete="off"
+                spellCheck={false}
                 value={digits}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'blanc-lock-error' : undefined}
                 onChange={(event) => {
-                  const next = event.target.value.replace(/\D/g, '').slice(0, 4);
+                  const raw = event.target.value;
+                  const next = kind === 'passphrase' ? raw : raw.replace(/\D/g, '').slice(0, maxDigits);
                   setDigits(next);
                   setError('');
-                  if (next.length === 4) submit(next);
+                  if (kind === 'pin4' && next.length === 4) submit(next);
                 }}
               />
             </label>
-            <div className="blanc-lock-dots" aria-hidden>
-              {[0, 1, 2, 3].map((i) => (
-                <span key={i} className={i < digits.length ? 'filled' : ''} />
-              ))}
-            </div>
-            {error && <p className="blanc-error" role="alert">{error}</p>}
-          </>
+            {kind !== 'passphrase' && (
+              <div className="blanc-lock-dots" aria-hidden>
+                {Array.from({ length: kind === 'pin4' ? 4 : Math.max(4, digits.length) }, (_, i) => (
+                  <span key={i} className={i < digits.length ? 'filled' : ''} />
+                ))}
+              </div>
+            )}
+            {kind !== 'pin4' && (
+              <button type="submit" className="blanc-lock-submit">
+                {t('lock4.blanc.unlock')}
+              </button>
+            )}
+            {error && <p id="blanc-lock-error" className="blanc-error" role="alert">{error}</p>}
+          </form>
         )}
         {stage === 'pin' && <LockscreenStudyPanel mode={cfg.study} variant="blanc" />}
         {stage === 'pin' && hasPin && (

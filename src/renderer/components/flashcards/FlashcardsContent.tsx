@@ -170,8 +170,9 @@ import {
 } from '../../sceneRoundTrip';
 import { srsIntervalLabel } from '../../srsIntervalLabel';
 import { cardBookPosition, openBookAt, type BookPosition } from '../../bookRoundTrip';
+import { useUnsavedWork } from '../../unsavedWork';
 
-export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
+export type Mode ='overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
 export type OverviewTab = 'dictionary' | 'epub';
 /**
  * MINING gate 10 added `catalogue`. The other three are all EPUB tools, which
@@ -473,6 +474,8 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   );
   const [reviewed, setReviewed] = useState(0);
   const [total, setTotal] = useState(0);
+  // Answers are saved as they are given; what a restart ends is the session itself.
+  useUnsavedWork('review-session', mode === 'review' && reviewed > 0 && reviewIndex < sessionCards.length);
   const [reviewSource, setReviewSource] = useState<'dictionary' | 'epub'>('dictionary');
   const [sessionStartedAt, setSessionStartedAt] = useState(0);
   const [reviewBookKey, setReviewBookKey] = useState<string>('all');

@@ -301,6 +301,11 @@ export default function NotificationCenter() {
                           setOpen(false);
                           return;
                         }
+                        if (n.clientAction === 'whats-new') {
+                          void import('../../releaseCheck').then((m) => m.openUpdateSettings());
+                          setOpen(false);
+                          return;
+                        }
                         if (n.clientAction === 'restart-to-update') {
                           // Asks first when a restart would cut a recording short.
                           void import('../../releaseCheck').then((m) => m.restartToUpdate());
@@ -321,6 +326,8 @@ export default function NotificationCenter() {
                             ? t('shortcut.notice.refused.open')
                             : n.clientAction === 'restart-to-update'
                               ? t('install.update.restart')
+                              : n.clientAction === 'whats-new'
+                                ? t('upd3.whatsNew.open')
                               : n.clientAction === 'download-cedict'
                                 ? t('risk4.cedict.download')
                                 : t('notifications.openLink')}

@@ -141,3 +141,32 @@ describe('Settings -> Lockscreen through main', () => {
     expect(statusText()).toContain('Enter your current passcode first.');
   });
 });
+
+describe('lock4: a longer PIN or a passphrase in Settings', () => {
+  const radios = () => [...app.host.querySelectorAll('input[type=radio][name="lock4-secret-kind"]')] as HTMLInputElement[];
+
+  it('the kind is a labelled radio group; a passphrase goes to main as typed, a short one never does', async () => {
+    const group = app.host.querySelector('[role=radiogroup][aria-labelledby="lock4-kind-label"]');
+    expect(group).not.toBeNull();
+    expect(app.host.querySelector('#lock4-kind-label')?.textContent).toBe('Type of passcode');
+    expect(radios().map((r) => r.closest('label')?.textContent)).toEqual(['PIN (4 to 12 digits)', 'Passphrase']);
+    expect(radios()[0]?.checked).toBe(true);
+    await act(async () => radios()[1]!.click());
+    await settle(10);
+    expect(newFields()[0]?.getAttribute('inputmode')).toBe('text');
+    // Digits only is a PIN, not a passphrase: refused here with the passphrase rule.
+    await saveNewPin('123456789', 10);
+    expect(setPin).not.toHaveBeenCalled();
+    expect(statusText()).toContain('A passphrase needs 6 to 64 characters');
+    await saveNewPin('river stone 9');
+    expect(setPin).toHaveBeenCalledWith(null, 'river stone 9');
+  });
+
+  it('a PIN of up to 12 digits is accepted; 13 cannot be typed and 3 are refused', async () => {
+    await saveNewPin('123', 10);
+    expect(setPin).not.toHaveBeenCalled();
+    expect(statusText()).toContain('Enter a PIN of 4 to 12 digits.');
+    await saveNewPin('1234567890123');
+    expect(setPin).toHaveBeenCalledWith(null, '123456789012');
+  });
+});

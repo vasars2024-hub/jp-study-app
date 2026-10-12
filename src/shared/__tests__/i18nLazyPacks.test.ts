@@ -76,6 +76,40 @@ describe('which keys are lazy', () => {
   });
 });
 
+describe('the Updates pack (upd3)', () => {
+  it('is all `upd3.` keys, none of them in the eager English catalog', async () => {
+    // The `upd2.*` strings it once carried (a failed download, what a restart would
+    // cut short) are eager on purpose: the restart warning is a toast in any window.
+    const loader = await freshLoader();
+    const { UPDATE3_UI_EN } = await import('../i18n/updateUi3/en');
+    const keys = Object.keys(UPDATE3_UI_EN);
+    expect(keys.length).toBeGreaterThan(20);
+    expect(keys.filter((key) => loader.i18nPackForKey(key) !== 'upd3')).toEqual([]);
+    expect(keys.filter((key) => loader.en[key] !== undefined)).toEqual([]);
+    expect(loader.en['upd2.unsaved.note-editor']).toBeTruthy();
+    expect(loader.en['upd2.error.checksum']).toBeTruthy();
+  });
+
+  it('covers English in every language, and loads and merges like any pack', async () => {
+    const [{ UPDATE3_UI_EN }, { UPDATE3_UI_JA }, { UPDATE3_UI_ZH }, { UPDATE3_UI_RU }] = await Promise.all([
+      import('../i18n/updateUi3/en'),
+      import('../i18n/updateUi3/ja'),
+      import('../i18n/updateUi3/zh'),
+      import('../i18n/updateUi3/ru'),
+    ]);
+    for (const pack of [UPDATE3_UI_JA, UPDATE3_UI_ZH, UPDATE3_UI_RU]) {
+      expect(Object.keys(UPDATE3_UI_EN).filter((key) => pack[key] === undefined)).toEqual([]);
+    }
+    const loader = await freshLoader();
+    expect(loader.pendingI18nPack('upd3.history.title')).toBe('upd3');
+    await loader.ensureCatalog('ja');
+    await loader.ensureI18nPack('upd3', 'ja');
+    expect(loader.en['upd3.history.title']).toBe('Update history');
+    expect(loader.catalogFor('ja')['upd3.history.title']).toBe(UPDATE3_UI_JA['upd3.history.title']);
+    expect(loader.pendingI18nPack('upd3.history.title')).toBeNull();
+  });
+});
+
 describe('the loader', () => {
   it('loads, merges into English, notifies once, and stops reporting the key as pending', async () => {
     const loader = await freshLoader();
