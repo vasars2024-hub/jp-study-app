@@ -1,5 +1,9 @@
 /** Wire types for the bulk book-OCR job, shared by main and renderer. */
 
+import { libraryItemLangTag } from './libraryLevel';
+import { studyLangFromTag } from './studyLang';
+import type { LibraryItem } from './types';
+
 export type BookOcrPhase =
   | 'preparing'
   | 'rasterizing'
@@ -116,6 +120,23 @@ export type BookOcrEngine = 'auto' | 'manga';
 
 /** The languages a book can be read in: PaddleOCR has a recognizer for each. */
 export type BookOcrLang = 'ja' | 'zh' | 'ru';
+
+/**
+ * The language a book is OCR'd in: what the library knows about the item (see
+ * `libraryItemLangTag`), else `fallback`, the study language.
+ *
+ * The Convert panel picks the engine with this and sends it as `req.lang`; the
+ * main-process job uses it for a request without one. Both used to read
+ * `item.lang`, a field `LibraryItem` never had, so the tag was always undefined
+ * and every book was read in the study language: a Chinese book on a Japanese
+ * profile went through the Japanese recognizer.
+ */
+export function bookOcrLangOf(
+  item: Pick<LibraryItem, 'readingSource' | 'inboxMeta' | 'levelMeta'>,
+  fallback: BookOcrLang,
+): BookOcrLang {
+  return studyLangFromTag(libraryItemLangTag(item)) ?? fallback;
+}
 
 /** The general-OCR set for a book's language: detector, recognizer, charset. */
 export function bookOcrWebAssets(lang: BookOcrLang = 'ja'): string[] {

@@ -21,6 +21,22 @@ export function effectiveLang(item: LibraryItem): LibraryLang {
   return item.inboxMeta?.lang ?? item.levelMeta?.lang ?? 'unknown';
 }
 
+/**
+ * The language tag the library holds for an item's content, or undefined when
+ * nothing says. `LibraryItem` has no `lang` of its own; the evidence is, in
+ * order: the provider's language for a downloaded chapter (`readingSource`),
+ * then the language detected from an Inbox article's or a book's text sample.
+ * `'unknown'` and empty tags are not evidence.
+ */
+export function libraryItemLangTag(
+  item: Pick<LibraryItem, 'readingSource' | 'inboxMeta' | 'levelMeta'>,
+): string | undefined {
+  for (const tag of [item.readingSource?.language, item.inboxMeta?.lang, item.levelMeta?.lang]) {
+    if (typeof tag === 'string' && tag.trim() && tag.trim().toLowerCase() !== 'unknown') return tag.trim();
+  }
+  return undefined;
+}
+
 /** Map an exam-band cover estimate (N3 / HSK4) onto the shared 1–7 tier scale. */
 export function tierFromBookEstimate(est: BookLevelEstimate): LevelTier | null {
   const slots = est.scheme === 'hsk' ? ZH_SLOTS : JA_SLOTS;

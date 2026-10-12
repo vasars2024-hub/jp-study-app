@@ -22,6 +22,8 @@ import {
   MIYAKO_BUSHI,
   NATURAL_MINOR,
   PIANO_PROGRESSIONS,
+  TONE_HIGH_HZ,
+  TONE_LOW_HZ,
   bassRoot,
   chordTones,
   createMotif,
@@ -30,9 +32,11 @@ import {
   nearestNote,
   realizeMotif,
   scaleNotes,
+  toneShelfGains,
   voiceChord,
   walkingBassBar,
   type Chord,
+  type LayerShape,
   type Motif,
   type MusicStyleId,
   type SoundLayerId,
@@ -63,6 +67,30 @@ export interface SoundscapeTarget {
   music: MusicStyleId;
   musicGain: number;
   ducked: boolean;
+  /** snd6: the level ducking takes the mix to (DUCK_GAIN when absent). */
+  duckGain?: number;
+  /** snd6: tone and pan per layer; absent layers are neutral. */
+  shapes?: Partial<Record<SoundLayerId, LayerShape>>;
+  /**
+   * snd6: when set, layers and music that come and go with this change
+   * cross-fade over this many seconds instead of switching (a scene change).
+   * One-shot: it applies to the change it arrives with.
+   */
+  crossfadeSec?: number;
+}
+
+/** One ambience layer's chain: its voice, then tone, pan and level. */
+interface LayerEntry {
+  rig: Rig;
+  low: BiquadFilterNode;
+  high: BiquadFilterNode;
+  pan: StereoPannerNode;
+  level: GainNode;
+  tick: Tick | undefined;
+  /** What the level was last asked to reach, so an unchanged target is not re-ramped. */
+  gain: number;
+  tone: number;
+  panValue: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -1488,6 +1516,17 @@ function createReverbImpulse(ctx: AudioContext): AudioBuffer {
 
 const RAMP = 0.12;
 
+/** A level change: a straight line over a cross-fade, the usual short glide otherwise. */
+function rampTo(param: AudioParam, value: number, now: number, crossfade: number): void {
+  if (crossfade > 0) {
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value, now);
+    param.linearRampToValueAtTime(value, now + crossfade);
+  } else {
+    param.setTargetAtTime(value, now, RAMP);
+  }
+}
+
 export class SoundscapeEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -1497,8 +1536,10 @@ export class SoundscapeEngine {
   private scheduled: GainNode | null = null;
   private reverb: GainNode | null = null;
   private readonly noiseBuffers = new Map<NoiseColor, AudioBuffer>();
-  private readonly layers = new Map<SoundLayerId, { rig: Rig; level: GainNode; tick: Tick | undefined }>();
-  private music: { style: MusicStyleId; rig: Rig; level: GainNode; tick: Tick } | null = null;
+  private readonly layers = new Map<SoundLayerId, LayerEntry>();
+  private music: { style: MusicStyleId; rig: Rig; level: GainNode; tick: Tick; gain: number } | null = null;
+  /** snd6: voices fading out (under a cross-fade or a switch), freed when the fade ends. */
+  private readonly leaving = new Set<{ rig: Rig; level: GainNode; timer: ReturnType<typeof setTimeout> }>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private stopTimer: ReturnType<typeof setTimeout> | null = null;
   private playing = false;
@@ -1649,64 +1690,143 @@ export class SoundscapeEngine {
     const ctx = this.ctx;
     if (!ctx || !this.fade || !this.master || !this.duck) return;
     const now = ctx.currentTime;
+    // One-shot: a cross-fade belongs to the change it came with.
+    const crossfade = Math.max(0, this.target.crossfadeSec ?? 0);
+    this.target = { ...this.target, crossfadeSec: undefined };
     this.master.gain.setTargetAtTime(this.target.master, now, RAMP);
-    this.duck.gain.setTargetAtTime(this.target.ducked ? DUCK_GAIN : 1, now, 0.35);
+    // snd6: duck quickly (the first syllable must be heard), come back slowly.
+    const ducked = this.target.ducked;
+    this.duck.gain.setTargetAtTime(ducked ? (this.target.duckGain ?? DUCK_GAIN) : 1, now, ducked ? 0.12 : 0.5);
 
     for (const [id, entry] of this.layers) {
       if ((this.target.layers[id] ?? 0) > 0) continue;
       this.layers.delete(id);
-      this.release(entry.rig, entry.level);
+      this.release(entry.rig, entry.level, crossfade);
     }
     for (const [id, gain] of Object.entries(this.target.layers) as [SoundLayerId, number][]) {
       if (!(gain > 0)) continue;
+      const shape = this.target.shapes?.[id];
+      const tone = shape?.tone ?? 0;
+      const panValue = shape?.pan ?? 0;
       const existing = this.layers.get(id);
       if (existing) {
-        existing.level.gain.setTargetAtTime(gain, now, RAMP);
+        if (existing.gain !== gain) {
+          existing.gain = gain;
+          rampTo(existing.level.gain, gain, now, crossfade);
+        }
+        if (existing.tone !== tone) {
+          existing.tone = tone;
+          const { lowDb, highDb } = toneShelfGains(tone);
+          existing.low.gain.setTargetAtTime(lowDb, now, RAMP);
+          existing.high.gain.setTargetAtTime(highDb, now, RAMP);
+        }
+        if (existing.panValue !== panValue) {
+          existing.panValue = panValue;
+          existing.pan.pan.setTargetAtTime(panValue, now, RAMP);
+        }
         continue;
       }
       const rig = new Rig(ctx, this.noiseBuffer);
+      const { lowDb, highDb } = toneShelfGains(tone);
+      // The tone and pan nodes belong to the rig, so they are freed with the voice.
+      const low = rig.keep(ctx.createBiquadFilter());
+      low.type = 'lowshelf';
+      low.frequency.value = TONE_LOW_HZ;
+      low.gain.value = lowDb;
+      const high = rig.keep(ctx.createBiquadFilter());
+      high.type = 'highshelf';
+      high.frequency.value = TONE_HIGH_HZ;
+      high.gain.value = highDb;
+      const pan = rig.keep(ctx.createStereoPanner());
+      pan.pan.value = panValue;
       const level = ctx.createGain();
       level.gain.setValueAtTime(0, now);
-      level.gain.linearRampToValueAtTime(gain, now + 0.5);
-      rig.out.connect(level);
+      level.gain.linearRampToValueAtTime(gain, now + Math.max(0.5, crossfade));
+      rig.out.connect(low);
+      low.connect(high);
+      high.connect(pan);
+      pan.connect(level);
       level.connect(this.fade);
       const built = LAYERS[id](rig, () => this.reverbInput());
-      this.layers.set(id, { rig, level, tick: typeof built === 'function' ? built : undefined });
+      this.layers.set(id, {
+        rig,
+        low,
+        high,
+        pan,
+        level,
+        tick: typeof built === 'function' ? built : undefined,
+        gain,
+        tone,
+        panValue,
+      });
     }
 
     const style = this.target.musicGain > 0 ? this.target.music : 'off';
     if (this.music && this.music.style !== style) {
-      this.release(this.music.rig, this.music.level);
+      this.release(this.music.rig, this.music.level, crossfade);
       this.music = null;
     }
     if (style !== 'off') {
       if (this.music) {
-        this.music.level.gain.setTargetAtTime(this.target.musicGain, now, RAMP);
+        if (this.music.gain !== this.target.musicGain) {
+          this.music.gain = this.target.musicGain;
+          rampTo(this.music.level.gain, this.target.musicGain, now, crossfade);
+        }
       } else {
         const rig = new Rig(ctx, this.noiseBuffer);
         const level = ctx.createGain();
         level.gain.setValueAtTime(0, now);
-        level.gain.linearRampToValueAtTime(this.target.musicGain, now + 0.8);
+        level.gain.linearRampToValueAtTime(this.target.musicGain, now + Math.max(0.8, crossfade));
         rig.out.connect(level);
         level.connect(this.fade);
-        this.music = { style, rig, level, tick: buildMusic(rig, style, this.reverbInput()) };
+        this.music = { style, rig, level, tick: buildMusic(rig, style, this.reverbInput()), gain: this.target.musicGain };
       }
     }
   }
 
-  /** Fade a voice out, then free its nodes. */
-  private release(rig: Rig, level: GainNode): void {
+  /**
+   * Fade a voice out, then free its nodes. Under a cross-fade it falls in a
+   * straight line over the same seconds the incoming voices rise, so the two
+   * sum to a steady bed instead of dipping through silence; otherwise it goes
+   * in a blink.
+   */
+  private release(rig: Rig, level: GainNode, crossfade = 0): void {
     const ctx = this.ctx;
     if (!ctx) return;
-    level.gain.cancelScheduledValues(ctx.currentTime);
-    level.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
-    setTimeout(() => {
-      rig.dispose();
-      level.disconnect();
-    }, 600);
+    const now = ctx.currentTime;
+    level.gain.cancelScheduledValues(now);
+    let holdMs = 600;
+    if (crossfade > 0) {
+      level.gain.setValueAtTime(level.gain.value, now);
+      level.gain.linearRampToValueAtTime(0, now + crossfade);
+      holdMs = crossfade * 1000 + 120;
+    } else {
+      level.gain.setTargetAtTime(0, now, 0.1);
+    }
+    const leaving = {
+      rig,
+      level,
+      timer: setTimeout(() => {
+        this.leaving.delete(leaving);
+        rig.dispose();
+        level.disconnect();
+      }, holdMs),
+    };
+    this.leaving.add(leaving);
+  }
+
+  /** snd6: how many voices are still fading out (test seam). */
+  leavingCount(): number {
+    return this.leaving.size;
   }
 
   private teardownVoices(): void {
+    for (const leaving of this.leaving) {
+      clearTimeout(leaving.timer);
+      leaving.rig.dispose();
+      leaving.level.disconnect();
+    }
+    this.leaving.clear();
     for (const entry of this.layers.values()) {
       entry.rig.dispose();
       entry.level.disconnect();

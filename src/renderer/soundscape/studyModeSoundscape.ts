@@ -14,10 +14,25 @@
  * Same conservative rules as the focus link (focusSoundscape.ts): off by
  * default; it only stops what it started; a mixer it paused for listening is
  * started again when listening ends; pausing by hand hands control back.
+ *
+ * snd6: pop-out windows count too. Each publishes its mode through
+ * studyModePresence.ts, and this link takes the highest-priority mode among its
+ * own window and every fresh pop-out. The same record carries "speech or video
+ * is audible over there", which is handed to the foreground-audio signal so the
+ * mixer ducks for a pop-out's video as it does for one in this window.
  */
-import { COMMAND_HANDLERS_EVENT, hasCommandHandler } from '../keyboardShortcuts';
+import { COMMAND_HANDLERS_EVENT } from '../keyboardShortcuts';
+import { setRemoteForegroundAudio } from '../foregroundAudio';
 import { fadeOutSoundscape, isSoundscapePlaying, startSoundscape, subscribeSoundscape } from './soundscapeStore';
 import { MODE_PRESET_KEEP, MODE_PRESET_PAUSE, type StudyModeId } from './soundscapeModel';
+import {
+  PRESENCE_KEY,
+  detectStudyMode,
+  hasPresence,
+  pickStudyMode,
+  remoteStudyAudio,
+  remoteStudyModes,
+} from './studyModePresence';
 import {
   STUDY_MODE_PRESETS_KEY,
   loadStudyModePresets,
@@ -29,24 +44,6 @@ export { STUDY_MODE_PRESETS_KEY, loadStudyModePresets, onStudyModePresetsChanged
 
 const PAUSE_FADE_SECONDS = 2;
 const EXIT_FADE_SECONDS = 3;
-
-/** The commands a study surface registers while it is up. */
-export const MODE_SIGNALS: Readonly<Record<StudyModeId, readonly string[]>> = {
-  review: ['flashcards.flip'],
-  listening: ['video.replayLine', 'music.replayLine'],
-  reading: ['reader.pageNext', 'manga.nextPage'],
-};
-
-/**
- * The mode the app is in, or null. Review and listening are deliberate
- * sittings and win over a book left open behind them.
- */
-export function detectStudyMode(has: (id: string) => boolean = hasCommandHandler): StudyModeId | null {
-  for (const mode of ['review', 'listening', 'reading'] as const) {
-    if (MODE_SIGNALS[mode].some((id) => has(id))) return mode;
-  }
-  return null;
-}
 
 // ---- the link ------------------------------------------------------------------
 
@@ -68,9 +65,17 @@ function act(fn: () => void): void {
   }
 }
 
+/** This window's mode, or the highest-priority one a pop-out reports. */
+function currentStudyMode(): StudyModeId | null {
+  return pickStudyMode([detectStudyMode(), ...remoteStudyModes()]);
+}
+
+/** How often a stale pop-out entry is looked for while any entry exists. */
+const PRESENCE_RECHECK_MS = 30_000;
+
 function sync(): void {
   const presets = loadStudyModePresets();
-  const mode = presets.enabled ? detectStudyMode() : null;
+  const mode = presets.enabled ? currentStudyMode() : null;
   if (mode === current) return;
   current = mode;
   if (mode) {
@@ -101,14 +106,30 @@ function sync(): void {
   }
 }
 
-/** Main window only (main.tsx); idempotent. Returns an uninstall for tests. */
+/** Main window only (main.tsx); idempotent. Returns an uninstall for tests. Pop-outs install studyModePresence instead. */
 export function installStudyModeSoundscape(): () => void {
   if (installed) return () => undefined;
   installed = true;
   current = null;
   const onHandlers = (): void => sync();
+  let recheck: ReturnType<typeof setInterval> | null = null;
+  const onPresence = (): void => {
+    setRemoteForegroundAudio(remoteStudyAudio());
+    sync();
+    // A pop-out that died without withdrawing goes stale; look again until none is left.
+    if (hasPresence() && !recheck) {
+      recheck = setInterval(() => {
+        onPresence();
+        if (!hasPresence() && recheck) {
+          clearInterval(recheck);
+          recheck = null;
+        }
+      }, PRESENCE_RECHECK_MS);
+    }
+  };
   const onStorage = (event: StorageEvent): void => {
     if (event.key === STUDY_MODE_PRESETS_KEY) sync();
+    if (event.key === PRESENCE_KEY || event.key === null) onPresence();
   };
   // The owner pausing or starting by hand takes the sound back from the link.
   const offMixer = subscribeSoundscape((snap) => {
@@ -120,10 +141,13 @@ export function installStudyModeSoundscape(): () => void {
   const offPresets = onStudyModePresetsChanged(() => sync());
   window.addEventListener(COMMAND_HANDLERS_EVENT, onHandlers);
   window.addEventListener('storage', onStorage);
-  sync();
+  onPresence();
   return () => {
     window.removeEventListener(COMMAND_HANDLERS_EVENT, onHandlers);
     window.removeEventListener('storage', onStorage);
+    if (recheck) clearInterval(recheck);
+    recheck = null;
+    setRemoteForegroundAudio(false);
     offPresets();
     offMixer();
     installed = false;

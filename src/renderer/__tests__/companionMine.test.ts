@@ -51,6 +51,11 @@ beforeAll(() => {
 afterEach(() => {
   h.mined.length = 0;
   h.results.length = 0;
+  // Every field of the shared recorder resets, not only the arrays: `ready`
+  // counted every install across the file, so "says ready" saw 2 whenever the
+  // gloss test's install ran first.
+  h.ready = 0;
+  h.onMine = null;
 });
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';

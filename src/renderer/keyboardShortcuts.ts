@@ -14,11 +14,14 @@ import { TOOLBOX_SHORTCUT_COMMANDS } from '../shared/toolboxShortcuts';
 import { loadToolboxSettings } from './toolboxSettings';
 import { resumeMostRecentWatched } from './continueWatchingStore';
 import { reachMediaWorkspace } from './mediaWorkspaceBridge';
-import { t } from './i18n';
+import { I18N_PENDING_TEXT, t } from './i18n';
 import { GLOBAL_COMMAND_DEFAULTS, migrateLegacyGlobalChords, type GlobalCommandStatus } from '../shared/globalCommands';
 import { reportGlobalShortcutFailures } from './globalShortcutNotice';
 import { isDnd, setDnd } from './notificationStore';
 import { lockGumNow } from './lockscreenSettings';
+
+/** kbd6: most steps in a key sequence ("Ctrl+K S"); see keySequences.ts. */
+export const KEY_SEQUENCE_MAX_STEPS = 4;
 
 export type CommandCategory =
   | 'Navigation'
@@ -1177,7 +1180,8 @@ const NAV_OPEN_PREFIX = 'nav.open.';
 
 function firstOsChord(keys: string): string {
   if (!keys) return '';
-  const first = keys.split('|')[0]!.trim();
+  // kbd6: never a sequence.
+  const first = splitChords(keys).find((alt) => !isKeySequence(alt)) ?? '';
   if (!first || /Mouse(Left|Middle|Right|4|5)/i.test(first)) return '';
   return first;
 }
@@ -1241,7 +1245,8 @@ function ownsGlobalRegistration(): boolean {
 export function collectGlobalChords(): Record<string, string> {
   const out: Record<string, string> = {};
   for (const cmd of COMMAND_CATALOG) {
-    if (cmd.global) out[cmd.id] = effectiveKeys(cmd.id);
+    // kbd6: sequences stay in-app.
+    if (cmd.global) out[cmd.id] = splitChords(effectiveKeys(cmd.id)).filter((alt) => !isKeySequence(alt)).join('|');
   }
   return out;
 }
@@ -1388,6 +1393,7 @@ function persist(): void {
   window.dispatchEvent(new CustomEvent(EVENT));
   void syncGlobalCommands();
   syncOsHotkeyHelperFromShortcuts();
+  loadKeySequences();
 }
 
 export function onShortcutsChanged(cb: () => void): () => void {
@@ -1502,8 +1508,21 @@ export function chordFromMouseEvent(e: MouseEvent): string | null {
   );
 }
 
-/** Normalize one alternative (no `|`). */
+// kbd6: an alternative may be a sequence of chords separated by single spaces.
+export function isKeySequence(alt: string): boolean {
+  return alt.trim().includes(' ');
+}
+
+/** One alternative, step by step; a mouse or empty step voids a sequence. */
 function normalizeOne(c: string): string {
+  const raw = c.replace(/\s*\+\s*/g, '+').trim().split(/\s+/).filter(Boolean);
+  if (raw.length < 2) return raw[0] ? normalizeStep(raw[0]) : '';
+  const steps = raw.slice(0, KEY_SEQUENCE_MAX_STEPS).map(normalizeStep);
+  return steps.some((x) => !x || /(^|\+)Mouse/.test(x)) ? '' : steps.join(' ');
+}
+
+/** One chord (one step). */
+function normalizeStep(c: string): string {
   const bits = c.split('+').map((s) => s.trim()).filter(Boolean);
   let ctrl = false;
   let alt = false;
@@ -1547,9 +1566,16 @@ export function splitChords(keys: string): string[] {
     .filter(Boolean);
 }
 
-/** Pretty display: "Ctrl+Shift+H · Space". */
+/** "Ctrl+Shift+H · Space"; a sequence reads "Ctrl+K, then S". */
 export function formatKeysDisplay(keys: string): string {
-  return splitChords(keys).join(' · ') || '';
+  return splitChords(keys)
+    .map((alt) =>
+      alt.split(' ').reduce((first, next) => {
+        const out = t('kbd6.keys.sequence', { first, next });
+        return out === I18N_PENDING_TEXT ? `${first} ${next}` : out;
+      }),
+    )
+    .join(' · ');
 }
 
 function allCommands(): AppCommand[] {
@@ -1654,7 +1680,8 @@ export function getBindings(): BindingRow[] {
     return {
       ...c,
       keys,
-      isDefault: keys === c.defaultKeys,
+      // Both normalized (a default may spell `Meta+Ctrl+…`).
+      isDefault: keys === normalizeChord(c.defaultKeys),
       conflictsWith: [...sharing],
     };
   });
@@ -1666,7 +1693,8 @@ export function getBindings(): BindingRow[] {
  * `mode: 'add'` appends a chord as an alternative (`|`).
  */
 export function setBinding(id: string, chord: string, mode: 'replace' | 'add' = 'replace'): string[] {
-  const def = allCommands().find((c) => c.id === id)?.defaultKeys ?? '';
+  // Normalized like `next` (a default may spell `Meta+Ctrl+…`).
+  const def = normalizeChord(allCommands().find((c) => c.id === id)?.defaultKeys ?? '');
   const prof = store.profiles[store.active] ?? (store.profiles[store.active] = {});
 
   let next = '';
@@ -2278,6 +2306,11 @@ export function commandIsLive(id: string): boolean {
   return store.customCommands.some((c) => c.id === id);
 }
 
+/** kbd6: `id`'s view-handler scopes (undefined = unscoped) and whether a built-in answers it. */
+export function commandHandlerInfo(id: string): { scopes: CommandScope[]; builtin: boolean } {
+  return { scopes: (handlers.get(id) ?? []).map((h) => h.scope), builtin: builtinHandler(id) != null };
+}
+
 function isTypingTarget(): boolean {
   const el = document.activeElement;
   if (!el) return false;
@@ -2373,6 +2406,8 @@ function dispatchChord(chord: string, e: Event, opts?: { fromMouse?: boolean }):
     if (!ke.ctrlKey && !ke.altKey && !ke.metaKey) return false;
   }
   const editing = typing && isEditingChord(chord, (document.activeElement as HTMLElement | null)?.isContentEditable === true);
+  // kbd6: a chord starting a live sequence waits for the next key (the prefix wins).
+  if (!fromMouse && seq?.startKeySequence(chord, e, editing)) return true;
   for (const c of allCommands()) {
     if (!chordMatches(c.id, chord)) continue;
     if (editing && !c.worksWhileTyping) continue;
@@ -2387,6 +2422,16 @@ function dispatchChord(chord: string, e: Event, opts?: { fromMouse?: boolean }):
   return false;
 }
 
+// kbd6: sequences run in a lazy module, loaded once some binding holds one.
+let seq: typeof import('./keySequences') | null = null;
+function loadKeySequences(): void {
+  if (seq || !allCommands().some((c) => isKeySequence(effectiveKeys(c.id)))) return;
+  void import('./keySequences').then((m) => {
+    m.attach((id, e) => eligibleHandler(id, e) ?? builtinHandler(id));
+    seq = m;
+  });
+}
+
 /**
  * Install global keydown + mousedown listeners. Call once from main.tsx.
  * Capture-mode in ShortcutSettings uses stopPropagation so it wins first.
@@ -2395,11 +2440,13 @@ export function installKeyboardShortcuts(): () => void {
   const onKey = (e: KeyboardEvent) => {
     if (e.repeat) return;
     const chord = chordFromEvent(e);
-    if (!chord) return;
+    // Modifier-only keys neither advance nor cancel a sequence.
+    if (!chord || seq?.continueKeySequence(chord, e)) return;
     dispatchChord(chord, e);
   };
 
   const onMouse = (e: MouseEvent) => {
+    seq?.cancelKeySequence();
     // Skip pure UI chrome clicks unless they carry modifiers / non-left button.
     const chord = chordFromMouseEvent(e);
     if (!chord) return;
@@ -2412,8 +2459,10 @@ export function installKeyboardShortcuts(): () => void {
   window.addEventListener('keydown', onKey);
   // mousedown alone — auxclick would double-fire the same button after mouseup.
   window.addEventListener('mousedown', onMouse, true);
+  loadKeySequences();
   return () => {
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('mousedown', onMouse, true);
+    seq?.cancelKeySequence();
   };
 }

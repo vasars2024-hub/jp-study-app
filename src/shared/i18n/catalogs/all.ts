@@ -6,7 +6,7 @@
 // enforces that and will fail if anything under src/main or src/renderer
 // reaches for this module.
 //
-// The lazy packs (`../aiPack`) are merged in here the way the loader merges
+// The lazy packs (`../aiPack`, `../pass6Pack`) are merged in here the way the loader merges
 // them at runtime (in place, an eager key wins), so the key checks see every
 // string the app can show. Only tooling and tests load this module, and the
 // vitest setup (`../testing/mergeLazyPacks.ts`) has already done the same merge.
@@ -20,6 +20,10 @@ import { AI_PACK_EN } from '../aiPack/en';
 import { AI_PACK_JA } from '../aiPack/ja';
 import { AI_PACK_RU } from '../aiPack/ru';
 import { AI_PACK_ZH } from '../aiPack/zh';
+import { PASS6_PACK_EN } from '../pass6Pack/en';
+import { PASS6_PACK_JA } from '../pass6Pack/ja';
+import { PASS6_PACK_RU } from '../pass6Pack/ru';
+import { PASS6_PACK_ZH } from '../pass6Pack/zh';
 import { en } from './en';
 import { ja } from './ja';
 import { ru } from './ru';
@@ -35,6 +39,10 @@ mergePack(en, AI_PACK_EN);
 mergePack(ja, AI_PACK_JA);
 mergePack(zh, AI_PACK_ZH);
 mergePack(ru, AI_PACK_RU);
+mergePack(en, PASS6_PACK_EN);
+mergePack(ja, PASS6_PACK_JA);
+mergePack(zh, PASS6_PACK_ZH);
+mergePack(ru, PASS6_PACK_RU);
 
 export const CATALOGS: Record<UiLang, Catalog> = { en, ja, zh, ru };
 

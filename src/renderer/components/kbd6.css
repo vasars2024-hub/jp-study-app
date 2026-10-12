@@ -1,0 +1,146 @@
+/* kbd6 — key sequences, palette scope chips, find-by-keys in Settings > Shortcuts.
+   Colours come from the shared tokens (--panel / --text / --border / --accent) so
+   the default look, Aero, WIRED and Blanc each paint these in their own palette;
+   the system-colour fallbacks cover a window that never loaded styles.css. */
+
+/* The "Ctrl+K pressed. Waiting for the next key…" live region (keyboardShortcuts.ts).
+   Always in the tree while it exists, so a screen reader hears the text change;
+   closed means transparent and empty, never display:none. */
+.kbd6-seq-status {
+  position: fixed;
+  left: 50%;
+  bottom: 56px;
+  z-index: 30000;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 6px 12px;
+  border: 1px solid var(--border, GrayText);
+  border-left: 3px solid var(--accent, Highlight);
+  border-radius: var(--radius-md, 8px);
+  background: var(--panel, Canvas);
+  color: var(--text, CanvasText);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transform: translate(-50%, 0);
+  opacity: 1;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.kbd6-seq-status[data-open='false'] {
+  opacity: 0;
+  transform: translate(-50%, 6px);
+}
+.kbd6-seq-status[data-state='miss'] {
+  border-left-color: var(--accent-2, var(--accent, Highlight));
+  color: var(--muted, CanvasText);
+}
+[data-materials='aero'] .kbd6-seq-status {
+  background: color-mix(in srgb, var(--panel, Canvas) 94%, var(--accent, Highlight));
+}
+[data-theme='wired-archive'] .kbd6-seq-status {
+  border-radius: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.02em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kbd6-seq-status {
+    transition: none;
+  }
+}
+
+/* Palette rows: where the command's keys are heard, and whether they are heard here. */
+.kbd6-scope-chip {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.kbd6-avail {
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.kbd6-avail[data-avail='here'] {
+  color: var(--accent-2, var(--accent));
+  font-weight: 600;
+}
+.kbd6-avail[data-avail='elsewhere'],
+.kbd6-avail[data-avail='inactive'] {
+  font-style: italic;
+}
+[data-theme='wired-archive'] .kbd6-scope-chip {
+  border-radius: 0;
+}
+
+/* Settings > Shortcuts toolbar: "Record a sequence" and the key filter chip. */
+.kbd6-seq-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.kbd6-seq-toggle input {
+  margin: 0;
+  inline-size: 16px;
+  block-size: 16px;
+}
+.kbd6-seq-toggle:focus-within {
+  outline: 2px solid var(--focus-ring-color, var(--accent));
+  outline-offset: 1px;
+}
+.kbd6-keyfilter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+}
+.kbd6-keyfilter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
+  color: var(--text);
+}
+.kbd6-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.kbd6-chip-x:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.kbd6-chip-x:focus-visible {
+  outline: 2px solid var(--focus-ring-color, var(--accent));
+  outline-offset: 1px;
+}
+[data-theme='wired-archive'] .kbd6-keyfilter-chip,
+[data-theme='wired-archive'] .kbd6-chip-x {
+  border-radius: 0;
+}
+/* A prefix clash ("Ctrl+K starts the sequence for …") reads as its own line. */
+.sc-prefix {
+  display: block;
+}

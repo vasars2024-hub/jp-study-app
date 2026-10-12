@@ -22,6 +22,7 @@ import { isInstalled } from './downloads';
 import { pageConfidence, type BookLine, type BookPage } from '../shared/bookOcr';
 import {
   bookOcrEngine,
+  bookOcrLangOf,
   estimateEtaMs,
   judgeBookOcrRun,
   type BookOcrLang,
@@ -30,7 +31,6 @@ import {
   type BookOcrRequest,
   type BookOcrResult,
 } from '../shared/bookOcrIpc';
-import { studyLangFromTag } from '../shared/studyLang';
 import { getMainStudyLang } from './studyLanguage';
 
 /** Item ids whose job has been asked to stop. */
@@ -76,8 +76,8 @@ export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
   // and the old per-page catch turned a book's worth of throws into a book's
   // worth of blank pages that then replaced the readable original.
   // The book's language picks the recognizer: the request's, the library
-  // item's, else the study language. It used to be Japanese, always.
-  const lang: BookOcrLang = req.lang ?? studyLangFromTag(item.lang) ?? getMainStudyLang();
+  // item's (`bookOcrLangOf`), else the study language. It used to be Japanese, always.
+  const lang: BookOcrLang = req.lang ?? bookOcrLangOf(item, getMainStudyLang());
   const engine = bookOcrEngine(isInstalled, lang);
   if (!engine) {
     const refusal = { error: 'models-missing', errorKey: 'bookOcr.error.modelsMissing' };
@@ -179,7 +179,8 @@ export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
         const source = pages[i].lines.map((l) => l.text).join('');
         if (source.trim()) {
           try {
-            pages[i].translation = await translateForBook(source, 'ja', req.targetLang ?? 'en');
+            // From the book's language: it used to be 'ja' whatever the book was.
+            pages[i].translation = await translateForBook(source, lang, req.targetLang ?? 'en');
           } catch {
             // Leave the page untranslated; the column simply renders empty.
           }

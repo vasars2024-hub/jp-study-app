@@ -43,23 +43,31 @@ import MatchMode from '../components/flashcards/MatchMode';
 const t = (key: string, lang: UiLang, vars?: Record<string, string | number>) =>
   translate(key, vars, { lang, catalog: CATALOGS[lang], fallback: en });
 
-let host: HTMLDivElement;
-let root: Root;
+let host: HTMLDivElement | null = null;
+let root: Root | null = null;
 
 function mount(): void {
-  host = document.createElement('div');
-  document.body.appendChild(host);
-  root = createRoot(host);
-  act(() => { root.render(createElement(MatchMode, {})); });
+  const h = document.createElement('div');
+  document.body.appendChild(h);
+  const r = createRoot(h);
+  host = h;
+  root = r;
+  act(() => { r.render(createElement(MatchMode, {})); });
+}
+
+/** The mounted host; a test that reads it without mounting is a bug in the test. */
+function mounted(): HTMLDivElement {
+  if (!host) throw new Error('mount() first');
+  return host;
 }
 
 function tiles(): HTMLButtonElement[] {
-  return Array.from(host.querySelectorAll<HTMLButtonElement>('.flash-match-tile'));
+  return Array.from(mounted().querySelectorAll<HTMLButtonElement>('.flash-match-tile'));
 }
 
 /** Every live region's text, joined — the fix must not depend on which one. */
 function announced(): string {
-  return Array.from(host.querySelectorAll('[aria-live]'))
+  return Array.from(mounted().querySelectorAll('[aria-live]'))
     .map((e) => e.textContent ?? '')
     .join(' | ');
 }
@@ -88,9 +96,17 @@ beforeEach(() => {
   ];
 });
 
+// Only the tests that mounted have something to unmount, and each mount is
+// unmounted exactly once. The string tests never mount, so whether this ran
+// depended on a mount test having run first (and it then unmounted that stale
+// root a second time).
 afterEach(() => {
-  act(() => root.unmount());
-  host.remove();
+  const r = root;
+  const h = host;
+  root = null;
+  host = null;
+  if (r) act(() => r.unmount());
+  h?.remove();
 });
 
 describe('Match tells you when a pair is wrong', () => {
@@ -104,7 +120,7 @@ describe('Match tells you when a pair is wrong', () => {
   it('announces a wrong pair rather than only colouring the tile', () => {
     mount();
     missOnce();
-    expect(host.querySelector('.flash-match-tile.is-wrong'), 'no tile was marked').toBeTruthy();
+    expect(mounted().querySelector('.flash-match-tile.is-wrong'), 'no tile was marked').toBeTruthy();
     expect(announced()).toContain('flash.match.miss(count=1)');
   });
 

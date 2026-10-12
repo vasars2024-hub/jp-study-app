@@ -174,6 +174,7 @@ import {
   agentConversationPlanContext,
   createAgentConversationPlan,
   isAgentConversationPlanQuarantined,
+  resetAgentConversationPlannerForTests,
   retryAgentConversationPlanSave,
   runAgentConversationPlan,
   updateAgentConversationPlanQueue,
@@ -221,24 +222,29 @@ function task(id = 'task-1') {
   }], 10);
 }
 
-describe('Agent conversation planner', () => {
-  beforeEach(() => {
-    harness.settings.enabled = true;
-    harness.settings.backend = 'local-gguf';
-    harness.settings.privacyMode = false;
-    harness.settings.memoryEnabled = true;
-    harness.queue = { version: 1, items: [] };
-    harness.saveCalls = [];
-    harness.saveThrows = false;
-    harness.durableOk = true;
-    harness.initThrows = false;
-    harness.allowedOperations = ['dictionary.lookup'];
-    harness.permission = 'limited-actions';
-    harness.handlers = {};
-    harness.leaseExpected = null;
-    (window as unknown as { api: Record<string, unknown> }).api = {};
-  });
+// File-level, so the queue-surface tests below start from the same harness as
+// the planner tests instead of whatever the previous test left in it, and the
+// planner's session-scoped quarantine map is empty for every test (a plan
+// quarantined by one test made `run-next` on the same task id fail in the next).
+beforeEach(() => {
+  harness.settings.enabled = true;
+  harness.settings.backend = 'local-gguf';
+  harness.settings.privacyMode = false;
+  harness.settings.memoryEnabled = true;
+  harness.queue = { version: 1, items: [] };
+  harness.saveCalls = [];
+  harness.saveThrows = false;
+  harness.durableOk = true;
+  harness.initThrows = false;
+  harness.allowedOperations = ['dictionary.lookup'];
+  harness.permission = 'limited-actions';
+  harness.handlers = {};
+  harness.leaseExpected = null;
+  (window as unknown as { api: Record<string, unknown> }).api = {};
+  resetAgentConversationPlannerForTests();
+});
 
+describe('Agent conversation planner', () => {
   it('bounds the exact disclosed shelf subset', () => {
     const disclosed = agentConversationPlanContext(conversation());
     expect(disclosed).toHaveLength(AGENT_CONVERSATION_PLAN_CONTEXT_LIMIT);

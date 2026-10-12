@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import Icon from '../components/Icons';
 import './widgets.css';
 import { Input, Select, Slider, Toggle } from '../components/ui';
@@ -16,7 +16,12 @@ import {
   STUDY_MODES,
   isMusicStyleId,
   isMixSilent,
+  isNeutralShape,
+  shapeOf,
   type FadeScheduleId,
+  type LayerShape,
+  type MixesImportError,
+  type SoundLayerId,
   type StudyModePresets,
 } from '../soundscape/soundscapeModel';
 import {
@@ -28,10 +33,14 @@ import {
   applySoundscapeScene,
   clearSoundscape,
   deleteSoundscapeMix,
+  exportSoundscapeMixes,
   getSoundscape,
+  importSoundscapeMixes,
   saveSoundscapeMix,
   setSoundLayerLevel,
+  setSoundLayerShape,
   setSoundscapeDuck,
+  setSoundscapeDuckForSpeech,
   setSoundscapeFade,
   setSoundscapeMaster,
   setSoundscapeMusic,
@@ -52,6 +61,68 @@ import {
 
 const percent = (value: number): number => Math.round(value * 100);
 
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
+/** snd6: what a screen reader says for a tone position ("Darker, 40%"). */
+function toneText(tone: number, t: TFn): string {
+  if (tone === 0) return t('snd6.shape.toneNeutral');
+  return tone < 0 ? t('snd6.shape.darker', { percent: percent(-tone) }) : t('snd6.shape.brighter', { percent: percent(tone) });
+}
+
+function panText(pan: number, t: TFn): string {
+  if (pan === 0) return t('snd6.shape.centre');
+  return pan < 0 ? t('snd6.shape.left', { percent: percent(-pan) }) : t('snd6.shape.right', { percent: percent(pan) });
+}
+
+function importErrorText(error: MixesImportError, t: TFn): string {
+  if (error === 'notJson') return t('snd6.mixes.error.notJson');
+  if (error === 'empty') return t('snd6.mixes.error.empty');
+  return t('snd6.mixes.error.notMixes');
+}
+
+/**
+ * snd6: one layer's tone and pan, opened under its row. Sliders run -100..100
+ * with the centre as neutral; Reset puts both back.
+ */
+function LayerShapeControls({ id, label, shape, t }: { id: SoundLayerId; label: string; shape: LayerShape; t: TFn }) {
+  return (
+    <div className="wgt-sound-shape" role="group" aria-label={t('snd6.shape.groupOf', { name: label })}>
+      <label className="wgt-sound-shape-row">
+        <span>{t('snd6.shape.tone')}</span>
+        <Slider
+          min={-100}
+          max={100}
+          step={5}
+          value={Math.round(shape.tone * 100)}
+          aria-label={t('snd6.shape.toneOf', { name: label })}
+          aria-valuetext={toneText(shape.tone, t)}
+          onChange={(event) => setSoundLayerShape(id, { tone: Number(event.target.value) / 100 })}
+        />
+      </label>
+      <label className="wgt-sound-shape-row">
+        <span>{t('snd6.shape.pan')}</span>
+        <Slider
+          min={-100}
+          max={100}
+          step={5}
+          value={Math.round(shape.pan * 100)}
+          aria-label={t('snd6.shape.panOf', { name: label })}
+          aria-valuetext={panText(shape.pan, t)}
+          onChange={(event) => setSoundLayerShape(id, { pan: Number(event.target.value) / 100 })}
+        />
+      </label>
+      <button
+        type="button"
+        className="wgt-btn wgt-sound-shape-reset"
+        disabled={isNeutralShape(shape)}
+        onClick={() => setSoundLayerShape(id, { tone: 0, pan: 0 })}
+      >
+        {t('snd6.shape.reset')}
+      </button>
+    </div>
+  );
+}
+
 /**
  * Soundscape — a mixer of generated study sounds. The widget is only the controls:
  * playback belongs to soundscapeStore, so collapsing or removing the widget does
@@ -63,6 +134,13 @@ export function SoundscapeWidget() {
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
   const [, setClock] = useState(0);
+  /** snd6: the one layer whose tone/pan controls are open. */
+  const [shaping, setShaping] = useState<SoundLayerId | null>(null);
+  const [pasting, setPasting] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [mixMsg, setMixMsg] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+  const shapeIdBase = useId();
 
   useEffect(() => subscribeSoundscape(setSnap), []);
   const [focus, setFocus] = useState<FocusSoundscapeSettings>(() => loadFocusSoundscape());
@@ -97,6 +175,52 @@ export function SoundscapeWidget() {
       setName('');
     }
   };
+  // ---- snd6: saved mixes as a file -------------------------------------------
+  const reportImport = (text: string): boolean => {
+    const result = importSoundscapeMixes(text);
+    if (!result.ok) {
+      setMixMsg(t('snd6.mixes.importFailed', { error: importErrorText(result.error, t) }));
+      return false;
+    }
+    const parts = [t('snd6.mixes.added', { count: result.added })];
+    if (result.duplicates) parts.push(t('snd6.mixes.duplicates', { count: result.duplicates }));
+    if (result.overflow) parts.push(t('snd6.mixes.overflow', { count: result.overflow, max: MAX_SAVED_MIXES }));
+    setMixMsg(parts.join(' '));
+    return true;
+  };
+  const exportFile = (): void => {
+    const name = `gum-soundscape-mixes-${new Date().toISOString().slice(0, 10)}.json`;
+    try {
+      const url = URL.createObjectURL(new Blob([exportSoundscapeMixes()], { type: 'application/json' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = name;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMixMsg(t('snd6.mixes.exported', { name }));
+    } catch {
+      setMixMsg(t('snd6.mixes.exportFailed'));
+    }
+  };
+  const copyMixes = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(exportSoundscapeMixes());
+      setMixMsg(t('snd6.mixes.copied', { count: state.saved.length }));
+    } catch {
+      setMixMsg(t('snd6.mixes.copyFailed'));
+    }
+  };
+  const loadFile = async (file: File | undefined): Promise<void> => {
+    if (!file) return;
+    try {
+      reportImport(await file.text());
+    } catch {
+      setMixMsg(t('snd6.mixes.importFailed', { error: importErrorText('notJson', t) }));
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
   const onNameKey = (event: KeyboardEvent<HTMLInputElement>): void => {
     // Enter also confirms an IME conversion; that Enter must not save the mix.
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -208,23 +332,45 @@ export function SoundscapeWidget() {
             {SOUND_LAYERS.filter((layer) => layer.group === group.id).map((layer) => {
               const on = state.active.includes(layer.id);
               const label = t(layer.labelKey);
+              const shape = shapeOf(state, layer.id);
+              const shaped = !isNeutralShape(shape);
+              const open = shaping === layer.id;
+              const shapeId = `${shapeIdBase}-${layer.id}`;
               return (
-                <div key={layer.id} className={`wgt-sound-row${on ? ' is-on' : ''}`}>
-                  <button
-                    type="button"
-                    className="wgt-sound-name"
-                    aria-pressed={on}
-                    onClick={() => toggleSoundLayer(layer.id)}
-                  >
-                    {label}
-                  </button>
-                  <Slider
-                    min={0}
-                    max={100}
-                    value={on ? percent(state.levels[layer.id]) : 0}
-                    onChange={(event) => setSoundLayerLevel(layer.id, Number(event.target.value) / 100)}
-                    aria-label={t('soundscape.layerVolume', { name: label })}
-                  />
+                <div key={layer.id} className="wgt-sound-layer">
+                  <div className={`wgt-sound-row${on ? ' is-on' : ''}`}>
+                    <button
+                      type="button"
+                      className="wgt-sound-name"
+                      aria-pressed={on}
+                      onClick={() => toggleSoundLayer(layer.id)}
+                    >
+                      {label}
+                    </button>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={on ? percent(state.levels[layer.id]) : 0}
+                      onChange={(event) => setSoundLayerLevel(layer.id, Number(event.target.value) / 100)}
+                      aria-label={t('soundscape.layerVolume', { name: label })}
+                    />
+                    <button
+                      type="button"
+                      className={`wgt-btn-icon wgt-sound-shape-btn${shaped ? ' is-shaped' : ''}`}
+                      aria-expanded={open}
+                      aria-controls={open ? shapeId : undefined}
+                      aria-label={shaped ? t('snd6.shape.openShaped', { name: label }) : t('snd6.shape.open', { name: label })}
+                      title={shaped ? t('snd6.shape.openShaped', { name: label }) : t('snd6.shape.open', { name: label })}
+                      onClick={() => setShaping(open ? null : layer.id)}
+                    >
+                      <Icon name="wrench" size={11} />
+                    </button>
+                  </div>
+                  {open && (
+                    <div id={shapeId}>
+                      <LayerShapeControls id={layer.id} label={label} shape={shape} t={t} />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -257,6 +403,63 @@ export function SoundscapeWidget() {
               aria-label={t('soundscape.music.volume')}
             />
           </div>
+        </div>
+
+        {/* snd6: saved mixes to a file and back — keep them, move them, share them. */}
+        <div className="wgt-sound-group wgt-sound-mixes" role="group" aria-label={t('snd6.mixes.heading')}>
+          <div className="wgt-sound-heading">{t('snd6.mixes.heading')}</div>
+          <div className="wgt-sound-mixes-actions">
+            <button type="button" className="wgt-btn" disabled={!state.saved.length} onClick={exportFile}>
+              {t('snd6.mixes.export')}
+            </button>
+            <button type="button" className="wgt-btn" disabled={!state.saved.length} onClick={() => void copyMixes()}>
+              {t('snd6.mixes.copy')}
+            </button>
+            <button type="button" className="wgt-btn" onClick={() => fileRef.current?.click()}>
+              {t('snd6.mixes.import')}
+            </button>
+            <button type="button" className="wgt-btn" aria-expanded={pasting} onClick={() => setPasting((open) => !open)}>
+              {t('snd6.mixes.paste')}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json,application/json"
+              hidden
+              aria-hidden="true"
+              tabIndex={-1}
+              data-snd6-mix-file
+              onChange={(event) => void loadFile(event.target.files?.[0])}
+            />
+          </div>
+          {pasting && (
+            <div className="wgt-sound-paste">
+              <textarea
+                value={pasteText}
+                aria-label={t('snd6.mixes.pasteLabel')}
+                placeholder={t('snd6.mixes.pastePlaceholder')}
+                onChange={(event) => setPasteText(event.target.value)}
+              />
+              <button
+                type="button"
+                className="wgt-btn primary"
+                disabled={!pasteText.trim()}
+                onClick={() => {
+                  if (reportImport(pasteText)) {
+                    setPasteText('');
+                    setPasting(false);
+                  }
+                }}
+              >
+                {t('snd6.mixes.importPasted')}
+              </button>
+            </div>
+          )}
+          {mixMsg && (
+            <div className="wgt-sound-duck" role="status">
+              {mixMsg}
+            </div>
+          )}
         </div>
 
         {/* snd2: the mixer follows Pomodoro work blocks and Focus Mode (focusSoundscape.ts). */}
@@ -402,6 +605,16 @@ export function SoundscapeWidget() {
         onChange={(event) => setSoundscapeDuck(event.target.checked)}
         label={t('soundscape.duck')}
       />
+      {/* snd6: duck under speech, a card's clip or a video — in this window or a pop-out. */}
+      <Toggle
+        className="wgt-sound-duck"
+        checked={state.duckForSpeech}
+        onChange={(event) => setSoundscapeDuckForSpeech(event.target.checked)}
+        label={t('snd6.duck.speech')}
+      />
+      <div className="wgt-sound-duck wgt-sound-ducking" role="status">
+        {snap.ducking === 'speech' ? t('snd6.duck.nowSpeech') : snap.ducking === 'music' ? t('snd6.duck.nowMusic') : ''}
+      </div>
     </div>
   );
 }

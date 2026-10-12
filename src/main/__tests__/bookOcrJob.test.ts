@@ -21,6 +21,10 @@ const h = vi.hoisted(() => ({
   ocrCalls: [] as Array<{ engine?: string; forceLang?: string }>,
   attached: [] as string[],
   broadcasts: [] as Array<Record<string, unknown>>,
+  /** What the library holds for the item beyond its id/title/kind. */
+  item: {} as Record<string, unknown>,
+  studyLang: 'ja' as 'ja' | 'zh' | 'ru',
+  translateCalls: [] as Array<{ source: string; target: string }>,
 }));
 
 vi.mock('electron', () => ({
@@ -57,7 +61,7 @@ vi.mock('../ocrAuto', () => ({
 vi.mock('../bookEpub', () => ({ buildBookEpub: () => Buffer.from('epub') }));
 
 vi.mock('../library', () => ({
-  getLibraryItem: (id: string) => ({ id, title: 'テスト', kind: 'manga', createdAt: 1 }),
+  getLibraryItem: (id: string) => ({ id, title: 'テスト', kind: 'manga', createdAt: 1, ...h.item }),
   itemDir: (id: string) => `/lib/${id}`,
   listItemPagePaths: () => h.pages.map((_, i) => `/lib/x/pages/page-${i}.png`),
   attachGeneratedEpub: (id: string) => {
@@ -67,7 +71,13 @@ vi.mock('../library', () => ({
 }));
 
 vi.mock('../pdfRasterize', () => ({ rasterizePdf: async () => undefined }));
-vi.mock('../translate', () => ({ translateForBook: async () => '' }));
+vi.mock('../translate', () => ({
+  translateForBook: async (_text: string, source: string, target: string) => {
+    h.translateCalls.push({ source, target });
+    return '';
+  },
+}));
+vi.mock('../studyLanguage', () => ({ getMainStudyLang: () => h.studyLang }));
 
 const WEB = ['paddle-ocr-det', 'paddle-ocr-ja', 'paddle-ocr-ja-keys'];
 const MANGA = ['manga-ocr', 'manga-ocr-decoder', 'manga-ocr-vocab', 'comic-text-detector'];
@@ -78,6 +88,9 @@ beforeEach(() => {
   h.ocrCalls = [];
   h.attached = [];
   h.broadcasts = [];
+  h.item = {};
+  h.studyLang = 'ja';
+  h.translateCalls = [];
 });
 
 describe('runBookOcr — no engine installed', () => {
@@ -166,5 +179,59 @@ describe('runBookOcr — success', () => {
     const res = await runBookOcr({ itemId: 'm7' });
     expect(res.ok).toBe(true);
     expect(h.attached).toEqual(['m7']);
+  });
+});
+
+/*
+ * The job used to read `item.lang`, which `LibraryItem` never had: every book
+ * without a request language was read in the study language, so a Chinese book
+ * on a Japanese profile went through the Japanese recognizer (and its bilingual
+ * build translated it "from Japanese").
+ */
+describe("runBookOcr — the book's language comes from the library item", () => {
+  const ZH_WEB = ['paddle-ocr-det', 'paddle-ocr-zh', 'paddle-ocr-zh-keys'];
+
+  it('reads a downloaded Chinese chapter as Chinese on a Japanese profile', async () => {
+    h.installed = new Set([...WEB, ...ZH_WEB, ...MANGA]);
+    h.item = { readingSource: { kind: 'seanime-manga-chapter', language: 'zh-hk' } };
+    h.pages = [{ text: '今天天气很好' }, { text: '我们去公园' }];
+    const res = await runBookOcr({ itemId: 'z3', bilingual: true, targetLang: 'en' });
+    expect(res.ok).toBe(true);
+    expect(h.ocrCalls.map((c) => [c.engine, c.forceLang])).toEqual([['auto', 'zh'], ['auto', 'zh']]);
+    expect(h.translateCalls).toEqual([{ source: 'zh', target: 'en' }, { source: 'zh', target: 'en' }]);
+  });
+
+  it('reads a book whose text was detected as Chinese as Chinese', async () => {
+    h.installed = new Set([...WEB, ...ZH_WEB]);
+    h.item = { kind: 'book', levelMeta: { lang: 'zh', knownRatio: 0.4, levelEstimate: 4 } };
+    h.pages = [{ text: '一' }];
+    expect((await runBookOcr({ itemId: 'z4' })).ok).toBe(true);
+    expect(h.ocrCalls.map((c) => c.forceLang)).toEqual(['zh']);
+  });
+
+  it('reads a Japanese chapter as Japanese on a Chinese profile', async () => {
+    h.studyLang = 'zh';
+    h.installed = new Set([...WEB, ...ZH_WEB]);
+    h.item = { readingSource: { kind: 'seanime-manga-chapter', language: 'ja' } };
+    h.pages = [{ text: 'あいう' }];
+    expect((await runBookOcr({ itemId: 'j1' })).ok).toBe(true);
+    expect(h.ocrCalls.map((c) => c.forceLang)).toEqual(['ja']);
+  });
+
+  it('falls back to the study language when the item says nothing usable', async () => {
+    h.studyLang = 'zh';
+    h.installed = new Set([...WEB, ...ZH_WEB]);
+    h.item = { levelMeta: { lang: 'unknown', knownRatio: 0, levelEstimate: null } };
+    h.pages = [{ text: '一' }];
+    expect((await runBookOcr({ itemId: 'u1' })).ok).toBe(true);
+    expect(h.ocrCalls.map((c) => c.forceLang)).toEqual(['zh']);
+  });
+
+  it("the request's language still wins over the item's", async () => {
+    h.installed = new Set([...WEB, ...ZH_WEB]);
+    h.item = { levelMeta: { lang: 'zh', knownRatio: 0, levelEstimate: null } };
+    h.pages = [{ text: 'あ' }];
+    expect((await runBookOcr({ itemId: 'r1', lang: 'ja' })).ok).toBe(true);
+    expect(h.ocrCalls.map((c) => c.forceLang)).toEqual(['ja']);
   });
 });

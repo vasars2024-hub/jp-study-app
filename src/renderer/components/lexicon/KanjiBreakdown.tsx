@@ -39,6 +39,17 @@ function watchCharacterDictionaries(): void {
   });
 }
 
+/**
+ * Tests only: forget every cached character and the watcher. Pairs with
+ * `resetDictionaryChangeSignalForTests`, which drops the watcher's listener but
+ * left `watchingFacts` true, so a later test's commit never cleared this cache.
+ */
+export function resetKanjiFactsCacheForTests(): void {
+  factsCache.clear();
+  factsGeneration = 0;
+  watchingFacts = false;
+}
+
 /** The distinct Han characters of `word`, in order, capped. */
 export function hanCharacters(word: string, max = MAX_CHARS): string[] {
   const out: string[] = [];

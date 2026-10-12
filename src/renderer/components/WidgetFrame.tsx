@@ -10,6 +10,8 @@ import { useAeroMaterials, useWiredMaterials } from './ui';
 import { wiredWidgetTitle } from '../widgets/wiredLabels';
 import { aeroGadgetTitle } from '../widgets/aeroLabels';
 import { clearTimer } from '../widgets/timerStore';
+import { alignMove, alignResize, type AlignGuide, type AlignRect } from '../widgets/widgetAlign';
+import '../widgets/wid6.css';
 
 // Home Workspace widget host. A lighter cousin of the desktop's FloatingWindow:
 // free-positioned, drag + resize done with a compositor-only transform during
@@ -34,6 +36,77 @@ function desktopPointerScale(desk: HTMLElement | null): number {
 }
 
 const snap = (n: number): number => Math.round(n / GRID) * GRID;
+
+/**
+ * wid6: the other widgets beside this one, as rects in the coordinates its own
+ * `left`/`top` use (offsets are layout values, so the desk's zoom transform
+ * does not distort them). Previews in the gallery are not on the desk.
+ */
+function siblingRects(self: HTMLElement): AlignRect[] {
+  const parent = self.offsetParent;
+  if (!parent) return [];
+  return [...parent.querySelectorAll<HTMLElement>('.widget-frame:not(.widget-preview-frame)')]
+    .filter((el) => el !== self && el.offsetParent === parent)
+    .map((el) => ({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }));
+}
+
+/**
+ * wid6: the guide lines drawn over the desk while a widget is dragged or
+ * resized, plus a coordinate readout (shown by the Wired sheet, where placing a
+ * module is a terminal operation). Plain DOM, not React state: a drag must not
+ * re-render the desktop per pointer event.
+ */
+class GuideLayer {
+  private root: HTMLDivElement | null = null;
+  private drawn = '';
+
+  constructor(private readonly host: Element | null) {}
+
+  /** Draw `guides` and a readout reading `text` at `pos` (desk coordinates). */
+  show(guides: AlignGuide[], pos: { x: number; y: number }, text: string): void {
+    if (!this.host) return;
+    const key = `${guides.map((g) => `${g.axis}${g.at}:${g.from}-${g.to}`).join('|')}#${text}`;
+    if (key === this.drawn) return;
+    this.drawn = key;
+    if (!this.root) {
+      this.root = document.createElement('div');
+      this.root.className = 'widget-guides';
+      this.root.setAttribute('aria-hidden', 'true');
+      this.host.appendChild(this.root);
+    }
+    this.root.replaceChildren();
+    for (const g of guides) {
+      const line = document.createElement('div');
+      line.className = `widget-guide is-${g.axis}`;
+      const length = `${Math.max(0, g.to - g.from)}px`;
+      if (g.axis === 'x') {
+        line.style.left = `${g.at}px`;
+        line.style.top = `${g.from}px`;
+        line.style.height = length;
+      } else {
+        line.style.top = `${g.at}px`;
+        line.style.left = `${g.from}px`;
+        line.style.width = length;
+      }
+      this.root.appendChild(line);
+    }
+    const readout = document.createElement('div');
+    readout.className = 'widget-guide-readout';
+    readout.style.left = `${Math.round(pos.x)}px`;
+    readout.style.top = `${Math.round(pos.y)}px`;
+    readout.textContent = text;
+    this.root.appendChild(readout);
+  }
+
+  clear(): void {
+    this.root?.remove();
+    this.root = null;
+    this.drawn = '';
+  }
+}
+
+/** A coordinate the way the Wired readout prints it: four digits, zero-padded. */
+const pad4 = (n: number): string => String(Math.max(0, Math.round(n))).padStart(4, '0');
 
 export interface WidgetFrameProps {
   widget: WidgetSnapshot;
@@ -195,10 +268,28 @@ export default function WidgetFrame({
     const dh = (desk?.clientHeight ?? 720) - TASKBAR;
     let curX = ox, curY = oy;
     let raf: number | null = null;
+    // wid6: edges and centres catch the other widgets' and the desk's; Alt places freely.
+    const others = siblingRects(el);
+    const guides = new GuideLayer(el.offsetParent);
+    const readout = (x: number, y: number): string => t('wid6.guides.readout', { x: pad4(x), y: pad4(y) });
+    let snappedX = false, snappedY = false;
+    const frameH = el.offsetHeight || (collapsed ? 30 : widget.h);
     el.style.willChange = 'transform';
     const move = (ev: PointerEvent) => {
       curX = Math.min(Math.max(ox + (ev.clientX - sx) / z, 0), dw - 60);
       curY = Math.min(Math.max(oy + (ev.clientY - sy) / z, 0), dh - 30);
+      snappedX = false;
+      snappedY = false;
+      if (!ev.altKey) {
+        const aligned = alignMove({ x: curX, y: curY, w: widget.w, h: frameH }, others, { width: dw, height: dh });
+        curX = Math.min(Math.max(aligned.x, 0), dw - 60);
+        curY = Math.min(Math.max(aligned.y, 0), dh - 30);
+        snappedX = aligned.snappedX && curX === aligned.x;
+        snappedY = aligned.snappedY && curY === aligned.y;
+        guides.show(aligned.guides, { x: curX, y: curY }, readout(curX, curY));
+      } else {
+        guides.show([], { x: curX, y: curY }, readout(curX, curY));
+      }
       if (raf != null) return;
       raf = requestAnimationFrame(() => {
         raf = null;
@@ -211,9 +302,11 @@ export default function WidgetFrame({
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', up);
       if (raf != null) cancelAnimationFrame(raf);
+      guides.clear();
       el.style.transform = '';
       el.style.willChange = '';
-      onPatch({ x: snap(curX), y: snap(curY) });
+      // An edge that caught a guide stays exactly on it; anything else keeps the grid.
+      onPatch({ x: snappedX ? Math.round(curX) : snap(curX), y: snappedY ? Math.round(curY) : snap(curY) });
     };
     handle.addEventListener('pointermove', move);
     handle.addEventListener('pointerup', up);
@@ -232,9 +325,29 @@ export default function WidgetFrame({
     const sx = e.clientX, sy = e.clientY, ow = widget.w, oh = widget.h;
     let curW = ow, curH = oh;
     let raf: number | null = null;
+    // wid6: the far edges catch the other widgets' edges and the desk's.
+    const others = siblingRects(el);
+    const deskEl = deskRef.current;
+    const bounds = { width: deskEl?.clientWidth ?? 1200, height: (deskEl?.clientHeight ?? 720) - TASKBAR };
+    const guides = new GuideLayer(el.offsetParent);
+    const readout = (w: number, h: number): string => t('wid6.guides.size', { w: pad4(w), h: pad4(h) });
+    const corner = (w: number, h: number): { x: number; y: number } => ({ x: widget.x + w, y: widget.y + h });
+    let snappedW = false, snappedH = false;
     const move = (ev: PointerEvent) => {
       curW = Math.max(def.minSize.w, ow + (ev.clientX - sx) / z);
       curH = Math.max(def.minSize.h, oh + (ev.clientY - sy) / z);
+      snappedW = false;
+      snappedH = false;
+      if (!ev.altKey) {
+        const aligned = alignResize({ x: widget.x, y: widget.y, w: curW, h: curH }, others, bounds, def.minSize);
+        curW = aligned.w;
+        curH = aligned.h;
+        snappedW = aligned.snappedW;
+        snappedH = aligned.snappedH;
+        guides.show(aligned.guides, corner(curW, curH), readout(curW, curH));
+      } else {
+        guides.show([], corner(curW, curH), readout(curW, curH));
+      }
       if (raf != null) return;
       raf = requestAnimationFrame(() => {
         raf = null;
@@ -247,7 +360,8 @@ export default function WidgetFrame({
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', up);
       if (raf != null) cancelAnimationFrame(raf);
-      onPatch({ w: snap(curW), h: snap(curH) });
+      guides.clear();
+      onPatch({ w: snappedW ? Math.round(curW) : snap(curW), h: snappedH ? Math.round(curH) : snap(curH) });
     };
     handle.addEventListener('pointermove', move);
     handle.addEventListener('pointerup', up);
@@ -319,7 +433,7 @@ export default function WidgetFrame({
           </button>
           <div
             className={`aero-gadget-grip${locked ? ' is-locked' : ''}`}
-            title={locked ? t('widgetFrame.locked') : t('aeroVista.gadget.drag')}
+            title={locked ? t('widgetFrame.locked') : t('wid6.drag.hintAero', { drag: t('aeroVista.gadget.drag') })}
             onPointerDown={dragStart}
             onDoubleClick={() => onPatch({ collapsed: !collapsed })}
           >
@@ -366,7 +480,7 @@ export default function WidgetFrame({
       }}
       onPointerDown={onFocus}
     >
-      <div className="widget-bar" onPointerDown={dragStart} onDoubleClick={() => onPatch({ collapsed: !collapsed })}>
+      <div className="widget-bar" title={locked ? undefined : t('wid6.drag.hint')} onPointerDown={dragStart} onDoubleClick={() => onPatch({ collapsed: !collapsed })}>
         <span className="widget-title">{wired ? wiredWidgetTitle(widget.type, t(def.titleKey)) : t(def.titleKey)}</span>
         <span className="widget-btns">
           {locked && <span className="widget-lock" title={t('widgetFrame.locked')} aria-hidden>⌧</span>}

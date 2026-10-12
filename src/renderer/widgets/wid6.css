@@ -1,0 +1,212 @@
+/* wid6 — alignment guides while placing a widget, and the gallery's live preview.
+   Base look first; Aero and Wired restyle both under their material scope. */
+
+/* ---- Alignment guides (WidgetFrame drag / resize) ---- */
+.widget-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9990;
+}
+.widget-guide {
+  position: absolute;
+}
+.widget-guide.is-x {
+  width: 0;
+  border-left: 1px solid var(--accent);
+}
+.widget-guide.is-y {
+  height: 0;
+  border-top: 1px solid var(--accent);
+}
+/* The coordinate readout is Wired's: a terminal tells you where the module sits. */
+.widget-guide-readout {
+  display: none;
+}
+
+/* ---- Gallery: list beside a live preview ---- */
+.widget-gallery-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.widget-gallery-body > .widget-gallery-groups,
+.widget-gallery-body > .widget-gallery-empty {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+}
+.widget-gallery-preview {
+  flex: 0 0 256px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  border-left: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-2) 55%, transparent);
+}
+.widget-gallery-preview-head {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.widget-gallery-preview-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.widget-gallery-preview-desc,
+.widget-gallery-preview-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.widget-gallery-preview-meta {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+.widget-gallery .widget-gallery-preview-add {
+  align-self: flex-start;
+  min-height: 24px;
+}
+/* The card the preview is showing. */
+.widget-card.is-previewed {
+  outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: -1px;
+}
+/* A narrow gallery keeps the list; the preview is a nicety, not the content. */
+@media (max-width: 720px) {
+  .widget-gallery-preview {
+    display: none;
+  }
+}
+
+.widget-preview-stage {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    var(--panel-2);
+  border: 1px solid var(--border);
+}
+/* The real frame, scaled into the stage; never a target, never on the desk. */
+.widget-frame.widget-preview-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  transform-origin: center;
+  pointer-events: none;
+  animation: none;
+}
+.widget-preview-fallback {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 4px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .widget-preview-stage .widget-preview-frame {
+    transition: opacity 160ms ease;
+  }
+}
+
+/* ---- Aero: the Vista sidebar and its gadget gallery ---- */
+:root[data-materials='aero'] .widget-guide.is-x {
+  border-left-color: #3c9be8;
+  box-shadow: 0 0 4px rgba(110, 200, 255, 0.85);
+}
+:root[data-materials='aero'] .widget-guide.is-y {
+  border-top-color: #3c9be8;
+  box-shadow: 0 0 4px rgba(110, 200, 255, 0.85);
+}
+:root[data-materials='aero'] .widget-gallery-preview {
+  border-left: 1px solid rgba(127, 157, 185, 0.6);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(236, 245, 252, 0.92) 100%);
+  color: #1e395b;
+}
+:root[data-materials='aero'] .widget-gallery-preview-head {
+  color: #1e395b;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+:root[data-materials='aero'] .widget-gallery-preview-name {
+  color: #0b4a78;
+}
+:root[data-materials='aero'] .widget-gallery-preview-desc,
+:root[data-materials='aero'] .widget-gallery-preview-meta {
+  color: #3d5a76;
+}
+/* Gadgets lived on the dark Sidebar; the preview shows them on it. */
+:root[data-materials='aero'] .widget-preview-stage {
+  border: 1px solid rgba(10, 40, 60, 0.55);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 18%),
+    linear-gradient(180deg, #2c4a63 0%, #14273a 55%, #0d1b2a 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+:root[data-materials='aero'] .widget-card.is-previewed {
+  outline: 1px solid rgba(60, 155, 232, 0.8);
+  box-shadow: 0 0 6px rgba(110, 200, 255, 0.55);
+}
+
+/* ---- Wired: the Navi terminal ---- */
+:root[data-materials='wired'] .widget-guide.is-x {
+  border-left: 1px dashed var(--wired-cyan);
+}
+:root[data-materials='wired'] .widget-guide.is-y {
+  border-top: 1px dashed var(--wired-cyan);
+}
+:root[data-materials='wired'] .widget-guide-readout {
+  display: block;
+  position: absolute;
+  translate: 0 calc(-100% - 4px);
+  padding: 1px 6px;
+  font: 10px/1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--wired-cyan);
+  background: var(--wired-glass-strong);
+  border: 1px solid var(--wired-line);
+  white-space: nowrap;
+}
+:root[data-materials='wired'] .widget-gallery-preview {
+  border-left: 1px solid var(--wired-line);
+  background: var(--wired-glass);
+  font-family: var(--font-mono);
+}
+:root[data-materials='wired'] .widget-gallery-preview-head {
+  color: var(--wired-cyan);
+}
+:root[data-materials='wired'] .widget-gallery-preview-head::before {
+  content: '>> ';
+}
+:root[data-materials='wired'] .widget-gallery-preview-name {
+  color: var(--wired-cyan);
+  font-weight: 500;
+}
+:root[data-materials='wired'] .widget-gallery-preview-desc,
+:root[data-materials='wired'] .widget-gallery-preview-meta {
+  color: var(--wired-cyan-dim);
+}
+/* A monitor bay: black glass, a cyan bezel and a faint raster. */
+:root[data-materials='wired'] .widget-preview-stage {
+  border: 1px solid var(--wired-line);
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(180deg, rgba(109, 241, 255, 0.05) 0 1px, transparent 1px 3px),
+    var(--wired-black);
+  box-shadow: inset 0 0 18px rgba(109, 241, 255, 0.12);
+}
+:root[data-materials='wired'] .widget-card.is-previewed {
+  outline: 1px dashed var(--wired-cyan-dim);
+}

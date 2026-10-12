@@ -11,7 +11,7 @@
  * returning nothing, which no mocked unit test noticed.
  */
 import { act, createElement } from 'react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, installJsdomShims, mount, settle, stubBridge, type Mounted } from './helpers/axeHarness';
 
 vi.mock('../components/AnkiSetup', () => ({ default: () => <div /> }));
@@ -30,6 +30,8 @@ const setEnabled = vi.fn(async (on: boolean) => {
 });
 
 let app: Mounted;
+let SettingsApp: typeof import('../components/settings/SettingsApp').default;
+let wallPresetId = 'void';
 
 beforeAll(async () => {
   installJsdomShims();
@@ -41,12 +43,23 @@ beforeAll(async () => {
     listLibrary: [],
     displayList: [],
   });
-  localStorage.clear();
   const { WALL_PRESETS } = await import('../environment/wallCatalog');
-  const { default: SettingsApp } = await import('../components/settings/SettingsApp');
+  wallPresetId = WALL_PRESETS[0]?.id ?? 'void';
+  ({ default: SettingsApp } = await import('../components/settings/SettingsApp'));
+}, 120_000);
+
+// Each test gets a fresh "main" (no PIN, lock off), a fresh profile and a fresh
+// page, and sets up whatever history it needs itself. They used to share one
+// mounted page and one main, so each test depended on the ones before it.
+beforeEach(async () => {
+  state.hasPin = false;
+  state.enabled = false;
+  setPin.mockClear();
+  setEnabled.mockClear();
+  localStorage.clear();
   const noop = (): undefined => undefined;
   app = await mount(createElement(SettingsApp, {
-    wall: { kind: 'preset', id: WALL_PRESETS[0]?.id ?? 'void' }, wallPreset: '', presets: [],
+    wall: { kind: 'preset', id: wallPresetId }, wallPreset: '', presets: [],
     onWallPreset: noop, onWallImage: noop, onWallVideo: noop, onWallClear: noop, onReset: noop, onOpenVisualizer: noop, onOpenMusicWidget: noop,
   } as never), 80);
   await act(async () => {
@@ -55,7 +68,7 @@ beforeAll(async () => {
   await settle(80);
 }, 120_000);
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanup();
 });
 
@@ -67,6 +80,21 @@ const fill = (el: Element | null, v: string) => {
 const newFields = () => [...app.host.querySelectorAll('input[autocomplete="new-password"]')];
 const saveButton = () => newFields()[0]?.closest('.os-viz-row')?.querySelector('.btn.primary') as HTMLButtonElement;
 const statusText = () => [...app.host.querySelectorAll('[role=status]')].map((n) => n.textContent).join(' | ');
+/** Type a new PIN (twice) and press Save. */
+async function saveNewPin(pin: string, settleMs = 30): Promise<void> {
+  await act(async () => {
+    fill(newFields()[0] ?? null, pin);
+    fill(newFields()[1] ?? null, pin);
+  });
+  await act(async () => saveButton().click());
+  await settle(settleMs);
+}
+/** The first PIN, set the way the first test proves it works. */
+async function setFirstPin(): Promise<void> {
+  await saveNewPin('4826');
+  expect(setPin).toHaveBeenCalledWith(null, '4826');
+  setPin.mockClear();
+}
 
 describe('Settings -> Lockscreen through main', () => {
   it('the first PIN is set in main and its recovery code shown once', async () => {
@@ -82,18 +110,16 @@ describe('Settings -> Lockscreen through main', () => {
   });
 
   it('a change without the current passcode never reaches main', async () => {
-    setPin.mockClear();
-    await act(async () => {
-      fill(newFields()[0] ?? null, '1111');
-      fill(newFields()[1] ?? null, '1111');
-    });
-    await act(async () => saveButton().click());
-    await settle(10);
+    await setFirstPin();
+    await saveNewPin('1111', 10);
     expect(setPin).not.toHaveBeenCalled();
     expect(statusText()).toContain('Enter your current passcode first.');
   });
 
   it('with the current passcode main gets (current, new)', async () => {
+    await setFirstPin();
+    await saveNewPin('1111', 10);
+    expect(setPin).not.toHaveBeenCalled();
     await act(async () => fill(app.host.querySelector('input[autocomplete="current-password"]'), '4826'));
     await act(async () => saveButton().click());
     await settle(30);
@@ -101,6 +127,7 @@ describe('Settings -> Lockscreen through main', () => {
   });
 
   it('lock at launch turns on through main; off needs the current passcode first', async () => {
+    await setFirstPin();
     const box = [...app.host.querySelectorAll('.os-check-row input[type=checkbox]')].find((x) =>
       /launch/i.test(x.closest('label')?.textContent ?? ''),
     ) as HTMLInputElement;

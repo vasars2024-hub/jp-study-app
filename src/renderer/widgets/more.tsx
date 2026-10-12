@@ -10,6 +10,7 @@ import DailyGoalPanel from '../components/DailyGoalPanel';
 import './widgets.css';
 import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
 import { sendTelemetryPingIfNeeded } from '../telemetryPing';
+import { writeLocalStorage } from '../localStorageWrite';
 
 // ---------- World clock (multiple time zones) ----------
 interface Zone {
@@ -294,12 +295,9 @@ export function LearnerMapWidget(_props: WidgetProps) {
   const [refreshToken, setRefreshToken] = useState(0);
 
   const shareCountry = () => {
-    try {
-      localStorage.setItem(TELEMETRY_CONSENT_KEY, 'yes');
-      void sendTelemetryPingIfNeeded();
-    } catch {
-      /* storage unavailable */
-    }
+    // Guarded writer: a full store reports the refusal instead of dropping it silently.
+    writeLocalStorage(TELEMETRY_CONSENT_KEY, 'yes');
+    void sendTelemetryPingIfNeeded();
     setConsent('yes');
     setRefreshToken((n) => n + 1);
   };

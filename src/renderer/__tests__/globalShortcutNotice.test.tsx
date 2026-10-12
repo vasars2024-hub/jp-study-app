@@ -55,6 +55,10 @@ const onToast = (e: Event): void => {
 };
 
 beforeEach(() => {
+  // Every test starts from a fresh profile and states its own history (the
+  // earlier launches it depends on) instead of inheriting it from whichever
+  // test happened to run before it.
+  localStorage.clear();
   toasts = [];
   window.addEventListener('os:toast', onToast);
 });
@@ -98,6 +102,9 @@ describe('global shortcuts Windows refused: one notice per sync', () => {
   });
 
   it('the next launch with the same refused set says nothing', async () => {
+    await launch('in-use');
+    expect(toasts).toHaveLength(1);
+    toasts = [];
     const { store } = await launch('in-use');
     expect(toasts).toHaveLength(0);
     // The earlier entry is still in the center; no duplicate was added.
@@ -106,6 +113,9 @@ describe('global shortcuts Windows refused: one notice per sync', () => {
 
   it('a changed set is news again, and names the mixed reason honestly', async () => {
     localStorage.setItem('ui-lang', 'en');
+    await launch('in-use');
+    expect(toasts).toHaveLength(1);
+    toasts = [];
     const { store } = await launch('mixed');
     expect(toasts).toHaveLength(1);
     expect(toasts[0]?.message).toMatch(/shortcuts couldn't be registered\. Open Shortcuts to see why\.$/);
@@ -114,6 +124,9 @@ describe('global shortcuts Windows refused: one notice per sync', () => {
   });
 
   it('once everything registers the memory clears, so a later refusal is reported', async () => {
+    await launch('in-use');
+    expect(toasts).toHaveLength(1);
+    toasts = [];
     await launch('ok');
     expect(toasts).toHaveLength(0);
     await launch('in-use');

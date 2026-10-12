@@ -125,10 +125,11 @@ describe('scenes follow the study mode', () => {
     expect(store.getSoundscape().sceneId).toBe('rainy-cafe');
   });
 
-  it('review wins over a book left open behind it', () => {
-    expect(link.detectStudyMode((id) => id === 'reader.pageNext' || id === 'flashcards.flip')).toBe('review');
-    expect(link.detectStudyMode((id) => id === 'reader.pageNext')).toBe('reading');
-    expect(link.detectStudyMode(() => false)).toBeNull();
+  it('review wins over a book left open behind it', async () => {
+    const { detectStudyMode } = await import('../soundscape/studyModePresence');
+    expect(detectStudyMode((id) => id === 'reader.pageNext' || id === 'flashcards.flip')).toBe('review');
+    expect(detectStudyMode((id) => id === 'reader.pageNext')).toBe('reading');
+    expect(detectStudyMode(() => false)).toBeNull();
   });
 
   it('pausing by hand takes the sound back from the link', () => {

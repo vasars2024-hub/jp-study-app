@@ -11,12 +11,13 @@ import Icon, { type IconName } from './Icons';
 import { useModalKeyboard } from './ui/useModalKeyboard';
 import {
   COMMAND_CATALOG,
-  commandIsLive,
   effectiveKeys,
   formatKeysDisplay,
   listCustomCommands,
   runCommand,
 } from '../keyboardShortcuts';
+import { scopeOfCommand, type KeymapScope } from '../keymapEditor';
+import { commandAvailability, keyQueryToChord, keysMatchQuery, type CommandAvailability } from '../keyQuery';
 import { loadPaletteRecents, rankWithRecency, recordPaletteUse, RECENT_SHOWN, type PaletteRecent } from '../paletteRecents';
 import { WIDGETS } from '../widgets/registry';
 import {
@@ -39,6 +40,22 @@ import { useT } from '../i18n';
 import { commandCategory, commandLabel, commandNote } from '../commandI18n';
 import { scoreLabelledItem } from '../fuzzySearch';
 import './kbd5.css';
+import './kbd6.css';
+
+/** kbd6: how many view-scoped commands the empty list leads with ("In this view"). */
+const IN_VIEW_SHOWN = 8;
+
+/**
+ * kbd6: where every command's keys would be heard, read the moment the palette is
+ * asked to open. It has to be taken then — once the palette's input has focus, every
+ * scoped surface reports that it does not have the keyboard.
+ */
+function availabilitySnapshot(): Map<string, CommandAvailability> {
+  const out = new Map<string, CommandAvailability>();
+  for (const c of COMMAND_CATALOG) out.set(c.id, commandAvailability(c.id));
+  for (const c of listCustomCommands()) out.set(c.id, commandAvailability(c.id));
+  return out;
+}
 
 type PaletteMode = 'commands' | 'search' | 'toolbox';
 
@@ -68,6 +85,12 @@ interface Item {
    * the list for the highlighted row, so the list itself stays one line a row.
    */
   desc?: string;
+  /** kbd6: the command's raw binding, for search-by-key ("ctrl+k" finds it). */
+  rawKeys?: string;
+  /** kbd6: where the command's keys are heard (scope chip) … */
+  scope?: KeymapScope;
+  /** … and whether they would be heard where the palette was opened from. */
+  avail?: CommandAvailability;
   run: () => void;
 }
 
@@ -183,12 +206,15 @@ export default function CommandPalette() {
   const listRef = useRef<HTMLUListElement>(null);
   const listId = useId();
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const [availability, setAvailability] = useState<Map<string, CommandAvailability>>(() => new Map());
 
   // Open/close via the shortcut manager's events.
   useEffect(() => {
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
       const m = (detail === 'search' || detail === 'toolbox' ? detail : 'commands') as PaletteMode;
+      // Before anything moves focus into the palette (see availabilitySnapshot).
+      setAvailability(availabilitySnapshot());
       setMode(m);
       setQuery('');
       setSel(0);
@@ -331,13 +357,22 @@ export default function CommandPalette() {
       if (mode === 'toolbox' && c.category !== 'Toolbox') continue;
       const category = commandCategory(c.category, t);
       const desc = commandNote(c.id, c.note, t, c.category === 'Toolbox' ? c.scope : undefined);
+      const rawKeys = effectiveKeys(c.id);
+      const scope = scopeOfCommand(c);
+      const avail = availability.get(c.id) ?? 'inactive';
+      // kbd6: whether it works from here is the availability chip's job now — unless
+      // the command is app-wide, with no view to name, and nothing would answer it.
+      const unplaced = scope === 'app' || scope === 'system';
       out.push({
         key: `cmd-${c.id}`,
         label: commandLabel(c.id, c.label, t),
-        sub: commandIsLive(c.id) ? category : t('palette.needsView', { category }),
+        sub: unplaced && (avail === 'inactive' || avail === 'elsewhere') ? t('palette.needsView', { category }) : category,
         group: t('palette.group.commands'),
         glyph: 'command',
-        keys: formatKeysDisplay(effectiveKeys(c.id)) || undefined,
+        keys: formatKeysDisplay(rawKeys) || undefined,
+        rawKeys,
+        scope,
+        avail,
         ...(desc ? { desc, terms: desc } : {}),
         run: () => void runCommand(c.id),
       });
@@ -347,6 +382,7 @@ export default function CommandPalette() {
     if (mode !== 'toolbox') {
       const customCategory = commandCategory('Custom', t);
       for (const c of listCustomCommands()) {
+        const rawKeys = effectiveKeys(c.id);
         out.push({
           key: `cmd-${c.id}`,
           // The user's own name for it, never translated.
@@ -354,7 +390,10 @@ export default function CommandPalette() {
           sub: customCategory,
           group: t('palette.group.commands'),
           glyph: 'command',
-          keys: formatKeysDisplay(effectiveKeys(c.id)) || undefined,
+          keys: formatKeysDisplay(rawKeys) || undefined,
+          rawKeys,
+          scope: scopeOfCommand({ id: c.id, category: 'Custom' }),
+          avail: availability.get(c.id) ?? 'anywhere',
           run: () => void runCommand(c.id),
         });
       }
@@ -492,7 +531,7 @@ export default function CommandPalette() {
     return out;
     // `t` is intentionally left out of the deps: its identity is stable (see
     // the comment above), `lang` is what actually needs to trigger a redo.
-  }, [open, mode, grammarItems, settingsRows, lang]);
+  }, [open, mode, grammarItems, settingsRows, availability, lang]);
 
   // Read once per opening: a pick closes the palette, so nothing changes while it is up.
   const [recents, setRecents] = useState<PaletteRecent[]>([]);
@@ -512,8 +551,28 @@ export default function CommandPalette() {
         .slice(0, RECENT_SHOWN)
         .map((item) => ({ ...item, group: recentGroup }));
       const shown = new Set(recent.map((item) => item.key));
+      // kbd6: then the commands of the surface the palette was opened from — the keys
+      // that work right here, which a catalog-ordered list buries under Navigation.
+      const hereGroup = t('kbd6.palette.group.here');
+      const inView = items
+        .filter((item) => item.avail === 'here' && item.scope && item.scope !== 'app' && !shown.has(item.key))
+        .slice(0, IN_VIEW_SHOWN)
+        .map((item) => ({ ...item, group: hereGroup }));
+      for (const item of inView) shown.add(item.key);
       const rest = items.filter((item) => !item.typedOnly && !shown.has(item.key));
-      return [...recent, ...rest].slice(0, 40);
+      return [...recent, ...inView, ...rest].slice(0, 40);
+    }
+    // kbd6: a query that spells keys ("ctrl+k", "F5", "ctrl+k s") puts what is bound
+    // to them first, whether or not the label matches the text.
+    const chordQ = keyQueryToChord(q);
+    if (chordQ) {
+      const keyGroup = t('kbd6.palette.group.keys', { keys: formatKeysDisplay(chordQ) });
+      const bound = items
+        .filter((item) => item.rawKeys && keysMatchQuery(item.rawKeys, chordQ))
+        .map((item) => ({ ...item, group: keyGroup }));
+      const taken = new Set(bound.map((item) => item.key));
+      const others = items.filter((item) => !taken.has(item.key));
+      return [...bound, ...rankWithRecency(others, (item) => scoreLabelledItem(q, item), recents)].slice(0, 40);
     }
     // Fuzzy tiers first, then frecency inside and across them; stable for ties,
     // so equal scores keep catalog order (commands, pages, widgets, …).
@@ -573,6 +632,20 @@ export default function CommandPalette() {
   }, [sel]);
 
   if (!open) return null;
+
+  /**
+   * kbd6: "Works here" or what to do first. A command that answers anywhere needs no
+   * note — its scope chip says where. An app-wide one with no live handler names no
+   * place to go, so its `sub` keeps the old "needs its view" wording instead.
+   */
+  const availText = (avail: CommandAvailability, scope: KeymapScope | undefined): string => {
+    if (avail === 'here') return t('kbd6.palette.worksHere');
+    if (avail === 'anywhere') return '';
+    const place = scope && scope !== 'app' && scope !== 'system' ? t(`kbd5.scope.${scope}`) : '';
+    // No place to name: the row's `sub` already says it needs its view (see `items`).
+    if (!place) return '';
+    return avail === 'elsewhere' ? t('kbd6.palette.switchTo', { place }) : t('kbd6.palette.openFirst', { place });
+  };
 
   const placeholder = mode === 'search'
     ? t('palette.searchPlaceholder')
@@ -649,6 +722,17 @@ export default function CommandPalette() {
               <span className="palette-label">{r.label}</span>
               {r.sub && <span className="palette-sub muted">{r.sub}</span>}
               <span className="palette-right">
+                {/* kbd6: text inside the option, so its accessible name carries them. */}
+                {r.scope && (
+                  <span className="kbd6-scope-chip" data-scope={r.scope}>
+                    {t(`kbd5.scope.${r.scope}`)}
+                  </span>
+                )}
+                {r.avail && availText(r.avail, r.scope) && (
+                  <span className="kbd6-avail" data-avail={r.avail}>
+                    {availText(r.avail, r.scope)}
+                  </span>
+                )}
                 {r.keys && <kbd className="palette-kbd">{r.keys}</kbd>}
                 <span className="palette-group">{r.group}</span>
               </span>

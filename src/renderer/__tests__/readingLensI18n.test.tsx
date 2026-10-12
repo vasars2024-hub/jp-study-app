@@ -155,13 +155,10 @@ const SURFACES: Array<{ name: string; node: () => React.ReactElement; minChars: 
 ];
 
 describe('Reading Lens renderer i18n', () => {
-  const rendered = new Map<string, string>();
-
   for (const lang of UI_LANGS) {
     for (const surface of SURFACES) {
       it(`renders ${surface.name} without leaking catalog keys in ${lang}`, async () => {
         const text = await renderIn(lang, surface.node());
-        rendered.set(`${surface.name}/${lang}`, text);
         const label = `${surface.name} in ${lang}`;
         expect(text.length, `${label} rendered something`).toBeGreaterThan(surface.minChars);
         expect(leakedKeys(host), `${label}: no catalog key reaches the user`).toEqual([]);
@@ -173,13 +170,24 @@ describe('Reading Lens renderer i18n', () => {
     }
   }
 
-  it('actually switches script per language rather than falling back to English', () => {
+  it('actually switches script per language rather than falling back to English', async () => {
     const cjk = /[぀-ヿ一-鿿]/g;
     const cyrillic = /[Ѐ-ӿ]/g;
     const count = (text: string, re: RegExp): number => (text.match(re) ?? []).length;
     // The settings section is the surface with the most static chrome, so it is
-    // the one where a silent English fallback would be most visible.
-    const key = (lang: UiLang): string => rendered.get(`ReadingLensSection/${lang}`) ?? '';
+    // the one where a silent English fallback would be most visible. Rendered
+    // here, per language, rather than read back from the cases above: those
+    // only filled a shared map when they happened to run first.
+    const section = SURFACES.find((s) => s.name === 'ReadingLensSection');
+    if (!section) throw new Error('ReadingLensSection surface missing');
+    const texts = new Map<UiLang, string>();
+    for (const lang of UI_LANGS) {
+      texts.set(lang, await renderIn(lang, section.node()));
+      act(() => root?.unmount());
+      root = null;
+      document.body.replaceChildren();
+    }
+    const key = (lang: UiLang): string => texts.get(lang) ?? '';
 
     expect(count(key('ja'), cjk), 'ja renders kana/kanji').toBeGreaterThan(10);
     expect(count(key('zh'), cjk), 'zh renders hanzi').toBeGreaterThan(10);

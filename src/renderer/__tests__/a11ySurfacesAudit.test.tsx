@@ -54,7 +54,6 @@ let host: HTMLDivElement;
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  stubApi();
   const none = (): void => undefined;
   (globalThis as Record<string, unknown>).ResizeObserver ??= class {
     observe = none;
@@ -70,6 +69,9 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  // Per test, not once: the Dictionary case swaps in a lean bridge, and every
+  // surface mounted after it found `displayList`, `onPlayerSync`… missing.
+  stubApi();
   localStorage.clear();
   host = document.createElement('div');
   document.body.append(host);

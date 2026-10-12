@@ -16,12 +16,12 @@ import AssetInstallPrompt from '../AssetInstallPrompt';
 import { useT } from '../../i18n';
 import { useAssetStatuses } from '../../assetStore';
 import type { LibraryItem } from '../../../shared/types';
-import { studyLangFromTag } from '../../../shared/studyLang';
 import { getStudyLang } from '../../studyEnvironment';
 import {
   BOOK_OCR_MANGA_ASSETS,
   bookOcrEngine,
   bookOcrInstallAsset,
+  bookOcrLangOf,
   bookOcrViewOf,
   bookOcrWebAssets,
   type BookOcrLang,
@@ -63,8 +63,9 @@ export function BookOcrPanel({ item }: Props) {
   const [switching, setSwitching] = useState(false);
   const engineStatuses = useAssetStatuses(ENGINE_ASSETS);
   const engineKnown = engineStatuses.some((s) => s !== null);
-  // The book's language picks the recognizer (the library tag, else the study language).
-  const bookLang: BookOcrLang = studyLangFromTag(item.lang) ?? getStudyLang();
+  // The book's language picks the recognizer: what the library knows about the
+  // item (a chapter's provider language, a detected text language), else the study language.
+  const bookLang: BookOcrLang = bookOcrLangOf(item, getStudyLang());
   const engine = bookOcrEngine(
     (id) => engineStatuses[ENGINE_ASSETS.indexOf(id)]?.state === 'installed',
     bookLang,

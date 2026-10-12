@@ -24,6 +24,7 @@ import {
   formatKeysDisplay,
   getBindings,
   importShortcuts,
+  isKeySequence,
   normalizeChord,
   resetAllBindings,
   setBinding,
@@ -31,6 +32,7 @@ import {
   type AppCommand,
   type BindingRow,
 } from './keyboardShortcuts';
+import { keySequenceSteps } from './keyQuery';
 import { PLAYER_DEFAULT_KEYBINDINGS, PLAYER_KEYBINDINGS_STORAGE_KEY, formatPlayerKeyCode } from './playerKeymap';
 import { writeLocalStorageJson } from './localStorageWrite';
 
@@ -334,15 +336,42 @@ export interface KeymapConflict {
   id: string;
   scope: KeymapScope;
   source: KeymapSource;
+  /**
+   * The other entry's keys that collide. For an exact clash that is the chord asked
+   * about; for a prefix clash it is the other entry's own alternative (so `replace`
+   * knows what to take away from it).
+   */
   chord: string;
   /** True when one keypress reaches both: one of them will never fire. */
   overlapping: boolean;
   editable: boolean;
+  /**
+   * kbd6: not the same keys, but one is the first step(s) of the other's sequence.
+   * The dispatcher lets the prefix win, so the shorter binding stops firing while the
+   * sequence's command is live — "Ctrl+K starts the sequence for X".
+   */
+  prefix?: true;
+  /** For a prefix clash: the shorter keys, the ones pressed first. */
+  lead?: string;
+}
+
+/**
+ * The shorter of two alternatives when it is the first step(s) of the longer one
+ * ("Ctrl+K" and "Ctrl+K S"), else null. Equal keys are not a prefix.
+ */
+export function sequenceLead(a: string, b: string): string | null {
+  const sa = keySequenceSteps(a);
+  const sb = keySequenceSteps(b);
+  if (sa.length === sb.length) return null;
+  const [short, long] = sa.length < sb.length ? [sa, sb] : [sb, sa];
+  if (!short.length || !short.every((s, i) => long[i] === s)) return null;
+  return short.join(' ');
 }
 
 /**
  * Every other entry that already uses one of `chords` (a `|` list is split),
- * judged against the scope of `targetId`.
+ * judged against the scope of `targetId` — and, since kbd6, every entry whose
+ * keys are the start of one of `chords` or start with one of them (a prefix clash).
  */
 export function findConflicts(targetId: string, chords: string, entries: KeymapEntry[] = keymapEntries()): KeymapConflict[] {
   const target = entries.find((e) => e.id === targetId);
@@ -352,33 +381,50 @@ export function findConflicts(targetId: string, chords: string, entries: KeymapE
   for (const entry of entries) {
     if (entry.id === targetId) continue;
     for (const chord of wanted) {
-      if (!entry.chords.includes(chord)) continue;
-      out.push({
-        id: entry.id,
-        scope: entry.scope,
-        source: entry.source,
-        chord,
-        overlapping: scopesOverlap(targetScope, entry.scope),
-        editable: entry.editable,
-      });
+      if (entry.chords.includes(chord)) {
+        out.push({
+          id: entry.id,
+          scope: entry.scope,
+          source: entry.source,
+          chord,
+          overlapping: scopesOverlap(targetScope, entry.scope),
+          editable: entry.editable,
+        });
+      }
+      for (const other of entry.chords) {
+        const lead = sequenceLead(chord, other);
+        if (!lead) continue;
+        out.push({
+          id: entry.id,
+          scope: entry.scope,
+          source: entry.source,
+          chord: other,
+          overlapping: scopesOverlap(targetScope, entry.scope),
+          editable: entry.editable,
+          prefix: true,
+          lead,
+        });
+      }
     }
   }
   return out;
 }
 
-/** Overlapping conflicts per entry id, for the row badges. */
+/** Overlapping conflicts per entry id, for the row badges (prefix clashes included). */
 export function conflictMap(entries: KeymapEntry[] = keymapEntries()): Map<string, KeymapConflict[]> {
   const byChord = new Map<string, KeymapEntry[]>();
   for (const entry of entries) {
     for (const chord of entry.chords) byChord.set(chord, [...(byChord.get(chord) ?? []), entry]);
   }
   const out = new Map<string, KeymapConflict[]>();
+  const add = (id: string, conflict: KeymapConflict): void => {
+    out.set(id, [...(out.get(id) ?? []), conflict]);
+  };
   for (const entry of entries) {
-    const list: KeymapConflict[] = [];
     for (const chord of entry.chords) {
       for (const other of byChord.get(chord) ?? []) {
         if (other.id === entry.id || !scopesOverlap(entry.scope, other.scope)) continue;
-        list.push({
+        add(entry.id, {
           id: other.id,
           scope: other.scope,
           source: other.source,
@@ -388,7 +434,42 @@ export function conflictMap(entries: KeymapEntry[] = keymapEntries()): Map<strin
         });
       }
     }
-    if (list.length) out.set(entry.id, list);
+  }
+  // kbd6: prefix clashes. Sequences are rare, so walk only from them: each pair is
+  // reported on both rows (a sequence against a sequence is met from either side).
+  for (const entry of entries) {
+    for (const seq of entry.chords) {
+      if (!isKeySequence(seq)) continue;
+      for (const other of entries) {
+        if (other.id === entry.id || !scopesOverlap(entry.scope, other.scope)) continue;
+        for (const oc of other.chords) {
+          const lead = sequenceLead(seq, oc);
+          if (!lead) continue;
+          add(entry.id, {
+            id: other.id,
+            scope: other.scope,
+            source: other.source,
+            chord: oc,
+            overlapping: true,
+            editable: other.editable,
+            prefix: true,
+            lead,
+          });
+          if (!isKeySequence(oc)) {
+            add(other.id, {
+              id: entry.id,
+              scope: entry.scope,
+              source: entry.source,
+              chord: seq,
+              overlapping: true,
+              editable: entry.editable,
+              prefix: true,
+              lead,
+            });
+          }
+        }
+      }
+    }
   }
   return out;
 }

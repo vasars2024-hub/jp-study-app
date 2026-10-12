@@ -8,7 +8,7 @@ import {
   type StatsSummary,
 } from '../stats';
 import { loadSaved, onSavedChanged, type SavedWord } from '../savedWords';
-import { knowledgeCounts } from '../knownWords';
+import { knowledgeCounts, onKnowledgeChanged } from '../knownWords';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import { studyLangTag } from '../../shared/studyLang';
@@ -185,15 +185,11 @@ export function ReadingProgress() {
 export function VocabularyProgress() {
   const { t } = useT();
   const [counts, setCounts] = useState(() => knowledgeCounts());
-  useEffect(() => {
-    const refresh = () => setCounts(knowledgeCounts());
-    window.addEventListener('word-knowledge-changed', refresh);
-    window.addEventListener('storage', refresh);
-    return () => {
-      window.removeEventListener('word-knowledge-changed', refresh);
-      window.removeEventListener('storage', refresh);
-    };
-  }, []);
+  // wid6: onKnowledgeChanged also fires on a study-language switch. The widget
+  // listened to the knowledge event and raw storage only, so after switching
+  // from Japanese to Chinese it kept showing the Japanese counts until a word
+  // happened to change.
+  useEffect(() => onKnowledgeChanged(() => setCounts(knowledgeCounts())), []);
   const learned = counts[2] + counts[3]; // Familiar or better
   const total = counts[1] + counts[2] + counts[3];
   const pct = total > 0 ? (learned / total) * 100 : 0;

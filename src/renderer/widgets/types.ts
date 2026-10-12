@@ -66,6 +66,12 @@ export interface WidgetDef {
   component: ComponentType<WidgetProps>;
   /** wid5: what the widget's "Widget settings" popover offers; absent = nothing to configure. */
   settingsSchema?: readonly WidgetSettingField[];
+  /**
+   * wid6: false when the gallery must not mount the real widget as a preview —
+   * one that reaches outside the app on mount (the learner map asks the stats
+   * service for counts). It shows its description instead.
+   */
+  previewLive?: boolean;
 }
 
 /** Typed, tolerant read of a persisted setting with a fallback. */

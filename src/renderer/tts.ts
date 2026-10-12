@@ -1,5 +1,7 @@
 // Lightweight TTS via Web Speech API — offline OS voices, no new dependency.
 
+import { noteSpeechStarted, noteSpeechStopped } from './foregroundAudio';
+
 export type TtsLang = 'ja' | 'zh' | 'ru' | 'en' | string;
 
 const LANG_TAG: Record<string, string> = {
@@ -31,11 +33,14 @@ export function speak(text: string, lang: TtsLang = 'ja'): boolean {
   if (voice) u.voice = voice;
   u.rate = 0.95;
   speechSynthesis.speak(u);
+  // snd6: the Soundscape lowers itself while the voice is speaking.
+  noteSpeechStarted();
   return true;
 }
 
 export function stopSpeaking(): void {
   if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+  noteSpeechStopped();
 }
 
 /**

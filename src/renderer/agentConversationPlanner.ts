@@ -124,6 +124,11 @@ interface QuarantinedAgentPlan {
 
 const quarantinedAgentPlans = new Map<string, QuarantinedAgentPlan>();
 
+/** Tests only: forget every quarantined plan (the session-scoped map above). */
+export function resetAgentConversationPlannerForTests(): void {
+  quarantinedAgentPlans.clear();
+}
+
 function queueItemSnapshot(item: AgentTaskQueue['items'][number]): string {
   try {
     return JSON.stringify({

@@ -8,6 +8,7 @@ import {
   type LevelKind,
   type LevelList,
 } from '../levelLists';
+import { onKnowledgeChanged } from '../knownWords';
 import { useT } from '../i18n';
 
 // JLPT / HSK / custom vocabulary progress. Lists are user-provided (paste an
@@ -23,15 +24,8 @@ export function LevelProgressWidget() {
   const [paste, setPaste] = useState('');
 
   useEffect(() => onLevelListsChanged(() => setLists(loadLevelLists())), []);
-  useEffect(() => {
-    const refresh = () => setTick((t) => t + 1);
-    window.addEventListener('word-knowledge-changed', refresh);
-    window.addEventListener('storage', refresh);
-    return () => {
-      window.removeEventListener('word-knowledge-changed', refresh);
-      window.removeEventListener('storage', refresh);
-    };
-  }, []);
+  // wid6: knowledge changes include a study-language switch (see VocabularyProgress).
+  useEffect(() => onKnowledgeChanged(() => setTick((n) => n + 1)), []);
 
   const save = () => {
     if (!paste.trim()) return;

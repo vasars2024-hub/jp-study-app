@@ -14,7 +14,7 @@
 // `../catalogs/<lang>` without going through `ensureCatalog`.
 
 import type { Catalog, UiLang } from '../core';
-import { registerI18nPack } from '../catalogs';
+import { registerI18nPack, type I18nPackId } from '../catalogs';
 import { en } from '../catalogs/en';
 import { ja } from '../catalogs/ja';
 import { ru } from '../catalogs/ru';
@@ -23,17 +23,25 @@ import { AI_PACK_EN } from '../aiPack/en';
 import { AI_PACK_JA } from '../aiPack/ja';
 import { AI_PACK_RU } from '../aiPack/ru';
 import { AI_PACK_ZH } from '../aiPack/zh';
+import { PASS6_PACK_EN } from '../pass6Pack/en';
+import { PASS6_PACK_JA } from '../pass6Pack/ja';
+import { PASS6_PACK_RU } from '../pass6Pack/ru';
+import { PASS6_PACK_ZH } from '../pass6Pack/zh';
 
-const PACKS: Array<[UiLang, Catalog, Catalog]> = [
-  ['en', en, AI_PACK_EN],
-  ['ja', ja, AI_PACK_JA],
-  ['zh', zh, AI_PACK_ZH],
-  ['ru', ru, AI_PACK_RU],
+const PACKS: Array<[I18nPackId, UiLang, Catalog, Catalog]> = [
+  ['ai', 'en', en, AI_PACK_EN],
+  ['ai', 'ja', ja, AI_PACK_JA],
+  ['ai', 'zh', zh, AI_PACK_ZH],
+  ['ai', 'ru', ru, AI_PACK_RU],
+  ['pass6', 'en', en, PASS6_PACK_EN],
+  ['pass6', 'ja', ja, PASS6_PACK_JA],
+  ['pass6', 'zh', zh, PASS6_PACK_ZH],
+  ['pass6', 'ru', ru, PASS6_PACK_RU],
 ];
 
-for (const [lang, catalog, pack] of PACKS) {
+for (const [id, lang, catalog, pack] of PACKS) {
   for (const [key, value] of Object.entries(pack)) {
     if (catalog[key] === undefined) catalog[key] = value;
   }
-  registerI18nPack('ai', lang, pack);
+  registerI18nPack(id, lang, pack);
 }

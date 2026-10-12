@@ -12,6 +12,8 @@
  * DOM audio device.
  */
 
+import { trackForegroundMedia } from './foregroundAudio';
+
 export interface CardAudioElement {
   play(): Promise<void>;
   pause(): void;
@@ -20,7 +22,12 @@ export interface CardAudioElement {
 
 export type CardAudioFactory = (src: string) => CardAudioElement;
 
-const domFactory: CardAudioFactory = (src) => new Audio(src) as unknown as CardAudioElement;
+/** snd6: a real clip is reported as foreground audio, so the Soundscape ducks under it. */
+const domFactory: CardAudioFactory = (src) => {
+  const element = new Audio(src);
+  trackForegroundMedia(element);
+  return element as unknown as CardAudioElement;
+};
 
 export class CardAudioChannel {
   private current: CardAudioElement | null = null;

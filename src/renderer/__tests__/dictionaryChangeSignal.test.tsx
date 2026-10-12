@@ -20,7 +20,7 @@ import {
   wordFrequencyCacheGeneration,
 } from '../dictFrequencyCache';
 import EntryFrequencies from '../components/lexicon/EntryFrequencies';
-import KanjiBreakdown from '../components/lexicon/KanjiBreakdown';
+import KanjiBreakdown, { resetKanjiFactsCacheForTests } from '../components/lexicon/KanjiBreakdown';
 import type { DictEntry } from '../../shared/types';
 
 type Snapshot = { jobId: string; status: string; terminal?: { state: string } };
@@ -46,6 +46,10 @@ beforeEach(() => {
   installed = false;
   resetDictionaryChangeSignalForTests();
   resetWordFrequencyCache();
+  // The per-character cache is module state too: without this, a miss cached by
+  // one test (and a watcher whose listener the signal reset dropped) carried
+  // into the next.
+  resetKanjiFactsCacheForTests();
   (window as unknown as { api: unknown }).api = {
     onDictImportChanged: vi.fn((cb: (s: Snapshot) => void) => {
       emit = cb;

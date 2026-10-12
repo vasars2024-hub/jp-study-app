@@ -137,11 +137,13 @@ export function resetCatalogsForTest(): void {
 // "no such key" (show the key, which is a bug). `i18nLazyPacks.test.ts` keeps
 // every pack key under its prefixes or in the eager catalog.
 
-export type I18nPackId = 'ai';
+export type I18nPackId = 'ai' | 'pass6';
 
 /** Key prefixes owned by each pack. A key under one is never in an eager catalog by accident. */
 export const I18N_PACK_PREFIXES: Readonly<Record<I18nPackId, readonly string[]>> = {
   ai: ['aiStudy.', 'aiImmerse.', 'aiTutor.', 'aiAgent.', 'aiProv.', 'aiError.', 'aiFix.', 'aiSpeak.'],
+  // Soundscape/widget/shortcut strings; main.tsx loads them before first paint.
+  pass6: ['snd6.', 'wid6.', 'kbd6.'],
 };
 
 const PACK_IDS = Object.keys(I18N_PACK_PREFIXES) as I18nPackId[];
@@ -159,6 +161,17 @@ function importPack(pack: I18nPackId, lang: UiLang): Promise<Catalog> {
           return import('./aiPack/ru').then((m) => m.AI_PACK_RU);
         default:
           return import('./aiPack/en').then((m) => m.AI_PACK_EN);
+      }
+    case 'pass6':
+      switch (lang) {
+        case 'ja':
+          return import('./pass6Pack/ja').then((m) => m.PASS6_PACK_JA);
+        case 'zh':
+          return import('./pass6Pack/zh').then((m) => m.PASS6_PACK_ZH);
+        case 'ru':
+          return import('./pass6Pack/ru').then((m) => m.PASS6_PACK_RU);
+        default:
+          return import('./pass6Pack/en').then((m) => m.PASS6_PACK_EN);
       }
   }
 }

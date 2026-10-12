@@ -4,9 +4,13 @@ import { WIDGETS, getWidgetDef } from '../widgets/registry';
 import { WIDGET_CATEGORIES, type WidgetCategory } from '../widgets/types';
 import Icon from './Icons';
 import { useT } from '../i18n';
-import { useWiredMaterials } from './ui';
+import { useAeroMaterials, useWiredMaterials } from './ui';
 import { useModalKeyboard } from './ui/useModalKeyboard';
 import { wiredWidgetDesc, wiredWidgetTitle } from '../widgets/wiredLabels';
+import { aeroGadgetTitle } from '../widgets/aeroLabels';
+import WidgetPreview from '../widgets/WidgetPreview';
+import '../widgets/wid6.css';
+import { writeLocalStorageJson } from '../localStorageWrite';
 
 // Persist favorites + recently-used across sessions (small UI state → localStorage).
 const GKEY = 'jp-widget-gallery';
@@ -14,20 +18,20 @@ interface GalleryPrefs {
   favorites: string[];
   recent: string[];
 }
+/** A stored list that is not a list of strings (hand-edited, older build) reads as empty. */
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
 function loadPrefs(): GalleryPrefs {
   try {
-    const raw = JSON.parse(localStorage.getItem(GKEY) ?? '{}') as Partial<GalleryPrefs>;
-    return { favorites: raw.favorites ?? [], recent: raw.recent ?? [] };
+    const raw = JSON.parse(localStorage.getItem(GKEY) ?? '{}') as Partial<Record<keyof GalleryPrefs, unknown>> | null;
+    return { favorites: stringList(raw?.favorites), recent: stringList(raw?.recent) };
   } catch {
     return { favorites: [], recent: [] };
   }
 }
 function savePrefs(p: GalleryPrefs): void {
-  try {
-    localStorage.setItem(GKEY, JSON.stringify(p));
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorageJson(GKEY, p);
 }
 export function noteWidgetUsed(type: string): void {
   const p = loadPrefs();
@@ -61,7 +65,10 @@ export default function WidgetGallery({
 }: WidgetGalleryProps) {
   const { t, lang } = useT();
   const wired = useWiredMaterials();
+  const aero = useAeroMaterials();
   const [prefs, setPrefs] = useState<GalleryPrefs>(loadPrefs);
+  /** wid6: the card the preview pane shows — the last one pointed at or focused. */
+  const [previewType, setPreviewType] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('All');
   const [query, setQuery] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
@@ -110,7 +117,9 @@ export default function WidgetGallery({
     } else if (tab !== 'All') list = list.filter((w) => w.category === tab);
     if (q) {
       list = list.filter((w) => {
-        const title = wired ? wiredWidgetTitle(w.type, t(w.titleKey)) : t(w.titleKey);
+        // Matched by the name the theme shows, and by the plain title (an Aero gadget is still a clock).
+        const plain = t(w.titleKey);
+        const title = `${wired ? wiredWidgetTitle(w.type, plain) : aero ? aeroGadgetTitle(w.type, plain) : plain} ${plain}`;
         const desc = wired ? wiredWidgetDesc(w.type, t(w.descKey)) : t(w.descKey);
         return title.toLowerCase().includes(q) || desc.toLowerCase().includes(q);
       });
@@ -118,9 +127,17 @@ export default function WidgetGallery({
     return list;
     // `t` is intentionally left out of the deps: its identity is stable, `lang`
     // is what actually needs to trigger a redo of the filtered/translated list.
-  }, [tab, query, prefs, lang, wired]);
+  }, [tab, query, prefs, lang, wired, aero]);
 
   const tabs: Tab[] = ['All', 'Favorites', 'Recent', ...WIDGET_CATEGORIES];
+
+  /** The name a widget goes by in this theme (an Aero gadget, a Wired module, or its plain title). */
+  const titleOf = (w: (typeof WIDGETS)[number]): string =>
+    wired ? wiredWidgetTitle(w.type, t(w.titleKey)) : aero ? aeroGadgetTitle(w.type, t(w.titleKey)) : t(w.titleKey);
+  const descOf = (w: (typeof WIDGETS)[number]): string => (wired ? wiredWidgetDesc(w.type, t(w.descKey)) : t(w.descKey));
+
+  // The preview follows the pointer and the keyboard; with neither yet, the first card shows.
+  const previewDef = (previewType ? visible.find((w) => w.type === previewType) : undefined) ?? visible[0];
 
   const installed = useMemo(() => new Set(installedTypes), [installedTypes]);
 
@@ -142,29 +159,33 @@ export default function WidgetGallery({
     const fav = prefs.favorites.includes(w.type);
     const isInstalled = installed.has(w.type);
     return (
-      <div key={w.type} className={`widget-card${isInstalled ? ' installed' : ''}`}>
+      <div
+        key={w.type}
+        className={`widget-card${isInstalled ? ' installed' : ''}${previewDef?.type === w.type ? ' is-previewed' : ''}`}
+        data-widget-card={w.type}
+        onPointerEnter={() => setPreviewType(w.type)}
+        onFocus={() => setPreviewType(w.type)}
+      >
         <div className="widget-card-head">
-          <span className="widget-card-title">
-            {wired ? wiredWidgetTitle(w.type, t(w.titleKey)) : t(w.titleKey)}
-          </span>
+          <span className="widget-card-title">{titleOf(w)}</span>
           <button
             className={`widget-fav ${fav ? 'on' : ''}`}
             title={fav ? t('widgetGallery.unfavorite') : t('widgetGallery.favorite')}
+            aria-label={fav ? t('wid6.gallery.unfavoriteNamed', { name: titleOf(w) }) : t('wid6.gallery.favoriteNamed', { name: titleOf(w) })}
             aria-pressed={fav}
             onClick={() => toggleFav(w.type)}
           >
             <Icon name="star" size={14} fill={fav} />
           </button>
         </div>
-        <div className="widget-card-desc">
-          {wired ? wiredWidgetDesc(w.type, t(w.descKey)) : t(w.descKey)}
-        </div>
+        <div className="widget-card-desc">{descOf(w)}</div>
         <div className="widget-card-foot">
           {isInstalled && <span className="widget-card-badge">{t('widgetGallery.onWorkspace')}</span>}
           <button
             className="wgt-btn widget-card-add"
             onClick={() => onAdd(w.type)}
             title={isInstalled ? t('widgetGallery.addAnother') : t('widgetGallery.add')}
+            aria-label={isInstalled ? t('wid6.gallery.addAnotherNamed', { name: titleOf(w) }) : t('wid6.gallery.addNamed', { name: titleOf(w) })}
           >
             {isInstalled ? t('widgetGallery.addAnother') : t('widgetGallery.add')}
           </button>
@@ -188,6 +209,7 @@ export default function WidgetGallery({
           <span className="widget-gallery-title">{t('widgetGallery.title')}</span>
           <input
             className="widget-gallery-search"
+            aria-label={t('widgetGallery.searchPlaceholder')}
             placeholder={t('widgetGallery.searchPlaceholder')}
             value={query}
             ref={searchRef}
@@ -200,32 +222,60 @@ export default function WidgetGallery({
             <button key={tb} className={`widget-tab ${tab === tb ? 'active' : ''}`} onClick={() => setTab(tb)}>{tabLabel(tb)}</button>
           ))}
         </div>
-        {visible.length === 0 ? (
-          <div className="widget-gallery-empty">
-            <Icon name="widgets" size={28} />
-            <p className="widget-gallery-empty-title">{t('widgetGallery.noMatch')}</p>
-            {query.trim() !== '' && (
-              <button className="wgt-btn" onClick={() => setQuery('')}>
-                {t('widgetGallery.clearSearch')}
+        <div className="widget-gallery-body">
+          {visible.length === 0 ? (
+            <div className="widget-gallery-empty">
+              <Icon name="widgets" size={28} />
+              <p className="widget-gallery-empty-title">{t('widgetGallery.noMatch')}</p>
+              {query.trim() !== '' && (
+                <button className="wgt-btn" onClick={() => setQuery('')}>
+                  {t('widgetGallery.clearSearch')}
+                </button>
+              )}
+            </div>
+          ) : grouped ? (
+            <div className="widget-gallery-groups">
+              {grouped.map((b) => (
+                <section key={b.category} className="widget-gallery-group" aria-label={t(`widgets.category.${b.category}`)}>
+                  <h3 className="widget-gallery-group-label">{t(`widgets.category.${b.category}`)}</h3>
+                  <div className="widget-gallery-grid">
+                    {b.items.map((w) => renderCard(w))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="widget-gallery-groups">
+              <div className="widget-gallery-grid">{visible.map((w) => renderCard(w))}</div>
+            </div>
+          )}
+          {previewDef && (
+            <aside className="widget-gallery-preview" aria-label={t('wid6.gallery.previewOf', { name: titleOf(previewDef) })}>
+              <div className="widget-gallery-preview-head">{t('wid6.gallery.preview')}</div>
+              <WidgetPreview
+                key={previewDef.type}
+                def={previewDef}
+                title={titleOf(previewDef)}
+                description={descOf(previewDef)}
+                aero={aero}
+                wired={wired}
+              />
+              <div className="widget-gallery-preview-name">{titleOf(previewDef)}</div>
+              <p className="widget-gallery-preview-desc">{descOf(previewDef)}</p>
+              <p className="widget-gallery-preview-meta">
+                {t('wid6.gallery.defaultSize', { w: previewDef.defaultSize.w, h: previewDef.defaultSize.h })}
+              </p>
+              <button
+                type="button"
+                className="wgt-btn primary widget-gallery-preview-add"
+                aria-label={installed.has(previewDef.type) ? t('wid6.gallery.addAnotherNamed', { name: titleOf(previewDef) }) : t('wid6.gallery.addNamed', { name: titleOf(previewDef) })}
+                onClick={() => onAdd(previewDef.type)}
+              >
+                {installed.has(previewDef.type) ? t('widgetGallery.addAnother') : t('widgetGallery.add')}
               </button>
-            )}
-          </div>
-        ) : grouped ? (
-          <div className="widget-gallery-groups">
-            {grouped.map((b) => (
-              <section key={b.category} className="widget-gallery-group" aria-label={t(`widgets.category.${b.category}`)}>
-                <h3 className="widget-gallery-group-label">{t(`widgets.category.${b.category}`)}</h3>
-                <div className="widget-gallery-grid">
-                  {b.items.map((w) => renderCard(w))}
-                </div>
-              </section>
-            ))}
-          </div>
-        ) : (
-          <div className="widget-gallery-groups">
-            <div className="widget-gallery-grid">{visible.map((w) => renderCard(w))}</div>
-          </div>
-        )}
+            </aside>
+          )}
+        </div>
 
         {hiddenWidgets.length > 0 && (
           <div className="widget-gallery-hidden">

@@ -170,3 +170,85 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* snd6: a layer row carries a third cell, the tone/pan disclosure. */
+.wgt-sound-layer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wgt-sound-layer > .wgt-sound-row {
+  grid-template-columns: minmax(0, 46%) minmax(0, 1fr) auto;
+}
+.wgt-sound .wgt-sound-shape-btn {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  opacity: 0.7;
+}
+.wgt-sound .wgt-sound-shape-btn:hover,
+.wgt-sound .wgt-sound-shape-btn[aria-expanded='true'] {
+  opacity: 1;
+}
+/* A shaped layer says so even while its controls are closed. */
+.wgt-sound .wgt-sound-shape-btn.is-shaped {
+  opacity: 1;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.wgt-sound-shape {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 4px 12px;
+  padding: 4px 6px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--panel-2) 60%, transparent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.wgt-sound-shape-row {
+  display: grid;
+  grid-template-columns: minmax(0, 30%) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 24px;
+}
+.wgt-sound .wgt-sound-shape-reset {
+  align-self: flex-end;
+  min-height: 24px;
+}
+/* snd6: saved mixes to a file and back. */
+.wgt-sound-mixes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.wgt-sound-mixes-actions .wgt-btn,
+.wgt-sound-paste .wgt-btn {
+  min-height: 24px;
+}
+.wgt-sound-paste {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wgt-sound-paste textarea {
+  min-height: 64px;
+  resize: vertical;
+  font: 11px/1.4 var(--font-mono, ui-monospace, monospace);
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+}
+.wgt-sound-ducking {
+  min-height: 0;
+}
+.wgt-sound-mixes {
+  gap: 4px;
+}

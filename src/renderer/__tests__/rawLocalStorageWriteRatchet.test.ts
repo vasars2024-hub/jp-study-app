@@ -41,10 +41,12 @@ const SRC = resolve(__dirname, '../..');
  * merge brought 196; custom CSS, the UI customization document, the player's
  * subtitle size, the watch-library migration mark and the calendar reminder
  * state moved onto the guarded writer, and the dead tracking-sources store was
- * deleted: 190 on 2026-09-24. MOVE THIS DOWN when you migrate more. Never up.
+ * deleted: 190 on 2026-09-24. 183 sites in 139 files on 2026-10-12 after the widget
+ * gallery prefs and the learner-map consent moved onto it. MOVE THIS DOWN when you
+ * migrate more. Never up.
  */
-const MAX_RAW_SITES = 190;
-const MAX_RAW_FILES = 148;
+const MAX_RAW_SITES = 183;
+const MAX_RAW_FILES = 139;
 
 /**
  * **Not every site should be migrated, and this is the distinction to make

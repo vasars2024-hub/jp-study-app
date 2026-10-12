@@ -38,8 +38,9 @@ vi.mock('../i18n', () => ({
  */
 vi.mock('../widgets/registry', () => {
   const WIDGETS = [
-    { type: 'clock', category: 'system', titleKey: 'w.clock', descKey: 'w.clock.desc' },
-    { type: 'notes', category: 'study', titleKey: 'w.notes', descKey: 'w.notes.desc' },
+    // wid6: the gallery previews the highlighted widget, so a def carries its size and component.
+    { type: 'clock', category: 'system', titleKey: 'w.clock', descKey: 'w.clock.desc', defaultSize: { w: 200, h: 120 }, minSize: { w: 100, h: 80 }, component: () => null },
+    { type: 'notes', category: 'study', titleKey: 'w.notes', descKey: 'w.notes.desc', defaultSize: { w: 200, h: 120 }, minSize: { w: 100, h: 80 }, component: () => null },
   ];
   return { WIDGETS, getWidgetDef: (type: string) => WIDGETS.find((w) => w.type === type) };
 });

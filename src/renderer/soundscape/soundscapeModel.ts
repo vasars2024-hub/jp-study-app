@@ -101,6 +101,63 @@ export interface SoundscapeMix {
   layers: Partial<Record<SoundLayerId, number>>;
   music: MusicStyleId;
   musicVolume: number;
+  /**
+   * snd6: tone and pan per layer. Optional — the built-in scenes leave the
+   * owner's own shaping alone; a saved mix carries the shaping it was saved with.
+   */
+  shapes?: Partial<Record<SoundLayerId, LayerShape>>;
+}
+
+/**
+ * snd6 — per-layer shaping. `tone` tilts the layer from dark (-1: highs cut,
+ * lows lifted) to bright (+1); `pan` places it from left (-1) to right (+1).
+ */
+export interface LayerShape {
+  tone: number;
+  pan: number;
+}
+
+export const NEUTRAL_SHAPE: Readonly<LayerShape> = { tone: 0, pan: 0 };
+/** Shelf gains at full tilt. The cut is deeper than the lift: a lift is how a mix starts to clip. */
+export const TONE_HIGH_DB = 6;
+export const TONE_LOW_DB = 4;
+/** Where the tilt's two shelves sit. */
+export const TONE_LOW_HZ = 280;
+export const TONE_HIGH_HZ = 2600;
+
+function clampSigned(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(-1, value));
+}
+
+export function normalizeLayerShape(raw: unknown): LayerShape {
+  const source = (raw && typeof raw === 'object' ? raw : {}) as Partial<LayerShape>;
+  // Snap near-centre values to centre so "back to neutral" is reachable by drag.
+  const snap = (v: number): number => (Math.abs(v) < 0.02 ? 0 : Math.round(v * 100) / 100);
+  return { tone: snap(clampSigned(source.tone)), pan: snap(clampSigned(source.pan)) };
+}
+
+export function isNeutralShape(shape: LayerShape | undefined): boolean {
+  return !shape || (shape.tone === 0 && shape.pan === 0);
+}
+
+/** Clean a stored shape map: known layers only, neutral shapes dropped. */
+export function normalizeShapes(raw: unknown): Partial<Record<SoundLayerId, LayerShape>> {
+  const out: Partial<Record<SoundLayerId, LayerShape>> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isSoundLayerId(id)) continue;
+    const shape = normalizeLayerShape(value);
+    if (!isNeutralShape(shape)) out[id] = shape;
+  }
+  return out;
+}
+
+/** The two shelf gains (dB) a tone setting asks for. */
+export function toneShelfGains(tone: number): { lowDb: number; highDb: number } {
+  const t = clampSigned(tone);
+  if (t === 0) return { lowDb: 0, highDb: 0 };
+  return { lowDb: -t * TONE_LOW_DB, highDb: t * TONE_HIGH_DB };
 }
 
 export interface SoundscapeScene {
@@ -248,13 +305,15 @@ export interface FadeSchedule {
   fadeOutSec: number;
   /** Seconds the focus link fades over when a Pomodoro work block ends. */
   breakFadeSec: number;
+  /** snd6: seconds one scene takes to cross-fade into the next. */
+  crossfadeSec: number;
 }
 
 export const FADE_SCHEDULES: readonly FadeSchedule[] = [
-  { id: 'quick', labelKey: 'snd5.fade.quick', fadeInSec: 0.6, fadeOutSec: 8, breakFadeSec: 6 },
-  { id: 'gentle', labelKey: 'snd5.fade.gentle', fadeInSec: 5, fadeOutSec: 30, breakFadeSec: 12 },
-  { id: 'slow', labelKey: 'snd5.fade.slow', fadeInSec: 20, fadeOutSec: 180, breakFadeSec: 30 },
-  { id: 'sleep', labelKey: 'snd5.fade.sleep', fadeInSec: 45, fadeOutSec: 600, breakFadeSec: 60 },
+  { id: 'quick', labelKey: 'snd5.fade.quick', fadeInSec: 0.6, fadeOutSec: 8, breakFadeSec: 6, crossfadeSec: 1.5 },
+  { id: 'gentle', labelKey: 'snd5.fade.gentle', fadeInSec: 5, fadeOutSec: 30, breakFadeSec: 12, crossfadeSec: 4 },
+  { id: 'slow', labelKey: 'snd5.fade.slow', fadeInSec: 20, fadeOutSec: 180, breakFadeSec: 30, crossfadeSec: 8 },
+  { id: 'sleep', labelKey: 'snd5.fade.sleep', fadeInSec: 45, fadeOutSec: 600, breakFadeSec: 60, crossfadeSec: 12 },
 ];
 
 export function fadeScheduleOf(id: unknown): FadeSchedule {
@@ -305,6 +364,10 @@ export interface SoundscapeState {
   fade: FadeScheduleId;
   /** snd5: the overall volume the owner last chose while each scene or saved mix was on. */
   sceneVolumes: Record<string, number>;
+  /** snd6: tone and pan per layer; neutral layers are absent. Kept while a layer is off, like its level. */
+  shapes: Partial<Record<SoundLayerId, LayerShape>>;
+  /** snd6: lower the soundscape further while speech, a card clip or a video is playing. */
+  duckForSpeech: boolean;
 }
 
 export const SOUNDSCAPE_STORAGE_KEY = 'jp-soundscape-v1';
@@ -313,6 +376,8 @@ export const MAX_SAVED_MIXES = 24;
 export const SLEEP_TIMER_MINUTES: readonly number[] = [15, 30, 45, 60, 90];
 /** How far `duckWithMedia` lowers the soundscape. */
 export const DUCK_GAIN = 0.3;
+/** snd6: how far `duckForSpeech` lowers it — further, because a voice has to be understood, not just heard. */
+export const DUCK_SPEECH_GAIN = 0.15;
 
 const LAYER_IDS: readonly SoundLayerId[] = SOUND_LAYERS.map((layer) => layer.id);
 const LAYER_ID_SET: ReadonlySet<string> = new Set(LAYER_IDS);
@@ -348,6 +413,8 @@ export function defaultSoundscapeState(): SoundscapeState {
     saved: [],
     fade: 'quick',
     sceneVolumes: {},
+    shapes: {},
+    duckForSpeech: true,
   };
 }
 
@@ -360,11 +427,18 @@ function normalizeMix(raw: unknown): SoundscapeMix {
       if (isSoundLayerId(id) && clamp01(level) > 0) layers[id] = clamp01(level);
     }
   }
-  return {
+  const mix: SoundscapeMix = {
     layers,
     music: isMusicStyleId(source.music) ? source.music : 'off',
     musicVolume: clamp01(source.musicVolume, 0.5),
   };
+  if (source.shapes !== undefined) {
+    // Only the shaping of layers that are in the mix means anything.
+    const shapes = normalizeShapes(source.shapes);
+    for (const id of Object.keys(shapes) as SoundLayerId[]) if (layers[id] === undefined) delete shapes[id];
+    mix.shapes = shapes;
+  }
+  return mix;
 }
 
 /** Repair whatever was stored: unknown layers and styles are dropped, levels clamped. */
@@ -407,6 +481,8 @@ export function normalizeSoundscapeState(raw: unknown): SoundscapeState {
     saved,
     fade: fadeScheduleOf(source.fade).id,
     sceneVolumes: normalizeSceneVolumes(source.sceneVolumes),
+    shapes: normalizeShapes(source.shapes),
+    duckForSpeech: source.duckForSpeech !== false,
   };
 }
 
@@ -414,7 +490,25 @@ export function normalizeSoundscapeState(raw: unknown): SoundscapeState {
 export function mixOf(state: SoundscapeState): SoundscapeMix {
   const layers: Partial<Record<SoundLayerId, number>> = {};
   for (const id of state.active) layers[id] = state.levels[id];
-  return { layers, music: state.music, musicVolume: state.musicVolume };
+  const mix: SoundscapeMix = { layers, music: state.music, musicVolume: state.musicVolume };
+  const shapes = activeShapesOf(state);
+  if (Object.keys(shapes).length) mix.shapes = shapes;
+  return mix;
+}
+
+/** snd6: the shaping of the layers that are sounding (what a saved mix keeps). */
+export function activeShapesOf(state: SoundscapeState): Partial<Record<SoundLayerId, LayerShape>> {
+  const shapes: Partial<Record<SoundLayerId, LayerShape>> = {};
+  for (const id of state.active) {
+    const shape = state.shapes[id];
+    if (shape && !isNeutralShape(shape)) shapes[id] = { ...shape };
+  }
+  return shapes;
+}
+
+/** snd6: a layer's shaping, neutral when it has none. */
+export function shapeOf(state: SoundscapeState, id: SoundLayerId): LayerShape {
+  return state.shapes[id] ?? { ...NEUTRAL_SHAPE };
 }
 
 /** `state` with `mix` applied: its layers become the active set at their levels. */
@@ -428,7 +522,17 @@ export function applyMix(state: SoundscapeState, mix: SoundscapeMix): Soundscape
     levels[id] = level;
     active.push(id);
   }
-  return { ...state, levels, active, music: clean.music, musicVolume: clean.musicVolume };
+  let shapes = state.shapes;
+  if (clean.shapes) {
+    // A saved mix brings the shaping it was saved with; its unshaped layers go neutral.
+    shapes = { ...state.shapes };
+    for (const id of active) {
+      const shape = clean.shapes[id];
+      if (shape) shapes[id] = { ...shape };
+      else delete shapes[id];
+    }
+  }
+  return { ...state, levels, active, music: clean.music, musicVolume: clean.musicVolume, shapes };
 }
 
 function sameMix(a: SoundscapeMix, b: SoundscapeMix): boolean {
@@ -454,6 +558,101 @@ export function matchingSceneId(state: SoundscapeState): string | null {
 /** Nothing would be heard: no layer in the mix and no music. */
 export function isMixSilent(state: SoundscapeState): boolean {
   return state.active.length === 0 && state.music === 'off';
+}
+
+// ---------------------------------------------------------------------------
+// snd6 — saved mixes as a file: export, import, merge
+// ---------------------------------------------------------------------------
+
+export const MIXES_FORMAT = 'gum-soundscape-mixes';
+export const MIXES_VERSION = 1;
+
+export interface MixesDocument {
+  format: typeof MIXES_FORMAT;
+  version: number;
+  exportedAt: string;
+  mixes: { name: string; layers: Partial<Record<SoundLayerId, number>>; music: MusicStyleId; musicVolume: number; shapes?: Partial<Record<SoundLayerId, LayerShape>> }[];
+}
+
+/** The owner's saved mixes as a shareable JSON document (ids stay local). */
+export function exportMixesDocument(saved: readonly SavedMix[], now: Date = new Date()): string {
+  const doc: MixesDocument = {
+    format: MIXES_FORMAT,
+    version: MIXES_VERSION,
+    exportedAt: now.toISOString(),
+    // The ids are local to this install; an importer makes its own.
+    mixes: saved.map((kept) => {
+      const mix: Partial<SavedMix> = { ...kept };
+      delete mix.id;
+      return mix as MixesDocument['mixes'][number];
+    }),
+  };
+  return JSON.stringify(doc, null, 2);
+}
+
+export type MixesImportError = 'notJson' | 'notMixes' | 'empty';
+
+/**
+ * Read a mixes document — or a bare array of mixes, or a single mix — into
+ * clean mixes. Unknown layers and styles are dropped exactly as a stored state
+ * would be repaired; an entry left with nothing to hear is skipped.
+ */
+export function parseMixesDocument(text: string): { ok: true; mixes: Omit<SavedMix, 'id'>[] } | { ok: false; error: MixesImportError } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, error: 'notJson' };
+  }
+  let entries: unknown[];
+  if (Array.isArray(parsed)) entries = parsed;
+  else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { mixes?: unknown }).mixes)) {
+    const doc = parsed as { format?: unknown; mixes: unknown[] };
+    if (doc.format !== undefined && doc.format !== MIXES_FORMAT) return { ok: false, error: 'notMixes' };
+    entries = doc.mixes;
+  } else if (parsed && typeof parsed === 'object' && 'layers' in parsed) entries = [parsed];
+  else return { ok: false, error: 'notMixes' };
+  const mixes: Omit<SavedMix, 'id'>[] = [];
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    const name = (entry as { name?: unknown }).name;
+    if (typeof name !== 'string' || !name.trim()) continue;
+    const mix = normalizeMix(entry);
+    if (!Object.keys(mix.layers).length && mix.music === 'off') continue;
+    mixes.push({ name: name.trim().slice(0, 60), ...mix });
+  }
+  return mixes.length ? { ok: true, mixes } : { ok: false, error: 'empty' };
+}
+
+/**
+ * Add imported mixes to the saved list. A mix that sounds the same as one
+ * already kept is skipped (it would only be a second row for one sound); a name
+ * already in use gets a counter; the list never grows past MAX_SAVED_MIXES.
+ */
+export function mergeImportedMixes(
+  saved: readonly SavedMix[],
+  incoming: readonly Omit<SavedMix, 'id'>[],
+  makeId: (index: number) => string,
+): { saved: SavedMix[]; added: number; duplicates: number; overflow: number } {
+  const out = [...saved];
+  let added = 0;
+  let duplicates = 0;
+  let overflow = 0;
+  incoming.forEach((mix, index) => {
+    if (out.some((kept) => sameMix(kept, mix))) {
+      duplicates += 1;
+      return;
+    }
+    if (out.length >= MAX_SAVED_MIXES) {
+      overflow += 1;
+      return;
+    }
+    let name = mix.name;
+    for (let n = 2; out.some((kept) => kept.name === name); n += 1) name = `${mix.name.slice(0, 55)} (${n})`;
+    out.push({ ...mix, name, id: makeId(index) });
+    added += 1;
+  });
+  return { saved: out, added, duplicates, overflow };
 }
 
 /**

@@ -9,6 +9,8 @@ import {
 } from 'react';
 import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
 import type { LibraryItem } from '../../shared/types';
+import { libraryItemLangTag } from '../../shared/libraryLevel';
+import { studyLangFromTag } from '../../shared/studyLang';
 import {
   progressFromReadingLocator,
   readingLocatorFromProgress,
@@ -153,7 +155,10 @@ function resolveEpubSourceLang(item: LibraryItem, sampleHtml: string, profileLan
   if (/[\u3040-\u30ff]/u.test(sampleHtml)) return 'ja';
   // Cyrillic text is Russian whatever the tag says (untagged books are common).
   if (/\p{Script=Cyrillic}/u.test(sampleHtml)) return 'ru';
-  if (item.lang === 'ja' || item.lang === 'zh' || item.lang === 'en' || item.lang === 'ru') return item.lang;
+  // The library's tag for the item (it has no `lang` of its own; this used to read one).
+  const tag = libraryItemLangTag(item);
+  const tagged = studyLangFromTag(tag) ?? (tag?.toLowerCase().split(/[-_]/)[0] === 'en' ? 'en' : null);
+  if (tagged) return tagged;
   if (profileLang) return profileLang;
   return 'ja';
 }

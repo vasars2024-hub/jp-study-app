@@ -220,12 +220,25 @@ class FBiquad extends FNode {
     this.gain = new FParam(ctx, 0);
     this.detune = new FParam(ctx, 0);
   }
-  private coefficients(f: number, q: number): number[] {
+  private coefficients(f: number, q: number, gainDb: number): number[] {
     const sr = this.ctx.sampleRate;
     const freq = Math.min(Math.max(10, f), sr / 2 - 10);
     const w0 = (2 * Math.PI * freq) / sr;
-    const alpha = Math.sin(w0) / (2 * Math.max(1e-4, q));
     const cos = Math.cos(w0);
+    if (this.type === 'lowshelf' || this.type === 'highshelf') {
+      // snd6: RBJ shelves with slope 1, as the spec's shelving filters (Q unused).
+      const A = Math.pow(10, gainDb / 40);
+      const sq = 2 * Math.sqrt(A) * (Math.sin(w0) / 2) * Math.SQRT2;
+      const sign = this.type === 'lowshelf' ? 1 : -1;
+      const b0 = A * ((A + 1) - sign * (A - 1) * cos + sq);
+      const b1 = sign * 2 * A * ((A - 1) - sign * (A + 1) * cos);
+      const b2 = A * ((A + 1) - sign * (A - 1) * cos - sq);
+      const a0 = (A + 1) + sign * (A - 1) * cos + sq;
+      const a1 = -sign * 2 * ((A - 1) + sign * (A + 1) * cos);
+      const a2 = (A + 1) + sign * (A - 1) * cos - sq;
+      return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
+    }
+    const alpha = Math.sin(w0) / (2 * Math.max(1e-4, q));
     let b0: number; let b1: number; let b2: number;
     if (this.type === 'highpass') {
       b0 = (1 + cos) / 2; b1 = -(1 + cos); b2 = (1 + cos) / 2;
@@ -241,10 +254,11 @@ class FBiquad extends FNode {
     const x = this.inputSum(i);
     const f = this.frequency.at(i);
     const q = this.Q.at(i);
-    const key = `${f.toFixed(1)}|${q.toFixed(3)}`;
+    const g = this.gain.at(i);
+    const key = `${f.toFixed(1)}|${q.toFixed(3)}|${g.toFixed(2)}`;
     if (key !== this.key) {
       this.key = key;
-      this.c = this.coefficients(f, q);
+      this.c = this.coefficients(f, q, g);
     }
     const [b0, b1, b2, a1, a2] = this.c;
     const y = b0 * x + b1 * this.x1 + b2 * this.x2 - a1 * this.y1 - a2 * this.y2;

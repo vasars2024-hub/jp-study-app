@@ -7,22 +7,33 @@
  */
 
 import { isPlaying as mediaIsPlaying, onPlayingChanged } from '../audioBus';
+import { isForegroundAudioActive, onForegroundAudioChanged } from '../foregroundAudio';
 import { writeLocalStorageJson } from '../localStorageWrite';
 import { soundscapeEngine } from './soundscapeEngine';
 import {
   BUILT_IN_SCENES,
+  DUCK_GAIN,
+  DUCK_SPEECH_GAIN,
   MAX_SAVED_MIXES,
   SOUNDSCAPE_STORAGE_KEY,
+  activeShapesOf,
   applyMix,
   clamp01,
+  exportMixesDocument,
   fadeScheduleOf,
   isMixSilent,
+  isNeutralShape,
   matchingSceneId,
+  mergeImportedMixes,
   mixOf,
+  normalizeLayerShape,
   normalizeSoundscapeState,
+  parseMixesDocument,
   sleepFadePlan,
   sliderToGain,
   type FadeScheduleId,
+  type LayerShape,
+  type MixesImportError,
   type MusicStyleId,
   type SoundLayerId,
   type SoundscapeMix,
@@ -36,6 +47,8 @@ export interface SoundscapeSnapshot {
   sceneId: string | null;
   /** Epoch ms at which the sleep timer stops playback, or null when it is off. */
   timerEndsAt: number | null;
+  /** snd6: why the mix is lowered right now, if it is. */
+  ducking: 'speech' | 'music' | null;
 }
 
 function load(): SoundscapeState {
@@ -55,12 +68,14 @@ let timerHandle: ReturnType<typeof setTimeout> | null = null;
 let timerFadeHandle: ReturnType<typeof setTimeout> | null = null;
 let saveHandle: ReturnType<typeof setTimeout> | null = null;
 let mediaPlaying = false;
+/** snd6: speech, a card clip or a video is audible (any window). */
+let foregroundPlaying = false;
 let mediaHooked = false;
 let snapshot: SoundscapeSnapshot | null = null;
 const listeners = new Set<(snapshot: SoundscapeSnapshot) => void>();
 
 export function getSoundscape(): SoundscapeSnapshot {
-  if (!snapshot) snapshot = { state, playing, sceneId: matchingSceneId(state), timerEndsAt };
+  if (!snapshot) snapshot = { state, playing, sceneId: matchingSceneId(state), timerEndsAt, ducking: playing ? duckReason() : null };
   return snapshot;
 }
 
@@ -71,15 +86,30 @@ export function subscribeSoundscape(listener: (snapshot: SoundscapeSnapshot) => 
   };
 }
 
-function pushToEngine(): void {
+/**
+ * snd6: speech wins over music — it ducks deeper, because a word has to be
+ * understood where a song only has to stay out of the way.
+ */
+function duckReason(): 'speech' | 'music' | null {
+  if (state.duckForSpeech && foregroundPlaying) return 'speech';
+  if (state.duckWithMedia && mediaPlaying) return 'music';
+  return null;
+}
+
+/** `crossfadeSec` is for a scene change: what leaves and what arrives overlap for that long. */
+function pushToEngine(crossfadeSec = 0): void {
   const layers: Partial<Record<SoundLayerId, number>> = {};
   for (const id of state.active) layers[id] = sliderToGain(state.levels[id]);
+  const reason = duckReason();
   soundscapeEngine.apply({
     master: sliderToGain(state.master),
     layers,
     music: state.music,
     musicGain: state.music === 'off' ? 0 : sliderToGain(state.musicVolume),
-    ducked: state.duckWithMedia && mediaPlaying,
+    ducked: reason !== null,
+    duckGain: reason === 'speech' ? DUCK_SPEECH_GAIN : DUCK_GAIN,
+    shapes: activeShapesOf(state),
+    ...(crossfadeSec > 0 ? { crossfadeSec } : {}),
   });
 }
 
@@ -90,9 +120,9 @@ function emit(): void {
 }
 
 /** Apply a change, keep the engine in step, and persist shortly after. */
-function commit(next: SoundscapeState): void {
+function commit(next: SoundscapeState, crossfadeSec = 0): void {
   state = next;
-  pushToEngine();
+  pushToEngine(crossfadeSec);
   // A dragged slider commits dozens of times a second; one write afterwards is enough.
   if (saveHandle) clearTimeout(saveHandle);
   saveHandle = setTimeout(() => {
@@ -111,7 +141,20 @@ function hookMedia(): void {
     if (now === mediaPlaying) return;
     mediaPlaying = now;
     pushToEngine();
+    emit();
   });
+  foregroundPlaying = isForegroundAudioActive();
+  onForegroundAudioChanged((active) => {
+    if (active === foregroundPlaying) return;
+    foregroundPlaying = active;
+    pushToEngine();
+    emit();
+  });
+}
+
+/** snd6: the cross-fade a scene change gets under the current fade schedule. */
+function sceneCrossfade(): number {
+  return playing ? fadeScheduleOf(state.fade).crossfadeSec : 0;
 }
 
 /**
@@ -178,7 +221,7 @@ export function startSoundscape(sceneId?: string): boolean {
     const mix = sceneMix(sceneId);
     if (mix) {
       state = withSceneVolume(applyMix(state, mix), sceneId);
-      commit(state);
+      commit(state, sceneCrossfade());
     }
   }
   start();
@@ -249,13 +292,30 @@ export function setSoundscapeDuck(on: boolean): void {
   commit({ ...state, duckWithMedia: on });
 }
 
+/** snd6: lower the mix while speech, a card clip or a video plays. */
+export function setSoundscapeDuckForSpeech(on: boolean): void {
+  commit({ ...state, duckForSpeech: on });
+}
+
+/** snd6: a layer's tone (-1 dark .. +1 bright) and pan (-1 left .. +1 right). */
+export function setSoundLayerShape(id: SoundLayerId, patch: Partial<LayerShape>): void {
+  const shape = normalizeLayerShape({ ...(state.shapes[id] ?? { tone: 0, pan: 0 }), ...patch });
+  const shapes = { ...state.shapes };
+  if (isNeutralShape(shape)) delete shapes[id];
+  else shapes[id] = shape;
+  commit({ ...state, shapes });
+}
+
 /** Switch to a built-in scene or a saved mix and start it. */
 export function applySoundscapeScene(id: string): void {
   const mix = sceneMix(id);
   if (!mix) return;
+  // snd6: measured before followMix, which may start playback — a scene that
+  // starts the sound fades in on the schedule; one that replaces it cross-fades.
+  const crossfade = sceneCrossfade();
   state = withSceneVolume(applyMix(state, mix), id);
   followMix();
-  commit(state);
+  commit(state, crossfade);
 }
 
 export function clearSoundscape(): void {
@@ -269,8 +329,29 @@ export function saveSoundscapeMix(name: string): boolean {
   const trimmed = name.trim().slice(0, 60);
   if (!trimmed || isMixSilent(state) || state.saved.length >= MAX_SAVED_MIXES) return false;
   const id = `mix-${Date.now().toString(36)}`;
-  commit({ ...state, saved: [...state.saved, { id, name: trimmed, ...mixOf(state) }] });
+  // snd6: a saved mix always records its shaping, neutral included, so applying
+  // it later puts the layers back exactly as they were heard.
+  commit({ ...state, saved: [...state.saved, { id, name: trimmed, ...mixOf(state), shapes: activeShapesOf(state) }] });
   return true;
+}
+
+/** snd6: the saved mixes as a JSON document to keep or share. */
+export function exportSoundscapeMixes(now: Date = new Date()): string {
+  return exportMixesDocument(state.saved, now);
+}
+
+export type SoundscapeImportResult =
+  | { ok: true; added: number; duplicates: number; overflow: number }
+  | { ok: false; error: MixesImportError };
+
+/** snd6: add the mixes in a document exported here (or by hand) to the saved list. */
+export function importSoundscapeMixes(text: string): SoundscapeImportResult {
+  const parsed = parseMixesDocument(text);
+  if (!parsed.ok) return parsed;
+  const stamp = Date.now().toString(36);
+  const merged = mergeImportedMixes(state.saved, parsed.mixes, (index) => `mix-${stamp}-${index}`);
+  if (merged.added > 0) commit({ ...state, saved: merged.saved });
+  return { ok: true, added: merged.added, duplicates: merged.duplicates, overflow: merged.overflow };
 }
 
 export function deleteSoundscapeMix(id: string): void {

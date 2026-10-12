@@ -15,7 +15,7 @@ import { bootMotionPrefs } from './motion/motionPrefs';
 import { installRewardBursts } from './motion/rewardBurst';
 import { bootWindowChrome } from './windowChrome';
 import { bootTheme, onThemeChanged } from './theme';
-import { applyLangAttribute, initI18n } from './i18n';
+import { applyLangAttribute, ensureUiPack, initI18n } from './i18n';
 import { syncStudyLangToMain } from './studyEnvironment';
 import { bootEnvironment } from './environment';
 import { installAmbientAudio } from './environment/ambientAudio';
@@ -376,7 +376,17 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !i
   // Focus Mode live, and a second window must never start a second mixer.
   runWhenIdle(() => {
     // Same primary-window test the calendar reminders use (bare query string).
-    if (new URLSearchParams(window.location.search).toString() !== '') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.toString() !== '') {
+      // snd6: a pop-out never runs a mixer, but it tells the main window which
+      // study mode it is in and whether speech or video is playing in it.
+      if (params.has('popout')) {
+        void import('./soundscape/studyModePresence')
+          .then(({ installStudyModePresence }) => installStudyModePresence())
+          .catch((err) => console.warn('[soundscape:presence]', err));
+      }
+      return;
+    }
     void import('./soundscape/focusSoundscape')
       .then(({ installFocusSoundscape }) => installFocusSoundscape())
       .catch((err) => console.warn('[soundscape:focus-link]', err));
@@ -431,9 +441,13 @@ if (container) {
   // boot in a non-English UI. English is the default and is already loaded, so
   // for most sessions this costs a microtask, not a fetch.
   void initI18n().then(async () => {
+    // Pass-6 strings (Soundscape, widgets, shortcuts) are a lazy pack so Blanc
+    // never parses them; the desk shows them at once, so they are in before paint.
+    const pass6Strings = ensureUiPack('pass6');
     // The ordered theme-sheet slot (see bootThemeSheets above) is in before any
     // window paints its first React frame.
     await themeSheetsReady;
+    await pass6Strings;
     // Every window — the Reading Lens and the dictionary overlay too — hides its
     // AI entry points from the first paint when "Use AI features" is off.
     startAiSetupSync();

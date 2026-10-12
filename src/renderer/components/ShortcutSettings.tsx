@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { confirmDialog, promptDialog } from './ui';
+import Icon from './Icons';
 import { useT } from '../i18n';
 import { commandCategory, commandLabel, commandNote } from '../commandI18n';
 import {
@@ -22,6 +23,7 @@ import {
   getBindings,
   getGlobalCommandStatuses,
   globalCommandErrorText,
+  KEY_SEQUENCE_MAX_STEPS,
   listCustomCommands,
   listShortcutProfiles,
   normalizeChord,
@@ -49,6 +51,7 @@ import {
   PLAYER_ENTRY_PREFIX,
   PLAYER_FIXED_CHORDS,
   playerActionLabelKey,
+  playerCodeToChord,
   playerRows,
   resetPlayerBinding,
   resetWholeKeymap,
@@ -59,10 +62,15 @@ import {
   type KeymapImportError,
   type KeymapScope,
 } from '../keymapEditor';
+import { keyQueryToChord, keysMatchQuery, normalizeTypedKeys } from '../keyQuery';
 import { SHORTCUT_REVEAL_EVENT, takePendingShortcutReveal, type ShortcutRevealTarget } from '../shortcutReveal';
 import CustomShortcutForm from './settings/CustomShortcutForm';
 import './companion/companion.css';
 import './kbd5.css';
+import './kbd6.css';
+
+/** kbd6: how long capture (sequence mode) and find-by-keys wait for another step. */
+const STEP_IDLE_MS = 1200;
 
 // Ordered by purpose, roughly by how often a shortcut in that group gets used:
 // moving around the OS first, then arranging it, then the study surfaces
@@ -138,6 +146,36 @@ function conflictNames(list: KeymapConflict[], rows: BindingRow[], t: TFn): stri
   return names.join(', ');
 }
 
+/**
+ * kbd6: a prefix clash in words, from the side of the row that shows it. When the
+ * other entry holds the shorter keys, this row's sequence starts with them;
+ * otherwise this row's keys start the other entry's sequence.
+ */
+function prefixText(c: KeymapConflict, rows: BindingRow[], t: TFn): string {
+  const name = entryLabel(c.id, rows, t);
+  const lead = formatKeysDisplay(c.lead ?? '');
+  if (c.chord === c.lead) return t('kbd6.conflict.startsMine', { name, lead });
+  return t('kbd6.conflict.startsTheirs', { name, lead, sequence: formatKeysDisplay(c.chord) });
+}
+
+/** The conflict lines under a row: exact clashes as one list, each prefix clash spelled out. */
+function conflictLines(list: KeymapConflict[], rows: BindingRow[], t: TFn) {
+  const exact = list.filter((c) => !c.prefix);
+  const prefixes = [...new Set(list.filter((c) => c.prefix).map((c) => prefixText(c, rows, t)))];
+  return (
+    <>
+      {exact.length > 0 && (
+        <span className="sc-conflict">{t('settings.shortcuts.alsoBound', { names: conflictNames(exact, rows, t) })}</span>
+      )}
+      {prefixes.map((text) => (
+        <span key={text} className="sc-conflict sc-prefix" data-sc-prefix-conflict>
+          {text}
+        </span>
+      ))}
+    </>
+  );
+}
+
 type CaptureMode = 'replace' | 'add';
 
 interface PendingBind {
@@ -170,6 +208,11 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
   const [customOpen, setCustomOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingBind | null>(null);
+  /** kbd6: capture appends steps ("Ctrl+K", then "S") and commits after a pause. */
+  const [sequenceMode, setSequenceMode] = useState(false);
+  /** kbd6: rows bound to these keys only ('' = no key filter), and whether keys are being read. */
+  const [keyFilter, setKeyFilter] = useState('');
+  const [findingKeys, setFindingKeys] = useState(false);
   /**
    * v1.0 audit 4.2 — every category shipped expanded, so the page was one
    * 8142 px column of 172 rows. Collapsed is the default and only the
@@ -183,8 +226,10 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
   const captureRef = useRef<string | null>(null);
   const modeRef = useRef<CaptureMode>('replace');
   const fileRef = useRef<HTMLInputElement>(null);
+  const sequenceModeRef = useRef(false);
   captureRef.current = capturing;
   modeRef.current = captureMode;
+  sequenceModeRef.current = sequenceMode;
 
   useEffect(() => onGlobalCommandStatus(setGlobalStatus), []);
   useEffect(() => onPlayerKeymapChanged(() => setPlayerRev((n) => n + 1)), []);
@@ -285,12 +330,37 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       setHoldHint('');
       return;
     }
+    // kbd6: sequence mode — each chord is a step; a pause (or the last allowed step) commits.
+    let steps: string[] = [];
+    let stepTimer: number | null = null;
+    const clearStepTimer = (): void => {
+      if (stepTimer != null) window.clearTimeout(stepTimer);
+      stepTimer = null;
+    };
+
     const finish = (chord: string) => {
       const id = captureRef.current;
       if (!id) return;
+      clearStepTimer();
+      steps = [];
       setCapturing(null);
       setHoldHint('');
       commitChord(id, chord, modeRef.current);
+    };
+
+    const finishSteps = (): void => {
+      const done = steps;
+      if (done.length) finish(done.join(' '));
+    };
+    const addStep = (chord: string): void => {
+      steps = [...steps, chord];
+      clearStepTimer();
+      if (steps.length >= KEY_SEQUENCE_MAX_STEPS) {
+        finishSteps();
+        return;
+      }
+      setHoldHint(t('kbd6.settings.stepsSoFar', { keys: formatKeysDisplay(steps.join(' ')) }));
+      stepTimer = window.setTimeout(finishSteps, STEP_IDLE_MS);
     };
 
     const modPreview = (e: KeyboardEvent) => {
@@ -308,11 +378,13 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       const id = captureRef.current;
       if (!id) return;
       if (e.key === 'Escape') {
+        clearStepTimer();
+        steps = [];
         setCapturing(null);
         setHoldHint('');
         return;
       }
-      if ((e.key === 'Backspace' || e.key === 'Delete') && modeRef.current === 'replace') {
+      if ((e.key === 'Backspace' || e.key === 'Delete') && modeRef.current === 'replace' && !steps.length) {
         setEntryChords(id, []);
         setCapturing(null);
         setHoldHint('');
@@ -320,15 +392,21 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
         return;
       }
       if (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta') {
-        modPreview(e);
+        // Mid-sequence the hint keeps showing the steps so far.
+        if (!steps.length) modPreview(e);
         return;
       }
       const chord = chordFromEvent(e);
       if (!chord) return;
+      if (sequenceModeRef.current) {
+        addStep(chord);
+        return;
+      }
       finish(chord);
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
+      if (steps.length) return;
       if (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta') {
         modPreview(e);
       }
@@ -337,6 +415,11 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
     const onMouse = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      // A mouse button is never a sequence step: a click mid-sequence commits the steps so far.
+      if (steps.length) {
+        if (e.type === 'mousedown') finishSteps();
+        return;
+      }
       const chord = chordFromMouseEvent(e);
       if (!chord) {
         if (e.button === 0) setHoldHint(t('settings.shortcuts.leftClickNeedsMod'));
@@ -351,6 +434,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
     window.addEventListener('auxclick', onMouse, true);
     window.addEventListener('contextmenu', onMouse, true);
     return () => {
+      clearStepTimer();
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
       window.removeEventListener('mousedown', onMouse, true);
@@ -360,17 +444,65 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
     // commitChord reads only refs and stable setters besides `t`, which is stable.
   }, [capturing, lang]);
 
+  // kbd6: "Find by keys" — press a chord (or the steps of a sequence) and the list
+  // narrows to what is bound to it. Steps arrive while the user keeps typing; a pause
+  // (or the last allowed step) ends the reading. Escape puts the previous filter back.
+  useEffect(() => {
+    if (!findingKeys) return undefined;
+    let steps: string[] = [];
+    let timer: number | null = null;
+    const before = keyFilter;
+    const stop = (): void => {
+      if (timer != null) window.clearTimeout(timer);
+      timer = null;
+      setFindingKeys(false);
+    };
+    const onKeyDown = (e: KeyboardEvent): void => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        setKeyFilter(before);
+        stop();
+        return;
+      }
+      const chord = chordFromEvent(e);
+      if (!chord) return;
+      steps = [...steps, chord];
+      setKeyFilter(normalizeChord(steps.join(' ')));
+      if (timer != null) window.clearTimeout(timer);
+      if (steps.length >= KEY_SEQUENCE_MAX_STEPS) {
+        stop();
+        return;
+      }
+      timer = window.setTimeout(stop, STEP_IDLE_MS);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      if (timer != null) window.clearTimeout(timer);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
+    // `keyFilter` is read once, as the value to restore on Escape.
+  }, [findingKeys]);
+
   /** Overlapping conflicts per entry, across every scope. */
   const conflicts = useMemo(() => conflictMap(keymapEntries(rows)), [rows, playerRev]);
   const players = useMemo(() => playerRows(), [playerRev]);
 
   const q = query.trim().toLowerCase();
+  /** kbd6: the query read as keys ("ctrl k" → Ctrl+K), or null when it is words. */
+  const chordQ = useMemo(() => keyQueryToChord(query), [query]);
+  /** Text OR key match for the query, AND the key filter when one is set. */
+  const keysPass = (keys: string): boolean => !keyFilter || keysMatchQuery(keys, keyFilter);
+  const queryKeys = (keys: string): boolean => chordQ != null && keysMatchQuery(keys, chordQ);
   const visible = useMemo(() => {
-    if (!q) return rows;
+    if (!q && !keyFilter) return rows;
     return rows.filter((r) => {
+      if (!keysPass(r.keys)) return false;
+      if (!q) return true;
       const label = displayLabel(r, t);
       const cat = commandCategory(r.category, t);
       return (
+        queryKeys(r.keys) ||
         label.toLowerCase().includes(q) ||
         r.keys.toLowerCase().includes(q) ||
         r.id.toLowerCase().includes(q) ||
@@ -380,25 +512,42 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
         (displayNote(r, t)?.toLowerCase().includes(q) ?? false)
       );
     });
-  }, [rows, q, lang]);
+  }, [rows, q, chordQ, keyFilter, lang]);
 
   const visiblePlayers = useMemo(() => {
     const groupName = t('kbd5.player.title').toLowerCase();
     return players.filter((p) => {
+      const keys = playerCodeToChord(p.code);
+      if (!keysPass(keys)) return false;
       if (!q) return true;
       const label = t(playerActionLabelKey(p.action), playerParams(p.action, p.value)).toLowerCase();
-      return label.includes(q) || p.keys.toLowerCase().includes(q) || p.action.toLowerCase().includes(q) || groupName.includes(q);
+      return (
+        queryKeys(keys) ||
+        label.includes(q) ||
+        p.keys.toLowerCase().includes(q) ||
+        p.action.toLowerCase().includes(q) ||
+        groupName.includes(q)
+      );
     });
-  }, [players, q, lang]);
+  }, [players, q, chordQ, keyFilter, lang]);
 
   const visibleExtension = useMemo(() => {
     const groupName = t('kbd5.ext.title').toLowerCase();
-    return CHROME_KEY_COMMANDS.filter(
-      (e) => !q || t(e.labelKey).toLowerCase().includes(q) || e.suggested.toLowerCase().includes(q) || groupName.includes(q),
-    );
-  }, [q, lang]);
+    return CHROME_KEY_COMMANDS.filter((e) => {
+      const keys = normalizeChord(e.suggested);
+      if (!keysPass(keys)) return false;
+      return (
+        !q ||
+        queryKeys(keys) ||
+        t(e.labelKey).toLowerCase().includes(q) ||
+        e.suggested.toLowerCase().includes(q) ||
+        groupName.includes(q)
+      );
+    });
+  }, [q, chordQ, keyFilter, lang]);
 
-  const searching = q.length > 0;
+  const searching = q.length > 0 || keyFilter !== '';
+  const keyFilterCount = visible.length + visiblePlayers.length + visibleExtension.length;
   /** Groups with at least one visible row — what the bulk controls act on. */
   const shownCats = useMemo(() => {
     const cats: string[] = CATEGORY_ORDER.filter((cat) => visible.some((r) => r.category === cat));
@@ -480,16 +629,28 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
   const startCapture = (id: string, mode: CaptureMode) => {
     setManualId(null);
     setPending(null);
+    setFindingKeys(false);
     setCaptureMode(mode);
     setCapturing(capturing === id && captureMode === mode ? null : id);
-    setHoldHint(t('settings.shortcuts.holdHintDots'));
+    setHoldHint(sequenceMode ? t('kbd6.settings.sequenceStart') : t('settings.shortcuts.holdHintDots'));
+  };
+
+  const toggleFindKeys = () => {
+    if (findingKeys) {
+      setFindingKeys(false);
+      return;
+    }
+    setCapturing(null);
+    setManualId(null);
+    setPending(null);
+    setFindingKeys(true);
   };
 
   const applyManual = (id: string) => {
     const text = manualText.trim();
     setManualId(null);
     setManualText('');
-    commitChord(id, text, 'replace');
+    commitChord(id, normalizeTypedKeys(text), 'replace');
   };
 
   const toggleGroup = (cat: string) =>
@@ -531,7 +692,11 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
           {[...new Set(pending.conflicts.map((c) => c.id))].map((cid) => {
             const c = pending.conflicts.find((x) => x.id === cid) as KeymapConflict;
             return (
-              <li key={cid}>{t('kbd5.conflict.item', { name: entryLabel(cid, all, t), scope: scopeText(c.scope, t) })}</li>
+              <li key={cid}>
+                {c.prefix
+                  ? prefixText(c, all, t)
+                  : t('kbd5.conflict.item', { name: entryLabel(cid, all, t), scope: scopeText(c.scope, t) })}
+              </li>
             );
           })}
         </ul>
@@ -580,7 +745,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
 
   const manualRow = (id: string) => {
     if (manualId !== id) return null;
-    const live = manualText.trim() ? findConflicts(id, manualText).filter((c) => c.overlapping) : [];
+    const live = manualText.trim() ? findConflicts(id, normalizeTypedKeys(manualText)).filter((c) => c.overlapping) : [];
     return (
       <>
         <div className="sc-manual">
@@ -634,6 +799,25 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        <button
+          type="button"
+          className={`btn small${findingKeys ? ' primary' : ''}`}
+          aria-pressed={findingKeys}
+          data-sc-find-keys
+          title={t('kbd6.settings.findByKeysHint')}
+          onClick={toggleFindKeys}
+        >
+          {findingKeys ? t('kbd6.settings.findListeningShort') : t('kbd6.settings.findByKeys')}
+        </button>
+        <label className="kbd6-seq-toggle" title={t('kbd6.settings.recordSequenceHint')}>
+          <input
+            type="checkbox"
+            data-sc-record-sequence
+            checked={sequenceMode}
+            onChange={(e) => setSequenceMode(e.target.checked)}
+          />
+          {t('kbd6.settings.recordSequence')}
+        </label>
         <select
           className="set-select"
           value={profiles.active}
@@ -738,6 +922,34 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
         </p>
       )}
       {capturing && holdHint && <p className="sc-msg sc-capture-hint">{holdHint}</p>}
+      {findingKeys && (
+        <p className="sc-msg sc-capture-hint" role="status" data-sc-find-status>
+          {t('kbd6.settings.findListening')}
+        </p>
+      )}
+      {keyFilter && (
+        <div className="kbd6-keyfilter" data-sc-key-filter={keyFilter}>
+          <span className="kbd6-keyfilter-chip">
+            <span>{t('kbd6.settings.keyFilter', { keys: formatKeysDisplay(keyFilter) })}</span>
+            <button
+              type="button"
+              className="kbd6-chip-x"
+              data-sc-clear-key-filter
+              aria-label={t('kbd6.settings.clearKeyFilter', { keys: formatKeysDisplay(keyFilter) })}
+              title={t('kbd6.settings.clearKeyFilter', { keys: formatKeysDisplay(keyFilter) })}
+              onClick={() => {
+                setFindingKeys(false);
+                setKeyFilter('');
+              }}
+            >
+              <Icon name="close" size={12} />
+            </button>
+          </span>
+          <span className="muted" role="status">
+            {t('kbd6.settings.keyFilterCount', { count: keyFilterCount, keys: formatKeysDisplay(keyFilter) })}
+          </span>
+        </div>
+      )}
 
       {shownCats.length > 1 && (
         <div className="sc-group-bulk">
@@ -805,11 +1017,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                       const text = status?.error ? globalCommandErrorText(status) : '';
                       return text ? <span className="sc-conflict sc-global-error">{text}</span> : null;
                     })()}
-                    {rowConflicts.length > 0 && (
-                      <span className="sc-conflict">
-                        {t('settings.shortcuts.alsoBound', { names: conflictNames(rowConflicts, rows, t) })}
-                      </span>
-                    )}
+                    {rowConflicts.length > 0 && conflictLines(rowConflicts, rows, t)}
                   </div>
                   <div className="sc-row-actions">
                     <button
@@ -946,11 +1154,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                             {scopeText('player', t)}
                           </span>
                         </span>
-                        {rowConflicts.length > 0 && (
-                          <span className="sc-conflict">
-                            {t('settings.shortcuts.alsoBound', { names: conflictNames(rowConflicts, rows, t) })}
-                          </span>
-                        )}
+                        {rowConflicts.length > 0 && conflictLines(rowConflicts, rows, t)}
                       </div>
                       <div className="sc-row-actions">
                         <button
