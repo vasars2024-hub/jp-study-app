@@ -97,6 +97,12 @@ const MATRIX: Record<string, MatrixEntry> = {
     gates: [{ call: /refuseWhileLocked\('window:recorder'\)/, inFunction: 'startRecorder' }],
     why: 'region picker (startRecorder is its entry), panel, frame, hidden encoder host',
   },
+  'src/main/snipToCards.ts': {
+    sites: ['refuse'],
+    // It asks the lock directly (no toast while locked is wanted, so no refusal notice).
+    gates: [{ call: /if \(!deps \|\| appLocked\(\)\) return false;/, inFunction: 'showToast' }],
+    why: 'snip-to-cards toast over other apps; the clipboard watcher also stands down while locked',
+  },
   'src/main/studyBlockWindows.ts': {
     sites: ['refuse'],
     gates: [{ call: /refuseWhileLocked\('window:study-block'\)/, inFunction: 'openStudyBlockWindow' }],
@@ -277,6 +283,27 @@ describe('static: the other gates', () => {
     expect(check).toBeLessThan(src.indexOf("pathname === '/v1/mine'"));
   });
 
+  it('every restart / relaunch in main.ts is refused while locked first (risk4)', () => {
+    const main = read('src/main.ts');
+    const relaunches = [...main.matchAll(/app\.relaunch\(\)/g)].map((m) => m.index ?? 0);
+    expect(relaunches.length).toBeGreaterThanOrEqual(3);
+    for (const at of relaunches) {
+      const before = main.slice(Math.max(0, at - 260), at);
+      expect({ at, gated: /refuseRestartWhileLocked\('[a-z-]+'\)/.test(before) }).toEqual({ at, gated: true });
+    }
+    // The command registry no longer treats restart as lock-safe.
+    expect(read('src/main/lockGuard.ts')).toMatch(/LOCK_SAFE_COMMANDS: ReadonlySet<string> = new Set\(\['app\.toggle', 'app\.focus'\]\)/);
+  });
+
+  it('native notifications: `new Notification(` exists only in the lock-gated helper (risk4)', () => {
+    const files = [resolve(REPO, 'src/main.ts'), ...sourceFiles(resolve(REPO, 'src/main'))];
+    const offenders = files
+      .filter((f) => /new Notification\(/.test(readFileSync(f, 'utf8')))
+      .map(posix)
+      .filter((f) => f !== 'src/main/lockedNotifications.ts');
+    expect(offenders).toEqual([]);
+  });
+
   it('Blanc takes main\'s lock (it used to read only its own session flag)', () => {
     const src = read('src/renderer/blancMain.tsx');
     expect(src).toContain('lockscreenIsLocked');
@@ -413,6 +440,33 @@ describe('behaviour: global commands refuse while locked', () => {
     expect(lens).toHaveBeenCalledTimes(1);
     expect(content).toHaveBeenCalledTimes(1);
     reg.__globalCommandsTestables.reset();
+  });
+});
+
+describe('behaviour: native notifications wait for the unlock (risk4)', () => {
+  it('held while locked (newest kept), shown silently on unlock, straight through when unlocked', async () => {
+    const lockGuardMod = await import('../lockGuard');
+    const notes = await import('../lockedNotifications');
+    const shown: Array<{ title: string; silent?: boolean }> = [];
+    notes.__setNativeNoticeDepsForTests({
+      isSupported: () => true,
+      show: (o) => void shown.push(o),
+      isLocked: () => lockGuardMod.appLocked(),
+      deferUntilUnlocked: (key, fn) => lockGuardMod.deferWhileLocked(key, fn),
+    });
+    for (let i = 0; i < notes.MAX_HELD_NOTICES + 2; i += 1) {
+      expect(notes.showNativeNotification({ title: `n${i}`, body: 'b' })).toBe('held');
+    }
+    expect(shown).toEqual([]);
+    expect(notes.heldNativeNoticeCount()).toBe(notes.MAX_HELD_NOTICES);
+    expect(guard.deferredKeys()).toContain('native-notifications');
+    locked = false;
+    guard.release();
+    expect(shown.map((n) => n.title)).toEqual(['n2', 'n3', 'n4', 'n5', 'n6']);
+    expect(shown.every((n) => n.silent === true)).toBe(true);
+    expect(notes.showNativeNotification({ title: 'live', body: 'b' })).toBe('shown');
+    expect(shown.at(-1)).toEqual({ title: 'live', body: 'b' });
+    notes.__setNativeNoticeDepsForTests(null);
   });
 });
 

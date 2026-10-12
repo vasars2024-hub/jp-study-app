@@ -39,6 +39,8 @@ export interface MediaJob {
    * one the settings asked for. Absent means no substitution — never a guess.
    */
   modelSubstitution?: { requested: string; used: string };
+  /** Transcription only: the Whisper model is downloading/loading (percent null = size unknown). */
+  modelDownload?: { percent: number | null };
   /** True once the job reached a terminal phase. */
   finished: boolean;
   updatedAt: number;
@@ -195,6 +197,7 @@ function wire(): void {
       etaMs: p.etaMs,
       error: p.error,
       modelSubstitution: p.modelSubstitution,
+      modelDownload: p.modelDownload,
       finished: TERMINAL.has(p.phase),
       updatedAt: Date.now(),
     });

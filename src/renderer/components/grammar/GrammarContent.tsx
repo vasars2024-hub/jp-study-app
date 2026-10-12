@@ -8,7 +8,7 @@
  * presentations — nothing in this file may import `AppChrome`/`MenuBar`/
  * `StatusBar`, because Blanc composes it directly.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   GRAMMAR,
   GUIDES,
@@ -20,7 +20,7 @@ import {
   type GuideCategory,
 } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
-import { explanationCopiesMeaning, structureCopiesTitle } from '../../data/grammar/hollow';
+import { explanationCopiesMeaning, isHollowGrammarPoint, structureCopiesTitle } from '../../data/grammar/hollow';
 import type { ExampleSentence } from '../../../shared/types';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import {
@@ -54,6 +54,18 @@ import {
   type GrammarSightingInput,
   type GrammarSightingSource,
 } from '../../grammarSightings';
+
+/*
+ * The optional AI helpers (`GrammarAiTools.tsx`). Each loads on the first press
+ * of its button — never with the lesson — so Blanc's grammar panel pays nothing
+ * for them until they are used, and `data-ai-entry` hides the buttons while
+ * "Use AI features" is off.
+ */
+const GrammarExplainAi = lazy(() => import('./GrammarAiTools').then((m) => ({ default: m.GrammarExplainAi })));
+const GrammarExamplesAi = lazy(() => import('./GrammarAiTools').then((m) => ({ default: m.GrammarExamplesAi })));
+const GrammarSightingsAi = lazy(() => import('./GrammarAiTools').then((m) => ({ default: m.GrammarSightingsAi })));
+
+type SightingVerdicts = Map<string, { uses: boolean; note: string }>;
 
 const SIGHTING_SOURCE_KEYS: Record<GrammarSightingSource, string> = {
   deck: 'gram2.seen.source.deck',
@@ -131,6 +143,18 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
   const [keptNote, setKeptNote] = useState('');
   const [deckRev, setDeckRev] = useState(0);
   const [captures, setCaptures] = useState<ReadingLensHistoryEntry[]>([]);
+  // Optional AI helpers, each opened by its own button (nothing runs on its own).
+  const [aiExplainOpen, setAiExplainOpen] = useState(false);
+  const [aiExamplesOpen, setAiExamplesOpen] = useState(false);
+  const [aiSightingsOpen, setAiSightingsOpen] = useState(false);
+  const [sightingVerdicts, setSightingVerdicts] = useState<SightingVerdicts>(() => new Map());
+  const hollow = isHollowGrammarPoint(point);
+  useEffect(() => {
+    setAiExplainOpen(false);
+    setAiExamplesOpen(false);
+    setAiSightingsOpen(false);
+    setSightingVerdicts(new Map());
+  }, [point.id]);
   useEffect(() => {
     let active = true;
     // History is bounded and loaded asynchronously, once per detail mount.
@@ -254,6 +278,21 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
       </header>
       <p className="gram-gloss">{point.meaning}</p>
 
+      {/* A point with no content of its own can ask the optional AI for an
+          explanation; the reference's own (empty) blocks stay hidden as before. */}
+      {hollow && !aiExplainOpen && (
+        <div className="gram-more-actions" data-ai-entry>
+          <button type="button" className="gram-more-btn ai-tutor-entry" onClick={() => setAiExplainOpen(true)}>
+            {t('aiTutor.explain.button')}
+          </button>
+        </div>
+      )}
+      {hollow && aiExplainOpen && (
+        <Suspense fallback={null}>
+          <GrammarExplainAi point={point} onClose={() => setAiExplainOpen(false)} />
+        </Suspense>
+      )}
+
       {/* A block that only repeats the title or the gloss says nothing; hide it
           rather than print the same words twice under a heading. */}
       {!structureCopiesTitle(point) && (
@@ -308,7 +347,9 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
                 )}
                 {ex.en && <span className="gram-ex-en">{ex.en}</span>}
                 <span className="gram-ex-own-row">
-                  <span className="gram-ex-own-tag">{t('grammar.examples.own.tag')}</span>
+                  <span className="gram-ex-own-tag">
+                    {ex.generated ? t('aiTutor.examples.generatedTag') : t('grammar.examples.own.tag')}
+                  </span>
                   <button
                     type="button"
                     className="gram-ex-own-remove"
@@ -333,7 +374,21 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
           <button className="gram-more-btn" onClick={() => setImportOpen(true)}>
             {t('grammar.examples.own.add')}
           </button>
+          {!aiExamplesOpen && (
+            <button type="button" className="gram-more-btn ai-tutor-entry" data-ai-entry onClick={() => setAiExamplesOpen(true)}>
+              {t('aiTutor.examples.button')}
+            </button>
+          )}
         </div>
+        {aiExamplesOpen && (
+          <Suspense fallback={null}>
+            <GrammarExamplesAi
+              point={point}
+              existing={[...point.examples, ...ownExamples]}
+              onClose={() => setAiExamplesOpen(false)}
+            />
+          </Suspense>
+        )}
         <ContentImportDialog<ExampleImportRow>
           open={importOpen}
           onClose={() => setImportOpen(false)}
@@ -433,10 +488,35 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
                   <span className="gram-ex-en muted">
                     {t(SIGHTING_SOURCE_KEYS[sighting.source])}
                     {sighting.word ? <span lang={contentLangOf(point.lang)}> · {sighting.word}</span> : null}
+                    {sightingVerdicts.has(sighting.id) && (
+                      <span
+                        className={`ai-tutor-tag ${sightingVerdicts.get(sighting.id)?.uses ? 'is-yes' : 'is-no'}`}
+                        title={sightingVerdicts.get(sighting.id)?.note || undefined}
+                      >
+                        {t(sightingVerdicts.get(sighting.id)?.uses ? 'aiTutor.sightings.confirmed' : 'aiTutor.sightings.rejected')}
+                      </span>
+                    )}
                   </span>
                 </li>
               ))}
             </ul>
+            {/* Off until pressed: the AI only labels sightings, it never hides one. */}
+            {!aiSightingsOpen ? (
+              <div className="gram-more-actions" data-ai-entry>
+                <button type="button" className="gram-more-btn ai-tutor-entry" onClick={() => setAiSightingsOpen(true)}>
+                  {t('aiTutor.sightings.button')}
+                </button>
+              </div>
+            ) : (
+              <Suspense fallback={null}>
+                <GrammarSightingsAi
+                  point={point}
+                  sightings={sightings}
+                  onVerdicts={setSightingVerdicts}
+                  onClose={() => setAiSightingsOpen(false)}
+                />
+              </Suspense>
+            )}
           </>
         )}
         {(point.examples.some((ex) => ex.source === 'tatoeba') ||

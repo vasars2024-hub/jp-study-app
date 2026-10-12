@@ -3,6 +3,7 @@ import { app } from 'electron';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   AGENT_WORKSPACE_RELATIVE_PATH,
+  capAgentWorkspaceHistory,
   emptyAgentWorkspaceState,
   isAgentQueryProvenancedCard,
   normalizeAgentWorkspaceState,
@@ -94,10 +95,12 @@ function retainedConversation(conversation: AgentConversation): AgentConversatio
  */
 export function prepareAgentWorkspaceForPersistence(value: unknown): AgentWorkspaceState {
   const normalized = normalizeAgentWorkspaceState(value);
-  return {
+  // The size cap runs on what will actually be written: retention filtering first, so
+  // session-only context never counts against (or survives in) the on-disk budget.
+  return capAgentWorkspaceHistory({
     ...normalized,
     conversations: normalized.conversations.map(retainedConversation),
-  };
+  });
 }
 
 function readFile(filePath: string): AgentWorkspaceState {

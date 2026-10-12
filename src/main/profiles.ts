@@ -13,6 +13,7 @@ import type {
   ProfileSnapshot,
   ProfileStoreSchema,
   StudyProfile,
+  StudyProfilePatch,
 } from '../shared/profiles';
 import {
   CARD_CONTENTS,
@@ -359,7 +360,7 @@ export class ProfileStore {
 
   // ----- UPDATE (T8) -------------------------------------------------------------------
 
-  updateProfile(id: ProfileId, patch: Partial<StudyProfile>): MutationResult {
+  updateProfile(id: ProfileId, patch: StudyProfilePatch): MutationResult {
     const reject = (error: string): MutationResult => ({
       ok: false,
       error,

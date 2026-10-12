@@ -1040,6 +1040,7 @@ describe('Agent execution IPC', () => {
             sensitivity: 'ordinary',
             retained: true,
             createdAt: 40,
+            preview: '',
           },
           {
             id: 'ctx-origin',
@@ -1049,6 +1050,7 @@ describe('Agent execution IPC', () => {
             sensitivity: 'ordinary',
             retained: true,
             createdAt: 20,
+            preview: '',
           },
         ],
         providerContextIds: ['ctx-word'],
@@ -1091,6 +1093,7 @@ describe('Agent execution IPC', () => {
             sensitivity: 'ordinary',
             retained: true,
             createdAt: 10,
+            preview: '',
           },
           {
             id: 'ctx-live',
@@ -1100,6 +1103,7 @@ describe('Agent execution IPC', () => {
             sensitivity: 'ordinary',
             retained: true,
             createdAt: 20,
+            preview: '',
           },
         ],
         providerContextIds: ['ctx-old', 'ctx-live'],
@@ -1150,6 +1154,7 @@ describe('Agent execution IPC', () => {
             sensitivity: 'ordinary',
             retained: true,
             createdAt: 100,
+            preview: '',
           },
           {
             id: 'ctx-origin-a',
@@ -1159,6 +1164,7 @@ describe('Agent execution IPC', () => {
             sensitivity: 'ordinary',
             retained: true,
             createdAt: 10,
+            preview: '',
           },
           {
             id: 'ctx-origin-b',
@@ -1168,6 +1174,7 @@ describe('Agent execution IPC', () => {
             sensitivity: 'ordinary',
             retained: true,
             createdAt: 20,
+            preview: '',
           },
         ],
         providerContextIds: ['ctx-word', 'ctx-origin-a', 'ctx-origin-b'],

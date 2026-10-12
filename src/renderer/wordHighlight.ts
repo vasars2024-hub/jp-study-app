@@ -91,6 +91,8 @@ export function highlightEl(root: HTMLElement, force = false): void {
         const span = root.ownerDocument.createElement('span');
         span.className = `wk wk-${getLevel(tk.lemma)}`;
         span.setAttribute('data-lemma', tk.lemma);
+        // Names never count as the unknown word of an i+1 sentence or against coverage.
+        if (tk.proper) span.setAttribute('data-proper', '');
         span.textContent = tk.surface;
         frag.appendChild(span);
         any = true;

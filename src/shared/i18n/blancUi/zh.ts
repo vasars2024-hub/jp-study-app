@@ -116,7 +116,7 @@ export const BLANC_UI_ZH: Catalog = {
   'blanc.shell.hide': '隐藏',
   'blanc.shell.exit': '退出 Blanc',
   'blanc.shell.back': '返回',
-  'blanc.shell.searchTitle': '搜索 Blanc（Ctrl+F）',
+  'blanc.shell.searchTitle': '搜索 Blanc',
   'blanc.shell.search': '搜索 Blanc',
   'blanc.shell.contextTools': '上下文工具',
   'blanc.shell.exitFullscreenWorkspace': '退出全屏工作区',

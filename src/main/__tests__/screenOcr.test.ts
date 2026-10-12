@@ -82,8 +82,13 @@ const h = vi.hoisted(() => {
     throws: null as Error | null,
   };
 
-  return { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr, downloads };
+  /** The study language main reads the Lens in. */
+  const study = { lang: 'ja' };
+
+  return { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr, downloads, study };
 });
+
+vi.mock('../studyLanguage', () => ({ getMainStudyLang: () => h.study.lang }));
 
 vi.mock('electron', () => ({
   screen: {
@@ -132,6 +137,10 @@ const { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr, downlo
 /** The two-monitor default, restored per test — the display list is mutable. */
 const DEFAULT_DISPLAYS = displays.map((d) => ({ ...d }));
 const {
+  clearOcrCache,
+  ocrCacheSize,
+  OCR_CACHE_LIMIT,
+  captureScale,
   regionToPixels,
   pickScreenSource,
   decideZoom,
@@ -179,6 +188,9 @@ beforeEach(() => {
   state.sourcesThrow = null;
   state.sources = null;
   displays.splice(0, displays.length, ...DEFAULT_DISPLAYS.map((d) => ({ ...d })));
+  // The fake bitmaps are uniform, so equal-sized crops hash alike across tests.
+  clearOcrCache();
+  h.study.lang = 'ja';
 });
 
 // ---- regionToPixels: clamping and validation ---------------------------
@@ -502,11 +514,22 @@ describe('ocrRegion — DIP mapping', () => {
     // display 2 has scaleFactor 2. The source has to carry `display_id: '2'`:
     // the default stub only offers display 1, and this case used to pass by
     // riding the old fallback — i.e. it asserted display 2's scale factor while
-    // capturing display 1's pixels. That fallback is now a refusal.
-    state.sources = [{ display_id: '2', thumbnail: state.thumbnail }];
+    // capturing display 1's pixels. That fallback is now a refusal. Its frame is
+    // the 2560×1440 the capturer actually returns for a 1280×720 @200 % display.
+    state.sources = [{ display_id: '2', thumbnail: fakeImage(2560, 1440) }];
     const res = await ocrRegion({ x: 0, y: 0, width: 300, height: 200 }, 2);
     expect(res.ok).toBe(true);
     expect(res.lines[0].box).toEqual([50, 20, 100, 20]);
+    expect(cropCalls).toEqual([{ x: 0, y: 0, width: 600, height: 400 }]);
+  });
+
+  it('crops and maps by the frame it actually got when the capturer returned a smaller one', async () => {
+    // Asked for 2560×1440, handed 1920×1080 (a capped size): 1.5 px per DIP, not 2.
+    ocr.impl = () => result([line([150, 60, 450, 120])]);
+    state.sources = [{ display_id: '2', thumbnail: fakeImage(1920, 1080) }];
+    const res = await ocrRegion({ x: 100, y: 40, width: 300, height: 200 }, 2);
+    expect(cropCalls).toEqual([{ x: 150, y: 60, width: 450, height: 300 }]);
+    expect(res.lines[0].box).toEqual([100, 40, 200, 40]);
   });
 
   it('never emits a zero-width or zero-height hotspot', async () => {
@@ -547,7 +570,7 @@ describe('ocrRegion — DIP mapping', () => {
         lines: [line([100, 40, 300, 80], '二')],
       },
     });
-    state.sources = [{ display_id: '2', thumbnail: state.thumbnail }];
+    state.sources = [{ display_id: '2', thumbnail: fakeImage(2560, 1440) }];
 
     const res = await ocrRegion({ x: 0, y: 0, width: 300, height: 200 }, 2);
 
@@ -746,5 +769,153 @@ describe('ocrRegion — zoom escalation', () => {
     expect(ocr.calls).toHaveLength(1);
     expect(resizeCalls).toHaveLength(0);
     expect(res.zoom).toBe(1);
+  });
+});
+
+// ---- capture scale (multi-monitor / DPI) ---------------------------------
+
+describe('captureScale', () => {
+  it('uses the display scale factor when the frame matches it', () => {
+    expect(captureScale({ width: 1280, height: 720 }, { width: 2560, height: 1440 }, 2)).toEqual({ x: 2, y: 2 });
+  });
+
+  it('absorbs the rounding of a fractional scale instead of drifting by a pixel', () => {
+    // 2560 px at 175 % is 1462.86 DIP, reported as 1463: the frame is still 2560.
+    expect(captureScale({ width: 1463, height: 823 }, { width: 2560, height: 1440 }, 1.75)).toEqual({ x: 1.75, y: 1.75 });
+  });
+
+  it('follows the frame when the capturer returned a different size than asked', () => {
+    expect(captureScale({ width: 1280, height: 720 }, { width: 1920, height: 1080 }, 2)).toEqual({ x: 1.5, y: 1.5 });
+  });
+
+  it('keeps the axes independent and refuses an empty frame', () => {
+    expect(captureScale({ width: 1000, height: 1000 }, { width: 2000, height: 1500 }, 1)).toEqual({ x: 2, y: 1.5 });
+    expect(captureScale({ width: 1000, height: 1000 }, { width: 0, height: 0 }, 1)).toBeNull();
+  });
+});
+
+// ---- result cache ---------------------------------------------------------
+
+describe('ocrRegion — result cache', () => {
+  it('serves the same pixels read by the same engine from the cache, with a fresh screenshot', async () => {
+    ocr.impl = () => result([line([0, 0, 200, 40], '猫', 0.95)]);
+    const first = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    const second = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1, { includeScreenshot: true });
+    expect(ocr.calls).toHaveLength(1);
+    expect(first.cached).toBeUndefined();
+    expect(second.cached).toBe(true);
+    expect(second.text).toBe('猫');
+    expect(second.screenshotDataUrl).toMatch(/^data:image\/jpeg;base64,/);
+  });
+
+  it('reads again for a different engine, a changed screen, or newly installed models', async () => {
+    ocr.impl = () => result([line([0, 0, 200, 40], '猫', 0.95)]);
+    await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1, { engine: 'web' });
+    state.thumbnail = fakeImage(1920, 1080, 0x33);
+    await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    engines.manga = false;
+    await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    expect(ocr.calls).toHaveLength(4);
+  });
+
+  it('never caches a failed read', async () => {
+    ocr.throws = new Error('onnx session died');
+    await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    ocr.throws = null;
+    ocr.impl = () => result([line([0, 0, 200, 40], '犬', 0.95)]);
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    expect(res.ok).toBe(true);
+    expect(res.cached).toBeUndefined();
+  });
+
+  it('stays bounded, evicting the least recently used read', async () => {
+    ocr.impl = () => result([line([0, 0, 200, 40], '猫', 0.95)]);
+    for (let i = 0; i < OCR_CACHE_LIMIT + 5; i++) {
+      await ocrRegion({ x: 0, y: 0, width: 100 + i, height: 100 }, 1);
+    }
+    expect(ocrCacheSize()).toBe(OCR_CACHE_LIMIT);
+    // The very first read was evicted: reading it again costs a pass.
+    const before = ocr.calls.length;
+    await ocrRegion({ x: 0, y: 0, width: 100, height: 100 }, 1);
+    expect(ocr.calls.length).toBe(before + 1);
+  });
+});
+
+// ---- progress and cancel --------------------------------------------------
+
+describe('ocrRegion — progress and cancel', () => {
+  it('reports capturing, then reading, then refining when it re-reads small text', async () => {
+    let n = 0;
+    ocr.impl = () => {
+      n += 1;
+      return n === 1 ? result([line([0, 0, 100, 8], 'あ', 0.6)]) : result([line([0, 0, 300, 24], 'あいう', 0.95)]);
+    };
+    const stages: string[] = [];
+    await ocrRegion({ x: 0, y: 0, width: 400, height: 200 }, 1, { onStage: (s) => stages.push(s) });
+    expect(stages).toEqual(['capturing', 'reading', 'refining']);
+  });
+
+  it('does not start the second pass once cancelled', async () => {
+    const controller = new AbortController();
+    ocr.impl = () => {
+      controller.abort();
+      return result([line([0, 0, 100, 8], 'あ', 0.6)]);
+    };
+    const res = await ocrRegion({ x: 0, y: 0, width: 400, height: 200 }, 1, { signal: controller.signal });
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('cancelled');
+    expect(ocr.calls).toHaveLength(1);
+    expect(resizeCalls).toHaveLength(0);
+  });
+
+  it('does not read at all when cancelled during the capture', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const res = await ocrRegion({ x: 0, y: 0, width: 400, height: 200 }, 1, { signal: controller.signal });
+    expect(res.error).toBe('cancelled');
+    expect(ocr.calls).toHaveLength(0);
+  });
+});
+
+// ---- the bundled offline recognizer's image -------------------------------
+
+describe('ocrRegion — fallback image while the web model is missing', () => {
+  it('hands a Japanese learner the lossless crop beside the install offer', async () => {
+    engines.paddle = false;
+    state.sources = [{ display_id: '2', thumbnail: fakeImage(2560, 1440) }];
+    const res = await ocrRegion({ x: 10, y: 10, width: 300, height: 100 }, 2, { includeScreenshot: true });
+    expect(res).toMatchObject({ ok: false, available: false, error: 'web-models-missing', downloading: true });
+    expect(res.fallbackImage).toMatchObject({ width: 600, height: 200, dipPerPixelX: 0.5, dipPerPixelY: 0.5 });
+    expect(res.fallbackImage?.dataUrl).toMatch(/^data:image\/png;base64,/);
+    expect(res.hash).toMatch(/^[0-9a-f]{40}$/);
+    expect(res.screenshotDataUrl).toMatch(/^data:image\/jpeg;base64,/);
+    expect(ocr.calls).toHaveLength(0);
+  });
+
+  it('bounds a whole-screen fallback image and scales its mapping with it', async () => {
+    engines.paddle = false;
+    state.thumbnail = fakeImage(3840, 2160);
+    displays.splice(0, 1, { id: 1, bounds: { x: 0, y: 0, width: 3840, height: 2160 }, scaleFactor: 1 });
+    const res = await ocrRegion({ x: 0, y: 0, width: 3840, height: 2160 }, 1);
+    expect(res.fallbackImage).toMatchObject({ width: 2400, height: 1350 });
+    expect(res.fallbackImage!.dipPerPixelX).toBeCloseTo(1.6);
+  });
+
+  it('offers no fallback outside Japanese, whose data is the only one bundled', async () => {
+    engines.paddle = false;
+    h.study.lang = 'zh';
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    expect(res.error).toBe('web-models-missing');
+    expect(res.fallbackImage).toBeUndefined();
+    expect(cropCalls).toEqual([]);
+  });
+
+  it('keeps the offer alone when the capture itself fails', async () => {
+    engines.paddle = false;
+    state.sourcesThrow = new Error('permission denied');
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    expect(res).toMatchObject({ available: false, error: 'web-models-missing' });
+    expect(res.fallbackImage).toBeUndefined();
   });
 });

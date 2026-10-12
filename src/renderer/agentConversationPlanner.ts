@@ -53,6 +53,8 @@ export type AgentConversationPlanFailureCode =
   | 'ai-off'
   | 'cloud-key-missing'
   | 'spend-budget'
+  /** The Agent's cloud opt-in (Settings > AI > What may use the cloud) is off. */
+  | 'cloud-disabled'
   | 'no-approved-actions'
   | 'task-conflict'
   | 'store-failed';
@@ -108,6 +110,8 @@ export type AgentConversationRunResult =
   | {
       ok: false;
       code: AgentConversationRunFailureCode;
+      /** The executor's own sentence for an authorization refusal (English; localize to show). */
+      reason?: string;
       task?: AgentTask;
       stepId?: string;
       events?: AgentExecutionEvent[];
@@ -276,6 +280,7 @@ function planFailureFromResponse(code: LocalAgentPlanFailureCode | undefined): A
     case 'ai-off': return 'ai-off';
     case 'cloud-key-missing': return 'cloud-key-missing';
     case 'spend-budget': return 'spend-budget';
+    case 'cloud-disabled': return 'cloud-disabled';
     default: return 'planner-unavailable';
   }
 }
@@ -605,7 +610,7 @@ export async function runAgentConversationPlan(
             : 'run-failed',
     };
   }
-  if (result.refusal) return { ok: false, code: result.refusal.code };
+  if (result.refusal) return { ok: false, code: result.refusal.code, reason: result.refusal.reason };
   if (result.leaseCommitFailure) {
     // Main has already persisted the row as `running`. Keep that in-doubt state
     // quarantined: the tool may have completed and blind Retry is unsafe.

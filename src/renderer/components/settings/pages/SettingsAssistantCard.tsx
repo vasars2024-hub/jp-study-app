@@ -11,7 +11,7 @@
  * `movedTo: 'files'` entry still routes through `SettingsApp.navigate` and
  * opens the Files app rather than a page that no longer exists.
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
@@ -21,20 +21,31 @@ const STRATEGY_KEY = {
   phrase: 'help.assistant.foundPhrase',
   keywords: 'help.assistant.foundKeywords',
   widest: 'help.assistant.foundWidest',
+  model: 'aiTutor.settings.foundModel',
   none: 'help.assistant.foundNothing',
 } as const;
+
+/**
+ * The optional model fallback, offered only when every keyword pass found
+ * nothing; it can only name real settings (`answerSettingsQuestionWithModel`).
+ */
+const SettingsAssistantAi = lazy(() => import('./SettingsAssistantAi'));
 
 export default function SettingsAssistantCard() {
   const { t } = useT();
   const { advancedMode, navigate } = useSettings();
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<AssistantAnswer | null>(null);
+  const [asked, setAsked] = useState('');
+  const [reasons, setReasons] = useState<Map<string, string>>(() => new Map());
 
   const ask = () => {
     if (!question.trim()) return;
     // Advanced-mode visibility is passed through, so the assistant can never
     // offer a setting the user's current view would refuse to render.
     setAnswer(answerSettingsQuestion(question, t, { advanced: advancedMode }));
+    setAsked(question.trim());
+    setReasons(new Map());
   };
 
   return (
@@ -89,6 +100,9 @@ export default function SettingsAssistantCard() {
                     {t(entry.titleKey)}
                   </button>
                   {entry.descKey ? <span className="muted"> {t(entry.descKey)}</span> : null}
+                  {answer.strategy === 'model' && reasons.get(entry.id) ? (
+                    <span className="muted"> {t('aiTutor.settings.reason', { reason: reasons.get(entry.id) ?? '' })}</span>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -97,6 +111,19 @@ export default function SettingsAssistantCard() {
             // Not a dead end: the thing a user should try next is named, rather
             // than left for them to guess.
             <p className="muted">{t('help.assistant.nothingNext')}</p>
+          )}
+          {answer.strategy === 'none' && asked && (
+            <Suspense fallback={null}>
+              <SettingsAssistantAi
+                key={asked}
+                question={asked}
+                advanced={advancedMode}
+                onAnswer={(next, why) => {
+                  setReasons(why);
+                  setAnswer(next);
+                }}
+              />
+            </Suspense>
           )}
         </div>
       )}

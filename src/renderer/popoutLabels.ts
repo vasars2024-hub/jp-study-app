@@ -52,6 +52,8 @@ export const POPOUT_LABEL_KEYS: Partial<Record<DesktopWinSection, string>> = {
   city: 'palette.section.city',
   immersion: 'palette.section.immersion',
   calendar: 'palette.section.calendar',
+  snips: 'palette.section.snips',
+  conversation: 'palette.section.conversation',
 };
 
 /** Resolves a pop-out window's title in the active UI language. */

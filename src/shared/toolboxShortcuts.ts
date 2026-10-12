@@ -6,6 +6,7 @@ export type ToolboxShortcutCategory =
   | 'Productivity'
   | 'System'
   | 'Language'
+  | 'Study'
   | 'Active Tool';
 
 export type ToolboxShortcutScope =

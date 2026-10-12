@@ -17,7 +17,7 @@
  * modules (`conjugate`, `pitchAccent`, `japaneseNumbers`, `knownWords`) keep in
  * English are mapped to keys here, by id, and resolved at render.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import {
@@ -93,6 +93,13 @@ import { isDownloadedIn, loadDownloaded, onDownloadedChanged } from '../../whisp
 import { getStudyLang, onStudyLangChanged } from '../../studyEnvironment';
 
 type TFn = ReturnType<typeof useT>['t'];
+
+/**
+ * "Explain my mistake" (optional AI, `BlancAiAssist.tsx`). Loaded on the first
+ * press of the button and never before: Blanc is the low-RAM mode. The button
+ * carries `data-ai-entry`, so it is hidden while "Use AI features" is off.
+ */
+const BlancMistakeAi = lazy(() => import('./BlancAiAssist').then((m) => ({ default: m.BlancMistakeAi })));
 
 type FuriganaFormat = 'ruby' | 'brackets' | 'kana';
 
@@ -316,8 +323,24 @@ export function BlancCounterPanel() {
   const { t } = useT();
   const [text, setText] = useState('');
   const [spoke, setSpoke] = useState('');
+  // Test yourself (off by default): the reading stays hidden until a guess is checked.
+  const [testMode, setTestMode] = useState(false);
+  const [guess, setGuess] = useState('');
+  const [guessVerdict, setGuessVerdict] = useState<'right' | 'wrong' | null>(null);
+  const [mistakeOpen, setMistakeOpen] = useState(false);
 
   const readings = useMemo<NumberReading[]>(() => readInput(text), [text]);
+  const target = readings[0] ?? null;
+  useEffect(() => {
+    setGuess('');
+    setGuessVerdict(null);
+    setMistakeOpen(false);
+  }, [target?.surface, target?.reading]);
+  const checkGuess = (): void => {
+    if (!target || !guess.trim()) return;
+    setGuessVerdict(checkAnswer(guess, target.reading) ? 'right' : 'wrong');
+    setMistakeOpen(false);
+  };
 
   // A bare number is the case where "every counter at once" is the useful view.
   const counterTable = useMemo<NumberReading[]>(() => {
@@ -358,9 +381,63 @@ export function BlancCounterPanel() {
               {ex}
             </button>
           ))}
+          <button type="button" aria-pressed={testMode} className={testMode ? 'active' : ''} onClick={() => setTestMode((on) => !on)}>
+            {t('aiTutor.blanc.testMe')}
+          </button>
         </div>
       </fieldset>
 
+      {testMode && target && (
+        <fieldset>
+          <legend>{t('aiTutor.blanc.testLegend', { phrase: target.surface })}</legend>
+          <div className="blanc-command-row">
+            <input
+              type="text"
+              lang="ja"
+              value={guess}
+              aria-label={t('aiTutor.blanc.testLabel')}
+              placeholder={t('blanc.native.conj.placeholder')}
+              onChange={(e) => {
+                setGuess(e.target.value);
+                setGuessVerdict(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+                if (e.key === 'Enter') checkGuess();
+              }}
+            />
+            <button type="button" disabled={!guess.trim()} onClick={checkGuess}>
+              {t('blanc.native.conj.check')}
+            </button>
+          </div>
+          {guessVerdict === 'right' && <p className="blanc-drill-right">{t('blanc.native.conj.correct')}</p>}
+          {guessVerdict === 'wrong' && (
+            <>
+              <p className="blanc-drill-wrong"><span lang="ja">{target.reading}</span></p>
+              {!mistakeOpen ? (
+                <button type="button" data-ai-entry onClick={() => setMistakeOpen(true)}>
+                  {t('aiTutor.blanc.explainMistake')}
+                </button>
+              ) : (
+                <Suspense fallback={null}>
+                  <BlancMistakeAi
+                    kind="counter"
+                    word={target.surface}
+                    reading={target.reading}
+                    meaning=""
+                    task={readingLabel(t, target.label)}
+                    expected={target.reading}
+                    typed={guess.trim()}
+                    onClose={() => setMistakeOpen(false)}
+                  />
+                </Suspense>
+              )}
+            </>
+          )}
+        </fieldset>
+      )}
+
+      {(!testMode || guessVerdict !== null || !target) && (
       <fieldset>
         <legend>{t('blanc.native.counter.legend.reading')}</legend>
         {readings.length ? (
@@ -386,8 +463,9 @@ export function BlancCounterPanel() {
           </p>
         )}
       </fieldset>
+      )}
 
-      {counterTable.length > 0 && (
+      {counterTable.length > 0 && (!testMode || guessVerdict !== null) && (
         <fieldset>
           <legend>{t('blanc.native.counter.legend.all')}</legend>
           <ul className="blanc-reading-list">
@@ -484,12 +562,14 @@ export function BlancConjugationPanel() {
   const [verdict, setVerdict] = useState<'right' | 'wrong' | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [score, setScore] = useState({ right: 0, total: 0 });
+  const [mistakeOpen, setMistakeOpen] = useState(false);
 
   const draw = useCallback(() => {
     setQuestion(nextQuestion(classes, forms));
     setAnswer('');
     setVerdict(null);
     setRevealed(false);
+    setMistakeOpen(false);
   }, [classes, forms]);
 
   // Draw the first question, and redraw whenever the pool changes so the shown
@@ -562,6 +642,26 @@ export function BlancConjugationPanel() {
                 <span lang="ja">{question.answer}</span>
               </p>
             )}
+            {verdict === 'wrong' && (!mistakeOpen ? (
+              <div className="blanc-status-row">
+                <button type="button" data-ai-entry onClick={() => setMistakeOpen(true)}>
+                  {t('aiTutor.blanc.explainMistake')}
+                </button>
+              </div>
+            ) : (
+              <Suspense fallback={null}>
+                <BlancMistakeAi
+                  kind="conjugation"
+                  word={question.dict}
+                  reading={question.reading}
+                  meaning={question.meaning}
+                  task={`${formSpec ? t(FORM_LABEL_KEYS[formSpec.id]) : question.form} (${formSpec?.japanese ?? ''})`}
+                  expected={question.answer}
+                  typed={answer.trim()}
+                  onClose={() => setMistakeOpen(false)}
+                />
+              </Suspense>
+            ))}
             {!verdict && (
               <div className="blanc-status-row">
                 <button type="button" onClick={() => setRevealed(true)}>

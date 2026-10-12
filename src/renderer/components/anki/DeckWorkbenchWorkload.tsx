@@ -18,7 +18,7 @@
  * proposal changes. A single "reviews per day" that blended them would be the
  * one lie this recipe is placed to avoid.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type JSX } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   DEFAULT_FORECAST_DAYS,

@@ -14,6 +14,24 @@
   opacity: 0.8;
 }
 
+/* Quiet hours: a nightly Do-not-disturb window (notificationStore `QuietHours`). */
+.os-notif-schedule-on {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  cursor: pointer;
+}
+.os-notif-schedule-time {
+  min-height: 24px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
 .os-notif-group + .os-notif-group {
   margin-top: 10px;
 }

@@ -6,6 +6,7 @@ import {
   defaultWhisperTier,
   isWhisperModelTier,
   whisperSpec,
+  whisperTierForLang,
   type WhisperModelTier,
 } from '../shared/whisperModels';
 
@@ -42,14 +43,29 @@ export function onWhisperDeviceChanged(cb: (device: WhisperDevice) => void): () 
   return () => window.removeEventListener(DEVICE_EVENT, handler);
 }
 
-export function loadWhisperModelTier(lang: 'ja' | 'zh' | 'ru' = 'ja'): WhisperModelTier {
+/**
+ * The tier to run for `lang`, and the one the user picked when that differs.
+ *
+ * The Settings choice is global; a tier that cannot transcribe `lang` (the
+ * Japanese-only kotoba-whisper for Chinese audio) is replaced by a multilingual
+ * one, preferring one `isDownloaded` says is already on disk.
+ */
+export function whisperTierPlan(
+  lang: 'ja' | 'zh' | 'ru' = 'ja',
+  isDownloaded?: (tier: WhisperModelTier) => boolean,
+): { tier: WhisperModelTier; picked: WhisperModelTier } {
+  let picked = defaultWhisperTier(lang);
   try {
     const raw = localStorage.getItem(MODEL_KEY);
-    if (isWhisperModelTier(raw)) return raw;
+    if (isWhisperModelTier(raw)) picked = raw;
   } catch {
     /* ignore */
   }
-  return defaultWhisperTier(lang);
+  return { tier: whisperTierForLang(picked, lang, isDownloaded), picked };
+}
+
+export function loadWhisperModelTier(lang: 'ja' | 'zh' | 'ru' = 'ja'): WhisperModelTier {
+  return whisperTierPlan(lang).tier;
 }
 
 export function setWhisperModelTier(tier: WhisperModelTier): void {

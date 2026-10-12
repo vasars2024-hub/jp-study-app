@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../../i18n';
 import { confirmDialog, Select, Toggle } from '../../ui';
 import GlobalChordRow from '../GlobalChordRow';
+import SnipSettingsForm from '../../snip/SnipSettingsForm';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { ReadingLensStatus } from '../../../../main/readingLens';
 import type { ReadingLensSource } from '../../../../shared/readingLens';
@@ -475,6 +476,15 @@ export default function ReadingLensSection() {
       />
 
       <LensCaptureHistory />
+
+      {/* Snip to cards: Win+Shift+S anywhere → OCR → the unknown words as cards. */}
+      <h4 className="snip-settings-heading" style={{ margin: '18px 0 6px' }}>{t('snip.settings.title')}</h4>
+      <SnipSettingsForm />
+      <div className="os-viz-row" style={{ marginTop: 8 }}>
+        <button type="button" className="btn small" onClick={() => void window.api.snipOpen(null)}>
+          {t('snip.settings.open')}
+        </button>
+      </div>
     </>
   );
 }

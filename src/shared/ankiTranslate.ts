@@ -216,7 +216,7 @@ export function buildTranslatePrompt(
 ): string {
   const lines = notes.map((note, index) => `${index + 1}. ${note.text}`);
   return [
-    'You translate flashcard field text for a Japanese study application.',
+    'You translate flashcard field text for a language study application.',
     `Translate every numbered text into the language with code: ${request.targetLanguage}.`,
     `Give exactly ${request.variantCount} distinct alternative translation(s) per text; a user picks one.`,
     'Translate meaning, not word order. Keep it short enough to read on a flashcard.',

@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * A production snapshot of the app for the e2e harness, built into tools/e2e/out/app.
+ * A production snapshot of the app for the e2e harness. run.cjs builds each snapshot into
+ * its own directory (tools/e2e/out/builds/<build-id>/app, via `--out=<dir>`), so a rebuild
+ * never touches a snapshot another run is executing (tools/e2e/isolation.cjs). Run on its
+ * own without `--out`, it still writes tools/e2e/out/app.
  *
  * Why not `npm start`: the dev server serves the LIVE tree, and this repo is edited by
  * several agents at once — another agent's save reloads the harness's page mid-flow
@@ -34,33 +37,33 @@ async function loadVitePluginConfig() {
   return plugin.config;
 }
 
-function retarget(outDir) {
+function retarget(outDir, appDir) {
   const rel = String(outDir ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
   if (!rel.startsWith('.vite/')) throw new Error(`unexpected outDir ${outDir}`);
-  return path.join(APP, rel);
+  return path.join(appDir, rel);
 }
 
-async function build() {
+async function build(appDir = APP) {
   const t0 = Date.now();
   const vite = require(path.join(REPO, 'node_modules', 'vite'));
   const ViteConfigGenerator = require(path.join(REPO, 'node_modules', '@electron-forge', 'plugin-vite', 'dist', 'ViteConfig.js')).default;
   const pluginConfig = await loadVitePluginConfig();
   const generator = new ViteConfigGenerator(pluginConfig, REPO, true);
 
-  fs.rmSync(path.join(APP, '.vite'), { recursive: true, force: true });
-  fs.mkdirSync(APP, { recursive: true });
+  fs.rmSync(path.join(appDir, '.vite'), { recursive: true, force: true });
+  fs.mkdirSync(appDir, { recursive: true });
 
   // Renderer first: the main build's defines name the renderer entries.
   const renderers = await generator.getRendererConfig();
   for (const config of renderers) {
-    config.build = { ...config.build, outDir: retarget(config.build?.outDir) };
+    config.build = { ...config.build, outDir: retarget(config.build?.outDir, appDir) };
     config.logLevel = 'warn';
     console.log(`[e2e build] renderer -> ${path.relative(REPO, config.build.outDir)}`);
     await vite.build(config);
   }
   const builds = await generator.getBuildConfigs();
   for (const config of builds) {
-    config.build = { ...config.build, outDir: retarget(config.build?.outDir) };
+    config.build = { ...config.build, outDir: retarget(config.build?.outDir, appDir) };
     config.logLevel = 'warn';
     const entry = config.build?.lib?.entry ?? config.build?.rollupOptions?.input;
     console.log(`[e2e build] ${typeof entry === 'string' ? path.relative(REPO, entry) : JSON.stringify(entry)} -> ${path.relative(REPO, config.build.outDir)}`);
@@ -69,10 +72,10 @@ async function build() {
 
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
   fs.writeFileSync(
-    path.join(APP, 'package.json'),
+    path.join(appDir, 'package.json'),
     JSON.stringify({ name: pkg.name, productName: pkg.productName, version: pkg.version, main: '.vite/build/main.js', private: true }, null, 2),
   );
-  fs.writeFileSync(path.join(APP, 'build-info.json'), JSON.stringify({ builtAt: new Date().toISOString(), ms: Date.now() - t0 }, null, 2));
+  fs.writeFileSync(path.join(appDir, 'build-info.json'), JSON.stringify({ builtAt: new Date().toISOString(), ms: Date.now() - t0 }, null, 2));
   console.log(`[e2e build] done in ${Math.round((Date.now() - t0) / 1000)} s`);
 }
 
@@ -81,10 +84,10 @@ async function build() {
  * the app runs (`run.cjs` links before launch and unlinks at teardown): a junction left in
  * tools/e2e/out is a trap for any recursive delete that follows it into the repo.
  */
-function linkResources() {
+function linkResources(appDir = APP) {
   for (const name of LINKS) {
     const target = path.join(REPO, name);
-    const link = path.join(APP, name);
+    const link = path.join(appDir, name);
     if (!fs.existsSync(target)) continue;
     try {
       fs.lstatSync(link);
@@ -92,14 +95,18 @@ function linkResources() {
     } catch {
       /* not there yet */
     }
-    fs.symlinkSync(target, link, 'junction');
+    try {
+      fs.symlinkSync(target, link, 'junction');
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err; // another run linked it a moment ago
+    }
   }
 }
 
 /** Remove the junctions themselves (never what they point at). */
-function unlinkResources() {
+function unlinkResources(appDir = APP) {
   for (const name of LINKS) {
-    const link = path.join(APP, name);
+    const link = path.join(appDir, name);
     let isLink = false;
     try {
       isLink = fs.lstatSync(link).isSymbolicLink();
@@ -118,7 +125,8 @@ function unlinkResources() {
 }
 
 if (require.main === module) {
-  build().catch((err) => {
+  const out = process.argv.slice(2).find((a) => a.startsWith('--out='));
+  build(out ? path.resolve(out.slice('--out='.length)) : APP).catch((err) => {
     console.error(err);
     process.exitCode = 1;
   });

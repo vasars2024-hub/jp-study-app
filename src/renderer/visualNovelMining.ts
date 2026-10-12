@@ -36,6 +36,14 @@ import { getTranslateTarget } from './translateTarget';
 import { mineToStudy } from './studyMining';
 import { getStudyLang } from './studyEnvironment';
 import { studyLangFromTag, studyLangOfText } from '../shared/studyLang';
+import {
+  vn5ContextAfter,
+  vn5ContextBefore,
+  vn5ContextText,
+  vn5ScreenshotFor,
+  type Vn5StudyPrefs,
+} from '../shared/visualNovelStudy5';
+import { loadVn5StudyPrefs } from './visualNovelStudy5Prefs';
 
 /** The media-item shape the deck and study stores key VN cards by (`vn:<id>`). */
 export function visualNovelMediaItem(entry: Pick<VisualNovelEntry, 'id' | 'title' | 'executablePath' | 'language' | 'createdAt'>): MediaItem {
@@ -63,7 +71,20 @@ export function visualNovelMediaItem(entry: Pick<VisualNovelEntry, 'id' | 'title
 export async function mineVisualNovelLine(
   entry: Pick<VisualNovelEntry, 'id' | 'title' | 'executablePath' | 'language' | 'createdAt'>,
   capture: VisualNovelTextCapture,
+  /**
+   * The novel's lines in reading order (oldest first). With them the card gets
+   * the previous line or two as context, and a screenshot captured just before
+   * the line when it has none of its own (both per the study preferences).
+   */
+  options: { captures?: readonly VisualNovelTextCapture[]; prefs?: Vn5StudyPrefs } = {},
 ): Promise<boolean> {
+  const prefs = options.prefs ?? loadVn5StudyPrefs();
+  const captures = options.captures ?? [];
+  const contextBefore = vn5ContextText(vn5ContextBefore(captures, capture.id, prefs.contextLines));
+  const contextAfter = vn5ContextText(vn5ContextAfter(captures, capture.id, prefs.contextAfterLines));
+  const screenshot = prefs.attachScreenshot
+    ? capture.screenshotPath || vn5ScreenshotFor(captures, capture.id)
+    : '';
   const item = visualNovelMediaItem(entry);
   const japanese = capture.japanese.trim();
   if (!japanese) return false;
@@ -88,8 +109,10 @@ export async function mineVisualNovelLine(
     studyKind: 'sentence',
     // The game's own language when it names one, else the line's script.
     studyLang: studyLangFromTag(entry.language) ?? studyLangOfText(japanese, getStudyLang()),
-    imagePath: capture.screenshotPath || undefined,
+    imagePath: screenshot || undefined,
     audioPath: capture.audioPath || undefined,
+    contextBefore: contextBefore || undefined,
+    contextAfter: contextAfter || undefined,
   });
   return mined.created;
 }

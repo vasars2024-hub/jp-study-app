@@ -15,11 +15,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const translateTo = vi.fn(async (): Promise<string> => {
+const translateTo = vi.fn(async (..._args: unknown[]): Promise<string> => {
   throw new Error('offline model not installed');
 });
 vi.mock('../translator', () => ({
-  translateTo: (...args: unknown[]) => translateTo(...(args as [])),
+  translateTo: (...args: unknown[]) => translateTo(...args),
   onModelProgress: () => () => undefined,
 }));
 

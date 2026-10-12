@@ -33,7 +33,13 @@ import {
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { refuseWhileLocked } from './lockGuard';
-import { ocrClipboardImage, ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
+import {
+  ocrClipboardImage,
+  ocrRegion,
+  type LensOcrResult,
+  type LensOcrStage,
+  type RegionRect,
+} from './screenOcr';
 import { coverDisplay } from './screenSources';
 import {
   getGlobalCommandChord,
@@ -190,6 +196,8 @@ let openedMode: LensOpenMode = 'select';
 let lensDisplayId = 0;
 let lastTriggerAt = 0;
 let pendingInit: LensInit | null = null;
+/** The running scan of each lens window, by webContents id, so Cancel can stop it. */
+const activeScans = new Map<number, AbortController>();
 
 export function configureReadingLens(opts: {
   rendererUrl: RendererUrlFn;
@@ -645,10 +653,26 @@ export function registerReadingLensIpc(): void {
 
   ipcMain.handle('lens:getInit', (): LensInit | null => pendingInit);
 
-  ipcMain.handle('lens:ocr', async (_e, region: unknown): Promise<LensOcrResult> => {
+  ipcMain.handle('lens:ocr', async (e, region: unknown): Promise<LensOcrResult> => {
     const r = (region ?? {}) as Partial<RegionRect> & {
       engine?: 'auto' | 'manga' | 'web';
       includeScreenshot?: boolean;
+      /** The renderer's id for this scan, echoed on every progress event. */
+      scanId?: unknown;
+    };
+    // One scan per lens window: a new one supersedes (and stops) the last.
+    const sender = (e as Partial<Electron.IpcMainInvokeEvent>).sender;
+    const senderId = typeof sender?.id === 'number' ? sender.id : -1;
+    activeScans.get(senderId)?.abort();
+    const controller = new AbortController();
+    activeScans.set(senderId, controller);
+    const scanId = typeof r.scanId === 'number' && Number.isFinite(r.scanId) ? r.scanId : 0;
+    const onStage = (stage: LensOcrStage): void => {
+      try {
+        if (sender && !sender.isDestroyed()) sender.send('lens:ocrProgress', { scanId, stage });
+      } catch {
+        /* the lens closed mid-scan */
+      }
     };
     const rect: RegionRect = {
       x: Number(r.x) || 0,
@@ -670,10 +694,27 @@ export function registerReadingLensIpc(): void {
       saveSettings();
       broadcastSettings();
     }
-    return ocrRegion(rect, lensDisplayId, {
-      engine: r.engine ?? 'auto',
-      includeScreenshot: r.includeScreenshot === true,
-    });
+    try {
+      return await ocrRegion(rect, lensDisplayId, {
+        engine: r.engine ?? 'auto',
+        includeScreenshot: r.includeScreenshot === true,
+        signal: controller.signal,
+        onStage,
+      });
+    } finally {
+      if (activeScans.get(senderId) === controller) activeScans.delete(senderId);
+    }
+  });
+
+  // The reader's Cancel (and Escape): stops the window's running scan before
+  // its next pass. Only the sender's own scan — a window cannot stop another's.
+  ipcMain.handle('lens:ocrCancel', (e): boolean => {
+    const senderId = (e as Partial<Electron.IpcMainInvokeEvent>).sender?.id ?? -1;
+    const controller = activeScans.get(senderId);
+    if (!controller) return false;
+    controller.abort();
+    activeScans.delete(senderId);
+    return true;
   });
 
   // Renderer toggles pass-through: interactive over hotspots/chrome, click-through

@@ -64,6 +64,7 @@ import {
   findLexiconXrefs,
   findSemanticNeighbors,
   lookup,
+  missingSourceDictionaries,
   type CollocationQuery,
   type CompoundQuery,
   type DictLangCode,
@@ -84,6 +85,7 @@ import {
   type ChineseLookupDeps,
 } from './chineseLookup';
 import { listUserNotes, readUserNote, writeUserNote } from './notes';
+import { reportCedictMissing } from './cedictMissingNotice';
 import { chineseReadings, russianReadings } from './readingAid';
 import { getMainChineseScript } from '../studyLanguage';
 import type { ReadingAidLang, ReadingAidResult } from '../../shared/readingAid';
@@ -718,7 +720,36 @@ const chineseDeps: ChineseLookupDeps = {
   },
   loadCedictText,
   script: () => getMainChineseScript(),
+  // risk4: the first lookup with no Chinese dictionary at all offers the download.
+  onMissing: () => {
+    reportCedictMissing();
+  },
 };
+
+/**
+ * Whether any Chinese dictionary can answer: the downloaded CC-CEDICT, a
+ * bundled copy (dev / older installs), or a Chinese dictionary imported into
+ * the database. The renderer asks at startup when the study language is
+ * Chinese, and prompts once when nothing can (risk4).
+ */
+export async function chineseDictionaryAvailable(): Promise<boolean> {
+  try {
+    const downloads = await import('../downloads');
+    if (downloads.isInstalled('cc-cedict')) return true;
+  } catch {
+    /* downloads unavailable: check the other two */
+  }
+  try {
+    if (fs.existsSync(bundledCedictPath())) return true;
+  } catch {
+    /* no app paths (tests) */
+  }
+  try {
+    return missingSourceDictionaries(dictionaryDb(), ['zh']).length === 0;
+  } catch {
+    return false;
+  }
+}
 
 /** Look a Chinese term up. Database first, CC-CEDICT file second. */
 export function lookupChineseInDictionary(query: string, limit?: number): Promise<DictResult> {

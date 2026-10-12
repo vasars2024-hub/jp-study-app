@@ -1,4 +1,4 @@
-import type { AiProviderId } from './aiProviders';
+import { AI_PROVIDERS, type AiProviderId } from './aiProviders';
 import { normalizeAgentProviderPrice } from './agentProviderPricing';
 import {
   AGENT_HISTORY_TURN_CEILING,
@@ -46,6 +46,12 @@ export interface AgentExecutionRequest {
   policy: AgentProviderPolicy;
   allowLocalFallback: boolean;
   attachments: AgentExecutionAttachment[];
+  /**
+   * The user's "share study data with cloud models" answer (Agent settings),
+   * read at send. Optional on the wire; anything but `true` means "do not
+   * share", and main enforces it before a cloud request is built.
+   */
+  shareStudyData?: boolean;
 }
 
 /**
@@ -135,11 +141,13 @@ export const AGENT_EXECUTION_OUTPUT_BUDGET_MAX = 16_384;
 export const AGENT_EXECUTION_DEFAULT_INPUT_BUDGET = 50_000;
 export const AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET = 1_500;
 
-const CLOUD_PROVIDERS = new Set<AiProviderId>([
-  'gemini-2.5-flash',
-  'deepseek-v4-flash',
-  'deepseek-v4-pro',
-]);
+/**
+ * Every provider the runtime can route. This was a hand-kept copy of the first
+ * three rows, so Claude, OpenAI and a local OpenAI-compatible server — added to
+ * the provider table — were refused here as `invalid-request` before main ever
+ * looked at them.
+ */
+const CLOUD_PROVIDERS: ReadonlySet<AiProviderId> = new Set(AI_PROVIDERS.map((provider) => provider.id));
 
 const FAILURE_CODES = new Set<AgentExecutionFailureCode>([
   'invalid-request',
@@ -489,6 +497,7 @@ export function normalizeAgentExecutionRequest(value: unknown): AgentExecutionRe
     policy,
     allowLocalFallback: raw.allowLocalFallback === true,
     attachments,
+    ...(raw.shareStudyData === true ? { shareStudyData: true } : {}),
   };
 }
 

@@ -8,6 +8,8 @@
  * flag (future-ready: it suppresses the tray badge, history is still kept).
  */
 
+import { writeLocalStorage } from './localStorageWrite';
+
 export type NotificationKind = 'default' | 'success' | 'warning' | 'error' | 'info';
 export type NotificationPriority = 'low' | 'normal' | 'high';
 
@@ -33,7 +35,13 @@ export interface ShellNotification {
   i18n?: NotificationI18n;
 }
 
-export type NotificationClientAction = 'extension-settings' | 'open-calendar' | 'open-shortcuts' | 'restart-to-update';
+export type NotificationClientAction =
+  | 'extension-settings'
+  | 'open-calendar'
+  | 'open-shortcuts'
+  | 'restart-to-update'
+  /** risk4: start the CC-CEDICT download (renderer/cedictMissingPrompt.ts). */
+  | 'download-cedict';
 
 export interface NotificationI18n {
   title?: string;
@@ -97,10 +105,83 @@ export function dndUntil(now = Date.now()): number | null {
   return Number.isFinite(until) && until > now ? until : null;
 }
 
+/** The switch or a timed period — what the Do not disturb toggle shows and turns off. */
+export function isManualDnd(now = Date.now()): boolean {
+  return readDndRaw() === '1' || dndUntil(now) !== null;
+}
+
+/** Quiet now, for any reason: the switch, a timed period, or the nightly schedule. */
 export function isDnd(now = Date.now()): boolean {
-  const raw = readDndRaw();
-  if (raw === '1') return true;
-  return dndUntil(now) !== null;
+  return isManualDnd(now) || inQuietHours(now);
+}
+
+/* ------------------------------------------------------------------ *
+ * Quiet hours — Do not disturb on a daily schedule.
+ *
+ * The manual switch and the timed "for 1 hour / until morning" periods cover a
+ * moment; a nightly window covers every night without remembering to press
+ * anything. It feeds `isDnd`, so everything that already respects Do not
+ * disturb (sounds, the badge, pop-ups, calendar reminder banners) respects it.
+ * ------------------------------------------------------------------ */
+
+export interface QuietHours {
+  on: boolean;
+  /** Local `HH:MM`. An end earlier than the start wraps past midnight. */
+  start: string;
+  end: string;
+}
+
+const LS_QUIET_HOURS = 'jp-os-quiet-hours';
+export const DEFAULT_QUIET_HOURS: QuietHours = { on: false, start: '22:00', end: '07:00' };
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function loadQuietHours(): QuietHours {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_QUIET_HOURS) ?? 'null') as Partial<QuietHours> | null;
+    if (!raw || typeof raw !== 'object') return { ...DEFAULT_QUIET_HOURS };
+    return {
+      on: raw.on === true,
+      start: typeof raw.start === 'string' && HHMM.test(raw.start) ? raw.start : DEFAULT_QUIET_HOURS.start,
+      end: typeof raw.end === 'string' && HHMM.test(raw.end) ? raw.end : DEFAULT_QUIET_HOURS.end,
+    };
+  } catch {
+    return { ...DEFAULT_QUIET_HOURS };
+  }
+}
+
+export function setQuietHours(patch: Partial<QuietHours>): QuietHours {
+  const current = loadQuietHours();
+  const next: QuietHours = {
+    on: typeof patch.on === 'boolean' ? patch.on : current.on,
+    start: typeof patch.start === 'string' && HHMM.test(patch.start) ? patch.start : current.start,
+    end: typeof patch.end === 'string' && HHMM.test(patch.end) ? patch.end : current.end,
+  };
+  writeLocalStorage(LS_QUIET_HOURS, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent(EVENT));
+  return next;
+}
+
+function minutesOfDay(hhmm: string): number {
+  return Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+}
+
+/** Whether `now` (local time) falls inside the nightly quiet window. */
+export function inQuietHours(now = Date.now(), hours: QuietHours = loadQuietHours()): boolean {
+  if (!hours.on || hours.start === hours.end) return false;
+  const d = new Date(now);
+  const at = d.getHours() * 60 + d.getMinutes();
+  const start = minutesOfDay(hours.start);
+  const end = minutesOfDay(hours.end);
+  return start < end ? at >= start && at < end : at >= start || at < end;
+}
+
+/** When the current quiet window ends (local wall clock), or null outside one. */
+export function quietHoursEndAt(now = Date.now(), hours: QuietHours = loadQuietHours()): number | null {
+  if (!inQuietHours(now, hours)) return null;
+  const end = new Date(now);
+  end.setHours(Number(hours.end.slice(0, 2)), Number(hours.end.slice(3, 5)), 0, 0);
+  if (end.getTime() <= now) end.setDate(end.getDate() + 1);
+  return end.getTime();
 }
 
 function writeDnd(value: string): void {

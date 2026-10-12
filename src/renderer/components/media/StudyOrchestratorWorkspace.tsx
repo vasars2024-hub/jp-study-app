@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type {
   StudyAnkiPreview,
   StudyCardPreview,
@@ -78,11 +78,14 @@ import {
 import {
   STUDY_RECIPE_FIELDS,
   createStudyFilterRecipe,
+  parseStudyCommand,
   parseStudyFilterRecipe,
   previewStudyFilterRecipe,
   serializeStudyFilterRecipe,
+  studyCommandOperation,
   studyFilterRecipeCode,
   studyFilterRecipeSource,
+  type StudyCommandIntent,
   type StudyFilterField,
   type StudyFilterRecipeRejection,
   type StudyFilterRecipeValue,
@@ -131,6 +134,13 @@ import {
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { studyContentLang } from '../../studyEnvironment';
+import { useAiReadiness } from '../../aiSetupClient';
+
+/**
+ * The command box's optional AI fallback (free text → one typed operation, shown
+ * for confirmation): its own chunk, mounted only when the parser understood nothing.
+ */
+const StudyCommandAiFallback = lazy(() => import('./StudyCommandAiFallback'));
 
 interface StudyOrchestratorWorkspaceProps {
   /**
@@ -390,6 +400,10 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [command, setCommand] = useState('');
+  /** A command the parser did not understand, handed to the optional AI fallback. */
+  const [commandAiText, setCommandAiText] = useState('');
+  const commandAiReadiness = useAiReadiness();
+  const commandAiOn = commandAiReadiness.loaded && commandAiReadiness.enabled;
   const [recipeOpen, setRecipeOpen] = useState(false);
   const [recipeText, setRecipeText] = useState('');
   const [recipeNotice, setRecipeNotice] = useState('');
@@ -1542,30 +1556,17 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
     setRecipeNotice(t('study.recipe.applied', { count: selectedAfter, added, removed }));
   };
 
-  const runCommand = async (): Promise<void> => {
-    const text = command.trim().toLocaleLowerCase();
-    if (!text || !workspace) return;
+  /** One typed operation, the same handlers the Agent uses; the only way a command acts. */
+  const runStudyIntent = async (intent: StudyCommandIntent): Promise<void> => {
+    if (!workspace) return;
     setBusy(true);
     setError('');
     try {
       const handlers = createStudyAgentHandlers();
-      let result: unknown;
-      if (/remove|exclude/.test(text) && text.includes('n5') && text.includes('n4')) {
-        result = await handlers['study.filter-vocabulary']?.({
-          workspaceId: workspace.id,
-          excludedJlptLevels: ['N5', 'N4'],
-        });
-      } else if (text.includes('undo')) {
-        result = await handlers['study.undo-filter']?.({ workspaceId: workspace.id });
-      } else if (text.includes('anki') && /preview|show|check/.test(text)) {
-        result = await handlers['study.preview-anki']?.({ workspaceId: workspace.id });
-        setAnkiPreview(result as StudyAnkiPreview);
-      } else if (/preview|show|check/.test(text) && text.includes('card')) {
-        result = await handlers['study.preview-cards']?.({ workspaceId: workspace.id });
-        setCardPreview(result as StudyCardPreview);
-      } else {
-        throw new Error('Try “Remove N5 and N4 words”, “Undo filter”, or “Preview Anki”.');
-      }
+      const { operation, arguments: args } = studyCommandOperation(intent, workspace.id);
+      const result: unknown = await handlers[operation]?.(args);
+      if (intent.op === 'preview-anki') setAnkiPreview(result as StudyAnkiPreview);
+      if (intent.op === 'preview-cards') setCardPreview(result as StudyCardPreview);
       setWorkspace(newestWorkspace(await window.api.studyGet(), workspace.context.mediaId));
       setStatus(typeof result === 'object' ? 'Study command completed through a typed operation.' : String(result));
       setCommand('');
@@ -1574,6 +1575,25 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
     } finally {
       setBusy(false);
     }
+  };
+
+  const runCommand = async (): Promise<void> => {
+    const text = command.trim();
+    if (!text || !workspace) return;
+    setCommandAiText('');
+    setError('');
+    // The deterministic parser first, always. Only when it understood nothing may
+    // the optional AI fallback suggest an operation, which the user then confirms.
+    const intent = parseStudyCommand(text);
+    if (intent) {
+      await runStudyIntent(intent);
+      return;
+    }
+    if (commandAiOn) {
+      setCommandAiText(text);
+      return;
+    }
+    setError('Try “Remove N5 and N4 words”, “Undo filter”, or “Preview Anki”.');
   };
 
   const activeReadiness = workspace ? document.readiness[workspace.readinessId] : undefined;
@@ -3283,6 +3303,20 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
                   {t('study.command.apply')}
                 </button>
               </div>
+              {commandAiOn && commandAiText && (
+                <Suspense fallback={null}>
+                  <StudyCommandAiFallback
+                    key={commandAiText}
+                    text={commandAiText}
+                    busy={busy}
+                    onConfirm={(intent) => {
+                      setCommandAiText('');
+                      void runStudyIntent(intent);
+                    }}
+                    onDismiss={() => setCommandAiText('')}
+                  />
+                </Suspense>
+              )}
 
               <div
                 className="study-vocabulary-list"

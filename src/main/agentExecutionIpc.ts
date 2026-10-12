@@ -406,7 +406,8 @@ function finishExecution(
 function providerFailureCode(error: unknown, signal: AbortSignal): AgentExecutionFailureCode {
   if (signal.aborted) return 'cancelled';
   if (error instanceof AiProviderRuntimeError && PROVIDER_CODES.has(error.code)) {
-    return error.code;
+    // A truncated answer is an unusable one; the bridge has no separate code.
+    return error.code === 'output-truncated' ? 'invalid-response' : error.code as AgentExecutionFailureCode;
   }
   return 'provider-failed';
 }
@@ -502,6 +503,8 @@ export function registerAgentExecutionIpc(
           mode,
           signal: controller.signal,
           allowLocalFallback: request.allowLocalFallback,
+          shareStudyData: request.shareStudyData === true,
+          feature: 'agentChat',
           onTextChunk: (text) => {
             if (!active.has(request.requestId) || !text) return;
             try {

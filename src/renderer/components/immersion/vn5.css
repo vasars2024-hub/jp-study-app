@@ -1,0 +1,64 @@
+/* Visual novels 7.5: line study bar, per-novel glossary/coverage and daily stats. */
+
+.vn5-line-study {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+.vn5-line-study.is-compact { margin: 4px 8px; padding: 4px 6px; border-radius: 6px; }
+.vn5-line-study-toggle,
+.vn5-line-study-repeat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--lq-hit-target, 32px);
+}
+.vn5-line-study button { min-height: 28px; }
+
+.vn5-coverage { display: grid; gap: 8px; min-width: 0; }
+.vn5-coverage-figures { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; color: var(--text-muted); font-size: 0.82rem; }
+.vn5-coverage-meter {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.vn5-coverage-meter > span { display: block; height: 100%; background: var(--accent); }
+.vn5-glossary { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; max-height: 260px; overflow: auto; }
+.vn5-glossary li { display: grid; grid-template-columns: minmax(0, 8em) 3em minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 0.85rem; }
+.vn5-glossary-count { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.vn5-glossary-gloss { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.vn5-daily { display: flex; align-items: flex-end; gap: 3px; height: 48px; margin: 0; padding: 0; list-style: none; }
+.vn5-daily li { flex: 1 1 0; min-width: 4px; background: var(--accent); opacity: 0.75; border-radius: 2px 2px 0 0; }
+.vn5-daily li.is-empty { background: var(--border); opacity: 1; min-height: 2px; }
+
+.vn5-context-setting { display: grid; gap: 6px; }
+.vn5-context-setting label { display: inline-flex; align-items: center; gap: 6px; min-height: var(--lq-hit-target, 32px); }
+
+/* VN 7.6: line cleanup and filters, with a live preview. */
+.vn5-filters { display: grid; gap: 6px; margin: 10px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.vn5-filters > label { display: inline-flex; align-items: center; gap: 6px; min-height: var(--lq-hit-target, 32px); }
+.vn5-filter-rules { display: grid; gap: 4px; }
+.vn5-filter-rule { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vn5-filter-rule input[type='checkbox'] { min-width: 24px; min-height: 24px; }
+.vn5-filter-pattern { flex: 1 1 12em; min-width: 0; font-family: var(--font-mono, monospace); }
+.vn5-filter-rule.is-invalid .vn5-filter-pattern { border-color: var(--danger, #ef4444); }
+.vn5-filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vn5-filter-preview { display: grid; gap: 4px; min-width: 0; }
+.vn5-filter-preview ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 0.85rem; }
+.vn5-filter-preview li { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; color: var(--text-muted); }
+.vn5-filter-preview li.is-changed .vn5-filter-after { color: var(--text); font-weight: 600; }
+.vn5-filter-preview li.is-dropped .vn5-filter-before { text-decoration: line-through; }
+.vn5-filter-before,
+.vn5-filter-after { overflow-wrap: anywhere; }
+
+/* This capture session's reading speed. */
+.vn5-session-stats { display: block; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.vn-reader .vn5-session-stats,
+.vn-reader .vn-reader-keys { margin: 0 10px; font-size: 0.75rem; }

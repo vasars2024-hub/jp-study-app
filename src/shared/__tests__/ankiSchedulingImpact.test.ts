@@ -55,7 +55,7 @@ function draftOf(
 }
 
 /** A review card with a real interval, due `dueIn` days from today. */
-function reviewCard(id: string, ivl: number, dueIn = 1, over: Partial<RawAnkiCardRow> = {}): CardSpec {
+function reviewCard(id: string, ivl: number, dueIn = 1, over: Partial<Omit<RawAnkiCardRow, 'id' | 'nid'>> = {}): CardSpec {
   return { id, nid: `n${id}`, type: 2, queue: 2, due: 1000 + dueIn, ivl, reps: 4, factor: 2500, ...over };
 }
 

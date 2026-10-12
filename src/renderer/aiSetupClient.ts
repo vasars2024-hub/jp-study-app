@@ -25,6 +25,7 @@ import {
   type AiSetupStatus,
 } from '../shared/aiSetup';
 import { DEFAULT_LOCAL_MODEL_ASSET_ID } from '../shared/localAgentModels';
+import { ensureUiPack } from './i18n';
 import { loadLocalAgentSettings, onLocalAgentSettingsChanged } from './localAgentSettingsStore';
 import { openSectionSurface } from './sectionSurface';
 
@@ -74,11 +75,36 @@ function applyDocumentFlag(enabled: boolean): void {
   }
 }
 
+let aiStringsQueued = false;
+
+/**
+ * The AI features' strings are a lazy i18n pack (`shared/i18n/catalogs.ts`), kept
+ * out of every window's boot. Once main says AI is on, they are fetched on idle,
+ * so the first AI surface the learner opens renders its real text rather than a
+ * placeholder. With AI off they are never fetched unless an AI surface asks.
+ */
+function preloadAiStrings(): void {
+  if (aiStringsQueued) return;
+  aiStringsQueued = true;
+  const run = (): void => {
+    try {
+      void ensureUiPack('ai');
+    } catch {
+      // A failed preload is only a placeholder later; t() asks again on use.
+    }
+  };
+  // Called as a method: a detached `requestIdleCallback` throws "Illegal invocation".
+  const host = globalThis as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+  if (typeof host.requestIdleCallback === 'function') host.requestIdleCallback(run, { timeout: 4_000 });
+  else setTimeout(run, 1_000);
+}
+
 function adopt(raw: unknown): void {
   const next = normalizeAiSetupStatus(raw);
   if (!next) return;
   status = next;
   applyDocumentFlag(next.enabled);
+  if (next.enabled) preloadAiStrings();
   emit();
 }
 

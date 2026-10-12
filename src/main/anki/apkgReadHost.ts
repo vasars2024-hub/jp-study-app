@@ -147,7 +147,7 @@ export function parseApkgDraftPageOffMainLoop(
         disarmStartup();
         return;
       }
-      if (!message || typeof message.ok !== 'boolean') {
+      if (!message || !('ok' in message) || typeof message.ok !== 'boolean') {
         finish(() => reject(new Error('apkg-read-bad-response')));
         return;
       }

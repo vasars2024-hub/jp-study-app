@@ -6,13 +6,26 @@
 import { app } from 'electron';
 import { ANKI_UNREACHABLE_MSG, ANKI_COLLECTION_UNAVAILABLE_MSG } from '../../shared/anki';
 import type { AnkiLinkState, AnkiLinkStatus } from '../../shared/anki';
-import { FAST_TIMEOUT_MS, AnkiError, invoke, onTransportFailure } from './client';
+import { FAST_TIMEOUT_MS, AnkiError, invokeMulti, onTransportFailure } from './client';
 
 type InternalState = 'unknown' | 'probing' | 'connected' | 'degraded' | 'disconnected';
 
 const CONNECTED_PROBE_MS = 30000; // cadence while connected
-const DISCONNECTED_PROBE_MS = 10000; // cadence while disconnected
+/**
+ * Cadence while disconnected: exponential from the first failure, capped. Anki
+ * not running at all is the common case (a user who never uses it), and a
+ * fixed 10 s probe meant 360 refused connections an hour for nothing. A
+ * "Retry" / any successful ordinary call still pokes an immediate probe.
+ */
+export const DISCONNECTED_BACKOFF_MS = [5000, 10000, 20000, 40000] as const;
+export const DISCONNECTED_PROBE_MAX_MS = 60000;
 const DEGRADED_RETRY_MS = 5000; // single fast retry after the first failure
+
+/** The wait before the next probe after `failures` consecutive failed probes (>= 1). */
+export function disconnectedProbeDelay(failures: number): number {
+  const i = Math.max(0, failures - 1);
+  return i < DISCONNECTED_BACKOFF_MS.length ? DISCONNECTED_BACKOFF_MS[i] : DISCONNECTED_PROBE_MAX_MS;
+}
 /** Ignore stray call timeouts if a probe succeeded within this window. */
 const RECENT_PROBE_GRACE_MS = 20000;
 /** Retry while AnkiConnect is up but the collection isn't loaded yet. */
@@ -90,7 +103,7 @@ export function startHeartbeat(): void {
   // slow deck list fetches shouldn't flicker the UI to "disconnected".
   unsubscribeClient = onTransportFailure(() => {
     if (lastOkAt != null && Date.now() - lastOkAt < RECENT_PROBE_GRACE_MS) return;
-    applyFailure();
+    applyFailure(false);
   });
   app.once('before-quit', stopHeartbeat); // H9
   state = 'probing';
@@ -165,27 +178,43 @@ async function probe(): Promise<void> {
   probeInFlight = true;
   lastProbeAt = Date.now();
   try {
-    const version = await invoke('version', undefined, {
-      timeoutMs: FAST_TIMEOUT_MS,
-      quiet: true,
-    });
-    try {
-      await invoke('deckNames', undefined, { timeoutMs: FAST_TIMEOUT_MS, quiet: true });
-      probeInFlight = false;
-      applySuccess(version);
-    } catch (err) {
-      probeInFlight = false;
+    // `version` + `deckNames` in ONE request: `version` answers without a
+    // collection, `deckNames` proves the collection is open.
+    const [versionOutcome, decksOutcome] = await invokeMulti(
+      [
+        { action: 'version', params: undefined },
+        { action: 'deckNames', params: undefined },
+      ],
+      { timeoutMs: FAST_TIMEOUT_MS, quiet: true },
+    );
+    probeInFlight = false;
+    if (!versionOutcome.ok) {
+      waitingCollection = false;
+      applyFailure(true);
+      return;
+    }
+    const version = Number(versionOutcome.result);
+    if (!decksOutcome.ok) {
+      const err = decksOutcome.error;
       if (err instanceof AnkiError && err.kind === 'collection') {
         applyWaitingCollection(version);
         return;
       }
       waitingCollection = false;
-      applyFailure();
+      applyFailure(true);
+      return;
     }
-  } catch {
+    applySuccess(version);
+  } catch (err) {
     probeInFlight = false;
+    // `multi` itself refused by AnkiConnect while it answers otherwise: the
+    // collection is not open yet (it reports that for `multi` too).
+    if (err instanceof AnkiError && err.kind === 'collection') {
+      applyWaitingCollection(apiVersion);
+      return;
+    }
     waitingCollection = false;
-    applyFailure();
+    applyFailure(true);
   }
 }
 
@@ -217,7 +246,12 @@ function applySuccess(version: number): void {
   }
 }
 
-function applyFailure(): void {
+/**
+ * `fromProbe`: the failure is the heartbeat's own probe. An ordinary call's
+ * failure while already disconnected changes nothing — it must neither push the
+ * next probe out nor climb the backoff (a busy UI would otherwise starve it).
+ */
+function applyFailure(fromProbe: boolean): void {
   if (halted || !started) return;
   waitingCollection = false;
   const prev = state;
@@ -228,17 +262,31 @@ function applyFailure(): void {
     scheduleNext(DEGRADED_RETRY_MS);
     return;
   }
+  if (prev === 'disconnected' && !fromProbe) return;
   consecutiveFailures += 1;
   if (prev === 'degraded') {
     // H6: second consecutive failure — now visibly disconnected.
     state = 'disconnected';
-    scheduleNext(DISCONNECTED_PROBE_MS);
+    scheduleNext(disconnectedProbeDelay(1));
     push();
     return;
   }
-  // H3 (probing) or repeat failures while already disconnected.
+  // H3 (probing) or repeat failures while already disconnected: back off.
   const wasDisconnected = prev === 'disconnected';
   state = 'disconnected';
-  scheduleNext(DISCONNECTED_PROBE_MS);
+  scheduleNext(disconnectedProbeDelay(consecutiveFailures));
   if (!wasDisconnected) push();
+}
+
+/** Tests: the state machine from scratch (timers are the caller's fakes). */
+export function resetHeartbeatForTests(): void {
+  stopHeartbeat();
+  state = 'unknown';
+  apiVersion = undefined;
+  lastOkAt = undefined;
+  lastProbeAt = undefined;
+  consecutiveFailures = 0;
+  waitingCollection = false;
+  probeInFlight = false;
+  halted = false;
 }

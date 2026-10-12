@@ -1,0 +1,234 @@
+/* The optional AI helpers for watching and reading: the video brief and quiz,
+   the i+1 line pick, the reader's explain / simplify, the VN explain and
+   translate, the Study command confirmation. Theme tokens only (Study OS, Aero,
+   WIRED and Blanc each define them), so every panel follows whichever theme
+   hosts it. Every control keeps the 24px target floor through min-height /
+   min-width. */
+.ai-immerse {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: var(--radius-sm, 8px);
+  background: var(--panel-2, var(--surface-1, transparent));
+  color: var(--text, inherit);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: start;
+}
+
+.imm5-ai-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 12px;
+}
+
+.ai-immerse.is-inline {
+  margin: 4px 0;
+  padding: 8px 10px;
+}
+
+.ai-immerse-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-immerse-head > h4,
+.ai-immerse-head > h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1 1 auto;
+}
+
+.ai-immerse-btn {
+  min-height: 24px;
+  min-width: 24px;
+}
+
+.ai-immerse-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-immerse-section-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.ai-immerse-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-inline-start: 3px solid var(--accent, currentColor);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--panel, transparent);
+}
+
+.ai-immerse-answer p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ai-immerse-badge {
+  align-self: flex-start;
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--accent, currentColor);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent, inherit);
+}
+
+.ai-immerse-busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-immerse-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border, currentColor);
+  border-top-color: var(--accent, currentColor);
+  animation: ai-immerse-spin 0.8s linear infinite;
+  flex: 0 0 auto;
+}
+
+.ai-immerse-progress {
+  width: 96px;
+  height: 8px;
+  accent-color: var(--accent, currentColor);
+}
+
+@keyframes ai-immerse-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-immerse-spinner {
+    animation: none;
+    border-top-color: var(--border, currentColor);
+  }
+}
+
+.ai-immerse-error {
+  margin: 0;
+  color: var(--danger, inherit);
+}
+
+.ai-immerse-note {
+  margin: 0;
+}
+
+.ai-immerse-meta {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.ai-immerse-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-immerse-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: var(--radius-sm, 6px);
+}
+
+.ai-immerse-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The line / question that seeks: a real button, sized as a target, reading as text. */
+.ai-immerse-seek {
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.ai-immerse-seek:hover,
+.ai-immerse-seek:focus-visible {
+  border-color: var(--accent, currentColor);
+}
+
+.ai-immerse-time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.ai-immerse-target {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--accent-soft, rgba(127, 127, 127, 0.2));
+}
+
+.ai-immerse-reveal summary {
+  min-height: 24px;
+  cursor: pointer;
+}
+
+/* Side by side: the original and the AI rewrite, each labelled. */
+.ai-immerse-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 10px;
+}
+
+.ai-immerse-compare > section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: var(--radius-sm, 6px);
+  white-space: pre-wrap;
+}
+
+.ai-immerse-compare > section.is-ai {
+  border-inline-start: 3px solid var(--accent, currentColor);
+}
+
+.ai-immerse-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ai-immerse-words button {
+  min-height: 24px;
+}

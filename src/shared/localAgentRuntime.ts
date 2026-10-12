@@ -32,6 +32,7 @@ export type LocalAgentPlanFailureCode =
   | 'model-missing'
   | 'cloud-key-missing'
   | 'spend-budget'
+  | 'cloud-disabled'
   | 'planner-failed';
 
 export interface LocalAgentPlanResponse {

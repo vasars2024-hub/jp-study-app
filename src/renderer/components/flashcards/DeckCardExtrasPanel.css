@@ -1,0 +1,50 @@
+/* One deck card's saved extras, opened from its row in any deck list (Study OS,
+   WIRED, Aero, Blanc). Moved here from FlashcardsContent.css so the Aero and
+   Blanc lists, which do not render that module's overview, get it too. */
+.flash-card-extras-host {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.flash-card-extras-host .flash-strip-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flash-card-extras-host .flash-strip-head > .muted {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Saved notes with their edit / remove actions on one line. */
+.flash-card-extras-host .ai-study-note-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.flash-card-extras-host .ai-study-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flash-card-extras-host .ai-study-edit textarea {
+  width: 100%;
+  min-height: 3em;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+/* Aero deck browser: the panel opens under its row, inside the row list. */
+.aero-flash-card-extras {
+  padding: 0 8px 8px;
+}

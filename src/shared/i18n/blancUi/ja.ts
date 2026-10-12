@@ -116,7 +116,7 @@ export const BLANC_UI_JA: Catalog = {
   'blanc.shell.hide': '隠す',
   'blanc.shell.exit': 'Blanc を終了',
   'blanc.shell.back': '戻る',
-  'blanc.shell.searchTitle': 'Blanc を検索（Ctrl+F）',
+  'blanc.shell.searchTitle': 'Blanc を検索',
   'blanc.shell.search': 'Blanc を検索',
   'blanc.shell.contextTools': 'コンテキストツール',
   'blanc.shell.exitFullscreenWorkspace': '全画面ワークスペースを終了',

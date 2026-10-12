@@ -22,6 +22,10 @@
  *    screen (`lockscreen:blocked`), throttled per kind.
  *  - In a packaged build DevTools close as soon as they open, on every
  *    webContents (windows and `<webview>` guests alike).
+ *  - lock3: every `ipcMain` handler is held while locked (`lockIpcGate.ts`),
+ *    so a renderer that flips its own state still reads and writes nothing;
+ *    main arms the lock by itself on idle / sleep / Windows lock when the
+ *    owner opted in (`lockAutoArm.ts`).
  *
  * It is a STUDY lock, not a security boundary: the app ships without asar, so
  * anyone with write access to the install folder can edit main.js, and Chromium
@@ -65,8 +69,23 @@ export interface LockBlockNotice {
  * Commands that only ever bring the lock UI forward (main.ts routes them through
  * `showLockUiIfLocked`), so they stay live while locked. Everything else a chord,
  * the tray or the radial wheel can run is refused.
+ *
+ * `app.restart` used to be here. A restart used to reset the PIN backoff (it
+ * lived in memory), so a chord press bought five more guesses; the backoff is
+ * persisted now, and restart / relaunch are refused while locked anyway
+ * (`refuseRestartWhileLocked`). Quitting is not a command here: an OS-level quit
+ * (tray Quit, closing from the taskbar, shutdown) still works.
  */
-export const LOCK_SAFE_COMMANDS: ReadonlySet<string> = new Set(['app.toggle', 'app.focus', 'app.restart']);
+export const LOCK_SAFE_COMMANDS: ReadonlySet<string> = new Set(['app.toggle', 'app.focus']);
+
+/**
+ * Every restart / relaunch path in main asks this first: the `app.restart`
+ * command, a second instance started with `--restart`, and `app:relaunch`.
+ * `source` names the path (`command`, `second-instance`, `ipc`).
+ */
+export function refuseRestartWhileLocked(source: string): boolean {
+  return refuseWhileLocked(`command:app.restart:${source}`);
+}
 
 /**
  * Extension routes that reveal nothing: liveness, the pairing pull (it needs the
@@ -173,6 +192,21 @@ export function createLockGuard<W extends GuardWindow>(deps: LockGuardDeps<W>): 
     }
   };
 
+  /**
+   * Every window, content included, hears the transition on `lockscreen:state`
+   * (risk4): sound cues and system banners in any renderer are held while
+   * locked. It never asks a window to draw a PIN pad (that is `lockscreen:locked`).
+   */
+  const broadcastState = (lockedNow: boolean) => {
+    for (const win of deps.windows()) {
+      try {
+        if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('lockscreen:state', lockedNow);
+      } catch {
+        /* a window mid-teardown */
+      }
+    }
+  };
+
   /** Apply the lock to one window. Returns true when it was hidden. */
   const gateWindow = (win: W): boolean => {
     if (win.isDestroyed()) return false;
@@ -210,9 +244,11 @@ export function createLockGuard<W extends GuardWindow>(deps: LockGuardDeps<W>): 
         if (gateWindow(win)) count += 1;
         if (!win.isDestroyed()) closeDevTools(win.webContents);
       }
+      broadcastState(true);
       log(`engaged; hid ${count} window(s)`);
     },
     release() {
+      broadcastState(false);
       const toShow = [...hidden];
       hidden.clear();
       for (const win of toShow) {

@@ -28,6 +28,8 @@ import {
   type TranscriptionJob,
   type TranscriptionCue,
   type TranscriptionChunkResult,
+  type TranscriptionChunkStatus,
+  isTranscriptionChunkStatus,
   type TranscriptionCardsReady,
   normalizeTranscriptionCardOptions,
   type TranscriptCardTiming,
@@ -78,6 +80,8 @@ import {
 } from '../shared/transcriptionSentenceCards';
 import { extractFlashcardAudioClip, pruneMediaClips } from './flashcardAudio';
 import { getMainStudyLang } from './studyLanguage';
+import { bridgeHostWindow } from './extensionBridgeHost';
+import { WHISPER_MULTILINGUAL_REQUIRED } from '../shared/whisperModels';
 
 export interface TranscriptionHost {
   listItems: () => MediaItem[];
@@ -158,40 +162,141 @@ function loadQueue(): TranscriptionJob[] {
 // Renderer RPC
 // ---------------------------------------------------------------------------
 
-const pendingReplies = new Map<string, {
+/**
+ * How long a model download may go without reporting progress before the chunk
+ * is given up on. A download that is moving is never cut off: every progress
+ * report re-arms this, and the transcription timeout starts only at `model-ready`.
+ */
+const MODEL_STALL_TIMEOUT_MS = 120_000;
+
+interface PendingChunk {
   resolve: (result: TranscriptionChunkResult) => void;
   timer: NodeJS.Timeout;
-}>();
+  mediaId: string;
+  /** The window running it, told to stop on cancel or timeout. */
+  target: BrowserWindow;
+  onStatus?: (status: TranscriptionChunkStatus) => void;
+}
 
-/** Called by the renderer when a chunk comes back. */
-export function resolveTranscriptionChunk(id: string, payload: TranscriptionChunkResult): void {
+const pendingReplies = new Map<string, PendingChunk>();
+
+/** Settles one chunk; the renderer is told to stop it when it did not answer itself. */
+function settleChunk(id: string, result: TranscriptionChunkResult, stopRenderer: boolean): void {
   const pending = pendingReplies.get(id);
   if (!pending) return;
   clearTimeout(pending.timer);
   pendingReplies.delete(id);
-  pending.resolve(payload);
+  if (stopRenderer) {
+    // Terminates the worker. It used to be left running after a timeout, and
+    // each retry started another: up to nine Whisper workers on one machine.
+    try {
+      if (liveWindow(pending.target)) pending.target.webContents.send('transcription:chunk-cancel', { id });
+    } catch {
+      /* the window is going away; its workers go with it */
+    }
+  }
+  pending.resolve(result);
 }
 
-function requestChunk(pcm: Float32Array, lang: string): Promise<TranscriptionChunkResult> {
-  const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
-  if (!windows.length) {
+function armChunkTimer(id: string, ms: number): void {
+  const pending = pendingReplies.get(id);
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pending.timer = setTimeout(() => settleChunk(id, { ok: false, error: 'timeout' }, true), ms);
+}
+
+/** Called by the renderer when a chunk comes back, or reports on its model. */
+export function resolveTranscriptionChunk(id: string, payload: TranscriptionChunkResult | TranscriptionChunkStatus): void {
+  const pending = pendingReplies.get(id);
+  if (!pending) return;
+  if (isTranscriptionChunkStatus(payload)) {
+    // Still loading: the clock that matters is "no progress for a while", not
+    // "the download is big". Ready: now the transcription itself is timed.
+    armChunkTimer(id, payload.stage === 'model-ready' ? CHUNK_TIMEOUT_MS : MODEL_STALL_TIMEOUT_MS);
+    pending.onStatus?.(payload);
+    return;
+  }
+  settleChunk(id, payload, false);
+}
+
+/**
+ * Stops the chunks in flight for one media (or all): the renderer's worker is
+ * terminated, and the job's loop gets `cancelled` at once instead of waiting
+ * out a chunk nobody wants any more.
+ */
+function cancelChunksFor(mediaId?: string): number {
+  let stopped = 0;
+  for (const [id, pending] of [...pendingReplies]) {
+    if (mediaId !== undefined && pending.mediaId !== mediaId) continue;
+    settleChunk(id, { ok: false, error: 'cancelled' }, true);
+    stopped += 1;
+  }
+  return stopped;
+}
+
+/**
+ * The window that asked for each media's transcription (its `webContents.id`).
+ * In memory only: a job restored from disk has no requester, and goes to the
+ * bridge host window instead.
+ */
+const requesters = new Map<string, number>();
+
+function liveWindow(win: BrowserWindow | null | undefined): win is BrowserWindow {
+  try {
+    return Boolean(win && !win.isDestroyed() && win.webContents && !win.webContents.isDestroyed?.());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The ONE window that runs Whisper for this media's chunks.
+ *
+ * Every Study OS window, pop-out and Blanc installs the chunk handler, and main
+ * used to send each chunk to all of them: with two windows open, every slice
+ * was transcribed twice (and the cards batch written twice), N× the CPU/GPU for
+ * one answer. The window that asked does the work; when it is gone (or the job
+ * was restored at boot), the same single host the extension bridge uses does.
+ */
+function chunkHostWindow(mediaId: string): BrowserWindow | null {
+  const requester = requesters.get(mediaId);
+  if (requester !== undefined) {
+    const win = BrowserWindow.getAllWindows().find((w) => {
+      try {
+        return w.webContents?.id === requester;
+      } catch {
+        return false;
+      }
+    });
+    if (liveWindow(win)) return win;
+  }
+  const host = bridgeHostWindow();
+  return liveWindow(host) ? host : null;
+}
+
+function requestChunk(
+  pcm: Float32Array,
+  lang: string,
+  mediaId: string,
+  onStatus?: (status: TranscriptionChunkStatus) => void,
+): Promise<TranscriptionChunkResult> {
+  const target = chunkHostWindow(mediaId);
+  if (!target) {
     return Promise.resolve({ ok: false, error: 'no-window' });
   }
+  if (cancelled.has(mediaId)) return Promise.resolve({ ok: false, error: 'cancelled' });
   const id = crypto.randomUUID();
   return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      pendingReplies.delete(id);
-      resolve({ ok: false, error: 'timeout' });
-    }, CHUNK_TIMEOUT_MS);
-    pendingReplies.set(id, { resolve, timer });
+    // Until the renderer says the model is loading or ready, the ordinary
+    // budget applies (a renderer that never answers still times out).
+    const timer = setTimeout(() => settleChunk(id, { ok: false, error: 'timeout' }, true), CHUNK_TIMEOUT_MS);
+    pendingReplies.set(id, { resolve, timer, mediaId, target, ...(onStatus ? { onStatus } : {}) });
     const buffer = Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength);
-    for (const win of windows) {
-      win.webContents.send('transcription:chunk-request', {
-        id,
-        lang,
-        pcmBase64: buffer.toString('base64'),
-      });
-    }
+    target.webContents.send('transcription:chunk-request', {
+      id,
+      lang,
+      pcmBase64: buffer.toString('base64'),
+    });
   });
 }
 
@@ -212,10 +317,14 @@ function broadcast(progress: TranscriptionProgress): void {
   }
 }
 
-function broadcastCardsReady(payload: TranscriptionCardsReady): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('transcription:cards-ready', payload);
-  }
+/**
+ * Hand the cards batch to the one window that writes it. Every window's handler
+ * replaces the previous batch and adds this one to the shared local deck, so a
+ * broadcast had N windows racing on the same store.
+ */
+function deliverCardsReady(payload: TranscriptionCardsReady): void {
+  const target = chunkHostWindow(payload.mediaId);
+  if (target) target.webContents.send('transcription:cards-ready', payload);
 }
 
 async function mapWithConcurrency<T, R>(
@@ -234,6 +343,16 @@ async function mapWithConcurrency<T, R>(
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, worker));
   return results;
+}
+
+/**
+ * The study language a transcript's sentence cards are made in, or null when
+ * the segmenter cannot cut it into sentences (it splits on CJK punctuation and
+ * keeps Han/kana text only, so Japanese and Chinese — not Russian — qualify).
+ */
+function transcriptCardLang(lang: string): 'ja' | 'zh' | null {
+  const base = lang.trim().toLowerCase().split(/[-_]/)[0];
+  return base === 'ja' || base === 'zh' ? base : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,18 +479,42 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         texts.push('');
         continue;
       }
-      let reply = await requestChunk(slice, job.lang);
+      // Model download / load progress, shown on the job while it happens; the
+      // first event without it (the next `transcribing` emit) clears it.
+      const onModelStatus = (status: TranscriptionChunkStatus): void => {
+        if (status.stage === 'model-loading') {
+          emit('transcribing', i, {
+            modelDownload: {
+              percent: typeof status.progress === 'number' && Number.isFinite(status.progress)
+                ? Math.max(0, Math.min(100, Math.round(status.progress)))
+                : null,
+            },
+          });
+        } else {
+          emit('transcribing', i);
+        }
+      };
+      let reply = await requestChunk(slice, job.lang, job.mediaId, onModelStatus);
       // A slice that timed out is asked for again rather than written down as
       // silence: an empty slice in the middle of a transcript reads as "nothing
       // was said" when the model was only slow (or still loading).
       for (let retry = 0; !reply.ok && reply.error === 'timeout' && retry < CHUNK_TIMEOUT_RETRIES; retry += 1) {
         if (cancelled.has(job.mediaId)) break;
-        reply = await requestChunk(slice, job.lang);
+        reply = await requestChunk(slice, job.lang, job.mediaId, onModelStatus);
+      }
+      // Cancelled mid-chunk: the worker was stopped, and the job ends now.
+      if ((!reply.ok && reply.error === 'cancelled') || cancelled.has(job.mediaId)) {
+        emit('cancelled', i);
+        return { ok: false, error: 'cancelled' };
       }
       if (!reply.ok) {
         // `no-window` is not the file's fault — the job goes back to the queue
         // rather than counting as a failed attempt against this media.
         if (reply.error === 'no-window') throw new Error('no-window');
+        // The chosen model cannot transcribe this language (a Japanese-only
+        // model for Chinese audio) and no multilingual one is installed: every
+        // slice would come back the same, so the job stops and says so.
+        if (reply.error === WHISPER_MULTILINGUAL_REQUIRED) throw new Error(WHISPER_MULTILINGUAL_REQUIRED);
         // Still timing out: fail the job (the queue retries it) instead of
         // finishing a transcript with a silent hole in it.
         if (reply.error === 'timeout') throw new Error('chunk-timeout');
@@ -435,11 +578,13 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       subtitlesCheckedAt: Date.now(),
     });
 
-    // Japanese transcription is also a sentence-mining action. The renderer
-    // owns the local deck, so main prepares exact managed clips and broadcasts
-    // a reversible batch instead of writing renderer storage from another
-    // process.
-    if (/^ja\b/i.test(job.lang) && cardOptions.createCards) {
+    // Japanese and Chinese transcription are also sentence-mining actions. The
+    // renderer owns the local deck, so main prepares exact managed clips and
+    // hands one window a reversible batch instead of writing renderer storage
+    // from another process. (It used to gate on `^ja`, so a Chinese transcript
+    // with "make cards" on silently made nothing.)
+    const cardLang = transcriptCardLang(job.lang);
+    if (cardLang && cardOptions.createCards) {
       emit('aligning', total);
       // No cue windows means no alignment. The chunk grid still puts the sentence
       // in the right neighbourhood, which is worth a card — but every surface
@@ -456,7 +601,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       const translations = cardOptions.translateToEnglish
         ? await translateWindowReferences(
             segments.map((segment) => segment.text),
-            'ja',
+            cardLang,
             'en',
             () => cancelled.has(job.mediaId),
           )
@@ -503,10 +648,11 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         // here, where the keep-set is exact, rather than growing the directory
         // by a full transcript on every re-run.
         pruneMediaClips(job.mediaId, cards.map((card) => card.audioPath));
-        broadcastCardsReady({
+        deliverCardsReady({
           mediaId: job.mediaId,
           title: job.title,
-          batchId: `transcription:${job.mediaId}:ja`,
+          // Japanese keeps its original id, so re-running replaces the batch it made before.
+          batchId: `transcription:${job.mediaId}:${cardLang}`,
           cards,
           timing,
           cardOptions,
@@ -719,7 +865,7 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
         texts.push('');
         continue;
       }
-      const reply = await requestChunk(slice, job.lang);
+      const reply = await requestChunk(slice, job.lang, job.mediaId);
       if (!reply.ok) {
         if (reply.error === 'no-window') throw new Error('no-window');
         texts.push('');
@@ -913,7 +1059,8 @@ async function drain(): Promise<void> {
       try {
         const result = job.kind === 'fuse-en-ja' ? await runFusionJob(job) : await runJob(job);
         queue.shift();
-        if (!result.ok && result.error !== 'cancelled') {
+        // A missing multilingual model is not fixed by trying the same file again.
+        if (!result.ok && result.error !== 'cancelled' && result.error !== WHISPER_MULTILINGUAL_REQUIRED) {
           const attempts = job.attempts + 1;
           // A file that fails repeatedly is dropped rather than retried forever.
           // The no-window counter resets: this run did reach a renderer, so the
@@ -967,10 +1114,15 @@ async function drain(): Promise<void> {
 // Public API
 // ---------------------------------------------------------------------------
 
-export function enqueueTranscription(request: TranscriptionRequest): TranscriptionResult {
+/**
+ * @param requesterId The `webContents.id` of the window that asked. Its chunks
+ * are transcribed in that window alone (see `chunkHostWindow`).
+ */
+export function enqueueTranscription(request: TranscriptionRequest, requesterId?: number): TranscriptionResult {
   if (!host) return { ok: false, error: 'host-not-registered' };
   const item = host.listItems().find((entry) => entry.id === request.mediaId);
   if (!item) return { ok: false, error: 'item-not-found' };
+  if (typeof requesterId === 'number') requesters.set(item.id, requesterId);
   const kind = request.kind ?? 'transcribe';
   // Matched on kind as well as media, so asking to fuse a file that is already
   // queued for a plain transcript is a real second job rather than a silent no-op.
@@ -1020,6 +1172,9 @@ export function cancelTranscription(mediaId?: string): void {
   // the head) is left in place so its loop can notice the flag and unwind
   // cleanly — yanking it here would leak the in-flight chunk request.
   const runningId = active > 0 ? queue[0]?.mediaId : undefined;
+  // The running job's chunk in flight is stopped too — the worker terminated,
+  // not left to finish a minute of audio nobody will read.
+  if (runningId && targets.includes(runningId)) cancelChunksFor(runningId);
   queue = queue.filter((job, index) => {
     if (index === 0 && job.mediaId === runningId) return true;
     return !cancelled.has(job.mediaId);
@@ -1134,8 +1289,8 @@ export function registerTranscriptionIpc(transcriptionHost: TranscriptionHost): 
   host = transcriptionHost;
   queue = loadQueue();
 
-  ipcMain.handle('transcription:enqueue', (_e, request: TranscriptionRequest) =>
-    enqueueTranscription(request ?? { mediaId: '' }));
+  ipcMain.handle('transcription:enqueue', (event, request: TranscriptionRequest) =>
+    enqueueTranscription(request ?? { mediaId: '' }, event?.sender?.id));
   ipcMain.handle('transcription:cancel', (_e, mediaId?: string) => {
     cancelTranscription(typeof mediaId === 'string' ? mediaId : undefined);
   });
@@ -1145,7 +1300,7 @@ export function registerTranscriptionIpc(transcriptionHost: TranscriptionHost): 
       typeof mediaId === 'string' ? mediaId : '',
       typeof subtitleId === 'string' ? subtitleId : '',
     ));
-  ipcMain.on('transcription:chunk-reply', (_e, payload: TranscriptionChunkResult & { id: string }) => {
+  ipcMain.on('transcription:chunk-reply', (_e, payload: (TranscriptionChunkResult | TranscriptionChunkStatus) & { id: string }) => {
     if (payload && typeof payload.id === 'string') resolveTranscriptionChunk(payload.id, payload);
   });
 
@@ -1162,4 +1317,7 @@ export const __transcriptionTestables = {
   pickEnglishTrack,
   planNoWindowRetry,
   hasPendingRetry: (): boolean => retryTimer !== null,
+  pendingChunkCount: (): number => pendingReplies.size,
+  CHUNK_TIMEOUT_MS,
+  MODEL_STALL_TIMEOUT_MS,
 };

@@ -24,7 +24,7 @@
  * queue, reps, lapses, interval and ease and drops the card's revlog. Hiding it
  * would leave the user hunting for a feature the recipe names.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type JSX } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   DEFAULT_DORMANT_DAYS,

@@ -107,6 +107,7 @@ import {
 import {
   buildMirrorFeedbackRequest,
   evaluateMirrorWriting,
+  resolveMirrorBackend,
   type MirrorAxis,
   type MirrorEvaluation,
 } from '../../games/mirrorWriting/evaluator';
@@ -1755,6 +1756,7 @@ function MirrorWritingPanel({
   const { t } = useT();
   const { lang: studyLang, tag: studyTag } = useStudyLanguage();
   const ai = useAiReadiness();
+  const appAiReady = ai.loaded && ai.enabled && ai.ready;
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [evaluation, setEvaluation] = useState<MirrorEvaluation | null>(null);
@@ -1788,7 +1790,7 @@ function MirrorWritingPanel({
     setBusy(true);
     setError(null);
     setEvaluation(null);
-    const result = await evaluateMirrorWriting(settings, text, draft);
+    const result = await evaluateMirrorWriting(settings, text, draft, { appAiReady });
     setBusy(false);
     if (!result.ok) {
       // The evaluator is a plain module, so it hands back a key and resolves it
@@ -1850,7 +1852,7 @@ function MirrorWritingPanel({
         <button type="button" className="btn primary" disabled={busy || draft.trim().length < 8} onClick={() => void submit()}>
           {busy ? t('games.mirror.evaluating') : t('games.mirror.submit')}
         </button>
-        {settings.mirrorBackend === 'local' && <span className="muted">{t('games.mirror.quickCheckNote')}</span>}
+        {resolveMirrorBackend(settings, appAiReady) === 'local' && <span className="muted">{t('games.mirror.quickCheckNote')}</span>}
         {ai.loaded && ai.enabled && ai.ready && (
           <button
             data-ai-entry

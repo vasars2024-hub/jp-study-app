@@ -18,6 +18,7 @@ import { t } from './i18n';
 import { GLOBAL_COMMAND_DEFAULTS, migrateLegacyGlobalChords, type GlobalCommandStatus } from '../shared/globalCommands';
 import { reportGlobalShortcutFailures } from './globalShortcutNotice';
 import { isDnd, setDnd } from './notificationStore';
+import { lockGumNow } from './lockscreenSettings';
 
 export type CommandCategory =
   | 'Navigation'
@@ -83,7 +84,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Open command palette',
     category: 'Navigation',
     defaultKeys: 'Ctrl+K',
-    note: 'Ctrl+P opens the same palette in search mode.',
+    note: '{keys} opens the same palette in search mode.',
   },
   { id: 'nav.search', label: 'Global search', category: 'Navigation', defaultKeys: 'Ctrl+P' },
   { id: 'nav.settings', label: 'Open settings', category: 'Navigation', defaultKeys: 'Ctrl+,' },
@@ -104,7 +105,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Focus settings search',
     category: 'Utility',
     defaultKeys: 'Ctrl+Alt+S',
-    note: 'Works while the Settings window is open. Ctrl+F is reserved for Toolbox search.',
+    note: 'Works while the Settings window is open. {keys} is reserved for Toolbox search.',
   },
   { id: 'nav.open.dictionary', label: 'Open Dictionary', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.library', label: 'Open Library', category: 'Navigation', defaultKeys: '' },
@@ -250,7 +251,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     defaultKeys: 'Ctrl+Alt+D',
     // One-way on purpose, and the note says so: pressing it again does not put
     // the desk back. Restore all windows is the return trip.
-    note: 'Sends every visible window to the taskbar. Ctrl+Alt+Shift+D brings them back.',
+    note: 'Sends every visible window to the taskbar. {keys} brings them back.',
   },
   {
     id: 'window.restoreAll',
@@ -275,7 +276,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     // shape as Ctrl+Alt+Shift+D (restore all). osShortcutDefaults.test.ts
     // guards the whole chord space against collisions.
     defaultKeys: 'Ctrl+Alt+Shift+W',
-    note: 'Clears the desk and empties the taskbar. Ctrl+W closes just the focused app.',
+    note: 'Clears the desk and empties the taskbar. {keys} closes just the focused app.',
   },
   {
     id: 'window.closeOthers',
@@ -306,14 +307,14 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Zoom in',
     category: 'Window',
     defaultKeys: 'Ctrl+Alt+=',
-    note: 'Scales the whole interface. Plain Ctrl+= is the reader font size, which is scoped to a book.',
+    note: 'Scales the whole interface. The reader font size ({keys}) is separate and scoped to a book.',
   },
   {
     id: 'window.zoomOut',
     label: 'Zoom out',
     category: 'Window',
     defaultKeys: 'Ctrl+Alt+-',
-    note: 'Scales the whole interface. Plain Ctrl+- is the reader font size, which is scoped to a book.',
+    note: 'Scales the whole interface. The reader font size ({keys}) is separate and scoped to a book.',
   },
   {
     id: 'window.zoomReset',
@@ -363,7 +364,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Show / hide book translation',
     category: 'Reader',
     defaultKeys: 'Ctrl+Alt+Shift+T',
-    note: 'Toggles original-only vs bilingual/translation overlay in EPUB and manga readers. Ctrl+Shift+T belongs to the Toolbox (Reopen Last Tool).',
+    note: 'Toggles original-only vs bilingual/translation overlay in EPUB and manga readers. {keys} belongs to the Toolbox (Reopen Last Tool).',
   },
   { id: 'reader.fontUp', label: 'Increase font size', category: 'Reader', defaultKeys: 'Ctrl+=' },
   { id: 'reader.fontDown', label: 'Decrease font size', category: 'Reader', defaultKeys: 'Ctrl+-' },
@@ -416,21 +417,21 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Manga zoom in',
     category: 'Manga',
     defaultKeys: '',
-    note: 'Unbound by default — manga also listens to reader font-up (Ctrl+=).',
+    note: 'Unbound by default — manga also listens to reader font-up ({keys}).',
   },
   {
     id: 'manga.zoomOut',
     label: 'Manga zoom out',
     category: 'Manga',
     defaultKeys: '',
-    note: 'Unbound by default — manga also listens to reader font-down (Ctrl+-).',
+    note: 'Unbound by default — manga also listens to reader font-down ({keys}).',
   },
   {
     id: 'manga.zoomReset',
     label: 'Manga zoom reset',
     category: 'Manga',
     defaultKeys: '',
-    note: 'Unbound by default — manga also listens to reader zoom-reset (Ctrl+0).',
+    note: 'Unbound by default — manga also listens to reader zoom-reset ({keys}).',
   },
 
   // Dictionary
@@ -439,7 +440,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Play pronunciation',
     category: 'Dictionary',
     defaultKeys: 'Ctrl+Alt+P',
-    note: 'Works while a dictionary popup is open. Ctrl+Shift+P opens the Toolbox command palette.',
+    note: 'Works while a dictionary popup is open. {keys} opens the Toolbox command palette.',
   },
   {
     id: 'dictionary.lookupSelection',
@@ -481,6 +482,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
       ['lens.repeat', 'Reading Lens: repeat the last region', 'Reads the same box again — for visual novels and games that keep text in one place.'],
       ['lens.clipboard', 'Reading Lens: read the clipboard', 'Reads copied text, or a copied picture (a snip, a manga panel) with OCR.'],
       ['vn.toggleCapture', 'Start / stop visual novel text capture', 'Captures from the texthooker for the visual novel you are playing (or played last).'],
+      ['snip.toggle', 'Snip to cards: pause / resume', 'Stops or restarts watching the clipboard for Win+Shift+S snips that become cards.'],
       ['app.focus', 'Open / focus Gum', 'Brings the Gum window to the front, starting it again if it was closed.'],
       ['app.toggleMiniView', 'Toggle Mini View', 'Switches Gum between the full desktop and the compact Mini View.'],
     ] as const
@@ -577,21 +579,21 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Focus URL bar',
     category: 'Immersion',
     defaultKeys: 'Ctrl+Shift+L',
-    note: 'Immersion view only. Ctrl+L is reserved for Toolbox sidebar focus.',
+    note: 'Immersion view only. {keys} is reserved for Toolbox sidebar focus.',
   },
   {
     id: 'immersion.reload',
     label: 'Reload page',
     category: 'Immersion',
     defaultKeys: 'F5',
-    note: 'Immersion view only. Ctrl+R is reserved for Toolbox recent tools.',
+    note: 'Immersion view only. {keys} is reserved for Toolbox recent tools.',
   },
   {
     id: 'immersion.bookmark',
     label: 'Save current site',
     category: 'Immersion',
     defaultKeys: 'Ctrl+Shift+D',
-    note: 'Immersion view only. Ctrl+D stays on reader dictionary lookup.',
+    note: 'Immersion view only. {keys} stays on reader dictionary lookup.',
   },
   {
     id: 'immersion.focusMode',
@@ -631,6 +633,14 @@ export const COMMAND_CATALOG: AppCommand[] = [
       'Quits and relaunches so main-process / helper / code changes apply. Not the same as Hide / show. With the Startup helper installed, the chord stays OS-level and syncs when you rebind it here.',
   },
   {
+    id: 'app.lock',
+    label: 'Lock Gum now',
+    category: 'Utility',
+    defaultKeys: GLOBAL_COMMAND_DEFAULTS['app.lock'] ?? '',
+    global: true,
+    note: 'Shows the PIN pad and hides every Gum window until the PIN is entered. Needs a PIN (Settings → Lockscreen). Windows’ own Win+L still locks the PC.',
+  },
+  {
     id: 'study.focusMode',
     label: 'Toggle focus mode',
     category: 'Utility',
@@ -642,7 +652,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Toggle performance HUD',
     category: 'Utility',
     defaultKeys: 'Ctrl+Alt+F',
-    note: 'FPS / heap / particle budget overlay. Ctrl+Shift+F stays on save-to-collection.',
+    note: 'FPS / heap / particle budget overlay. {keys} stays on save-to-collection.',
   },
 
   // Music
@@ -1853,16 +1863,39 @@ interface HandlerEntry {
 
 const handlers = new Map<string, HandlerEntry[]>();
 
+/**
+ * snd5: which view-registered commands are live says which study surface is up
+ * (a review session registers `flashcards.flip`, an open book `reader.pageNext`).
+ * Views re-register on every render that changes their deps, so the signal is
+ * coalesced: one event after the churn settles, not one per register/unregister.
+ */
+export const COMMAND_HANDLERS_EVENT = 'command-handlers-changed';
+let handlersSignal: ReturnType<typeof setTimeout> | null = null;
+function signalHandlersChanged(): void {
+  if (typeof window === 'undefined' || handlersSignal) return;
+  handlersSignal = setTimeout(() => {
+    handlersSignal = null;
+    window.dispatchEvent(new CustomEvent(COMMAND_HANDLERS_EVENT));
+  }, 120);
+}
+
+/** True while some mounted view has a handler registered for `id`. */
+export function hasCommandHandler(id: string): boolean {
+  return (handlers.get(id)?.length ?? 0) > 0;
+}
+
 export function registerCommandHandler(id: string, fn: Handler, opts?: CommandHandlerOptions): () => void {
   const entry: HandlerEntry = { fn, scope: opts?.scope };
   const list = handlers.get(id) ?? [];
   list.push(entry);
   handlers.set(id, list);
+  signalHandlersChanged();
   return () => {
     const cur = handlers.get(id);
     if (!cur) return;
     const i = cur.indexOf(entry);
     if (i >= 0) cur.splice(i, 1);
+    signalHandlersChanged();
   };
 }
 
@@ -2176,6 +2209,10 @@ function builtinHandler(id: string): Handler | null {
       return () => {
         void window.api?.relaunchApp?.();
       };
+    case 'app.lock':
+      return () => {
+        void lockGumNow();
+      };
     // The companion rows run in main (they act on other apps' windows). Pressed inside
     // Gum — or picked from the palette, or when Windows refused the chord — they take
     // the same path the OS hotkey would.
@@ -2190,6 +2227,7 @@ function builtinHandler(id: string): Handler | null {
     case 'lens.repeat':
     case 'lens.clipboard':
     case 'vn.toggleCapture':
+    case 'snip.toggle':
     case 'app.focus':
     case 'app.toggleMiniView':
       return () => {

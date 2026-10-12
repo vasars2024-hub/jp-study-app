@@ -40,10 +40,10 @@ import {
 } from '../../../shared/seanimeContinueWatching';
 import { MEDIA_WORKSPACE_OPEN_EVENT } from '../../../shared/mediaWorkspace';
 import { knowledgeCounts, onKnowledgeChanged } from '../../knownWords';
-import { dueDeckCards, loadDeck, onDeckChanged } from '../../flashcardDeck';
+import { deckDueForecast, dueDeckCards, loadDeck, onDeckChanged } from '../../flashcardDeck';
 import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
 import { summarizeReviewLog, type ReviewLogSummary } from '../../../shared/reviewLog';
-import { localDueForecast, type LocalDueForecast } from '../../../shared/reviewForecast';
+import type { LocalDueForecast } from '../../../shared/reviewForecast';
 import { getActiveProfile, onProfileChanged } from '../../profileState';
 import { syncKnowledgeFromAnki } from '../../ankiSync';
 import { LevelMeter } from '../LevelMeter';
@@ -420,7 +420,7 @@ export function StatsReviews() {
     };
     const refreshDeck = (): void => {
       const deck = loadDeck();
-      setForecast({ dueNow: dueDeckCards(deck).length, days: localDueForecast(deck, REVIEW_FORECAST_DAYS) });
+      setForecast({ dueNow: dueDeckCards(deck).length, days: deckDueForecast(deck, REVIEW_FORECAST_DAYS) });
     };
     refreshLog();
     refreshDeck();

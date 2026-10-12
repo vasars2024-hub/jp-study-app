@@ -48,9 +48,20 @@ import { AI_PROVIDERS } from './aiProviders';
  */
 export type AgentSpendPeriod = string;
 
+/**
+ * Billed cloud services that are not LLM providers, so not in `AI_PROVIDERS`,
+ * but whose spending still belongs in the monthly total (risk4: DeepL used to
+ * be checked against the ceiling and never added to it). Appended after the
+ * LLM providers, so existing documents and their order are unchanged, and a
+ * reader that does not know an id here simply drops the row (never a crash).
+ */
+export const SPEND_ONLY_PROVIDER_IDS = ['deepl'] as const;
+export type SpendOnlyProviderId = (typeof SPEND_ONLY_PROVIDER_IDS)[number];
+export type AgentSpendProviderId = AiProviderId | SpendOnlyProviderId;
+
 export interface AgentSpendEntry {
   period: AgentSpendPeriod;
-  providerId: AiProviderId;
+  providerId: AgentSpendProviderId;
   /** Sum of the priced requests only. Never negative, never `NaN`. */
   spentUsd: number;
   /** Requests whose cost is inside `spentUsd`. */
@@ -105,7 +116,14 @@ export const AGENT_SPEND_BUDGET_MAX_USD = 10_000;
  */
 export const AGENT_SPEND_EPSILON_USD = 1e-9;
 
-const PROVIDER_IDS: readonly AiProviderId[] = AI_PROVIDERS.map((provider) => provider.id);
+const PROVIDER_IDS: readonly AgentSpendProviderId[] = [
+  ...AI_PROVIDERS.map((provider) => provider.id),
+  ...SPEND_ONLY_PROVIDER_IDS,
+];
+
+export function isAgentSpendProviderId(value: unknown): value is AgentSpendProviderId {
+  return typeof value === 'string' && PROVIDER_ID_SET.has(value);
+}
 const PROVIDER_ID_SET: ReadonlySet<string> = new Set(PROVIDER_IDS);
 const PERIOD_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -173,7 +191,7 @@ export function normalizeAgentSpendLedger(value: unknown): AgentSpendLedger {
       const existing = merged.get(key);
       merged.set(key, {
         period: entry.period,
-        providerId: entry.providerId as AiProviderId,
+        providerId: entry.providerId as AgentSpendProviderId,
         spentUsd: (existing?.spentUsd ?? 0) + spent,
         requests: (existing?.requests ?? 0) + count(entry.requests),
         unpricedRequests: (existing?.unpricedRequests ?? 0) + count(entry.unpricedRequests),
@@ -202,7 +220,7 @@ export function pruneAgentSpendLedger(ledger: AgentSpendLedger): AgentSpendLedge
 export function agentSpendInPeriod(
   ledger: AgentSpendLedger,
   period: AgentSpendPeriod,
-  providerId?: AiProviderId,
+  providerId?: AgentSpendProviderId,
 ): number {
   let total = 0;
   for (const entry of ledger.entries) {
@@ -245,7 +263,7 @@ export function agentSpendTotals(
  */
 export function recordAgentSpend(
   ledger: AgentSpendLedger,
-  providerId: AiProviderId,
+  providerId: AgentSpendProviderId,
   costUsd: number | undefined,
   atMs: number,
 ): AgentSpendLedger {
@@ -323,5 +341,5 @@ export function agentSpendVerdict(
  */
 export interface AgentSpendGuard {
   verdict(estimatedCostUsd: number | undefined): AgentSpendVerdict;
-  record(providerId: AiProviderId, costUsd: number | undefined): void;
+  record(providerId: AgentSpendProviderId, costUsd: number | undefined): void;
 }

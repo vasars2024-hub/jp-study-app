@@ -56,4 +56,22 @@ export const LOCK_UPDATE_UI_ZH: Catalog = {
   'upd2.notes.open': '在 GitHub 上打开',
   'upd2.privacy':
     '隐私：安装版会在后台访问 github.com，GitHub 能看到你的 IP 地址。更新说明和上面的版本检查只在你点击按钮时才从 GitHub 获取。Gum 不会发送任何帐户、卡组或学习数据。',
+
+  'upd2.channel.beta': '测试版（包括预发布版本）',
+  'upd2.channel.betaNote': '测试版会在预发布版本发布后立即收到更新，可能还不够稳定。你随时可以切换回稳定版。',
+  'upd2.state.skipped': 'Gum {version} 已发布。你选择了跳过这个版本。',
+  'upd2.skip': '跳过 {version}',
+  'upd2.skippedNote': '正在跳过 {version}：Gum 不会提示或下载这个版本。',
+  'upd2.unskip': '取消跳过',
+  'upd2.unavailable.offline': '无法连接到 GitHub。请检查网络连接后重试。',
+  'upd2.unavailable.rateLimited': 'GitHub 目前正在限制来自你所在网络的请求。请在 {time} 之后重试。',
+  'upd2.unavailable.rateLimitedNoTime': 'GitHub 目前正在限制来自你所在网络的请求。请一小时后重试。',
+  'upd2.unavailable.http': 'GitHub 返回了错误。请稍后重试。',
+  'upd2.unavailable.invalid': 'GitHub 的回复不是版本信息。请稍后重试。',
+  'upd2.unavailable.disabled': '本次测试运行中已关闭更新检查。',
+  'upd2.restart.unsaved': '现在重启会中断{list}。',
+  'upd2.restart.anyway': '仍然重启',
+  'upd2.restart.notNow': '暂不',
+  'upd2.unsaved.recording': '正在进行的屏幕录制',
+  'upd2.unsaved.recording-finalize': '仍在保存的录制',
 };

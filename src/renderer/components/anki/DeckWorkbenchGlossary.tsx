@@ -18,7 +18,7 @@
  * The panel queues; it never applies. The preview, the outcome counts, the
  * refusals, Apply and Undo are all the tray's, unchanged.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type JSX } from 'react';
 import { ANKI_DRAFT_MAX_PAGE_SIZE, type AnkiDraft } from '../../../shared/ankiDraft';
 import {
   buildGlossarySource,

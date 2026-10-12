@@ -82,6 +82,11 @@
   stroke-width: 1;
 }
 
+/* wid5: the radar is decoration under the hands; it never takes a click. */
+:root[data-materials='wired'] .wgt-radar {
+  pointer-events: none;
+}
+
 :root[data-materials='wired'] .wgt-radar-ring,
 :root[data-materials='wired'] .wgt-radar-axis {
   fill: none;

@@ -70,7 +70,7 @@ export function redactSecrets(detail: string): string {
       // Header forms — Authorization, and the two custom headers this app sends.
       .replace(/Bearer\s+[A-Za-z0-9._-]{12,}/gi, 'Bearer [redacted]')
       .replace(
-        /\b(x-api-key|x-seanime-token|authorization)\b(\s*[:=]\s*)\S+/gi,
+        /\b(x-goog-api-key|x-api-key|x-seanime-token|authorization)\b(\s*[:=]\s*)\S+/gi,
         '$1$2[redacted]',
       )
       // Field forms — `"apiKey":"…"`, `clientSecret=…`, `password: '…'`. Covers

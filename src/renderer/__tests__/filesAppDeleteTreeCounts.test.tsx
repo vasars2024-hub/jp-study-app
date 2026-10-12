@@ -138,21 +138,21 @@ const ITEMS: FilesItem[] = [
     name: 'Alpha note',
     kind: 'note',
     categoryId: 'outputs/notes',
-    location: { store: 'localStorage', key: 'jp-notes-v1', describes: 'a note' },
+    location: { store: 'localStorage', key: 'jp-notes-v1' },
   }),
   item({
     id: 'note:2',
     name: 'Beta note',
     kind: 'note',
     categoryId: 'outputs/notes',
-    location: { store: 'localStorage', key: 'jp-notes-v1', describes: 'a note' },
+    location: { store: 'localStorage', key: 'jp-notes-v1' },
   }),
   item({
     id: 'note:3',
     name: 'Gamma note',
     kind: 'note',
     categoryId: 'outputs/notes',
-    location: { store: 'localStorage', key: 'jp-notes-v1', describes: 'a note' },
+    location: { store: 'localStorage', key: 'jp-notes-v1' },
   }),
   item({
     id: 'hl:1',
@@ -163,7 +163,7 @@ const ITEMS: FilesItem[] = [
     // `preserved` row in `FILES_ROUTE_PARITY` — i.e. an item the user can also
     // reach somewhere else, which is the only case D343 is about.
     source: 'library',
-    location: { store: 'localStorage', key: 'jp-highlights-v1', describes: 'a highlight' },
+    location: { store: 'localStorage', key: 'jp-highlights-v1' },
   }),
 ];
 

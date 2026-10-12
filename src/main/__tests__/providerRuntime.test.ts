@@ -61,7 +61,10 @@ describe('main-owned AI provider runtime', () => {
       estimatedCostUsd: 0.00004,
     });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('/models/gemini-2.5-flash:generateContent?key=gemini-key');
+    // The key travels in a header, never in the URL (audit R4).
+    expect(url).toMatch(/\/models\/gemini-2\.5-flash:generateContent$/);
+    expect(url).not.toContain('gemini-key');
+    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('gemini-key');
     const body = JSON.parse(String(init.body)) as {
       generationConfig: Record<string, unknown>;
     };
@@ -164,8 +167,9 @@ describe('main-owned AI provider runtime', () => {
       delivery: 'streamed',
       usage: { inputTokens: 8, outputTokens: 3, totalTokens: 11, estimatedCostUsd: 0.000014 },
     });
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain(':streamGenerateContent?alt=sse&key=gemini-key');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/:streamGenerateContent\?alt=sse$/);
+    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('gemini-key');
   });
 
   it('streams DeepSeek deltas and requests final usage', async () => {

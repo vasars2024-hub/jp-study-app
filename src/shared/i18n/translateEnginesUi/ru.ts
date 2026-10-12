@@ -34,6 +34,19 @@ export const TRANSLATE_ENGINES_UI_RU: Catalog = {
   'xlate2.result.by': 'Перевод: {provider}',
   'xlate2.result.fellBack': '{provider} не смог перевести этот текст ({reason}), поэтому перевела офлайн-модель.',
   'xlate2.error.cloud': '{provider} не смог перевести этот текст: {reason}.',
+  'xlate2.error.chain': 'Ни один движок не смог перевести этот текст. {details}.',
+  'xlate2.error.attempt': '{provider} — {reason}',
+  'xlate2.result.cached': 'Мгновенно (переведено ранее)',
+  'xlate2.result.cachedHint': 'Этот же текст только что переводился тем же движком с теми же настройками, поэтому перевод взят повторно и ничего не отправлялось.',
+  'xlate2.result.partial': 'Неполный перевод: {missing} из {total} предложений остались без перевода даже после повторного запроса (предложение {sentences}). Результат не сохранён; переведите ещё раз, чтобы повторить.',
+
+  'xlate2.back.action': 'Обратный перевод',
+  'xlate2.back.actionAll': 'Обратный перевод всего',
+  'xlate2.back.hint': 'Перевести обратно на язык «{lang}», чтобы проверить, сохранился ли смысл',
+  'xlate2.back.label': 'Обратно на «{lang}»:',
+  'xlate2.back.working': 'Перевожу обратно…',
+  'xlate2.back.failed': 'Не удалось перевести обратно: {reason}',
+  'xlate2.keysHintMore': 'Esc — остановить · Alt+B — обратный перевод всех предложений',
 
   // ---- Why a cloud engine did not answer ----
   'xlate2.fallback.consent': 'вы не разрешили отправлять ему текст',
@@ -42,6 +55,7 @@ export const TRANSLATE_ENGINES_UI_RU: Catalog = {
   'xlate2.fallback.rateLimit': 'слишком много запросов, повторите чуть позже',
   'xlate2.fallback.quota': 'квота аккаунта исчерпана',
   'xlate2.fallback.spend': 'будет превышен месячный лимит расходов',
+  'xlate2.fallback.offline': 'компьютер не подключён к сети, поэтому ничего не отправлялось',
   'xlate2.fallback.network': 'сервис недоступен',
   'xlate2.fallback.timeout': 'истекло время ожидания запроса',
   'xlate2.fallback.invalid': 'ответ не оказался пригодным переводом',
@@ -73,6 +87,8 @@ export const TRANSLATE_ENGINES_UI_RU: Catalog = {
     many: 'Ещё {count} терминов относятся к другим языковым парам.',
     other: 'Ещё {count} термина относятся к другим языковым парам.',
   },
+  'xlate2.glossary.namesTitle': 'Имена в этом тексте ({count})',
+  'xlate2.glossary.namesHint': 'Имя будет писаться одинаково во всех переводах. Написание берётся из словарного чтения, а не из текста, — проверьте его перед сохранением.',
   'xlate2.glossary.report': 'Термины глоссария соблюдены: {count} из {total}.',
   'xlate2.glossary.missing': 'Не соблюдены: {terms}.',
 

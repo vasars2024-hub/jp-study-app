@@ -21,6 +21,18 @@ export interface WriteSourceCard {
   reading?: string;
   meaning?: string;
   sentence?: string;
+  /**
+   * Answers the learner explicitly accepted for this card ("Accept my answer as
+   * correct"). `meaning` answers word→meaning questions, `target` meaning→word.
+   */
+  acceptedAnswers?: { meaning?: readonly string[]; target?: readonly string[] };
+}
+
+/** The learner's own accepted answers for one side, cleaned. Never the canonical answer. */
+function learnerAccepted(card: WriteSourceCard, side: 'meaning' | 'target'): string[] {
+  const list = card.acceptedAnswers?.[side];
+  if (!Array.isArray(list)) return [];
+  return list.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean);
 }
 
 /**
@@ -212,7 +224,12 @@ export function buildWriteQuestion(
     // sentence fallback is never split, its commas are just punctuation.
     const variants = card.word?.trim() ? japaneseVariants(japanese) : [];
     const accepted = [
-      ...new Set([japanese, ...variants, ...(reading && reading !== japanese ? [reading] : [])]),
+      ...new Set([
+        japanese,
+        ...variants,
+        ...(reading && reading !== japanese ? [reading] : []),
+        ...learnerAccepted(card, 'target'),
+      ]),
     ];
     return {
       cardId: card.id,
@@ -233,7 +250,12 @@ export function buildWriteQuestion(
     prompt: japanese,
     answer: meaning,
     accepted: [
-      ...new Set([meaning, ...glossSenses(meaning), ...glossSenses(meaning).map(withoutParentheticals)]),
+      ...new Set([
+        meaning,
+        ...glossSenses(meaning),
+        ...glossSenses(meaning).map(withoutParentheticals),
+        ...learnerAccepted(card, 'meaning'),
+      ]),
     ].filter(Boolean),
     hint: reading && reading !== japanese ? reading : '',
     answerLength: [...meaning].length,

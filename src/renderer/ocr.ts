@@ -2,6 +2,7 @@
 // One worker is kept alive per language so repeat scans are fast; the first
 // scan downloads the engine + language data (a few MB) from the CDN.
 import { createWorker, type Worker } from 'tesseract.js';
+import type { TesseractPageLike } from '../shared/lensBasicOcr';
 
 /** 'jpn' = horizontal text, 'jpn_vert' = vertical (most manga speech bubbles). */
 export type OcrLang = 'jpn' | 'jpn_vert';
@@ -103,12 +104,15 @@ async function withoutTesseractParamWarnings<T>(fn: () => Promise<T>): Promise<T
   }
 }
 
-/** Recognize Japanese text in a base64 image data URL. Returns cleaned text. */
-export async function runOcr(
-  dataUrl: string,
+/**
+ * One recognition on the cached worker for `lang`, with the timeout, the
+ * dead-worker eviction and the progress slot every caller needs.
+ */
+async function recognizeOnWorker<T>(
   lang: OcrLang,
-  onProgress?: (p: number) => void,
-): Promise<string> {
+  onProgress: ((p: number) => void) | undefined,
+  call: (worker: Worker) => Promise<T>,
+): Promise<T> {
   activeProgress = onProgress ?? null;
   const cached = getWorker(lang);
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -119,11 +123,7 @@ export async function runOcr(
         reject(Object.assign(new Error('OCR did not finish in time.'), { name: 'TimeoutError' }));
       }, OCR_RECOGNIZE_TIMEOUT_MS);
     });
-    const { data } = await Promise.race([
-      withoutTesseractParamWarnings(() => worker.recognize(dataUrl)),
-      deadline,
-    ]);
-    return cleanJapanese(data.text);
+    return await Promise.race([withoutTesseractParamWarnings(() => call(worker)), deadline]);
   } catch (err) {
     // A worker that timed out or threw mid-call may be dead; never hand it to
     // the next scan. (A start failure has already removed itself.)
@@ -133,6 +133,31 @@ export async function runOcr(
     if (timer) clearTimeout(timer);
     activeProgress = null;
   }
+}
+
+/** Recognize Japanese text in a base64 image data URL. Returns cleaned text. */
+export async function runOcr(
+  dataUrl: string,
+  lang: OcrLang,
+  onProgress?: (p: number) => void,
+): Promise<string> {
+  const { data } = await recognizeOnWorker(lang, onProgress, (worker) => worker.recognize(dataUrl));
+  return cleanJapanese(data.text);
+}
+
+/**
+ * Recognize a page and keep its layout: blocks → paragraphs → lines, each line
+ * with its box and confidence. What the Reading Lens's bundled recognizer
+ * (`shared/lensBasicOcr.ts`) needs to place a hotspot over every line.
+ */
+export async function recognizeOcrPage(
+  dataUrl: string,
+  lang: OcrLang,
+  onProgress?: (p: number) => void,
+): Promise<TesseractPageLike> {
+  const { data } = await recognizeOnWorker(lang, onProgress, (worker) =>
+    worker.recognize(dataUrl, {}, { blocks: true, text: true }));
+  return data as unknown as TesseractPageLike;
 }
 
 /**

@@ -45,6 +45,13 @@ import type { AgentAutomationRun } from '../../shared/localAgentAutomationRuns';
 import type { AgentAutomation } from '../../shared/localAgentAutomation';
 import { en } from '../../shared/i18n/catalogs';
 
+/** A plain (non-plural) English catalog string. */
+function enText(key: string): string {
+  const entry = en[key];
+  if (typeof entry !== 'string') throw new Error(`no plain catalog string "${key}"`);
+  return entry;
+}
+
 const SETTINGS_KEY = 'jp-study-local-agent-settings-v1';
 
 function automation(id: string, name: string): AgentAutomation {
@@ -150,7 +157,7 @@ describe('the schedule table reports what actually happened', () => {
     const text = lastRunText('Morning review');
     // Compared against the catalog, so a missing key fails here instead of
     // rendering a raw key at the user.
-    expect(text).toContain(en['blanc.agent.run.missed'].split('{time}')[1].trim());
+    expect(text).toContain(enText('blanc.agent.run.missed').split('{time}')[1].trim());
     expect(text).not.toBe('');
   });
 
@@ -161,8 +168,8 @@ describe('the schedule table reports what actually happened', () => {
     );
 
     const text = lastRunText('Morning review');
-    expect(text).toContain(en['blanc.agent.run.delivered'].split('{time}')[0].trim());
-    expect(text).not.toContain(en['blanc.agent.run.missed'].split('{time}')[1].trim());
+    expect(text).toContain(enText('blanc.agent.run.delivered').split('{time}')[0].trim());
+    expect(text).not.toContain(enText('blanc.agent.run.missed').split('{time}')[1].trim());
   });
 
   it('says a delivered fire failed before a plan was queued', async () => {
@@ -178,9 +185,9 @@ describe('the schedule table reports what actually happened', () => {
     );
 
     const text = lastRunText('Morning review');
-    expect(text).toContain(en['blanc.agent.run.failed'].split('{time}')[0].trim());
+    expect(text).toContain(enText('blanc.agent.run.failed').split('{time}')[0].trim());
     expect(text).toContain(en['blanc.agent.run.failure.planner-unavailable']);
-    expect(text).not.toContain(en['blanc.agent.run.delivered'].split('{time}')[0].trim());
+    expect(text).not.toContain(enText('blanc.agent.run.delivered').split('{time}')[0].trim());
   });
 
   /**
@@ -220,6 +227,6 @@ describe('the schedule table reports what actually happened', () => {
     );
 
     expect(lastRunText('Morning review'))
-      .toContain(en['blanc.agent.run.missed'].split('{time}')[1].trim());
+      .toContain(enText('blanc.agent.run.missed').split('{time}')[1].trim());
   });
 });

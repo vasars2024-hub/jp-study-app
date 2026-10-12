@@ -93,7 +93,9 @@ import { AgentSpendPanel } from './AgentSpendPanel';
 import {
   AGENT_CLOUD_TARGETS,
   agentTargetLabel,
+  agentOfflinePreflight,
   executionErrorKey,
+  readOnline,
   executionErrorNeedsSetup,
   isAgentCloudTarget,
   newAgentConversationId,
@@ -120,7 +122,7 @@ import {
   onLocalAgentSettingsChanged,
   saveLocalAgentSettings,
 } from '../../localAgentSettingsStore';
-import { shouldAskCloudStudyDataConsent } from '../../../shared/agentCloudStudyDataGate';
+import { cloudMayReceiveStudyData, shouldAskCloudStudyDataConsent } from '../../../shared/agentCloudStudyDataGate';
 import { AgentPromptLibrary } from './AgentPromptLibrary';
 import { AgentContextSuggestions } from './AgentContextSuggestions';
 import { AgentPipelineTerminal } from './AgentPipelineTerminal';
@@ -1370,6 +1372,8 @@ export default function AgentWorkspaceShell() {
     text: string;
   } | null>(null);
   const [planQueueFailure, setPlanQueueFailure] = useState<string | null>(null);
+  // Which rule refused, in the UI language (the executor's own sentence is English).
+  const [planQueueFailureDetail, setPlanQueueFailureDetail] = useState<string | null>(null);
   const [maxInputChars, setMaxInputChars] = useState(AGENT_EXECUTION_DEFAULT_INPUT_BUDGET);
   const [maxOutputTokens, setMaxOutputTokens] = useState(AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET);
   /**
@@ -1523,6 +1527,21 @@ export default function AgentWorkspaceShell() {
   const [streamedText, setStreamedText] = useState('');
   const [executionFailure, setExecutionFailure] =
     useState<AgentExecutionFailureCode | null>(null);
+  // The browser's own connectivity signal, followed live for the composer's offline note.
+  const [online, setOnline] = useState(readOnline);
+  useEffect(() => {
+    const update = (): void => setOnline(readOnline());
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
+  // Back online: an offline refusal from the preflight no longer describes anything.
+  useEffect(() => {
+    if (online) setExecutionFailure((current) => (current === 'network' ? null : current));
+  }, [online]);
   const railRef = useRef<HTMLUListElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1902,6 +1921,12 @@ export default function AgentWorkspaceShell() {
       || visionUnsupported
       || (sensitiveConsentRequired && !cloudSensitiveConsent)
     ) return;
+    // No network and a cloud target: say so now, not after a request that cannot leave.
+    const offline = agentOfflinePreflight(target, readOnline(), allowLocalFallback);
+    if (offline) {
+      setExecutionFailure(offline);
+      return;
+    }
     const requestId = newAgentExecutionId();
     const basePolicy = defaultAgentExecutionPolicy(target);
     // Read at submit rather than held in state: this is the policy the user had
@@ -1932,6 +1957,9 @@ export default function AgentWorkspaceShell() {
       },
       allowLocalFallback: target === 'local' ? false : allowLocalFallback,
       attachments,
+      // Main strips saved words and review sessions from a cloud request unless
+      // this is true; `unset` (never answered) counts as "do not share".
+      shareStudyData: cloudMayReceiveStudyData(executionSettings.agentCloudShareStudyData),
     };
     setRunningRequestId(requestId);
     setRunningPrompt(prompt);
@@ -2258,6 +2286,14 @@ export default function AgentWorkspaceShell() {
                         {t('agent.rail.cloud')}
                       </span>
                     ) : null}
+                    {summary.trimmedMessages > 0 ? (
+                      <span
+                        className="agent-chip agent-chip-trimmed"
+                        title={t('agent.history.trimmedHint', { count: summary.trimmedMessages })}
+                      >
+                        {t('agent.history.trimmedChip')}
+                      </span>
+                    ) : null}
                   </span>
                 </button>
                 <button
@@ -2274,6 +2310,12 @@ export default function AgentWorkspaceShell() {
             ))}
           </ul>
           )}
+
+          {state?.droppedConversations ? (
+            <p className="agent-history-notice agent-history-dropped" role="note">
+              {t('agent.history.droppedConversations', { count: state.droppedConversations })}
+            </p>
+          ) : null}
 
           <div className="agent-rail-foot">
             {pendingClear ? (
@@ -2444,6 +2486,11 @@ export default function AgentWorkspaceShell() {
                   : ' is-inspector-collapsed'}`}
               >
                 <div className="agent-conversation-main">
+                {selected.trimmedMessages ? (
+                  <p className="agent-history-notice agent-history-trimmed" role="note">
+                    {t('agent.history.trimmedHeader', { count: selected.trimmedMessages })}
+                  </p>
+                ) : null}
                 {selected.messages.length === 0 ? (
                 <p className="agent-placeholder">{t('agent.conversation.empty')}</p>
               ) : (
@@ -2836,6 +2883,9 @@ export default function AgentWorkspaceShell() {
                 {executionFailure && executionErrorNeedsSetup(executionFailure) ? (
                   <AiSetupPrompt compact reasonKey="settings.ai.setup.fixHere" />
                 ) : null}
+                {!online && target !== 'local' && executionFailure !== 'network' ? (
+                  <p className="agent-offline-note" role="status">{t('agent.execute.offlineNow')}</p>
+                ) : null}
 
                 {knownInputOverBudget ? (
                   <p className="agent-message-error" role="alert">
@@ -3029,14 +3079,19 @@ export default function AgentWorkspaceShell() {
                         conversationId={selected.id}
                         queue={approvalContext?.queue ?? null}
                         disabled={blocked}
-                        onFailure={setPlanQueueFailure}
+                        onFailure={(code, detail) => {
+                          setPlanQueueFailure(code);
+                          setPlanQueueFailureDetail(detail ?? null);
+                        }}
                         onTimeline={recordTimelineProjection}
                         onOperation={appendOperation}
+                        operationLog={operationLog}
                       />
                       <AgentPipelineTerminal lines={pipelineLines} />
                       {planQueueFailure ? (
                         <p className="agent-plan-error" role="alert">
                           {t(`agent.plan.queue.error.${planQueueFailure}`)}
+                          {planQueueFailureDetail ? ` ${planQueueFailureDetail}` : null}
                         </p>
                       ) : null}
                       <ActivityTimeline entries={agentTimelineForConversation(timeline, selected.id)} />

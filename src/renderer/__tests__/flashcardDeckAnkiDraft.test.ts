@@ -13,8 +13,10 @@ import {
   FLASHCARD_DECK_EVENT,
   FLASHCARD_DECK_STORAGE_KEY,
   loadDeckAsAnkiDraft,
+  loadDeckFingerprint,
   parseFlashcardDeckStore,
   setDeckCardFolder,
+  updateDeckCard,
 } from '../flashcardDeck';
 import { LOCAL_DECK_NOTE_TYPE_NAME } from '../../shared/ankiLocalDeck';
 
@@ -128,5 +130,22 @@ describe('loadDeckAsAnkiDraft', () => {
 
     addDeckCards([{ word: '川', reading: 'かわ', meaning: 'river', source: 'epub' }]);
     expect(loadDeckAsAnkiDraft().draft.source.fingerprint).not.toBe(first);
+  });
+
+  it('answers "did the deck change" without building the draft, with the draft\'s own fingerprint', () => {
+    const [card] = addDeckCards([{ word: '森', reading: 'もり', meaning: 'forest', source: 'epub' }]);
+    expect(loadDeckFingerprint()).toBe(loadDeckAsAnkiDraft().draft.source.fingerprint);
+    const before = loadDeckFingerprint();
+    updateDeckCard(card.id, { meaning: 'woods' });
+    expect(loadDeckFingerprint()).not.toBe(before);
+    expect(loadDeckFingerprint()).toBe(loadDeckAsAnkiDraft().draft.source.fingerprint);
+  });
+
+  it('a rebuild after an edit normalizes the edited field again and reuses the rest', () => {
+    const [card] = addDeckCards([{ word: '月', reading: 'つき', meaning: 'moon<br>month', source: 'epub' }]);
+    const field = () => loadDeckAsAnkiDraft().draft.notes[0].fields.find((f) => f.name === 'Meaning');
+    expect(field()?.normalized).toBe('moon month');
+    updateDeckCard(card.id, { meaning: 'moon<b>light</b>' });
+    expect(field()).toMatchObject({ raw: 'moon<b>light</b>', normalized: 'moon light' });
   });
 });

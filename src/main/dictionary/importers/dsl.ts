@@ -82,7 +82,7 @@ export function importDsl(db: SqliteDb, text: string, options: DslImportOptions 
       }
       let primaryId: number | null = null;
       for (const headword of entry.headwords) {
-        const id = Number(insertHeadword.run(dictId, sourceLang, headword, normalizeForLookup(headword), primaryId).lastInsertRowid);
+        const id: number = Number(insertHeadword.run(dictId, sourceLang, headword, normalizeForLookup(headword), primaryId).lastInsertRowid);
         primaryId ??= id;
         counts.headwords += 1;
       }

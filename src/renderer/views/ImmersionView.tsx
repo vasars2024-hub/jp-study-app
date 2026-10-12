@@ -31,7 +31,9 @@ import {
   createWebview,
   useImmersion,
 } from '../components/immersion/ImmersionContent';
+import { Imm5ReaderBar } from '../components/immersion/ImmersionStudy5';
 import { openSectionSurface } from '../sectionSurface';
+import { withShortcut } from '../shortcutHints';
 
 export default function ImmersionView() {
   const aero = useAeroMaterials();
@@ -241,7 +243,13 @@ export default function ImmersionView() {
               className={`aero-immersion-icon-btn ${state.currentBookmark ? 'active' : ''}`}
               aria-label={t('immersion.saveSite')}
               aria-pressed={state.currentBookmark !== null}
-              title={!currentUrl ? t('immersion.reason.noPage') : state.currentBookmark ? t('immersion.bookmark.unstar') : t('immersion.saveSite')}
+              title={
+                !currentUrl
+                  ? t('immersion.reason.noPage')
+                  : state.currentBookmark
+                    ? t('immersion.bookmark.unstar')
+                    : withShortcut(t('immersion.saveSite'), 'immersion.bookmark')
+              }
               disabled={!currentUrl}
               onClick={() => void state.saveCurrentSite()}
             >
@@ -284,6 +292,9 @@ export default function ImmersionView() {
                   <strong>{currentUrl ? title : t('immersion.aero.newPage')}</strong>
                 </div>
                 {currentUrl && <span className="aero-immersion-host">{new URL(currentUrl).host}</span>}
+                {state.showReader && readerHtmlProp && (
+                  <Imm5ReaderBar study={state.study5} canSave={!!currentUrl} />
+                )}
               </div>
 
               <div className="aero-immersion-surface">
@@ -325,7 +336,8 @@ export default function ImmersionView() {
                 {state.showReader && readerHtmlProp && (
                   <div
                     ref={state.readerRef}
-                    className={`immersion-reader aero-immersion-reader wk-on${splitView ? ' immersion-split-reader' : ''}`}
+                    className={`immersion-reader aero-immersion-reader wk-on${splitView ? ' immersion-split-reader' : ''}${state.study5.hideFurigana ? ' imm5-hide-furigana' : ''}${state.study5.vertical ? ' imm5-vertical' : ''}`}
+                    lang={state.studyLang}
                     onPointerDown={state.onReaderPointerDown}
                     data-dict-owner=""
                     onMouseUp={state.onReaderMouseUp}

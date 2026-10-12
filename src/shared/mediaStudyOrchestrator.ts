@@ -74,6 +74,12 @@ export interface StudyContextRef {
    */
   bookLocation?: string;
   bookPercent?: number;
+  /**
+   * The public page at the scene, when the media came from the web: a YouTube
+   * watch link with `&t=`, so the card reopens there even after the local
+   * download is gone.
+   */
+  webUrl?: string;
   sessionId?: string;
   returnTarget?: {
     section: 'video' | 'flashcards' | 'anki' | 'study';

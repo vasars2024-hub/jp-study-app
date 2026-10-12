@@ -23,6 +23,7 @@
  * that occur in the passage being translated.
  */
 import type { TranslateSenseHint } from './translateCore';
+import { kanaToRomaji } from './readingListMatching';
 
 export interface TranslateGlossaryTerm {
   source: string;
@@ -332,6 +333,87 @@ export function suggestGlossaryFromDeck(
     if (!gloss) continue;
     known.add(word);
     out.push({ source: word, target: gloss });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Names in the passage
+// ---------------------------------------------------------------------------
+
+/** What a name suggestion reads from a tokenizer token; the renderer's `JpToken` satisfies it. */
+export interface GlossaryNameToken {
+  surface: string;
+  /** Katakana or hiragana reading from the dictionary. */
+  reading?: string;
+  /** IPADIC 固有名詞: a person, place or organisation name. */
+  proper?: boolean;
+}
+
+const HAS_KANJI_OR_KATAKANA = /[\u30a0-\u30ff\u3400-\u9fff]/;
+
+/**
+ * A name's reading as the romanization English text actually uses: Hepburn
+ * without long-vowel marks (さとう → Sato, とうきょう → Tokyo, おおさか →
+ * Osaka), each part capitalised. Null when the reading is not plain kana.
+ */
+export function romanizeNameReading(reading: string): string | null {
+  const roma = kanaToRomaji(reading.trim());
+  if (!roma || roma === reading.trim() || !/^[a-z' ]+$/.test(roma)) return null;
+  const simplified = roma
+    .replace(/ou/g, 'o')
+    .replace(/uu/g, 'u')
+    .replace(/oo/g, 'o')
+    .replace(/'/g, '');
+  return simplified
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+/**
+ * Proper nouns in the passage, offered as glossary terms that keep them stable:
+ * a model that renders 春香 as "Haruka" in one sentence and "Spring Fragrance"
+ * in the next is the most common complaint about machine translation of
+ * fiction. Adjacent name tokens (田中 + 太郎) are offered as one name.
+ *
+ * Only for a Latin-script target (English): the romanization is the rendering.
+ * Never a term already in the glossary; longest first.
+ */
+export function suggestNameTerms(
+  tokens: readonly GlossaryNameToken[],
+  target: string,
+  existing: readonly TranslateGlossaryTerm[],
+  limit = 6,
+): TranslateGlossaryTerm[] {
+  if (baseLang(target) !== 'en') return [];
+  const known = new Set(existing.map((term) => term.source));
+  const runs: Array<{ surface: string; parts: string[] }> = [];
+  let current: { surface: string; parts: string[] } | null = null;
+  for (const token of tokens) {
+    const surface = typeof token.surface === 'string' ? token.surface : '';
+    const reading = typeof token.reading === 'string' ? token.reading : '';
+    const roman = token.proper && HAS_KANJI_OR_KATAKANA.test(surface) && reading ? romanizeNameReading(reading) : null;
+    if (!roman) {
+      current = null;
+      continue;
+    }
+    if (current) {
+      current.surface += surface;
+      current.parts.push(roman);
+    } else {
+      current = { surface, parts: [roman] };
+      runs.push(current);
+    }
+  }
+  const out: TranslateGlossaryTerm[] = [];
+  const seen = new Set<string>();
+  for (const run of [...runs].sort((a, b) => b.surface.length - a.surface.length)) {
+    if (seen.has(run.surface) || known.has(run.surface) || run.surface.length > MAX_GLOSSARY_TERM_CHARS) continue;
+    seen.add(run.surface);
+    out.push({ source: run.surface, target: run.parts.join(' ') });
     if (out.length >= limit) break;
   }
   return out;

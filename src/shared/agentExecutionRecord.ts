@@ -31,6 +31,11 @@ interface AgentOperationRecordContract {
   claim: AgentOperationClaim;
   entityType: string;
   entityIds: (result: unknown) => string[];
+  /**
+   * For an `updated` claim that CAN be taken back: the inverse call's arguments, read off
+   * the adapter's own result. Absent means the update is recorded but not undoable.
+   */
+  inverseArguments?: (result: unknown) => Array<Record<string, unknown>> | null;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -109,6 +114,29 @@ export const AGENT_OPERATION_RECORD_CONTRACTS: Readonly<
     entityType: 'calendar-event',
     entityIds: objectId,
   },
+  // A planned week lands as several events in one confirmed step; each id is returned,
+  // so the whole batch is one Undo away (one `calendar.delete-event` per id).
+  'calendar.schedule-sessions': {
+    claim: 'created',
+    entityType: 'calendar-event',
+    entityIds: propertyIds('createdIds'),
+  },
+  // A move is undoable: the adapter returns where the event was (or the series it was split
+  // from) and where it put it; the inverse refuses unless it is still exactly there.
+  'calendar.reschedule-event': {
+    claim: 'updated',
+    entityType: 'calendar-event',
+    entityIds: propertyId('id'),
+    inverseArguments: (result) => {
+      const raw = record(result);
+      const undo = record(raw?.undo);
+      const id = stringId(raw?.id)[0];
+      const date = stringId(record(undo?.expect)?.date)[0];
+      if (!raw || !undo || !id || !date || (undo.kind !== 'restore' && undo.kind !== 'rejoin')) return null;
+      // `date` satisfies the operation's required arguments; the `undo` object is what runs.
+      return [{ id, date, undo }];
+    },
+  },
   'media.add-item': {
     claim: 'created',
     entityType: 'media-item',
@@ -149,7 +177,9 @@ export function agentOperationDraftFromExecution(
   if (!contract) return null;
   const entityIds = contract.entityIds(step.result);
   if (entityIds.length === 0) return null;
+  const inverseArguments = contract.inverseArguments?.(step.result) ?? null;
   return {
+    ...(inverseArguments ? { inverseArguments } : {}),
     operation: step.request.operation,
     claim: contract.claim,
     entityType: contract.entityType,

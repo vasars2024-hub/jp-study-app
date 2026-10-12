@@ -162,6 +162,8 @@ export interface ChineseLookupDeps {
   loadCedictText: () => Promise<string>;
   /** Which script the learner reads, for headwords the query does not settle. */
   script?: () => 'simplified' | 'traditional';
+  /** A lookup found no Chinese dictionary at all (risk4: the renderer offers the download). */
+  onMissing?: () => void;
 }
 
 /**
@@ -301,9 +303,13 @@ export async function lookupChineseTerm(
       } catch {
         /* unreadable database: nothing installed that can answer */
       }
-      return databaseHasChinese
-        ? { query: q, entries: [] }
-        : { query: q, entries: [], missingSourceLangs: ['zh'] };
+      if (databaseHasChinese) return { query: q, entries: [] };
+      try {
+        deps.onMissing?.();
+      } catch {
+        /* the prompt is a courtesy; the result below still says it */
+      }
+      return { query: q, entries: [], missingSourceLangs: ['zh'] };
     }
     return result ?? { query: q, entries: [], error: err instanceof Error ? err.message : String(err) };
   }

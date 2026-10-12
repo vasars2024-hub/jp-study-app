@@ -86,7 +86,8 @@ export interface FusionArbitrationSummary {
   /** Batches whose request or parse produced nothing. */
   failedBatches: number;
   /** Why no verdicts were produced, when none were; `null` when it ran. */
-  skipped: 'no-key' | 'no-candidates' | 'cancelled' | null;
+  /** cloud-off: the user turned the fusion second opinion's cloud opt-in off. */
+  skipped: 'no-key' | 'no-candidates' | 'cancelled' | 'cloud-off' | null;
   /**
    * Failed batches counted by reason, e.g. `{ timeout: 1 }` — the provider's own
    * error code for a request that threw, or `unparsable` / `empty` / `rejected`
@@ -199,6 +200,7 @@ const ARBITRATION_SKIPS: readonly FusionArbitrationSummary['skipped'][] = [
   'no-key',
   'no-candidates',
   'cancelled',
+  'cloud-off',
   null,
 ];
 
@@ -363,7 +365,7 @@ export type FusionArbitrationStatus =
   /** No `arbitration` field — the sidecar predates it and says nothing. */
   | { kind: 'unknown' }
   /** Never asked, and the reason is not a failure. */
-  | { kind: 'off'; reason: 'no-key' | 'no-candidates' | 'cancelled' }
+  | { kind: 'off'; reason: 'no-key' | 'no-candidates' | 'cancelled' | 'cloud-off' }
   /** Asked, and every batch came back unusable. */
   | { kind: 'failed'; failedBatches: number }
   /** Asked, some verdicts landed, some batches did not. */

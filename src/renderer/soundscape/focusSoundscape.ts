@@ -20,7 +20,7 @@
 import { onFocusModeChanged, loadFocusMode } from '../focusMode';
 import { isPomodoroOnBreak, isPomodoroWorkRunning, onTimersChanged } from '../widgets/timerStore';
 import { writeLocalStorageJson } from '../localStorageWrite';
-import { fadeOutSoundscape, isSoundscapePlaying, startSoundscape, subscribeSoundscape } from './soundscapeStore';
+import { breakFadeSeconds, fadeOutSoundscape, isSoundscapePlaying, startSoundscape, subscribeSoundscape } from './soundscapeStore';
 
 export interface FocusSoundscapeSettings {
   /** Master switch for the whole link. Off by default: sound must be asked for. */
@@ -155,7 +155,8 @@ function sync(reason: Reason, now: number = Date.now()): void {
       // The block ended (break) or was paused/reset. "Fade on break" off means
       // the sound carries on until the user stops it.
       if (s.fadeOnBreak) {
-        fadeOutSoundscape(isPomodoroOnBreak() ? BREAK_FADE_SECONDS : EXIT_FADE_SECONDS);
+        // snd5: the mixer's fade schedule sets the break fade (6 s on "quick").
+        fadeOutSoundscape(isPomodoroOnBreak() ? Math.max(BREAK_FADE_SECONDS, breakFadeSeconds()) : EXIT_FADE_SECONDS);
         autoStarted = false;
       }
     } else {

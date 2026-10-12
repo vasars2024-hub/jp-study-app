@@ -140,6 +140,15 @@ export interface StudyProfile {
   noteCss?: string;
 }
 
+/**
+ * What `profile:update` accepts. `card` and `anki` are merged shallowly into the
+ * stored ones (main/profiles.ts `updateProfile`), so a patch may name one key of them.
+ */
+export type StudyProfilePatch = Omit<Partial<StudyProfile>, 'card' | 'anki'> & {
+  card?: Partial<CardBlueprint>;
+  anki?: Partial<AnkiBinding>;
+};
+
 /** Durable store shape — userData/profiles.json. */
 export interface ProfileStoreSchema {
   schemaVersion: 1;

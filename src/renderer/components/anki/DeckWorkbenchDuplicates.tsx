@@ -14,7 +14,7 @@
  * filter also composes: `Expression:script:latin` then a duplicate scan is a
  * real audit query.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type JSX } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   NEAR_MAX_COMPARISONS,

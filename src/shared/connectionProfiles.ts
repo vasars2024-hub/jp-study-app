@@ -43,6 +43,7 @@ import {
   type ScraperSettings,
   type ScraperSettingsValidationResult,
 } from './scraperSettings';
+import type { ScraperSettingsIssue } from './scraperSettingsPrimitives';
 
 export const CONNECTION_PROFILES_VERSION = 1;
 export const CONNECTION_PROFILE_HISTORY_LIMIT = 20;

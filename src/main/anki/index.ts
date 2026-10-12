@@ -36,7 +36,9 @@ import {
 import type { CardContent, FieldRole, ProfileId, StudyProfile } from '../../shared/profiles';
 import { buildRouteContext, profileForLanguage, resolveProfileMatch } from '../../shared/profileRules';
 import type { AnkiAddRequest, AnkiAddResult, AnkiStatus } from '../../shared/types';
+import { cardAiExtrasHtml, cardAiExtrasLabels, placeCardAiExtras } from '../../shared/cardAiExtrasHtml';
 import { fetchJapaneseAudio } from '../dictionary';
+import { mt } from '../i18n';
 import { getMainStudyLang } from '../studyLanguage';
 import { studyLangOfText, type StudyLang } from '../../shared/studyLang';
 import { getFrequency, getPitch } from '../dictionary/yomitan';
@@ -46,7 +48,8 @@ import { configureNoteStylingQueue, flushPendingNoteStyling, pushNoteStyling } f
 import { readJsonSync, writeJsonAtomic } from '../atomicJson';
 import { getProfileStore } from '../profiles';
 import { loadProfileRules } from '../profileRules';
-import { invoke, isCollectionUnavailable, setAnkiUrlProvider, toUiError } from './client';
+import { invoke, invokeMulti, isCollectionUnavailable, setAnkiUrlProvider, toUiError } from './client';
+import { getModelFieldNames, invalidateModelFieldNames } from './modelFields';
 import { escapeForAnki } from './fieldMapper';
 import {
   getLinkStatus,
@@ -275,7 +278,7 @@ async function gatherMiningValues(
     ...resolveCustomFrequencyRanks(
       term,
       reading,
-      req.language && req.language !== 'unknown' ? req.language : undefined,
+      req.route?.language && req.route.language !== 'unknown' ? req.route.language : undefined,
     ).byDictionary,
     ...(req.frequencies ?? {}),
   };
@@ -354,7 +357,7 @@ async function validateSortField(
   templates: Record<string, string>,
   term: string,
 ): Promise<{ fields: Record<string, string>; error?: string }> {
-  const names = (await invoke('modelFieldNames', { modelName })) ?? [];
+  const names = await getModelFieldNames(modelName);
   if (!names.length) return { fields, error: `Model "${modelName}" has no fields.` };
   const sortField = names[0];
   if (fields[sortField]?.trim()) return { fields };
@@ -413,7 +416,7 @@ async function attachUnreferencedMedia(
   modelName: string,
   media: { image?: string; audio?: string; clip?: string },
 ): Promise<Record<string, string>> {
-  const names = (await invoke('modelFieldNames', { modelName })) ?? [];
+  const names = await getModelFieldNames(modelName);
   return appendUnreferencedMediaToFields(fields, names, media);
 }
 
@@ -525,7 +528,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
     const model = await ensureModel(profile);
 
     if (req.prebuiltCard) {
-      const names = (await invoke('modelFieldNames', { modelName: profile.anki.modelName })) ?? [];
+      const names = await getModelFieldNames(profile.anki.modelName);
       if (names.length < 2) {
         return { ok: false, error: `Model "${profile.anki.modelName}" needs at least two fields for AI cards.` };
       }
@@ -594,9 +597,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
         profile.anki.exampleFallbackTemplates,
       );
       const values = await gatherMiningValues(req, content, activeTemplates, mediaWarnings);
-      const realFields = new Set(
-        (await invoke('modelFieldNames', { modelName: profile.anki.modelName })) ?? [],
-      );
+      const realFields = new Set(await getModelFieldNames(profile.anki.modelName));
       fields = {};
       for (const [fieldName, template] of Object.entries(activeTemplates ?? {})) {
         if (!realFields.has(fieldName) || !template.trim()) continue;
@@ -708,6 +709,12 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       storedMediaFilenames = mediaFilenamesFromAnkiMarkup(autoImage, autoAudio, autoClip);
     }
 
+    // A Gum deck card's saved extras (memory aid, notes, kept examples, accepted
+    // answers): re-validated here, model-written text sanitized and marked as
+    // generated, into the Notes field — else appended to the meaning field.
+    const extrasHtml = cardAiExtrasHtml(req.cardExtras, cardAiExtrasLabels((key) => mt(key)));
+    if (extrasHtml) fields = placeCardAiExtras(fields, model.fieldMap, extrasHtml);
+
     // Tagging policy (5.3): applied by the gateway, never by callers.
     const tags = [APP_TAG, `${APP_TAG}::${profile.id}`]
       .concat(profile.anki.extraTags ?? [])
@@ -739,16 +746,54 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
 
 // ----- Legacy shims (section 7 contract) --------------------------------------------
 
+/**
+ * `anki:status` is asked by every surface that shows a deck or note-type picker,
+ * often several at once when a window opens. Asks within this window share one
+ * answer; an ask while one is running joins it.
+ */
+const ANKI_STATUS_COALESCE_MS = 2000;
+let statusInFlight: Promise<AnkiStatus> | null = null;
+let statusAnswered: { at: number; status: AnkiStatus } | null = null;
+
 /** anki:status — connected flag + sorted deck/model lists, unchanged shape. */
-async function ankiStatusShim(): Promise<AnkiStatus> {
+function ankiStatusShim(): Promise<AnkiStatus> {
+  if (statusAnswered && Date.now() - statusAnswered.at < ANKI_STATUS_COALESCE_MS) {
+    return Promise.resolve(statusAnswered.status);
+  }
+  if (statusInFlight) return statusInFlight;
+  const run = readAnkiStatus().then((status) => {
+    statusAnswered = { at: Date.now(), status };
+    return status;
+  });
+  statusInFlight = run;
+  const clear = (): void => {
+    if (statusInFlight === run) statusInFlight = null;
+  };
+  run.then(clear, clear);
+  return run;
+}
+
+/** Tests, and the reconnect edge: the next `anki:status` asks Anki again. */
+function forgetAnkiStatus(): void {
+  statusAnswered = null;
+}
+
+async function readAnkiStatus(): Promise<AnkiStatus> {
   const link = getLinkStatus();
   if (link.waitingCollection) {
     return { connected: false, decks: [], models: [], error: ANKI_COLLECTION_UNAVAILABLE_MSG };
   }
   const linkUp = link.state === 'connected';
   try {
-    const decks = (await invoke('deckNames', undefined)) ?? [];
-    const models = (await invoke('modelNames', undefined)) ?? [];
+    // One request for both lists.
+    const [deckOutcome, modelOutcome] = await invokeMulti([
+      { action: 'deckNames', params: undefined },
+      { action: 'modelNames', params: undefined },
+    ]);
+    if (!deckOutcome.ok) throw deckOutcome.error;
+    if (!modelOutcome.ok) throw modelOutcome.error;
+    const decks = (deckOutcome.result as string[] | null) ?? [];
+    const models = (modelOutcome.result as string[] | null) ?? [];
     cachedDecks = decks;
     cachedModels = models;
     if (!linkUp) pokeProbe();
@@ -781,7 +826,7 @@ async function ankiStatusShim(): Promise<AnkiStatus> {
  */
 async function ankiAddNoteShim(req: AnkiAddRequest): Promise<AnkiAddResult> {
   try {
-    const names = (await invoke('modelFieldNames', { modelName: req.model })) ?? [];
+    const names = await getModelFieldNames(req.model);
     const fields: Record<string, string> = {};
     if (names[0]) fields[names[0]] = req.front;
     if (names[1]) fields[names[1]] = req.back;
@@ -996,6 +1041,7 @@ export function registerAnkiIpc(): void {
 
   // Heartbeat -> renderer pushes + interval cadence.
   onWirePush((status) => {
+    forgetAnkiStatus();
     broadcast('anki:linkChanged', status);
     if (status.state === 'disconnected') onAnkiDisconnected();
   });
@@ -1003,14 +1049,29 @@ export function registerAnkiIpc(): void {
   // edited while Anki was closed) and kick an immediate poll.
   onConnected(() => {
     invalidateAnkiCaches();
+    invalidateModelFieldNames();
     onAnkiConnected();
     // Card styling saved while Anki was closed reaches the note type now.
     void flushPendingNoteStyling((id) => store.getProfile(id)).catch(() => undefined);
   });
 
   // Profile store -> cache invalidation (T8) + query-union recheck (5.5).
+  // A profile that switched note type drops both names' cached fields: the old
+  // one may come back edited, the new one may have been looked up as missing.
+  const boundModels = new Map<string, string>();
+  for (const p of store.getAllProfiles()) boundModels.set(p.id, p.anki.modelName);
   store.onStoreEvent((ev) => {
-    if (ev.type === 'update') invalidateAnkiCaches(ev.profileId);
+    if (ev.type === 'update') {
+      invalidateAnkiCaches(ev.profileId);
+      const before = boundModels.get(ev.profileId);
+      const after = store.getProfile(ev.profileId)?.anki.modelName;
+      if (before !== after) {
+        if (before) invalidateModelFieldNames(before);
+        if (after) invalidateModelFieldNames(after);
+        forgetAnkiStatus();
+      }
+      if (after) boundModels.set(ev.profileId, after);
+    }
     onQueriesMaybeChanged();
   });
 
@@ -1045,11 +1106,12 @@ export function registerAnkiIpc(): void {
   // Ordered field names of a note type, for the field-mapping UI (5.4).
   ipcMain.handle(
     'anki:modelFields',
-    async (_e, modelName: string): Promise<{ ok: boolean; fields: string[]; error?: string }> => {
+    async (_e, modelName: string, opts?: unknown): Promise<{ ok: boolean; fields: string[]; error?: string }> => {
       const name = typeof modelName === 'string' ? modelName.trim() : '';
       if (!name) return { ok: false, fields: [], error: 'A note type name is required.' };
+      const refresh = Boolean(opts && typeof opts === 'object' && (opts as { refresh?: unknown }).refresh === true);
       try {
-        const fields = (await invoke('modelFieldNames', { modelName: name })) ?? [];
+        const fields = await getModelFieldNames(name, { refresh });
         return { ok: true, fields };
       } catch (err) {
         return { ok: false, fields: [], error: toUiError(err) };

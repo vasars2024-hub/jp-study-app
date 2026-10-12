@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { getUiLang, useT } from '../../i18n';
-import { verifyLockscreenPinDetailed } from '../../lockscreenSettings';
+import { loadLockscreen, markLockscreenUnlocked, verifyLockscreenPinDetailed } from '../../lockscreenSettings';
 import { useLockBlockedToasts } from '../../lockBlockedNotice';
 import { trapTab } from '../ui/focusTrap';
+import { showOsToast } from '../ToastHost';
+import { LockscreenChallenge, LockscreenRecovery, LockscreenStudyPanel } from '../LockscreenStudy';
 
 function useMinuteClock(): Date {
   const [now, setNow] = useState(() => new Date());
@@ -32,6 +34,36 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
   const now = useMinuteClock();
   const inputRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLElement>(null);
+  // lock3: the same study step and recovery as Study OS's lock screen.
+  const [cfg] = useState(() => loadLockscreen());
+  const hasPin = Boolean(cfg.pinHash);
+  const [stage, setStage] = useState<'challenge' | 'pin'>(() => (cfg.answerToUnlock ? 'challenge' : 'pin'));
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const pinActiveRef = useRef(stage === 'pin' && !recoveryOpen);
+  pinActiveRef.current = stage === 'pin' && !recoveryOpen;
+  const finishChallenge = (): void => {
+    if (hasPin) {
+      setStage('pin');
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
+    // A stale mirror never unlocks: main decides whether a PIN is due after all.
+    void Promise.resolve(window.api?.lockscreenIsLocked?.())
+      .catch(() => false)
+      .then((mainLocked) => {
+        if (mainLocked) {
+          setStage('pin');
+          return;
+        }
+        markLockscreenUnlocked();
+        onUnlocked();
+      });
+  };
+  const onRecovered = (): void => {
+    showOsToast(t('lock3.recovery.done'), 'warn');
+    markLockscreenUnlocked();
+    onUnlocked();
+  };
 
   const submit = (pin: string): void => {
     if (pin.length !== 4) return;
@@ -62,6 +94,7 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
         trapTab(event, boxRef.current);
         return;
       }
+      if (!pinActiveRef.current) return;
       const target = event.target;
       if (
         target instanceof HTMLElement &&
@@ -87,7 +120,7 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
       const box = boxRef.current;
       const target = event.target;
       if (!box || !(target instanceof Node) || box.contains(target)) return;
-      inputRef.current?.focus();
+      (inputRef.current ?? box).focus();
     };
     window.addEventListener('keydown', onKey);
     document.addEventListener('focusin', onFocusIn);
@@ -105,6 +138,7 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label={t('blanc.tb.lockscreen')}
+        tabIndex={-1}
       >
         <time className="blanc-lock-time">
           {now.toLocaleTimeString(LANG_TAGS[getUiLang()], { hour: '2-digit', minute: '2-digit' })}
@@ -112,29 +146,38 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
         <div className="blanc-lock-date">
           {now.toLocaleDateString(LANG_TAGS[getUiLang()], { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
-        <label>
-          {t('blanc.tb.pinLabel')}
-          <input
-            ref={inputRef}
-            autoFocus
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            value={digits}
-            onChange={(event) => {
-              const next = event.target.value.replace(/\D/g, '').slice(0, 4);
-              setDigits(next);
-              setError('');
-              if (next.length === 4) submit(next);
-            }}
-          />
-        </label>
-        <div className="blanc-lock-dots" aria-hidden>
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={i < digits.length ? 'filled' : ''} />
-          ))}
-        </div>
-        {error && <p className="blanc-error" role="alert">{error}</p>}
+        {stage === 'challenge' && <LockscreenChallenge variant="blanc" onPassed={finishChallenge} />}
+        {stage === 'pin' && !recoveryOpen && (
+          <>
+            <label>
+              {t('blanc.tb.pinLabel')}
+              <input
+                ref={inputRef}
+                autoFocus
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={digits}
+                onChange={(event) => {
+                  const next = event.target.value.replace(/\D/g, '').slice(0, 4);
+                  setDigits(next);
+                  setError('');
+                  if (next.length === 4) submit(next);
+                }}
+              />
+            </label>
+            <div className="blanc-lock-dots" aria-hidden>
+              {[0, 1, 2, 3].map((i) => (
+                <span key={i} className={i < digits.length ? 'filled' : ''} />
+              ))}
+            </div>
+            {error && <p className="blanc-error" role="alert">{error}</p>}
+          </>
+        )}
+        {stage === 'pin' && <LockscreenStudyPanel mode={cfg.study} variant="blanc" />}
+        {stage === 'pin' && hasPin && (
+          <LockscreenRecovery variant="blanc" onRecovered={onRecovered} onOpenChange={setRecoveryOpen} />
+        )}
       </section>
     </div>
   );

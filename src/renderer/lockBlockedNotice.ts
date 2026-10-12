@@ -6,7 +6,7 @@
  */
 import { useEffect } from 'react';
 import { t } from './i18n';
-import { showOsToast } from './components/ToastHost';
+import { showLockSurfaceToast } from './components/ToastHost';
 
 const KEY_BY_KIND: Record<string, string> = {
   command: 'lock2.blocked.command',
@@ -23,6 +23,6 @@ export function useLockBlockedToasts(): void {
   useEffect(() => {
     const subscribe = typeof window !== 'undefined' ? window.api?.onLockscreenBlocked : undefined;
     if (!subscribe) return undefined;
-    return subscribe((notice) => showOsToast(lockBlockedMessage(notice?.kind ?? ''), 'warn'));
+    return subscribe((notice) => showLockSurfaceToast(lockBlockedMessage(notice?.kind ?? ''), 'warn'));
   }, []);
 }

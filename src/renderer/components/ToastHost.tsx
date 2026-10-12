@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ToastViewport } from './ui/Toast';
 import ReadingReminderHost from './reading/ReadingReminderHost';
 import CalendarReminderHost from './calendar/CalendarReminderHost';
@@ -66,33 +66,59 @@ function isUrgent(kind: string): boolean {
   return kind === 'err' || kind === 'error' || kind === 'warn' || kind === 'warning';
 }
 
-export default function ToastHost() {
+/**
+ * lock3: toasts raised while the window shows its lock screen. A toast is study
+ * content more often than not ("Mined 猫", a book's title, a scrape result), and
+ * the lock screen is exactly where nobody but the owner should read it. Only a
+ * toast marked `lockSurface` (the lock's own notices) is drawn while locked; the
+ * rest wait here — newest few, without their actions, since an Undo offered
+ * minutes later would act on a stale state — and show once a host is unlocked.
+ */
+const MAX_HELD_WHILE_LOCKED = 3;
+const heldWhileLocked: Array<{ message: string; kind: string }> = [];
+
+export default function ToastHost({ locked = false }: { locked?: boolean }) {
   // `t` is called during render, not memoised, so the `lang` re-render that
   // `useT` drives is what relabels the dismiss control on a language change.
   const { t } = useT();
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+  const counter = useRef(0);
+  const push = useCallback((message: string, kind: string, action?: ToastAction) => {
+    // shell2: Do not disturb holds back informational pop-ups. The notification
+    // capture records them separately, so nothing is lost — it waits in the center.
+    if (!shouldShowToast(kind, Boolean(action))) return;
+    const id = ++counter.current;
+    const remaining = action ? ACTION_TIMEOUT_MS : PLAIN_TIMEOUT_MS;
+    setToasts((prev) => [
+      ...prev.slice(-4),
+      { id, message, kind, action, remaining, deadline: Date.now() + remaining },
+    ]);
+  }, []);
   useEffect(() => {
-    let n = 0;
     const onToast = (e: Event) => {
-      const d = (e as CustomEvent<{ message?: string; kind?: string; action?: ToastAction }>).detail;
+      const d = (e as CustomEvent<{ message?: string; kind?: string; action?: ToastAction; lockSurface?: boolean }>).detail;
       const message = d?.message?.trim();
       if (!message) return;
-      const id = ++n;
       const kind = d?.kind ?? 'ok';
       const action =
         d?.action && typeof d.action.run === 'function' && d.action.label ? d.action : undefined;
-      // shell2: Do not disturb holds back informational pop-ups. The notification
-      // capture records them separately, so nothing is lost — it waits in the center.
-      if (!shouldShowToast(kind, Boolean(action))) return;
-      const remaining = action ? ACTION_TIMEOUT_MS : PLAIN_TIMEOUT_MS;
-      setToasts((prev) => [
-        ...prev.slice(-4),
-        { id, message, kind, action, remaining, deadline: Date.now() + remaining },
-      ]);
+      if (lockedRef.current && d?.lockSurface !== true) {
+        heldWhileLocked.push({ message, kind });
+        while (heldWhileLocked.length > MAX_HELD_WHILE_LOCKED) heldWhileLocked.shift();
+        return;
+      }
+      push(message, kind, action);
     };
     window.addEventListener('os:toast', onToast);
     return () => window.removeEventListener('os:toast', onToast);
-  }, []);
+  }, [push]);
+  // Unlocked (this host, or a fresh one after the lock screen went): what waited.
+  useEffect(() => {
+    if (locked || !heldWhileLocked.length) return;
+    for (const held of heldWhileLocked.splice(0, heldWhileLocked.length)) push(held.message, held.kind);
+  }, [locked, push]);
 
   // One sweep for every toast, instead of a `setTimeout` per toast that no
   // longer knows its own deadline once the host is held.
@@ -192,19 +218,28 @@ export default function ToastHost() {
           );
         })}
       </div>
-      <ToastViewport />
-      {/*
-        Reading Lists §11.3's reminder card. Mounted here for the reason this
-        file's header already gives: this is the one place every shell mounts
-        exactly once, and App.tsx alone renders `ToastHost` in ten branches. An
-        eleventh mount point would be eleven chances for one shell to be the one
-        that never shows a reminder. It renders nothing until main pushes one.
-      */}
-      <ReadingReminderHost />
-      {/* Calendar reminders, same reasoning: renders nothing until one is due. */}
-      <CalendarReminderHost />
+      {/* lock3: the other buses and the reminder cards stay mounted (nothing
+          pushed while locked is lost) but are not drawn over a lock screen. */}
+      <div className="os-toast-locked-hold" hidden={locked}>
+        <ToastViewport />
+        {/*
+          Reading Lists §11.3's reminder card. Mounted here for the reason this
+          file's header already gives: this is the one place every shell mounts
+          exactly once, and App.tsx alone renders `ToastHost` in ten branches. An
+          eleventh mount point would be eleven chances for one shell to be the one
+          that never shows a reminder. It renders nothing until main pushes one.
+        */}
+        <ReadingReminderHost />
+        {/* Calendar reminders, same reasoning: renders nothing until one is due. */}
+        <CalendarReminderHost />
+      </div>
     </>
   );
+}
+
+/** A notice from the lock itself (refused shortcut, recovery) — the only kind drawn over a lock screen. */
+export function showLockSurfaceToast(message: string, kind = 'warn'): void {
+  window.dispatchEvent(new CustomEvent('os:toast', { detail: { message, kind, lockSurface: true } }));
 }
 
 /**

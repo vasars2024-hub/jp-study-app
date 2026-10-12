@@ -77,6 +77,35 @@ export function toolOutputForPlanner(
   return cloudMayReceiveStudyData(share) ? output : AGENT_STUDY_DATA_REDACTION_NOTE;
 }
 
+/**
+ * Context-shelf kinds that ARE the user's study record: their saved/mined words
+ * (a portrait of what they do not yet know) and a review session's results.
+ * The chat path sent both to the cloud with no check (audit A8 / F1(c)).
+ */
+export const AGENT_STUDY_DATA_CONTEXT_KINDS: ReadonlySet<string> = new Set(['saved-words', 'study-session']);
+
+export function isAgentStudyDataContext(item: { kind: string }): boolean {
+  return AGENT_STUDY_DATA_CONTEXT_KINDS.has(item.kind);
+}
+
+/**
+ * The shelf as a chat request may carry it. A local target gets everything; a
+ * cloud target loses the study-data items unless the user allowed sharing.
+ * Items are dropped rather than redacted in place, so the provider disclosure
+ * (which lists the ids actually sent) stays true.
+ */
+export function contextForAgentTarget<T extends { kind: string }>(
+  context: readonly T[],
+  target: 'local' | 'cloud',
+  share: unknown,
+): { context: T[]; withheld: T[] } {
+  if (target === 'local' || cloudMayReceiveStudyData(share)) return { context: [...context], withheld: [] };
+  const kept: T[] = [];
+  const withheld: T[] = [];
+  for (const item of context) (isAgentStudyDataContext(item) ? withheld : kept).push(item);
+  return { context: kept, withheld };
+}
+
 /** The one-time notice shows only for a cloud-capable setup the user has not answered yet. */
 export function shouldAskCloudStudyDataConsent(value: unknown, cloudConfigured: boolean): boolean {
   return cloudConfigured && normalizeAgentCloudShareStudyData(value) === 'unset';

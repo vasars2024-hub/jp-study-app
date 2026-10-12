@@ -17,7 +17,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { executeAgentTaskStep, missingAgentToolArguments } from '../../shared/localAgent';
+import { executeAgentTaskStep, getAgentToolOperation, missingAgentToolArguments } from '../../shared/localAgent';
 import { parseLocalAgentModelPlan } from '../../shared/localAgentPrompt';
 
 const REGISTRY = resolve(__dirname, '../agentToolRegistry.ts');
@@ -78,13 +78,20 @@ describe('a zero-argument plan runs end to end', () => {
   it('the two operations that failed live declare zero-parameter adapters', () => {
     const source = readFileSync(REGISTRY, 'utf8');
     // A zero-parameter arrow — nothing to read out of `arguments`, so `{}` is complete input.
-    for (const operation of ['flashcard.list-decks', 'calendar.list']) {
+    for (const operation of ['flashcard.list-decks']) {
       const line = source.split('\n').find((candidate) => candidate.includes(`'${operation}':`));
       expect(line, `${operation} is no longer declared in the central handlers`).toBeTruthy();
       expect(line, `${operation} now takes arguments — re-check its requiredArguments`)
         .toMatch(new RegExp(`'${operation}':\\s*(async\\s*)?\\(\\s*\\)\\s*=>`));
       expect(missingAgentToolArguments(operation as never, {})).toEqual([]);
     }
+    // `calendar.list` now reads an OPTIONAL window (`from`/`to`, both defaulted), so `{}` is
+    // still complete input: re-checked, it declares no required argument and has hints instead.
+    expect(missingAgentToolArguments('calendar.list', {})).toEqual([]);
+    expect(getAgentToolOperation('calendar.list')?.argumentHints).toMatchObject({
+      from: expect.any(String),
+      to: expect.any(String),
+    });
     // Control: the same reader applied to an operation that DOES take arguments must not match,
     // otherwise the two assertions above would pass against any file at all.
     const withArguments = source.split('\n').find((candidate) => candidate.includes("'flashcard.create-deck':"));

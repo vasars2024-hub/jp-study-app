@@ -154,7 +154,10 @@ function sanitizeWallpaper(value: unknown): WallpaperSnapshot {
 export function sanitizeWindow(value: unknown): WindowSnapshot | null {
   if (!isObject(value)) return null;
   if (typeof value.id !== 'string' || typeof value.section !== 'string') return null;
-  const num = (k: string): number => (typeof value[k] === 'number' ? value[k] : 0);
+  const num = (k: string): number => {
+    const v = value[k];
+    return typeof v === 'number' ? v : 0;
+  };
   // Liquid presentation (L3). This function is an ALLOWLIST — a field it does
   // not name is silently deleted on the way to disk, which is how the renderer
   // could go liquid, commit, and be reverted 600ms later by its own re-hydration.

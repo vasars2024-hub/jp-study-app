@@ -30,12 +30,16 @@ export const GLOBAL_COMMAND_DEFAULTS: Readonly<Record<string, string>> = {
   'lens.repeat': '',
   'lens.clipboard': '',
   'vn.toggleCapture': '',
+  // Snip to cards: pause / resume watching the clipboard for Win+Shift+S snips.
+  'snip.toggle': '',
   'app.focus': '',
   'app.toggleMiniView': '',
   // Older global rows, now registered through the same registry.
   'app.toggle': 'Ctrl+Alt+Shift+G',
   'app.restart': 'Ctrl+Alt+Shift+R',
   'toolbox.open': 'Ctrl+Alt+B',
+  // lock3: unbound by default (every obvious chord is taken); bind it in Shortcuts.
+  'app.lock': '',
 };
 
 /**
@@ -55,6 +59,7 @@ export const COMPANION_COMMAND_ORDER: readonly string[] = [
   'lens.repeat',
   'lens.clipboard',
   'vn.toggleCapture',
+  'snip.toggle',
   'app.focus',
   'app.toggleMiniView',
 ];

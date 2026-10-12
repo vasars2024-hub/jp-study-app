@@ -226,7 +226,7 @@ export const GAME_ARENA_CHROME_RU: Catalog = {
   'games.settings.apiUrl': 'Адрес API',
   'games.settings.apiKey': 'Ключ API',
   'games.settings.privacy':
-    '«Зеркальное письмо» отправляет черновики за пределы устройства, только если выбран и настроен бэкенд API. Локальный бэкенд остаётся офлайн.',
+    'Быстрая проверка не покидает этот компьютер. ИИ приложения следует «Настройки → ИИ»: офлайн-модель или ваш облачный провайдер, если «Зеркальному письму» это разрешено. На адрес API черновики уходят, только когда вы его выбрали.',
   'games.mirror.backend.local': 'Быстрая проверка (мгновенно, без загрузки)',
   'games.mirror.backend.api': 'Адрес API',
   'games.mirror.draft': 'Ваш текст',
@@ -280,7 +280,7 @@ export const GAME_ARENA_CHROME_RU: Catalog = {
   'games.mirror.summary.strong': 'Уверенное воспроизведение. Черновик передаёт задание, нужна лишь лёгкая правка.',
   'games.mirror.summary.solid': 'Неплохой черновик. Дополните упущенные мысли и выровняйте связность, прежде чем сверяться с эталоном.',
   'games.mirror.summary.early': 'Пока ранний черновик. Сосредоточьтесь на том, чтобы раскрыть каждую мысль понятными японскими предложениями.',
-  'games.mirror.error.apiMissing': 'Укажите адрес API и ключ в настройках Игровой арены.',
+  'games.mirror.error.apiMissing': 'Укажите адрес API в настройках Игровой арены.',
   'games.mirror.error.network': 'Запрос к оценщику не удался ({status}).',
   'games.mirror.error.schemaInvalid': 'Ответ оценщика не соответствует схеме оценок.',
   'games.mirror.error.requestFailed': 'Запрос к оценщику не удался.',

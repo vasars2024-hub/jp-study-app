@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, net } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
@@ -33,7 +33,22 @@ import {
   type TranslateBatchItemResult,
 } from '../shared/translateBatchFailure';
 import type { TranslateResultMeta, TranslateRouteFailure } from '../shared/translateProviders';
-import { registerTranslateProviderIpc, routeTranslation, TranslateRouteError } from './translateRouter';
+import {
+  registerTranslateProviderIpc,
+  routeTranslation,
+  TranslateCancelledError,
+  TranslateRouteError,
+  workbenchTranslateCache,
+} from './translateRouter';
+
+/** Electron's own connectivity check; a check that throws is not evidence of being offline. */
+function networkIsOnline(): boolean {
+  try {
+    return typeof net?.isOnline === 'function' ? net.isOnline() : true;
+  } catch {
+    return true;
+  }
+}
 
 /** Any language code from shared/langs.ts (kept as an alias for callers). */
 export type TransLang = string;
@@ -131,11 +146,18 @@ export function flushTranslationCache(): void {
   }
 }
 
-export function translationCacheKey(text: string, source: TransLang, target: TransLang): string {
+/**
+ * `engine` names who produced the translation. The offline model keeps the
+ * original key (so its existing cache stays valid); every other engine — a cloud
+ * provider id — gets its own namespace, so a cloud answer is never served later
+ * as the offline model's, nor one provider's as another's.
+ */
+export function translationCacheKey(text: string, source: TransLang, target: TransLang, engine = 'local'): string {
   const normalized = text.trim().normalize('NFKC');
+  const scope = engine && engine !== 'local' ? `${engine}\0` : '';
   return crypto
     .createHash('sha256')
-    .update(`${source}\0${target}\0${normalized}`)
+    .update(`${scope}${source}\0${target}\0${normalized}`)
     .digest('hex')
     .slice(0, 24);
 }
@@ -144,8 +166,9 @@ export function getCachedTranslation(
   text: string,
   source: TransLang,
   target: TransLang,
+  engine = 'local',
 ): string | undefined {
-  return loadTranslationCache().entries[translationCacheKey(text, source, target)];
+  return loadTranslationCache().entries[translationCacheKey(text, source, target, engine)];
 }
 
 export function setCachedTranslation(
@@ -153,8 +176,9 @@ export function setCachedTranslation(
   source: TransLang,
   target: TransLang,
   translated: string,
+  engine = 'local',
 ): void {
-  loadTranslationCache().entries[translationCacheKey(text, source, target)] = translated;
+  loadTranslationCache().entries[translationCacheKey(text, source, target, engine)] = translated;
   translationCacheDirty = true;
 }
 
@@ -846,6 +870,14 @@ export interface TranslateDetailedOptions {
   modelFileName?: string;
   /** Each sentence the moment it is translated, so the UI can show it before the passage ends. */
   onSegment?: (index: number, segment: TranslateSegment, total: number) => void;
+  /** The user's cancel (risk4): checked before each sentence; a sentence already running finishes. */
+  signal?: AbortSignal;
+}
+
+function cancelledError(): Error {
+  const err = new Error('Translation cancelled.');
+  err.name = 'AbortError';
+  return err;
 }
 
 export async function translateTextDetailed(
@@ -883,12 +915,17 @@ export async function translateTextDetailed(
   const borrowed = options?.modelFileName ? await borrowSessionFor(options.modelFileName) : null;
   try {
     for (let i = 0; i < parts.length; i++) {
+      if (options?.signal?.aborted) throw cancelledError();
       // Hints apply to every sentence of the passage: a pin is recorded against a
       // headword, not an offset, so a word pinned once is pinned wherever the
       // splitter happens to have cut.
-      const translated = await enqueue(() => translateSentence(
-        parts[i], source, target, hints, style, borrowed?.borrowed ? borrowed.session : undefined,
-      ));
+      const translated = await enqueue(() => {
+        // Queued behind another passage and cancelled meanwhile: never start it.
+        if (options?.signal?.aborted) throw cancelledError();
+        return translateSentence(
+          parts[i], source, target, hints, style, borrowed?.borrowed ? borrowed.session : undefined,
+        );
+      });
       // An untranslatable sentence is dropped rather than back-filled with its
       // own source text: a Japanese clause sitting inside an English paragraph
       // reads as part of the translation.
@@ -929,6 +966,13 @@ export async function translateForBook(
   return translateText(text, source, target);
 }
 
+/** In-flight interactive translations, by sender and request id, so the user can cancel one. */
+const inFlightTranslations = new Map<string, AbortController>();
+
+function inFlightKey(senderId: number, id: unknown): string {
+  return `${senderId}:${typeof id === 'number' && Number.isFinite(id) ? id : String(id ?? '')}`;
+}
+
 export function registerTranslateIpc(): void {
   // The provider choice, consent and fallback channels live with the router.
   registerTranslateProviderIpc();
@@ -959,6 +1003,8 @@ export function registerTranslateIpc(): void {
         provider?: unknown;
         /** Glossary terms; main keeps only the ones that occur in `text`. */
         glossary?: unknown;
+        /** Translate again instead of answering from the cache ("re-run"). */
+        fresh?: unknown;
       },
     ): Promise<{
       ok: boolean;
@@ -968,7 +1014,14 @@ export function registerTranslateIpc(): void {
       error?: string;
       errorKey?: string;
       failure?: TranslateRouteFailure;
+      cancelled?: boolean;
     }> => {
+      // The user's cancel (risk4): `translate:cancel` with this request's id
+      // aborts it in whichever engine is running it.
+      const runKey = inFlightKey(e.sender.id, req?.id);
+      const controller = new AbortController();
+      inFlightTranslations.get(runKey)?.abort();
+      inFlightTranslations.set(runKey, controller);
       // Each sentence goes to the window the moment it exists: the local model
       // finishes one at a time, a streamed cloud reply one line at a time.
       const onSegment = (index: number, segment: TranslateSegment, total: number): void => {
@@ -992,6 +1045,7 @@ export function registerTranslateIpc(): void {
           // same-language answer stay exactly what they were.
           const { text, segments } = await translateTextDetailed(
             req.text, req.source, req.target, undefined, hints, sanitizeTranslateStyle(req.style),
+            { signal: controller.signal },
           );
           return segments.length ? { ok: true, text, segments } : { ok: true, text };
         }
@@ -1004,12 +1058,17 @@ export function registerTranslateIpc(): void {
           provider: req.provider,
           glossary: req.glossary,
           onSegment,
+          signal: controller.signal,
+          fresh: req.fresh === true,
         }, {
           local: (args) => translateTextDetailed(args.text, args.source, args.target, undefined, args.hints, args.style, {
             ...(args.modelFileName ? { modelFileName: args.modelFileName } : {}),
             ...(args.onSegment ? { onSegment: args.onSegment } : {}),
+            ...(args.signal ? { signal: args.signal } : {}),
           }),
           localAvailable: isTranslateAvailable,
+          isOnline: networkIsOnline,
+          cache: workbenchTranslateCache,
         });
         return {
           ok: true,
@@ -1018,20 +1077,38 @@ export function registerTranslateIpc(): void {
           meta: routed.meta,
         };
       } catch (err) {
+        if (err instanceof TranslateCancelledError || controller.signal.aborted) {
+          return { ok: false, cancelled: true };
+        }
         console.error('[translate]', err);
         if (err instanceof TranslateRouteError) {
           return {
             ok: false,
             error: err.message,
-            errorKey: 'xlate2.error.cloud',
-            failure: { provider: err.provider, code: err.code },
+            errorKey: err.attempts.length > 1 ? 'xlate2.error.chain' : 'xlate2.error.cloud',
+            failure: {
+              provider: err.provider,
+              code: err.code,
+              ...(err.attempts.length > 1 ? { attempts: err.attempts } : {}),
+            },
           };
         }
         const errorKey = friendlyErrorKey(err);
         return { ok: false, error: friendlyError(err), ...(errorKey ? { errorKey } : {}) };
+      } finally {
+        if (inFlightTranslations.get(runKey) === controller) inFlightTranslations.delete(runKey);
       }
     },
   );
+
+  // Cancel one in-flight `translate:run` of this window (risk4). Only the sender's
+  // own requests: one window cannot cancel another's translation.
+  ipcMain.handle('translate:cancel', (e, id: unknown): { ok: boolean } => {
+    const controller = inFlightTranslations.get(inFlightKey(e.sender.id, id));
+    if (!controller) return { ok: false };
+    controller.abort();
+    return { ok: true };
+  });
 
   ipcMain.handle(
     'translate:runBatch',

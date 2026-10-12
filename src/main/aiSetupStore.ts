@@ -11,6 +11,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
+  applyAiFeatureSettingsPatch,
   normalizeAiFeatureSettings,
   type AiFeatureSettings,
 } from '../shared/aiSetup';
@@ -21,6 +22,8 @@ export interface AiSetupStore {
   readonly filePath: string;
   read(): AiFeatureSettings;
   setEnabled(enabled: boolean): AiFeatureSettings;
+  /** Cloud opt-ins and provider options (never a key). Malformed fields are dropped. */
+  update(patch: unknown): AiFeatureSettings;
 }
 
 export function createAiSetupStore(rootDirectory: string): AiSetupStore {
@@ -48,6 +51,7 @@ export function createAiSetupStore(rootDirectory: string): AiSetupStore {
     filePath,
     read,
     setEnabled: (enabled) => write({ ...read(), enabled: enabled === true }),
+    update: (patch) => write(applyAiFeatureSettingsPatch(read(), patch)),
   };
 }
 

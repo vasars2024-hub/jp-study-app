@@ -90,6 +90,24 @@ async function poll(ctx, expr, timeout = 15000, interval = 250) {
   return null;
 }
 
+/** `poll` for an expression that yields a Promise (an IPC call): settled before it is judged. */
+async function pollAsync(ctx, expr, timeout = 15000, interval = 250) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try {
+      const v = await ctx.eval(expr, { await: true });
+      if (v) return v;
+    } catch {
+      /* page mid-render */
+    }
+    await ctx.sleep(interval);
+  }
+  return null;
+}
+
+/** Deck cards (renderer localStorage), as the flows read them. */
+const DECK = `(() => { const d = JSON.parse(localStorage.getItem('jp-flashcard-deck') || '{"cards":[]}'); return d.cards || d; })()`;
+
 /**
  * Back to the desktop: a reader (book or manga) replaces the whole shell, so a flow that
  * opens one and fails half-way would leave the next flow's `os:open` going nowhere.
@@ -105,6 +123,30 @@ async function toDesktop(ctx) {
   return ctx.eval(`!!document.querySelector('.desktop-root')`);
 }
 
+/**
+ * Wait until the built-in dictionary answers a lookup. In a fresh profile it is still
+ * loading when the first flows run; a flow that looks words up used to pass only when the
+ * `dictionary` flow had run before it and paid that wait. Each such flow now waits itself
+ * (returns at once when it is already ready). Returns `{ ready, ms, entries }`.
+ */
+async function ensureDictionaryReady(ctx, { word = '猫', lang = 'ja', timeout = 180000 } = {}) {
+  const t0 = Date.now();
+  let entries = 0;
+  while (Date.now() - t0 < timeout) {
+    try {
+      entries = await ctx.eval(
+        `window.api.lookupTermOffline(${JSON.stringify(word)}, ${JSON.stringify(lang)}).then((r) => (r && Array.isArray(r.entries) ? r.entries.length : 0)).catch(() => 0)`,
+        { await: true },
+      );
+      if (entries > 0) return { ready: true, ms: Date.now() - t0, entries };
+    } catch {
+      /* page mid-render */
+    }
+    await ctx.sleep(1000);
+  }
+  return { ready: false, ms: Date.now() - t0, entries };
+}
+
 /** A real (CDP) mouse click on the first occurrence of `needle` inside `sel`. */
 async function clickText(ctx, sel, needle, offset = 0) {
   const pt = await ctx.eval(`__e2e.textPoint(${JSON.stringify(sel)}, ${JSON.stringify(needle)}, ${offset})`);
@@ -113,4 +155,4 @@ async function clickText(ctx, sel, needle, offset = 0) {
   return { ...r, point: pt };
 }
 
-module.exports = { PAGE_HELPERS, installHelpers, poll, clickText, toDesktop };
+module.exports = { PAGE_HELPERS, installHelpers, poll, pollAsync, clickText, toDesktop, ensureDictionaryReady, DECK };

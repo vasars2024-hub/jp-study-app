@@ -13,8 +13,10 @@
  * SYNC runs in one window at a time (a Web Lock), on Anki's link coming up, on
  * a timer while something is waiting, and on "Sync now":
  *   1. probe — AnkiConnect version and the active Anki profile (rule 7);
- *   2. link — Gum cards Anki already has are linked by note id, not re-added;
- *   3. push — queued answers, collapsed and checked (rules 2-6), via `answerCards`;
+ *   2. link — Gum cards Anki already has are linked by note id, not re-added
+ *      (only while sync is on; "Link existing notes" runs it on request);
+ *   3. push — queued answers, every one in review order and checked (rules 2-6),
+ *      via `answerCards`; a failure retries with backoff or pauses (rule 10);
  *   4. pull — while Anki owns scheduling, Anki's state for linked cards is
  *      mirrored for display; a deleted note unlinks its card (rule 6).
  * The queue lives in IndexedDB, so answers given offline survive a restart and
@@ -25,9 +27,10 @@ import {
   ANKI_SYNC_MAX_ATTEMPTS,
   ANKI_SYNC_PULL_BATCH,
   ankiEaseForRating,
+  ankiSyncBackoffMs,
+  ankiSyncErrorAction,
   countAnkiMirrorsDue,
   isFinalAnkiPushOutcome,
-  isTransientAnkiSyncError,
   needsAnkiLink,
   planAnkiReviewPush,
   type AnkiReviewOutboxItem,
@@ -37,13 +40,14 @@ import {
 } from '../shared/ankiReviewSync';
 import type { ReviewLogEntry } from '../shared/reviewLog';
 import { ankiOwnsScheduling } from './ankiSchedulingOwner';
-import { linkCardsToExistingAnkiNotes } from './ankiNoteLinking';
+import { ankiLinkingEnabled, linkCardsToExistingAnkiNotes, type AnkiLinkPassReport } from './ankiNoteLinking';
 import {
   ankiPushReviewsEnabled,
   readAnkiScheduleMirror,
   readAnkiSyncState,
   updateAnkiScheduleMirror,
   updateAnkiSyncState,
+  withFailedAnswers,
   withUnlinkedCards,
   type AnkiSyncRunSummary,
   type AnkiSyncSnapshot,
@@ -180,6 +184,8 @@ export interface AnkiSyncRunReport extends AnkiSyncRunSummary {
   busy?: boolean;
   errorKind?: AnkiSyncErrorKind;
   error?: string;
+  /** The failure paused sync until the user fixes it (rule 10); the queue is kept. */
+  paused?: boolean;
   /** Answers still queued after this run. */
   waiting: number;
 }
@@ -220,14 +226,32 @@ async function withSyncLock<T>(run: () => Promise<T>, busy: () => T): Promise<T>
   return (await locks.request.call(locks, SYNC_LOCK, { ifAvailable: true }, async (lock: unknown) => (lock ? run() : busy()))) as T;
 }
 
+/**
+ * Rule 10: a failed run keeps every queued answer. A `pause` kind (AnkiConnect
+ * cannot do the job) stops background runs until the user acts; a `retry` kind
+ * schedules the next background attempt further out each time.
+ */
 async function recordFailure(report: AnkiSyncRunReport, kind: AnkiSyncErrorKind, detail: string | undefined, now: number): Promise<AnkiSyncRunReport> {
   report.ok = false;
   report.errorKind = kind;
   if (detail) report.error = detail;
-  await updateAnkiSyncState((s) => ({
-    ...s,
-    lastError: { kind, at: now, ...(detail ? { detail } : {}) },
-  }));
+  const action = ankiSyncErrorAction(kind);
+  report.paused = action === 'pause';
+  await updateAnkiSyncState((s) => {
+    const next: AnkiSyncSnapshot = {
+      ...s,
+      lastError: { kind, at: now, ...(detail ? { detail } : {}) },
+    };
+    if (action === 'pause') {
+      next.paused = { kind, at: now, ...(detail ? { detail } : {}) };
+      delete next.retry;
+    } else {
+      const failures = (s.retry?.failures ?? 0) + 1;
+      next.retry = { failures, nextAt: now + ankiSyncBackoffMs(failures) };
+      delete next.paused;
+    }
+    return next;
+  });
   return report;
 }
 
@@ -246,7 +270,7 @@ async function pushQueued(report: AnkiSyncRunReport, state: AnkiSyncSnapshot, fo
     const settled = new Map<string, AnkiReviewPushOutcome>();
     for (const id of plan.superseded) settled.set(id, 'superseded');
     for (const id of plan.stale) settled.set(id, 'stale');
-    let failed: string[] = [];
+    const failed: string[] = [];
     let error: AnkiSyncErrorKind | null = null;
     if (plan.push.length) {
       const result = await push({
@@ -265,11 +289,13 @@ async function pushQueued(report: AnkiSyncRunReport, state: AnkiSyncSnapshot, fo
         }
       }
     }
-    // A data problem (not "Anki is away") counts against each answer, so one bad
-    // answer cannot hold the queue forever.
-    if (error && !isTransientAnkiSyncError(error)) failed = plan.push.map((item) => item.reviewId);
+    // Rule 10: a failed REQUEST (Anki away, AnkiConnect too old, API key...) is
+    // never the answers' fault and costs them nothing; the run stops and the
+    // caller retries later or pauses. Only an answer Anki refused on its own
+    // counts an attempt, and one that runs out leaves the queue into the
+    // panel's "not sent" list rather than vanishing.
     if (settled.size || failed.length) {
-      const dropped: string[] = [];
+      const dropped: AnkiReviewOutboxItem[] = [];
       await changeOutbox((box) => {
         for (const id of settled.keys()) delete box[id];
         for (const id of failed) {
@@ -278,7 +304,7 @@ async function pushQueued(report: AnkiSyncRunReport, state: AnkiSyncSnapshot, fo
           item.attempts += 1;
           if (item.attempts >= ANKI_SYNC_MAX_ATTEMPTS) {
             delete box[id];
-            dropped.push(id);
+            dropped.push({ ...item });
           }
         }
         return true;
@@ -288,6 +314,16 @@ async function pushQueued(report: AnkiSyncRunReport, state: AnkiSyncSnapshot, fo
         else bump(report.skipped, outcome);
       }
       bump(report.skipped, 'failed', dropped.length);
+      if (dropped.length) {
+        const words = new Map(loadDeck().map((card) => [card.id, card.word]));
+        await updateAnkiSyncState((s) => withFailedAnswers(s, dropped.map((item) => ({
+          reviewId: item.reviewId,
+          cardId: item.cardId,
+          word: words.get(item.cardId) ?? '',
+          reviewedAt: item.reviewedAt,
+          at: now,
+        }))));
+      }
     }
     if (error) {
       report.waiting = (await readAnkiReviewOutbox()).length;
@@ -464,20 +500,57 @@ export async function rebindAnkiSyncProfile(): Promise<AnkiSyncSnapshot> {
 function withoutError(state: AnkiSyncSnapshot): AnkiSyncSnapshot {
   const next = { ...state };
   delete next.lastError;
+  delete next.paused;
+  delete next.retry;
   return next;
 }
 
-/** Whether a background tick has anything to do. */
-export async function ankiSyncHasWork(now = Date.now()): Promise<boolean> {
-  // A paused (profile-mismatch) sync is retried like any other: the run probes
-  // first, so switching Anki back to the bound profile resumes it by itself.
+/**
+ * Whether a background tick has anything to do. A paused sync (rule 10) waits
+ * for the user, and a retry waits out its backoff — unless `resume` (Anki has
+ * just reconnected, e.g. restarted after an add-on update), which tries once.
+ */
+export async function ankiSyncHasWork(now = Date.now(), options: { resume?: boolean } = {}): Promise<boolean> {
+  // A profile-mismatch is a retry, not a pause: the run probes first, so
+  // switching Anki back to the bound profile resumes it by itself.
   const state = await readAnkiSyncState();
+  if (!options.resume) {
+    if (state.paused) return false;
+    if (state.retry && now < state.retry.nextAt) return false;
+  }
   if (ankiPushReviewsEnabled() && !ankiOwnsScheduling() && (await readAnkiReviewOutbox()).length) return true;
   if (ankiOwnsScheduling() && now - (state.lastPullAt ?? 0) >= ANKI_REVIEW_PULL_EVERY_MS) {
     return loadDeck().some((card) => typeof card.ankiNoteId === 'number' && card.ankiNoteId > 0);
   }
-  if (now - (state.lastLinkAt ?? 0) >= ANKI_REVIEW_LINK_EVERY_MS) return loadDeck().some(needsAnkiLink);
+  if (ankiLinkingEnabled() && now - (state.lastLinkAt ?? 0) >= ANKI_REVIEW_LINK_EVERY_MS) return loadDeck().some(needsAnkiLink);
   return false;
+}
+
+/**
+ * "Link existing notes": one link pass over the whole deck on the user's
+ * request, with sync on or off. Probes first, so a profile switch is refused
+ * exactly as a sync would refuse it (rule 7).
+ */
+export async function linkExistingAnkiNotesNow(): Promise<AnkiLinkPassReport> {
+  const now = Date.now();
+  const empty: AnkiLinkPassReport = { looked: 0, linkedIds: [], ambiguous: 0, batches: 0 };
+  const api = typeof window !== 'undefined' ? window.api : undefined;
+  if (typeof api?.ankiSyncProbe !== 'function') return { ...empty, errorKind: 'unsupported' };
+  let probe: AnkiSyncProbeResult;
+  try {
+    probe = await api.ankiSyncProbe();
+  } catch (error) {
+    return { ...empty, errorKind: 'api', error: error instanceof Error ? error.message : String(error) };
+  }
+  if (!probe.ok) return { ...empty, errorKind: probe.errorKind ?? 'api', ...(probe.error ? { error: probe.error } : {}) };
+  let state = await readAnkiSyncState();
+  if (probe.profile && !state.boundProfile) {
+    state = await updateAnkiSyncState((s) => ({ ...s, boundProfile: probe.profile, seenProfile: probe.profile }));
+  }
+  if (probe.profile && state.boundProfile && probe.profile !== state.boundProfile) {
+    return { ...empty, errorKind: 'profile-mismatch', error: `${state.boundProfile} -> ${probe.profile}` };
+  }
+  return linkCardsToExistingAnkiNotes(loadDeck(), now, { explicit: true });
 }
 
 /** Mirror counts for the panel: how many linked cards Anki has due and suspended. */
@@ -491,18 +564,20 @@ export async function ankiMirrorCounts(): Promise<ReturnType<typeof countAnkiMir
  */
 export function installAnkiReviewSync(): () => void {
   const offs: Array<() => void> = [];
-  const tick = async (): Promise<void> => {
+  const tick = async (resume = false): Promise<void> => {
     try {
       const link = await window.api?.ankiLinkState?.();
       if (link?.state !== 'connected') return;
-      if (await ankiSyncHasWork()) await syncAnkiNow();
+      if (await ankiSyncHasWork(Date.now(), { resume })) await syncAnkiNow();
     } catch {
       /* the next tick tries again */
     }
   };
   if (typeof window.api?.onAnkiLinkChanged === 'function') {
     offs.push(window.api.onAnkiLinkChanged((status) => {
-      if (status.state === 'connected') void tick();
+      // Anki coming back (often restarted after an add-on update) is worth one
+      // try even while paused or backing off.
+      if (status.state === 'connected') void tick(true);
     }));
   }
   const first = window.setTimeout(() => void tick(), 15_000);

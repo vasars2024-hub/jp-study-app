@@ -243,7 +243,7 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   'games.settings.apiUrl': 'API endpoint',
   'games.settings.apiKey': 'API key',
   'games.settings.privacy':
-    'Mirror Writing sends drafts off-device only when the API backend is selected and configured. The local backend stays offline.',
+    'The quick check never leaves this computer. App AI follows Settings → AI: the offline model, or your cloud provider if Mirror Writing is allowed to use it. An API endpoint receives drafts only when you select it.',
   'games.mirror.backend.local': 'Quick check (instant, no download)',
   'games.mirror.backend.api': 'API endpoint',
   'games.mirror.draft': 'Your draft',
@@ -297,7 +297,7 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   'games.mirror.summary.strong': 'Strong recall. The draft expresses the prompt with only light polish needed.',
   'games.mirror.summary.solid': 'Solid draft. Tighten missing ideas and sentence flow before comparing with the reference.',
   'games.mirror.summary.early': 'Early draft. Focus on covering every idea in clear Japanese sentences.',
-  'games.mirror.error.apiMissing': 'Configure an API endpoint and key in Game Arena settings.',
+  'games.mirror.error.apiMissing': 'Set an API endpoint in Game Arena settings.',
   'games.mirror.error.network': 'Evaluator request failed ({status}).',
   'games.mirror.error.schemaInvalid': 'The evaluator response did not match the score schema.',
   'games.mirror.error.requestFailed': 'The evaluator request failed.',

@@ -116,6 +116,37 @@ function ListPicker({
   );
 }
 
+/**
+ * wid5 — the choices for the "List" field in these widgets' settings popover.
+ * '' is "follow the most recently changed list", the fallback `useChosenList`
+ * already applies; list names are the owner's content and shown as written.
+ */
+export function useReadingListOptions(): { value: string; label: string }[] {
+  const { t, lang } = useT();
+  const { document } = useReadingListsDocument();
+  return useMemo(() => {
+    const auto = { value: '', label: t('wid5.settings.readingList.auto') };
+    if (!document) return [auto];
+    const summaries = sortReadingListSummaries(summarizeReadingLists(document), 'recent');
+    return [auto, ...summaries.map((s) => ({ value: s.listId, label: s.name }))];
+    // `t` is stable; `lang` is what retranslates the automatic choice.
+  }, [document, lang]);
+}
+
+/** As above, limited to lists that carry a target date (the pace widget's only meaningful choices). */
+export function useChallengeListOptions(): { value: string; label: string }[] {
+  const { t, lang } = useT();
+  const { document } = useReadingListsDocument();
+  return useMemo(() => {
+    const auto = { value: '', label: t('wid5.settings.readingList.firstChallenge') };
+    if (!document) return [auto];
+    return [
+      auto,
+      ...document.lists.filter((list) => list.target?.by !== undefined).map((list) => ({ value: list.id, label: list.name })),
+    ];
+  }, [document, lang]);
+}
+
 /** The one empty state every widget here shows before any list exists. */
 function NoLists() {
   const { t } = useT();

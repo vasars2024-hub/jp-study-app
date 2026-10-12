@@ -23,6 +23,7 @@
 
 import { clipboard } from 'electron';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { noteGumClipboardWrite } from './gumClipboardWrites';
 
 export interface ForegroundInfo {
   hwnd: number;
@@ -369,6 +370,8 @@ function restoreClipboard(snapshot: ClipboardSnapshot): void {
   // A bookmark is the title of the URL that is the text.
   if (snapshot.bookmark && snapshot.text === snapshot.bookmark.url) data.bookmark = snapshot.bookmark.title;
   try {
+    // A restored picture is the user's old clipboard, not a new snip (snipToCards.ts).
+    noteGumClipboardWrite();
     if (Object.keys(data).length) clipboard.write(data);
     else clipboard.clear();
   } catch {

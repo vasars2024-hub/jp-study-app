@@ -69,6 +69,34 @@ describe('i18n catalog split', () => {
     // budget that matches the work. An assertion failure still fails on the assertion.
   }, 60_000);
 
+  it('no app code imports the lazy AI pack except the loader and main', () => {
+    // A static import of `i18n/aiPack/*` from a renderer module puts every AI
+    // string back into that window's boot — the cost the pack exists to remove.
+    // Main takes the English pack eagerly on purpose (src/main/i18n.ts); the
+    // tooling aggregate and the vitest setup are not app code.
+    const allowed = [
+      path.join('i18n', 'catalogs.ts'),
+      path.join('i18n', 'catalogs', 'all.ts'),
+      path.join('i18n', 'testing', 'mergeLazyPacks.ts'),
+      path.join('main', 'i18n.ts'),
+    ];
+    const offenders = files.filter((f) => {
+      if (allowed.some((a) => f.endsWith(a))) return false;
+      if (f.includes(path.join('i18n', 'aiPack') + path.sep)) return false;
+      const src = fs.readFileSync(f, 'utf8');
+      return /from\s+['"][^'"]*i18n\/aiPack\/[a-z]+['"]/.test(src);
+    });
+    expect(offenders.map((f) => path.relative(SRC, f))).toEqual([]);
+  }, 60_000);
+
+  it('the loader reaches the AI pack only through dynamic import', () => {
+    const loader = fs.readFileSync(path.join(SRC, 'shared', 'i18n', 'catalogs.ts'), 'utf8');
+    for (const lang of ['en', 'ja', 'zh', 'ru']) {
+      expect(loader).not.toMatch(new RegExp(`from\\s+['"]\\./aiPack/${lang}['"]`));
+      expect(loader).toMatch(new RegExp(`import\\(['"]\\./aiPack/${lang}['"]\\)`));
+    }
+  });
+
   it('the loader reaches the non-English catalogs only through dynamic import', () => {
     const loader = fs.readFileSync(path.join(SRC, 'shared', 'i18n', 'catalogs.ts'), 'utf8');
     for (const lang of ['ja', 'zh', 'ru']) {

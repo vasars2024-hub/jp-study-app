@@ -126,10 +126,62 @@ export interface ParsedLocalAgentPlan {
   task: AgentTask | null;
 }
 
-function unwrapJson(text: string): string {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced?.[1]?.trim() ?? trimmed;
+/**
+ * The end index (inclusive) of the balanced `{…}` starting at `start`, or -1.
+ * String-aware, so a `}` inside a label does not close the object early.
+ */
+function balancedObjectEnd(text: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The first balanced JSON object in a model reply.
+ *
+ * Small models wrap the plan whatever the prompt says: `Here is the plan:\n{…}`,
+ * a ```json fence, a Qwen3 `<think>` block, or a trailing "Let me know…". The
+ * old exact-fence unwrap rejected all of them (audit A3). This drops think
+ * blocks, then tries each `{` in order and returns the first balanced span that
+ * parses as an object; validation of its SHAPE stays with the caller. `null`
+ * when the reply holds no object at all.
+ */
+export function extractFirstJsonObject(text: string): Record<string, unknown> | null {
+  const cleaned = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/^[\s\S]*?<\/think>/i, '');
+  // Bounded: each attempt is a linear scan, and a reply full of braces must not
+  // turn plan parsing quadratic.
+  let attempts = 0;
+  for (let start = cleaned.indexOf('{'); start >= 0 && attempts < 64; start = cleaned.indexOf('{', start + 1)) {
+    attempts += 1;
+    const end = balancedObjectEnd(cleaned, start);
+    // A stray `{` in prose never closes; a later one may still open the plan.
+    if (end < 0) continue;
+    try {
+      const value: unknown = JSON.parse(cleaned.slice(start, end + 1));
+      if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+    } catch {
+      // Not JSON (prose with a brace in it); try the next opening brace.
+    }
+  }
+  return null;
 }
 
 export function parseLocalAgentModelPlan(
@@ -145,9 +197,13 @@ export function parseLocalAgentModelPlan(
   }
   let raw: RawModelPlan;
   try {
-    raw = JSON.parse(unwrapJson(response)) as RawModelPlan;
+    // A bare top-level value that is not an object (an array, a string) is still
+    // a wrong-shape plan, not "invalid JSON": keep the two refusals distinct.
+    raw = JSON.parse(response.trim()) as RawModelPlan;
   } catch {
-    throw new Error('The local model returned invalid plan JSON.');
+    const extracted = extractFirstJsonObject(response);
+    if (!extracted) throw new Error('The local model returned invalid plan JSON.');
+    raw = extracted as RawModelPlan;
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('The local model plan must be an object.');

@@ -208,7 +208,8 @@ describe('metered connection probe', () => {
     expect(await isConnectionMetered(run, 'win32')).toBe(false);
     // Hidden, non-interactive, bounded.
     const [file, args, timeout] = run.mock.calls[0] as unknown as [string, string[], number];
-    expect(file).toBe('powershell.exe');
+    // risk4: the in-box PowerShell by absolute path, never resolved through PATH.
+    expect(file).toMatch(/^[A-Za-z]:\\.*\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe$/i);
     expect(args).toEqual(expect.arrayContaining(['-NoProfile', '-NonInteractive']));
     expect(timeout).toBeGreaterThan(0);
   });

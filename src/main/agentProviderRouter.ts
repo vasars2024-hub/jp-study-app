@@ -20,8 +20,13 @@ import {
   type AiProviderRuntimeEvent,
   type AiProviderUsage,
 } from './providerRuntime';
+import type { AiCloudFeatureId } from '../shared/aiSetup';
+import {
+  AGENT_STUDY_DATA_REDACTION_NOTE,
+  contextForAgentTarget,
+} from '../shared/agentCloudStudyDataGate';
 import { isLocalModelMissingError } from './localModelFiles';
-import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
+import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled, assertAiFeatureAllowed } from './aiFeatureGate';
 import { runLocalQwenPrompt } from './translate';
 
 export interface AgentProviderExecutionOptions {
@@ -34,6 +39,14 @@ export interface AgentProviderExecutionOptions {
   pricing?: AiProviderPricing;
   signal?: AbortSignal;
   allowLocalFallback?: boolean;
+  /**
+   * The user's "share study data with cloud models" answer, as the renderer read
+   * it at send. Anything but `true` keeps saved words and review sessions out of
+   * a cloud request.
+   */
+  shareStudyData?: boolean;
+  /** The calling feature; its cloud opt-in (Settings > AI) is enforced for a cloud target. */
+  feature?: AiCloudFeatureId;
   onTextChunk?: (text: string) => void;
   onCloudEvent?: (event: AiProviderRuntimeEvent) => void;
 }
@@ -229,6 +242,7 @@ function promptWithContext(
   attachments: readonly AgentExecutionAttachment[] = [],
   maxInputChars = Number.POSITIVE_INFINITY,
   historyLimit = HISTORY_MESSAGE_LIMIT,
+  withheldNote = '',
 ): { prompt: string; historyMessageIds: string[] } {
   const preset = agentModePreset(mode);
   const head = preset ? `${preset}\n\n${prompt}` : prompt;
@@ -240,7 +254,10 @@ function promptWithContext(
       ? `[Context ${index + 1}: ${item.label}]\n${body}`
       : `[Context ${index + 1}: ${item.label}]`;
   });
-  const contextSuffix = context.length === 0
+  // The model is told material was withheld, so it can say so instead of
+  // answering as if the user had attached nothing.
+  if (withheldNote) rows.push(withheldNote);
+  const contextSuffix = rows.length === 0
     ? ''
     : `\n\nSelected Gum context:\n${rows.join('\n\n')}`;
   const attachmentsSuffix = attachmentSuffix(attachments);
@@ -338,6 +355,14 @@ async function runLocal(
     if (isLocalModelMissingError(error)) {
       throw new AiProviderRuntimeError(error.message, 'local-model-missing');
     }
+    // `runLocalQwenPrompt` reports its deadline and a cancel as plain Errors, so
+    // both used to surface as `provider-failed` (audit A6): "the provider
+    // returned an unusable response" for what was a slow model or a Stop press.
+    if (options.signal?.aborted) throw new AiProviderRuntimeError('Local request was cancelled.', 'cancelled');
+    const message = error instanceof Error ? error.message : '';
+    if ((error instanceof Error && error.name === 'TimeoutError') || /timed out after/i.test(message)) {
+      throw new AiProviderRuntimeError(message || 'Local request timed out.', 'timeout', true);
+    }
     throw error;
   }
   return {
@@ -378,7 +403,20 @@ export async function runAgentProviderPrompt(
   // The master switch outranks every other refusal: a user who turned AI off
   // should not be told about keys or budgets, and nothing may be sent.
   if (!aiFeaturesEnabled()) throw new AiProviderRuntimeError(AI_FEATURES_OFF_MESSAGE, 'ai-off');
-  const context = options.context ?? [];
+  const cloudTarget = policy.target.kind === 'cloud';
+  // The calling feature's own cloud opt-in (Settings > AI), checked before any
+  // key is read or any text is assembled.
+  if (cloudTarget && options.feature) assertAiFeatureAllowed(options.feature, 'cloud');
+  // Study data (saved words, review sessions) stays home unless the user allowed
+  // sharing it. Enforced HERE, where the cloud request is built, so a renderer
+  // that never asked cannot widen it (audit F1(c)).
+  const shelf = contextForAgentTarget(
+    options.context ?? [],
+    cloudTarget ? 'cloud' : 'local',
+    options.shareStudyData === true ? 'allow' : 'local-only',
+  );
+  const context = shelf.context;
+  const withheldNote = shelf.withheld.length > 0 ? AGENT_STUDY_DATA_REDACTION_NOTE : '';
   // The shared execution normalizer restricts this first slice to text and
   // document attachments. Keep the runtime guard too, so a future caller
   // cannot accidentally claim that binary data was consumed by a text prompt.
@@ -418,6 +456,7 @@ export async function runAgentProviderPrompt(
     accepted.input,
     policy.maxInputChars,
     policy.historyTurns ?? HISTORY_MESSAGE_LIMIT,
+    withheldNote,
   );
   const providerPrompt = assembled.prompt;
   if (providerPrompt.length > policy.maxInputChars) {

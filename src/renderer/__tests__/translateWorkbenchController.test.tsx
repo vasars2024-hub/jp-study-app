@@ -156,6 +156,65 @@ describe('clipboard watch', () => {
   });
 });
 
+describe('clipboard watch stays offline unless allowed (risk4)', () => {
+  async function watchOnce(allowCloud: boolean) {
+    vi.useFakeTimers();
+    const reads = ['seed', '犬が好きです。'];
+    const clipboardReadText = vi.fn(async () => reads.shift() ?? '犬が好きです。');
+    Object.defineProperty(window, 'api', { value: { clipboardReadText }, configurable: true, writable: true });
+    vi.mocked(translateTo).mockResolvedValue('I like dogs.');
+    if (allowCloud) await act(async () => controller.setClipboardAllowCloud?.(true));
+    await act(async () => controller.setClipboardWatch(true));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(CLIPBOARD_WATCH_INTERVAL_MS); });
+    await act(async () => controller.setClipboardWatch(false));
+    expect(translateTo).toHaveBeenCalledTimes(1);
+    return vi.mocked(translateTo).mock.calls[0][5];
+  }
+
+  it('is off by default, and a clipboard translation sends no cloud engine', async () => {
+    expect(controller.clipboardAllowCloud).toBe(false);
+    const options = await watchOnce(false);
+    expect(options).not.toHaveProperty('provider');
+  });
+
+  it('the opt-in is remembered and lets the watcher use the pair\'s engine', async () => {
+    const options = await watchOnce(true);
+    expect(writeLocalStorage).toHaveBeenCalledWith('jp-translate-clipboard-cloud-v1', '1');
+    expect(options?.provider).toBe('pair');
+  });
+
+  it('a translation the learner starts still uses the pair\'s engine', async () => {
+    await translate('猫が好き。');
+    expect(vi.mocked(translateTo).mock.calls[0][5]?.provider).toBe('pair');
+  });
+});
+
+describe('cancel (risk4)', () => {
+  it('aborts the running translation and returns to idle without an error', async () => {
+    let seen: AbortSignal | undefined;
+    vi.mocked(translateTo).mockImplementation((_text, _s, _t, _p, _h, options) => new Promise((_resolve, reject) => {
+      seen = options?.signal;
+      options?.signal?.addEventListener('abort', () => {
+        const err = new Error('Translation cancelled.');
+        err.name = 'AbortError';
+        reject(err);
+      });
+    }));
+    await act(async () => controller.setInput('猫が好き。'));
+    let pending: Promise<void> | undefined;
+    await act(async () => { pending = controller.run(); });
+    expect(controller.busy).toBe(true);
+    expect(seen?.aborted).toBe(false);
+    await act(async () => controller.cancel?.());
+    await act(async () => { await pending; });
+    expect(seen?.aborted).toBe(true);
+    expect(controller.state).toBe('idle');
+    expect(controller.error).toBe('');
+    expect(controller.msg).toBe('risk4.translate.cancelled');
+  });
+});
+
 describe('handleTranslateHotkey', () => {
   const key = (over: Partial<Parameters<typeof handleTranslateHotkey>[0]>) => ({
     key: 'm', code: 'KeyM', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false,

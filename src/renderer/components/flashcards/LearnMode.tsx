@@ -10,7 +10,7 @@
  * thing in both modes. Its `close` verdict keeps its meaning too: the card is
  * neither promoted nor demoted, and the user may say they were right.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   applyLearnAnswer,
   isLearnComplete,
@@ -26,6 +26,7 @@ import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 import { studyContentLang } from '../../studyEnvironment';
+import { LazyAiWhyWrongPanel, whyWrongCardFor } from './aiStudyEntry';
 
 export default function LearnMode({ onExit, deck = 'all' }: {
   onExit?: () => void;
@@ -33,7 +34,7 @@ export default function LearnMode({ onExit, deck = 'all' }: {
   deck?: DeckFolderFilter;
 }) {
   const { t } = useT();
-  const [pool, setPool] = useState<ReturnType<typeof loadDeck>>([]);
+  const [pool, setPool] = useState<ReturnType<typeof loadPracticeDeck>>([]);
   const [session, setSession] = useState<LearnSession | null>(null);
   const [step, setStep] = useState<LearnStep | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -57,6 +58,10 @@ export default function LearnMode({ onExit, deck = 'all' }: {
   useEffect(() => {
     if (step?.kind === 'recall' && !grade) inputRef.current?.focus();
   }, [step, grade]);
+
+  const missed = step?.kind === 'recall' && (grade?.verdict === 'close' || grade?.verdict === 'wrong');
+  // The card behind a missed recall, for the optional "Why was I wrong?".
+  const whyCard = useMemo(() => (missed ? whyWrongCardFor(pool, step?.cardId) : null), [missed, pool, step?.cardId]);
 
   const progress = useMemo(
     () => (session ? learnProgress(session) : { mastered: 0, total: 0 }),
@@ -206,6 +211,19 @@ export default function LearnMode({ onExit, deck = 'all' }: {
         {grade?.verdict === 'close' && t('flash.write.close')}
         {grade?.verdict === 'wrong' && t('flash.learn.recallWrong', { answer: question.answer })}
       </p>
+
+      {missed && whyCard && grade && (
+        <Suspense fallback={null}>
+          <LazyAiWhyWrongPanel
+            key={`${step.cardId}\u0000${typed}`}
+            card={whyCard}
+            typed={typed}
+            expected={question.answer}
+            direction="meaning-to-target"
+            verdict={grade.verdict === 'close' ? 'close' : 'wrong'}
+          />
+        </Suspense>
+      )}
 
       <div className="flash-match-actions">
         {grade?.verdict === 'close' && (

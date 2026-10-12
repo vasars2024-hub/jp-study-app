@@ -20,6 +20,7 @@ import {
   type FocusTabId,
 } from '../focusMode';
 import { registerCommandHandler } from '../keyboardShortcuts';
+import { withShortcut } from '../shortcutHints';
 import { useT } from '../i18n';
 
 // Lazy for the same reason as in App.tsx: a static import here put both
@@ -126,7 +127,7 @@ export default function FocusShell({
       className={`btn small focus-exit-btn${locked ? ' is-locked' : ''}`}
       onClick={exit}
       disabled={locked}
-      title={locked ? t('focus.lock.exitBlocked') : t('focus.exitHint')}
+      title={locked ? t('focus.lock.exitBlocked') : withShortcut(t('focus.exitHint'), 'study.focusMode')}
     >
       {locked ? t('focus.exitLocked') : t('focus.exit')}
     </button>

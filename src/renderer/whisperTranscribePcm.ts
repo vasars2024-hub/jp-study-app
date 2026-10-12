@@ -8,6 +8,7 @@
  */
 
 import { isStudyLang, type StudyLang } from '../shared/studyLang';
+import { WHISPER_MULTILINGUAL_REQUIRED } from '../shared/whisperModels';
 
 export interface PcmTranscription {
   ok: boolean;
@@ -30,6 +31,41 @@ export function decodePcmBase64(pcmBase64: string): Float32Array {
   return new Float32Array(bytes.buffer);
 }
 
+export interface TranscribePcmOptions {
+  /** Aborting terminates the worker at once and resolves `{ ok: false, error: 'cancelled' }`. */
+  signal?: AbortSignal;
+  /** The model is being fetched or loaded; `percent` is null when sizes are unknown. */
+  onModelLoading?: (percent: number | null) => void;
+  /** The model is loaded; transcription starts now. */
+  onModelReady?: () => void;
+}
+
+/**
+ * Aggregates Transformers.js `progress_callback` events (one per model file)
+ * into one percent: bytes loaded over bytes known. Null until a size is known.
+ */
+export function createModelProgressTracker(): (message: { file?: unknown; loaded?: unknown; total?: unknown; status?: unknown }) => number | null {
+  const files = new Map<string, { loaded: number; total: number }>();
+  return (message) => {
+    const file = typeof message.file === 'string' ? message.file : '';
+    const total = Number(message.total);
+    const loaded = Number(message.loaded);
+    if (file && Number.isFinite(total) && total > 0) {
+      files.set(file, { total, loaded: Number.isFinite(loaded) ? Math.min(total, Math.max(0, loaded)) : 0 });
+    } else if (file && message.status === 'done' && files.has(file)) {
+      const entry = files.get(file)!;
+      files.set(file, { total: entry.total, loaded: entry.total });
+    }
+    let sumTotal = 0;
+    let sumLoaded = 0;
+    for (const entry of files.values()) {
+      sumTotal += entry.total;
+      sumLoaded += entry.loaded;
+    }
+    return sumTotal > 0 ? Math.round((sumLoaded / sumTotal) * 100) : null;
+  };
+}
+
 /**
  * Transcribes 16 kHz mono float32 PCM.
  *
@@ -37,14 +73,31 @@ export function decodePcmBase64(pcmBase64: string): Float32Array {
  * worker would hold the model in memory for the whole session even when nobody is
  * transcribing.
  */
-export async function transcribePcm(audio: Float32Array, lang?: string): Promise<PcmTranscription> {
+export async function transcribePcm(
+  audio: Float32Array,
+  lang?: string,
+  options: TranscribePcmOptions = {},
+): Promise<PcmTranscription> {
   if (!audio.length) return { ok: false, error: 'Empty audio PCM' };
+  if (options.signal?.aborted) return { ok: false, error: 'cancelled' };
 
-  const { loadWhisperDevice, loadWhisperModelTier, whisperHfId } = await import('./whisperSettings');
+  const { loadWhisperDevice, whisperTierPlan, whisperHfId } = await import('./whisperSettings');
+  const { isDownloadedIn, loadDownloaded } = await import('./whisperModelCache');
   const { getStudyLang } = await import('./studyEnvironment');
   // Model tiers exist only for the study languages; anything else falls back
   // to the study language rather than asking for a tier that has no model behind it.
   const resolved: StudyLang = isStudyLang(lang) ? lang : getStudyLang();
+  const device = loadWhisperDevice();
+  const downloaded = loadDownloaded();
+  const plan = whisperTierPlan(resolved, (tier) => isDownloadedIn(downloaded, tier, device));
+  // The picked model cannot transcribe this language (kotoba-whisper is
+  // Japanese-only). A multilingual one stands in when it is installed; when none
+  // is, say so rather than download one inside a chunk or feed Chinese audio to
+  // a Japanese model.
+  const languageSwap = plan.tier !== plan.picked;
+  if (languageSwap && !isDownloadedIn(downloaded, plan.tier, device)) {
+    return { ok: false, error: WHISPER_MULTILINGUAL_REQUIRED };
+  }
 
   return new Promise<PcmTranscription>((resolve) => {
     let worker: Worker;
@@ -61,13 +114,22 @@ export async function transcribePcm(audio: Float32Array, lang?: string): Promise
     // Set only by the worker's own `model-fallback` status. Carried onto BOTH
     // endings: a substituted model that then errors is exactly the case where
     // knowing which graph ran matters most.
-    let modelSubstitution: PcmTranscription['modelSubstitution'];
+    // A language swap is a substitution too: the track must name the model that ran.
+    let modelSubstitution: PcmTranscription['modelSubstitution'] = languageSwap
+      ? { requested: whisperHfId(plan.picked), used: whisperHfId(plan.tier) }
+      : undefined;
+    const onAbort = (): void => finish({ ok: false, error: 'cancelled' });
     const finish = (result: PcmTranscription): void => {
       if (settled) return;
       settled = true;
+      options.signal?.removeEventListener('abort', onAbort);
       worker.terminate();
       resolve(modelSubstitution ? { ...result, modelSubstitution } : result);
     };
+    // Cancel really stops the work: the worker (and the model inside it) goes.
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+    const modelProgress = createModelProgressTracker();
+    let modelReady = false;
 
     worker.onmessage = (event: MessageEvent) => {
       const message = event.data as {
@@ -77,14 +139,28 @@ export async function transcribePcm(audio: Float32Array, lang?: string): Promise
         requestedModel?: string;
         cues?: Array<{ start?: number; end?: number; text?: string }>;
         message?: string;
+        file?: string;
+        loaded?: number;
+        total?: number;
       };
+      if (message.type === 'progress') {
+        if (!modelReady) options.onModelLoading?.(modelProgress(message));
+        return;
+      }
+      if (message.type === 'status' && message.status === 'transcribing') {
+        if (!modelReady) {
+          modelReady = true;
+          options.onModelReady?.();
+        }
+        return;
+      }
       if (
         message.type === 'status'
         && message.status === 'model-fallback'
         && typeof message.requestedModel === 'string'
         && typeof message.model === 'string'
       ) {
-        modelSubstitution = { requested: message.requestedModel, used: message.model };
+        modelSubstitution = { requested: modelSubstitution?.requested ?? message.requestedModel, used: message.model };
         return;
       }
       if (message.type === 'partial' && Array.isArray(message.cues)) {
@@ -113,8 +189,8 @@ export async function transcribePcm(audio: Float32Array, lang?: string): Promise
     worker.postMessage(
       {
         audio,
-        model: whisperHfId(loadWhisperModelTier(resolved)),
-        prefer: loadWhisperDevice(),
+        model: whisperHfId(plan.tier),
+        prefer: device,
         lang: resolved,
       },
       // Transferred, not copied — a 30-second slice is ~2 MB.

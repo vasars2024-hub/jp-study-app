@@ -2383,5 +2383,125 @@
   },
   "bg_recSaveInApp": {
     "message": "Часть этой записи уже передана в Gum, поэтому в браузере нет целого файла. Откройте её в Gum."
+  },
+  "content_aiExplain": {
+    "message": "Объяснить в контексте"
+  },
+  "content_aiSuggestMeaning": {
+    "message": "Предложить значение (ИИ)"
+  },
+  "content_aiBadge": {
+    "message": "ИИ"
+  },
+  "content_aiBusy": {
+    "message": "Запрос к ИИ…"
+  },
+  "content_aiRetry": {
+    "message": "Повторить"
+  },
+  "content_aiCancelled": {
+    "message": "Отменено."
+  },
+  "content_aiSenseFits": {
+    "message": "Здесь подходит значение $1"
+  },
+  "content_aiNoSenseFits": {
+    "message": "Ни одно из значений словаря не подходит к этому предложению."
+  },
+  "content_aiConfHigh": {
+    "message": "Уверенность: высокая"
+  },
+  "content_aiConfMedium": {
+    "message": "Уверенность: средняя"
+  },
+  "content_aiConfLow": {
+    "message": "Уверенность: низкая"
+  },
+  "content_aiDisclaimer": {
+    "message": "ИИ может ошибаться — сверьтесь со словарём."
+  },
+  "content_aiMeaningLabel": {
+    "message": "Предложенное значение"
+  },
+  "content_aiMeaningApply": {
+    "message": "Использовать в карточке"
+  },
+  "content_aiMeaningDismiss": {
+    "message": "Скрыть"
+  },
+  "content_aiMeaningApplied": {
+    "message": "Попадёт в карточку при сохранении слова, с пометкой «ИИ»."
+  },
+  "content_aiBreakdown": {
+    "message": "Разбор ИИ"
+  },
+  "content_aiSimplify": {
+    "message": "Упростить абзац"
+  },
+  "content_aiSheetBreakdown": {
+    "message": "Разбор предложения"
+  },
+  "content_aiSheetSimplify": {
+    "message": "Упрощённый абзац"
+  },
+  "content_aiOriginal": {
+    "message": "Оригинал"
+  },
+  "content_aiSimplifiedText": {
+    "message": "Упрощено ИИ"
+  },
+  "content_aiNotes": {
+    "message": "Что изменено"
+  },
+  "content_aiTranslation": {
+    "message": "Перевод"
+  },
+  "content_aiWords": {
+    "message": "По словам"
+  },
+  "content_aiEngineLocal": {
+    "message": "Офлайн-модель (данные не покидали компьютер)"
+  },
+  "content_aiEngineCloud": {
+    "message": "Облачный ИИ"
+  },
+  "content_aiStateOff": {
+    "message": "ИИ выключен. Включите его в Gum: Настройки > ИИ."
+  },
+  "content_aiStateNoKey": {
+    "message": "ИИ не настроен. Добавьте провайдера в Gum: Настройки > ИИ — или установите там офлайн-модель."
+  },
+  "content_aiStateNoLocal": {
+    "message": "Офлайн-модель ИИ не установлена. Установите её в Gum: Настройки > ИИ."
+  },
+  "content_aiStateConsent": {
+    "message": "Этой функции не разрешено отправлять текст в облако. Разрешите в Gum: Настройки > ИИ — или используйте офлайн-модель."
+  },
+  "content_aiStateOffline": {
+    "message": "Нет интернета — облачный ИИ недоступен. Офлайн-модель работает без сети."
+  },
+  "content_aiStateAppClosed": {
+    "message": "Gum не запущен. Откройте приложение, чтобы пользоваться ИИ, — словарь работает и так."
+  },
+  "content_aiStateOutdated": {
+    "message": "В этой версии Gum нет ИИ для браузера. Обновите Gum и перезагрузите расширение."
+  },
+  "content_aiStateRateLimit": {
+    "message": "Слишком много запросов к ИИ. Подождите минуту и повторите."
+  },
+  "content_aiStateTooLong": {
+    "message": "Текст слишком длинный для ИИ. Выберите фрагмент короче."
+  },
+  "content_aiStateTimeout": {
+    "message": "ИИ отвечал слишком долго. Повторите попытку."
+  },
+  "content_aiStateSpend": {
+    "message": "Достигнут месячный лимит расходов на ИИ (Gum: Настройки > ИИ)."
+  },
+  "content_aiStateNoAnswer": {
+    "message": "У ИИ нет ответа на это."
+  },
+  "content_aiStateFailed": {
+    "message": "ИИ не смог ответить. Повторите попытку."
   }
 }

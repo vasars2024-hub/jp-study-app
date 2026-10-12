@@ -87,7 +87,7 @@ describe('rates for callers that pass none', () => {
   it('values the request with the built-in estimate, so the ledger counts it in dollars', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(1_000_000, 1_000_000)));
     await runCloudAiRequest(unpricedCallerRequest());
-    const estimate = AGENT_PROVIDER_DEFAULT_PRICING['gemini-2.5-flash'];
+    const estimate = AGENT_PROVIDER_DEFAULT_PRICING['gemini-2.5-flash']!;
     const totals = spend.read().currentPeriod;
     expect(totals.spentUsd).toBeCloseTo(estimate.inputPerMillionTokens + estimate.outputPerMillionTokens, 9);
     expect(totals.unpricedRequests).toBe(0);

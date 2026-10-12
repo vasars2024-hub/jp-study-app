@@ -125,6 +125,67 @@
     opacity: 1;
   }
 }
+.lens-scanning {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+/* The pill stays click-through; only its Cancel catches the mouse. */
+.lens-scan-cancel {
+  pointer-events: auto;
+  min-height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lens-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 12px;
+  cursor: pointer;
+}
+.lens-scan-cancel:hover,
+.lens-scan-cancel:focus-visible {
+  outline: none;
+  border-color: var(--lens-accent);
+  background: var(--lens-accent);
+  color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lens-scanning::before {
+    animation: none;
+  }
+}
+
+/* ---- Bundled-recognizer notice ---- */
+
+.lens-basic-banner {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--lens-bg);
+  color: var(--lens-ink);
+  font-size: 12.5px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.lens-basic-banner p {
+  margin: 0;
+  line-height: 1.45;
+}
+.lens-basic-banner-top {
+  top: 16px;
+}
+.lens-basic-banner-bottom {
+  bottom: 16px;
+}
+.lens-source-badge.lens-basic-badge,
+.lens-source-badge.lens-cached-badge {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--lens-ink);
+}
 
 /* ---- Reading ---- */
 

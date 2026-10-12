@@ -43,7 +43,7 @@ import {
   type ReadingPassageHandoffStageResult,
   type ReadingPassageHandoffTakeResult,
 } from './shared/readingPassageHandoff';
-import type { LensOcrResult, RegionRect } from './main/screenOcr';
+import type { LensOcrResult, LensOcrStage, RegionRect } from './main/screenOcr';
 import type { ReverifyOutcome, AssetIntegrity } from './main/downloads';
 import {
   ANIME_SCHEDULE_CHANNEL,
@@ -204,7 +204,7 @@ import type {
   StudyVocabularyFilters,
   StudyVocabularyWorkspace,
 } from './shared/mediaStudyOrchestrator';
-import type { ProfileId, ProfileSnapshot, StudyProfile } from './shared/profiles';
+import type { ProfileId, ProfileSnapshot, StudyProfile, StudyProfilePatch } from './shared/profiles';
 import type {
   DesktopIndex,
   DesktopLayout,
@@ -537,6 +537,14 @@ const api = {
     ipcRenderer.invoke('dict:lookupChinese', query, limit),
   /** Drop main's cached CC-CEDICT index after a managed install finishes. */
   resetChineseDictCache: (): Promise<void> => ipcRenderer.invoke('dict:resetChineseCache'),
+  /** Whether any Chinese dictionary can answer (CC-CEDICT downloaded/bundled, or one imported) — risk4. */
+  dictChineseAvailable: (): Promise<boolean> => ipcRenderer.invoke('dict:chineseAvailable'),
+  /** A lookup found no Chinese dictionary at all; sent once per run (risk4). */
+  onCedictMissing: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('dict:cedictMissing', handler);
+    return () => ipcRenderer.removeListener('dict:cedictMissing', handler);
+  },
   /**
    * Readings for the study language's reading aid: pinyin per character for
    * Chinese words, the stressed spelling for Russian words. Japanese furigana
@@ -895,7 +903,7 @@ const api = {
     ipcRenderer.invoke('profile:delete', id),
   profileUpdate: (
     id: ProfileId,
-    patch: Partial<StudyProfile>,
+    patch: StudyProfilePatch,
   ): Promise<{ ok: boolean; error?: string; snapshot: ProfileSnapshot }> =>
     ipcRenderer.invoke('profile:update', { id, patch }),
   profileMigrateLegacy: (values: { deck?: string; model?: string }): Promise<ProfileSnapshot> =>
@@ -925,11 +933,15 @@ const api = {
   /** Push the profile's saved card CSS to its Anki note type, or queue it. */
   ankiPushNoteStyling: (id?: ProfileId): Promise<NoteStylingPushResult> =>
     ipcRenderer.invoke('anki:pushNoteStyling', id),
-  /** Ordered field names of a note type (for the field-mapping editor). */
+  /**
+   * Ordered field names of a note type (for the field-mapping editor). Main caches
+   * them per note type; `refresh` asks Anki again (the user pressed refresh).
+   */
   ankiModelFields: (
     modelName: string,
+    opts?: { refresh?: boolean },
   ): Promise<{ ok: boolean; fields: string[]; error?: string }> =>
-    ipcRenderer.invoke('anki:modelFields', modelName),
+    ipcRenderer.invoke('anki:modelFields', modelName, opts),
   ankiGetIntervals: (opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot> =>
     ipcRenderer.invoke('anki:getIntervals', opts),
   /**
@@ -1485,8 +1497,24 @@ const api = {
   lockscreenSetSize: (size: { width: number; height: number }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('lockscreen:setSize', size),
   lockscreenIsOpen: (): Promise<boolean> => ipcRenderer.invoke('lockscreen:isOpen'),
-  /** Salted scrypt hash of a 4-digit PIN (main/lockscreenPin.ts). */
-  lockscreenHashPin: (pin: string): Promise<string | null> => ipcRenderer.invoke('lockscreen:hashPin', pin),
+  /** lock3: main is the only writer of the PIN, the launch lock and auto-lock (main/lockscreenPin.ts). */
+  lockscreenStatus: (): Promise<import('./shared/lockStatus').LockStatus> => ipcRenderer.invoke('lockscreen:status'),
+  /** Set or change the PIN; a PIN already set must be given as `current`. */
+  lockscreenSetPin: (current: string | null, next: string): Promise<import('./shared/lockStatus').LockMutationResult> =>
+    ipcRenderer.invoke('lockscreen:setPin', current, next),
+  lockscreenClearPin: (current: string): Promise<import('./shared/lockStatus').LockMutationResult> =>
+    ipcRenderer.invoke('lockscreen:clearPin', current),
+  /** Lock at launch; turning it off needs the current PIN. */
+  lockscreenSetEnabled: (on: boolean, current?: string): Promise<import('./shared/lockStatus').LockMutationResult> =>
+    ipcRenderer.invoke('lockscreen:setEnabled', on, current),
+  lockscreenNewRecoveryCode: (current: string): Promise<import('./shared/lockStatus').LockMutationResult> =>
+    ipcRenderer.invoke('lockscreen:newRecoveryCode', current),
+  /** A forgotten PIN: the recovery code removes it and lifts the lock. */
+  lockscreenRecover: (code: string): Promise<import('./shared/lockStatus').LockMutationResult> =>
+    ipcRenderer.invoke('lockscreen:recover', code),
+  lockscreenSetAutoLock: (
+    options: Partial<import('./shared/lockStatus').AutoLockOptions>,
+  ): Promise<import('./shared/lockStatus').LockMutationResult> => ipcRenderer.invoke('lockscreen:setAutoLock', options),
   /** Check a PIN against the stored value, with attempt backoff; legacy values come back upgraded. */
   lockscreenVerifyPin: (
     pin: string,
@@ -1511,6 +1539,16 @@ const api = {
     const handler = (): void => cb();
     ipcRenderer.on('lockscreen:locked', handler);
     return () => ipcRenderer.removeListener('lockscreen:locked', handler);
+  },
+  /**
+   * Every window hears main's lock transitions (risk4): sound cues and system
+   * banners are held while locked. Unlike `onLockscreenLocked` this never asks
+   * the window to draw a PIN pad.
+   */
+  onLockscreenState: (cb: (locked: boolean) => void): (() => void) => {
+    const handler = (_e: unknown, locked: unknown): void => cb(locked === true);
+    ipcRenderer.on('lockscreen:state', handler);
+    return () => ipcRenderer.removeListener('lockscreen:state', handler);
   },
   /** Something was refused because Gum is locked (main/lockGuard.ts): toast it on the lock screen. */
   onLockscreenBlocked: (cb: (notice: { kind: string; action: string }) => void): (() => void) => {
@@ -1632,6 +1670,11 @@ const api = {
     request: import('./shared/mirrorEvaluatorIpc').MirrorEvaluateRequest,
   ): Promise<import('./shared/mirrorEvaluatorIpc').MirrorEvaluateResponse> =>
     ipcRenderer.invoke('games:mirrorEvaluate', request),
+  /** Mirror Writing graded by the app's own AI (Settings > AI), through main's central client. */
+  gamesMirrorEvaluateAppAi: (
+    request: import('./shared/mirrorEvaluatorIpc').MirrorAppAiRequest,
+  ): Promise<import('./shared/mirrorEvaluatorIpc').MirrorAppAiResponse> =>
+    ipcRenderer.invoke('games:mirrorEvaluateAppAi', request),
   getWindowBorderless: (): Promise<boolean> => ipcRenderer.invoke('shell:getWindowBorderless'),
   setWindowBorderless: (borderless: boolean): Promise<boolean> =>
     ipcRenderer.invoke('shell:setWindowBorderless', borderless),
@@ -1643,7 +1686,13 @@ const api = {
   releaseStatus: (): Promise<import('./shared/release').ReleaseStatus> => ipcRenderer.invoke('release:status'),
   /** Squirrel self-update (main/squirrelUpdater.ts); idle on the portable zip. */
   appUpdateStatus: (): Promise<import('./shared/appUpdate').AppUpdateStatus> => ipcRenderer.invoke('appUpdate:status'),
-  appUpdateRestart: (): Promise<boolean> => ipcRenderer.invoke('appUpdate:restart'),
+  /** Refuses with what would be lost (a recording in progress) unless `force` (the user saw the warning). */
+  appUpdateRestart: (opts?: { force?: boolean }): Promise<import('./shared/appUpdate').AppUpdateRestartResult> =>
+    ipcRenderer.invoke('appUpdate:restart', opts),
+  /** Channel (stable / beta) and the skipped version. */
+  appUpdateSetPrefs: (
+    patch: Partial<import('./shared/appUpdate').AppUpdatePrefs>,
+  ): Promise<import('./shared/appUpdate').AppUpdateDetails> => ipcRenderer.invoke('appUpdate:setPrefs', patch),
   onAppUpdateChanged: (cb: (status: import('./shared/appUpdate').AppUpdateStatus) => void): (() => void) => {
     const handler = (_e: unknown, status: import('./shared/appUpdate').AppUpdateStatus): void => cb(status);
     ipcRenderer.on('appUpdate:changed', handler);
@@ -1772,6 +1821,8 @@ const api = {
     provider?: import('./shared/translateProviders').TranslateEngineRequest;
     /** Glossary terms; main keeps only those that occur in `text`. */
     glossary?: import('./shared/translateGlossary').TranslateGlossaryTerm[];
+    /** Translate again rather than answer from main's cache. */
+    fresh?: boolean;
   }): Promise<{
     ok: boolean;
     text?: string;
@@ -1782,8 +1833,12 @@ const api = {
     error?: string;
     errorKey?: string;
     failure?: import('./shared/translateProviders').TranslateRouteFailure;
+    /** The user cancelled it (`translateCancel`). */
+    cancelled?: boolean;
   }> =>
     ipcRenderer.invoke('translate:run', req),
+  /** Cancel one in-flight `translateRun` of this window by its id (risk4). */
+  translateCancel: (id: number): Promise<{ ok: boolean }> => ipcRenderer.invoke('translate:cancel', id),
   // Translation engines: the per-pair choice, per-provider cloud consent, offline fallback.
   translateProviders: (): Promise<import('./shared/translateProviders').TranslateProviderSnapshot> =>
     ipcRenderer.invoke('translate:providers'),
@@ -1826,13 +1881,8 @@ const api = {
   // Cloud-LLM linguistic analysis of a completed translation (needs an API key)
   translateAnalyze: (
     req: import('./shared/translateAnalysisCore').TranslateAnalyzeRequest,
-  ): Promise<{
-    ok: boolean;
-    result?: import('./shared/translateAnalysisCore').TranslateAnalysisResult;
-    error?: string;
-    aiOff?: boolean;
-    needsKey?: boolean;
-  }> => ipcRenderer.invoke('translate:analyze', req),
+  ): Promise<import('./shared/translateAnalysisCore').TranslateAnalyzeResponse> =>
+    ipcRenderer.invoke('translate:analyze', req),
   // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
   extractVideoClip: (
     req: import('./shared/videoClip').VideoClipRequest,
@@ -2557,6 +2607,13 @@ const api = {
     youtubeId: string,
   ): Promise<{ text: string | null; file: string | null }> =>
     ipcRenderer.invoke('yt:cachedCaptionText', youtubeId),
+  /** Fetch ONE caption track (`--skip-download`) for the pre-study list. */
+  yt5FetchCaptionTrack: (
+    videoId: string,
+    key: string,
+    kind: 'human' | 'auto',
+  ): Promise<{ ok: true; text: string; file: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('yt5:fetchCaptionTrack', videoId, key, kind),
   /** Hand a discovered video to the playlist manager. Does not download it. */
   ytAddVideoByUrl: (
     url: string,
@@ -2647,12 +2704,13 @@ const api = {
   miningRenderEpubDeck: (
     analysis: EpubMiningAnalysis,
     config?: Partial<TraditionalMiningConfig>,
+    opts?: { freshTranslations?: boolean },
   ): Promise<{
     deck: EpubDeckExport;
     enrichedCandidates: MiningCandidate[];
     warnings?: string[];
     cancelled?: boolean;
-  }> => ipcRenderer.invoke('mining:renderEpubDeck', analysis, config),
+  }> => ipcRenderer.invoke('mining:renderEpubDeck', analysis, config, opts),
   miningBuildEpubDeck: (
     itemId: string,
     config?: Partial<TraditionalMiningConfig>,
@@ -2674,6 +2732,14 @@ const api = {
   aiSetupStatus: (): Promise<AiSetupStatus> => ipcRenderer.invoke('aiSetup:status'),
   aiSetupSetEnabled: (enabled: boolean): Promise<AiSetupStatus> =>
     ipcRenderer.invoke('aiSetup:setEnabled', enabled),
+  /** Cloud opt-ins per feature and non-secret provider options (OpenAI model, local server). */
+  aiSetupUpdate: (patch: import('./shared/aiSetup').AiFeatureSettingsPatch): Promise<AiSetupStatus> =>
+    ipcRenderer.invoke('aiSetup:update', patch),
+  /** One tiny fixed request to a provider: key, server and model checked. No user data is sent. */
+  aiSetupTestConnection: (
+    providerId: AiProviderId,
+  ): Promise<import('./shared/aiConnectionTest').AiConnectionTestResult> =>
+    ipcRenderer.invoke('aiSetup:testConnection', providerId),
   onAiSetupChanged: (cb: (status: AiSetupStatus) => void): (() => void) => {
     const handler = (_event: unknown, status: AiSetupStatus): void => cb(status);
     ipcRenderer.on('aiSetup:changed', handler);
@@ -2924,6 +2990,8 @@ const api = {
     ipcRenderer.invoke('ai:enrichCard', req),
   aiGenerateDeck: (req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]> =>
     ipcRenderer.invoke('ai:generateDeck', req),
+  /** Aborts every AI Card Studio run in flight (the HTTP request or the offline prompt). */
+  aiCancelGenerate: (): Promise<{ ok: true; cancelled: number }> => ipcRenderer.invoke('ai:cancelGenerate'),
   onAiGenerateProgress: (
     cb: (p: import('./shared/mining').AiGenerationProgress) => void,
   ): (() => void) => {
@@ -2935,15 +3003,88 @@ const api = {
     ipcRenderer.invoke('ai:saveCsv', csv),
   mediaStudyAssist: (
     req: import('./shared/mediaStudyAssistant').MediaStudyAssistantRequest,
-  ): Promise<{
-    ok: boolean;
-    result?: import('./shared/mediaStudyAssistant').MediaStudyAssistantResult;
-    error?: string;
-    cached?: boolean;
-    aiOff?: boolean;
-    needsKey?: boolean;
-  }> => ipcRenderer.invoke('media-study:assist', req),
-  studyGet: (): Promise<StudyOrchestratorDocument> => ipcRenderer.invoke('study:get'),
+  ): Promise<import('./main/mediaStudyAssistant').MediaStudyAssistResponse> => ipcRenderer.invoke('media-study:assist', req),
+  // The optional AI study helpers (main/aiStudyAssist.ts). Each takes an optional
+  // `requestId` that `aiStudyCancel` aborts.
+  aiStudyWhyWrong: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiWhyWrong').WhyWrongResult>> =>
+    ipcRenderer.invoke('aiStudy:whyWrong', req),
+  aiStudyExampleSentences: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiExampleSentences').ExampleSentencesResult>> =>
+    ipcRenderer.invoke('aiStudy:exampleSentences', req),
+  aiStudyLeechRescue: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiLeechRescue').LeechRescueSuggestion>> =>
+    ipcRenderer.invoke('aiStudy:leechRescue', req),
+  aiStudyContextExplain: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiContextExplain').ContextExplainResult>> =>
+    ipcRenderer.invoke('aiStudy:contextExplain', req),
+  aiStudyCancel: (requestId: string): Promise<boolean> => ipcRenderer.invoke('aiStudy:cancel', requestId),
+  // The optional AI helpers for watching and reading (main/aiImmerseAssist.ts).
+  // Each takes an optional `requestId` that `aiImmerseCancel` aborts.
+  aiImmerseBrief: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiMediaBrief').MediaBriefChunkResult>> =>
+    ipcRenderer.invoke('aiImmerse:brief', req),
+  aiImmersePickLines: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiMediaBrief').LinePickResult>> =>
+    ipcRenderer.invoke('aiImmerse:pickLines', req),
+  aiImmerseExplainLine: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiImmerseLine').LineExplainResult>> =>
+    ipcRenderer.invoke('aiImmerse:explainLine', req),
+  aiImmerseSimplify: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiImmerseLine').ReaderSimplifyResult>> =>
+    ipcRenderer.invoke('aiImmerse:simplify', req),
+  aiImmerseTranslateLine: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiImmerseLine').ContextTranslateResult>> =>
+    ipcRenderer.invoke('aiImmerse:translateLine', req),
+  aiImmerseStudyCommand: (
+    req: unknown,
+  ): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/studyFilterRecipe').StudyCommandIntent>> =>
+    ipcRenderer.invoke('aiImmerse:studyCommand', req),
+  aiImmerseCancel: (requestId: string): Promise<boolean> => ipcRenderer.invoke('aiImmerse:cancel', requestId),
+  // The optional AI helpers for grammar, statistics, planning, onboarding and the
+  // Blanc tools (main/aiTutorAssist.ts). They share the study helpers' runner, so
+  // `aiStudyCancel` aborts them by the `requestId` each request carries.
+  aiTutorGrammarExplain: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiGrammarTutor').GrammarExplainResult>> =>
+    ipcRenderer.invoke('aiTutor:grammarExplain', req),
+  aiTutorGrammarExamples: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiGrammarTutor').GrammarExamplesResult>> =>
+    ipcRenderer.invoke('aiTutor:grammarExamples', req),
+  aiTutorGrammarProduction: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiGrammarTutor').GrammarProductionResult>> =>
+    ipcRenderer.invoke('aiTutor:grammarProduction', req),
+  aiTutorGrammarSightings: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiGrammarTutor').GrammarSightingResult>> =>
+    ipcRenderer.invoke('aiTutor:grammarSightings', req),
+  aiTutorStatsCoach: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiStatsCoach').StatsCoachResult>> =>
+    ipcRenderer.invoke('aiTutor:statsCoach', req),
+  aiTutorGoalSuggest: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiStudyPlanner').GoalSuggestResult>> =>
+    ipcRenderer.invoke('aiTutor:goalSuggest', req),
+  aiTutorEventParse: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiStudyPlanner').EventDraft>> =>
+    ipcRenderer.invoke('aiTutor:eventParse', req),
+  aiTutorPlacementQuiz: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiOnboarding').PlacementQuizResult>> =>
+    ipcRenderer.invoke('aiTutor:placementQuiz', req),
+  aiTutorSettingsHelp: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiOnboarding').SettingsHelpResult>> =>
+    ipcRenderer.invoke('aiTutor:settingsHelp', req),
+  aiTutorBlancMistake: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiBlancTutor').BlancMistakeResult>> =>
+    ipcRenderer.invoke('aiTutor:blancMistake', req),
+  aiTutorBlancSummary: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiBlancTutor').BlancSummaryResult>> =>
+    ipcRenderer.invoke('aiTutor:blancSummary', req),
+  // Speaking and writing (main/aiSpeakAssist.ts); cancelled through `aiStudyCancel`.
+  aiSpeakShadowing: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiShadowing').ShadowingFeedbackResult>> =>
+    ipcRenderer.invoke('aiSpeak:shadowing', req),
+  aiSpeakConversation: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiConversation').ConversationReplyResult>> =>
+    ipcRenderer.invoke('aiSpeak:conversation', req),
+  aiSpeakCorrect: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiWritingCorrection').WritingCorrectionResult>> =>
+    ipcRenderer.invoke('aiSpeak:correct', req),
+  aiSpeakJournal: (req: unknown): Promise<import('./shared/aiStudyCommon').AiStudyResponse<import('./shared/aiWritingCorrection').JournalGradeResult>> =>
+    ipcRenderer.invoke('aiSpeak:journal', req),
+  studyGet:(): Promise<StudyOrchestratorDocument> => ipcRenderer.invoke('study:get'),
   studyMigrateLegacy: (value: unknown): Promise<StudyOrchestratorDocument> =>
     ipcRenderer.invoke('study:migrateLegacy', value),
   studyPrepare: (request: StudyAnalysisRequest): Promise<StudyPreparationResult> =>
@@ -3476,8 +3617,16 @@ const api = {
   lensGetInit: (): Promise<LensInit | null> => ipcRenderer.invoke('lens:getInit'),
   /** Capture + OCR a region (window-local DIP coords). */
   lensOcr: (
-    region: RegionRect & { engine?: 'auto' | 'manga' | 'web'; includeScreenshot?: boolean },
+    region: RegionRect & { engine?: 'auto' | 'manga' | 'web'; includeScreenshot?: boolean; scanId?: number },
   ): Promise<LensOcrResult> => ipcRenderer.invoke('lens:ocr', region),
+  /** Stop this window's running scan before its next pass. */
+  lensOcrCancel: (): Promise<boolean> => ipcRenderer.invoke('lens:ocrCancel'),
+  /** Where the running scan is (capturing → reading → refining). */
+  onLensOcrProgress: (cb: (progress: { scanId: number; stage: LensOcrStage }) => void): (() => void) => {
+    const handler = (_e: unknown, progress: { scanId: number; stage: LensOcrStage }): void => cb(progress);
+    ipcRenderer.on('lens:ocrProgress', handler);
+    return () => ipcRenderer.removeListener('lens:ocrProgress', handler);
+  },
   /** Toggle pass-through: true = capture the mouse, false = click through to the app below. */
   lensSetInteractive: (interactive: boolean): void => {
     ipcRenderer.send('lens:setInteractive', interactive);
@@ -3547,6 +3696,63 @@ const api = {
     const handler = (_e: unknown, status: ReadingLensStatus): void => cb(status);
     ipcRenderer.on('lens:settings-changed', handler);
     return () => ipcRenderer.removeListener('lens:settings-changed', handler);
+  },
+
+  // Snip to cards (main/snipToCards.ts): a Win+Shift+S snip on the clipboard → OCR →
+  // the unknown words as cards, with a history and an analysis view.
+  snipGetStatus: (): Promise<import('./shared/snipToCards').SnipStatus> => ipcRenderer.invoke('snip:getStatus'),
+  snipSetSettings: (
+    patch: Partial<import('./shared/snipToCards').SnipSettings>,
+  ): Promise<import('./shared/snipToCards').SnipStatus> => ipcRenderer.invoke('snip:setSettings', patch),
+  snipHistoryList: (
+    query: { search?: string; limit?: number } = {},
+  ): Promise<import('./shared/snipToCards').SnipEntry[]> => ipcRenderer.invoke('snip:history:list', query),
+  snipHistoryGet: (id: string): Promise<import('./shared/snipToCards').SnipEntry | null> =>
+    ipcRenderer.invoke('snip:history:get', id),
+  snipHistoryUpdate: (
+    id: string,
+    patch: import('./shared/snipToCards').SnipEntryPatch,
+  ): Promise<import('./shared/snipToCards').SnipEntry | null> => ipcRenderer.invoke('snip:history:update', id, patch),
+  snipHistoryRemove: (id: string): Promise<number> => ipcRenderer.invoke('snip:history:remove', id),
+  snipHistoryClear: (): Promise<number> => ipcRenderer.invoke('snip:history:clear'),
+  snipImage: (id: string): Promise<string | null> => ipcRenderer.invoke('snip:image', id),
+  snipReady: (): Promise<void> => ipcRenderer.invoke('snip:ready'),
+  snipAction: (action: import('./shared/snipToCards').SnipAction): Promise<boolean> =>
+    ipcRenderer.invoke('snip:action', action),
+  snipOpen: (id: string | null): Promise<void> => ipcRenderer.invoke('snip:open', id),
+  snipToastShow: (payload: import('./shared/snipToCards').SnipToastPayload): Promise<boolean> =>
+    ipcRenderer.invoke('snip:toast:show', payload),
+  snipToastGet: (): Promise<import('./shared/snipToCards').SnipToastPayload | null> => ipcRenderer.invoke('snip:toast:get'),
+  snipToastClose: (): Promise<void> => ipcRenderer.invoke('snip:toast:close'),
+  onSnipProcess: (cb: (job: import('./shared/snipToCards').SnipJob) => void): (() => void) => {
+    const handler = (_e: unknown, job: import('./shared/snipToCards').SnipJob): void => cb(job);
+    ipcRenderer.on('snip:process', handler);
+    return () => ipcRenderer.removeListener('snip:process', handler);
+  },
+  onSnipAction: (cb: (action: import('./shared/snipToCards').SnipAction) => void): (() => void) => {
+    const handler = (_e: unknown, action: import('./shared/snipToCards').SnipAction): void => cb(action);
+    ipcRenderer.on('snip:action', handler);
+    return () => ipcRenderer.removeListener('snip:action', handler);
+  },
+  onSnipOpen: (cb: (target: { id: string | null }) => void): (() => void) => {
+    const handler = (_e: unknown, target: { id: string | null }): void => cb(target);
+    ipcRenderer.on('snip:open', handler);
+    return () => ipcRenderer.removeListener('snip:open', handler);
+  },
+  onSnipHistoryChanged: (cb: (change: { id: string | null }) => void): (() => void) => {
+    const handler = (_e: unknown, change: { id: string | null }): void => cb(change);
+    ipcRenderer.on('snip:history-changed', handler);
+    return () => ipcRenderer.removeListener('snip:history-changed', handler);
+  },
+  onSnipSettingsChanged: (cb: (status: import('./shared/snipToCards').SnipStatus) => void): (() => void) => {
+    const handler = (_e: unknown, status: import('./shared/snipToCards').SnipStatus): void => cb(status);
+    ipcRenderer.on('snip:settings-changed', handler);
+    return () => ipcRenderer.removeListener('snip:settings-changed', handler);
+  },
+  onSnipToast: (cb: (payload: import('./shared/snipToCards').SnipToastPayload | null) => void): (() => void) => {
+    const handler = (_e: unknown, payload: import('./shared/snipToCards').SnipToastPayload | null): void => cb(payload);
+    ipcRenderer.on('snip:toast', handler);
+    return () => ipcRenderer.removeListener('snip:toast', handler);
   },
 
   // Downloadable models & dictionaries (Phase 6). Nothing heavy ships in the
@@ -3953,6 +4159,7 @@ const api = {
     media: ReadonlyArray<import('./shared/deckMediaExport').DeckMediaItem>;
     rows?: string[][];
     schedules?: import('./shared/localDeckApkg').LocalDeckApkgRequest['schedules'];
+    notes?: import('./shared/localDeckApkg').LocalDeckApkgRequest['notes'];
   }): Promise<import('./main/flashcardAudio').DeckExportResult> =>
     ipcRenderer.invoke('flashcards:exportDeck', request),
   /** Open a folder this app wrote under userData/exports. Refuses anything else. */
@@ -3983,10 +4190,20 @@ const api = {
     ipcRenderer.on('transcription:chunk-request', handler);
     return () => ipcRenderer.removeListener('transcription:chunk-request', handler);
   },
+  /** The chunk's result, or an interim model-loading / model-ready status. */
   replyTranscriptionChunk: (
-    payload: import('./shared/transcriptionIpc').TranscriptionChunkResult & { id: string },
+    payload: (
+      | import('./shared/transcriptionIpc').TranscriptionChunkResult
+      | import('./shared/transcriptionIpc').TranscriptionChunkStatus
+    ) & { id: string },
   ): void => {
     ipcRenderer.send('transcription:chunk-reply', payload);
+  },
+  /** Main stops one chunk (job cancelled, or it timed out): terminate its worker. */
+  onTranscriptionChunkCancel: (cb: (payload: { id: string }) => void): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string }): void => cb(payload);
+    ipcRenderer.on('transcription:chunk-cancel', handler);
+    return () => ipcRenderer.removeListener('transcription:chunk-cancel', handler);
   },
   onExtensionTranscribeRequest: (
     cb: (payload: { id: string; pcmBase64: string }) => void,

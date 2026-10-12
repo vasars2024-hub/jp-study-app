@@ -139,7 +139,7 @@ export default function GrammarFilterPanel({
     for (const f of filters.functions) {
       chips.push({
         key: `fn-${f}`,
-        label: GRAMMAR_FUNCTION_LABELS[f] ?? f,
+        label: (GRAMMAR_FUNCTION_LABELS as Readonly<Record<string, string>>)[f] ?? f,
         clear: () => patch({ functions: filters.functions.filter((x) => x !== f) }),
       });
     }

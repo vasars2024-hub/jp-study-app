@@ -21,6 +21,12 @@ import { useT } from '../i18n';
 
 const CAL_CATS: CalendarCategory[] = ['exam', 'study', 'assignment', 'reminder', 'personal'];
 
+// Lost in the 456cd6df checkpoint while every add/duplicate/rule path still
+// calls it, so those buttons threw a ReferenceError.
+function uid(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
 function isDirectMediaRef(ref: string): boolean {
   return /^(app:|data:|blob:|file:|https?:|\/)/i.test(ref);
 }

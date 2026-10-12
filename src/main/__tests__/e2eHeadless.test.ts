@@ -9,9 +9,11 @@
  * factory in main creates its window hidden, so the instance-level guard is never racing
  * a window that was already on screen when the constructor returned.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer, request as httpRequest } from 'node:http';
+import { connect as netConnect, createServer as createNetServer, type AddressInfo, type Server } from 'node:net';
 import { join, relative, resolve } from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fakes = vi.hoisted(() => {
   class FakeEmitter {
@@ -27,7 +29,13 @@ const fakes = vi.hoisted(() => {
       return true;
     }
   }
+  const paths = new Map<string, string>();
+  const userData = `${(process.env.TEMP ?? process.env.TMPDIR ?? '/tmp').replace(/\\/g, '/')}/gum-e2e-headless-test-${process.pid}`;
   const app = Object.assign(new FakeEmitter(), {
+    getPath: (name: string) => paths.get(name) ?? (name === 'userData' ? userData : `${userData}/${name}`),
+    setPath: (name: string, value: string) => {
+      paths.set(name, value);
+    },
     isPackaged: false,
     focus: vi.fn(),
     setLoginItemSettings: vi.fn(),
@@ -70,7 +78,53 @@ const fakes = vi.hoisted(() => {
     }
   }
   const autoUpdater = { checkForUpdates: vi.fn(), setFeedURL: vi.fn(), quitAndInstall: vi.fn() };
-  return { app, shell, dialog, globalShortcut, Notification, Menu, BrowserWindow, FakeEmitter, autoUpdater };
+  // The real modules' surfaces, each method a spy that THROWS: reaching one means the
+  // isolation stub was not installed and the OS clipboard / screen would have been used.
+  const real = (name: string) => vi.fn(() => {
+    throw new Error(`real ${name} reached`);
+  });
+  const clipboard = {
+    readText: real('clipboard.readText'),
+    writeText: real('clipboard.writeText'),
+    readHTML: real('clipboard.readHTML'),
+    writeHTML: real('clipboard.writeHTML'),
+    readRTF: real('clipboard.readRTF'),
+    writeRTF: real('clipboard.writeRTF'),
+    readImage: real('clipboard.readImage'),
+    writeImage: real('clipboard.writeImage'),
+    readBookmark: real('clipboard.readBookmark'),
+    writeBookmark: real('clipboard.writeBookmark'),
+    readFindText: real('clipboard.readFindText'),
+    writeFindText: real('clipboard.writeFindText'),
+    readBuffer: real('clipboard.readBuffer'),
+    writeBuffer: real('clipboard.writeBuffer'),
+    availableFormats: real('clipboard.availableFormats'),
+    has: real('clipboard.has'),
+    clear: real('clipboard.clear'),
+    read: real('clipboard.read'),
+    write: real('clipboard.write'),
+  };
+  const desktopCapturer = { getSources: real('desktopCapturer.getSources') };
+  const fakeImage = (w: number, h: number) => ({
+    isEmpty: () => w === 0 || h === 0,
+    getSize: () => ({ width: w, height: h }),
+    resize: (o: { width: number; height: number }) => fakeImage(o.width, o.height),
+  });
+  const nativeImage = {
+    createEmpty: () => fakeImage(0, 0),
+    createFromBitmap: (_b: Buffer, o: { width: number; height: number }) => fakeImage(o.width, o.height),
+    createFromPath: () => fakeImage(640, 360),
+  };
+  const screen = { getAllDisplays: () => [{ id: 2528732444 }] };
+  const ipcHandlers = new Map<string, (...a: unknown[]) => unknown>();
+  const ipcMain = {
+    handle: (ch: string, fn: (...a: unknown[]) => unknown) => ipcHandlers.set(ch, fn),
+    on: (ch: string, fn: (...a: unknown[]) => unknown) => ipcHandlers.set(ch, fn),
+  };
+  return {
+    app, shell, dialog, globalShortcut, Notification, Menu, BrowserWindow, FakeEmitter, autoUpdater,
+    clipboard, desktopCapturer, nativeImage, screen, ipcMain, ipcHandlers,
+  };
 });
 
 vi.mock('electron', () => ({
@@ -82,6 +136,11 @@ vi.mock('electron', () => ({
   Menu: fakes.Menu,
   BrowserWindow: fakes.BrowserWindow,
   autoUpdater: fakes.autoUpdater,
+  clipboard: fakes.clipboard,
+  desktopCapturer: fakes.desktopCapturer,
+  nativeImage: fakes.nativeImage,
+  screen: fakes.screen,
+  ipcMain: fakes.ipcMain,
   session: { defaultSession: null },
 }));
 
@@ -312,6 +371,216 @@ describe('headless keeps the app\'s own semantics observable', () => {
       expect((mod.e2eHeadlessStatus() as { calls: Array<{ api: string }> }).calls.map((c) => c.api)).toContain('autoUpdater.checkForUpdates');
     } finally {
       globalThis.fetch = saved;
+    }
+  });
+});
+
+/** A session double with every surface the isolation guards touch. */
+function fakeSession() {
+  const state = {
+    beforeRequest: null as null | ((d: { url: string }, cb: (r: Record<string, unknown>) => void) => void),
+    displayHandler: null as null | ((req: unknown, cb: (s: Record<string, unknown>) => void) => void),
+    preloads: [] as Array<Record<string, unknown>>,
+  };
+  const ses = {
+    on: () => undefined,
+    setPermissionRequestHandler: () => undefined,
+    setPermissionCheckHandler: () => undefined,
+    webRequest: {
+      onCompleted: () => undefined,
+      onBeforeRequest: (_f: unknown, fn: typeof state.beforeRequest) => {
+        state.beforeRequest = fn;
+      },
+    },
+    setDisplayMediaRequestHandler: (fn: typeof state.displayHandler) => {
+      state.displayHandler = fn;
+    },
+    registerPreloadScript: (s: Record<string, unknown>) => {
+      state.preloads.push(s);
+      return 'id';
+    },
+  };
+  const route = (url: string): Promise<Record<string, unknown>> =>
+    new Promise((resolve) => state.beforeRequest!({ url }, resolve));
+  return { ses, state, route };
+}
+
+describe('isolation: the owner\'s services, clipboard, screen and files', () => {
+  afterAll(async () => {
+    const mod = await import('../e2eHeadless');
+    mod.uninstallLoopbackGuard();
+    rmSync(fakes.app.getPath('userData'), { recursive: true, force: true });
+  });
+
+  it('headless mode installs every isolation stub, and each one answers from the harness', async () => {
+    fakes.app.listeners.clear();
+    const mod = await freshModule();
+    const savedFetch = globalThis.fetch;
+    try {
+      mod.initE2eHeadless({
+        env: {
+          GUM_E2E_HEADLESS: '1',
+          GUM_E2E_LOOPBACK: JSON.stringify({ remap: { 8765: 41001 } }),
+          GUM_E2E_REMOTE: JSON.stringify({ 'jimaku.cc': 'http://127.0.0.1:41002', 'evil.example': 'https://evil.example' }),
+        },
+        argv: [],
+        isPackaged: false,
+      });
+    } finally {
+      globalThis.fetch = savedFetch;
+    }
+    const { ses, state, route } = fakeSession();
+    mod.guardSessionForE2e(ses as never);
+
+    const iso = mod.e2eIsolationStatus() as { missing: string[]; stubs: Array<{ name: string; installed: boolean }> };
+    expect(iso.stubs.map((s) => s.name)).toEqual([...mod.ISOLATION_STUBS]);
+    expect(iso.missing).toEqual([]);
+
+    // Clipboard: an in-memory buffer (the real methods throw if reached).
+    const cb = fakes.clipboard as unknown as Record<string, (...a: unknown[]) => unknown>;
+    cb.writeText('窓辺の猫');
+    expect(cb.readText()).toBe('窓辺の猫');
+    expect(cb.availableFormats()).toEqual(['text/plain']);
+    expect((cb.readImage() as { isEmpty: () => boolean }).isEmpty()).toBe(true);
+    cb.clear();
+    expect(cb.readText()).toBe('');
+    expect(mod.e2eClipboard({ text: 'from the harness' }).text).toBe('from the harness');
+    expect(cb.readText()).toBe('from the harness');
+    // …and the renderer's half goes through the same buffer over the shim's IPC.
+    await fakes.ipcHandlers.get('e2e:clipboard:write')!({}, 'page copy');
+    expect(await fakes.ipcHandlers.get('e2e:clipboard:read')!({})).toBe('page copy');
+
+    // Screen: synthetic sources only, sized as asked, matched to the display; no windows.
+    const getSources = (fakes.desktopCapturer as unknown as { getSources: (o: unknown) => Promise<Array<Record<string, unknown>>> }).getSources;
+    const screens = await getSources({ types: ['screen'], thumbnailSize: { width: 1920, height: 1080 } });
+    expect(screens).toHaveLength(1);
+    expect(screens[0]).toMatchObject({ display_id: '2528732444' });
+    expect((screens[0].thumbnail as { getSize: () => unknown }).getSize()).toEqual({ width: 1920, height: 1080 });
+    expect(await getSources({ types: ['window'] })).toEqual([]);
+
+    // Display media: whatever handler the app installs, a request that reaches the session is refused.
+    const appHandler = vi.fn();
+    (ses as unknown as { setDisplayMediaRequestHandler: (h: unknown) => void }).setDisplayMediaRequestHandler(appHandler);
+    const granted = await new Promise((resolve) => state.displayHandler!({ frame: null }, resolve));
+    expect(granted).toEqual({});
+    expect(appHandler).not.toHaveBeenCalled();
+
+    // Pages: a session preload that installs the main-world shim.
+    expect(state.preloads).toHaveLength(1);
+    expect(state.preloads[0]).toMatchObject({ type: 'frame' });
+    const preload = readFileSync(String(state.preloads[0].filePath), 'utf8');
+    expect(preload).toContain('executeInMainWorld');
+    expect(preload).toContain('getDisplayMedia');
+    expect(preload).toContain('e2e:clipboard:write');
+
+    // Chromium requests: protected loopback ports refused, faked ones redirected, remote fakes too.
+    expect(await route('http://127.0.0.1:8765/')).toEqual({ redirectURL: 'http://127.0.0.1:41001/' });
+    expect(await route('ws://localhost:6677/')).toEqual({ cancel: true });
+    expect(await route('http://127.0.0.1:39391/health')).toEqual({});
+    expect(await route('https://jimaku.cc/api/entries/search?query=x')).toEqual({ redirectURL: 'http://127.0.0.1:41002/jimaku.cc/api/entries/search?query=x' });
+    // A remote map entry that is not loopback was dropped, never followed.
+    expect(await route('https://evil.example/')).toEqual({});
+
+    // Files: the Recycle Bin only inside the run; the user folders point into the profile.
+    const userData = fakes.app.getPath('userData');
+    const victim = join(userData, 'victim.txt');
+    mkdirSync(userData, { recursive: true });
+    writeFileSync(victim, 'x');
+    const trash = (fakes.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem;
+    await trash(victim);
+    expect(existsSync(victim)).toBe(false);
+    await expect(trash('C:\\Users\\someone\\Documents\\thesis.docx')).rejects.toThrow(/outside the run/);
+    expect((mod.e2eHeadlessStatus() as { violations: Array<{ api: string }> }).violations.map((v) => v.api)).toContain('shell.trashItem outside the run');
+    for (const name of ['videos', 'downloads', 'documents', 'desktop', 'music', 'pictures']) {
+      expect(resolve(fakes.app.getPath(name)).startsWith(resolve(userData))).toBe(true);
+    }
+  });
+
+  it('the loopback policy: owner ports are remapped or refused, everything else allowed', async () => {
+    const mod = await freshModule();
+    const config = mod.parseLoopbackConfig(JSON.stringify({ remap: { 8765: 50001 }, protect: { 9696: 'Prowlarr' } }));
+    expect(mod.decideLoopback(config, '127.0.0.1', 8765)).toEqual({ verdict: 'remapped', to: 50001, service: 'AnkiConnect' });
+    expect(mod.decideLoopback(config, 'localhost', 8080)).toEqual({ verdict: 'refused', service: 'qBittorrent WebUI' });
+    expect(mod.decideLoopback(config, '[::1]', 6677)).toEqual({ verdict: 'refused', service: 'texthooker (Textractor WebSocket)' });
+    expect(mod.decideLoopback(config, '127.0.0.1', 9696)).toEqual({ verdict: 'refused', service: 'Prowlarr' });
+    expect(mod.decideLoopback(config, '127.0.0.1', 18791)).toEqual({ verdict: 'allowed' });
+    expect(mod.decideLoopback(config, 'example.com', 8765)).toEqual({ verdict: 'allowed' });
+    for (const port of [8765, 8080, 6677, 9001, 2333, 43211, 11434, 1234]) {
+      expect(mod.decideLoopback(mod.parseLoopbackConfig(undefined), '127.0.0.1', port).verdict).toBe('refused');
+    }
+  });
+
+  it('no real loopback port is contacted: every outgoing connection is recorded, remapped or refused', async () => {
+    // Stand-ins for the owner's services, on ephemeral ports so the test never touches a
+    // real one. Each counts the connections it ACCEPTS — the only proof that matters.
+    const listen = (server: Server) => new Promise<number>((resolve) => server.listen(0, '127.0.0.1', () => resolve((server.address() as AddressInfo).port)));
+    const accepted = { owner: 0, ownerOther: 0, fake: 0 };
+    const owner = createNetServer((s) => {
+      accepted.owner += 1;
+      s.destroy();
+    });
+    const ownerOther = createNetServer((s) => {
+      accepted.ownerOther += 1;
+      s.destroy();
+    });
+    const fake = createHttpServer((req, res) => {
+      accepted.fake += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ result: 6, error: null, path: req.url }));
+    });
+    const ownerPort = await listen(owner);
+    const otherPort = await listen(ownerOther);
+    const fakePort = await listen(fake);
+    const savedFetch = globalThis.fetch;
+    try {
+      const mod = await freshModule();
+      mod.initE2eHeadless({
+        env: {
+          GUM_E2E_HEADLESS: '1',
+          GUM_E2E_LOOPBACK: JSON.stringify({ remap: { [ownerPort]: fakePort }, protect: { [ownerPort]: 'AnkiConnect (stand-in)', [otherPort]: 'qBittorrent (stand-in)' } }),
+        },
+        argv: [],
+        isPackaged: false,
+      });
+      mod.clearE2eRecords();
+      // Node's fetch (undici) — what anki/client.ts uses.
+      const res = await globalThis.fetch(`http://127.0.0.1:${ownerPort}/`, { method: 'POST', body: JSON.stringify({ action: 'version', version: 6 }) });
+      expect(await res.json()).toMatchObject({ result: 6 });
+      // node:http — what the qBittorrent client uses — by host name.
+      const viaHttp = await new Promise<number>((resolve, reject) => {
+        const req = httpRequest({ host: 'localhost', port: ownerPort, path: '/x', method: 'GET', agent: false }, (r) => {
+          r.resume();
+          resolve(r.statusCode ?? 0);
+        });
+        req.on('error', reject);
+        req.end();
+      });
+      expect(viaHttp).toBe(200);
+      // A protected port with no fake: refused before a connection exists.
+      await expect(globalThis.fetch(`http://127.0.0.1:${otherPort}/api/v2/app/version`)).rejects.toThrow();
+      const refusedSocket = await new Promise<string>((resolve) => {
+        const s = netConnect({ host: '127.0.0.1', port: otherPort });
+        s.on('connect', () => resolve('connected'));
+        s.on('error', (err: NodeJS.ErrnoException) => resolve(String(err.code)));
+      });
+      expect(refusedSocket).toBe('ECONNREFUSED');
+      // An unprotected loopback port (the harness's own fake, the bridge) is untouched.
+      const direct = await globalThis.fetch(`http://127.0.0.1:${fakePort}/direct`);
+      expect(direct.status).toBe(200);
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(accepted.owner).toBe(0);
+      expect(accepted.ownerOther).toBe(0);
+      expect(accepted.fake).toBe(3);
+      const loop = (mod.e2eIsolationStatus() as { loopback: { connections: Array<{ port: number; verdict: string; via: string }>; leaked: number } }).loopback;
+      expect(loop.leaked).toBe(0);
+      expect(loop.connections.filter((c) => c.port === ownerPort).map((c) => c.verdict)).toEqual(['remapped', 'remapped']);
+      expect(loop.connections.filter((c) => c.port === otherPort).map((c) => c.verdict)).toEqual(['refused', 'refused']);
+      expect(loop.connections.filter((c) => c.port === fakePort).map((c) => c.verdict)).toEqual(['allowed']);
+      expect(loop.connections.every((c) => c.via === 'node')).toBe(true);
+    } finally {
+      globalThis.fetch = savedFetch;
+      for (const s of [owner, ownerOther, fake]) s.close();
     }
   });
 });

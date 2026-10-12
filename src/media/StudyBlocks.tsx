@@ -370,6 +370,7 @@ export function AiWorkspaceBlock({
   translationBusy,
   onTranslate,
   hasCue,
+  episode,
 }: {
   mode: AiMode;
   onModeChange: (mode: AiMode) => void;
@@ -378,6 +379,11 @@ export function AiWorkspaceBlock({
   translationBusy: boolean;
   onTranslate: () => void;
   hasCue: boolean;
+  /**
+   * Whole-episode tools under the per-line modes (the episode brief and quiz).
+   * Optional: the detached copy of this block has no transcript and passes none.
+   */
+  episode?: React.ReactNode;
 }): React.ReactElement {
   const { t } = useT();
   return (
@@ -415,6 +421,7 @@ export function AiWorkspaceBlock({
           </div>
         )}
       </div>
+      {episode ?? null}
     </section>
   );
 }

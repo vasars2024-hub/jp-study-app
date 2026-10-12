@@ -347,6 +347,31 @@ function notifyTransportFailure(): void {
   }
 }
 
+// ----- API-error signal (model-field cache invalidation) ----------------------
+
+const apiErrorListeners = new Set<(err: AnkiError, params: unknown) => void>();
+
+/**
+ * Fires for every api-kind refusal (HTTP 200 with `error` set), with the params
+ * that were sent. `modelFields.ts` listens for "model was not found" so a note
+ * type deleted in Anki drops out of its cache whichever action discovered it.
+ */
+export function onAnkiApiError(cb: (err: AnkiError, params: unknown) => void): () => void {
+  apiErrorListeners.add(cb);
+  return () => apiErrorListeners.delete(cb);
+}
+
+function notifyApiError(err: AnkiError, params: unknown): void {
+  if (err.kind !== 'api') return;
+  for (const cb of Array.from(apiErrorListeners)) {
+    try {
+      cb(err, params);
+    } catch (listenerErr) {
+      console.error('[anki] api-error listener threw:', listenerErr);
+    }
+  }
+}
+
 // ----- invoke ----------------------------------------------------------------
 
 export interface InvokeOpts {
@@ -400,7 +425,84 @@ export async function invoke<A extends keyof AnkiActionMap>(
 
   if (body && body.error != null) {
     const msg = String(body.error);
-    throw new AnkiError(classifyApiError(msg), action, msg);
+    const err = new AnkiError(classifyApiError(msg), action, msg);
+    notifyApiError(err, params);
+    throw err;
   }
   return (body ? body.result : undefined) as AnkiActionMap[A]['result'];
+}
+
+// ----- multi -----------------------------------------------------------------
+
+/** One action inside a `multi` batch. */
+export interface AnkiMultiCall<A extends keyof AnkiActionMap = keyof AnkiActionMap> {
+  action: A;
+  params: AnkiActionMap[A]['params'];
+}
+
+/** Per-action outcome of a `multi` batch: the result, or the AnkiError that action alone met. */
+export type AnkiMultiOutcome = { ok: true; result: unknown } | { ok: false; error: AnkiError };
+
+/**
+ * Several actions in ONE request (AnkiConnect `multi`). Each inner action
+ * carries `version: 6`, so AnkiConnect answers each with its own
+ * `{ result, error }` — one action's refusal does not fail its neighbours.
+ * A transport failure (or a refusal of `multi` itself) throws like `invoke`.
+ * The timeout is the slowest inner action's tier.
+ */
+export async function invokeMulti(calls: readonly AnkiMultiCall[], opts?: InvokeOpts): Promise<AnkiMultiOutcome[]> {
+  if (!calls.length) return [];
+  const timeoutMs = opts?.timeoutMs ?? Math.max(...calls.map((c) => DEFAULT_TIMEOUTS[c.action]));
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, timeoutMs);
+  const onOuterAbort = (): void => ctrl.abort();
+  if (opts?.signal) {
+    if (opts.signal.aborted) ctrl.abort();
+    else opts.signal.addEventListener('abort', onOuterAbort, { once: true });
+  }
+  const first = calls[0].action;
+  let body: { result?: unknown; error?: unknown } | undefined;
+  try {
+    const res = await fetch(urlProvider(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'multi',
+        version: 6,
+        params: { actions: calls.map((c) => ({ action: c.action, version: 6, params: c.params ?? {} })) },
+      }),
+      signal: ctrl.signal,
+    });
+    body = (await res.json()) as { result?: unknown; error?: unknown };
+  } catch (err) {
+    const callerAborted = Boolean(opts?.signal?.aborted) && !timedOut;
+    if (!callerAborted && !opts?.quiet) notifyTransportFailure();
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new AnkiError(timedOut || callerAborted ? 'timeout' : 'transport', first, callerAborted ? 'aborted by caller' : detail);
+  } finally {
+    clearTimeout(timer);
+    if (opts?.signal) opts.signal.removeEventListener('abort', onOuterAbort);
+  }
+  if (body && body.error != null) {
+    const msg = String(body.error);
+    throw new AnkiError(classifyApiError(msg), first, msg);
+  }
+  const rows = Array.isArray(body?.result) ? (body?.result as unknown[]) : [];
+  return calls.map((call, i) => {
+    const row = rows[i] as { result?: unknown; error?: unknown } | undefined;
+    if (!row || typeof row !== 'object') {
+      return { ok: false, error: new AnkiError('api', call.action, 'multi: no answer for this action') };
+    }
+    if (row.error != null) {
+      const msg = String(row.error);
+      const err = new AnkiError(classifyApiError(msg), call.action, msg);
+      notifyApiError(err, call.params);
+      return { ok: false, error: err };
+    }
+    return { ok: true, result: row.result };
+  });
 }

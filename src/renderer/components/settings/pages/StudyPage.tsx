@@ -24,6 +24,7 @@ import {
   type FocusTabId,
 } from '../../../focusMode';
 import { segButton as seg } from '../../ui/segButton';
+import { keysOrUnset } from '../../../shortcutHints';
 import { Toggle } from '../../ui';
 
 
@@ -64,7 +65,7 @@ export default function StudyPage() {
           />
         }
       >
-        <p className="muted os-set-hint">{t('focus.settings.shortcutHint')}</p>
+        <p className="muted os-set-hint">{t('focus.settings.shortcutHint', { keys: keysOrUnset('study.focusMode') })}</p>
       </SettingsCard>
 
       <SettingsCard

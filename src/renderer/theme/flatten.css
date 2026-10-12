@@ -721,3 +721,18 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+/* =============================================================================
+   components/anki/deckWorkbench.css — 1 rule
+   ============================================================================= */
+
+/* MATERIAL — the Aero deck assistant pane, a sheet of glass over the workbench.
+   Scoped to Aero exactly as the source rule is; the higher specificity of the
+   added `[data-lq-flat]` wins regardless of sheet order. */
+:root[data-materials='aero'][data-lq-flat] .wb-ai {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.16)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}

@@ -1,0 +1,88 @@
+/* wid5 — widget settings popover and keyboard move/resize mode. */
+
+.widget-settings {
+  position: absolute;
+  top: 32px;
+  right: 6px;
+  z-index: 5;
+  width: min(260px, calc(100% - 12px));
+  max-height: calc(100% - 40px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-md, 0 6px 24px rgba(0, 0, 0, 0.25));
+  font-size: 12px;
+  min-width: 0;
+}
+.widget-settings-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.widget-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.widget-settings-field > span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.widget-settings-field input[type='number'],
+.widget-settings-field select {
+  min-width: 0;
+  min-height: 26px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 3px 6px;
+  font: inherit;
+}
+.widget-settings-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.widget-settings-toggle > span {
+  color: var(--text);
+}
+.widget-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Keyboard move/resize: the frame shows it is being driven by keys. */
+.widget-frame.is-keyboard-moving {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+}
+.widget-keyboard-hint {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  z-index: 5;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* The Aero gadget is frameless: its popover hangs below the gadget instead. */
+.aero-gadget .widget-settings {
+  top: 4px;
+  right: 4px;
+}

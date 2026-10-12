@@ -22,7 +22,7 @@ import type { TranslateSegment } from '../../../shared/translateCore';
 import { openGrammarPractice } from '../../extensionBridgeUi';
 import { writeLocalStorage } from '../../localStorageWrite';
 import type { WordLookupHit } from '../../wordLookup';
-import { copyText, type TranslateController } from './TranslateContent';
+import { LANG_LABELS, copyText, type TranslateController } from './TranslateContent';
 import '../analysis/sentenceAnalysis.css';
 import './translateStudy.css';
 
@@ -142,6 +142,21 @@ export function TranslateOptionsBar({ state, className = '' }: { state: Translat
         {state.clipboardWatch && (
           <span className="xlate-watch-status muted" role="status">{t('xlate.clipboard.watching')}</span>
         )}
+        {state.clipboardWatch && state.setClipboardAllowCloud && (
+          <label className="xlate-watch" title={t('risk4.translate.clipboardCloudHint')}>
+            <input
+              type="checkbox"
+              checked={state.clipboardAllowCloud === true}
+              onChange={(e) => state.setClipboardAllowCloud?.(e.target.checked)}
+            />
+            {t('risk4.translate.clipboardCloud')}
+          </label>
+        )}
+        {state.busy && state.cancel && (
+          <button type="button" className="btn ghost xlate-cancel" onClick={() => state.cancel?.()}>
+            {t('risk4.translate.cancel')}
+          </button>
+        )}
       </div>
       {glossaryOpen && (
         <TranslateGlossaryPanel
@@ -195,6 +210,9 @@ export default function TranslateStudyPanel({ state }: { state: TranslateControl
 
   const aidLabel = t(`xlate.aid.${studyLang ?? 'ja'}`);
   const multi = segments.length > 1;
+  const back = state.backTranslations ?? {};
+  const sourceName = LANG_LABELS[source] ?? source.toUpperCase();
+  const backBusy = Object.values(back).some((entry) => entry.status === 'busy');
 
   return (
     <section className="xlate-study" aria-label={t('xlate.study.label')}>
@@ -210,7 +228,19 @@ export default function TranslateStudyPanel({ state }: { state: TranslateControl
             {aidLabel}
           </button>
         )}
+        {state.backTranslateAll && (
+          <button
+            type="button"
+            className="btn ghost xlate-back-all"
+            onClick={state.backTranslateAll}
+            disabled={backBusy}
+            title={t('xlate2.back.hint', { lang: sourceName })}
+          >
+            {multi ? t('xlate2.back.actionAll') : t('xlate2.back.action')}
+          </button>
+        )}
         <span className="xlate-study-keys muted">{t('xlate.keysHint')}</span>
+        <span className="xlate-study-keys muted">{t('xlate2.keysHintMore')}</span>
       </div>
 
       <TranslateResultSource meta={state.meta} />
@@ -249,6 +279,24 @@ export default function TranslateStudyPanel({ state }: { state: TranslateControl
               <p className="xlate-dst" lang={target}>
                 {segment.target || <span className="muted">{t('xlate.segment.untranslated')}</span>}
               </p>
+              {back[row] && (
+                <p
+                  className={`xlate-back${back[row].status === 'error' ? ' is-error' : ''}`}
+                  lang={back[row].status === 'done' ? source : undefined}
+                  role="status"
+                >
+                  {back[row].status === 'busy'
+                    ? t('xlate2.back.working')
+                    : back[row].status === 'error'
+                      ? t('xlate2.back.failed', { reason: back[row].error ?? '' })
+                      : (
+                        <>
+                          <span className="muted">{t('xlate2.back.label', { lang: sourceName })}</span>{' '}
+                          {back[row].text}
+                        </>
+                      )}
+                </p>
+              )}
               {multi && (
                 <div className="xlate-pair-actions">
                   <button
@@ -269,6 +317,18 @@ export default function TranslateStudyPanel({ state }: { state: TranslateControl
                   >
                     {t('xlate.segment.mine')}
                   </button>
+                  {state.backTranslate && (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={!segment.target || back[row]?.status === 'busy'}
+                      aria-label={`${t('xlate2.back.action')} — ${subject}`}
+                      title={t('xlate2.back.hint', { lang: sourceName })}
+                      onClick={() => state.backTranslate?.(row)}
+                    >
+                      {t('xlate2.back.action')}
+                    </button>
+                  )}
                 </div>
               )}
               {picked && (

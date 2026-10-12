@@ -18,7 +18,7 @@
  */
 
 import type { ReadingLensCapture, ReadingLensEngine, ReadingLensSource } from './readingLens';
-import { READING_LENS_SOURCES } from './readingLens';
+import { READING_LENS_CAPTURE_ENGINES, READING_LENS_SOURCES } from './readingLens';
 
 export const READING_LENS_HISTORY_VERSION = 1 as const;
 
@@ -168,10 +168,9 @@ export function normalizeReadingLensHistoryEntry(value: unknown): ReadingLensHis
     ? (value.source as ReadingLensSource)
     : 'screen';
   const engineRaw = value.engine;
-  const engine: ReadingLensEngine =
-    engineRaw === 'auto' || engineRaw === 'manga' || engineRaw === 'web' || engineRaw === 'none' || engineRaw === 'import'
-      ? engineRaw
-      : 'auto';
+  const engine: ReadingLensEngine = READING_LENS_CAPTURE_ENGINES.includes(engineRaw as ReadingLensEngine)
+    ? (engineRaw as ReadingLensEngine)
+    : 'auto';
 
   return {
     captureId,

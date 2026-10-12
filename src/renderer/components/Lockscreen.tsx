@@ -17,6 +17,8 @@ import { WIRED_ARCHIVE_THEME_ID } from '../theme/wired-archive';
 import { loadThemeId } from '../theme';
 import { useLockBlockedToasts } from '../lockBlockedNotice';
 import { trapTab } from './ui/focusTrap';
+import { showOsToast } from './ToastHost';
+import { LockscreenChallenge, LockscreenRecovery, LockscreenStudyPanel, type LockscreenVariant } from './LockscreenStudy';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'] as const;
 
@@ -83,6 +85,15 @@ export default function Lockscreen({
     return () => window.clearInterval(timer);
   }, [retryUntil]);
   const [clock, setClock] = useState(() => new Date());
+  /**
+   * lock3: "answer a card to unlock" comes before the PIN when the owner turned
+   * it on. Without a PIN at all it is the whole gate — a study habit at launch,
+   * not a lock (main is never locked behind it; `finishChallenge` checks).
+   */
+  const hasPin = Boolean(cfg.pinHash);
+  const [stage, setStage] = useState<'challenge' | 'pin'>(() => (cfg.answerToUnlock ? 'challenge' : 'pin'));
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const pinActive = stage === 'pin' && !recoveryOpen;
   const widgetRef = useRef<HTMLDivElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   // a11y3: every skin is `role="dialog" aria-modal="true"`, so the keyboard has
@@ -100,13 +111,48 @@ export default function Lockscreen({
   }, []);
 
   useEffect(() => {
-    const t = window.setInterval(() => setClock(new Date()), 30_000);
+    // The WIRED terminal ticks seconds; the other skins show minutes.
+    const t = window.setInterval(() => setClock(new Date()), wiredMode ? 1_000 : 30_000);
     return () => window.clearInterval(t);
-  }, []);
+  }, [wiredMode]);
 
   useEffect(() => {
-    if (aeroMode || wiredMode) passwordRef.current?.focus();
-  }, [aeroMode, wiredMode]);
+    if ((aeroMode || wiredMode) && pinActive) passwordRef.current?.focus();
+  }, [aeroMode, wiredMode, pinActive]);
+  // The challenge's buttons go away when it is passed: keep focus in the lock.
+  useEffect(() => {
+    if (stage !== 'pin') return;
+    const root = rootRef.current;
+    if (root && !root.contains(document.activeElement)) (passwordRef.current ?? root).focus();
+  }, [stage]);
+
+  const finishChallenge = useCallback(() => {
+    if (hasPin) {
+      setStage('pin');
+      return;
+    }
+    // No PIN in this window's mirror — but main is the judge: if it holds a
+    // lock, the PIN step follows after all (a stale mirror never unlocks).
+    void Promise.resolve(window.api?.lockscreenIsLocked?.())
+      .catch(() => false)
+      .then((mainLocked) => {
+        if (mainLocked) {
+          setStage('pin');
+          return;
+        }
+        setUnlocking(true);
+        markLockscreenUnlocked();
+        onUnlocked();
+      });
+  }, [hasPin, onUnlocked]);
+
+  const onRecovered = useCallback(() => {
+    // Shown once the desktop is back (toasts wait while the lock screen is up).
+    showOsToast(t('lock3.recovery.done'), 'warn');
+    setUnlocking(true);
+    markLockscreenUnlocked();
+    onUnlocked();
+  }, [onUnlocked, t]);
 
   // Doze: any key or press wakes the screen and puts focus back in the field.
   useEffect(() => {
@@ -211,7 +257,7 @@ export default function Lockscreen({
   );
 
   useEffect(() => {
-    if (aeroMode || wiredMode) return;
+    if (aeroMode || wiredMode || !pinActive) return;
     const onKey = (e: KeyboardEvent) => {
       if (unlocking) return;
       if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -228,7 +274,7 @@ export default function Lockscreen({
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [press, unlocking, aeroMode, wiredMode]);
+  }, [press, unlocking, aeroMode, wiredMode, pinActive]);
 
   const submitPassword = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -242,6 +288,18 @@ export default function Lockscreen({
   const locale = LANG_TAGS[lang];
   const time = clock.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const date = clock.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+  // The big clocks are decorative (aria-hidden); a screen reader gets one sentence.
+  const clockSr = (
+    <span className="sr-only">{t('lock3.clock.sr', { time, date: clock.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' }) })}</span>
+  );
+  const variant: LockscreenVariant = wiredMode ? 'wired' : aeroMode ? 'aero' : widgetMode ? 'widget' : 'win11';
+  const studyExtras = (
+    <>
+      {!widgetMode && <LockscreenStudyPanel mode={cfg.study} variant={variant} />}
+      {hasPin && <LockscreenRecovery variant={variant} onRecovered={onRecovered} onOpenChange={setRecoveryOpen} />}
+    </>
+  );
+  const challenge = stage === 'challenge' ? <LockscreenChallenge variant={variant} onPassed={finishChallenge} /> : null;
 
   if (wiredMode) {
     return (
@@ -262,15 +320,21 @@ export default function Lockscreen({
             <span>TERMINAL ID: WIRED ARCHIVE</span>
             <span>NODE STATUS: PASSIVE</span>
           </header>
-          <div className="lockscreen-wired-clock">
-            <time>{time}</time>
+          {clockSr}
+          {/* A Navi's boot readout: present day, present time, to the second. */}
+          <div className="lockscreen-wired-clock" aria-hidden="true">
+            <span className="lockscreen-wired-clock-label">PRESENT DAY</span>
             <span>{date}</span>
+            <span className="lockscreen-wired-clock-label">PRESENT TIME</span>
+            <time>{clock.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</time>
           </div>
           <div className="lockscreen-wired-grid" aria-hidden="true">
             {['LEX', 'MEM', 'FEED', 'OPS', 'LINK', 'SYS'].map((node) => (
               <span key={node}>{node}</span>
             ))}
           </div>
+          {challenge}
+          {stage === 'pin' && !recoveryOpen && (
           <form className="lockscreen-wired-form" onSubmit={submitPassword}>
             <label htmlFor="wired-access-code">{t('lockscreen.wired.inputCode')}</label>
             <div className="lockscreen-wired-command">
@@ -298,6 +362,8 @@ export default function Lockscreen({
               {retryText ?? (error ? t('lockscreen.wired.denied') : t('lockscreen.wired.clearance'))}
             </p>
           </form>
+          )}
+          {stage === 'pin' && studyExtras}
         </section>
       </div>
     );
@@ -325,12 +391,16 @@ export default function Lockscreen({
           <time>{time}</time>
           <span>{date}</span>
         </div>
+        {clockSr}
         <div className="lockscreen-aero-center">
           <div className={`lockscreen-aero-tile${shake ? ' is-shake' : ''}${error ? ' is-error' : ''}`}>
             <div className="lockscreen-aero-frame" aria-hidden="true">
               <span className="lockscreen-aero-picture" />
             </div>
             <div className="lockscreen-aero-name">{t('lockscreen.user')}</div>
+            {challenge}
+            {stage === 'pin' && !recoveryOpen && (
+            <>
             <form className="lockscreen-aero-form" onSubmit={submitPassword}>
               <input
                 ref={passwordRef}
@@ -359,6 +429,9 @@ export default function Lockscreen({
             <p id="lockscreen-aero-status" className="lockscreen-aero-status" role="status" aria-live="polite">
               {retryText ?? (showIncorrect ? t('lockscreen.xp.incorrect') : '')}
             </p>
+            </>
+            )}
+            {stage === 'pin' && studyExtras}
           </div>
         </div>
         <button
@@ -424,6 +497,10 @@ export default function Lockscreen({
             <span className="lockscreen-clock-inline">{time}</span>
           </header>
           <div className="lockscreen-date muted">{date}</div>
+          {clockSr}
+          {challenge}
+          {stage === 'pin' && !recoveryOpen && (
+          <>
           <p className={`lockscreen-prompt${error ? ' is-error' : ''}`} role="status">
             {retryText ?? (error ? t('lockscreen.widget.wrong') : t('lockscreen.widget.enter'))}
           </p>
@@ -465,6 +542,9 @@ export default function Lockscreen({
               );
             })}
           </div>
+          </>
+          )}
+          {stage === 'pin' && studyExtras}
         </div>
       </div>
     );
@@ -500,6 +580,10 @@ export default function Lockscreen({
           </svg>
         </div>
         <div className="lockscreen-win11-name">{t('lockscreen.user')}</div>
+        {clockSr}
+        {challenge}
+        {stage === 'pin' && !recoveryOpen && (
+        <>
         <p className={`lockscreen-win11-prompt${error ? ' is-error' : ''}`} role="status">
           {retryText ?? (error ? t('lockscreen.win11.incorrect') : t('lockscreen.win11.enter'))}
         </p>
@@ -541,6 +625,9 @@ export default function Lockscreen({
             );
           })}
         </div>
+        </>
+        )}
+        {stage === 'pin' && studyExtras}
       </div>
     </div>
   );

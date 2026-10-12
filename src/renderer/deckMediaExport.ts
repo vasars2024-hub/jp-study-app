@@ -56,6 +56,7 @@ export async function runDeckAudioExport(
     media: built.media,
     rows: built.rows,
     ...(built.schedules ? { schedules: built.schedules } : {}),
+    ...(built.notes ? { notes: built.notes } : {}),
   });
   return {
     ok: result.ok === true,

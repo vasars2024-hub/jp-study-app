@@ -16,7 +16,6 @@ import {
   type DayScene,
 } from '../../../shared/calendarDayDetail';
 import { daysFromToday, dueByDate } from '../../../shared/studyActivityHeatmap';
-import { localDueForecast } from '../../../shared/reviewForecast';
 import type { ReviewLogEntry } from '../../../shared/reviewLog';
 import { READING_WORKSPACE_SCHEMA_VERSION } from '../../../shared/readingWorkspace';
 import { continueWatchingPathFromKey } from '../../../shared/seanimeContinueWatching';
@@ -28,7 +27,7 @@ import {
   loadGameProgress,
   onStatsChanged,
 } from '../../stats';
-import { loadDeck, onDeckChanged } from '../../flashcardDeck';
+import { deckDueForecast, loadDeck, onDeckChanged } from '../../flashcardDeck';
 import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
 import { openInAdoptedPlayer, openSceneAt, readMiningHistory, recentMinedScenes } from '../../sceneRoundTrip';
 import { requestFlashcardsFocus } from '../../openIntents';
@@ -115,7 +114,7 @@ export function useCalendarDayDetail(dateKey: string): CalendarDayDetail {
       deck,
       games: recentGames(),
       scenes: minedScenes(),
-      dueByDay: dueByDate(localDueForecast(deck, horizon, now.getTime()), now),
+      dueByDay: dueByDate(deckDueForecast(deck, horizon, now.getTime()), now),
       streakDates: new Set(streakRunDates(getActiveStudyDates(), restDates, now)),
       restDates,
     });
@@ -134,7 +133,7 @@ export function monthDayDetails(
   const scenes = minedScenes();
   const restDates = getStreakRestDates();
   const streakDates = new Set(streakRunDates(getActiveStudyDates(), restDates, now));
-  const dueByDay = dueByDate(localDueForecast(deck, 42, now.getTime()), now);
+  const dueByDay = dueByDate(deckDueForecast(deck, 42, now.getTime()), now);
   return dateKeys.map((dateKey) => buildCalendarDayDetail({
     dateKey,
     now,

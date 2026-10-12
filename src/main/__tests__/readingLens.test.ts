@@ -149,10 +149,13 @@ vi.mock('electron', () => {
 });
 
 const ocrCalls: unknown[][] = [];
+/** Replaces the stubbed scan for one test (progress and cancel). */
+const ocrImpl: { current: null | ((region: unknown, displayId: unknown, opts: unknown) => Promise<unknown>) } = { current: null };
 vi.mock('../screenOcr', () => ({
   ocrClipboardImage: async () => h.env.clipOcr,
   ocrRegion: async (...args: unknown[]) => {
     ocrCalls.push(args);
+    if (ocrImpl.current) return ocrImpl.current(args[0], args[1], args[2]);
     return { ok: true, engine: 'web', lines: [], text: '', available: true, hash: 'x' };
   },
 }));
@@ -690,7 +693,27 @@ describe('lens:ocr region coercion', () => {
   it('defaults the engine to auto and the screenshot to off', async () => {
     await booted();
     await h.ipc.handlers.get('lens:ocr')!({}, { x: 1, y: 2, width: 3, height: 4 });
-    expect(ocrCalls[0][2]).toEqual({ engine: 'auto', includeScreenshot: false });
+    expect(ocrCalls[0][2]).toMatchObject({ engine: 'auto', includeScreenshot: false });
+  });
+
+  it('reports progress to the scanning window and lets it cancel its own scan', async () => {
+    await booted();
+    const sent: Array<[string, unknown]> = [];
+    const sender = { id: 7, isDestroyed: () => false, send: (channel: string, payload: unknown) => sent.push([channel, payload]) };
+    ocrImpl.current = async (_r, _d, opts) => {
+      const o = opts as { signal: AbortSignal; onStage: (s: string) => void };
+      o.onStage('capturing');
+      // The reader presses Cancel while the scan runs.
+      expect(await h.ipc.handlers.get('lens:ocrCancel')!({ sender })).toBe(true);
+      expect(o.signal.aborted).toBe(true);
+      return { ok: false, error: 'cancelled' };
+    };
+    const res = await h.ipc.handlers.get('lens:ocr')!({ sender }, { x: 1, y: 2, width: 30, height: 40, scanId: 3 });
+    expect(res).toMatchObject({ error: 'cancelled' });
+    expect(sent).toEqual([['lens:ocrProgress', { scanId: 3, stage: 'capturing' }]]);
+    // Nothing left to cancel once it finished; another window's cancel never reaches it.
+    expect(await h.ipc.handlers.get('lens:ocrCancel')!({ sender })).toBe(false);
+    ocrImpl.current = null;
   });
 
   it('only attaches a screenshot on an explicit true', async () => {
@@ -919,7 +942,7 @@ describe('IPC registration', () => {
   it('registers every channel preload expects', async () => {
     const m = await load();
     m.registerReadingLensIpc();
-    for (const ch of ['lens:getSettings', 'lens:setEnabled', 'lens:setHotkey', 'lens:open', 'lens:getInit', 'lens:ocr', 'lens:close', 'lens:history:record', 'lens:history:list', 'lens:history:pin', 'lens:history:remove', 'lens:history:clear']) {
+    for (const ch of ['lens:getSettings', 'lens:setEnabled', 'lens:setHotkey', 'lens:open', 'lens:getInit', 'lens:ocr', 'lens:ocrCancel', 'lens:close', 'lens:history:record', 'lens:history:list', 'lens:history:pin', 'lens:history:remove', 'lens:history:clear']) {
       expect(h.ipc.handlers.has(ch)).toBe(true);
     }
     expect(h.ipc.listeners.has('lens:setInteractive')).toBe(true);

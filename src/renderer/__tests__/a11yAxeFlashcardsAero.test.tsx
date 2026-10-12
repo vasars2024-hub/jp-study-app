@@ -80,6 +80,31 @@ describe('Flashcards (Aero skin) — axe-core', () => {
     expect(await a11yViolations(document.body)).toEqual([]);
   });
 
+  it('a deck row opens the card\'s saved extras — with AI off too', async () => {
+    // The same entry as the Study OS deck row. Not `data-ai-entry`: the extras
+    // are the learner's, so the AI-off flag must not hide the button.
+    localStorage.setItem('jp-flashcard-deck', JSON.stringify({ folders: ['Verbs'], cards: [
+      { ...CARDS[0], mnemonic: 'Tabe-ru: a table.' }, ...CARDS.slice(1),
+    ] }));
+    document.documentElement.setAttribute('data-ai-off', '');
+    try {
+      const host = await mountAero();
+      const open = host.querySelector<HTMLButtonElement>('.aero-flash-card-row [data-flash-action="row-card-extras"]');
+      expect(open, 'extras button on the row').not.toBeNull();
+      expect(open?.closest('[data-ai-entry]')).toBeNull();
+      expect(open?.getAttribute('aria-label')).toMatch(/食べる/);
+      await click(open);
+      await settle(60);
+      expect(open?.getAttribute('aria-pressed')).toBe('true');
+      const panel = host.querySelector('.aero-flash-card-extras [data-deck-card-extras="a"]');
+      expect(panel, 'extras panel under the row').not.toBeNull();
+      expect(panel?.textContent).toContain('Tabe-ru: a table.');
+      expect(await a11yViolations(host)).toEqual([]);
+    } finally {
+      document.documentElement.removeAttribute('data-ai-off');
+    }
+  });
+
   it('creating a folder', async () => {
     const host = await mountAero();
     await click(host.querySelector('.aero-flash-folder-add'));

@@ -129,7 +129,7 @@ import type {
   StudyVocabularyFilters,
   StudyVocabularyWorkspace,
 } from '../shared/mediaStudyOrchestrator';
-import type { ProfileId, ProfileSnapshot, StudyProfile } from '../shared/profiles';
+import type { ProfileId, ProfileSnapshot, StudyProfile, StudyProfilePatch } from '../shared/profiles';
 import type { ProfileRulesStore } from '../shared/profileRules';
 import type {
   DesktopIndex,
@@ -382,6 +382,8 @@ declare global {
       /** Same page size as `lookupTerm`; a `truncated` result is reachable by asking again. */
       lookupChinese(query: string, limit?: number): Promise<DictResult>;
       resetChineseDictCache(): Promise<void>;
+      dictChineseAvailable?(): Promise<boolean>;
+      onCedictMissing?(cb: () => void): () => void;
       readingAid(lang: 'zh' | 'ru', words: string[]): Promise<Record<string, string[]>>;
       lookupTermsBatch(
         queries: Array<{ expression: string; reading?: string }>,
@@ -528,7 +530,7 @@ declare global {
       profileDelete(id: ProfileId): Promise<{ ok: boolean; error?: string; snapshot: ProfileSnapshot }>;
       profileUpdate(
         id: ProfileId,
-        patch: Partial<StudyProfile>,
+        patch: StudyProfilePatch,
       ): Promise<{ ok: boolean; error?: string; snapshot: ProfileSnapshot }>;
       profileMigrateLegacy(values: { deck?: string; model?: string }): Promise<ProfileSnapshot>;
       onProfileChanged(cb: (snap: ProfileSnapshot) => void): () => void;
@@ -541,7 +543,7 @@ declare global {
       ): Promise<DeleteMinedNotesResult>;
       ankiEnsureModel(id?: ProfileId): Promise<EnsureModelResult>;
       ankiPushNoteStyling(id?: ProfileId): Promise<NoteStylingPushResult>;
-      ankiModelFields(modelName: string): Promise<{ ok: boolean; fields: string[]; error?: string }>;
+      ankiModelFields(modelName: string, opts?: { refresh?: boolean }): Promise<{ ok: boolean; fields: string[]; error?: string }>;
       ankiGetIntervals(opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot>;
       /** Review state for named notes only — see the note in `preload.ts`. */
       ankiGetIntervalsForNotes(noteIds: readonly number[]): Promise<IntervalSnapshot>;
@@ -904,13 +906,20 @@ declare global {
       lockscreenUnlock(): Promise<{ ok: boolean }>;
       lockscreenSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
       lockscreenIsOpen(): Promise<boolean>;
-      lockscreenHashPin?(pin: string): Promise<string | null>;
+      lockscreenStatus?(): Promise<import('../shared/lockStatus').LockStatus>;
+      lockscreenSetPin?(current: string | null, next: string): Promise<import('../shared/lockStatus').LockMutationResult>;
+      lockscreenClearPin?(current: string): Promise<import('../shared/lockStatus').LockMutationResult>;
+      lockscreenSetEnabled?(on: boolean, current?: string): Promise<import('../shared/lockStatus').LockMutationResult>;
+      lockscreenNewRecoveryCode?(current: string): Promise<import('../shared/lockStatus').LockMutationResult>;
+      lockscreenRecover?(code: string): Promise<import('../shared/lockStatus').LockMutationResult>;
+      lockscreenSetAutoLock?(options: Partial<import('../shared/lockStatus').AutoLockOptions>): Promise<import('../shared/lockStatus').LockMutationResult>;
       lockscreenVerifyPin?(pin: string, stored: string): Promise<{ ok: boolean; retryAfterMs?: number; upgradedHash?: string }>;
       onLockscreenUnlocked(cb: () => void): () => void;
       lockscreenSyncConfig?(config: { enabled: boolean; pinHash: string }, rendererLocked: boolean): Promise<{ ok: boolean; locked: boolean }>;
       lockscreenLock?(): Promise<{ locked: boolean }>;
       lockscreenIsLocked?(): Promise<boolean>;
       onLockscreenLocked?(cb: () => void): () => void;
+      onLockscreenState?(cb: (locked: boolean) => void): () => void;
       onLockscreenBlocked?(cb: (notice: { kind: string; action: string }) => void): () => void;
       companionPacksList?(): Promise<unknown[]>;
       companionPacksImport?(opts?: { kind?: 'file' | 'folder' }): Promise<import('../shared/companionPacks').CompanionPackImportResult>;
@@ -958,6 +967,9 @@ declare global {
       gamesMirrorEvaluate?(
         request: import('../shared/mirrorEvaluatorIpc').MirrorEvaluateRequest,
       ): Promise<import('../shared/mirrorEvaluatorIpc').MirrorEvaluateResponse>;
+      gamesMirrorEvaluateAppAi?(
+        request: import('../shared/mirrorEvaluatorIpc').MirrorAppAiRequest,
+      ): Promise<import('../shared/mirrorEvaluatorIpc').MirrorAppAiResponse>;
       getWindowBorderless(): Promise<boolean>;
       setWindowBorderless(borderless: boolean): Promise<boolean>;
       getWindowChromeMode(): Promise<'standard' | 'borderless' | 'frameless'>;
@@ -968,7 +980,8 @@ declare global {
       releaseStatus(): Promise<import('../shared/release').ReleaseStatus>;
       /** Squirrel self-update state (installed builds); `install: 'portable'` on the zip. */
       appUpdateStatus?(): Promise<import('../shared/appUpdate').AppUpdateStatus>;
-      appUpdateRestart?(): Promise<boolean>;
+      appUpdateRestart?(opts?: { force?: boolean }): Promise<import('../shared/appUpdate').AppUpdateRestartResult>;
+      appUpdateSetPrefs?(patch: Partial<import('../shared/appUpdate').AppUpdatePrefs>): Promise<import('../shared/appUpdate').AppUpdateDetails>;
       onAppUpdateChanged?(cb: (status: import('../shared/appUpdate').AppUpdateStatus) => void): () => void;
       appUpdateDetails?(): Promise<import('../shared/appUpdate').AppUpdateDetails>;
       appUpdateCheckNow?(): Promise<import('../shared/appUpdate').AppUpdateDetails>;
@@ -1050,6 +1063,7 @@ declare global {
         style?: import('../shared/translateCore').TranslateStyle;
         provider?: import('../shared/translateProviders').TranslateEngineRequest;
         glossary?: import('../shared/translateGlossary').TranslateGlossaryTerm[];
+        fresh?: boolean;
       }): Promise<{
         ok: boolean;
         text?: string;
@@ -1058,7 +1072,9 @@ declare global {
         error?: string;
         errorKey?: string;
         failure?: import('../shared/translateProviders').TranslateRouteFailure;
+        cancelled?: boolean;
       }>;
+      translateCancel?(id: number): Promise<{ ok: boolean }>;
       translateProviders(): Promise<import('../shared/translateProviders').TranslateProviderSnapshot>;
       translateSetPairProvider(
         source: string,
@@ -1096,13 +1112,7 @@ declare global {
       }) => void): () => void;
       translateAnalyze(
         req: import('../shared/translateAnalysisCore').TranslateAnalyzeRequest,
-      ): Promise<{
-        ok: boolean;
-        result?: import('../shared/translateAnalysisCore').TranslateAnalysisResult;
-        error?: string;
-        aiOff?: boolean;
-        needsKey?: boolean;
-      }>;
+      ): Promise<import('../shared/translateAnalysisCore').TranslateAnalyzeResponse>;
       // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
       extractVideoClip(
         req: import('../shared/videoClip').VideoClipRequest,
@@ -1565,6 +1575,11 @@ declare global {
       ytCachedCaptionText(
         youtubeId: string,
       ): Promise<{ text: string | null; file: string | null }>;
+      yt5FetchCaptionTrack?(
+        videoId: string,
+        key: string,
+        kind: 'human' | 'auto',
+      ): Promise<{ ok: true; text: string; file: string } | { ok: false; error: string }>;
       ytAddVideoByUrl(
         url: string,
       ): Promise<
@@ -1624,6 +1639,8 @@ declare global {
       miningRenderEpubDeck(
         analysis: EpubMiningAnalysis,
         config?: Partial<TraditionalMiningConfig>,
+        /** `freshTranslations`: "Translate again" — engine values and the provider's cache are not reused. */
+        opts?: { freshTranslations?: boolean },
       ): Promise<{
         deck: EpubDeckExport;
         enrichedCandidates: MiningCandidate[];
@@ -1651,6 +1668,10 @@ declare global {
       aiGetConfig(): Promise<AiEngineConfig>;
       aiSetupStatus(): Promise<AiSetupStatus>;
       aiSetupSetEnabled(enabled: boolean): Promise<AiSetupStatus>;
+      aiSetupUpdate(patch: import('../shared/aiSetup').AiFeatureSettingsPatch): Promise<AiSetupStatus>;
+      aiSetupTestConnection(
+        providerId: AiProviderId,
+      ): Promise<import('../shared/aiConnectionTest').AiConnectionTestResult>;
       onAiSetupChanged(cb: (status: AiSetupStatus) => void): () => void;
       localAgentPlan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse>;
       localAgentStatus(): Promise<LocalAgentRuntimeStatus>;
@@ -1769,18 +1790,92 @@ declare global {
       }>;
       aiEnrichCard(req: AiEnrichmentRequest): Promise<AiEnrichmentResult>;
       aiGenerateDeck(req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]>;
+      aiCancelGenerate?(): Promise<{ ok: true; cancelled: number }>;
       onAiGenerateProgress(cb: (p: import('../shared/mining').AiGenerationProgress) => void): () => void;
       aiSaveCsv(csv: string): Promise<{ ok: boolean; path?: string; error?: string }>;
       mediaStudyAssist(
         req: import('../shared/mediaStudyAssistant').MediaStudyAssistantRequest,
-      ): Promise<{
-        ok: boolean;
-        result?: import('../shared/mediaStudyAssistant').MediaStudyAssistantResult;
-        error?: string;
-        cached?: boolean;
-        aiOff?: boolean;
-        needsKey?: boolean;
-      }>;
+      ): Promise<import('../main/mediaStudyAssistant').MediaStudyAssistResponse>;
+      aiStudyWhyWrong(
+        req: import('../shared/aiWhyWrong').WhyWrongRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiWhyWrong').WhyWrongResult>>;
+      aiStudyExampleSentences(
+        req: import('../shared/aiExampleSentences').ExampleSentencesRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiExampleSentences').ExampleSentencesResult>>;
+      aiStudyLeechRescue(
+        req: import('../shared/aiLeechRescue').LeechRescueRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiLeechRescue').LeechRescueSuggestion>>;
+      aiStudyContextExplain(
+        req: import('../shared/aiContextExplain').ContextExplainRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiContextExplain').ContextExplainResult>>;
+      aiStudyCancel(requestId: string): Promise<boolean>;
+      aiImmerseBrief(
+        req: import('../shared/aiMediaBrief').MediaBriefRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiMediaBrief').MediaBriefChunkResult>>;
+      aiImmersePickLines(
+        req: import('../shared/aiMediaBrief').LinePickRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiMediaBrief').LinePickResult>>;
+      aiImmerseExplainLine(
+        req: import('../shared/aiImmerseLine').LineExplainRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiImmerseLine').LineExplainResult>>;
+      aiImmerseSimplify(
+        req: import('../shared/aiImmerseLine').ReaderSimplifyRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiImmerseLine').ReaderSimplifyResult>>;
+      aiImmerseTranslateLine(
+        req: import('../shared/aiImmerseLine').ContextTranslateRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiImmerseLine').ContextTranslateResult>>;
+      aiImmerseStudyCommand(
+        req: import('../shared/aiStudyCommand').StudyCommandAiRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/studyFilterRecipe').StudyCommandIntent>>;
+      aiImmerseCancel(requestId: string): Promise<boolean>;
+      // Grammar, statistics, planning, onboarding and Blanc helpers (main/aiTutorAssist.ts);
+      // cancelled through `aiStudyCancel`.
+      aiTutorGrammarExplain(
+        req: import('../shared/aiGrammarTutor').GrammarExplainRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiGrammarTutor').GrammarExplainResult>>;
+      aiTutorGrammarExamples(
+        req: import('../shared/aiGrammarTutor').GrammarExamplesRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiGrammarTutor').GrammarExamplesResult>>;
+      aiTutorGrammarProduction(
+        req: import('../shared/aiGrammarTutor').GrammarProductionRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiGrammarTutor').GrammarProductionResult>>;
+      aiTutorGrammarSightings(
+        req: import('../shared/aiGrammarTutor').GrammarSightingRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiGrammarTutor').GrammarSightingResult>>;
+      aiTutorStatsCoach(
+        req: import('../shared/aiStatsCoach').StatsCoachRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiStatsCoach').StatsCoachResult>>;
+      aiTutorGoalSuggest(
+        req: import('../shared/aiStudyPlanner').GoalSuggestRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiStudyPlanner').GoalSuggestResult>>;
+      aiTutorEventParse(
+        req: import('../shared/aiStudyPlanner').EventParseRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiStudyPlanner').EventDraft>>;
+      aiTutorPlacementQuiz(
+        req: import('../shared/aiOnboarding').PlacementQuizRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiOnboarding').PlacementQuizResult>>;
+      aiTutorSettingsHelp(
+        req: import('../shared/aiOnboarding').SettingsHelpRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiOnboarding').SettingsHelpResult>>;
+      aiTutorBlancMistake(
+        req: import('../shared/aiBlancTutor').BlancMistakeRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiBlancTutor').BlancMistakeResult>>;
+      aiTutorBlancSummary(
+        req: import('../shared/aiBlancTutor').BlancSummaryRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiBlancTutor').BlancSummaryResult>>;
+      // Speaking and writing (main/aiSpeakAssist.ts); cancelled through `aiStudyCancel`.
+      aiSpeakShadowing(
+        req: import('../shared/aiShadowing').ShadowingFeedbackRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiShadowing').ShadowingFeedbackResult>>;
+      aiSpeakConversation(
+        req: import('../shared/aiConversation').ConversationRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiConversation').ConversationReplyResult>>;
+      aiSpeakCorrect(
+        req: import('../shared/aiWritingCorrection').WritingCorrectionRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiWritingCorrection').WritingCorrectionResult>>;
+      aiSpeakJournal(
+        req: import('../shared/aiWritingCorrection').JournalGradeRequest,
+      ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiWritingCorrection').JournalGradeResult>>;
       studyGet(): Promise<StudyOrchestratorDocument>;
       studyMigrateLegacy(value: unknown): Promise<StudyOrchestratorDocument>;
       studyPrepare(request: StudyAnalysisRequest): Promise<StudyPreparationResult>;
@@ -2153,8 +2248,14 @@ declare global {
         region: RegionRect & {
           engine?: 'auto' | 'manga' | 'web';
           includeScreenshot?: boolean;
+          scanId?: number;
         },
       ): Promise<LensOcrResult>;
+      /** Stop this window's running scan before its next pass; false when none was running. */
+      lensOcrCancel(): Promise<boolean>;
+      onLensOcrProgress(
+        cb: (progress: { scanId: number; stage: import('../main/screenOcr').LensOcrStage }) => void,
+      ): () => void;
       lensSetInteractive(interactive: boolean): void;
       lensClose(): Promise<void>;
       lensHistoryRecord(
@@ -2192,6 +2293,31 @@ declare global {
       onReadingPassageHandoffStaged(cb: () => void): () => void;
       onLensOpen(cb: (init: LensInit) => void): () => void;
       onLensSettingsChanged(cb: (status: ReadingLensStatus) => void): () => void;
+
+      // Snip to cards (main/snipToCards.ts)
+      snipGetStatus(): Promise<import('../shared/snipToCards').SnipStatus>;
+      snipSetSettings(patch: Partial<import('../shared/snipToCards').SnipSettings>): Promise<import('../shared/snipToCards').SnipStatus>;
+      snipHistoryList(query?: { search?: string; limit?: number }): Promise<import('../shared/snipToCards').SnipEntry[]>;
+      snipHistoryGet(id: string): Promise<import('../shared/snipToCards').SnipEntry | null>;
+      snipHistoryUpdate(
+        id: string,
+        patch: import('../shared/snipToCards').SnipEntryPatch,
+      ): Promise<import('../shared/snipToCards').SnipEntry | null>;
+      snipHistoryRemove(id: string): Promise<number>;
+      snipHistoryClear(): Promise<number>;
+      snipImage(id: string): Promise<string | null>;
+      snipReady(): Promise<void>;
+      snipAction(action: import('../shared/snipToCards').SnipAction): Promise<boolean>;
+      snipOpen(id: string | null): Promise<void>;
+      snipToastShow(payload: import('../shared/snipToCards').SnipToastPayload): Promise<boolean>;
+      snipToastGet(): Promise<import('../shared/snipToCards').SnipToastPayload | null>;
+      snipToastClose(): Promise<void>;
+      onSnipProcess(cb: (job: import('../shared/snipToCards').SnipJob) => void): () => void;
+      onSnipAction(cb: (action: import('../shared/snipToCards').SnipAction) => void): () => void;
+      onSnipOpen(cb: (target: { id: string | null }) => void): () => void;
+      onSnipHistoryChanged(cb: (change: { id: string | null }) => void): () => void;
+      onSnipSettingsChanged(cb: (status: import('../shared/snipToCards').SnipStatus) => void): () => void;
+      onSnipToast(cb: (payload: import('../shared/snipToCards').SnipToastPayload | null) => void): () => void;
 
       // Downloadable models & dictionaries (Phase 6)
       assetsList(): Promise<{ assets: AssetSpec[]; statuses: AssetStatus[] }>;
@@ -2452,6 +2578,7 @@ declare global {
         media: ReadonlyArray<import('../shared/deckMediaExport').DeckMediaItem>;
         rows?: string[][];
         schedules?: import('../shared/localDeckApkg').LocalDeckApkgRequest['schedules'];
+        notes?: import('../shared/localDeckApkg').LocalDeckApkgRequest['notes'];
       }): Promise<import('../main/flashcardAudio').DeckExportResult>;
       flashcardRevealExport(directory: string): Promise<boolean>;
       flashcardReadAudio(
@@ -2473,8 +2600,13 @@ declare global {
         cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,
       ): () => void;
       replyTranscriptionChunk(
-        payload: import('../shared/transcriptionIpc').TranscriptionChunkResult & { id: string },
+        payload: (
+          | import('../shared/transcriptionIpc').TranscriptionChunkResult
+          | import('../shared/transcriptionIpc').TranscriptionChunkStatus
+        ) & { id: string },
       ): void;
+      /** Main stops one chunk (job cancelled or timed out): terminate its worker. */
+      onTranscriptionChunkCancel?(cb: (payload: { id: string }) => void): () => void;
       onExtensionTranscribeRequest(cb: (payload: { id: string; pcmBase64: string }) => void): () => void;
       replyExtensionTranscribe(
         id: string,

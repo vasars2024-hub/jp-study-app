@@ -18,27 +18,48 @@
  *  - shell `openExternal`/`openPath`/`showItemInFolder`/`beep`, native notifications,
  *    native context menus, OS dialogs, login-item / protocol-client writes and global
  *    shortcuts are stubbed to a log the harness reads back over the debug bridge;
- *  - web notifications are refused at the permission layer.
+ *  - web notifications are refused at the permission layer;
+ *  - ISOLATION from the owner's real services and data (`installLoopbackGuard` and the
+ *    stubs after it): every outgoing loopback connection — Node sockets in main (undici
+ *    `fetch`, `http`, the texthooker WebSocket) and Chromium requests in every session —
+ *    is witnessed, the well-known local service ports (AnkiConnect 8765, qBittorrent's
+ *    WebUI 8080, texthookers 6677/9001/2333, Seanime 43211, Ollama 11434, LM Studio 1234)
+ *    are remapped to the harness's fakes (`GUM_E2E_LOOPBACK`) or refused before a byte is
+ *    sent; the clipboard (main `clipboard`, renderer `navigator.clipboard`,
+ *    `execCommand('copy')`, `webContents.copy/paste`) is an in-memory buffer;
+ *    `desktopCapturer` answers synthetic screens (`GUM_E2E_SCREEN_IMAGE`), every page's
+ *    `getDisplayMedia`/`getUserMedia` answers a synthetic canvas + tone stream, and a
+ *    display-media request that still reaches a session is refused; `shell.trashItem`
+ *    only moves files inside the run's own profile; and the user folders (Videos,
+ *    Downloads, Documents …) point into the temp profile.
  *
  * It can only be turned on deliberately: `GUM_E2E_HEADLESS=1` in a dev (unpackaged) run,
  * or that variable PLUS an explicit `--e2e` argument in a packaged build — a stray
  * environment variable on a user's machine cannot hide their app.
  */
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import {
   app,
   autoUpdater,
   BrowserWindow,
+  clipboard,
+  desktopCapturer,
   dialog,
   globalShortcut,
+  ipcMain,
   Menu,
+  nativeImage,
   Notification,
+  screen,
   session,
   shell,
+  type NativeImage,
   type Session,
   type WebContents,
 } from 'electron';
+import { E2E_SHIM_CHANNELS } from '../shared/e2eShimChannels';
 
 export const E2E_HEADLESS_ENV = 'GUM_E2E_HEADLESS';
 export const E2E_ARGV_FLAG = '--e2e';
@@ -359,6 +380,13 @@ const guardedSessions = new WeakSet<Session>();
 export function guardSessionForE2e(ses: Session): void {
   if (guardedSessions.has(ses)) return;
   guardedSessions.add(ses);
+  guardSessionLoopback(ses);
+  installedIsolation.add('loopback guard (chromium sessions)');
+  guardSessionCapture(ses);
+  installedIsolation.add('display media (sessions)');
+  guardSessionShim(ses);
+  installedIsolation.add('clipboard (pages)');
+  installedIsolation.add('display media (pages)');
   type ReqHandler = Parameters<Session['setPermissionRequestHandler']>[0];
   type CheckHandler = Parameters<Session['setPermissionCheckHandler']>[0];
   const setRequest = ses.setPermissionRequestHandler.bind(ses);
@@ -451,6 +479,823 @@ function installDialogStubs(): void {
   patch(dialog, 'showErrorBox', (title: string, content: string) => record('dialog.showErrorBox', `${title}: ${content}`), 'dialog.showErrorBox');
 }
 
+// ---------------------------------------------------------------------------
+// Isolation: the owner's local services, clipboard, screen and files.
+// ---------------------------------------------------------------------------
+
+/**
+ * Loopback ports where a real service of the owner's may be listening. Under the harness
+ * a connection to one is remapped to the harness's fake for it, or refused before it is
+ * made — a fresh profile only ever knows these defaults, so they are the whole list.
+ */
+export const PROTECTED_LOOPBACK_PORTS: Readonly<Record<number, string>> = {
+  8765: 'AnkiConnect',
+  8080: 'qBittorrent WebUI',
+  6677: 'texthooker (Textractor WebSocket)',
+  9001: 'texthooker (Agent / exSTATic)',
+  2333: 'texthooker (LunaTranslator)',
+  43211: 'Seanime (installed copy)',
+  11434: 'Ollama',
+  1234: 'LM Studio',
+};
+
+export interface LoopbackGuardConfig {
+  /** Port -> the fake's port. A remapped connection goes to the fake instead. */
+  remap: Record<number, number>;
+  /** Port -> what lives there. Contacting one that is not remapped is refused. */
+  protect: Record<number, string>;
+}
+
+export interface LoopbackConnection {
+  ts: number;
+  /** `node` (a socket in main) or `chromium` (a session's request). */
+  via: 'node' | 'chromium';
+  host: string;
+  port: number;
+  /** `allowed`, `remapped` (to `to`) or `refused`. */
+  verdict: 'allowed' | 'remapped' | 'refused';
+  to?: number;
+  service?: string;
+}
+
+/** `GUM_E2E_LOOPBACK` = `{"remap":{"8765":51234},"protect":{"9100":"x"}}`, merged onto the defaults. */
+export function parseLoopbackConfig(raw: string | undefined): LoopbackGuardConfig {
+  const config: LoopbackGuardConfig = { remap: {}, protect: { ...PROTECTED_LOOPBACK_PORTS } };
+  if (!raw || !raw.trim()) return config;
+  try {
+    const parsed = JSON.parse(raw) as { remap?: Record<string, unknown>; protect?: Record<string, unknown> };
+    for (const [from, to] of Object.entries(parsed.remap ?? {})) {
+      const a = Number(from);
+      const b = Number(to);
+      if (Number.isInteger(a) && a > 0 && Number.isInteger(b) && b > 0) config.remap[a] = b;
+    }
+    for (const [port, label] of Object.entries(parsed.protect ?? {})) {
+      const p = Number(port);
+      if (Number.isInteger(p) && p > 0) config.protect[p] = String(label);
+    }
+  } catch (err) {
+    patchFailures.push(`GUM_E2E_LOOPBACK unreadable: ${String(err)}`);
+  }
+  return config;
+}
+
+function isLoopbackHost(host: string): boolean {
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  return h === 'localhost' || h === '::1' || h === '0.0.0.0' || /^127\./.test(h) || h === '::ffff:127.0.0.1';
+}
+
+const loopbackLog: LoopbackConnection[] = [];
+
+function noteLoopback(entry: Omit<LoopbackConnection, 'ts'>): void {
+  loopbackLog.push({ ts: Date.now(), ...entry });
+  if (loopbackLog.length > CALL_LIMIT) loopbackLog.splice(0, loopbackLog.length - CALL_LIMIT);
+  if (entry.verdict === 'refused') {
+    console.warn(`[e2e] refused a loopback connection to ${entry.service ?? 'a protected service'} on ${entry.host}:${entry.port} (${entry.via})`);
+  }
+}
+
+/** What the guard does with one loopback target. Pure, so the policy is testable alone. */
+export function decideLoopback(config: LoopbackGuardConfig, host: string, port: number): Pick<LoopbackConnection, 'verdict' | 'to' | 'service'> {
+  if (!isLoopbackHost(host)) return { verdict: 'allowed' };
+  const to = config.remap[port];
+  const service = config.protect[port];
+  if (to) return { verdict: 'remapped', to, ...(service ? { service } : {}) };
+  if (service) return { verdict: 'refused', service };
+  return { verdict: 'allowed' };
+}
+
+let activeLoopbackConfig: LoopbackGuardConfig = parseLoopbackConfig(undefined);
+
+/**
+ * The Node half: wrap `net.Socket.prototype.connect`, which every TCP client in main goes
+ * through (undici's `fetch` and WebSocket, `http.request`, `tls.connect`). A remapped
+ * target is rewritten before the connection exists; a refused one fails the way a closed
+ * port does (ECONNREFUSED), asynchronously, without a SYN ever leaving the process.
+ * Returns the disposer (tests); installing twice is a no-op.
+ */
+type GuardedSocketProto = {
+  connect: (...args: unknown[]) => unknown;
+  __gumE2eGuard?: {
+    original: (...args: unknown[]) => unknown;
+    /** The newest installer's configuration and log (a re-imported module re-points them). */
+    holder: { config: LoopbackGuardConfig; note: (entry: Omit<LoopbackConnection, 'ts'>) => void };
+  };
+};
+
+/** Take the socket guard out again (tests; the app never does). */
+export function uninstallLoopbackGuard(): void {
+  const proto = net.Socket.prototype as unknown as GuardedSocketProto;
+  if (!proto.__gumE2eGuard) return;
+  proto.connect = proto.__gumE2eGuard.original;
+  delete proto.__gumE2eGuard;
+}
+
+export function installLoopbackGuard(config: LoopbackGuardConfig): () => void {
+  activeLoopbackConfig = config;
+  const proto = net.Socket.prototype as unknown as GuardedSocketProto;
+  if (proto.__gumE2eGuard) {
+    // One guard per process: a second install (a re-imported module in tests) only
+    // re-points it at the newest configuration.
+    proto.__gumE2eGuard.holder.config = config;
+    proto.__gumE2eGuard.holder.note = noteLoopback;
+    return uninstallLoopbackGuard;
+  }
+  const original = proto.connect;
+  const holder = { config, note: noteLoopback };
+  const guarded = function connect(this: net.Socket, ...args: unknown[]): unknown {
+    // `net.connect()` hands over its normalized `[options, cb]` array; direct callers pass
+    // `(options, cb)`, `(port, host, cb)` or `(path, cb)` (a pipe: not ours to judge).
+    const normalized = Array.isArray(args[0]) ? (args[0] as unknown[]) : null;
+    let options: Record<string, unknown> | null = null;
+    if (normalized && normalized[0] && typeof normalized[0] === 'object') options = normalized[0] as Record<string, unknown>;
+    else if (!normalized && args[0] && typeof args[0] === 'object') options = args[0] as Record<string, unknown>;
+    let port: number | null = null;
+    let host = 'localhost';
+    if (options) {
+      // Node's own rule: a truthy `path` is a pipe; http hands over `path: null`, undici
+      // `path: undefined` and the port as a string.
+      if (!options.path && options.port !== undefined && options.port !== null) {
+        port = Number(options.port);
+        host = String(options.host ?? 'localhost');
+      }
+    } else if (typeof args[0] === 'number' || (typeof args[0] === 'string' && /^\d+$/.test(args[0]))) {
+      port = Number(args[0]);
+      host = typeof args[1] === 'string' ? args[1] : 'localhost';
+    }
+    if (port !== null && Number.isFinite(port) && isLoopbackHost(host)) {
+      const decision = decideLoopback(holder.config, host, port);
+      holder.note({ via: 'node', host, port, ...decision });
+      if (decision.verdict === 'refused') {
+        const err = Object.assign(new Error(`connect ECONNREFUSED ${host}:${port} (e2e: ${decision.service} is the owner's, not the harness's)`), {
+          code: 'ECONNREFUSED',
+          errno: -4078,
+          syscall: 'connect',
+          address: host,
+          port,
+        });
+        process.nextTick(() => this.destroy(err));
+        return this;
+      }
+      if (decision.verdict === 'remapped' && decision.to) {
+        if (options) {
+          const next = { ...options, port: decision.to, host: '127.0.0.1' };
+          if (normalized) normalized[0] = next;
+          else args[0] = next;
+        } else {
+          args[0] = decision.to;
+          if (typeof args[1] === 'string') args[1] = '127.0.0.1';
+        }
+      }
+    }
+    return original.apply(this, args);
+  };
+  proto.connect = guarded;
+  proto.__gumE2eGuard = { original, holder };
+  return uninstallLoopbackGuard;
+}
+
+/**
+ * Remote hosts the harness fakes (`GUM_E2E_REMOTE` = `{"jimaku.cc":"http://127.0.0.1:5123"}`):
+ * a request to `https://jimaku.cc/api/x?q` goes to `<fake>/jimaku.cc/api/x?q` instead.
+ */
+let remoteMap: Record<string, string> = {};
+
+export function parseRemoteMap(raw: string | undefined): Record<string, string> {
+  if (!raw || !raw.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const [host, base] of Object.entries(parsed)) {
+      const b = String(base ?? '');
+      // Only ever onto loopback: a typo must not send a request somewhere new.
+      if (/^http:\/\/127\.0\.0\.1:\d+\/?$/.test(b)) out[host.toLowerCase()] = b.replace(/\/$/, '');
+    }
+    return out;
+  } catch (err) {
+    patchFailures.push(`GUM_E2E_REMOTE unreadable: ${String(err)}`);
+    return {};
+  }
+}
+
+/** The fake's URL for `url`, or null when its host is not faked. */
+export function remapRemote(url: string, map: Record<string, string> = remoteMap): string | null {
+  try {
+    const u = new URL(url);
+    if (!/^https?:$/.test(u.protocol)) return null;
+    const base = map[u.hostname.toLowerCase()];
+    return base ? `${base}/${u.hostname.toLowerCase()}${u.pathname}${u.search}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The Chromium half, per session: renderer fetches, `net.fetch`, WebSockets, subresources. */
+function guardSessionLoopback(ses: Session): void {
+  try {
+    ses.webRequest?.onBeforeRequest?.(
+      { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
+      (details, callback) => {
+        let u: URL;
+        try {
+          u = new URL(details.url);
+        } catch {
+          callback({});
+          return;
+        }
+        if (!isLoopbackHost(u.hostname)) {
+          const moved = remapRemote(details.url);
+          if (moved) {
+            record('net (chromium) -> harness fake', `${u.host} -> ${new URL(moved).host}`);
+            callback({ redirectURL: moved });
+            return;
+          }
+          callback({});
+          return;
+        }
+        const port = Number(u.port || (u.protocol === 'https:' || u.protocol === 'wss:' ? 443 : 80));
+        const decision = decideLoopback(activeLoopbackConfig, u.hostname, port);
+        noteLoopback({ via: 'chromium', host: u.hostname, port, ...decision });
+        if (decision.verdict === 'refused') {
+          callback({ cancel: true });
+          return;
+        }
+        if (decision.verdict === 'remapped' && decision.to) {
+          u.hostname = '127.0.0.1';
+          u.port = String(decision.to);
+          callback({ redirectURL: u.toString() });
+          return;
+        }
+        callback({});
+      },
+    );
+  } catch (err) {
+    patchFailures.push(`loopback guard (session): ${String(err)}`);
+  }
+}
+
+// ----- clipboard: an in-memory buffer -------------------------------------------------
+
+interface ClipboardBuffer {
+  text: string;
+  html: string;
+  rtf: string;
+  image: NativeImage | null;
+  bookmark: { title: string; url: string };
+  findText: string;
+  buffers: Map<string, Buffer>;
+  reads: number;
+  writes: number;
+}
+const clip: ClipboardBuffer = {
+  text: '',
+  html: '',
+  rtf: '',
+  image: null,
+  bookmark: { title: '', url: '' },
+  findText: '',
+  buffers: new Map(),
+  reads: 0,
+  writes: 0,
+};
+
+function clipClear(): void {
+  clip.text = '';
+  clip.html = '';
+  clip.rtf = '';
+  clip.image = null;
+  clip.bookmark = { title: '', url: '' };
+  clip.buffers.clear();
+}
+
+/** What a harness flow sees / sets as "the clipboard" (debug bridge `/e2e clipboard`). */
+export function e2eClipboard(set?: { text?: string; imagePath?: string; clear?: boolean }): Record<string, unknown> {
+  if (set?.clear) clipClear();
+  if (typeof set?.text === 'string') {
+    clipClear();
+    clip.text = set.text;
+  }
+  if (set?.imagePath) {
+    clipClear();
+    try {
+      clip.image = nativeImage.createFromPath(set.imagePath);
+    } catch (err) {
+      patchFailures.push(`clipboard image: ${String(err)}`);
+    }
+  }
+  return {
+    text: clip.text,
+    html: clip.html,
+    hasImage: Boolean(clip.image && !clip.image.isEmpty()),
+    reads: clip.reads,
+    writes: clip.writes,
+  };
+}
+
+function emptyImage(): NativeImage {
+  try {
+    return nativeImage.createEmpty();
+  } catch {
+    return null as unknown as NativeImage;
+  }
+}
+
+function installClipboardStubs(): void {
+  if (!clipboard) {
+    patchFailures.push('clipboard: module missing');
+    return;
+  }
+  const read = <T>(api: string, value: () => T) => () => {
+    clip.reads += 1;
+    record(`clipboard.${api}`);
+    return value();
+  };
+  const write = (api: string, apply: (v: unknown) => void) => (v: unknown) => {
+    clip.writes += 1;
+    record(`clipboard.${api}`, typeof v === 'string' ? `${v.length} chars` : '');
+    apply(v);
+  };
+  patch(clipboard, 'readText', read('readText', () => clip.text), 'clipboard.readText');
+  patch(clipboard, 'writeText', write('writeText', (v) => { clipClear(); clip.text = String(v ?? ''); }), 'clipboard.writeText');
+  patch(clipboard, 'readHTML', read('readHTML', () => clip.html), 'clipboard.readHTML');
+  patch(clipboard, 'writeHTML', write('writeHTML', (v) => { clip.html = String(v ?? ''); }), 'clipboard.writeHTML');
+  patch(clipboard, 'readRTF', read('readRTF', () => clip.rtf), 'clipboard.readRTF');
+  patch(clipboard, 'writeRTF', write('writeRTF', (v) => { clip.rtf = String(v ?? ''); }), 'clipboard.writeRTF');
+  patch(clipboard, 'readImage', read('readImage', () => clip.image ?? emptyImage()), 'clipboard.readImage');
+  patch(clipboard, 'writeImage', write('writeImage', (v) => { clip.image = (v as NativeImage) ?? null; }), 'clipboard.writeImage');
+  patch(clipboard, 'readBookmark', read('readBookmark', () => ({ ...clip.bookmark })), 'clipboard.readBookmark');
+  patch(clipboard, 'writeBookmark', (title: string, url: string) => {
+    clip.writes += 1;
+    record('clipboard.writeBookmark');
+    clip.bookmark = { title: String(title ?? ''), url: String(url ?? '') };
+  }, 'clipboard.writeBookmark');
+  patch(clipboard, 'readFindText', read('readFindText', () => clip.findText), 'clipboard.readFindText');
+  patch(clipboard, 'writeFindText', write('writeFindText', (v) => { clip.findText = String(v ?? ''); }), 'clipboard.writeFindText');
+  patch(clipboard, 'readBuffer', (format: string) => {
+    clip.reads += 1;
+    record('clipboard.readBuffer', format);
+    return clip.buffers.get(format) ?? Buffer.alloc(0);
+  }, 'clipboard.readBuffer');
+  patch(clipboard, 'writeBuffer', (format: string, buffer: Buffer) => {
+    clip.writes += 1;
+    record('clipboard.writeBuffer', format);
+    clip.buffers.set(format, Buffer.from(buffer ?? []));
+  }, 'clipboard.writeBuffer');
+  patch(clipboard, 'availableFormats', () => {
+    const formats: string[] = [];
+    if (clip.text) formats.push('text/plain');
+    if (clip.html) formats.push('text/html');
+    if (clip.rtf) formats.push('text/rtf');
+    if (clip.image && !clip.image.isEmpty()) formats.push('image/png');
+    formats.push(...clip.buffers.keys());
+    return formats;
+  }, 'clipboard.availableFormats');
+  patch(clipboard, 'has', (format: string) => {
+    const f = String(format ?? '');
+    if (/text\/plain|^text$/i.test(f)) return Boolean(clip.text);
+    if (/html/i.test(f)) return Boolean(clip.html);
+    if (/image/i.test(f)) return Boolean(clip.image && !clip.image.isEmpty());
+    return clip.buffers.has(f);
+  }, 'clipboard.has');
+  patch(clipboard, 'clear', () => {
+    record('clipboard.clear');
+    clipClear();
+  }, 'clipboard.clear');
+  patch(clipboard, 'read', (format: string) => {
+    clip.reads += 1;
+    return clip.buffers.get(format)?.toString('utf8') ?? '';
+  }, 'clipboard.read');
+  patch(clipboard, 'write', (data: { text?: string; html?: string; rtf?: string; image?: NativeImage; bookmark?: string }) => {
+    clip.writes += 1;
+    record('clipboard.write');
+    clipClear();
+    clip.text = data?.text ?? '';
+    clip.html = data?.html ?? '';
+    clip.rtf = data?.rtf ?? '';
+    clip.image = data?.image ?? null;
+    if (data?.bookmark) clip.bookmark = { title: data.bookmark, url: data.text ?? '' };
+  }, 'clipboard.write');
+}
+
+// ----- screen: synthetic sources ----------------------------------------------------
+
+let screenImagePath = '';
+let screenImage: NativeImage | null = null;
+
+/** The picture every synthetic screen shows (a PNG path; '' = a plain grey frame). */
+export function setE2eScreenImage(file: string): boolean {
+  screenImagePath = file;
+  screenImage = null;
+  if (!file) return true;
+  try {
+    const img = nativeImage.createFromPath(file);
+    if (img.isEmpty()) return false;
+    screenImage = img;
+    return true;
+  } catch (err) {
+    patchFailures.push(`screen image: ${String(err)}`);
+    return false;
+  }
+}
+
+function syntheticFrame(width: number, height: number): NativeImage {
+  if (width <= 0 || height <= 0) return emptyImage();
+  try {
+    if (screenImage && !screenImage.isEmpty()) {
+      const size = screenImage.getSize();
+      return size.width === width && size.height === height ? screenImage : screenImage.resize({ width, height, quality: 'best' });
+    }
+    const w = Math.min(width, 64);
+    const h = Math.min(height, 64);
+    const bitmap = Buffer.alloc(w * h * 4, 0x80);
+    for (let i = 3; i < bitmap.length; i += 4) bitmap[i] = 0xff;
+    return nativeImage.createFromBitmap(bitmap, { width: w, height: h }).resize({ width, height });
+  } catch {
+    return emptyImage();
+  }
+}
+
+const captureLog = { getSources: 0, displayMediaRefused: 0, shimNotes: [] as string[] };
+
+function installCaptureStubs(): void {
+  if (!desktopCapturer) {
+    patchFailures.push('desktopCapturer: module missing');
+    return;
+  }
+  // No real pixels ever: every screen is the harness's picture, and there are no windows
+  // to list (a window source would name the owner's open windows).
+  patch(desktopCapturer, 'getSources', async (opts: { types?: string[]; thumbnailSize?: { width: number; height: number } }) => {
+    captureLog.getSources += 1;
+    record('desktopCapturer.getSources', { types: opts?.types, image: screenImagePath ? path.basename(screenImagePath) : 'grey' });
+    if (!(opts?.types ?? []).includes('screen')) return [];
+    const size = opts?.thumbnailSize ?? { width: 150, height: 150 };
+    let displays: Array<{ id: number }> = [];
+    try {
+      displays = screen.getAllDisplays();
+    } catch {
+      displays = [{ id: 0 }];
+    }
+    return displays.map((d, i) => ({
+      id: `screen:e2e-${i}:0`,
+      name: `E2E synthetic screen ${i + 1}`,
+      display_id: String(d.id),
+      thumbnail: syntheticFrame(size.width, size.height),
+      appIcon: null,
+    }));
+  }, 'desktopCapturer.getSources');
+}
+
+/** A display-media request that reaches a session anyway is refused: no real screen, ever. */
+function guardSessionCapture(ses: Session): void {
+  const set = (ses as unknown as { setDisplayMediaRequestHandler?: (...a: unknown[]) => void }).setDisplayMediaRequestHandler;
+  if (typeof set !== 'function') return;
+  const refuse = (_request: unknown, callback: (streams: Record<string, unknown>) => void) => {
+    captureLog.displayMediaRefused += 1;
+    record('session display-media request (refused: the page shim answers instead)');
+    callback({});
+  };
+  patch(ses, 'setDisplayMediaRequestHandler', () => {
+    record('session.setDisplayMediaRequestHandler (kept refusing)');
+    set.call(ses, refuse);
+  }, 'session.setDisplayMediaRequestHandler');
+  try {
+    set.call(ses, refuse);
+  } catch (err) {
+    patchFailures.push(`display media handler: ${String(err)}`);
+  }
+}
+
+/**
+ * Runs in every page's MAIN world before its own scripts (a session preload calls it
+ * through `contextBridge.executeInMainWorld`): `navigator.clipboard` and
+ * `execCommand('copy'|'cut'|'paste')` use the harness buffer; `getDisplayMedia` and
+ * `getUserMedia` answer a synthetic testsrc-like canvas stream (moving colour bars, a
+ * frame counter) plus a 440 Hz tone, so the recorder and the caption capture run
+ * end to end without the screen, a microphone or the system audio.
+ */
+export function e2ePageShim(bridge: {
+  readText: () => Promise<string>;
+  writeText: (text: string) => Promise<void>;
+  note: (what: string) => void;
+}): void {
+  const w = window as unknown as Record<string, unknown>;
+  if (w.__gumE2eShim) return;
+  const state = { displayMedia: 0, userMedia: 0, clipboardWrites: 0, clipboardReads: 0 };
+  Object.defineProperty(w, '__gumE2eShim', { value: state, configurable: false });
+  const define = (target: object, key: string, value: unknown) => {
+    try {
+      Object.defineProperty(target, key, { value, configurable: true, writable: true });
+    } catch {
+      /* frozen host object: the session-level refusals still hold */
+    }
+  };
+  const cb = navigator.clipboard;
+  if (cb) {
+    define(cb, 'writeText', async (text: string) => {
+      state.clipboardWrites += 1;
+      await bridge.writeText(String(text ?? ''));
+    });
+    define(cb, 'readText', async () => {
+      state.clipboardReads += 1;
+      return String((await bridge.readText()) ?? '');
+    });
+    define(cb, 'write', async (items: Array<{ types: string[]; getType: (t: string) => Promise<Blob> }>) => {
+      state.clipboardWrites += 1;
+      for (const item of items ?? []) {
+        if (item.types.includes('text/plain')) {
+          await bridge.writeText(await (await item.getType('text/plain')).text());
+          return;
+        }
+      }
+      bridge.note('navigator.clipboard.write without text/plain: kept in the page, never the OS');
+    });
+    define(cb, 'read', async () => {
+      state.clipboardReads += 1;
+      const text = String((await bridge.readText()) ?? '');
+      const Item = (window as unknown as { ClipboardItem?: new (d: Record<string, Blob>) => unknown }).ClipboardItem;
+      return Item ? [new Item({ 'text/plain': new Blob([text], { type: 'text/plain' }) })] : [];
+    });
+  }
+  const exec = Document.prototype.execCommand;
+  define(Document.prototype, 'execCommand', function execCommand(this: Document, command: string, ...rest: unknown[]) {
+    const c = String(command ?? '').toLowerCase();
+    if (c === 'copy' || c === 'cut') {
+      const active = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
+      let text = '';
+      if (active && typeof active.selectionStart === 'number' && typeof active.value === 'string') {
+        text = active.value.slice(active.selectionStart ?? 0, active.selectionEnd ?? 0);
+      } else {
+        text = String(document.getSelection() ?? '');
+      }
+      state.clipboardWrites += 1;
+      void bridge.writeText(text);
+      if (c === 'cut' && active && typeof active.setRangeText === 'function') active.setRangeText('');
+      return true;
+    }
+    if (c === 'paste') return false;
+    return exec.call(this, command, ...(rest as [boolean, string]));
+  });
+
+  const tone = (): MediaStreamTrack | null => {
+    try {
+      const ac = new AudioContext();
+      const osc = ac.createOscillator();
+      osc.frequency.value = 440;
+      const gain = ac.createGain();
+      gain.gain.value = 0.1;
+      const dst = ac.createMediaStreamDestination();
+      osc.connect(gain).connect(dst);
+      osc.start();
+      void ac.resume?.();
+      return dst.stream.getAudioTracks()[0] ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const bars = (width = 1280, height = 720): MediaStreamTrack | null => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const g = canvas.getContext('2d');
+      if (!g) return null;
+      const colours = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'];
+      let frame = 0;
+      const draw = () => {
+        frame += 1;
+        const bw = width / colours.length;
+        colours.forEach((c, i) => {
+          g.fillStyle = c;
+          g.fillRect(i * bw, 0, bw + 1, height * 0.7);
+        });
+        g.fillStyle = '#101010';
+        g.fillRect(0, height * 0.7, width, height * 0.3);
+        g.fillStyle = '#ffffff';
+        g.fillRect(((frame * 8) % (width + 80)) - 80, height * 0.74, 80, 80);
+        g.font = `${Math.round(height / 12)}px monospace`;
+        g.fillText(`GUM E2E ${String(frame).padStart(5, '0')}`, 24, height * 0.95);
+      };
+      draw();
+      setInterval(draw, 33);
+      return (canvas as unknown as { captureStream: (fps: number) => MediaStream }).captureStream(30).getVideoTracks()[0] ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const synthetic = (wantVideo: boolean, wantAudio: boolean): MediaStream => {
+    const tracks: MediaStreamTrack[] = [];
+    if (wantVideo) {
+      const v = bars();
+      if (v) tracks.push(v);
+    }
+    if (wantAudio) {
+      const a = tone();
+      if (a) tracks.push(a);
+    }
+    return new MediaStream(tracks);
+  };
+  const md = navigator.mediaDevices;
+  if (md) {
+    define(md, 'getDisplayMedia', async (constraints?: { video?: unknown; audio?: unknown }) => {
+      state.displayMedia += 1;
+      bridge.note('getDisplayMedia (synthetic)');
+      return synthetic(constraints?.video !== false, Boolean(constraints?.audio));
+    });
+    define(md, 'getUserMedia', async (constraints?: { video?: unknown; audio?: unknown }) => {
+      state.userMedia += 1;
+      bridge.note('getUserMedia (synthetic)');
+      return synthetic(Boolean(constraints?.video), Boolean(constraints?.audio));
+    });
+  }
+}
+
+/** The session preload that installs `e2ePageShim` in each page's main world. */
+function shimPreloadSource(): string {
+  return `'use strict';
+const { contextBridge, ipcRenderer } = require('electron');
+const bridge = {
+  readText: () => ipcRenderer.invoke(${JSON.stringify(E2E_SHIM_CHANNELS.clipboardRead)}),
+  writeText: (t) => ipcRenderer.invoke(${JSON.stringify(E2E_SHIM_CHANNELS.clipboardWrite)}, String(t ?? '')),
+  note: (what) => ipcRenderer.send(${JSON.stringify(E2E_SHIM_CHANNELS.note)}, String(what ?? '')),
+};
+const shim = ${e2ePageShim.toString()};
+try {
+  if (process.contextIsolated && contextBridge.executeInMainWorld) contextBridge.executeInMainWorld({ func: shim, args: [bridge] });
+  else shim(bridge);
+} catch (err) {
+  ipcRenderer.send(${JSON.stringify(E2E_SHIM_CHANNELS.note)}, 'shim failed: ' + String(err));
+}
+`;
+}
+
+let shimPreloadPath = '';
+
+function writeShimPreload(): string {
+  if (shimPreloadPath) return shimPreloadPath;
+  try {
+    const dir = path.join(app.getPath('userData'), 'e2e');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, 'page-shim-preload.js');
+    fs.writeFileSync(file, shimPreloadSource());
+    shimPreloadPath = file;
+  } catch (err) {
+    patchFailures.push(`page shim preload: ${String(err)}`);
+  }
+  return shimPreloadPath;
+}
+
+function guardSessionShim(ses: Session): void {
+  const file = writeShimPreload();
+  const register = (ses as unknown as { registerPreloadScript?: (s: Record<string, unknown>) => string }).registerPreloadScript;
+  if (!file || typeof register !== 'function') {
+    patchFailures.push('page shim: session.registerPreloadScript unavailable');
+    return;
+  }
+  try {
+    register.call(ses, { type: 'frame', id: 'gum-e2e-page-shim', filePath: file });
+  } catch (err) {
+    patchFailures.push(`page shim register: ${String(err)}`);
+  }
+}
+
+function installShimIpc(): void {
+  if (!ipcMain) return;
+  try {
+    ipcMain.handle(E2E_SHIM_CHANNELS.clipboardRead, () => {
+      clip.reads += 1;
+      record('navigator.clipboard.readText (buffer)');
+      return clip.text;
+    });
+    ipcMain.handle(E2E_SHIM_CHANNELS.clipboardWrite, (_event, text: unknown) => {
+      clip.writes += 1;
+      record('navigator.clipboard.writeText (buffer)', `${String(text ?? '').length} chars`);
+      clipClear();
+      clip.text = String(text ?? '');
+    });
+    ipcMain.on(E2E_SHIM_CHANNELS.note, (_event, what: unknown) => {
+      captureLog.shimNotes.push(String(what));
+      if (captureLog.shimNotes.length > 100) captureLog.shimNotes.shift();
+      record('page shim', String(what));
+    });
+  } catch (err) {
+    patchFailures.push(`shim ipc: ${String(err)}`);
+  }
+}
+
+// ----- files: the Recycle Bin and the user folders -------------------------------------
+
+function insideRun(target: string): boolean {
+  const roots: string[] = [];
+  try {
+    roots.push(app.getPath('userData'));
+  } catch {
+    /* no app (tests) */
+  }
+  const runArg = process.argv.find((a) => a.startsWith('--e2e-run='));
+  if (runArg) roots.push(runArg.slice('--e2e-run='.length));
+  const resolved = path.resolve(target).toLowerCase();
+  return roots.some((root) => {
+    const r = path.resolve(root).toLowerCase();
+    return resolved === r || resolved.startsWith(r + path.sep);
+  });
+}
+
+function installFileStubs(): void {
+  // "Move to the Recycle Bin" without the Recycle Bin: a file of the run's own profile is
+  // moved aside into it (so a restore check could still find it); anything else is left
+  // exactly where it is and the attempt is a violation.
+  patch(shell, 'trashItem', async (target: string) => {
+    if (!insideRun(String(target ?? ''))) {
+      violation('shell.trashItem outside the run', String(target));
+      throw new Error('e2e: refused to trash a path outside the run');
+    }
+    const bin = path.join(app.getPath('userData'), 'e2e-trash');
+    fs.mkdirSync(bin, { recursive: true });
+    const dest = path.join(bin, `${Date.now()}-${path.basename(target)}`);
+    try {
+      fs.renameSync(target, dest);
+    } catch (err) {
+      // Windows refuses to move an open file; the real trashItem fails the same way.
+      record('shell.trashItem failed (file busy?)', `${target}: ${String(err)}`);
+      throw err;
+    }
+    record('shell.trashItem (moved inside the run)', dest);
+  }, 'shell.trashItem');
+  patch(shell, 'writeShortcutLink', (p: string) => {
+    record('shell.writeShortcutLink', p);
+    return true;
+  }, 'shell.writeShortcutLink');
+  // The user folders: the recorder's default is Videos\Gum Recordings, exports default to
+  // Downloads. Under the harness they are folders of the temp profile.
+  try {
+    const home = path.join(app.getPath('userData'), 'e2e-home');
+    for (const name of ['desktop', 'documents', 'downloads', 'music', 'pictures', 'videos'] as const) {
+      const dir = path.join(home, name);
+      fs.mkdirSync(dir, { recursive: true });
+      app.setPath(name, dir);
+    }
+    record('user folders redirected', home);
+  } catch (err) {
+    patchFailures.push(`user folders: ${String(err)}`);
+  }
+}
+
+function neuterContentsIsolation(wc: WebContents): void {
+  // `webContents.copy()` & co. drive Chromium's native clipboard commands.
+  const viaPage = (command: 'copy' | 'cut' | 'paste') => () => {
+    record(`webContents.${command} (buffer)`, `#${wc.id}`);
+    void wc.executeJavaScript(`document.execCommand(${JSON.stringify(command)})`, true).catch(() => undefined);
+  };
+  patch(wc, 'copy', viaPage('copy'), 'webContents.copy');
+  patch(wc, 'cut', viaPage('cut'), 'webContents.cut');
+  patch(wc, 'paste', viaPage('paste'), 'webContents.paste');
+  patch(wc, 'pasteAndMatchStyle', viaPage('paste'), 'webContents.pasteAndMatchStyle');
+  patch(wc, 'copyImageAt', () => record('webContents.copyImageAt (dropped)'), 'webContents.copyImageAt');
+  // The session preload installs the page shim before the page's own scripts. A page it
+  // did not reach (a session created without it, a preload refused) gets it at dom-ready,
+  // with a page-local clipboard — late, but never the OS clipboard or the real screen —
+  // and the miss is recorded so the harness can see it.
+  wc.on('dom-ready', () => {
+    if (wc.isDestroyed()) return;
+    const fallback = `(() => { if (window.__gumE2eShim) return 'present';
+      let buffer = '';
+      (${e2ePageShim.toString()})({
+        readText: async () => buffer,
+        writeText: async (t) => { buffer = String(t); },
+        note: () => undefined,
+      });
+      return 'fallback'; })()`;
+    void wc.executeJavaScript(fallback, true).then((how: unknown) => {
+      if (how === 'fallback') {
+        captureLog.shimNotes.push(`page shim installed late (dom-ready) in #${wc.id} ${safeUrl(wc)}`);
+        record('page shim (late, dom-ready)', `#${wc.id}`);
+      }
+    }).catch(() => undefined);
+  });
+}
+
+function safeUrl(wc: WebContents): string {
+  try {
+    return wc.getURL().slice(0, 120);
+  } catch {
+    return '';
+  }
+}
+
+/** Which isolation stubs are in place (the harness's boot flow and the unit test read it). */
+export const ISOLATION_STUBS = [
+  'loopback guard (node sockets)',
+  'loopback guard (chromium sessions)',
+  'clipboard (main)',
+  'clipboard (pages)',
+  'desktopCapturer.getSources',
+  'display media (pages)',
+  'display media (sessions)',
+  'shell.trashItem',
+  'shell.openPath',
+  'user folders',
+] as const;
+const installedIsolation = new Set<string>();
+
 /**
  * Decide, once, whether this process is a headless harness run, and if so install every
  * stub. Call at module top level of main.ts, before `app` is ready (the `ready` listener
@@ -468,7 +1313,10 @@ export function initE2eHeadless(input: E2eHeadlessInput = {
   console.log('[e2e] headless mode ON: windows stay hidden, OS side effects are stubbed');
 
   app.on('browser-window-created', (_event, win) => neuterWindow(win));
-  app.on('web-contents-created', (_event, wc) => neuterContents(wc));
+  app.on('web-contents-created', (_event, wc) => {
+    neuterContents(wc);
+    neuterContentsIsolation(wc);
+  });
   app.on('session-created', (ses) => guardSessionForE2e(ses));
   // `ready` listeners run before any `whenReady().then` callback, so the default session
   // is wrapped before main.ts installs its permission policy on it.
@@ -535,13 +1383,36 @@ export function initE2eHeadless(input: E2eHeadlessInput = {
   // A network witness, not a block: every request main makes through Node's fetch is
   // recorded (origin + path, never the query), so a flow can assert that opening a
   // surface touched nothing. Chromium-side requests are witnessed per session below.
+  // A host the harness fakes (`GUM_E2E_REMOTE`: subtitle / metadata providers) is
+  // answered by its fake instead.
+  remoteMap = parseRemoteMap(input.env.GUM_E2E_REMOTE);
   const realFetch = globalThis.fetch;
   if (typeof realFetch === 'function') {
-    globalThis.fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
-      noteNetwork('net.fetch (main)', input instanceof Request ? input.url : String(input));
-      return realFetch(input, init);
+    globalThis.fetch = ((target: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const url = target instanceof Request ? target.url : String(target);
+      const moved = remapRemote(url);
+      if (moved) {
+        record('net.fetch (main) -> harness fake', `${new URL(url).host} -> ${new URL(moved).host}`);
+        return realFetch(target instanceof Request ? new Request(moved, target) : moved, init);
+      }
+      noteNetwork('net.fetch (main)', url);
+      return realFetch(target, init);
     }) as typeof fetch;
   }
+
+  // Isolation from the owner's own services, clipboard, screen and files.
+  installLoopbackGuard(parseLoopbackConfig(input.env.GUM_E2E_LOOPBACK));
+  installedIsolation.add('loopback guard (node sockets)');
+  installClipboardStubs();
+  installedIsolation.add('clipboard (main)');
+  if (input.env.GUM_E2E_SCREEN_IMAGE) setE2eScreenImage(String(input.env.GUM_E2E_SCREEN_IMAGE));
+  installCaptureStubs();
+  installedIsolation.add('desktopCapturer.getSources');
+  installShimIpc();
+  installFileStubs();
+  installedIsolation.add('shell.trashItem');
+  installedIsolation.add('shell.openPath');
+  installedIsolation.add('user folders');
 
   installDialogStubs();
   if (patchFailures.length) console.warn(`[e2e] patch failures: ${patchFailures.join('; ')}`);
@@ -557,6 +1428,31 @@ export function clearE2eRecords(): void {
   calls.length = 0;
   violations.length = 0;
   network.length = 0;
+  loopbackLog.length = 0;
+}
+
+/** The isolation half of the status: what is stubbed, and every loopback connection seen. */
+export function e2eIsolationStatus(): Record<string, unknown> {
+  const refused = loopbackLog.filter((c) => c.verdict === 'refused');
+  const remapped = loopbackLog.filter((c) => c.verdict === 'remapped');
+  const ports = [...new Set(loopbackLog.map((c) => c.port))].sort((a, b) => a - b);
+  return {
+    stubs: ISOLATION_STUBS.map((name) => ({ name, installed: installedIsolation.has(name) })),
+    missing: ISOLATION_STUBS.filter((name) => !installedIsolation.has(name)),
+    loopback: {
+      config: activeLoopbackConfig,
+      ports,
+      connections: [...loopbackLog],
+      refused: refused.length,
+      remapped: remapped.length,
+      /** A protected port contacted WITHOUT the guard turning it into the fake or a refusal: must be 0. */
+      leaked: loopbackLog.filter((c) => activeLoopbackConfig.protect[c.port] && c.verdict === 'allowed').length,
+    },
+    remote: remoteMap,
+    clipboard: e2eClipboard(),
+    capture: { getSources: captureLog.getSources, displayMediaRefused: captureLog.displayMediaRefused, screenImage: screenImagePath },
+    shimNotes: [...captureLog.shimNotes],
+  };
 }
 
 /** What the harness reads back: what was stubbed, what slipped through, what is on screen. */
@@ -580,5 +1476,6 @@ export function e2eHeadlessStatus(): Record<string, unknown> {
     pendingDialogs: { open: dialogQueue.open.length, save: dialogQueue.save.length, message: dialogQueue.message.length },
     windows,
     visibleWindows: windows.filter((w) => w.visible).length,
+    isolation: e2eIsolationStatus(),
   };
 }

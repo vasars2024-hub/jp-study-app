@@ -38,10 +38,12 @@ import {
 } from '../shared/subtitleFusionCore';
 import { callAiProvider } from './aiProviderClient';
 import { getConfiguredAiProvider } from './mining';
-import { aiFeaturesEnabled } from './aiFeatureGate';
+import { aiCloudAllowedFor, aiFeaturesEnabled } from './aiFeatureGate';
+import { getAiProviderHealth } from './providerRuntime';
+import type { AiProviderId } from '../shared/aiProviders';
 
-/** Why a job produced no verdicts, when it produced none. */
-export type FusionArbitrationSkip = 'no-key' | 'no-candidates' | 'cancelled' | null;
+/** Why a job produced no verdicts, when it produced none. `cloud-off`: the feature's cloud opt-in is off. */
+export type FusionArbitrationSkip = 'no-key' | 'no-candidates' | 'cancelled' | 'cloud-off' | null;
 
 export interface FusionArbitrationOutcome {
   decisions: FusedWindowDecision[];
@@ -112,6 +114,20 @@ export interface FusionArbitrationOptions {
   call?: (prompt: string, itemCount: number) => Promise<string>;
 }
 
+/**
+ * A key, or a provider that needs none: a local OpenAI-compatible server
+ * (Ollama, LM Studio) is configured by its URL and model, and "no key" used to
+ * skip it.
+ */
+function providerUsable(providerId: AiProviderId, apiKey: string): boolean {
+  if (apiKey) return true;
+  try {
+    return getAiProviderHealth(providerId).configured;
+  } catch {
+    return false;
+  }
+}
+
 /** The active provider, or `null` — an unreadable mining config is "no cloud". */
 function readProvider(): { providerId: ReturnType<typeof getConfiguredAiProvider>['providerId']; apiKey: string } | null {
   try {
@@ -157,16 +173,20 @@ export async function arbitrateFusionDecisions(
     // cloud check did not run. Refused here rather than per batch, where it
     // would surface as a failed arbitration.
     if (!aiFeaturesEnabled()) return unchanged('no-key');
+    // The user's "Subtitle fusion second opinion" cloud opt-in (Settings > AI).
+    if (!aiCloudAllowedFor('subtitleFusion')) return unchanged('cloud-off');
     const provider = readProvider();
-    if (!provider?.apiKey) return unchanged('no-key');
+    if (!provider || !providerUsable(provider.providerId, provider.apiKey)) return unchanged('no-key');
     send = (prompt: string, itemCount: number) => callAiProvider(
       provider.providerId,
       provider.apiKey,
       prompt,
       FUSION_ARBITRATION_SCHEMA,
-      { itemCount },
+      { itemCount, feature: 'subtitleFusion' },
     );
   }
+  // Captured as a const so the batch closure below sees the narrowed type.
+  const call = send;
 
   const batches = batchArbitrationCandidates(candidates);
   const verdicts: ArbitrationVerdict[] = [];
@@ -185,7 +205,7 @@ export async function arbitrateFusionDecisions(
     reason: string | null;
   }> => {
     try {
-      const raw = await send(buildFusionArbitrationPrompt(batch), batch.length);
+      const raw = await call(buildFusionArbitrationPrompt(batch), batch.length);
       const result = inspectFusionArbitration(raw, batch);
       if (result.verdicts.length) {
         // A batch that yielded *something* is not failed, but losing half its

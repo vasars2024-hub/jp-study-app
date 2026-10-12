@@ -209,18 +209,41 @@ export function installStudyRendererBridges(): () => void {
 
   // Transcription queue → Whisper. The main process owns the queue but cannot
   // run the model, so it asks the renderer one chunk at a time.
+  // Each chunk can be stopped by main (job cancelled, or the chunk timed out):
+  // its worker is terminated rather than left transcribing for nobody.
+  const chunkAborts = new Map<string, AbortController>();
+  offs.push(window.api.onTranscriptionChunkCancel?.(({ id }) => {
+    chunkAborts.get(id)?.abort();
+    chunkAborts.delete(id);
+  }));
   offs.push(window.api.onTranscriptionChunkRequest?.(({ id, pcmBase64, lang }) => {
+    const controller = new AbortController();
+    chunkAborts.set(id, controller);
     void (async () => {
       const { decodePcmBase64, transcribePcm } = await import('./whisperTranscribePcm');
+      // Only a changed whole percent crosses the bridge, not every byte event.
+      let lastPercent: number | null | undefined;
       try {
-        const result = await transcribePcm(decodePcmBase64(pcmBase64), lang);
-        window.api.replyTranscriptionChunk({ id, ...result });
+        const result = await transcribePcm(decodePcmBase64(pcmBase64), lang, {
+          signal: controller.signal,
+          // Tells main the model is downloading/loading, so the chunk timeout
+          // waits for it and the job shows the download's progress.
+          onModelLoading: (percent) => {
+            if (percent === lastPercent) return;
+            lastPercent = percent;
+            window.api.replyTranscriptionChunk({ id, stage: 'model-loading', ...(percent === null ? {} : { progress: percent }) });
+          },
+          onModelReady: () => window.api.replyTranscriptionChunk({ id, stage: 'model-ready' }),
+        });
+        if (!controller.signal.aborted) window.api.replyTranscriptionChunk({ id, ...result });
       } catch (err) {
         window.api.replyTranscriptionChunk({
           id,
           ok: false,
           error: err instanceof Error ? err.message : String(err),
         });
+      } finally {
+        chunkAborts.delete(id);
       }
     })();
   }));
@@ -456,6 +479,22 @@ export function installStudyRendererBridges(): () => void {
       }));
     window.api.replyClipboardList(id, entries);
   }));
+
+  // risk4: CC-CEDICT became a download. A Chinese learner with no Chinese
+  // dictionary gets one "Download now" prompt (at startup, or on the first
+  // lookup that finds none), and a download they started resumes. Lazy: it is
+  // not boot work.
+  let cedictAlive = true;
+  let offCedict: (() => void) | undefined;
+  void import('./cedictMissingPrompt')
+    .then((m) => {
+      if (cedictAlive) offCedict = m.installCedictMissingPrompt();
+    })
+    .catch(() => undefined);
+  offs.push(() => {
+    cedictAlive = false;
+    offCedict?.();
+  });
 
   // Every listener is attached: main may now replay mines that arrived while
   // no window (or a still-loading one) could take them. Main replays only to

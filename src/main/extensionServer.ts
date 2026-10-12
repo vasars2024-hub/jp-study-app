@@ -49,6 +49,7 @@ import {
   requestAnnotate,
 } from './extensionAnnotate';
 import { handleRecordingsRoute, setMicRecordingHandler } from './extensionRecordings';
+import { handleExtensionAiRoute } from './extensionAiRoutes';
 import {
   appLocked,
   EXTENSION_LOCKED_BODY,
@@ -1251,6 +1252,24 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     return;
   }
 
+  // Optional AI (extensionAiRoutes.ts): paired callers only, with that module's
+  // own small body cap, rate limit and cancel-on-disconnect. Keys and providers
+  // stay here in main; the extension only names the feature and the text.
+  if (
+    pathname === '/v1/ai/status' ||
+    pathname === '/v1/ai/explain-context' ||
+    pathname === '/v1/ai/breakdown' ||
+    pathname === '/v1/ai/simplify' ||
+    pathname === '/v1/ai/word-meaning'
+  ) {
+    if (!requireAuth(req, res)) {
+      req.resume();
+      return;
+    }
+    await handleExtensionAiRoute(req, res, pathname);
+    return;
+  }
+
   const bodyCap = pathname === '/v1/audio/save' ? AUDIO_SAVE_MAX_BODY_BYTES : MAX_BODY_BYTES;
   if (Number(req.headers['content-length'] || 0) > bodyCap) {
     req.resume();
@@ -1302,7 +1321,10 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     json(res, 200, {
       ok: true,
       version: 1,
-      port: bridgeState?.port ?? EXTENSION_PORT,
+      // The port this server is ACTUALLY on (`effectivePort`), as `getExtensionBridgeStatus`
+      // reports it: the stored port is wrong under a dev override, and a client checking
+      // which Gum answered would be told 18765 by an instance listening elsewhere.
+      port: bridgeState ? effectivePort(bridgeState) : (devPortOverride() ?? EXTENSION_PORT),
       // Additive: content routes answer 423 `locked` while this is true.
       locked: appLocked(),
       features: {

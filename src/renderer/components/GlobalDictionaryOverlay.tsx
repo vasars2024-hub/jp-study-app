@@ -167,7 +167,7 @@ export default function GlobalDictionaryOverlay() {
     return registerCommandHandler('dictionary.lookupSelection', () => {
       const sel = window.getSelection();
       const text = sel?.toString().trim() ?? '';
-      if (!text || sel.rangeCount === 0) {
+      if (!text || !sel || sel.rangeCount === 0) {
         toast('dictionary.noSelection');
         return;
       }

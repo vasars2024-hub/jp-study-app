@@ -1,0 +1,212 @@
+/* The optional AI study helpers: "Why was I wrong?", i+1 example sentences,
+   leech rescue, "Explain in context". Theme tokens only (Study OS, Aero, WIRED
+   and Blanc each define them), so the panels follow whichever theme hosts them.
+   Every control keeps the 24px target floor through min-height/min-width. */
+.ai-study {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--panel-2, var(--surface-1, transparent));
+  color: var(--text, inherit);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: start;
+}
+
+.ai-study.is-collapsed {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ai-study-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-study-head > h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1 1 auto;
+}
+
+.ai-study-btn {
+  min-height: 24px;
+  min-width: 24px;
+}
+
+.ai-study-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-study-notes {
+  margin: 0;
+  padding-inline-start: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-study-section-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.ai-study-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-inline-start: 3px solid var(--accent, currentColor);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--panel, transparent);
+}
+
+.ai-study-answer p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ai-study-badge {
+  align-self: flex-start;
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--accent, currentColor);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent, inherit);
+}
+
+.ai-study-busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-study-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border, currentColor);
+  border-top-color: var(--accent, currentColor);
+  animation: ai-study-spin 0.8s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes ai-study-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-study-spinner {
+    animation: none;
+    border-top-color: var(--border, currentColor);
+  }
+}
+
+.ai-study-error {
+  margin: 0;
+  color: var(--danger, inherit);
+}
+
+.ai-study-note {
+  margin: 0;
+}
+
+.ai-study-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-study-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.ai-study-item.is-discarded {
+  opacity: 0.7;
+}
+
+.ai-study-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.ai-study-check input {
+  min-width: 18px;
+  min-height: 18px;
+  margin-top: 2px;
+}
+
+.ai-study-meta {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.ai-study-sense {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.ai-study-sense.is-fit {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 0;
+  background: var(--panel, transparent);
+  font-weight: 600;
+}
+
+.ai-study-sense-tag {
+  margin-inline-start: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent, inherit);
+}
+
+.ai-study-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 0.9em;
+  text-align: start;
+}
+
+.ai-study-extras p {
+  margin: 0;
+}
+
+/* An open panel inside a flex row (the search bar, the review notices) takes
+   the whole line rather than squeezing beside the buttons. */
+.ai-study:not(.is-collapsed) {
+  flex: 1 1 100%;
+  min-width: 0;
+}

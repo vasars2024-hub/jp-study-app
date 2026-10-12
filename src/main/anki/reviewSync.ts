@@ -21,6 +21,7 @@ import {
   ANKI_SYNC_PUSH_BATCH,
   ankiMirrorFromCard,
   classifyAnkiSyncError,
+  compareAnkiAnswers,
   decideAnkiReviewPush,
   pickAnkiLinkCandidate,
   pickAnkiPrimaryCard,
@@ -40,10 +41,11 @@ import {
 } from '../../shared/ankiReviewSync';
 import type { StudyProfile } from '../../shared/profiles';
 import { getProfileStore } from '../profiles';
-import { invoke, toUiError, type AnkiCardInfo, type AnkiNoteInfo } from './client';
+import { invoke, invokeMulti, toUiError, type AnkiCardInfo, type AnkiNoteInfo } from './client';
 import { ankiSearchLiteral } from './extensionDuplicates';
 import { escapeForAnki, resolveTermFieldName } from './fieldMapper';
 import { noteAnkiActiveProfile } from './mediaUpload';
+import { getModelFieldNames } from './modelFields';
 
 const CHUNK = 500;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -182,27 +184,36 @@ export async function pushAnkiReviewAnswers(
     if (guard.mismatch) {
       return { ok: false, outcomes, profile: guard.profile, errorKind: 'profile-mismatch', error: guard.profile ?? '' };
     }
-    // Rule 3, defensively: the renderer collapses already, but one note answered
-    // twice in a single request would still be two answers in Anki.
-    const latest = new Map<number, AnkiReviewPushItem>();
-    for (const item of [...items].sort((a, b) => a.reviewedAt - b.reviewedAt)) {
-      const prior = latest.get(item.noteId);
-      if (prior) outcomes[prior.reviewId] = 'superseded';
-      latest.set(item.noteId, item);
+    // Rule 3: every answer of a note, in review order. Each is judged against
+    // the card as it is BEFORE this request, so an answer older than a review
+    // made in Anki is skipped (rule 2) while a later one still goes through.
+    const byNote = new Map<number, AnkiReviewPushItem[]>();
+    for (const item of [...items].sort(compareAnkiAnswers)) {
+      const list = byNote.get(item.noteId);
+      if (list) list.push(item);
+      else byNote.set(item.noteId, [item]);
     }
-    const { cards, missing } = await readNoteCards([...latest.keys()]);
-    const answers: { cardId: number; ease: number; reviewId: string }[] = [];
-    for (const item of latest.values()) {
-      const card = missing.has(item.noteId) ? null : pickAnkiPrimaryCard(cards.get(item.noteId) ?? []);
-      if (!card && !missing.has(item.noteId)) {
-        // The note exists but none of its cards could be read: try again later.
-        outcomes[item.reviewId] = 'failed';
-        continue;
+    const { cards, missing } = await readNoteCards([...byNote.keys()]);
+    const answers: { cardId: number; ease: number; reviewId: string; reviewedAt: number }[] = [];
+    for (const [noteId, list] of byNote) {
+      const card = missing.has(noteId) ? null : pickAnkiPrimaryCard(cards.get(noteId) ?? []);
+      for (const item of list) {
+        if (!card && !missing.has(noteId)) {
+          // The note exists but none of its cards could be read: try again later.
+          outcomes[item.reviewId] = 'failed';
+          continue;
+        }
+        const decision = decideAnkiReviewPush(item, card, now);
+        if (decision === 'push' && card) {
+          answers.push({ cardId: card.cardId, ease: item.ease, reviewId: item.reviewId, reviewedAt: item.reviewedAt });
+        } else if (decision !== 'push') {
+          outcomes[item.reviewId] = decision;
+        }
       }
-      const decision = decideAnkiReviewPush(item, card, now);
-      if (decision === 'push' && card) answers.push({ cardId: card.cardId, ease: item.ease, reviewId: item.reviewId });
-      else if (decision !== 'push') outcomes[item.reviewId] = decision;
     }
+    // AnkiConnect answers the list in order, so one card's answers land in the
+    // order they were given.
+    answers.sort(compareAnkiAnswers);
     if (answers.length) {
       const verdicts = await invoke('answerCards', {
         answers: answers.map(({ cardId, ease }) => ({ cardId, ease })),
@@ -323,21 +334,30 @@ export function ankiTermFieldForProfile(profile: StudyProfile, fieldNames: strin
 }
 
 interface LinkTarget {
+  deckName: string;
   modelName: string;
   termField: string;
 }
 
+/**
+ * Where a profile mines to: its deck, its note type, and the field it writes
+ * the term into. A profile without a deck or a note type mines nowhere, so it
+ * has nothing to link to. A note of another note type, or outside the deck,
+ * is never a candidate — the user's own sentence deck can hold the same word.
+ */
 async function linkTargets(): Promise<LinkTarget[]> {
   const seen = new Set<string>();
   const out: LinkTarget[] = [];
   const fieldCache = new Map<string, string[]>();
   for (const profile of getProfileStore().getAllProfiles()) {
     const modelName = profile.anki.modelName?.trim();
-    if (!modelName) continue;
+    const deckName = profile.anki.deckName?.trim();
+    if (!modelName || !deckName) continue;
     let fields = fieldCache.get(modelName);
     if (!fields) {
       try {
-        fields = (await invoke('modelFieldNames', { modelName })) ?? [];
+        // Cached per note type across passes (modelFields.ts), a missing one included.
+        fields = await getModelFieldNames(modelName);
       } catch (err) {
         // A profile whose note type does not exist in this collection has nothing to link to.
         if (classifyAnkiSyncError(toUiError(err)) === 'api') fields = [];
@@ -348,18 +368,29 @@ async function linkTargets(): Promise<LinkTarget[]> {
     if (!fields.length) continue;
     const termField = ankiTermFieldForProfile(profile, fields);
     if (!termField) continue;
-    const key = `${modelName}\u0000${termField}`;
+    const key = `${deckName}\u0000${modelName}\u0000${termField}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ modelName, termField });
+    out.push({ deckName, modelName, termField });
   }
   return out;
 }
 
+/** Anki's `deck:` search covers subdecks, so a card recorded in `Mining::N3` belongs to the `Mining` target. */
+function deckCovers(targetDeck: string, cardDeck: string | undefined): boolean {
+  if (!cardDeck) return true;
+  const want = targetDeck.toLowerCase();
+  const have = cardDeck.trim().toLowerCase();
+  return have === want || have.startsWith(`${want}::`);
+}
+
 /**
  * Find the Anki notes that already are these Gum cards (created on another
- * machine and synced in through AnkiWeb, or added by hand): same note type as
- * a profile, term field equal to the card's word. Read-only.
+ * machine and synced in through AnkiWeb, or added by hand): in a profile's deck,
+ * of that profile's note type, with that profile's term field equal to the
+ * card's word — and, for a card that records its Anki deck, in that deck only.
+ * Read-only. One call answers at most `ANKI_SYNC_LINK_BATCH` cards; the
+ * renderer pages through the rest.
  */
 export async function findAnkiNoteLinks(requests: readonly AnkiLinkRequest[], expectedProfile?: string): Promise<AnkiLinkResult> {
   const list = requests.slice(0, ANKI_SYNC_LINK_BATCH).filter((r) => normalizeTerm(r.term));
@@ -369,20 +400,35 @@ export async function findAnkiNoteLinks(requests: readonly AnkiLinkRequest[], ex
     if (guard.mismatch) {
       return { ok: false, matches: [], profile: guard.profile, errorKind: 'profile-mismatch', error: guard.profile ?? '' };
     }
-    const terms = [...new Set(list.map((r) => normalizeTerm(r.term)))];
-    const candidates = new Map<string, Map<number, AnkiLinkCandidate>>();
+    const targets = await linkTargets();
+    // Per target, the candidates it found, by term: a card only ever takes a
+    // candidate from a target whose deck covers the deck the card went to.
+    const candidates = targets.map(() => new Map<string, Map<number, AnkiLinkCandidate>>());
     const noteIds = new Set<number>();
-    const hitsByTarget: { target: LinkTarget; ids: number[] }[] = [];
-    for (const target of await linkTargets()) {
-      const ids: number[] = [];
+    const hitsByTarget: { index: number; target: LinkTarget; ids: number[] }[] = [];
+    // Every target's searches go out as ONE `multi` request (one search each
+    // when there is a single one), not one request per target and term batch.
+    const searches: { hit: number; query: string }[] = [];
+    for (const [index, target] of targets.entries()) {
+      const terms = [...new Set(list.filter((r) => deckCovers(target.deckName, r.deck)).map((r) => normalizeTerm(r.term)))];
+      if (!terms.length) continue;
+      const hit = hitsByTarget.push({ index, target, ids: [] }) - 1;
       for (const batch of chunks(terms, LINK_QUERY_TERMS)) {
         const any = batch.map((term) => ankiSearchLiteral(target.termField, escapeForAnki(term))).join(' or ');
-        const query = `${ankiSearchLiteral('note', target.modelName)} (${any})`;
-        ids.push(...((await invoke('findNotes', { query })) ?? []));
+        searches.push({ hit, query: `${ankiSearchLiteral('deck', target.deckName)} ${ankiSearchLiteral('note', target.modelName)} (${any})` });
       }
-      ids.forEach((id) => noteIds.add(id));
-      hitsByTarget.push({ target, ids });
     }
+    if (searches.length === 1) {
+      hitsByTarget[searches[0].hit].ids.push(...((await invoke('findNotes', { query: searches[0].query })) ?? []));
+    } else if (searches.length > 1) {
+      const outcomes = await invokeMulti(searches.map((s) => ({ action: 'findNotes' as const, params: { query: s.query } })));
+      searches.forEach((s, i) => {
+        const outcome = outcomes[i];
+        if (!outcome.ok) throw outcome.error;
+        hitsByTarget[s.hit].ids.push(...((outcome.result as number[] | null) ?? []));
+      });
+    }
+    for (const { ids } of hitsByTarget) ids.forEach((id) => noteIds.add(id));
     const infos = new Map<number, AnkiNoteInfo>();
     for (const chunk of chunks([...noteIds], CHUNK)) {
       for (const info of ((await invoke('notesInfo', { notes: chunk })) ?? []) as Partial<AnkiNoteInfo>[]) {
@@ -390,24 +436,31 @@ export async function findAnkiNoteLinks(requests: readonly AnkiLinkRequest[], ex
       }
     }
     const noteText = new Map<number, string>();
-    for (const { target, ids } of hitsByTarget) {
+    for (const { index, target, ids } of hitsByTarget) {
       for (const id of ids) {
         const info = infos.get(id);
+        // The note type is checked again on the note itself, not only trusted to the search.
+        if (info?.modelName !== undefined && info.modelName !== target.modelName) continue;
         const value = info?.fields?.[target.termField]?.value;
         if (!info || typeof value !== 'string') continue;
         const term = cleanField(value);
         const tags = info.tags ?? [];
         const appTagged = tags.some((tag) => tag === APP_TAG || tag.startsWith(`${APP_TAG}::`));
         noteText.set(id, Object.values(info.fields ?? {}).map((field) => cleanField(field.value ?? '')).join('\n'));
-        const byNote = candidates.get(term) ?? new Map<number, AnkiLinkCandidate>();
+        const byNote = candidates[index].get(term) ?? new Map<number, AnkiLinkCandidate>();
         byNote.set(id, { noteId: id, appTagged });
-        candidates.set(term, byNote);
+        candidates[index].set(term, byNote);
       }
     }
     const matches: AnkiLinkMatch[] = list.map((request) => {
       const term = normalizeTerm(request.term);
       const reading = request.reading ? normalizeTerm(request.reading) : '';
-      const pool = [...(candidates.get(term)?.values() ?? [])].map((candidate) => ({
+      const found = new Map<number, AnkiLinkCandidate>();
+      targets.forEach((target, index) => {
+        if (!deckCovers(target.deckName, request.deck)) return;
+        for (const candidate of candidates[index].get(term)?.values() ?? []) found.set(candidate.noteId, candidate);
+      });
+      const pool = [...found.values()].map((candidate) => ({
         ...candidate,
         readingMatches: Boolean(reading && reading !== term && (noteText.get(candidate.noteId) ?? '').includes(reading)),
       }));
@@ -436,6 +489,7 @@ function sanitizeLinkRequests(value: unknown): AnkiLinkRequest[] {
       key: item.key.slice(0, 120),
       term: item.term.slice(0, 200),
       ...(typeof item.reading === 'string' && item.reading ? { reading: item.reading.slice(0, 200) } : {}),
+      ...(typeof item.deck === 'string' && item.deck.trim() ? { deck: item.deck.trim().slice(0, 200) } : {}),
     });
   }
   return out;

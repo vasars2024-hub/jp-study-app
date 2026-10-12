@@ -7,12 +7,31 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const invoke = vi.hoisted(() => vi.fn());
-vi.mock('../anki/client', () => ({ invoke, isUnreachable: () => false }));
+vi.mock('../anki/client', async () => {
+  const actual = await vi.importActual<typeof import('../anki/client')>('../anki/client');
+  return {
+    ...actual,
+    invoke,
+    // `multi` answered action by action through the same mock, so the assertions
+    // below see each batched action as its own call.
+    invokeMulti: async (calls: Array<{ action: string; params: unknown }>) =>
+      Promise.all(calls.map(async (c) => {
+        try {
+          return { ok: true, result: await invoke(c.action, c.params) };
+        } catch (error) {
+          return { ok: false, error };
+        }
+      })),
+    isUnreachable: () => false,
+  };
+});
 
 import { ankiSearchLiteral, checkAnkiDuplicates, checkAnkiDuplicatesFromIpc } from '../anki/extensionDuplicates';
+import { resetModelFieldCacheForTests } from '../anki/modelFields';
 
 beforeEach(() => {
   invoke.mockReset();
+  resetModelFieldCacheForTests();
 });
 
 describe('mapped term field', () => {

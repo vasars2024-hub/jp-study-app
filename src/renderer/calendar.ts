@@ -26,6 +26,17 @@ export interface CalendarEvent {
   recurrenceInterval?: number;
   /** Last date recurrence may land on (inclusive). Unbounded when absent. */
   recurrenceEndDate?: string;
+  /**
+   * Occurrences of a repeating event that were removed or moved on their own
+   * (`YYYY-MM-DD`). A moved occurrence lives on as a separate one-off event.
+   */
+  excludedDates?: string[];
+  /**
+   * The iCalendar UID an imported event came with (Google, Outlook…). Exported back as its
+   * UID and used to recognise the same event on a second import. Absent for events made
+   * here, whose UID is derived from `id`.
+   */
+  icsUid?: string;
   createdAt: number;
 }
 
@@ -137,6 +148,104 @@ export function deleteEvent(id: string): CalendarEvent[] {
 }
 
 /**
+ * Add several complete events in ONE write (an .ics import): one change event, one mirror
+ * write, and no half-imported calendar if the window closes mid-way. An id already in the
+ * store is given a fresh one rather than overwriting what is there.
+ */
+export function importCalendarEvents(entries: readonly CalendarEvent[]): CalendarEvent[] {
+  if (!entries.length) return [];
+  const list = readList();
+  const taken = new Set(list.map((e) => e.id));
+  const added = entries.map((entry) => {
+    const id = entry.id && !taken.has(entry.id) ? entry.id : newId();
+    taken.add(id);
+    return { ...entry, id };
+  });
+  writeList([...added, ...list]);
+  return added;
+}
+
+/** Which occurrences an edit made from one date of a repeating event applies to. */
+export type RepeatEditScope = 'this' | 'following' | 'all';
+
+/** The occurrence-specific fields a one-off copy of a series must not carry. */
+function asOneOff(payload: Omit<CalendarEvent, 'id' | 'createdAt'>): Omit<CalendarEvent, 'id' | 'createdAt'> {
+  const { recurrenceInterval: _i, recurrenceEndDate: _e, excludedDates: _x, icsUid: _u, ...rest } = payload;
+  return { ...rest, recurrence: 'none' };
+}
+
+/**
+ * Save an edit made in the editor opened from ONE occurrence of a repeating event.
+ *
+ *   · `this` — the series skips that date and the edited copy becomes its own event (on
+ *     `payload.date`, which the editor starts at the occurrence's date).
+ *   · `following` — the series ends the day before that date; a new series starts at
+ *     `payload.date` with the edit, carrying the later skipped dates along (moved by the
+ *     same number of days). From the first occurrence this is the whole series.
+ *   · `all` — the series itself is changed.
+ *
+ * One write for each scope, so the calendar is never seen half-split. Returns the list.
+ */
+export function saveRepeatingEdit(
+  event: CalendarEvent,
+  occurrenceDate: string,
+  scope: RepeatEditScope,
+  payload: Omit<CalendarEvent, 'id' | 'createdAt'>,
+): CalendarEvent[] {
+  const list = readList();
+  const now = Date.now();
+  const occ = isCalendarDateKey(occurrenceDate) ? occurrenceDate : event.date;
+  if (event.recurrence === 'none' || scope === 'all' || (scope === 'following' && occ <= event.date)) {
+    const next = list.map((e) => (e.id === event.id ? { ...e, ...payload, excludedDates: e.excludedDates } : e));
+    writeList(next);
+    return next;
+  }
+  if (scope === 'this') {
+    const excludedDates = [...new Set([...(event.excludedDates ?? []), occ])].sort();
+    const single: CalendarEvent = { ...asOneOff(payload), id: newId(), createdAt: now };
+    const next = [single, ...list.map((e) => (e.id === event.id ? { ...e, excludedDates } : e))];
+    writeList(next);
+    return next;
+  }
+  const delta = isCalendarDateKey(payload.date) ? daysBetweenKeys(occ, payload.date) : 0;
+  const before = (event.excludedDates ?? []).filter((key) => key < occ);
+  const after = (event.excludedDates ?? []).filter((key) => key >= occ).map((key) => shiftDateKey(key, delta));
+  const following: CalendarEvent = {
+    ...payload,
+    ...(after.length ? { excludedDates: after } : { excludedDates: undefined }),
+    id: newId(),
+    createdAt: now,
+  };
+  const next = [
+    following,
+    ...list.map((e) => (e.id === event.id
+      ? { ...e, recurrenceEndDate: shiftDateKey(occ, -1), excludedDates: before.length ? before : undefined }
+      : e)),
+  ];
+  writeList(next);
+  return next;
+}
+
+/** Delete from one occurrence: just it, it and every later one, or the whole series. */
+export function deleteRepeatingScope(event: CalendarEvent, occurrenceDate: string, scope: RepeatEditScope): CalendarEvent[] {
+  if (event.recurrence === 'none' || scope === 'all' || !isCalendarDateKey(occurrenceDate)) return deleteEvent(event.id);
+  if (scope === 'this') return excludeOccurrence(event, occurrenceDate);
+  if (occurrenceDate <= event.date) return deleteEvent(event.id);
+  const before = (event.excludedDates ?? []).filter((key) => key < occurrenceDate);
+  return updateEvent(event.id, {
+    recurrenceEndDate: shiftDateKey(occurrenceDate, -1),
+    excludedDates: before.length ? before : undefined,
+  });
+}
+
+/** `HH:MM` moved by `minutes`, clamped to the same day (00:00–23:59). */
+export function shiftClockTime(hhmm: string, minutes: number): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const total = Math.min(23 * 60 + 59, Math.max(0, (h || 0) * 60 + (m || 0) + Math.round(minutes)));
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/**
  * A local-time `YYYY-MM-DD` key. Exported because `occurrenceDate` is one of
  * these, so a caller that wants "not today" has to compare against the same
  * shape — `new Date().toISOString()` would be UTC and wrong past 19:00 here.
@@ -145,9 +254,106 @@ export function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** A local `YYYY-MM-DD` key back to local midnight of that day. */
 export function parseDateKey(key: string): Date {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
+}
+
+/** A real calendar date in `YYYY-MM-DD` form — `2026-02-31` is shaped right and is not one. */
+export function isCalendarDateKey(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  if (y < 1000) return false;
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
+/**
+ * A 24-hour clock time as the calendar stores it: zero-padded `HH:MM`, so plain string
+ * comparison orders times. `9:00` is accepted and padded; anything else is null.
+ */
+export function normalizeClockTime(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (h > 23 || m > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/** `key` moved by whole calendar days (DST-safe: it moves the date, not 24-hour blocks). */
+export function shiftDateKey(key: string, days: number): string {
+  const d = parseDateKey(key);
+  d.setDate(d.getDate() + days);
+  return toDateKey(d);
+}
+
+/** Whole calendar days from `from` to `to` (negative when `to` is earlier). */
+export function daysBetweenKeys(from: string, to: string): number {
+  const a = parseDateKey(from);
+  const b = parseDateKey(to);
+  return Math.round(
+    (Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / 86_400_000,
+  );
+}
+
+/**
+ * The patch that moves one occurrence of `event` (the one on `fromDate`) to `toDate`.
+ *
+ * A one-off event simply takes the new date. A repeating event has no per-occurrence
+ * exceptions in this store, so the honest move is the whole series by the same number of
+ * days — its first date and its end date both shift, which keeps the occurrence the user
+ * dragged landing exactly where it was dropped. Null when nothing would change.
+ */
+export function rescheduleEventPatch(
+  event: Pick<CalendarEvent, 'date' | 'recurrence' | 'recurrenceEndDate'>,
+  fromDate: string,
+  toDate: string,
+): Pick<CalendarEvent, 'date'> & Partial<Pick<CalendarEvent, 'recurrenceEndDate'>> | null {
+  if (!isCalendarDateKey(fromDate) || !isCalendarDateKey(toDate)) return null;
+  const delta = daysBetweenKeys(fromDate, toDate);
+  if (delta === 0) return null;
+  if (event.recurrence === 'none') return { date: toDate };
+  return {
+    date: shiftDateKey(event.date, delta),
+    ...(event.recurrenceEndDate ? { recurrenceEndDate: shiftDateKey(event.recurrenceEndDate, delta) } : {}),
+  };
+}
+
+/**
+ * Take one occurrence out of a repeating series: the series gains an excluded date and the
+ * occurrence becomes its own one-off event on `toDate` (the same day when it is only being
+ * split off). The rest of the series is untouched. Null for a one-off event or a bad date.
+ */
+export function detachOccurrence(
+  event: CalendarEvent,
+  occurrenceDate: string,
+  toDate: string = occurrenceDate,
+): { seriesPatch: Pick<CalendarEvent, 'excludedDates'>; single: Omit<CalendarEvent, 'id' | 'createdAt'> } | null {
+  if (event.recurrence === 'none' || !isCalendarDateKey(occurrenceDate) || !isCalendarDateKey(toDate)) return null;
+  const excludedDates = [...new Set([...(event.excludedDates ?? []), occurrenceDate])].sort();
+  const {
+    id: _id,
+    createdAt: _createdAt,
+    recurrenceInterval: _interval,
+    recurrenceEndDate: _end,
+    excludedDates: _excluded,
+    ...rest
+  } = event;
+  return {
+    seriesPatch: { excludedDates },
+    single: { ...rest, date: toDate, recurrence: 'none' },
+  };
+}
+
+/** Remove a single occurrence of a repeating event; the rest of the series stays. */
+export function excludeOccurrence(event: CalendarEvent, occurrenceDate: string): CalendarEvent[] {
+  if (event.recurrence === 'none' || !isCalendarDateKey(occurrenceDate)) return readList();
+  return updateEvent(event.id, {
+    excludedDates: [...new Set([...(event.excludedDates ?? []), occurrenceDate])].sort(),
+  });
 }
 
 /** One concrete occurrence of an event on a specific calendar date. */
@@ -171,6 +377,10 @@ export function expandOccurrences(events: CalendarEvent[], start: Date, end: Dat
       if (ev.date >= startKey && ev.date <= endKey) out.push({ ...ev, occurrenceDate: ev.date });
       continue;
     }
+    const excluded = Array.isArray(ev.excludedDates) && ev.excludedDates.length ? new Set(ev.excludedDates) : null;
+    const push = (key: string): void => {
+      if (!excluded?.has(key)) out.push({ ...ev, occurrenceDate: key });
+    };
     const stopKey = ev.recurrenceEndDate && ev.recurrenceEndDate < endKey ? ev.recurrenceEndDate : endKey;
     const cursor = new Date(base);
     const stepDays =
@@ -180,7 +390,7 @@ export function expandOccurrences(events: CalendarEvent[], start: Date, end: Dat
       let guard = 0;
       while (toDateKey(cur) <= stopKey && guard < 1200) {
         const key = toDateKey(cur);
-        if (key >= startKey && key <= stopKey) out.push({ ...ev, occurrenceDate: key });
+        if (key >= startKey && key <= stopKey) push(key);
         // Clamp to the next month's last day without losing the original day.
         // Advancing Jan 31 directly with setMonth would skip February entirely.
         cur.setMonth(cur.getMonth() + 1, 1);
@@ -201,7 +411,7 @@ export function expandOccurrences(events: CalendarEvent[], start: Date, end: Dat
       let guard = 0;
       while (toDateKey(cursor) <= stopKey && guard < 3660) {
         const key = toDateKey(cursor);
-        if (key >= startKey && key <= stopKey) out.push({ ...ev, occurrenceDate: key });
+        if (key >= startKey && key <= stopKey) push(key);
         cursor.setDate(cursor.getDate() + stepDays);
         guard++;
       }

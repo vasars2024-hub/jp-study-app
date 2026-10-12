@@ -97,6 +97,9 @@ async function apiFetch(path, opts = {}) {
   let res;
   try {
     const init = { method: opts.method || 'GET', headers, body: opts.body };
+    // opts.signal: the caller's Cancel (the AI requests). Aborting the fetch
+    // closes the socket, which is what tells the app to stop the model call.
+    if (opts.signal) init.signal = opts.signal;
     // opts.timeoutMs: abort a request the app never answers (the recorder's
     // /finish and /status); a timed-out call is treated like an offline one.
     res =
@@ -104,6 +107,14 @@ async function apiFetch(path, opts = {}) {
         ? await fetchWithTimeout(`${baseUrl(port)}${path}`, init, Number(opts.timeoutMs))
         : await fetch(`${baseUrl(port)}${path}`, init);
   } catch (err) {
+    // Cancelled on purpose: not "Gum is not running".
+    if (opts.signal && opts.signal.aborted) {
+      const cancelled = new Error('cancelled');
+      cancelled.status = 0;
+      cancelled.offline = false;
+      cancelled.cancelled = true;
+      throw cancelled;
+    }
     const offline = new Error(t('bg_offline'));
     offline.status = 0;
     offline.offline = true;
@@ -187,9 +198,30 @@ async function noteAppLocked(locked) {
   } catch {
     /* the in-memory flag still holds for this worker's life */
   }
+  // risk4: every tab's content script purges its in-memory lookup cache on
+  // the lock, so a word looked up before it is not answered from memory.
+  void broadcastAppLockState(appLockedHint);
   if (!appLockedHint) {
     void flushQueue();
     void resumeRecordingUploads();
+  }
+}
+
+/** Tell every tab's content script about a lock edge. Tabs without one ignore it. */
+async function broadcastAppLockState(locked) {
+  let tabs = [];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return;
+  }
+  for (const tab of tabs) {
+    if (typeof tab.id !== 'number') continue;
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'gum-app-locked', locked: !!locked });
+    } catch {
+      /* no content script in that tab */
+    }
   }
 }
 
@@ -772,6 +804,43 @@ async function saveText(tab, text, mode, opts = {}) {
       queued: true,
     });
     return { ...saveQueuedResponse(payload, resolved, trimmed), ...lockedFlag(err) };
+  }
+}
+
+/* ------------------------------ optional AI ------------------------------- */
+/*
+ * One request per press, never in the background. The worker holds the
+ * AbortController so the content script's Cancel (`ai-cancel`) aborts the
+ * fetch; the app sees the socket close and stops the model call. Only the four
+ * named features reach the app, each with its own capped payload (shared.js
+ * aiAssistPayload) — a page cannot use this to call any other bridge route.
+ */
+const aiInFlight = new Map();
+/** More than this many at once is a stuck page, not a reader; the oldest goes. */
+const AI_MAX_IN_FLIGHT = 6;
+
+async function runAiAssist(msg) {
+  const feature = String(msg.feature || '');
+  const route = S.aiAssistRoute ? S.aiAssistRoute(feature) : '';
+  if (!route) return { ok: false, code: 'other' };
+  const payload = S.aiAssistPayload ? S.aiAssistPayload(feature, msg.payload) : null;
+  if (!payload) return { ok: false, code: 'empty-input' };
+  const id = (S.aiRequestId && S.aiRequestId(msg.requestId)) || `bg_${Date.now().toString(36)}`;
+  aiInFlight.get(id)?.abort();
+  if (aiInFlight.size >= AI_MAX_IN_FLIGHT) {
+    const [oldest] = aiInFlight.keys();
+    aiInFlight.get(oldest)?.abort();
+    aiInFlight.delete(oldest);
+  }
+  const ctl = typeof AbortController === 'function' ? new AbortController() : { signal: undefined, abort() {} };
+  aiInFlight.set(id, ctl);
+  try {
+    const json = await apiFetch(route, { method: 'POST', body: JSON.stringify(payload), signal: ctl.signal });
+    return json && typeof json === 'object' ? json : { ok: false, code: 'other' };
+  } catch (err) {
+    return S.aiFailureReply ? S.aiFailureReply(err) : { ok: false, code: 'other' };
+  } finally {
+    if (aiInFlight.get(id) === ctl) aiInFlight.delete(id);
   }
 }
 
@@ -1547,9 +1616,15 @@ async function scanLookup(text, lang) {
         /* fall through */
       }
     }
-    if (err.offline) {
+    // Offline while the last word from the app was "locked" (it closed, or the
+    // connection dropped, mid-lock): the offline cache stays shut too (risk4).
+    const lockedOffline = !!err.offline && (await isAppLockedHint());
+    if (err.offline && !lockedOffline) {
       const cached = await cachedScan(q, lang);
       if (cached) return { ok: true, ...cached, fromCache: true, offline: true };
+    }
+    if (lockedOffline) {
+      return { ok: false, matched: '', entries: [], offline: true, locked: true, code: 'locked', error: t(SERVER_ERROR_KEYS.locked || 'bg_errLocked') };
     }
     // Locked: no cached answers either — the lock is there to keep study data
     // off the screen, and the popup says why instead of looking empty.
@@ -2926,6 +3001,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } catch (err) {
         sendResponse({ ok: false, offline: !!err.offline, error: String(err.message || err) });
       }
+      return;
+    }
+    // ---- optional AI (shared.js "optional AI"; the app: extensionAiRoutes.ts) ----
+    if (msg?.type === 'ai-status') {
+      try {
+        sendResponse((await apiFetch('/v1/ai/status')) || { ok: false, code: 'other' });
+      } catch (err) {
+        sendResponse(S.aiFailureReply ? S.aiFailureReply(err) : { ok: false, code: 'other' });
+      }
+      return;
+    }
+    if (msg?.type === 'ai-assist') {
+      sendResponse(await runAiAssist(msg));
+      return;
+    }
+    if (msg?.type === 'ai-cancel') {
+      const id = S.aiRequestId ? S.aiRequestId(msg.requestId) : '';
+      const ctl = id ? aiInFlight.get(id) : null;
+      if (ctl) {
+        ctl.abort();
+        aiInFlight.delete(id);
+      }
+      sendResponse({ ok: true, cancelled: !!ctl });
       return;
     }
     if (msg?.type === 'examples') {

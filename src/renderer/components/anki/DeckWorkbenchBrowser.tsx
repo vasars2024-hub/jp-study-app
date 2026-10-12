@@ -12,7 +12,7 @@
  * well-defined) or when the whole source is loaded. With a query active on a
  * paged source the user gets the honest alternative: select the rows found here.
  */
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   EMPTY_SELECTION,

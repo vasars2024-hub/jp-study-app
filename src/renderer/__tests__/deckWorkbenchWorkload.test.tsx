@@ -55,12 +55,12 @@ function draftOf(cards: CardSpec[]): AnkiDraft {
     ],
   };
   return buildAnkiDraft(raw, {
-    source: { kind: 'apkg', label: 'test.apkg', createdAtSec: CRT },
+    source: { kind: 'apkg', label: 'test.apkg', createdAtSec: CRT, fingerprint: 'test-fingerprint' },
     normalize: (v) => v,
   });
 }
 
-const reviewCard = (id: string, ivl: number, dueIn: number, over: Partial<RawAnkiCardRow> = {}): CardSpec => ({
+const reviewCard = (id: string, ivl: number, dueIn: number, over: Partial<Omit<RawAnkiCardRow, 'id' | 'nid'>> = {}): CardSpec => ({
   id,
   nid: `n${id}`,
   type: 2,

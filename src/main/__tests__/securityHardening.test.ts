@@ -13,6 +13,7 @@ import {
   isTrustedIpcSender,
   makeAppOriginPolicy,
   permissionAllowed,
+  permissionDeniedWhileLocked,
   urlOrigin,
 } from '../securityHardening';
 
@@ -122,6 +123,36 @@ describe('permissions', () => {
     expect(cb).toHaveBeenLastCalledWith(false);
     expect(check?.(null, 'clipboard-read', 'app://bundle', {})).toBe(true);
     expect(check?.(null, 'clipboard-read', 'https://evil.example', {})).toBe(false);
+  });
+
+  it('lock3: while Gum is locked an app page gets no clipboard reads and no web notifications', () => {
+    let request: ((wc: unknown, p: string, cb: (ok: boolean) => void, d: unknown) => void) | null = null;
+    let check: ((wc: unknown, p: string, o: string, d: unknown) => boolean) | null = null;
+    const ses = {
+      setPermissionRequestHandler: (fn: typeof request) => {
+        request = fn;
+      },
+      setPermissionCheckHandler: (fn: typeof check) => {
+        check = fn;
+      },
+    };
+    let locked = true;
+    installPermissionPolicy(ses as never, 'app', packaged, undefined, { isLocked: () => locked });
+    const run = (p: string) => (check as unknown as (wc: unknown, p: string, o: string, d: unknown) => boolean)(null, p, 'app://bundle', {});
+    expect(run('clipboard-read')).toBe(false);
+    expect(run('notifications')).toBe(false);
+    expect(run('fullscreen')).toBe(true); // the rest of the allow-list is unchanged
+    const cb = vi.fn();
+    (request as unknown as (wc: unknown, p: string, cb: (ok: boolean) => void, d: unknown) => void)(
+      { getURL: () => 'app://bundle/index.html' },
+      'clipboard-read',
+      cb,
+      { requestingUrl: 'app://bundle/index.html' },
+    );
+    expect(cb).toHaveBeenLastCalledWith(false);
+    locked = false;
+    expect(run('clipboard-read')).toBe(true);
+    expect(permissionDeniedWhileLocked('media')).toBe(false);
   });
 });
 

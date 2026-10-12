@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import type {
@@ -19,6 +19,9 @@ import { getTranslateTarget } from '../../translateTarget';
  */
 const KANJI_LINKS = 24;
 
+/** The optional AI explain / translate-with-context actions: their own chunk. */
+const VisualNovelAiAssist = lazy(() => import('./VisualNovelAiAssist'));
+
 function draftFromCapture(capture: VisualNovelTextCapture): Required<VisualNovelCapturePatch> {
   return {
     kind: capture.kind,
@@ -37,12 +40,15 @@ export default function VisualNovelSentenceAssist({
   onDatabase,
   onStatus,
   onSaveCard,
+  captures = [],
 }: {
   entry: VisualNovelEntry;
   capture: VisualNovelTextCapture;
   onDatabase: (database: VisualNovelDatabase) => void;
   onStatus: (message: string, error?: boolean) => void;
   onSaveCard: () => void;
+  /** The novel's lines in reading order: the context the optional AI explain reads. */
+  captures?: readonly VisualNovelTextCapture[];
 }) {
   const { t, lang } = useT();
   const [draft, setDraft] = useState(() => draftFromCapture(capture));
@@ -245,6 +251,18 @@ export default function VisualNovelSentenceAssist({
           {confirmDelete ? t('vnAssist.confirmRemove') : t('vnAssist.removeSentence')}
         </button>
       </div>
+      {draft.japanese.trim() && (
+        <Suspense fallback={null}>
+          <VisualNovelAiAssist
+            line={{ ...capture, japanese: draft.japanese, translation: draft.translation, speaker: draft.speaker }}
+            captures={captures}
+            onUseTranslation={(translation) => {
+              setDraft((current) => ({ ...current, translation }));
+              void persist({ translation });
+            }}
+          />
+        </Suspense>
+      )}
       {analysis && (
         <div className="visual-novel-sentence-analysis">
           <span>{t('vnAssist.difficulty', { level: analysis.level?.label ?? t('vnAssist.unrated') })}</span>

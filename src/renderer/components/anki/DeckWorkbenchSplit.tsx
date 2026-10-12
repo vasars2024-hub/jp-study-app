@@ -17,7 +17,7 @@
  * the same function `planChangeTray` blocks on and `planDeckSplit` calls, so the
  * Add button cannot disagree with the refusal the tray would produce.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type JSX } from 'react';
 import type { AnkiDraftDeck } from '../../../shared/ankiDraft';
 import {
   DECK_SPLIT_AXES,

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TranslateAnalysisParseError,
+  analysisCompleteness,
   buildAnalysisPrompt,
   buildAnalysisSchema,
   computeAnalysisFlags,
@@ -26,14 +28,19 @@ describe('computeAnalysisFlags', () => {
     expect(computeAnalysisFlags('zh', 'ru').particlesJa).toBe(false);
   });
 
-  it('declension only for Russian target', () => {
+  // F8: keyed to the language on either side, so a Russian or Chinese SOURCE
+  // (the learner's study language) gets its own section too.
+  it('declension when Russian is source or target', () => {
     expect(computeAnalysisFlags('ja', 'ru').declensionRu).toBe(true);
-    expect(computeAnalysisFlags('ru', 'en').declensionRu).toBe(false);
+    expect(computeAnalysisFlags('ru', 'en').declensionRu).toBe(true);
+    expect(computeAnalysisFlags('ja', 'en').declensionRu).toBe(false);
   });
 
-  it('measure words only for Chinese target', () => {
+  it('measure words when Chinese is source or target', () => {
     expect(computeAnalysisFlags('en', 'zh').measureWordZh).toBe(true);
-    expect(computeAnalysisFlags('zh', 'en').measureWordZh).toBe(false);
+    expect(computeAnalysisFlags('zh', 'en').measureWordZh).toBe(true);
+    expect(computeAnalysisFlags('zh-Hant', 'en').measureWordZh).toBe(true);
+    expect(computeAnalysisFlags('ja', 'en').measureWordZh).toBe(false);
   });
 });
 
@@ -139,10 +146,17 @@ describe('parseAnalysisResponse', () => {
     expect(parseAnalysisResponse(raw, ALL_FLAGS).formality?.casual).toBe('a');
   });
 
-  it('malformed JSON returns an empty result, never throws', () => {
-    expect(parseAnalysisResponse('sure, here you go:', ALL_FLAGS)).toEqual({});
-    expect(parseAnalysisResponse('{"formality":', ALL_FLAGS)).toEqual({});
-    expect(parseAnalysisResponse('[1,2,3]', ALL_FLAGS)).toEqual({});
+  // F2: a reply that is not a JSON object used to become `{}`, which main then
+  // cached as a successful analysis. It throws now, and nothing is cached.
+  it('malformed JSON throws a coded parse error instead of returning {}', () => {
+    expect(() => parseAnalysisResponse('sure, here you go:', ALL_FLAGS)).toThrow(TranslateAnalysisParseError);
+    expect(() => parseAnalysisResponse('{"formality":', ALL_FLAGS)).toThrow(TranslateAnalysisParseError);
+    expect(() => parseAnalysisResponse('[1,2,3]', ALL_FLAGS)).toThrow(TranslateAnalysisParseError);
+  });
+
+  it('reads a fenced JSON reply', () => {
+    const raw = '```json\n{"formality":{"casual":"a","polite":"b","businessSafe":"c"}}\n```';
+    expect(parseAnalysisResponse(raw, ALL_FLAGS).formality?.polite).toBe('b');
   });
 
   it('drops malformed fields but keeps valid ones', () => {
@@ -187,5 +201,33 @@ describe('parseAnalysisResponse', () => {
     expect(result.aspectNotes).toHaveLength(1);
     expect(result.aspectNotes?.[0].particle).toBe('过');
     expect(result.declension).toBeUndefined();
+  });
+});
+
+describe('analysisCompleteness (F2: only complete analyses are cached)', () => {
+  const flags = computeAnalysisFlags('ja', 'en');
+  const formality = { casual: 'a', polite: 'b', businessSafe: 'c' };
+
+  it('an empty result is empty', () => {
+    expect(analysisCompleteness({}, flags, {})).toBe('empty');
+  });
+
+  it('a missing required section is partial', () => {
+    expect(analysisCompleteness({ particleNotes: ['x'] }, flags, { jaParticleTokens: ['は'] })).toBe('partial');
+  });
+
+  it('particle notes that do not cover every particle are partial', () => {
+    expect(analysisCompleteness({ formality, particleNotes: ['x'] }, flags, { jaParticleTokens: ['は', 'が'] })).toBe('partial');
+    expect(analysisCompleteness({ formality, particleNotes: ['x', 'y'] }, flags, { jaParticleTokens: ['は', 'が'] })).toBe('complete');
+  });
+});
+
+describe('the prompt follows the study language on either side (F8)', () => {
+  it('asks for measure words about the Chinese SOURCE, in the UI language', () => {
+    const req = { sourceText: '我买了三本书。', translatedText: 'I bought three books.', source: 'zh', target: 'en', explainIn: 'ru' };
+    const prompt = buildAnalysisPrompt(req, computeAnalysisFlags('zh', 'en'));
+    expect(prompt).toContain('Chinese text (我买了三本书。)');
+    expect(prompt).toContain('Russian');
+    expect(prompt).not.toContain('Chinese translation');
   });
 });

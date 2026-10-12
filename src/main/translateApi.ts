@@ -1,7 +1,8 @@
-// Cloud translation batch engine for EPUB mining fail-switch (Gemini / DeepSeek).
+// API translation batch engine for EPUB mining: any provider in the table, including
+// a keyless local OpenAI-compatible server (Ollama / LM Studio).
 // Shares prompt/parse logic with offline Qwen via translateCore.
 
-import type { AiProviderId } from '../shared/aiProviders';
+import { AI_PROVIDERS, type AiProviderId } from '../shared/aiProviders';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import {
   buildBatchPrompt,
@@ -15,14 +16,30 @@ import {
   getCachedTranslation,
   setCachedTranslation,
 } from './translate';
-import { runCloudAiRequest } from './providerRuntime';
+import { getAiProviderHealth, runCloudAiRequest } from './providerRuntime';
 
 const BATCH_SIZE = 40;
 const BATCH_CONCURRENCY = 6;
+/**
+ * A local OpenAI-compatible server (Ollama, LM Studio) runs one generation at a
+ * time on the user's own GPU; six 40-line batches in flight only queue there and
+ * time out one after another.
+ */
+const LOCAL_SERVER_CONCURRENCY = 1;
+
+function providerWire(providerId: AiProviderId): string | null {
+  return AI_PROVIDERS.find((provider) => provider.id === providerId)?.wire ?? null;
+}
+
+function keyOptional(providerId: AiProviderId): boolean {
+  return AI_PROVIDERS.find((provider) => provider.id === providerId)?.keyOptional === true;
+}
 
 export interface RunApiTranslationBatchOptions {
   shouldCancel?: () => boolean;
   onProgress?: (done: number, total: number) => void;
+  /** Ignore cached translations (they are still refreshed): "translate these again". */
+  fresh?: boolean;
 }
 
 async function callProviderTranslate(
@@ -34,7 +51,9 @@ async function callProviderTranslate(
     providerId,
     apiKey,
     prompt,
-    systemPrompt: providerId === 'gemini-2.5-flash'
+    // By wire format, not by one id: every chat-completions server (DeepSeek,
+    // OpenAI, a local server) and Claude need the JSON instruction.
+    systemPrompt: providerWire(providerId) === 'gemini'
       ? undefined
       : 'You are a translation assistant. Respond with valid JSON only — either a JSON array ' +
         '[{"id":"t0","text":"..."}, ...] or {"results":[...]} with the same item shape.',
@@ -62,7 +81,7 @@ async function translateApiGroup(
     for (const item of batchItems) {
       const text = parsed.get(item.id)?.trim() ?? '';
       const valid = text && isValidCrossLangTranslation(item.source, item.target, item.text, text);
-      if (valid) setCachedTranslation(item.text, item.source, item.target, text);
+      if (valid) setCachedTranslation(item.text, item.source, item.target, text, providerId);
       out.push({ id: item.id, text: valid ? text : '' });
     }
   }
@@ -71,7 +90,7 @@ async function translateApiGroup(
     const prompt = buildStrictPrompt(item);
     const raw = cleanLlmOutput(await callProviderTranslate(providerId, apiKey, prompt));
     const text = isValidCrossLangTranslation(item.source, item.target, item.text, raw) ? raw : '';
-    if (text) setCachedTranslation(item.text, item.source, item.target, text);
+    if (text) setCachedTranslation(item.text, item.source, item.target, text, providerId);
     out.push({ id: item.id, text });
   }
 
@@ -82,6 +101,7 @@ async function translateApiBatchChunk(
   providerId: AiProviderId,
   apiKey: string,
   items: TranslateBatchItem[],
+  fresh = false,
 ): Promise<{ id: string; text: string }[]> {
   const out: { id: string; text: string }[] = [];
   const needsLlm: TranslateBatchItem[] = [];
@@ -95,7 +115,8 @@ async function translateApiBatchChunk(
       needsLlm.push(item);
       continue;
     }
-    const cached = getCachedTranslation(item.text, item.source, item.target);
+    // Scoped to this provider: an offline or other-provider translation is not this one's.
+    const cached = fresh ? undefined : getCachedTranslation(item.text, item.source, item.target, providerId);
     if (cached !== undefined && isValidCrossLangTranslation(item.source, item.target, item.text, cached)) {
       out.push({ id: item.id, text: cached });
     } else {
@@ -155,19 +176,35 @@ export async function runApiTranslationBatch(
     while (ptr < chunks.length) {
       if (options?.shouldCancel?.()) return;
       const i = ptr++;
-      const chunkResults = await translateApiBatchChunk(providerId, apiKey, chunks[i]);
+      const chunkResults = await translateApiBatchChunk(providerId, apiKey, chunks[i], options?.fresh === true);
       results.push(...chunkResults);
       done += chunks[i].length;
       options?.onProgress?.(done, list.length);
     }
   }
+  const concurrency = keyOptional(providerId) ? LOCAL_SERVER_CONCURRENCY : BATCH_CONCURRENCY;
   await Promise.all(
-    Array.from({ length: Math.min(BATCH_CONCURRENCY, chunks.length) }, () => worker()),
+    Array.from({ length: Math.min(concurrency, chunks.length) }, () => worker()),
   );
   flushTranslationCache();
   return results;
 }
 
-export function isApiTranslationAvailable(providerId: AiProviderId, apiKey: string): boolean {
-  return Boolean(apiKey.trim());
+/**
+ * A key, or — for a provider that takes none, the local OpenAI-compatible
+ * server — a configured URL and model. "Has a key" alone made EPUB API
+ * translation unreachable with Ollama or LM Studio.
+ */
+export function isApiTranslationAvailable(
+  providerId: AiProviderId,
+  apiKey: string,
+  configured: (id: AiProviderId) => boolean = (id) => getAiProviderHealth(id).configured,
+): boolean {
+  if (apiKey.trim()) return true;
+  if (!keyOptional(providerId)) return false;
+  try {
+    return configured(providerId);
+  } catch {
+    return false;
+  }
 }

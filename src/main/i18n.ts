@@ -1,6 +1,13 @@
 import { ipcMain } from 'electron';
-import { catalogFor, en, ensureCatalog } from '../shared/i18n/catalogs';
+import { catalogFor, en, ensureCatalog, registerI18nPack } from '../shared/i18n/catalogs';
+import { AI_PACK_EN } from '../shared/i18n/aiPack/en';
 import { DEFAULT_LANG, isUiLang, translate, type TVars, type UiLang } from '../shared/i18n/core';
+
+// The AI strings are a lazy pack in the renderer (boot size). Main has no boot
+// budget and throws translated AI errors (`aiProv.mining.*`) at any time, so it
+// takes the English pack eagerly; registering it also makes every later
+// `ensureCatalog(lang)` fetch that language's AI strings along with it.
+registerI18nPack('ai', 'en', AI_PACK_EN);
 
 // Main-process side of Phase 2. The renderer owns the language *choice*
 // (persisted in its own localStorage); main just needs to know what it is so

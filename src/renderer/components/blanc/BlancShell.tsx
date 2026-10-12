@@ -1,4 +1,4 @@
-import { Activity, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Activity, Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
 import type { LibraryItem } from '../../../shared/types';
 import {
   BLANC_TRIM_EVENT,
@@ -61,6 +61,7 @@ import { LANG_LABELS, LANG_TAGS, UI_LANGS, type UiLang } from '../../../shared/i
 import Icon, { type IconName } from '../Icons';
 import VirtualList from '../VirtualList';
 import { retryableLazy } from '../../retryableLazy';
+import { pickCardAiExtras } from '../../../shared/cardAiExtras';
 import { useVisibleInterval } from '../../useVisibleInterval';
 import { writeLocalStorage } from '../../localStorageWrite';
 import FocusMusicBar from '../FocusMusicBar';
@@ -128,6 +129,7 @@ import {
 } from '../../../shared/toolboxShortcuts';
 import {
   chordFromEvent,
+  effectiveKeys,
   formatKeysDisplay,
   getBindings,
   onShortcutsChanged,
@@ -135,9 +137,18 @@ import {
   resetBinding,
   runCommand,
   setBinding,
+  splitChords,
   type BindingRow,
 } from '../../keyboardShortcuts';
-import { clearLockscreenPin, hasLockscreenPin, loadLockscreen, saveLockscreen, setLockscreenPin } from '../../lockscreenSettings';
+import { keysOrUnset, withShortcut } from '../../shortcutHints';
+import {
+  clearLockscreenPin,
+  hasLockscreenPin,
+  loadLockscreen,
+  setLockscreenEnabled,
+  setLockscreenPin,
+  type LockscreenChange,
+} from '../../lockscreenSettings';
 import { getActiveProfile } from '../../profileState';
 import { loadSaved, type SavedWord } from '../../savedWords';
 import { loadLookupHistory, type LookupHistoryEntry } from '../../lookupHistory';
@@ -220,6 +231,8 @@ const BlancDictionaryPanel = retryableLazy(withStudyOsCompat(() =>
 const BlancGrammarPanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancGrammarPanel').then((m) => ({ default: m.BlancGrammarPanel })),
 ));
+// The Deck tool's per-row saved extras: the panel the Study OS and Aero deck rows open.
+const DeckCardExtrasPanel = retryableLazy(withStudyOsCompat(() => import('../flashcards/DeckCardExtrasPanel')));
 const BlancClipboardPanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancDictionaryPanels').then((m) => ({ default: m.BlancClipboardPanel })),
 ));
@@ -257,6 +270,18 @@ const BlancVisualizerPanel = retryableLazy(withStudyOsCompat(() =>
 const BlancVisualNovelsPanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancVisualNovelsPanel').then((m) => ({ default: m.BlancVisualNovelsPanel })),
 ));
+// Snip to cards' history + analysis. Its own small stylesheet only (no Study OS compat
+// sheet): Blanc stays low-RAM, and the panel loads on first open.
+const BlancSnipsPanel = retryableLazy(() =>
+  import('./BlancSnipsPanel').then((m) => ({ default: m.BlancSnipsPanel })),
+);
+// The conversation partner (docs/AI_AUDIT.md N20): its own small stylesheet only,
+// loaded on first open.
+const BlancConversationPanel = retryableLazy(() =>
+  import('./BlancConversationPanel').then((m) => ({ default: m.BlancConversationPanel })),
+);
+// Writing help under Quick Notes, loaded on first open of that tool.
+const WritingCorrection = retryableLazy(() => import('../speak/WritingCorrection'));
 
 // Study-native toolbox track — see BlancStudyNativePanels.tsx.
 const BlancFuriganaPanel = retryableLazy(() =>
@@ -869,7 +894,7 @@ export default function BlancShell({
           <button
             type="button"
             className="blanc-icon-btn primary blanc-top-search"
-            title={t('blanc.shell.searchTitle')}
+            title={withShortcut(t('blanc.shell.searchTitle'), 'toolbox.search')}
             aria-label={t('blanc.shell.search')}
             onClick={() => setMasterSearchOpen(true)}
           >
@@ -1309,6 +1334,7 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
   // Rendered a page at a time: the table mounted one row (six cells and a
   // checkbox) per card, 20,000 rows on a large deck.
   const [rowLimit, setRowLimit] = useState(BLANC_DECK_PAGE);
+  const [extrasId, setExtrasId] = useState<string | null>(null);
 
   useEffect(() => onDeckChanged(() => setCards(loadDeck())), []);
   useEffect(() => {
@@ -1347,7 +1373,8 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
   };
 
   const sendCard = async (
-    card: Pick<DeckFlashcard, 'id' | 'word' | 'reading' | 'meaning' | 'sentence' | 'studyLang'>,
+    card: Pick<DeckFlashcard, 'id' | 'word' | 'reading' | 'meaning' | 'sentence' | 'studyLang'>
+      & Partial<Pick<DeckFlashcard, 'mnemonic' | 'distinction' | 'exampleSentences' | 'acceptedAnswers'>>,
   ): Promise<boolean> => {
     const result = await window.api.ankiMineNote({
       // The card's own language routes it (absent is Japanese, as stored).
@@ -1357,6 +1384,8 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
       meaning: card.meaning || undefined,
       sentence: card.sentence || undefined,
       deckName: deck || undefined,
+      // The card's saved extras (memory aid, notes, examples, accepted answers).
+      cardExtras: pickCardAiExtras(card),
     });
     const ok = result.ok || result.error === 'duplicate';
     if (card.id) {
@@ -1477,28 +1506,52 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
           </thead>
           <tbody>
             {cards.slice(0, rowLimit).map((card) => (
-              <tr key={card.id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(card.id)}
-                    aria-label={t('blanc.shell.deck.selectCard', { word: card.word })}
-                    onChange={() => toggle(card.id)}
-                  />
-                </td>
-                <td lang="ja">{card.word}</td>
-                <td>{card.meaning || card.back}</td>
-                <td>{card.bookTitle || card.source}</td>
-                <td>{card.ankiExported ? t('blanc.shell.deck.stateExported') : card.ankiExportError ? t('blanc.shell.deck.stateFailed') : t('blanc.shell.deck.stateLocal')}</td>
-                <td>
-                  <button type="button" onClick={() => {
-                    removeDeckCard(card.id);
-                    setCards(loadDeck());
-                  }}>
-                    {t('blanc.shell.remove')}
-                  </button>
-                </td>
-              </tr>
+              <Fragment key={card.id}>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(card.id)}
+                      aria-label={t('blanc.shell.deck.selectCard', { word: card.word })}
+                      onChange={() => toggle(card.id)}
+                    />
+                  </td>
+                  <td lang="ja">{card.word}</td>
+                  <td>{card.meaning || card.back}</td>
+                  <td>{card.bookTitle || card.source}</td>
+                  <td>{card.ankiExported ? t('blanc.shell.deck.stateExported') : card.ankiExportError ? t('blanc.shell.deck.stateFailed') : t('blanc.shell.deck.stateLocal')}</td>
+                  <td>
+                    {/* The card's saved extras (memory aid, notes, kept examples,
+                        accepted answers) — the same panel as the Study OS and Aero
+                        deck rows. Not `data-ai-entry`: it works with AI off. */}
+                    <button
+                      type="button"
+                      data-flash-action="row-card-extras"
+                      aria-pressed={extrasId === card.id}
+                      aria-label={t('aiStudy.extras.open', { word: card.word })}
+                      title={t('aiStudy.extras.open', { word: card.word })}
+                      onClick={() => setExtrasId(extrasId === card.id ? null : card.id)}
+                    >
+                      {t('blanc.shell.deck.extras')}
+                    </button>{' '}
+                    <button type="button" onClick={() => {
+                      removeDeckCard(card.id);
+                      setCards(loadDeck());
+                    }}>
+                      {t('blanc.shell.remove')}
+                    </button>
+                  </td>
+                </tr>
+                {extrasId === card.id && (
+                  <tr>
+                    <td colSpan={6}>
+                      <Suspense fallback={null}>
+                        <DeckCardExtrasPanel card={card} onClose={() => setExtrasId(null)} />
+                      </Suspense>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
             {cards.length === 0 && (
               <tr>
@@ -1608,6 +1661,8 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
   'frequency-explorer',
   'difficulty-analyzer',
   'notebook',
+  'snips',
+  'conversation',
   // Read & watch
   'novels',
   'visual-novels',
@@ -1664,6 +1719,8 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   music: 'music',
   novels: 'library',
   'visual-novels': 'library',
+  snips: 'scan',
+  conversation: 'chat',
   discover: 'sparkle',
   games: 'dice',
   immersion: 'globe',
@@ -1730,6 +1787,8 @@ const TOOL_CATEGORY: Record<BlancToolId, BlancToolCategory> = {
   'frequency-explorer': 'study',
   'difficulty-analyzer': 'study',
   notebook: 'study',
+  snips: 'study',
+  conversation: 'study',
   novels: 'read-watch',
   'visual-novels': 'read-watch',
   'reading-finder': 'read-watch',
@@ -1814,6 +1873,8 @@ const BLANC_SECTION_ROUTES: Record<string, BlancSectionRoute> = {
   novels: { tool: 'novels' },
   visualnovels: { tool: 'visual-novels' },
   'visual-novels': { tool: 'visual-novels' },
+  snips: { tool: 'snips' },
+  conversation: { tool: 'conversation' },
   agent: { tool: 'agent' },
 };
 
@@ -1965,6 +2026,8 @@ function renderBlancTool(
   if (tool === 'screen-recorder') return <RecorderLauncherPanel />;
   if (tool === 'mono-blocks') return <MonoBlocks />;
   if (tool === 'visual-novels') return <BlancVisualNovelsPanel />;
+  if (tool === 'snips') return <BlancSnipsPanel />;
+  if (tool === 'conversation') return <BlancConversationPanel />;
   return <BlancCalendarPanel />;
 }
 
@@ -2805,7 +2868,12 @@ function FocusTimerPanel() {
           <button type="button" onClick={resetFocusTimer} title={t('blanc.tb.resetTimer')}>{t('blanc.tb.reset')}</button>
           <button type="button" onClick={recordFocusTimerLap} title={t('blanc.tb.recordLap')}>{t('blanc.tb.lap')}</button>
         </div>
-        <p className="blanc-note">{t('blanc.tb.timerKeys', { startPause: 'Ctrl+Shift+Space', reset: 'Ctrl+Shift+Backspace' })}</p>
+        <p className="blanc-note">
+          {t('blanc.tb.timerKeys', {
+            startPause: keysOrUnset('focusTimer.startPause'),
+            reset: keysOrUnset('focusTimer.reset'),
+          })}
+        </p>
         <p className="blanc-note">{t('blanc.refine.timerKeepsRunning')}</p>
       </section>
 
@@ -3154,6 +3222,7 @@ function QuickNotesPanel() {
     }
   });
   const [saved, setSaved] = useState(false);
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   const save = (next: string): void => {
     setNotes(next);
     try {
@@ -3195,11 +3264,15 @@ function QuickNotesPanel() {
           aria-label={t('blanc.tb.quickNotes')}
           placeholder={t('blanc.tb.quickNotesPlaceholder')}
           onChange={(event) => save(event.target.value)}
+          onSelect={(event) => setSelection({ start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd })}
         />
         <div className="blanc-row-actions">
           <button type="button" onClick={() => save('')}>{t('blanc.tb.clear')}</button>
           <span className="blanc-note">{saved ? t('blanc.tb.saved') : t('blanc.tb.characters', { count: notes.length })}</span>
         </div>
+        <Suspense fallback={null}>
+          <WritingCorrection text={notes} selection={selection} studyLang={getStudyLang()} onApply={save} />
+        </Suspense>
       </fieldset>
     </div>
   );
@@ -3714,6 +3787,7 @@ function BlancSettingsPanel({
   const { t } = useT();
   const blancTools = useBlancTools();
   const [pin, setPin] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
   const [pinMsg, setPinMsg] = useState('');
   const [lockOn, setLockOn] = useState(() => loadLockscreen().enabled);
   const [pinSet, setPinSet] = useState(() => hasLockscreenPin());
@@ -3837,16 +3911,37 @@ function BlancSettingsPanel({
     setSettingsMsg(t('blanc.settings.resetCategoryDone', { category: t(`blanc.settings.category.${category}`) }));
   };
 
+  /** lock3: main's refusal, in words (wrong or missing current PIN, the shared backoff). */
+  const lockRefusal = (res: LockscreenChange): string =>
+    res.retryAfterMs
+      ? t('lockscreen.retryIn', { count: Math.max(1, Math.ceil(res.retryAfterMs / 1000)) })
+      : res.error === 'wrong-pin'
+        ? currentPin
+          ? t('lock3.settings.wrongCurrent')
+          : t('lock3.settings.currentNeeded')
+        : res.error === 'invalid'
+          ? t('blanc.settings.pinFourDigits')
+          : t('settings.lock.msg.saveFail');
+
   const savePin = (): void => {
-    // Hashed in main (scrypt), so saving is async.
-    void setLockscreenPin(pin).then((next) => {
-      if (!next) {
-        setPinMsg(t('blanc.settings.pinFourDigits'));
+    if (pinSet && currentPin.length !== 4) {
+      setPinMsg(t('lock3.settings.currentNeeded'));
+      return;
+    }
+    // Hashed in main (scrypt), so saving is async. Changing a PIN needs the current one.
+    void setLockscreenPin(pinSet ? currentPin : null, pin).then((res) => {
+      if (!res.ok) {
+        setPinMsg(lockRefusal(res));
         return;
       }
       setPin('');
+      setCurrentPin('');
       setPinSet(true);
-      setPinMsg(t('blanc.settings.pinSaved'));
+      setPinMsg(
+        res.recoveryCode
+          ? `${t('blanc.settings.pinSaved')} ${t('lock3.settings.recovery.blancShown', { code: res.recoveryCode })}`
+          : t('blanc.settings.pinSaved'),
+      );
     });
   };
 
@@ -3856,9 +3951,36 @@ function BlancSettingsPanel({
       setLockOn(false);
       return;
     }
-    const next = saveLockscreen({ enabled: on });
-    setLockOn(next.enabled);
-    setPinMsg(next.enabled ? t('blanc.settings.lockEnabled') : t('blanc.settings.lockDisabled'));
+    if (!on && currentPin.length !== 4) {
+      setPinMsg(t('lock3.settings.currentNeeded'));
+      return;
+    }
+    void setLockscreenEnabled(on, on ? undefined : currentPin).then((res) => {
+      setLockOn(res.settings.enabled);
+      if (!res.ok) {
+        setPinMsg(lockRefusal(res));
+        return;
+      }
+      setCurrentPin('');
+      setPinMsg(res.settings.enabled ? t('blanc.settings.lockEnabled') : t('blanc.settings.lockDisabled'));
+    });
+  };
+
+  const clearPin = (): void => {
+    if (currentPin.length !== 4) {
+      setPinMsg(t('lock3.settings.currentNeeded'));
+      return;
+    }
+    void clearLockscreenPin(currentPin).then((res) => {
+      if (!res.ok) {
+        setPinMsg(lockRefusal(res));
+        return;
+      }
+      setCurrentPin('');
+      setPinSet(false);
+      setLockOn(false);
+      setPinMsg(t('blanc.settings.pinCleared'));
+    });
   };
 
   return (
@@ -3935,6 +4057,18 @@ function BlancSettingsPanel({
       <fieldset data-blanc-setting="lockscreen" tabIndex={-1}>
         <legend>{t('blanc.settings.lockscreen')}</legend>
         <div className="blanc-folder-row">
+          {pinSet && (
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="current-password"
+              maxLength={4}
+              value={currentPin}
+              aria-label={t('lock3.settings.currentPin')}
+              placeholder={t('lock3.settings.currentPin')}
+              onChange={(event) => setCurrentPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
+            />
+          )}
           <input
             type="password"
             inputMode="numeric"
@@ -3947,15 +4081,7 @@ function BlancSettingsPanel({
           <button type="button" onClick={savePin} disabled={pin.length !== 4}>
             {t('blanc.settings.savePin')}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              clearLockscreenPin();
-              setPinSet(false);
-              setLockOn(false);
-              setPinMsg(t('blanc.settings.pinCleared'));
-            }}
-          >
+          <button type="button" onClick={clearPin} disabled={!pinSet}>
             {t('blanc.settings.clearPin')}
           </button>
         </div>
@@ -4438,6 +4564,13 @@ function BlancSettingsPanel({
   );
 }
 
+/** kbd5: a command's translated name for a conflict message, by id. */
+function shortcutName(id: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  const row = getBindings().find((r) => r.id === id);
+  if (!row) return id;
+  return row.custom ? row.label : commandLabel(id, row.label, t);
+}
+
 function ToolboxShortcutSettingsPanel() {
   const { t } = useT();
   const developerTools = useBlancDeveloperTools();
@@ -4445,7 +4578,13 @@ function ToolboxShortcutSettingsPanel() {
     getBindings().filter((row) => TOOLBOX_SHORTCUT_COMMANDS.some((command) => command.id === row.id)),
   );
   const [capturing, setCapturing] = useState<string | null>(null);
-  const [pendingConflict, setPendingConflict] = useState<{ id: string; chord: string; conflicts: string[] } | null>(null);
+  const [pendingConflict, setPendingConflict] = useState<{
+    id: string;
+    chord: string;
+    conflicts: string[];
+    /** The keys the row had before the capture, for a swap. */
+    previous: string[];
+  } | null>(null);
   const [shortcutMsg, setShortcutMsg] = useState('');
   const [query, setQuery] = useState('');
   const validation = validateToolboxShortcutRegistry(TOOLBOX_SHORTCUT_COMMANDS.map((command) => command.id));
@@ -4481,13 +4620,15 @@ function ToolboxShortcutSettingsPanel() {
       }
       const chord = chordFromEvent(event);
       if (!chord) return;
+      const previous = splitChords(effectiveKeys(capturing));
       const conflicts = setBinding(capturing, chord);
       if (conflicts.length > 0) {
-        setPendingConflict({ id: capturing, chord, conflicts });
+        setPendingConflict({ id: capturing, chord, conflicts, previous });
         setShortcutMsg(
           t('blanc.shortcuts.assignedConflict', {
             keys: formatKeysDisplay(chord),
-            commands: conflicts.join(', '),
+            // kbd5: names, not raw ids ("toolbox.search").
+            commands: conflicts.map((id) => shortcutName(id, t)).join(', '),
           }),
         );
       } else {
@@ -4500,11 +4641,28 @@ function ToolboxShortcutSettingsPanel() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [capturing]);
 
-  const replacePendingConflicts = (): void => {
+  /**
+   * kbd5: "replace" takes the chord away from the other command but keeps its
+   * other alternatives (it used to unbind it entirely); "swap" hands the other
+   * command the keys this one had before.
+   */
+  const settlePendingConflicts = (swap: boolean): void => {
     if (!pendingConflict) return;
-    pendingConflict.conflicts.forEach((id) => setBinding(id, ''));
-    setBinding(pendingConflict.id, pendingConflict.chord);
-    setShortcutMsg(t('blanc.shortcuts.replaced', { keys: formatKeysDisplay(pendingConflict.chord) }));
+    const { id, chord, conflicts, previous } = pendingConflict;
+    conflicts.forEach((other, index) => {
+      const remaining = splitChords(effectiveKeys(other)).filter((k) => k !== chord);
+      const giveBack = swap && index === 0 ? previous.filter((k) => k !== chord && !remaining.includes(k)) : [];
+      setBinding(other, [...giveBack, ...remaining].join('|'));
+    });
+    setBinding(id, chord);
+    setShortcutMsg(
+      swap && conflicts[0]
+        ? t('kbd5.conflict.swapped', {
+            name: shortcutName(conflicts[0], t),
+            keys: formatKeysDisplay(effectiveKeys(conflicts[0])) || t('kbd5.keys.unset'),
+          })
+        : t('blanc.shortcuts.replaced', { keys: formatKeysDisplay(chord) }),
+    );
     setPendingConflict(null);
     refreshBindings();
   };
@@ -4558,8 +4716,13 @@ function ToolboxShortcutSettingsPanel() {
         >
           {t('blanc.shortcuts.copyDocs')}
         </button>
+        {pendingConflict && pendingConflict.previous.length > 0 && (
+          <button type="button" onClick={() => settlePendingConflicts(true)}>
+            {t('kbd5.conflict.swap')}
+          </button>
+        )}
         {pendingConflict && (
-          <button type="button" onClick={replacePendingConflicts}>
+          <button type="button" onClick={() => settlePendingConflicts(false)}>
             {t('blanc.shortcuts.replaceConflicts')}
           </button>
         )}
@@ -4577,7 +4740,11 @@ function ToolboxShortcutSettingsPanel() {
                 {developerTools && <span>{row.id} / {meta?.scope ?? 'toolbox'}</span>}
                 {row.note && <small>{commandNote(row.id, meta?.description ?? row.note, t) ?? row.note}</small>}
                 {row.conflictsWith.length > 0 && (
-                  <small>{t('blanc.shortcuts.conflictsWith', { commands: row.conflictsWith.join(', ') })}</small>
+                  <small>
+                    {t('blanc.shortcuts.conflictsWith', {
+                      commands: row.conflictsWith.map((id) => shortcutName(id, t)).join(', '),
+                    })}
+                  </small>
                 )}
               </div>
               <button type="button" onClick={() => setCapturing(row.id)}>

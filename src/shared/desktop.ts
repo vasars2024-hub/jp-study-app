@@ -50,6 +50,10 @@ export const DESKTOP_WIN_SECTIONS = [
   // reachable as Immersion > More > Visual novel library, with its open state held in
   // a useState that reset on every close.
   'visualnovels',
+  // Snip to cards: the analysis and history of Win+Shift+S snips (main/snipToCards.ts).
+  'snips',
+  // The conversation partner: chat in the study language at your level (docs/AI_AUDIT.md N20).
+  'conversation',
 ] as const;
 
 export type DesktopWinSection = (typeof DESKTOP_WIN_SECTIONS)[number];

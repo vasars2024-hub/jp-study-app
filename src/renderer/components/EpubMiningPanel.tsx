@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import type {
   EpubDeckRow,
@@ -201,6 +201,13 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
   const selectedApiProvider =
     AI_PROVIDERS.find((p) => p.id === translationApiProvider) ?? AI_PROVIDERS[0];
   const apiKeySaved = Boolean(aiConfig?.apiKeysSet?.[providerKeyBucket(translationApiProvider)]);
+  // Main reads `export.translationApiProvider` before the app provider, so the
+  // run is sent the provider shown above — not a stale copy saved by an older
+  // build — and the cloud request goes where the panel says it goes.
+  const withShownProvider = (cfg: TraditionalMiningConfig): TraditionalMiningConfig => ({
+    ...cfg,
+    export: { ...(cfg.export ?? DEFAULT_TRADITIONAL_MINING_CONFIG.export), translationApiProvider },
+  });
 
   const aiReadiness = useAiReadiness();
   const readinessKey = `${aiReadiness.providerId}|${aiReadiness.cloudReady}|${aiReadiness.localReady}`;
@@ -373,7 +380,7 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
     setEnrichPhase('');
     setEnrichProgress(null);
     try {
-      const result = await window.api.miningAnalyzeEpub(selectedBookId, config, chapterRange);
+      const result = await window.api.miningAnalyzeEpub(selectedBookId, withShownProvider(config), chapterRange);
       // A cancelled or superseded run must never snap the panel back.
       if (analyzeGenRef.current !== gen) return;
       setAnalysis(result);
@@ -467,7 +474,12 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
     });
   }
 
-  async function downloadDeck(): Promise<void> {
+  /**
+   * `freshTranslations` is "Translate again": the cloud provider is asked
+   * anew for every engine-filled field instead of reusing its saved answers
+   * (which used to be the only thing a repeat download could return).
+   */
+  async function downloadDeck(options?: { freshTranslations?: boolean }): Promise<void> {
     if (!analysis || !filteredCandidates.length) return;
     setExporting(true);
     setStatus(t('epub.mining.status.preparing', { count: filteredCandidates.length }));
@@ -482,10 +494,11 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
         {
           ...config,
           export: {
-            ...(config.export ?? DEFAULT_TRADITIONAL_MINING_CONFIG.export),
+            ...(withShownProvider(config).export ?? DEFAULT_TRADITIONAL_MINING_CONFIG.export),
             fsMarker: false,
           },
         },
+        options?.freshTranslations ? { freshTranslations: true } : undefined,
       );
       setAnalysis({
         ...analysis,
@@ -1484,6 +1497,19 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
             <Icon name="download" size={16} />
             {exporting ? enrichPhase || t('epub.mining.preparingDeck') : t('epub.mining.downloadDeck')}
           </button>
+          {translationEngine === 'api' && exp.fillTranslations !== false && (
+            <button
+              type="button"
+              className="btn"
+              data-testid="epub-translate-again"
+              title={t('epub.mining.translateAgain.hint', { provider: selectedApiProvider.label })}
+              disabled={!analysis || !cardCount || exporting || analyzing || !apiKeySaved}
+              onClick={() => void downloadDeck({ freshTranslations: true })}
+            >
+              <Icon name="refresh" size={16} />
+              {t('epub.mining.translateAgain')}
+            </button>
+          )}
           {exporting && (
             <button type="button" className="btn subtle" onClick={cancelAnalysis}>
               {t('common.cancel')}

@@ -4,6 +4,7 @@ import AdmZip from 'adm-zip';
 import { ANKI_FIELD_SEP } from '../../shared/ankiDraft';
 import type { LocalDeckApkgRequest } from '../../shared/localDeckApkg';
 import { localSrsToAnkiSchedule } from '../../shared/apkgCards';
+import { cardAiExtrasHtml } from '../../shared/cardAiExtrasHtml';
 import { getSql } from './apkgCollection';
 
 function html(value: string): string {
@@ -62,6 +63,8 @@ export async function writeLocalDeckApkg(request: LocalDeckApkgRequest): Promise
     // An Image column exists only when the export carried pictures; a template
     // naming a field the note type lacks renders as an error in Anki.
     const imageBack = headers.includes('Image') ? '{{#Image}}<br>{{Image}}{{/Image}}' : '';
+    // The card's saved extras (`shared/cardAiExtras.ts`), when the export carried any.
+    const notesBack = headers.includes('Notes') ? '{{#Notes}}<hr>{{Notes}}{{/Notes}}' : '';
     const model = {
       id: modelId, name: 'JP Study local card', type: 0, mod: nowSec, usn: 0, sortf: 0,
       did: deckId, latexPre: '', latexPost: '', css: '.card{font-family:Arial;font-size:20px;text-align:left;color:black;background:white}',
@@ -69,7 +72,7 @@ export async function writeLocalDeckApkg(request: LocalDeckApkgRequest): Promise
       tmpls: [{
         name: 'Card 1', ord: 0,
         qfmt: '{{Expression}}{{#Reading}}<br>{{Reading}}{{/Reading}}{{#Front}}<br>{{Front}}{{/Front}}{{#Audio}}<br>{{Audio}}{{/Audio}}',
-        afmt: `{{FrontSide}}<hr id=answer>{{Meaning}}{{#Sentence}}<br>{{Sentence}}{{/Sentence}}{{#Back}}<br>{{Back}}{{/Back}}${imageBack}`,
+        afmt: `{{FrontSide}}<hr id=answer>{{Meaning}}{{#Sentence}}<br>{{Sentence}}{{/Sentence}}{{#Back}}<br>{{Back}}{{/Back}}${imageBack}${notesBack}`,
         did: null, bqfmt: '', bafmt: '',
       }],
       req: [[0, 'any', [0, 4]]],
@@ -82,6 +85,9 @@ export async function writeLocalDeckApkg(request: LocalDeckApkgRequest): Promise
     let scheduled = 0;
     rows.forEach((row, index) => {
       const values = headers.map((name, field) => {
+        // The saved extras: markup this writer builds from the validated card
+        // data (sanitized, generated text marked), never the row's own string.
+        if (name === 'Notes' && request.notes) return cardAiExtrasHtml(request.notes[index], request.notesLabels);
         const value = String(row[field] ?? '');
         // Media markup this writer produced itself (`[sound:…]`, `<img src="…">`) stays markup.
         return MARKUP_COLUMNS.has(name) && MARKUP_VALUE.test(value) ? value : html(value);

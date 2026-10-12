@@ -96,6 +96,8 @@ const OPEN_SECTIONS = new Set([
   // was rejected here while main.ts's own ARGV set accepted it.
   'files',
   'visualnovels',
+  'snips',
+  'conversation',
 ]);
 
 function helperDir(): string {

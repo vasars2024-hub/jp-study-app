@@ -12,12 +12,15 @@ import {
   dismissMany,
   dndUntil,
   getNotifications,
-  isDnd,
+  isManualDnd,
+  loadQuietHours,
   markAllRead,
   msUntilHour,
   onNotificationsChanged,
+  quietHoursEndAt,
   setDnd,
   setDndFor,
+  setQuietHours,
   type NotificationKind,
 } from '../../notificationStore';
 import { groupNotifications } from './notificationGroups';
@@ -126,6 +129,10 @@ export default function NotificationCenter() {
   // shell2: grouped by day, identical notices in a row collapsed with a count.
   const groups = groupNotifications(items);
   const quietUntil = dndUntil();
+  const quietHours = loadQuietHours();
+  const scheduledQuietUntil = quietHoursEndAt();
+  // The switch and the timed periods; the nightly schedule has its own row below.
+  const manualQuiet = isManualDnd();
 
   return (
     <>
@@ -135,7 +142,7 @@ export default function NotificationCenter() {
           <span className="os-flyout-title">{t('notifications.title')}</span>
           <span className="os-flyout-spacer" />
           <Toggle
-            checked={isDnd()}
+            checked={manualQuiet}
             onChange={(e) => setDnd(e.currentTarget.checked)}
             label={t('notifications.quiet')}
           />
@@ -154,7 +161,7 @@ export default function NotificationCenter() {
               ? t('shell2.dnd.until', {
                   time: new Date(quietUntil).toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' }),
                 })
-              : isDnd()
+              : manualQuiet
                 ? t('shell2.dnd.onIndefinite')
                 : t('shell2.dnd.offHint')}
           </span>
@@ -173,6 +180,38 @@ export default function NotificationCenter() {
             {t('shell2.dnd.morning')}
           </button>
           <HelpLink topic="notifications" />
+        </div>
+        <div className="os-notif-quiet os-notif-schedule" role="group" aria-label={t('planner.quiet.label')}>
+          <label className="os-notif-schedule-on">
+            <input
+              type="checkbox"
+              checked={quietHours.on}
+              onChange={(e) => setQuietHours({ on: e.currentTarget.checked })}
+            />
+            <span>{t('planner.quiet.toggle')}</span>
+          </label>
+          <input
+            type="time"
+            className="os-notif-schedule-time"
+            value={quietHours.start}
+            aria-label={t('planner.quiet.from')}
+            onChange={(e) => setQuietHours({ start: e.currentTarget.value })}
+          />
+          <span aria-hidden="true">–</span>
+          <input
+            type="time"
+            className="os-notif-schedule-time"
+            value={quietHours.end}
+            aria-label={t('planner.quiet.to')}
+            onChange={(e) => setQuietHours({ end: e.currentTarget.value })}
+          />
+          {scheduledQuietUntil && !manualQuiet ? (
+            <span className="os-notif-quiet-state type-status">
+              {t('planner.quiet.activeUntil', {
+                time: new Date(scheduledQuietUntil).toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' }),
+              })}
+            </span>
+          ) : null}
         </div>
         <div className="os-flyout-body" role="log" aria-label={t('notifications.listLabel')}>
           {items.length === 0 ? (
@@ -263,7 +302,12 @@ export default function NotificationCenter() {
                           return;
                         }
                         if (n.clientAction === 'restart-to-update') {
-                          void window.api.appUpdateRestart?.();
+                          // Asks first when a restart would cut a recording short.
+                          void import('../../releaseCheck').then((m) => m.restartToUpdate());
+                          return;
+                        }
+                        if (n.clientAction === 'download-cedict') {
+                          void import('../../cedictMissingPrompt').then((m) => m.startCedictDownload());
                           return;
                         }
                         if (n.actionUrl) void window.api.openExternal(n.actionUrl);
@@ -277,7 +321,9 @@ export default function NotificationCenter() {
                             ? t('shortcut.notice.refused.open')
                             : n.clientAction === 'restart-to-update'
                               ? t('install.update.restart')
-                              : t('notifications.openLink')}
+                              : n.clientAction === 'download-cedict'
+                                ? t('risk4.cedict.download')
+                                : t('notifications.openLink')}
                     </button>
                   </div>
                 ) : null}

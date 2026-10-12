@@ -34,7 +34,15 @@ export type ReadingLensSource = (typeof READING_LENS_SOURCES)[number];
 export const READING_LENS_MODES = ['dictionary', 'ai'] as const;
 export type ReadingLensMode = (typeof READING_LENS_MODES)[number];
 
-export type ReadingLensEngine = 'auto' | 'manga' | 'web' | 'none' | 'import';
+/**
+ * `basic` is the bundled offline recognizer (`lensBasicOcr.ts`), used when no
+ * downloaded model is installed; a capture records it so nobody mistakes its
+ * read for one of the accurate engines'.
+ */
+export type ReadingLensEngine = 'auto' | 'manga' | 'web' | 'basic' | 'none' | 'import';
+
+/** Every engine a stored capture may name. */
+export const READING_LENS_CAPTURE_ENGINES: readonly ReadingLensEngine[] = ['auto', 'manga', 'web', 'basic', 'none', 'import'];
 
 export interface ReadingLensLine {
   text: string;
@@ -153,9 +161,7 @@ function sourceOf(value: unknown): ReadingLensSource {
 }
 
 function engineOf(value: unknown, source: ReadingLensSource): ReadingLensEngine {
-  if (value === 'auto' || value === 'manga' || value === 'web' || value === 'none' || value === 'import') {
-    return value;
-  }
+  if (READING_LENS_CAPTURE_ENGINES.includes(value as ReadingLensEngine)) return value as ReadingLensEngine;
   return source === 'screen' ? 'auto' : 'import';
 }
 

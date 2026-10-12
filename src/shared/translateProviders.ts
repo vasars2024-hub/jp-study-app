@@ -239,6 +239,8 @@ export type TranslateFallbackCode =
   | 'rate-limit'
   | 'quota'
   | 'spend'
+  /** This computer has no network connection: nothing was sent. */
+  | 'offline'
   | 'network'
   | 'timeout'
   | 'invalid'
@@ -248,7 +250,7 @@ export type TranslateFallbackCode =
   | 'other';
 
 const FALLBACK_CODES: readonly TranslateFallbackCode[] = [
-  'consent', 'no-key', 'auth', 'rate-limit', 'quota', 'spend', 'network', 'timeout', 'invalid', 'too-long',
+  'consent', 'no-key', 'auth', 'rate-limit', 'quota', 'spend', 'offline', 'network', 'timeout', 'invalid', 'too-long',
   'not-installed', 'unsupported', 'other',
 ];
 
@@ -264,6 +266,7 @@ export const TRANSLATE_FALLBACK_KEYS: Record<TranslateFallbackCode, string> = {
   'rate-limit': 'xlate2.fallback.rateLimit',
   quota: 'xlate2.fallback.quota',
   spend: 'xlate2.fallback.spend',
+  offline: 'xlate2.fallback.offline',
   network: 'xlate2.fallback.network',
   timeout: 'xlate2.fallback.timeout',
   invalid: 'xlate2.fallback.invalid',
@@ -290,6 +293,8 @@ export function translateFallbackCodeFor(code: string | undefined): TranslateFal
     case 'spend-budget':
     case 'cost-budget':
       return 'spend';
+    case 'offline':
+      return 'offline';
     case 'network':
     case 'upstream':
       return 'network';
@@ -326,10 +331,58 @@ export interface TranslateResultMeta {
   fallbackCode?: TranslateFallbackCode;
   /** Which glossary terms the result honours. Absent when no glossary term occurs in the text. */
   glossary?: TranslateGlossaryReport;
+  /**
+   * Every engine that was tried and could not answer, in the order tried, each
+   * with its own reason — the chain behind `fallbackFrom`, which names only the
+   * engine that was asked for.
+   */
+  attempts?: TranslateEngineAttempt[];
+  /** Answered from the in-memory cache: same passage, engine and settings as before. */
+  cached?: boolean;
+  /**
+   * The engine left sentences untranslated even after asking again: `missing`
+   * are their 0-based indices out of `total`. Such a result is never cached.
+   */
+  partial?: TranslatePartialReport;
+}
+
+export interface TranslatePartialReport {
+  missing: number[];
+  total: number;
+}
+
+function partialReport(value: unknown): TranslatePartialReport | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const total = typeof raw.total === 'number' && Number.isInteger(raw.total) && raw.total > 0 ? Math.min(raw.total, 10_000) : 0;
+  if (!total || !Array.isArray(raw.missing)) return null;
+  const missing = raw.missing
+    .filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < total)
+    .slice(0, 512);
+  return missing.length ? { missing, total } : null;
+}
+
+/** One engine that was tried and failed, and why. */
+export interface TranslateEngineAttempt {
+  provider: TranslateProviderId;
+  code: TranslateFallbackCode;
 }
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string').slice(0, 64) : [];
+}
+
+function attemptList(value: unknown): TranslateEngineAttempt[] {
+  if (!Array.isArray(value)) return [];
+  const out: TranslateEngineAttempt[] = [];
+  for (const item of value.slice(0, 8)) {
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as Record<string, unknown>;
+    if (isTranslateProviderId(raw.provider) && isTranslateFallbackCode(raw.code)) {
+      out.push({ provider: raw.provider, code: raw.code });
+    }
+  }
+  return out;
 }
 
 export function sanitizeTranslateResultMeta(value: unknown): TranslateResultMeta | null {
@@ -343,6 +396,11 @@ export function sanitizeTranslateResultMeta(value: unknown): TranslateResultMeta
     const glossary = raw.glossary as Record<string, unknown>;
     meta.glossary = { applied: stringList(glossary.applied), missing: stringList(glossary.missing) };
   }
+  const attempts = attemptList(raw.attempts);
+  if (attempts.length) meta.attempts = attempts;
+  if (raw.cached === true) meta.cached = true;
+  const partial = partialReport(raw.partial);
+  if (partial) meta.partial = partial;
   return meta;
 }
 
@@ -350,13 +408,22 @@ export function sanitizeTranslateResultMeta(value: unknown): TranslateResultMeta
 export interface TranslateRouteFailure {
   provider: TranslateProviderId;
   code: TranslateFallbackCode;
+  /**
+   * Every engine tried, in order, when more than one was: the cloud engine that
+   * failed and then the offline model that could not stand in, each with its
+   * own reason, so the message names both instead of only the last.
+   */
+  attempts?: TranslateEngineAttempt[];
 }
 
 export function sanitizeTranslateRouteFailure(value: unknown): TranslateRouteFailure | null {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
   if (!isTranslateProviderId(raw.provider) || !isTranslateFallbackCode(raw.code)) return null;
-  return { provider: raw.provider, code: raw.code };
+  const attempts = attemptList(raw.attempts);
+  return attempts.length > 1
+    ? { provider: raw.provider, code: raw.code, attempts }
+    : { provider: raw.provider, code: raw.code };
 }
 
 // ---------------------------------------------------------------------------
@@ -380,6 +447,20 @@ export const CLOUD_TRANSLATE_MAX_CHARS = 6_000;
  * shows, and the one-line-per-sentence answer is what lets a streamed reply be
  * displayed sentence by sentence as it arrives.
  */
+/** What a careful translator watches for in this source language (no Japanese assumptions for zh/ru). */
+function sourceLanguageGuidance(source: string): string {
+  const base = String(source).toLowerCase().split('-')[0];
+  if (base === 'ja') {
+    return 'keep the speaker\'s politeness level (keigo, casual speech), render counters, idioms '
+      + 'and onomatopoeia by meaning rather than word for word.';
+  }
+  if (base === 'zh') {
+    return 'keep the speaker\'s register (formal or colloquial), render measure words, aspect particles '
+      + '(了, 过, 着), chengyu and other idioms by meaning rather than word for word.';
+  }
+  return 'keep the speaker\'s register (formal or casual speech) and render idioms by meaning rather than word for word.';
+}
+
 export function buildCloudTranslatePrompt(
   sentences: readonly string[],
   source: string,
@@ -397,8 +478,7 @@ export function buildCloudTranslatePrompt(
     : '';
   return (
     `Translate this ${src} passage into ${tgt}. Read the whole passage first: recover omitted subjects and `
-    + 'objects from context, keep the speaker\'s politeness level (keigo, casual speech), render counters, idioms '
-    + `and onomatopoeia by meaning rather than word for word. ${how}\n`
+    + `objects from context, ${sourceLanguageGuidance(source)} ${how}\n`
     + terms
     + `Answer with exactly one line per numbered sentence, in the form [n] translation, keeping the numbers, `
     + 'and nothing else.\n\n'

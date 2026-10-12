@@ -47,6 +47,7 @@ import {
 import { t as translateUi, useT } from '../renderer/i18n';
 import { getChineseScript, getStudyLang } from '../renderer/studyEnvironment';
 import { studyLangTag } from '../shared/studyLang';
+import { aiErrorKey } from '../shared/aiErrorCodes';
 import {
   loadWhisperDevice,
   loadWhisperModelTier,
@@ -115,7 +116,7 @@ import {
 import { decideExternalSubtitleMount } from '../shared/externalSubtitleMount';
 import { decodeSubtitleBytes } from '../shared/subtitleDecode';
 import { youtubeIdentityFromPath } from '../shared/youtubeDownloadFiles';
-import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
+import { isRollingCaptionTrack, parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
 import {
   minedCueKey,
   type VideoCoreMineRequest,
@@ -175,6 +176,18 @@ import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../renderer/subtitlesEx
 import { useLineLevel } from '../renderer/lineLevel';
 import { recordLinesStudied, recordStudyTime } from '../renderer/stats';
 import { openSentenceDeckDialog } from '../renderer/components/sentenceDeck/SentenceDeckDialog';
+
+/**
+ * The episode brief and quiz (summary, comprehension questions, i+1 lines) in the AI
+ * workspace. Its own chunk: nothing of it loads until the block is drawn.
+ */
+const MediaBriefPanel = React.lazy(() => import('../renderer/components/media/MediaBriefPanel'));
+
+/**
+ * Shadowing feedback (docs/AI_AUDIT.md N18): the take transcribed by the local Whisper
+ * model and compared with the line. Its own chunk, loaded once a take exists.
+ */
+const ShadowingFeedback = React.lazy(() => import('../renderer/components/speak/ShadowingFeedback'));
 
 /** A dictation answer scoring under this percentage goes on the session's missed-lines list. */
 const DICTATION_MISSED_BELOW = 80;
@@ -798,6 +811,7 @@ export default function VideoCoreStudyOverlay({
     auto: preferences.grammarHighlight && playerPaused,
     offline: preferences.grammarHighlight,
     errorLabel: t('mediaWorkspace.study.grammarError'),
+    describeError: (code) => t(aiErrorKey(code)),
   });
   const annotated = preferences.grammarHighlight && cueAnalysis.state.kind === 'ready'
     ? cueAnalysis.state.result
@@ -1261,6 +1275,13 @@ export default function VideoCoreStudyOverlay({
         const split = parseStudySubtitles(pick.text);
         const parsed = split.cues;
         if (!parsed.length) return;
+        // YouTube's speech recognition, not a person, wrote this track: say so once, so a
+        // misheard word is checked against the audio before it becomes a card.
+        if (isRollingCaptionTrack(pick.text)) {
+          window.dispatchEvent(new CustomEvent('os:toast', {
+            detail: { message: t('yt5.player.autoCaptions'), kind: 'warn' },
+          }));
+        }
 
         // The element's own duration is the best runtime available, and by the time the
         // grace window has elapsed it is loaded. A failure here costs the correction, not
@@ -3190,6 +3211,25 @@ export default function VideoCoreStudyOverlay({
    * No layout code changes — that is the "new blocks without redesigning the player"
    * acceptance criterion, made structural.
    */
+  /** The study track as plain seconds-and-text lines, for the episode brief. */
+  const briefCues = React.useMemo(
+    () => allCues.map((cue) => ({
+      start: cue.startMs / 1000,
+      end: cue.endMs / 1000,
+      text: stripAssCueText(cue.text),
+    })),
+    [allCues],
+  );
+  /** The cue a brief entry names (by its start), or the nearest one. */
+  const briefCueAt = React.useCallback((sec: number): VideoCoreActiveCue | null => {
+    const target = Math.round(sec * 1000);
+    let best: VideoCoreActiveCue | null = null;
+    for (const cue of allCuesRef.current) {
+      if (!best || Math.abs(cue.startMs - target) < Math.abs(best.startMs - target)) best = cue;
+    }
+    return best;
+  }, []);
+
   const miningPanel = (
     <VideoCoreMiningPanel
       cue={studyCue}
@@ -3218,6 +3258,7 @@ export default function VideoCoreStudyOverlay({
         selectedIndex={selectedAnnotation}
         onSelectedIndexChange={setSelectedAnnotation}
         onAnalyzeNow={cueAnalysis.analyzeNow}
+        onReanalyze={cueAnalysis.reanalyze}
         mineContext={grammarMineContext}
         onLookup={(surface, context) => {
           // Anchored to the grammar block's own edge, not the middle of the screen:
@@ -3380,6 +3421,17 @@ export default function VideoCoreStudyOverlay({
             src={shadowAudioUrl}
           />
         )}
+        {shadowAudioUrl && !shadowRecording && (
+          <React.Suspense fallback={null}>
+            <ShadowingFeedback
+              audioUrl={shadowAudioUrl}
+              expected={plainText}
+              cueSec={Math.max(0, (studyCue.endMs - studyCue.startMs) / 1000)}
+              studyLang={studyLang}
+              onReplayOriginal={() => replayCue(studyCue)}
+            />
+          </React.Suspense>
+        )}
         {shadowError && (
           <p className="study-shadowing-error" role="alert">{shadowError}</p>
         )}
@@ -3403,6 +3455,24 @@ export default function VideoCoreStudyOverlay({
         translation={translation}
         translationBusy={translationBusy}
         onTranslate={() => void translateCue()}
+        episode={briefCues.length > 0 ? (
+          <React.Suspense fallback={null}>
+            <MediaBriefPanel
+              cues={briefCues}
+              title={mediaName}
+              studyLang={studyLang}
+              variant="post"
+              onSeek={(sec) => {
+                const cue = briefCueAt(sec);
+                if (cue) seekTranscriptCue(cue);
+              }}
+              onMineLine={(line) => {
+                const cue = briefCueAt(line.start);
+                if (cue) mineLine({ cue, target: { surface: line.target } });
+              }}
+            />
+          </React.Suspense>
+        ) : null}
         analysis={(
           <VideoCoreGrammarPanel
             state={cueAnalysis.state}
@@ -3410,6 +3480,7 @@ export default function VideoCoreStudyOverlay({
             selectedIndex={selectedAnnotation}
             onSelectedIndexChange={setSelectedAnnotation}
             onAnalyzeNow={cueAnalysis.analyzeNow}
+            onReanalyze={cueAnalysis.reanalyze}
             mineContext={grammarMineContext}
             onLookup={(surface, context) => setPopup({
               query: surface,

@@ -1,0 +1,288 @@
+/*
+ * lock3 — the study panel, the "answer a card" step and the recovery form on
+ * every lock screen skin. Base rules inherit the skin's text colour; each skin
+ * adds only its accent (win11 glass, Aero/Vista logon blue, WIRED terminal
+ * cyan, Blanc's flat ink). No backdrop filters: the lock must paint on the
+ * flattened tiers too.
+ */
+.lockscreen-study,
+.lockscreen-challenge,
+.lockscreen-recovery {
+  box-sizing: border-box;
+  width: min(340px, 100%);
+  margin: 14px auto 0;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.lockscreen-study-due {
+  margin: 0;
+  opacity: 0.86;
+}
+
+.lockscreen-study-card {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.lockscreen-study-kicker {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.lockscreen-study-front,
+.lockscreen-challenge-front {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.lockscreen-study-back {
+  display: grid;
+  gap: 2px;
+}
+
+.lockscreen-study-reading {
+  opacity: 0.8;
+}
+
+.lockscreen-study-reveal,
+.lockscreen-challenge-btn,
+.lockscreen-challenge-option,
+.lockscreen-recovery-link,
+.lockscreen-recovery-actions button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lockscreen-study-reveal:focus-visible,
+.lockscreen-challenge-btn:focus-visible,
+.lockscreen-challenge-option:focus-visible,
+.lockscreen-recovery-link:focus-visible,
+.lockscreen-recovery-actions button:focus-visible,
+.lockscreen-recovery-input:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.lockscreen-challenge-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.lockscreen-challenge-note {
+  margin: 6px 0;
+  opacity: 0.86;
+}
+
+.lockscreen-challenge-options {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.lockscreen-challenge-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: start;
+}
+
+.lockscreen-challenge-option kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 5px;
+  font: 600 11px/1 var(--font-mono, monospace);
+  opacity: 0.8;
+}
+
+.lockscreen-challenge-option.is-right {
+  border-color: #3fb27f;
+  background: color-mix(in srgb, #3fb27f 22%, transparent);
+}
+
+.lockscreen-challenge-option.is-wrong {
+  border-color: #e0605a;
+  background: color-mix(in srgb, #e0605a 20%, transparent);
+}
+
+.lockscreen-challenge-option.is-answer {
+  border-color: #3fb27f;
+}
+
+.lockscreen-challenge-btn {
+  margin: 8px 4px 0;
+}
+
+.lockscreen-challenge-btn.is-primary {
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  font-weight: 600;
+}
+
+.lockscreen-challenge-back {
+  margin: 8px 0 0;
+  font-size: 15px;
+}
+
+.lockscreen-challenge-status,
+.lockscreen-recovery-status {
+  min-height: 1.45em;
+  margin: 6px 0 0;
+}
+
+.lockscreen-recovery-link {
+  border-color: transparent;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.85;
+}
+
+.lockscreen-recovery {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.lockscreen-recovery-hint {
+  margin: 0;
+  opacity: 0.86;
+}
+
+.lockscreen-recovery-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  color: inherit;
+  font: 600 15px/1.2 var(--font-mono, monospace);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.lockscreen-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* --- Skins ---------------------------------------------------------------- */
+
+/* Study OS (Win11-style): soft glass card under the PIN pad. */
+.lockscreen-study--win11 .lockscreen-study-card,
+.lockscreen-challenge--win11 {
+  border-radius: 14px;
+}
+.lockscreen-challenge--win11 {
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Aero (Vista / 7 logon): the glossy blue logon button look. */
+.lockscreen-challenge--aero .lockscreen-challenge-option,
+.lockscreen-challenge--aero .lockscreen-challenge-btn,
+.lockscreen-recovery--aero .lockscreen-recovery-actions button,
+.lockscreen-study--aero .lockscreen-study-reveal {
+  border-color: rgba(160, 210, 255, 0.55);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(120, 180, 240, 0.55) 0%, rgba(40, 100, 170, 0.6) 50%, rgba(20, 70, 140, 0.7) 51%, rgba(50, 120, 200, 0.6) 100%);
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+}
+.lockscreen-study--aero .lockscreen-study-card {
+  border-color: rgba(190, 225, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(10, 40, 80, 0.35);
+}
+.lockscreen-recovery--aero .lockscreen-recovery-input {
+  border-color: rgba(170, 200, 230, 0.8);
+  border-radius: 3px;
+  background: #fff;
+  color: #1a2b3c;
+}
+
+/* WIRED (Lain / Navi terminal): square, monospaced, cyan on black. */
+.lockscreen-study--wired,
+.lockscreen-challenge--wired,
+.lockscreen-recovery--wired {
+  /* The terminal panel has no padding of its own: each block brings the 28px gutter. */
+  width: 100%;
+  margin: 0;
+  padding: 0 28px 16px;
+  font-family: var(--font-mono, monospace);
+  text-align: start;
+  justify-items: start;
+}
+.lockscreen-study--wired .lockscreen-study-card,
+.lockscreen-challenge--wired .lockscreen-challenge-option,
+.lockscreen-challenge--wired .lockscreen-challenge-btn,
+.lockscreen-recovery--wired .lockscreen-recovery-actions button,
+.lockscreen-recovery--wired .lockscreen-recovery-input,
+.lockscreen-study--wired .lockscreen-study-reveal {
+  border-radius: 0;
+  border-color: color-mix(in srgb, var(--wired-cyan, #6ef2ff) 55%, transparent);
+  background: rgba(0, 20, 28, 0.6);
+}
+.lockscreen-study--wired .lockscreen-study-due::before,
+.lockscreen-challenge--wired .lockscreen-challenge-title::before {
+  content: '> ';
+  opacity: 0.7;
+}
+.lockscreen-wired-clock-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  opacity: 0.6;
+}
+
+/* Blanc: flat and quiet, the app's own ink. */
+.lockscreen-study--blanc .lockscreen-study-card,
+.lockscreen-challenge--blanc .lockscreen-challenge-option,
+.lockscreen-challenge--blanc .lockscreen-challenge-btn,
+.lockscreen-recovery--blanc .lockscreen-recovery-actions button,
+.lockscreen-recovery--blanc .lockscreen-recovery-input,
+.lockscreen-study--blanc .lockscreen-study-reveal {
+  border-radius: 2px;
+  background: transparent;
+}
+
+/* The floating widget is small: the challenge fits its width. */
+.lockscreen-challenge--widget,
+.lockscreen-recovery--widget {
+  width: 100%;
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lockscreen-challenge-option {
+    transition: none;
+  }
+}

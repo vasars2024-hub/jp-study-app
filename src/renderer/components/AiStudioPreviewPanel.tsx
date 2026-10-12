@@ -10,11 +10,12 @@ import { buildAiFormatSampleValues, buildAiPromptPreview, renderAiTemplate } fro
 import type { StudyProfile } from '../../shared/profiles';
 import { useT } from '../i18n';
 
-function FormatFacePreview({ label, text, emptyLabel }: { label: string; text: string; emptyLabel: string }) {
+function FormatFacePreview({ label, text, emptyLabel, lang }: { label: string; text: string; emptyLabel: string; lang: string }) {
   return (
     <div className="ai-format-face">
       <div className="card-preview-face-label">{label}</div>
-      <pre className="ai-format-face-body" lang="ja">
+      {/* The deck's own language, so a Chinese card renders with the Chinese CJK font. */}
+      <pre className="ai-format-face-body" lang={lang}>
         {text || emptyLabel}
       </pre>
     </div>
@@ -47,13 +48,13 @@ export default function AiStudioPreviewPanel({
       reverse: aiConfig.reverse,
       backGlossLangs: aiConfig.backGlossLangs,
     };
-    const values = buildAiFormatSampleValues(preset.id, langOptions);
+    const values = buildAiFormatSampleValues(preset.id, langOptions, mappingProfile.targetLang);
     return {
       label: template.label,
       front: renderAiTemplate(template.front, values),
       back: renderAiTemplate(template.back, values),
     };
-  }, [template, preset.id, aiConfig.frontLang, aiConfig.backLang, aiConfig.reverse, aiConfig.backGlossLangs]);
+  }, [template, preset.id, aiConfig.frontLang, aiConfig.backLang, aiConfig.reverse, aiConfig.backGlossLangs, mappingProfile.targetLang]);
 
   const promptText = useMemo(
     () =>
@@ -86,6 +87,7 @@ export default function AiStudioPreviewPanel({
   );
 
   const emptyFace = t('aiStudio.preview.emptyFace');
+  const cardLang = mappingProfile.targetLang || 'ja';
 
   return (
     <aside className="ai-studio-preview-column">
@@ -98,8 +100,8 @@ export default function AiStudioPreviewPanel({
         </div>
         {formatPreview ? (
           <div className="card-preview-pair">
-            <FormatFacePreview label={t('aiStudio.preview.front')} text={formatPreview.front} emptyLabel={emptyFace} />
-            <FormatFacePreview label={t('aiStudio.preview.back')} text={formatPreview.back} emptyLabel={emptyFace} />
+            <FormatFacePreview label={t('aiStudio.preview.front')} text={formatPreview.front} emptyLabel={emptyFace} lang={cardLang} />
+            <FormatFacePreview label={t('aiStudio.preview.back')} text={formatPreview.back} emptyLabel={emptyFace} lang={cardLang} />
           </div>
         ) : (
           <p className="muted">{t('aiStudio.preview.noTemplate')}</p>

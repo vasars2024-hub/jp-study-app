@@ -92,27 +92,71 @@ const PRESET_SAMPLE_PATCHES: Record<string, Partial<Record<string, string>>> = {
   },
 };
 
+/** Chinese samples, so a Chinese preset's preview shows a Chinese card, not 勉強する. */
+const ZH_BASE_SAMPLES: Record<string, string> = {
+  expression: '学习',
+  reading: 'xuéxí',
+  meaning: 'to study; to learn',
+  meaningRu: 'учиться, изучать',
+  meaningZh: '学习',
+  translation: 'учиться, изучать',
+  nuance: 'Everyday verb; neutral register.',
+  sentence: '我每天学习中文。',
+  sentenceTranslationEn: 'I study Chinese every day.',
+  sentenceTranslationRu: 'Я учу китайский каждый день.',
+  sentenceTranslationZh: '我每天学习中文。',
+  grammarBreakdown: '学习 (verb) · 每天 + 学习 + 中文',
+  culturalContext: 'HSK 1',
+  properNameNotes: '',
+  toponymNotes: '',
+  frequency: 'SUBTLEX-CH: #312',
+  'cloze-before': '我每天',
+  'cloze-after': '中文。',
+};
+
+const ZH_IDIOM_SAMPLES: Record<string, string> = {
+  ...ZH_BASE_SAMPLES,
+  expression: '画蛇添足',
+  reading: 'huà shé tiān zú',
+  meaning: 'to ruin something by adding what is not needed',
+  meaningRu: 'испортить лишним добавлением',
+  meaningZh: '多此一举',
+  nuance: 'Mildly critical; used about unnecessary additions.',
+  sentence: '这句话已经很清楚了，再解释就是画蛇添足。',
+  sentenceTranslationEn: 'The sentence is already clear; explaining more would be overdoing it.',
+  grammarBreakdown: '画 draw · 蛇 snake · 添 add · 足 feet',
+  culturalContext: 'From the Warring States anthology 战国策.',
+  'cloze-before': '这句话已经很清楚了，再解释就是',
+  'cloze-after': '。',
+};
+
 function isIdiomPreset(presetId?: string): boolean {
   return Boolean(
     presetId?.includes('idiom') ||
       presetId?.includes('slang') ||
       presetId?.includes('proverb') ||
-      presetId?.includes('internet'),
+      presetId?.includes('internet') ||
+      presetId?.includes('chengyu'),
   );
 }
 
-/** Representative AI field values for format / prompt previews in the studio UI. */
+/**
+ * Representative AI field values for format / prompt previews in the studio UI.
+ * `studyLang` is the deck's language: a Chinese deck previews Chinese samples.
+ */
 export function buildAiFormatSampleValues(
   presetId?: string,
   langOptions?: AiLanguageOptions,
+  studyLang?: string,
 ): Record<string, string> {
   const { front, back } = effectiveLanguagePair(normalizeLanguageOptions(langOptions ?? DEFAULT_AI_LANGUAGE_OPTIONS));
-  const core = {
-    ...(isIdiomPreset(presetId) ? IDIOM_SAMPLES : BASE_SAMPLES),
-    ...(presetId ? PRESET_SAMPLE_PATCHES[presetId] : {}),
-  };
-
-  const values: Record<string, string> = { ...core };
+  const zh = studyLang?.trim().toLowerCase().startsWith('zh') ?? false;
+  const values: Record<string, string> = zh
+    ? { ...(isIdiomPreset(presetId) ? ZH_IDIOM_SAMPLES : ZH_BASE_SAMPLES) }
+    : {
+        ...(isIdiomPreset(presetId) ? IDIOM_SAMPLES : BASE_SAMPLES),
+        ...(presetId ? PRESET_SAMPLE_PATCHES[presetId] : {}),
+      } as Record<string, string>;
   values.translation = values.translation || values.meaningRu || values.meaning;
 
   if (front === 'ru') {
@@ -157,6 +201,12 @@ export interface AiPromptPreviewInput {
 /** English names of the study languages, for prompts. */
 const TARGET_LANGUAGE_NAME: Readonly<Record<string, string>> = { ja: 'Japanese', zh: 'Chinese (Mandarin)', ru: 'Russian' };
 
+/** What "reading" means per study language, so a Chinese card gets pinyin, not kana. */
+const READING_FIELD: Readonly<Record<string, string>> = {
+  ja: 'reading (kana)',
+  zh: 'reading (pinyin with tone marks)',
+};
+
 export function buildAiPromptPreview(input: AiPromptPreviewInput): string {
   const langOptions = normalizeLanguageOptions(input.langOptions);
   const { front, back } = effectiveLanguagePair(langOptions);
@@ -186,7 +236,7 @@ export function buildAiPromptPreview(input: AiPromptPreviewInput): string {
       avoidNote +
       // The deck's own language: a Chinese or Russian profile invents Chinese or Russian items.
       `Generate exactly ${wordCount} distinct ${TARGET_LANGUAGE_NAME[targetLang] ?? 'Japanese'} items that fit this preset.\n` +
-      `Each item needs a natural example sentence, reading, English meaning, Russian meaning (meaningRu), ` +
+      `Each item needs a natural example sentence, ${READING_FIELD[targetLang] ?? 'reading'}, English meaning, Russian meaning (meaningRu), ` +
       `Chinese meaning when useful (meaningZh), and sentence translations.\n` +
       `Do not repeat expressions. Prefer useful study material over obscure trivia.\n\n` +
       `Active front template: ${input.templateFront}\n` +
@@ -196,7 +246,7 @@ export function buildAiPromptPreview(input: AiPromptPreviewInput): string {
     );
   }
 
-  const samples = buildAiFormatSampleValues(input.preset.id, langOptions);
+  const samples = buildAiFormatSampleValues(input.preset.id, langOptions, targetLang);
   const req = input.sampleTerm ?? {
     term: samples.expression,
     reading: samples.reading,
@@ -219,7 +269,7 @@ export function buildAiPromptPreview(input: AiPromptPreviewInput): string {
     `Provide English meaning in "meaning", Russian in "meaningRu", Chinese in "meaningZh".\n` +
     `Provide sentence translations in sentenceTranslationEn/Ru/Zh.\n\n` +
     `Target term: ${req.term}\n` +
-    `Reading: ${req.reading ?? ''}\n` +
+    `Reading${targetLang === 'zh' ? ' (pinyin with tone marks)' : ''}: ${req.reading ?? ''}\n` +
     `Sentence context: ${req.sentence ?? ''}\n` +
     `Book title: ${req.bookTitle ?? ''}\n` +
     `Frequency ranks: {}\n` +

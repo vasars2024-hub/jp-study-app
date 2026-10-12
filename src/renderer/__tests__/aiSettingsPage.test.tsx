@@ -23,7 +23,7 @@ import {
   resetAiSetupClientForTests,
 } from '../aiSetupClient';
 import { loadLocalAgentSettings } from '../localAgentSettingsStore';
-import type { AiSetupStatus } from '../../shared/aiSetup';
+import { pendingAiSetupStatus, type AiSetupStatus } from '../../shared/aiSetup';
 import { en } from '../../shared/i18n/catalogs';
 
 let host: HTMLDivElement;
@@ -55,7 +55,16 @@ function installApi(): void {
     },
     aiSetProvider: async (providerId: string) => {
       calls.push(['aiSetProvider', providerId]);
+      current = { ...current, providerId: providerId as AiSetupStatus['providerId'] };
       return {};
+    },
+    aiSetupUpdate: async (patch: Record<string, unknown>) => {
+      calls.push(['aiSetupUpdate', patch]);
+      return current;
+    },
+    aiSetupTestConnection: async (providerId: string) => {
+      calls.push(['aiSetupTestConnection', providerId]);
+      return { ok: false, code: 'authentication', status: 401 };
     },
     agentSpendLoad: async () => ({ ok: false, code: 'bridge-unavailable' }),
     onAgentSpendChanged: () => () => undefined,
@@ -77,6 +86,13 @@ async function render(): Promise<void> {
   await act(async () => { await Promise.resolve(); });
 }
 
+/** A plain (non-plural) English catalog string. */
+function enText(key: string): string {
+  const entry = en[key];
+  if (typeof entry !== 'string') throw new Error(`no plain catalog string "${key}"`);
+  return entry;
+}
+
 function button(text: string): HTMLButtonElement {
   const found = [...host.querySelectorAll('button')].find((node) => node.textContent?.includes(text));
   if (!found) throw new Error(`no button "${text}"`);
@@ -90,6 +106,7 @@ beforeEach(() => {
   document.documentElement.removeAttribute('data-ai-off');
   calls.length = 0;
   current = {
+    ...pendingAiSetupStatus(),
     enabled: true,
     engine: 'local-qwen',
     providerId: 'gemini-2.5-flash',
@@ -157,8 +174,78 @@ describe('Settings > AI', () => {
 
   it('writes the engine through the one app-wide owner', async () => {
     await render();
-    await act(async () => { button(en['settings.ai.engine.cloud']).click(); });
+    await act(async () => { button(enText('settings.ai.engine.cloud')).click(); });
     expect(calls).toContainEqual(['aiSetEngine', 'cloud']);
+  });
+
+  it('says so when main refuses a write, instead of swallowing it', async () => {
+    (window as unknown as { api: Record<string, unknown> }).api.aiSetEngine = async () => {
+      throw new Error('refused');
+    };
+    await render();
+    await act(async () => { button(enText('settings.ai.engine.cloud')).click(); });
+    expect(host.querySelector('[data-testid="ai-save-failed"]')?.textContent).toBe(en['aiProv.saveFailed']);
+  });
+});
+
+describe('Settings > AI: providers, models, test, cloud opt-ins', () => {
+  async function select(testId: string, value: string): Promise<void> {
+    const node = host.querySelector<HTMLSelectElement>(`[data-testid="${testId}"]`)!;
+    await act(async () => {
+      node.value = value;
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => { await Promise.resolve(); });
+  }
+
+  it('offers every vendor, and Claude\'s three models once Anthropic is picked', async () => {
+    await render();
+    const vendors = [...host.querySelector<HTMLSelectElement>('[data-testid="ai-vendor"]')!.options].map((o) => o.value);
+    expect(vendors).toEqual(['gemini', 'deepseek', 'anthropic', 'openai', 'openai-compatible']);
+    await select('ai-vendor', 'anthropic');
+    // The cheapest model is the default for a new vendor.
+    expect(calls).toContainEqual(['aiSetProvider', 'claude-haiku-5-5']);
+    const models = [...host.querySelector<HTMLSelectElement>('[data-testid="ai-model"]')!.options].map((o) => o.value);
+    expect(models).toEqual(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
+    expect(host.querySelector('[data-testid="ai-model-hint"]')?.textContent).toBe(en['aiProv.modelHint.haiku']);
+  });
+
+  it('sets up a local server from a preset, with no key required', async () => {
+    current = { ...current, providerId: 'openai-compatible' };
+    await render();
+    await act(async () => { button('Ollama').click(); });
+    expect(calls).toContainEqual(['aiSetupUpdate', { compatBaseUrl: 'http://localhost:11434/v1' }]);
+    expect(host.textContent).toContain(en['aiProv.key.optional'] as string);
+  });
+
+  it('tests the connection and names the failure in the UI language', async () => {
+    current = { ...current, engine: 'cloud', apiKeysSet: { gemini: true, deepseek: false } };
+    await render();
+    await act(async () => { host.querySelector<HTMLButtonElement>('[data-testid="ai-test-connection"]')!.click(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(calls).toContainEqual(['aiSetupTestConnection', 'gemini-2.5-flash']);
+    expect(host.querySelector('[data-testid="ai-test-result"]')?.textContent)
+      .toBe(`${en['aiProv.error.authentication']} (HTTP 401)`);
+  });
+
+  it('lists the per-feature cloud opt-ins with their defaults, and writes a change', async () => {
+    await render();
+    const subtitle = host.querySelector<HTMLInputElement>('[data-testid="ai-cloud-subtitleTranslate"]')!;
+    expect(subtitle.checked).toBe(false);
+    expect(host.querySelector<HTMLInputElement>('[data-testid="ai-cloud-cardGen"]')!.checked).toBe(true);
+    await act(async () => { subtitle.click(); });
+    expect(calls).toContainEqual(['aiSetupUpdate', { cloudFeatures: { subtitleTranslate: true } }]);
+  });
+
+  it('gives each optional study helper its own cloud toggle, off by default', async () => {
+    await render();
+    for (const id of ['whyWrong', 'exampleSentences', 'leechRescue', 'contextExplain']) {
+      const toggle = host.querySelector<HTMLInputElement>(`[data-testid="ai-cloud-${id}"]`);
+      expect(toggle, id).not.toBeNull();
+      expect(toggle?.checked, id).toBe(false);
+    }
+    await act(async () => { host.querySelector<HTMLInputElement>('[data-testid="ai-cloud-leechRescue"]')?.click(); });
+    expect(calls).toContainEqual(['aiSetupUpdate', { cloudFeatures: { leechRescue: true } }]);
   });
 });
 

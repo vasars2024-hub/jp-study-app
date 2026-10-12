@@ -19,6 +19,7 @@ describe('ReadingLens confidence chrome', () => {
         onAskAgent={() => undefined}
         visualNovelSaveState="idle"
         onSaveToVisualNovel={() => undefined}
+        onOpenRead={() => undefined}
       />,
     );
 

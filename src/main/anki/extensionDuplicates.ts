@@ -10,13 +10,16 @@
  * word where `canAddNotes` never looks, so for that target the check is a
  * read-only `findNotes` on that field within the note type instead.
  */
-import { invoke, isUnreachable } from './client';
+import { invoke, invokeMulti, isUnreachable } from './client';
 import { escapeForAnki } from './fieldMapper';
+import { getModelFieldNames, isModelMissingError } from './modelFields';
 
 export interface DuplicateCheckResult {
   ok: boolean;
   /** term -> true when Anki already has a note with that sort field. */
   duplicates: Record<string, boolean>;
+  /** The target's note type does not exist in this collection (so nothing is a duplicate). */
+  missingModel?: boolean;
   error?: string;
   unreachable?: boolean;
 }
@@ -62,7 +65,16 @@ export async function checkAnkiDuplicates(
   const list = [...new Set(terms.map((t) => String(t || '').trim()).filter(Boolean))].slice(0, 50);
   if (!list.length || !target.deckName || !target.modelName) return { ok: true, duplicates: {} };
   try {
-    const fields = (await invoke('modelFieldNames', { modelName: target.modelName })) ?? [];
+    let fields: string[];
+    try {
+      fields = await getModelFieldNames(target.modelName);
+    } catch (err) {
+      // A note type the collection does not have holds no notes: nothing is a
+      // duplicate there. Answered (and cached by modelFields.ts), so a marker
+      // that re-renders does not ask again.
+      if (isModelMissingError(err)) return { ok: true, duplicates: {}, missingModel: true };
+      throw err;
+    }
     const sortField = fields[0];
     if (!sortField) return { ok: false, duplicates: {}, error: 'model has no fields' };
     const termField = target.termField && fields.includes(target.termField) ? target.termField : sortField;
@@ -70,11 +82,16 @@ export async function checkAnkiDuplicates(
     if (termField !== sortField) {
       // Same scope as `canAddNotes`' default (the whole collection, this note
       // type), only on the field the profile actually writes the term into.
-      for (const term of list) {
-        const query = `${ankiSearchLiteral('note', target.modelName)} ${ankiSearchLiteral(termField, term)}`;
-        const ids = await invoke('findNotes', { query });
-        duplicates[term] = Array.isArray(ids) && ids.length > 0;
-      }
+      // One `multi` request for every term, not one request per term.
+      const outcomes = await invokeMulti(list.map((term) => ({
+        action: 'findNotes' as const,
+        params: { query: `${ankiSearchLiteral('note', target.modelName)} ${ankiSearchLiteral(termField, term)}` },
+      })));
+      list.forEach((term, i) => {
+        const outcome = outcomes[i];
+        if (!outcome.ok) throw outcome.error;
+        duplicates[term] = Array.isArray(outcome.result) && outcome.result.length > 0;
+      });
       return { ok: true, duplicates };
     }
     const verdicts = await invoke('canAddNotes', {

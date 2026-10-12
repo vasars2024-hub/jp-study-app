@@ -34,6 +34,15 @@ export const AGENT_UNDO_SUPPORTED_OPERATIONS: ReadonlySet<AgentToolOperationId> 
   'flashcard.delete-deck',
   'calendar.delete-event',
   'media.delete-item',
+  // The one RESTORING inverse: a calendar move put back. It does not remove, so its check
+  // after running is the adapter's own (it refuses when the event moved since), not
+  // "no id survives".
+  'calendar.reschedule-event',
+]);
+
+/** Inverses that put something back rather than remove what was created. */
+export const AGENT_UNDO_RESTORING_OPERATIONS: ReadonlySet<AgentToolOperationId> = new Set([
+  'calendar.reschedule-event',
 ]);
 
 /**
@@ -52,7 +61,10 @@ export const AGENT_UNDO_SUPPORTED_OPERATIONS: ReadonlySet<AgentToolOperationId> 
 export function agentUndoInvocations(
   operation: AgentToolOperationId,
   entityIds: readonly string[],
+  recorded?: ReadonlyArray<Readonly<Record<string, unknown>>>,
 ): Array<Record<string, unknown>> {
+  // An inverse whose arguments the forward adapter returned (a move) runs exactly those.
+  if (recorded?.length) return recorded.map((call) => ({ ...call }));
   if (operation === 'flashcard.delete-cards') return [{ ids: [...entityIds] }];
   if (operation === 'flashcard.delete-deck') return entityIds.map((name) => ({ name }));
   return entityIds.map((id) => ({ id }));
@@ -71,6 +83,8 @@ export interface AgentUndoTarget {
   operation: AgentToolOperationId;
   entityType: string;
   entityIds: readonly string[];
+  /** Recorded inverse arguments (a move's way back); absent for id-derived inverses. */
+  arguments?: ReadonlyArray<Readonly<Record<string, unknown>>>;
 }
 
 export type AgentUndoResolution =
@@ -142,7 +156,7 @@ export function resolveAgentUndo(
     {
       callId: `undo-${operationId}`,
       operation: inverse.operation,
-      arguments: agentUndoInvocations(inverse.operation, inverse.entityIds)[0] ?? {},
+      arguments: agentUndoInvocations(inverse.operation, inverse.entityIds, inverse.arguments)[0] ?? {},
     },
     permission,
     allowedOperations,
@@ -156,6 +170,7 @@ export function resolveAgentUndo(
       operation: inverse.operation,
       entityType: inverse.entityType,
       entityIds: [...inverse.entityIds],
+      ...(inverse.arguments ? { arguments: inverse.arguments.map((call) => ({ ...call })) } : {}),
     },
   };
 }

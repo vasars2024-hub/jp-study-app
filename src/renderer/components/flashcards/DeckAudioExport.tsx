@@ -8,6 +8,7 @@
  * than the number of cards it hoped to write.
  */
 import { useState } from 'react';
+import { cardAiExtrasLabels } from '../../../shared/cardAiExtrasHtml';
 import { loadDeck } from '../../flashcardDeck';
 import { runDeckAudioExport, type DeckMediaExportOutcome } from '../../deckMediaExport';
 import { useT } from '../../i18n';
@@ -28,6 +29,7 @@ export default function DeckAudioExport() {
       setOutcome(await runDeckAudioExport(loadDeck(), 'deck.csv', ',', {
         includeImages: true,
         includeSchedule: keepSchedule,
+        notesLabels: cardAiExtrasLabels(t),
       }));
     } catch (error) {
       setOutcome({

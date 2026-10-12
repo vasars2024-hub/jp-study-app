@@ -68,6 +68,7 @@ export type AgentToolOperationId =
   | 'calendar.schedule-session'
   | 'calendar.schedule-sessions'
   | 'calendar.create-reminder'
+  | 'calendar.reschedule-event'
   | 'calendar.delete-event'
   | 'settings.read'
   | 'settings.change-preference'
@@ -142,6 +143,7 @@ const REQUIRED_ARGUMENTS: Partial<Record<AgentToolOperationId, readonly string[]
   'calendar.schedule-sessions': ['sessions'],
   'study.cards-from-text': ['text'],
   'calendar.create-reminder': ['title', 'date'],
+  'calendar.reschedule-event': ['id', 'date'],
   'calendar.delete-event': ['id'],
   'settings.change-preference': ['key', 'value'],
   'settings.configure-module': ['key', 'value'],
@@ -186,11 +188,33 @@ const ARGUMENT_HINTS: Partial<Record<AgentToolOperationId, Readonly<Record<strin
     word: 'A word to look up (any inflection; it is reduced to its dictionary form). Omit for counts only.',
   },
   'calendar.create-reminder': {
+    date: 'YYYY-MM-DD, a real calendar date.',
     reminder: "When to notify: 'at' (default), '5m', '15m', '30m', '1h', '1d' before, or 'none'.",
-    startTime: 'HH:MM local time. Without it the reminder is all-day.',
+    startTime: 'HH:MM local time. Without it the reminder is all-day (notifies at 09:00).',
+    recurrence: "'none' (default), 'daily', 'weekly', 'monthly', or 'custom' with recurrenceInterval days.",
+    recurrenceEndDate: 'YYYY-MM-DD, last day a repeat may fall on. Omit for no end.',
   },
   'calendar.schedule-session': {
+    date: 'YYYY-MM-DD, a real calendar date.',
+    startTime: 'HH:MM local time. Omit for an all-day session.',
+    endTime: 'HH:MM local time, not before startTime.',
     reminder: "Optional notification: 'at', '5m', '15m', '30m', '1h', '1d' before. Default 'none'.",
+    category: "'study' (default), 'exam', 'assignment', 'reminder' or 'personal'.",
+    recurrence: "'none' (default), 'daily', 'weekly', 'monthly', or 'custom' with recurrenceInterval days.",
+    recurrenceInterval: "Days between repeats when recurrence is 'custom' (1-365).",
+    recurrenceEndDate: 'YYYY-MM-DD, last day a repeat may fall on. Omit for no end.',
+  },
+  'calendar.list': {
+    from: 'YYYY-MM-DD, first day to list. Default today.',
+    to: 'YYYY-MM-DD, last day to list. Default 30 days after from; at most a year.',
+  },
+  'calendar.reschedule-event': {
+    id: 'Event id from calendar.list.',
+    date: 'YYYY-MM-DD to move it to. A repeating event moves as a whole series by the same number of days.',
+    occurrenceDate: 'For a repeating event, the date of the occurrence being moved (from calendar.list). Default: its first date.',
+    onlyThisOccurrence: 'true to move just that one occurrence of a repeating event (it becomes its own event; the series keeps the rest). Needs occurrenceDate.',
+    startTime: 'Optional new HH:MM start.',
+    endTime: 'Optional new HH:MM end, not before the start.',
   },
   'calendar.schedule-sessions': {
     sessions: '[{ title, date: YYYY-MM-DD, startTime: HH:MM, endTime: HH:MM }], up to 14. Usually the output of study.plan-week.',
@@ -202,11 +226,24 @@ const ARGUMENT_HINTS: Partial<Record<AgentToolOperationId, Readonly<Record<strin
   'study.plan-week': {
     startTime: "HH:MM to start each session. Default '19:00'.",
   },
+  'dictionary.lookup': {
+    term: 'A word in the study language, any inflection.',
+    limit: 'Most dictionary entries to return. Default 5, capped at 10. found: false means no entry exists.',
+  },
   'dictionary.analyze-sentence': {
     term: 'One sentence in the study language.',
   },
   'dictionary.explain-grammar': {
     term: 'A grammar pattern (e.g. 〜ている) or a sentence that uses it.',
+  },
+  'settings.apply-theme': {
+    theme: "App theme id or name from Settings > Appearance (e.g. 'study-os', 'classic-light', 'dark-nebula', 'paper'). In the Blanc toolbox use preset instead.",
+    preset: 'Blanc toolbox only: a Blanc theme preset id.',
+    overrides: 'Blanc toolbox only: colour token overrides.',
+  },
+  'settings.preview-theme': {
+    theme: 'App theme id or name to preview without saving. In the Blanc toolbox use preset instead.',
+    preset: 'Blanc toolbox only: a Blanc theme preset id.',
   },
 };
 
@@ -259,7 +296,8 @@ export const AGENT_TOOL_OPERATIONS: readonly AgentToolOperationDefinition[] = [
   operation('flashcard.create-deck', 'flashcard', 'Create a flashcard deck', 'limited-actions'),
   operation('flashcard.add-cards', 'flashcard', 'Add flashcards', 'limited-actions'),
   operation('flashcard.delete-cards', 'flashcard', 'Delete flashcards', 'limited-actions', 'delete-data'),
-  operation('flashcard.modify-cards', 'flashcard', 'Modify flashcards', 'limited-actions'),
+  // Confirmed: it overwrites the user's own card text, and the log keeps no prior value to undo with.
+  operation('flashcard.modify-cards', 'flashcard', 'Modify flashcards', 'limited-actions', 'major-change'),
   operation('flashcard.schedule-reviews', 'flashcard', 'Schedule reviews', 'limited-actions'),
   operation('flashcard.delete-deck', 'flashcard', 'Delete a flashcard deck', 'full-automation', 'delete-data'),
   operation('flashcard.list-card-presets', 'flashcard', 'List AI card presets', 'read-only'),
@@ -303,6 +341,7 @@ export const AGENT_TOOL_OPERATIONS: readonly AgentToolOperationDefinition[] = [
   // by the same click that ran the step before it.
   operation('calendar.schedule-sessions', 'calendar', 'Schedule several study sessions', 'limited-actions', 'major-change'),
   operation('calendar.create-reminder', 'calendar', 'Create a reminder', 'limited-actions'),
+  operation('calendar.reschedule-event', 'calendar', 'Move a calendar event', 'limited-actions'),
   operation('calendar.delete-event', 'calendar', 'Delete a calendar event', 'full-automation', 'delete-data'),
   operation('settings.read', 'settings', 'Read settings', 'read-only'),
   operation(
@@ -514,6 +553,25 @@ function boundedText(value: string, field: string): string {
   return text;
 }
 
+/** Said when a tool failed without saying why (an empty or non-Error throw). */
+export const AGENT_STEP_FAILED_FALLBACK = 'The approved tool failed.';
+
+/**
+ * A tool's failure as a step error can hold it: never empty, never over the
+ * text bound. `boundedText` THROWS on both, and it used to be applied to raw
+ * handler errors inside the catch that records them, so an adapter throwing
+ * `new Error('')` or a long stack-like message made the failure path itself
+ * fail. The step stayed `running` and the lease was never released (audit A5).
+ */
+export function agentStepErrorText(error: unknown): string {
+  const raw = error instanceof Error
+    ? error.message
+    : typeof error === 'string' ? error : '';
+  const text = raw.replace(/\s+/g, ' ').trim();
+  if (!text) return AGENT_STEP_FAILED_FALLBACK;
+  return text.length > MAX_TEXT_LENGTH ? `${text.slice(0, MAX_TEXT_LENGTH - 1)}…` : text;
+}
+
 function validateRequest(request: AgentToolRequest): void {
   boundedText(request.callId, 'Tool call ID');
   if (!getAgentToolOperation(request.operation)) {
@@ -635,7 +693,8 @@ export function updateAgentTask(
     steps[index] = {
       ...step,
       status: 'failed',
-      error: boundedText(event.error, 'Step error'),
+      // Normalized, not validated: a failure must always be recordable.
+      error: agentStepErrorText(event.error),
     };
     return { ...task, status: 'failed', currentStepId: undefined, steps, updatedAt: now };
   }
@@ -795,7 +854,7 @@ export async function executeAgentTaskStep(
     };
   } catch (error) {
     const failedAt = now();
-    const message = error instanceof Error ? error.message : 'The approved tool failed.';
+    const message = agentStepErrorText(error);
     return {
       task: updateAgentTask(
         runningTask,

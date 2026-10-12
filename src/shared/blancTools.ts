@@ -23,6 +23,8 @@ export const BLANC_ONLY_TOOL_IDS = [
   'visualizer',
   'local-agent',
   'visual-novels',
+  'snips',
+  'conversation',
 ] as const;
 
 export type BlancOnlyToolId = (typeof BLANC_ONLY_TOOL_IDS)[number];

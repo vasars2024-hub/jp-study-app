@@ -15,13 +15,17 @@ import {
   SOUNDSCAPE_STORAGE_KEY,
   applyMix,
   clamp01,
+  fadeScheduleOf,
   isMixSilent,
   matchingSceneId,
   mixOf,
   normalizeSoundscapeState,
+  sleepFadePlan,
   sliderToGain,
+  type FadeScheduleId,
   type MusicStyleId,
   type SoundLayerId,
+  type SoundscapeMix,
   type SoundscapeState,
 } from './soundscapeModel';
 
@@ -47,6 +51,8 @@ let state: SoundscapeState = load();
 let playing = false;
 let timerEndsAt: number | null = null;
 let timerHandle: ReturnType<typeof setTimeout> | null = null;
+/** snd5: when the sleep timer's long fade begins. */
+let timerFadeHandle: ReturnType<typeof setTimeout> | null = null;
 let saveHandle: ReturnType<typeof setTimeout> | null = null;
 let mediaPlaying = false;
 let mediaHooked = false;
@@ -108,9 +114,19 @@ function hookMedia(): void {
   });
 }
 
-function clearTimer(): void {
+/**
+ * `restoreLevel` false is for stopping: a sleep fade may already have taken
+ * the level to nothing, and putting it back while the pause fade runs would
+ * sound as a blip. Changing or cancelling the timer while playing restores it.
+ */
+function clearTimer(restoreLevel = true): void {
   if (timerHandle) clearTimeout(timerHandle);
+  if (timerFadeHandle) {
+    clearTimeout(timerFadeHandle);
+    if (restoreLevel) soundscapeEngine.cancelScheduledFade();
+  }
   timerHandle = null;
+  timerFadeHandle = null;
   timerEndsAt = null;
 }
 
@@ -118,15 +134,26 @@ function start(): void {
   if (playing || isMixSilent(state)) return;
   hookMedia();
   pushToEngine();
-  soundscapeEngine.play();
+  soundscapeEngine.play(fadeScheduleOf(state.fade).fadeInSec);
   playing = true;
 }
 
 function stop(fadeSeconds = 0.4): void {
-  clearTimer();
+  // Stopping never puts a sleep fade's level back: the next `play()` does.
+  clearTimer(false);
   if (!playing) return;
   soundscapeEngine.pause(fadeSeconds);
   playing = false;
+}
+
+/** snd5: a scene or saved mix by id, with the overall volume last used with it. */
+function sceneMix(id: string): SoundscapeMix | undefined {
+  return BUILT_IN_SCENES.find((scene) => scene.id === id)?.mix ?? state.saved.find((saved) => saved.id === id);
+}
+
+function withSceneVolume(next: SoundscapeState, id: string): SoundscapeState {
+  const remembered = next.sceneVolumes[id];
+  return remembered === undefined ? next : { ...next, master: remembered };
 }
 
 /** Start when a change makes something audible; stop when it leaves nothing to hear. */
@@ -148,9 +175,9 @@ export function toggleSoundscape(): void {
  */
 export function startSoundscape(sceneId?: string): boolean {
   if (sceneId) {
-    const mix = BUILT_IN_SCENES.find((scene) => scene.id === sceneId)?.mix ?? state.saved.find((saved) => saved.id === sceneId);
+    const mix = sceneMix(sceneId);
     if (mix) {
-      state = applyMix(state, mix);
+      state = withSceneVolume(applyMix(state, mix), sceneId);
       commit(state);
     }
   }
@@ -170,8 +197,20 @@ export function isSoundscapePlaying(): boolean {
   return playing;
 }
 
+/**
+ * snd5: the overall volume is remembered per scene — set the temple bells
+ * quieter than the rainy café once, and each comes back at its own level.
+ */
 export function setSoundscapeMaster(value: number): void {
-  commit({ ...state, master: clamp01(value) });
+  const master = clamp01(value);
+  const scene = matchingSceneId(state);
+  const sceneVolumes = scene ? { ...state.sceneVolumes, [scene]: master } : state.sceneVolumes;
+  commit({ ...state, master, sceneVolumes });
+}
+
+/** snd5: how playback fades in and how the sleep timer and focus breaks fade out. */
+export function setSoundscapeFade(id: FadeScheduleId): void {
+  commit({ ...state, fade: fadeScheduleOf(id).id });
 }
 
 export function toggleSoundLayer(id: SoundLayerId): void {
@@ -212,9 +251,9 @@ export function setSoundscapeDuck(on: boolean): void {
 
 /** Switch to a built-in scene or a saved mix and start it. */
 export function applySoundscapeScene(id: string): void {
-  const mix = BUILT_IN_SCENES.find((scene) => scene.id === id)?.mix ?? state.saved.find((saved) => saved.id === id);
+  const mix = sceneMix(id);
   if (!mix) return;
-  state = applyMix(state, mix);
+  state = withSceneVolume(applyMix(state, mix), id);
   followMix();
   commit(state);
 }
@@ -238,15 +277,29 @@ export function deleteSoundscapeMix(id: string): void {
   commit({ ...state, saved: state.saved.filter((mix) => mix.id !== id) });
 }
 
-/** Stop playback after `minutes`, fading out; 0 turns the timer off. */
+/**
+ * Stop playback after `minutes`; 0 turns the timer off. snd5: the fade
+ * schedule decides how the end arrives — the level starts falling
+ * `fadeOutSec` before the end (8 s on "quick", ten minutes on "sleep") and
+ * reaches silence exactly when the timer does.
+ */
 export function setSoundscapeTimer(minutes: number): void {
   clearTimer();
   if (minutes > 0) {
-    timerEndsAt = Date.now() + minutes * 60_000;
+    const plan = sleepFadePlan(minutes, fadeScheduleOf(state.fade));
+    timerEndsAt = Date.now() + plan.stopInMs;
+    timerFadeHandle = setTimeout(() => {
+      soundscapeEngine.scheduleFadeOut(0, plan.fadeMs / 1000);
+    }, plan.fadeStartsInMs);
     timerHandle = setTimeout(() => {
-      stop(8);
+      stop(0.2);
       emit();
-    }, minutes * 60_000);
+    }, plan.stopInMs);
   }
   emit();
+}
+
+/** snd5: the fade the focus link uses when a work block ends. */
+export function breakFadeSeconds(): number {
+  return fadeScheduleOf(state.fade).breakFadeSec;
 }

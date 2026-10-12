@@ -6,11 +6,12 @@
  * nobody.
  */
 import { CALENDAR_REMINDER_EVENT, type CalendarReminder } from './calendarReminders';
-import { notify } from './notificationStore';
+import { dndUntil, isDnd, notify, onNotificationsChanged, quietHoursEndAt } from './notificationStore';
 import { getUiLang, t } from './i18n';
 import { LANG_TAGS } from '../shared/i18n/core';
 import { clockHour12, loadDesktopPrefs } from './desktopPrefs';
 import { openSectionSurface } from './sectionSurface';
+import { runWhenUnlocked } from './appLockState';
 
 function dayIndex(ms: number): number {
   const d = new Date(ms);
@@ -77,10 +78,77 @@ function showSystemNotification(title: string, body: string): void {
   }
 }
 
+/** A held reminder is still worth a card this long after its event started. */
+const HELD_RELEVANCE_MS = 2 * 60 * 60_000;
+let held: CalendarReminder[] = [];
+let heldTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Listening for Do not disturb being switched off while something is held. */
+let stopWatchingDnd: (() => void) | null = null;
+
+/** Cards for reminders held back by quiet time, once it is over; stale ones are dropped. */
+function releaseHeldReminders(now = Date.now()): CalendarReminder[] {
+  if (heldTimer) clearTimeout(heldTimer);
+  heldTimer = null;
+  stopWatchingDnd?.();
+  stopWatchingDnd = null;
+  const still = held
+    .filter((reminder) => reminder.startsAt > now - HELD_RELEVANCE_MS)
+    // It came due while the user was not to be disturbed: say so.
+    .map((reminder) => ({ ...reminder, missed: reminder.missed || reminder.startsAt < now }));
+  held = [];
+  return still;
+}
+
+/** Show what was held, now that nothing is quiet any more. */
+function flushHeldReminders(at: number): void {
+  const due = releaseHeldReminders(at);
+  if (due.length) window.dispatchEvent(new CustomEvent<CalendarReminder[]>(CALENDAR_REMINDER_EVENT, { detail: due }));
+}
+
+/**
+ * Wake when the quiet period ends. A timed period or the nightly window has a known end,
+ * so a timer covers it; the manual switch has none, so the held cards also wait for the
+ * switch itself — every Do not disturb change goes through the notification store's
+ * change event — and appear the moment it is turned off, not at the next reminder.
+ */
+function scheduleHeldRelease(now: number): void {
+  if (!stopWatchingDnd) {
+    stopWatchingDnd = onNotificationsChanged(() => {
+      const at = Date.now();
+      if (held.length && !isDnd(at)) flushHeldReminders(at);
+    });
+  }
+  const until = Math.max(dndUntil(now) ?? 0, quietHoursEndAt(now) ?? 0);
+  if (!until) return;
+  if (heldTimer) clearTimeout(heldTimer);
+  heldTimer = setTimeout(() => {
+    heldTimer = null;
+    const at = Date.now();
+    if (isDnd(at)) {
+      scheduleHeldRelease(at);
+      return;
+    }
+    flushHeldReminders(at);
+  }, Math.max(0, until - now) + 1_000);
+}
+
+/**
+ * Every due reminder is recorded in the Notification Center. What interrupts is gated:
+ *
+ *   · **Do not disturb / quiet hours** (`isDnd`, which includes the nightly schedule): no
+ *     system banner and no on-screen card while it lasts — the entry waits in the center,
+ *     unsounded and without a badge, as every other informational notice does under DND.
+ *     The card is HELD, not dropped: when the quiet period ends it appears (marked missed)
+ *     unless its event is long over.
+ *   · **Locked** (risk4): an OS banner would read the event past the PIN pad, so it waits
+ *     for the unlock; the in-app entry and card sit behind the lock screen anyway.
+ */
 export function deliverCalendarReminders(due: readonly CalendarReminder[]): void {
   if (!due.length) return;
   const now = Date.now();
   const focused = windowIsFocused();
+  const quiet = isDnd(now);
   for (const reminder of due) {
     const { title, body } = describeCalendarReminder(reminder, now);
     notify({
@@ -91,7 +159,14 @@ export function deliverCalendarReminders(due: readonly CalendarReminder[]): void
       source: 'calendar',
       clientAction: 'open-calendar',
     });
-    if (!focused) showSystemNotification(title, body);
+    if (!focused && !quiet) runWhenUnlocked(`calendar-banner:${reminder.key}`, () => showSystemNotification(title, body));
   }
-  window.dispatchEvent(new CustomEvent<CalendarReminder[]>(CALENDAR_REMINDER_EVENT, { detail: [...due] }));
+  if (quiet) {
+    const keys = new Set(due.map((reminder) => reminder.key));
+    held = [...held.filter((reminder) => !keys.has(reminder.key)), ...due];
+    scheduleHeldRelease(now);
+    return;
+  }
+  const earlier = releaseHeldReminders(now).filter((reminder) => !due.some((next) => next.key === reminder.key));
+  window.dispatchEvent(new CustomEvent<CalendarReminder[]>(CALENDAR_REMINDER_EVENT, { detail: [...earlier, ...due] }));
 }

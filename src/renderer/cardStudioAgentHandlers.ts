@@ -517,7 +517,11 @@ export function createCardStudioAgentHandlers(t: CardStudioAgentTranslate): Agen
             terms: usedTerms.length,
             termsWithSentence: usedTerms.filter((term) => Boolean(term.sentence)).length,
           }),
-        expressions: results.map((result) => result.expression),
+        // Failed items carry no cards; they are listed (and retryable) in the studio.
+        expressions: results.filter((result) => !result.failure).map((result) => result.expression),
+        ...(results.some((result) => result.failure)
+          ? { failedItems: results.filter((result) => result.failure).length }
+          : {}),
         cards,
       };
     },

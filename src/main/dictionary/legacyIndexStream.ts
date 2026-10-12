@@ -190,7 +190,8 @@ function scanWith(fd: number, scan: LegacyIndexScan): void {
       }
 
       // The examined object's own structure: key, colon, value, separator.
-      switch (phase) {
+      // Widened: `finishKey`/`finishValue` set 'colon'/'after' from closures, which narrowing does not see.
+      switch (phase as Phase) {
         case 'key':
           if (byte === QUOTE) {
             inString = true;

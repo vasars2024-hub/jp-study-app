@@ -31,6 +31,8 @@ import { RESOURCES_CATALOG_EN } from '../resourcesCatalog/en';
 import { RESOURCE_BUNDLES_EN } from '../resourceBundles/en';
 import { INSTALL_UI_EN } from '../installUi/en';
 import { LOCK_UPDATE_UI_EN } from '../lockUpdateUi/en';
+import { RISK4_UI_EN } from '../risk4Ui/en';
+import { LOCK3_UI_EN } from '../lock3Ui/en';
 import { WIDGETS_UI_EN } from '../widgetsUi/en';
 import { BLANC_UI_EN } from '../blancUi/en';
 import { BLANC_MECH_UI_EN } from '../blancMechUi/en';
@@ -40,11 +42,17 @@ import { SYSTEM_UI_EN } from '../systemUi/en';
 import { CAPTIONS_UI_EN } from '../captionsUi/en';
 import { QUALITY_UI_EN } from '../qualityUi/en';
 import { POLISH_UI_EN } from '../polishUi/en';
+import { PRODUCT5_UI_EN } from '../product5Ui/en';
 import { DICT3_UI_EN } from '../dict3Ui/en';
 import { RECORDER_V2_EN } from '../recorderV2/en';
 import { SCRAPER_V2_EN } from '../scraperV2/en';
 import { STUDY_AREAS_UI_EN } from '../studyAreasUi/en';
 import { TRANSLATE_ENGINES_UI_EN } from '../translateEnginesUi/en';
+import { AI_EAGER_UI_EN } from '../aiEagerUi/en';
+import { LENS_OCR_UI_EN } from '../lensOcrUi/en';
+import { MEDIA5_EN } from '../media5/en';
+import { PLANNER_UI_EN } from '../plannerUi/en';
+import { SNIP_UI_EN } from '../snipUi/en';
 
 export const en: Catalog = {
   // Common actions
@@ -860,6 +868,8 @@ export const en: Catalog = {
   ...RESOURCE_BUNDLES_EN,
   ...INSTALL_UI_EN,
   ...LOCK_UPDATE_UI_EN,
+  ...RISK4_UI_EN,
+  ...LOCK3_UI_EN,
   ...WIDGETS_UI_EN,
   ...BLANC_UI_EN,
   ...BLANC_MECH_UI_EN,
@@ -869,11 +879,19 @@ export const en: Catalog = {
   ...CAPTIONS_UI_EN,
   ...QUALITY_UI_EN,
   ...POLISH_UI_EN,
+  ...PRODUCT5_UI_EN,
   ...DICT3_UI_EN,
   ...RECORDER_V2_EN,
   ...SCRAPER_V2_EN,
   ...STUDY_AREAS_UI_EN,
   ...TRANSLATE_ENGINES_UI_EN,
+  // The AI features' strings are a lazy pack (../aiPack, merged by ../catalogs.ts);
+  // only the few that non-AI surfaces render at startup are eager.
+  ...AI_EAGER_UI_EN,
+  ...LENS_OCR_UI_EN,
+  ...MEDIA5_EN,
+  ...PLANNER_UI_EN,
+  ...SNIP_UI_EN,
 
   // Settings navigation
   'settings.appTitle': 'Settings',
@@ -1392,8 +1410,8 @@ export const en: Catalog = {
   'subtitle.autoTranslate': 'Translate missing subtitles automatically',
   'subtitle.autoTranslateDesc': 'When only one language is found, translate it in the background — only for episodes you play or titles you mark Watching. Machine translations are labelled as such.',
   'subtitle.translationEngine': 'Translation engine',
-  'subtitle.translationEngine.auto': 'Automatic — cloud key if set, otherwise the offline model',
-  'subtitle.translationEngine.cloud': 'Cloud only (Gemini or DeepSeek key)',
+  'subtitle.translationEngine.auto': 'Automatic — your AI provider if you allowed it in Settings → AI, otherwise the offline model',
+  'subtitle.translationEngine.cloud': 'Cloud only (your AI provider, once allowed in Settings → AI)',
   'subtitle.translationEngine.local': 'Offline model only (Qwen3)',
   'subtitle.autoStudyTrack': 'Make a Japanese track from English',
   'subtitle.autoStudyTrackDesc': 'When only English subtitles exist: transcribe the Japanese audio on the English timing with Whisper, or translate the English when the audio is not Japanese.',
@@ -2712,7 +2730,7 @@ export const en: Catalog = {
   'novel.reader.closeArticle': 'Close article and return to the book',
   'novel.reader.book': 'Book',
   'novel.reader.prevShort': 'Prev',
-  'novel.reader.collectShortcut': 'Add selection to collection (Ctrl+Shift+S)',
+  'novel.reader.collectShortcut': 'Add selection to collection',
   'novel.reader.collect': 'Collect',
   'novel.reader.jumpToChapter': 'Jump to chapter',
   'novel.reader.jumpToChapterEllipsis': 'Jump to chapter…',
@@ -3004,6 +3022,8 @@ export const en: Catalog = {
   'palette.section.flashcards': 'Flashcards',
   'palette.section.stats': 'Statistics',
   'palette.section.calendar': 'Calendar',
+  'palette.section.snips': 'Snips',
+  'palette.section.conversation': 'Conversation partner',
   'palette.section.resources': 'Resources',
   'palette.section.settings': 'Settings',
   'palette.section.immersion': 'Immersion',
@@ -4221,7 +4241,15 @@ export const en: Catalog = {
   'perf.interact': 'Interact',
   'perf.yes': 'yes',
   'perf.no': 'no',
-  'perf.hint': 'Ctrl+Shift+F hide · target 60 FPS',
+  'perf.hint': '{keys} hide · target 60 FPS',
+  'perf.label.title': 'Performance',
+  'perf.label.frame': 'Frame',
+  'perf.label.quality': 'Quality',
+  'perf.label.particles': 'Particles',
+  'perf.label.heap': 'Heap',
+  'perf.label.interact': 'Interacting',
+  'perf.label.yes': 'yes',
+  'perf.label.no': 'no',
   'common.back': 'Back',
   'bundleDetail.beginnerChecklist': 'Beginner checklist',
   'bundleDetail.checklistProgress': 'Progress: {done}/{total}',
@@ -4336,7 +4364,7 @@ export const en: Catalog = {
   'focus.brand': 'Focus',
   'focus.exit': 'Exit focus',
   'focus.exitLocked': 'Locked',
-  'focus.exitHint': 'Exit focus mode (Ctrl+Shift+E)',
+  'focus.exitHint': 'Exit focus mode',
   'focus.navAria': 'Focus apps',
   'focus.tab.library': 'Library',
   'focus.tab.dictionary': 'Dictionary',
@@ -4346,7 +4374,7 @@ export const en: Catalog = {
     'Hide the desktop, particles, and widgets. Keep library, reader, dictionary, Anki, and an optional music bar.',
   'focus.settings.enable': 'Enable focus mode',
   'focus.settings.shortcutHint':
-    'Shortcut: Ctrl+Shift+E. Exit anytime unless a focus lock is active. Desktop settings restore when you leave.',
+    'Shortcut: {keys}. Exit anytime unless a focus lock is active. Desktop settings restore when you leave.',
   'focus.lock.title': 'Focus lock',
   'focus.lock.desc': 'Commit to a study block — exit, Esc, and the shortcut stay disabled until the timer ends.',
   'focus.lock.hint': 'The timer starts each time you enter focus mode. Changing duration applies to the next session.',
@@ -4434,7 +4462,7 @@ export const en: Catalog = {
   'desktop.task.closeAll': 'Close all apps',
   'desktop.task.minimize': 'Minimize',
   'desktop.task.restore': 'Restore',
-  'desktop.clipboardHistory': 'Clipboard history (Ctrl+Alt+Shift+V)',
+  'desktop.clipboardHistory': 'Clipboard history',
   'desktop.tray.hiddenIcons': 'Show hidden icons',
   'desktop.desktopN': 'Desktop {n}',
   'desktop.dragToDesktop': 'Drag to desktop · click to open',
@@ -6132,7 +6160,7 @@ export const en: Catalog = {
   'manga.translate.warning.none': 'OCR finished, but no page could be translated (0 of {total}). The pages are saved as OCR only.',
   'manga.translate.warning.some': 'OCR finished, but pages without a translation: {failed} of {total}. Those pages are saved as OCR only.',
   'manga.translate.target': 'Translate to',
-  'manga.translate.toggleVisibility': 'Show / hide translation (Ctrl+Shift+T)',
+  'manga.translate.toggleVisibility': 'Show / hide translation',
   'manga.translate.show': 'Show translation',
   'manga.translate.hide': 'Hide translation',
   'manga.translate.ahead': 'Translate ahead',
@@ -6466,6 +6494,16 @@ export const en: Catalog = {
   'anki3.sync.mappingTitle': 'Where each profile mines to',
   'anki3.sync.mapping': '{profile}: deck "{deck}", note type "{model}"',
   'anki3.sync.unlinked.title': "Deleted in Anki, back on Gum's schedule",
+  'anki4.sync.paused': { one: 'Sync is paused until this is fixed; the {count} waiting answer is kept. Fix it, then press Sync now (restarting Anki also resumes it).', other: 'Sync is paused until this is fixed; the {count} waiting answers are kept. Fix it, then press Sync now (restarting Anki also resumes it).' },
+  'anki4.sync.retryAt': { one: 'Gum tries again by itself at {time}; the {count} waiting answer is kept.', other: 'Gum tries again by itself at {time}; the {count} waiting answers are kept.' },
+  'anki4.sync.link.now': 'Link existing notes',
+  'anki4.sync.link.result': { one: '{count} card linked to an existing note ({looked} looked up).', other: '{count} cards linked to existing notes ({looked} looked up).' },
+  'anki4.sync.link.none': 'Cards looked up: {looked}. No existing note matched.',
+  'anki4.sync.link.hintOn': "While sync is on, Gum links cards Anki already has by itself, searching only each profile's deck and note type.",
+  'anki4.sync.link.hintOff': "Sync is off, so Gum does not link cards by itself. This button looks up the cards Anki may already have, only in each profile's deck and note type, and records which note each one is.",
+  'anki4.sync.failed.title': 'Answers Anki would not take',
+  'anki4.sync.failed.hint': 'Anki refused these answers several times, so they left the queue. Gum still has the reviews; review these cards in Anki if you want its schedule to match.',
+  'anki4.sync.failed.clear': 'Clear list',
   'anki3.queue.linked': { one: '{count} was already in Anki and is now linked.', other: '{count} were already in Anki and are now linked.' },
   'anki3.export.keepSchedule': 'Keep review progress in the Anki package',
   'anki3.export.scheduled': { one: '{count} card keeps its schedule.', other: '{count} cards keep their schedule.' },
@@ -6853,6 +6891,8 @@ export const en: Catalog = {
   'media.jobs.cancelAll': 'Cancel all',
   'media.jobs.eta': '{time} left',
   'media.jobs.modelSubstituted': 'running {model}',
+  'media.jobs.modelDownloading': 'Downloading the Whisper model… {percent}%',
+  'media.jobs.modelLoading': 'Loading the Whisper model…',
   'media.jobs.modelSubstituted.detail':
     'This machine cannot run {requested} in the browser runtime, so {used} is producing this transcript. Its output is noticeably weaker.',
   'media.jobs.phase.queued': 'Queued',
@@ -7203,7 +7243,7 @@ export const en: Catalog = {
   'immersion.mode.titleDesc.live': ' — browse',
   'immersion.mode.titleDesc.reader': ' — read + highlight',
   'immersion.mode.titleDesc.focus': ' — distraction-free',
-  'immersion.saveSite': 'Save site (Ctrl+D)',
+  'immersion.saveSite': 'Save site',
   'immersion.saveAsTool': 'Save as tool',
   'immersion.toolSaved': 'Saved to My tools',
   'immersion.toolAlready': 'Already in My tools',
@@ -7220,7 +7260,7 @@ export const en: Catalog = {
   'immersion.exitFocus': 'Exit focus',
   'immersion.loading': 'Loading…',
   'immersion.openPageToBegin': 'Open a page to begin immersion reading.',
-  'immersion.hint': 'Search opens Live · F8 cycles modes · F6 Focus · Ctrl+L URL bar',
+  'immersion.hint': 'Search opens Live · {cycle} cycles modes · {focus} Focus · {url} URL bar',
   'immersion.sites': 'Sites',
   'immersion.rail.loadFailed': 'Could not load saved sites. Any sites already shown are kept.',
   'immersion.rail.retry': 'Try again',
@@ -7732,6 +7772,22 @@ export const en: Catalog = {
   'aiStudio.hint.starOrPreset': 'Open Dictionary, look up words, and tap the star icon — or switch source to preset generation.',
   'aiStudio.status.generatedPreset': 'Generated {cards} cards from {count} invented items · review them below, then Save to flashcards.',
   'aiStudio.status.generatedDict': 'Generated {cards} cards from {count} words · review them below, then Save to flashcards.',
+  'aiStudio.progress.msg.enriching': 'Enriching “{term}” ({n} of {total})…',
+  'aiStudio.progress.msg.builtDict': 'Built {cards} cards from {count} words.',
+  'aiStudio.progress.msg.inventing': 'Inventing {count} vocabulary items…',
+  'aiStudio.progress.msg.inventingBatch': 'Inventing {count} items (batch {n} of {total})…',
+  'aiStudio.progress.msg.invented': 'Invented {done} of {total} items…',
+  'aiStudio.progress.msg.building': 'Building {count} card sets ({cards} per item)…',
+  'aiStudio.progress.msg.cardSet': 'Card set {n} of {total}: {term}',
+  'aiStudio.progress.msg.generated': 'Generated {cards} cards from {count} invented items.',
+  'aiStudio.progress.msg.partial': 'Finished {count} items ({cards} cards); {failed} failed and can be retried.',
+  'aiStudio.status.generatedPartial': '{cards} cards from {count} items are ready · {failed} failed. The finished ones are kept; retry the rest below.',
+  'aiStudio.status.retryDone': 'Retry finished: {cards} cards ready in total · {failed} still failed.',
+  'aiStudio.failed.title': 'Not generated',
+  'aiStudio.failed.lead': 'These items failed. Everything already generated is kept.',
+  'aiStudio.failed.invent': 'Invented items still owed: {count}',
+  'aiStudio.btn.retryFailed': 'Retry failed items ({count})',
+  'aiStudio.presets.studyLang': 'Presets for your study language: {lang}',
   'aiStudio.status.csvSaved': 'CSV saved to {path}',
   'aiStudio.status.csvFail': 'Could not save CSV.',
   'aiStudio.status.sentAnki': 'Sent {ok} of {total} cards to Anki.',
@@ -7924,7 +7980,7 @@ export const en: Catalog = {
   'flash.session.summary': '{reviewed} of {total} reviewed',
   'flash.reviewDictionaryCount': 'Review dictionary ({count})',
   'flash.undoRating': 'Undo last rating',
-  'flash.undoRating.hint': 'Puts the last card back with its old schedule (Ctrl+Z)',
+  'flash.undoRating.hint': 'Puts the last card back with its old schedule',
   'flash.ankiQueue.pending': { one: '{count} card waiting for Anki', other: '{count} cards waiting for Anki' },
   'flash.ankiQueue.retry': 'Add to Anki now',
   'flash.ankiQueue.busy': 'Adding…',
@@ -8085,7 +8141,7 @@ export const en: Catalog = {
   'epub.translate.panelTitle': 'Book translation settings',
   'epub.translate.target': 'Translate to',
   'epub.translate.targetChanged': 'Translation target changed — re-translate to apply',
-  'epub.translate.toggleVisibility': 'Show / hide translation (Ctrl+Shift+T)',
+  'epub.translate.toggleVisibility': 'Show / hide translation',
   'epub.translate.show': 'Show translation',
   'epub.translate.hide': 'Hide translation',
   'epub.translate.view': 'View',
@@ -8241,6 +8297,8 @@ export const en: Catalog = {
   'epub.mining.failSwitch': 'Fail-switch engine',
   'epub.mining.engine.qwen': 'Offline Qwen3',
   'epub.mining.engine.api': 'Cloud API',
+  'epub.mining.translateAgain': 'Translate again',
+  'epub.mining.translateAgain.hint': 'Asks {provider} again for every translated field instead of reusing saved answers, then downloads the deck. Dictionary values are kept.',
   'epub.mining.qwen.checking': 'Checking local Qwen model…',
   'epub.mining.qwen.ready': 'Qwen3 model found — runs locally, no API key needed.',
   'epub.mining.qwen.missing':
@@ -11586,7 +11644,7 @@ export const en: Catalog = {
   'agent.undo.error.superseded': 'A newer operation changed the same item, so this undo was refused.',
   'agent.undo.error.entity-not-found': 'The item no longer exists, so it cannot be undone.',
   'agent.undo.error.operation-unavailable': 'This build does not have a safe inverse for that operation.',
-  'agent.undo.error.operation-denied': 'The active profile no longer permits the inverse operation.',
+  'agent.undo.error.operation-denied': 'The active profile or permission level does not allow the action that would undo this. Allow it in Agent settings, or undo it by hand.',
   'agent.undo.error.busy': 'That operation is already being undone.',
   'agent.undo.error.undo-failed': 'The change could not be undone.',
   'agent.undo.error.store-failed': 'The current item state could not be read.',

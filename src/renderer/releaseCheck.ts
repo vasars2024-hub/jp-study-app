@@ -131,9 +131,25 @@ export function announceDownloadedUpdate(status: AppUpdateStatus): boolean {
   });
   showOsToast(title, 'ok', {
     label: t('install.update.restart'),
-    run: () => void window.api.appUpdateRestart?.(),
+    run: () => void restartToUpdate(),
   });
   return true;
+}
+
+/**
+ * The toast's "Restart": main refuses while a restart would cut something short
+ * (a recording). Then the user is told what, and offered "Restart anyway".
+ */
+export async function restartToUpdate(): Promise<void> {
+  const api = window.api.appUpdateRestart;
+  if (!api) return;
+  const result = await api().catch(() => null);
+  if (!result || result.ok || result.reason !== 'unsaved') return;
+  const list = result.unsaved.map((kind) => t(`upd2.unsaved.${kind}`)).join(', ');
+  showOsToast(t('upd2.restart.unsaved', { list }), 'warn', {
+    label: t('upd2.restart.anyway'),
+    run: () => void api({ force: true }).catch(() => undefined),
+  });
 }
 
 let watchingUpdates = false;

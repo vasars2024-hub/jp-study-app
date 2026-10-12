@@ -102,6 +102,8 @@ const FORBIDDEN_FILES: Array<[RegExp, string]> = [
   [/\/widgets\/registry\.tsx?$/, 'the Study OS widget registry'],
   [/\/components\/DesktopShell\.tsx$/, 'the Study OS desktop shell'],
   [/\/ocr\.ts$/, 'the OCR stack'],
+  // The optional AI features' strings: a lazy i18n pack, merged on first use.
+  [/\/i18n\/aiPack\//, 'the lazy AI strings pack'],
 ];
 
 const FORBIDDEN_PACKAGES: Array<[RegExp, string]> = [

@@ -213,13 +213,26 @@ describe('DeckWorkbenchAiPanel generation', () => {
     expect(container.querySelector('.wb-ai-notes')).toBeNull();
   });
 
-  it('shows a provider message verbatim rather than a missing translation key', async () => {
+  // F8: a bridge that throws is said in the UI language (the thrown text is
+  // Electron's English "Error invoking remote method…"), and the notes it never
+  // answered become retryable failures instead of staying pending.
+  it('says a bridge failure in the UI language and leaves the notes retryable', async () => {
     (window as unknown as { api: Record<string, unknown> }).api.ankiAiGenerateAdditions = async () => {
       throw new Error('AI request timed out after 60s');
     };
     await mount();
     click('ankiWorkbench.ai.generate');
     await flush();
-    expect(text()).toContain('ankiWorkbench.ai.error.provider:AI request timed out after 60s');
+    expect(text()).toContain('aiError.ipc-failed');
+    expect(text()).not.toContain('AI request timed out after 60s');
+    expect(batch?.notes.map((n) => n.status)).toEqual(['failed', 'failed']);
+  });
+
+  it('still shows an unknown provider message verbatim, labelled as the provider\'s', async () => {
+    response = { ...response, results: [{ noteId: 'n1', ok: false, error: 'quota exhausted (vendor text)' }, response.results[1]] };
+    await mount();
+    click('ankiWorkbench.ai.generate');
+    await flush();
+    expect(text()).toContain('ankiWorkbench.ai.error.provider:quota exhausted (vendor text)');
   });
 });

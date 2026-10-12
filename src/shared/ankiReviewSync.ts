@@ -11,9 +11,13 @@
  * LINK. A Gum card and an Anki note are the same card when the Gum card carries
  * `ankiNoteId`. Anki note ids survive AnkiWeb sync unchanged, so the id is the
  * stable key across machines. A Gum card without an id (queued while Anki was
- * away, or refused as a duplicate) is linked by field match — the note type's
- * term field equal to the card's word, within the profile's note type — never
- * by creating a second note.
+ * away, or refused as a duplicate) is linked by field match — the term field a
+ * profile writes, equal to the card's word, searched only within that profile's
+ * note type AND deck (and, when the card records the deck it went to, only that
+ * deck) — never by creating a second note. Linking writes note ids onto Gum
+ * cards, so it runs only while sync is on (sending answers, or Anki owning
+ * scheduling) or when the user asks for it ("Link existing notes"), and a pass
+ * pages through every card that needs it, a batch at a time.
  *
  * CONFLICT RULES (one owner per card at any time; nothing is ever scheduled twice):
  *
@@ -26,10 +30,18 @@
  *     modified after the Gum review happened — it was reviewed or edited in Anki
  *     (on this machine or another one, via AnkiWeb) and replaying an older answer
  *     on top would double-review it.
- *  3. Latest answer per note. Several Gum answers to one card waiting in the
- *     queue (offline, relearning steps) collapse to the most recent one; the
- *     earlier ones are `superseded`. Replaying "again, good, good" in one burst
- *     would walk Anki's learning steps in seconds.
+ *  3. Every answer, in order. Several Gum answers to one card waiting in the
+ *     queue (offline, relearning steps) are ALL replayed, oldest first, in one
+ *     `answerCards` request: "again, then good" reaches Anki as a lapse followed
+ *     by a pass, so Anki's lapse count, ease and relearning state match what
+ *     happened. (Collapsing to the latest answer used to turn that into a
+ *     single "good" and lose the lapse.) A note's answers always travel in the
+ *     same request — split across two, rule 2 would refuse the second half,
+ *     because the first half makes Anki's card newer than it. Anki dates every
+ *     replayed answer "now", so the learning-step timings of a burst are
+ *     compressed; the sequence of buttons, which decides the state, is exact.
+ *     Only when one note has more answers waiting than fit one request
+ *     (`ANKI_SYNC_PUSH_BATCH`) are the oldest extras `superseded`.
  *  4. Undo grace. An answer is held for `ANKI_SYNC_UNDO_GRACE_MS` before it is
  *     sent, so Gum's review undo can take it back. Once sent it cannot be undone
  *     in Anki (AnkiConnect has no per-card undo); the local undo still applies.
@@ -45,7 +57,16 @@
  *     notes. The user re-binds explicitly.
  *  8. Idempotent. Each answer is keyed by its review-log row id; a key that was
  *     answered is removed in the same step, and a re-run with the same queue
- *     sends nothing twice.
+ *     sends nothing twice (a replay that lost its reply meets rule 2: Anki's
+ *     card is newer than every answer in it).
+ * 10. Errors. "Anki is away" (closed, collection loading, network) and unknown
+ *     refusals are retried with a growing pause (`ankiSyncBackoffMs`); the queue
+ *     is kept. An AnkiConnect that cannot do the job (too old, API key, old API
+ *     version) PAUSES sync instead: the queue is kept, the panel names the fix,
+ *     and sync resumes on "Sync now" or when Anki reconnects. Neither kind ever
+ *     costs an answer. Only an answer Anki refuses on its own (a per-answer
+ *     `failed`) counts attempts, and after `ANKI_SYNC_MAX_ATTEMPTS` it leaves the
+ *     queue into the panel's "not sent" list — never silently.
  *  9. Which card. A note with several cards (recognition + production) is
  *     answered on its lowest-ordinal card that is not suspended — the card the
  *     Gum deck mirrors.
@@ -80,12 +101,20 @@ export const ANKI_SYNC_REVIEW_MAX_AGE_MS = 14 * DAY_MS;
 export const ANKI_SYNC_UNDO_GRACE_MS = 20_000;
 /** Answers per `answerCards` request. */
 export const ANKI_SYNC_PUSH_BATCH = 100;
-/** Sends that failed for a reason other than "Anki is away" before an answer is dropped. */
+/**
+ * Per-answer refusals (Anki answered the request but not this answer) before the
+ * answer leaves the queue into the panel's "not sent" list (rule 10).
+ */
 export const ANKI_SYNC_MAX_ATTEMPTS = 5;
 /** Linked notes whose schedule one pull reads. */
 export const ANKI_SYNC_PULL_BATCH = 2000;
-/** Unlinked Gum cards one link pass looks up. */
+/** Unlinked Gum cards per link request; a link pass pages through all of them. */
 export const ANKI_SYNC_LINK_BATCH = 200;
+/** Pause between two link requests of one pass, so a big deck cannot flood AnkiConnect. */
+export const ANKI_SYNC_LINK_PAUSE_MS = 250;
+/** First retry delay after a retryable failure; doubles per failure up to the max. */
+export const ANKI_SYNC_BACKOFF_BASE_MS = 2 * 60_000;
+export const ANKI_SYNC_BACKOFF_MAX_MS = 60 * 60_000;
 
 // ----- Errors -----------------------------------------------------------------
 
@@ -126,9 +155,27 @@ export interface AnkiSyncProbeResult {
   error?: string;
 }
 
-/** Errors that mean "try again later, keep the queue": nothing about the data is wrong. */
+/** Errors that mean "Anki is away, try again later": nothing about the data is wrong. */
 export function isTransientAnkiSyncError(kind: AnkiSyncErrorKind): boolean {
   return kind === 'unreachable' || kind === 'collection';
+}
+
+/**
+ * Rule 10: what a whole-request failure does to the queue. `pause` — this
+ * AnkiConnect cannot do the job until the user fixes something (update the
+ * add-on, remove its API key); retrying on a timer would only fail again.
+ * `retry` — Anki is away, on another profile (the run probes first, so
+ * switching back resumes it), or refused for a reason we cannot name: try again
+ * after `ankiSyncBackoffMs`. Both keep every answer.
+ */
+export function ankiSyncErrorAction(kind: AnkiSyncErrorKind): 'retry' | 'pause' {
+  return kind === 'unsupported' || kind === 'permission' || kind === 'version' ? 'pause' : 'retry';
+}
+
+/** Wait before retry number `failures` (1-based): doubling from the base, capped. */
+export function ankiSyncBackoffMs(failures: number): number {
+  const n = Math.max(1, Math.floor(failures) || 1);
+  return Math.min(ANKI_SYNC_BACKOFF_MAX_MS, ANKI_SYNC_BACKOFF_BASE_MS * 2 ** Math.min(n - 1, 16));
 }
 
 // ----- Push (Gum → Anki) -------------------------------------------------------
@@ -173,9 +220,12 @@ export interface AnkiReviewPushResult {
 }
 
 export interface AnkiReviewPushPlan {
-  /** Sent now, oldest first, at most `ANKI_SYNC_PUSH_BATCH`. */
+  /**
+   * Sent now, oldest first, at most `ANKI_SYNC_PUSH_BATCH`: every waiting answer
+   * of each note it includes, in review order (rule 3).
+   */
   push: AnkiReviewOutboxItem[];
-  /** Review ids replaced by a later answer to the same note (rule 3). */
+  /** Review ids that cannot be replayed: a note with more answers waiting than one request holds (rule 3). */
   superseded: string[];
   /** Review ids too old to replay (rule 5). */
   stale: string[];
@@ -204,25 +254,46 @@ export function planAnkiReviewPush(
     list.push(item);
     byNote.set(item.noteId, list);
   }
-  const candidates: AnkiReviewOutboxItem[] = [];
+  const groups: AnkiReviewOutboxItem[][] = [];
   const superseded: string[] = [];
   let waiting = 0;
   for (const list of byNote.values()) {
-    list.sort((a, b) => a.reviewedAt - b.reviewedAt || a.reviewId.localeCompare(b.reviewId));
+    list.sort(compareAnkiAnswers);
     const latest = list[list.length - 1];
-    // Inside the grace the latest answer may still be undone, and an undo would
-    // make the one before it the latest again: nothing for this note moves yet.
+    // Inside the grace the latest answer may still be undone. Sending the
+    // earlier ones now would make Anki's card newer than the latest, and rule 2
+    // would then refuse it: nothing for this note moves yet.
     if (!options.force && now - latest.reviewedAt < ANKI_SYNC_UNDO_GRACE_MS) {
       waiting += list.length;
       continue;
     }
-    for (const earlier of list.slice(0, -1)) superseded.push(earlier.reviewId);
-    candidates.push(latest);
+    if (list.length > batch) {
+      for (const extra of list.slice(0, list.length - batch)) superseded.push(extra.reviewId);
+      groups.push(list.slice(list.length - batch));
+    } else {
+      groups.push(list);
+    }
   }
-  candidates.sort((a, b) => a.reviewedAt - b.reviewedAt);
-  const push = candidates.slice(0, batch);
-  waiting += candidates.length - push.length;
+  // Oldest note first; a note's answers are never split across two requests.
+  groups.sort((a, b) => compareAnkiAnswers(a[0], b[0]));
+  const push: AnkiReviewOutboxItem[] = [];
+  for (const group of groups) {
+    if (push.length + group.length > batch) {
+      waiting += group.length;
+      continue;
+    }
+    push.push(...group);
+  }
+  push.sort(compareAnkiAnswers);
   return { push, superseded, stale, waiting };
+}
+
+/** Review order: when it was answered, then the review id (stable for answers in one millisecond). */
+export function compareAnkiAnswers(
+  a: Pick<AnkiReviewPushItem, 'reviewedAt' | 'reviewId'>,
+  b: Pick<AnkiReviewPushItem, 'reviewedAt' | 'reviewId'>,
+): number {
+  return a.reviewedAt - b.reviewedAt || a.reviewId.localeCompare(b.reviewId);
 }
 
 /** The slice of an AnkiConnect `cardsInfo` row the sync reads. */
@@ -368,6 +439,8 @@ export interface AnkiLinkRequest {
   key: string;
   term: string;
   reading?: string;
+  /** The Anki deck the card was sent to, when recorded: only that deck is searched. */
+  deck?: string;
 }
 
 export interface AnkiLinkMatch {

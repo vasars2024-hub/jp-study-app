@@ -19,6 +19,7 @@ import { ATTACHABLE_SUBTITLE_FORMATS } from '../shared/subtitleDiscoveryIpc';
 import type { SubtitleRecord, SubtitleRecordFormat } from '../shared/subtitleRecord';
 import type { TranscriptionCardOptions, TranscriptionProgress } from '../shared/transcriptionIpc';
 import type { MediaItem } from '../shared/types';
+import { WHISPER_MULTILINGUAL_REQUIRED } from '../shared/whisperModels';
 
 export type PlayerWhisperState = 'idle' | 'extracting' | 'loading' | 'transcribing' | 'done' | 'error';
 
@@ -50,6 +51,8 @@ export function playerWhisperErrorKey(error: string | undefined): string {
       return 'studyLoop2.whisper.noHost';
     case 'item-not-found':
       return 'mediaWorkspace.study.whisperLocalOnly';
+    case WHISPER_MULTILINGUAL_REQUIRED:
+      return 'aiFix.whisper.multilingualRequired';
     default:
       return 'mediaWorkspace.study.whisperFailed';
   }
@@ -66,6 +69,14 @@ export function playerWhisperView(progress: TranscriptionProgress): PlayerWhispe
     case 'extracting-audio':
       return { state: 'extracting', progress: 0, messageKey: 'media.jobs.phase.extracting-audio' };
     case 'transcribing':
+      // A first run fetches the model inside the first chunk: say so, with its
+      // own progress, rather than "0 of N" for minutes.
+      if (progress.modelDownload) {
+        const percent = progress.modelDownload.percent;
+        return percent === null
+          ? { state: 'loading', progress: 0, messageKey: 'media.jobs.modelLoading' }
+          : { state: 'loading', progress: percent / 100, messageKey: 'media.jobs.modelDownloading', messageParams: { percent } };
+      }
       return progress.total > 0
         ? {
           state: 'transcribing',

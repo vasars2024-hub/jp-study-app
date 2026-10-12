@@ -22,7 +22,14 @@ function makeCandidate(
   };
 }
 
-function makeConfig(overrides?: Partial<TraditionalMiningConfig>): TraditionalMiningConfig {
+/** Each group is merged over its defaults, so an override names only the keys it changes. */
+interface ConfigOverrides {
+  limits?: Partial<TraditionalMiningConfig['limits']>;
+  templates?: Partial<TraditionalMiningConfig['templates']>;
+  export?: Partial<NonNullable<TraditionalMiningConfig['export']>>;
+}
+
+function makeConfig(overrides?: ConfigOverrides): TraditionalMiningConfig {
   return {
     analyzer: 'kuromoji',
     limits: {

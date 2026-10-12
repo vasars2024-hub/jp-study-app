@@ -70,6 +70,24 @@ recordings with Upload now / Discard. Chrome only allows recording a tab you
 invoked the extension on, so start it from one of those places, not from a
 page button.
 
+## Optional AI
+
+On demand only — hovering never asks a model. The extension holds no API key:
+Gum answers through `/v1/ai/*` with the provider, the "Use AI features" switch,
+each feature's cloud opt-in (Settings → AI) and the offline model it already has.
+
+- **Explain in context** (Meaning tab, or `E`): which dictionary sense the word
+  has in its sentence, and why. The sense is marked on the list, labelled AI.
+- **Suggest a meaning** (Meaning tab, words with no gloss): used for the card
+  only after **Use for the card**, and stored marked `(AI)`.
+- **AI breakdown** (Sentence tab): word by word plus a translation, on the
+  offline model when it is installed.
+- **Simplify paragraph** (Sentence tab): the paragraph and an AI rewrite side by side.
+
+Each shows a spinner with **Cancel** (which stops the request in Gum too) and
+says plainly when AI is off, not set up, not allowed to use the cloud, offline,
+or when Gum is not running. With AI off the buttons are not shown.
+
 ## Permissions
 
 - `activeTab` / `scripting` / `tabs` — read and theme the active page

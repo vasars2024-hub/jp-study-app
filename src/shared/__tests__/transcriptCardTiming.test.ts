@@ -66,7 +66,8 @@ describe('the job stamps every card and the batch', () => {
     // The card mapper and the broadcast each carry it. A card-only stamp would leave
     // any batch-level surface guessing, and a broadcast-only stamp would lose it the
     // moment a card is read on its own.
-    const broadcast = /broadcastCardsReady\(\{([\s\S]*?)\}\);/.exec(source);
+    // `deliverCardsReady` since F5: the batch goes to one window, not all of them.
+    const broadcast = /deliverCardsReady\(\{([\s\S]*?)\}\);/.exec(source);
     expect(broadcast?.[1]).toMatch(/\btiming,/);
     const mapper = /const cards = await mapWithConcurrency\(([\s\S]*?)\n {6}\}\);/.exec(source);
     expect(mapper?.[1]).toMatch(/\btiming,/);

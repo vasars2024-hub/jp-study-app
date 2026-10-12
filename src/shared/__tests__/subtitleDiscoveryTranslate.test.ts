@@ -113,15 +113,24 @@ describe('planDiscoveryLanguages — the helper line never spends the library-wi
 
 describe('normalizeSubtitleDiscoverySettings — automation fields', () => {
   it('defaults them on for an old settings file', () => {
+    // The engine defaults to the OFFLINE model (audit F1): background translation
+    // is the one AI path the user never pressed a button for, so an old settings
+    // file must not start reaching the cloud without the consent opt-in.
     expect(normalizeSubtitleDiscoverySettings({ autoDownloadLanguages: ['ja'] })).toMatchObject({
-      helperLanguage: 'en', autoTranslate: true, translationEngine: 'auto', autoStudyTrack: true, dismissedNotices: [],
+      helperLanguage: 'en', autoTranslate: true, translationEngine: 'local', autoStudyTrack: true, dismissedNotices: [],
     });
+  });
+
+  it('keeps an explicit engine choice the user already made', () => {
+    expect(normalizeSubtitleDiscoverySettings({ translationEngine: 'auto' }).translationEngine).toBe('auto');
+    expect(normalizeSubtitleDiscoverySettings({ translationEngine: 'cloud' }).translationEngine).toBe('cloud');
   });
 
   it('keeps an explicit "no helper line" and rejects an unknown engine', () => {
     const out = normalizeSubtitleDiscoverySettings({
       helperLanguage: null, translationEngine: 'telepathy', autoTranslate: false, dismissedNotices: ['a', 'a', 7],
     });
-    expect(out).toMatchObject({ helperLanguage: null, translationEngine: 'auto', autoTranslate: false, dismissedNotices: ['a'] });
+    // An unknown engine falls back to the offline default, never to a cloud-capable one.
+    expect(out).toMatchObject({ helperLanguage: null, translationEngine: 'local', autoTranslate: false, dismissedNotices: ['a'] });
   });
 });

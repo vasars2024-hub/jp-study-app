@@ -353,3 +353,59 @@ describe('there is one cloud-target list in the repository', () => {
     expect(shell).not.toMatch(/function executionErrorKey\s*\(/);
   });
 });
+
+describe('AI fix C: Blanc sends what Study OS sends', () => {
+  it('passes the Agent model configured for local chat (audit A2)', async () => {
+    localStorage.setItem('jp-study-local-agent-settings-v1', JSON.stringify({ modelFileName: 'Qwen3-8B-Q4_K_M.gguf' }));
+    await mount(<BlancCentralAgentPanel />);
+    await typeAndSend('local with my model');
+    expect(sent[0].policy.target).toEqual({ kind: 'local', backend: 'local-qwen', model: 'Qwen3-8B-Q4_K_M.gguf' });
+    expect(normalizeAgentExecutionRequest(sent[0])?.policy.target).toMatchObject({ model: 'Qwen3-8B-Q4_K_M.gguf' });
+  });
+
+  it('carries the study-data sharing answer, false until the user allowed it', async () => {
+    await mount(<BlancCentralAgentPanel />);
+    await typeAndSend('first');
+    expect(sent[0].shareStudyData).toBe(false);
+    act(() => root?.unmount());
+    host?.remove();
+    localStorage.setItem('jp-study-local-agent-settings-v1', JSON.stringify({ agentCloudShareStudyData: 'allow' }));
+    stubApi();
+    await mount(<BlancCentralAgentPanel />);
+    await typeAndSend('second');
+    expect(sent[0].shareStudyData).toBe(true);
+  });
+
+  it('offers Claude, OpenAI and a local server, and sends a Claude target main accepts', async () => {
+    await mount(<BlancCentralAgentPanel />);
+    const values = Array.from(q<HTMLSelectElement>('.blanc-agent-policy select').options).map((o) => o.value);
+    expect(values).toEqual(expect.arrayContaining([
+      'claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5', 'openai', 'openai-compatible',
+    ]));
+    await act(async () => {
+      drive(q<HTMLSelectElement>('.blanc-agent-policy select'), 'claude-sonnet-5-5');
+    });
+    await typeAndSend('hello claude');
+    expect(normalizeAgentExecutionRequest(sent[0])?.policy.target).toEqual({ kind: 'cloud', providerId: 'claude-sonnet-5-5' });
+  });
+
+  it('refuses a cloud send while offline without a round trip, like Study OS', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await mount(<BlancCentralAgentPanel />);
+    await act(async () => {
+      drive(q<HTMLSelectElement>('.blanc-agent-policy select'), 'deepseek-v4-flash');
+    });
+    await typeAndSend('are you there');
+    expect(sent).toHaveLength(0);
+    expect(host?.querySelector('.blanc-agent-error')?.textContent ?? '').not.toBe('');
+    // A local target still runs offline.
+    await act(async () => {
+      drive(q<HTMLSelectElement>('.blanc-agent-policy select'), 'local');
+    });
+    await act(async () => {
+      sendButton().click();
+    });
+    await settle();
+    expect(sent).toHaveLength(1);
+  });
+});

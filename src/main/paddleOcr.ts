@@ -132,7 +132,7 @@ export function paddleAssetsForLang(lang: PaddleLang): string[] {
 }
 
 async function unloadSessions(): Promise<void> {
-  const sessions: Array<OrtNamespace.InferenceSession | undefined> = [detector];
+  const sessions: Array<OrtNamespace.InferenceSession | undefined> = [detector ?? undefined];
   for (const rec of recognizers.values()) sessions.push(rec.session);
   detector = null;
   detectorPromise = null;

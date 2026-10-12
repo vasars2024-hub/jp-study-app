@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ANKI_COLLECTION_UNAVAILABLE_MSG, ANKI_UNREACHABLE_MSG } from '../anki';
 import {
+  ANKI_SYNC_BACKOFF_BASE_MS,
+  ANKI_SYNC_BACKOFF_MAX_MS,
   ANKI_SYNC_REVIEW_MAX_AGE_MS,
   ANKI_SYNC_UNDO_GRACE_MS,
   ankiEaseForRating,
+  ankiSyncBackoffMs,
+  ankiSyncErrorAction,
   ankiMirrorFromCard,
   classifyAnkiSyncError,
   countAnkiMirrorsDue,
@@ -40,31 +44,66 @@ describe('error classification', () => {
     expect(classifyAnkiSyncError('model was not found: Basic')).toBe('api');
     expect(classifyAnkiSyncError(undefined)).toBe('api');
   });
+
+  it('rule 10: pauses on what the user must fix, retries the rest with a growing wait', () => {
+    expect(['unsupported', 'permission', 'version'].map((k) => ankiSyncErrorAction(k as never))).toEqual(['pause', 'pause', 'pause']);
+    expect(['unreachable', 'collection', 'api', 'profile-mismatch'].map((k) => ankiSyncErrorAction(k as never)))
+      .toEqual(['retry', 'retry', 'retry', 'retry']);
+    expect(ankiSyncBackoffMs(1)).toBe(ANKI_SYNC_BACKOFF_BASE_MS);
+    expect(ankiSyncBackoffMs(2)).toBe(2 * ANKI_SYNC_BACKOFF_BASE_MS);
+    expect(ankiSyncBackoffMs(3)).toBe(4 * ANKI_SYNC_BACKOFF_BASE_MS);
+    expect(ankiSyncBackoffMs(50)).toBe(ANKI_SYNC_BACKOFF_MAX_MS);
+  });
 });
 
 describe('rule 3 + 4 + 5: what one drain sends', () => {
-  it('collapses several answers to one note into the latest and supersedes the rest', () => {
+  it('replays every answer to a note, in review order: "again then good" keeps the lapse', () => {
     const plan = planAnkiReviewPush([
-      item('a', 1, NOW - 120_000, 1),
       item('b', 1, NOW - 90_000, 3),
+      item('a', 1, NOW - 120_000, 1),
       item('c', 2, NOW - 100_000, 4),
     ], NOW);
-    expect(plan.push.map((i) => i.reviewId)).toEqual(['c', 'b']);
-    expect(plan.superseded).toEqual(['a']);
+    expect(plan.push.map((i) => [i.reviewId, i.ease])).toEqual([['a', 1], ['c', 4], ['b', 3]]);
+    expect(plan.superseded).toEqual([]);
     expect(plan.stale).toEqual([]);
     expect(plan.waiting).toBe(0);
+  });
+
+  it('orders answers given in the same millisecond by review id, so a replay is deterministic', () => {
+    const plan = planAnkiReviewPush([item('r2', 1, NOW - 60_000, 3), item('r1', 1, NOW - 60_000, 1)], NOW);
+    expect(plan.push.map((i) => i.reviewId)).toEqual(['r1', 'r2']);
   });
 
   it('holds a note whose latest answer is still inside the undo grace, unless forced', () => {
     const items = [item('old', 1, NOW - 60_000), item('fresh', 1, NOW - ANKI_SYNC_UNDO_GRACE_MS + 1000)];
     const held = planAnkiReviewPush(items, NOW);
+    // Not even "old": sending it now would make Anki's card newer than "fresh".
     expect(held.push).toEqual([]);
-    // Nothing is superseded yet: an undo of "fresh" would make "old" the latest again.
     expect(held.superseded).toEqual([]);
     expect(held.waiting).toBe(2);
     const forced = planAnkiReviewPush(items, NOW, { force: true });
-    expect(forced.push.map((i) => i.reviewId)).toEqual(['fresh']);
-    expect(forced.superseded).toEqual(['old']);
+    expect(forced.push.map((i) => i.reviewId)).toEqual(['old', 'fresh']);
+    expect(forced.superseded).toEqual([]);
+  });
+
+  it('never splits one note\'s answers across two requests', () => {
+    const plan = planAnkiReviewPush([
+      item('n2', 2, NOW - 200_000),
+      item('n1a', 1, NOW - 150_000, 1),
+      item('n1b', 1, NOW - 100_000, 3),
+    ], NOW, { batch: 2 });
+    expect(plan.push.map((i) => i.reviewId)).toEqual(['n2']);
+    expect(plan.waiting).toBe(2);
+  });
+
+  it('supersedes only the oldest extras of a note with more answers than one request holds', () => {
+    const plan = planAnkiReviewPush([
+      item('r1', 1, NOW - 400_000, 1),
+      item('r2', 1, NOW - 300_000, 1),
+      item('r3', 1, NOW - 200_000, 3),
+    ], NOW, { batch: 2 });
+    expect(plan.superseded).toEqual(['r1']);
+    expect(plan.push.map((i) => i.reviewId)).toEqual(['r2', 'r3']);
   });
 
   it('drops answers too old to replay and caps a batch', () => {

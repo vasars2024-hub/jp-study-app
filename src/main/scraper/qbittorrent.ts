@@ -23,8 +23,8 @@ import type {
 import type {
   ScraperQbitAuthMode,
   ScraperQbittorrentSettings,
-  ScraperSettingsIssue,
 } from '../../shared/scraperSourceSettings';
+import type { ScraperSettingsIssue } from '../../shared/scraperSettingsPrimitives';
 import {
   DEFAULT_SCRAPER_QBITTORRENT_SETTINGS,
   validateScraperQbittorrentSettings,
@@ -2092,7 +2092,8 @@ export const STOPPED_NO_FILE_LIST_REASON =
 async function fileListDeclined(
   input: ScraperQbitInput,
   hash: string,
-): Promise<QbitOutcome<'retry'>> {
+  // Never `notFound`/`partial`: its failure is returned as-is from waits of any `T`.
+): Promise<{ ok: true; value: 'retry' } | { ok: false; reason: string }> {
   const info = await qbitTorrentInfo(input, hash);
   if (!info.ok) return { ok: false, reason: info.reason };
   if (!info.value) return { ok: false, reason: TORRENT_GONE_REASON };

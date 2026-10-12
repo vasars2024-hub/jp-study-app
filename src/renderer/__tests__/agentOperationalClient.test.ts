@@ -55,13 +55,14 @@ import {
   saveLocalAgentAutomation,
 } from '../localAgentAutomationStore';
 import type { AgentAutomation } from '../../shared/localAgentAutomation';
+import type { AgentQueueItem } from '../../shared/localAgentTaskQueue';
 
 const NOW = 1_800_000_000_000;
 
-function queueItem(id: string) {
+function queueItem(id: string): AgentQueueItem {
   return {
     id,
-    task: { id, objective: 'o', steps: [], status: 'planned' },
+    task: { id, objective: 'o', steps: [], status: 'queued', createdAt: NOW, updatedAt: NOW },
     priority: 0,
     status: 'queued',
     createdAt: NOW,
@@ -93,7 +94,16 @@ function automation(id: string): AgentAutomation {
   };
 }
 
-function emptyDocument() {
+/** Loose on purpose: the bridge is also fed malformed rows the client must drop. */
+interface StoredDocument {
+  version: number;
+  queue: { version: number; items: unknown[] };
+  memory: { version: number; entries: unknown[] };
+  automations: unknown[];
+  legacyMigratedAt: number | null;
+}
+
+function emptyDocument(): StoredDocument {
   return {
     version: 1,
     queue: { version: 1, items: [] },
@@ -412,7 +422,8 @@ describe('writes', () => {
       items: [queueItem('t1'), queueItem('t2'), queueItem('t3')],
     });
 
-    releaseFirst?.();
+    // Assigned inside the save callback, which flow analysis does not follow.
+    (releaseFirst as (() => void) | null)?.();
 
     await expect(first).resolves.toMatchObject({
       ok: true,
@@ -466,7 +477,8 @@ describe('writes', () => {
       version: 1,
       items: [queueItem('latest')],
     });
-    releaseFirst?.();
+    // Assigned inside the save callback, which flow analysis does not follow.
+    (releaseFirst as (() => void) | null)?.();
 
     await Promise.all([first, latest]);
     expect(maximumInFlight).toBe(1);

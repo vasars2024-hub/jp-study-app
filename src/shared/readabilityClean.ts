@@ -217,6 +217,10 @@ export const PRE_READABILITY_REMOVE = [
   '.p-nav',
   '.header-wrap',
   '.footer-wrap',
+  // Aozora Bunko: the colophon (底本 / 入力 / 校正) and the notation notes after the text.
+  '.bibliographical_information',
+  '.notation_notes',
+  '.after_text',
 ];
 
 /** Tags removed from Readability output (leftover chrome inside the candidate). */
@@ -263,6 +267,8 @@ export const POST_READABILITY_REMOVE = [
   '.mw-jump-link',
   'sup.reference',
   '.reflist',
+  '.bibliographical_information',
+  '.notation_notes',
   'table.infobox',
   '.navbox',
   '.ambox',

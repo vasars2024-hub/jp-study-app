@@ -175,6 +175,13 @@ export interface MineNoteRequest {
   /** Named frequency ranks for tokens like {frequency:BCCWJ}. */
   frequencies?: Record<string, string | number>;
   extraTags?: string[];
+  /**
+   * A Gum deck card's saved extras (memory aid, "not to confuse with" note, kept
+   * example sentences, accepted answers). Main re-validates them, builds the
+   * sanitized, provenance-marked block (`shared/cardAiExtras.ts`) and puts it
+   * in the note type's Notes field, else appends it to the meaning field.
+   */
+  cardExtras?: import('./cardAiExtras').CardAiExtras;
 }
 
 export interface MineNoteResult {

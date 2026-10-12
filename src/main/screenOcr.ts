@@ -81,6 +81,34 @@ export interface LensOcrResult {
   zoom?: number;
   /** Optional bounded JPEG crop, requested only for study-card attachment. */
   screenshotDataUrl?: string;
+  /** Served from the result cache: the same pixels, read by the same engine, a moment ago. */
+  cached?: boolean;
+  /**
+   * Present only when the downloaded engine is missing and the study language
+   * is Japanese: the lossless crop, for the renderer's bundled offline
+   * recognizer (`shared/lensBasicOcr.ts`) to read while the model downloads.
+   * `dipPerPixel` maps its pixel boxes back to region-relative DIP.
+   */
+  fallbackImage?: LensFallbackImage;
+}
+
+export interface LensFallbackImage {
+  dataUrl: string;
+  width: number;
+  height: number;
+  dipPerPixelX: number;
+  dipPerPixelY: number;
+}
+
+/** Where a scan is, reported to the Lens while it runs. */
+export type LensOcrStage = 'capturing' | 'reading' | 'refining';
+
+export interface LensOcrRunOptions {
+  engine?: OcrEngineChoice;
+  includeScreenshot?: boolean;
+  /** The user's cancel: checked between capture and each OCR pass. */
+  signal?: AbortSignal;
+  onStage?: (stage: LensOcrStage) => void;
 }
 
 /** Region in the Lens window's local DIP coords (window covers one display at its origin). */
@@ -153,27 +181,61 @@ const EMPTY = (over: Partial<LensOcrResult>): LensOcrResult => ({
  */
 function regionToPixels(
   region: RegionRect,
-  scaleFactor: number,
+  scale: number | CaptureScale,
   size: { width: number; height: number },
 ): { x: number; y: number; width: number; height: number } | null {
   const finite = (n: number): boolean => Number.isFinite(n);
   if (!finite(region.x) || !finite(region.y) || !finite(region.width) || !finite(region.height)) {
     return null;
   }
-  if (!finite(scaleFactor) || scaleFactor <= 0) return null;
+  const sx = typeof scale === 'number' ? scale : scale.x;
+  const sy = typeof scale === 'number' ? scale : scale.y;
+  if (!finite(sx) || sx <= 0 || !finite(sy) || sy <= 0) return null;
   if (!finite(size.width) || !finite(size.height)) return null;
 
-  const x = Math.max(0, Math.round(region.x * scaleFactor));
-  const y = Math.max(0, Math.round(region.y * scaleFactor));
+  const x = Math.max(0, Math.round(region.x * sx));
+  const y = Math.max(0, Math.round(region.y * sy));
   // A region whose origin is already past the thumbnail has no overlap at all.
   if (x >= size.width || y >= size.height) return null;
 
   // Clamp the crop to the actual thumbnail so a region straddling an edge is safe.
-  const width = Math.min(Math.round(region.width * scaleFactor), size.width - x);
-  const height = Math.min(Math.round(region.height * scaleFactor), size.height - y);
+  const width = Math.min(Math.round(region.width * sx), size.width - x);
+  const height = Math.min(Math.round(region.height * sy), size.height - y);
   if (width <= 1 || height <= 1) return null;
 
   return { x, y, width, height };
+}
+
+/** Physical capture pixels per DIP, per axis. */
+interface CaptureScale {
+  x: number;
+  y: number;
+}
+
+/**
+ * How many captured pixels one DIP covers, read from the capture itself.
+ *
+ * `display.scaleFactor` is what the capture was *asked* to be, not what it is:
+ * `desktopCapturer` fits the screen into the requested thumbnail, and on a
+ * fractional scale (125 %, 175 %) the DIP bounds are already rounded, so
+ * `bounds × scaleFactor` is off by a pixel or more on a 4K panel — and a capturer
+ * that hands back a smaller frame than asked (a capped size, a driver that
+ * ignores the request) would put every crop in the wrong place by a whole
+ * factor. The real ratio of frame to bounds is right in every one of those
+ * cases. When it agrees with the scale factor to within 1.5 % the scale factor
+ * itself is used, so exact setups keep their exact integer crops.
+ */
+function captureScale(
+  bounds: { width: number; height: number },
+  frame: { width: number; height: number },
+  scaleFactor: number,
+): CaptureScale | null {
+  const sf = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
+  if (!(bounds.width > 0 && bounds.height > 0 && frame.width > 0 && frame.height > 0)) return null;
+  const x = frame.width / bounds.width;
+  const y = frame.height / bounds.height;
+  const near = (v: number): boolean => Math.abs(v - sf) / sf <= 0.015;
+  return { x: near(x) ? sf : x, y: near(y) ? sf : y };
 }
 
 // Which capturer source shows which display: `screenSources.ts`, shared with the
@@ -187,7 +249,7 @@ function regionToPixels(
 async function captureRegion(
   region: RegionRect,
   displayId: number,
-): Promise<{ image: Electron.NativeImage; scaleFactor: number } | null> {
+): Promise<{ image: Electron.NativeImage; scale: CaptureScale } | null> {
   const display =
     screen.getAllDisplays().find((d) => d.id === displayId) ?? screen.getPrimaryDisplay();
   const scaleFactor = display.scaleFactor || 1;
@@ -206,12 +268,14 @@ async function captureRegion(
   if (source.thumbnail.isEmpty()) return null;
 
   const full = source.thumbnail;
-  const px = regionToPixels(region, scaleFactor, full.getSize());
+  const scale = captureScale(display.bounds, full.getSize(), scaleFactor);
+  if (!scale) return null;
+  const px = regionToPixels(region, scale, full.getSize());
   if (!px) return null;
 
   const crop = full.crop(px);
   if (crop.isEmpty()) return null;
-  return { image: crop, scaleFactor };
+  return { image: crop, scale };
 }
 
 // ---- Adaptive zoom ------------------------------------------------------
@@ -292,10 +356,18 @@ function betterPass(a: AutoOcrResult, b: AutoOcrResult): AutoOcrResult {
  * its own fixed input, so upscaling the source changes nothing — measured
  * byte-identical output at 1×, 2× and 3× on the same bubble.
  */
+class LensScanCancelled extends Error {
+  constructor() {
+    super('cancelled');
+    this.name = 'AbortError';
+  }
+}
+
 async function ocrAdaptive(
   image: Electron.NativeImage,
   lang: PaddleLang,
   engine: OcrEngineChoice,
+  run: Pick<LensOcrRunOptions, 'signal' | 'onStage'> = {},
 ): Promise<{ result: AutoOcrResult; zoom: number }> {
   // The Lens reads one known study language, so pin the recognizer to it rather
   // than letting the multi-language probe misfire on hard text.
@@ -309,6 +381,10 @@ async function ocrAdaptive(
   const { width, height } = image.getSize();
   f = Math.min(f, MAX_SIDE / Math.max(width, height));
   if (f <= 1.05) return { result: first, zoom: 1 };
+
+  // The second pass is the expensive one; a reader who cancelled does not pay for it.
+  if (run.signal?.aborted) throw new LensScanCancelled();
+  run.onStage?.('refining');
 
   const upscaled = image.resize({
     width: Math.round(width * f),
@@ -340,10 +416,73 @@ async function ocrAdaptive(
  * Line boxes come back in region-relative DIP, ready for hotspot placement in
  * the Lens renderer.
  */
+// ---- Result cache -------------------------------------------------------
+//
+// A visual novel's dialogue box, a paused video frame, a manga page the reader
+// keeps returning to: the Lens is asked to read the same pixels again and again
+// ("repeat", a rescan, a resize that ends where it started). OCR is
+// deterministic for the same pixels, engine, language and installed models, so
+// the second read is the first one, served instantly. Keyed by the crop's
+// content hash, never by the region, so a changed screen is always read fresh.
+// In memory only and bounded: nothing about the user's screen is written down.
+
+const OCR_CACHE_LIMIT = 24;
+type CachedRead = Omit<LensOcrResult, 'screenshotDataUrl' | 'cached' | 'fallbackImage'>;
+const ocrCache = new Map<string, CachedRead>();
+
+function ocrCacheKey(hash: string, engine: OcrEngineChoice, lang: string): string {
+  // Installed engines are part of the key: `auto` reads differently once
+  // manga-ocr is installed, and a read cached before that must not outlive it.
+  return `${hash}|${engine}|${lang}|${paddleOcrAvailable() ? 1 : 0}${mangaOcrAvailable() ? 1 : 0}`;
+}
+
+function ocrCacheGet(key: string): CachedRead | undefined {
+  const hit = ocrCache.get(key);
+  if (hit) {
+    // Least-recently-used: a hit moves to the back of the eviction queue.
+    ocrCache.delete(key);
+    ocrCache.set(key, hit);
+  }
+  return hit;
+}
+
+function ocrCachePut(key: string, value: CachedRead): void {
+  ocrCache.set(key, value);
+  while (ocrCache.size > OCR_CACHE_LIMIT) {
+    const oldest = ocrCache.keys().next().value;
+    if (oldest === undefined) break;
+    ocrCache.delete(oldest);
+  }
+}
+
+/** The longest side of a fallback image; a full 4K screen is read at a still-legible 2400 px. */
+const FALLBACK_MAX_SIDE = 2400;
+
+/** The lossless crop for the renderer's bundled recognizer, with its DIP mapping. */
+function fallbackImageOf(image: Electron.NativeImage, scale: CaptureScale): LensFallbackImage {
+  const size = image.getSize();
+  const longest = Math.max(size.width, size.height);
+  const out = longest > FALLBACK_MAX_SIDE
+    ? image.resize({
+      width: Math.max(1, Math.round((size.width * FALLBACK_MAX_SIDE) / longest)),
+      height: Math.max(1, Math.round((size.height * FALLBACK_MAX_SIDE) / longest)),
+      quality: 'best',
+    })
+    : image;
+  const outSize = out.getSize();
+  return {
+    dataUrl: out.toDataURL(),
+    width: outSize.width,
+    height: outSize.height,
+    dipPerPixelX: size.width / scale.x / Math.max(1, outSize.width),
+    dipPerPixelY: size.height / scale.y / Math.max(1, outSize.height),
+  };
+}
+
 export async function ocrRegion(
   region: RegionRect,
   displayId: number,
-  opts: { engine?: OcrEngineChoice; includeScreenshot?: boolean } = {},
+  opts: LensOcrRunOptions = {},
 ): Promise<LensOcrResult> {
   // The Lens reads the study language: PaddleOCR's pack for it, and manga-ocr
   // (Japanese only) never for a Chinese or Russian learner.
@@ -365,16 +504,36 @@ export async function ocrRegion(
   // 'auto' still needs the general engine, since that is the pass it decides from.
   if (engine !== 'manga' && !paddleOcrAvailable()) {
     const fetch = await ensureWebOcrModels(lang);
-    return EMPTY({
+    const missing = EMPTY({
       engine: 'web',
       available: false,
       downloading: fetch.downloading,
       missingAssets: fetch.missingAssets,
       error: 'web-models-missing',
     });
+    // The app ships Tesseract's Japanese data, so a Japanese learner is read
+    // with that while the model downloads, instead of shown nothing. The
+    // capture is attempted only after the offer exists, and any capture problem
+    // returns the offer alone — exactly what this path returned before.
+    if (lang !== 'ja') return missing;
+    opts.onStage?.('capturing');
+    let fallbackCap: { image: Electron.NativeImage; scale: CaptureScale } | null = null;
+    try {
+      fallbackCap = await captureRegion(region, displayId);
+    } catch {
+      fallbackCap = null;
+    }
+    if (!fallbackCap || opts.signal?.aborted) return missing;
+    return {
+      ...missing,
+      hash: crypto.createHash('sha1').update(fallbackCap.image.toBitmap()).digest('hex'),
+      fallbackImage: fallbackImageOf(fallbackCap.image, fallbackCap.scale),
+      screenshotDataUrl: opts.includeScreenshot ? boundedScreenshotDataUrl(fallbackCap.image) : undefined,
+    };
   }
 
-  let cap: { image: Electron.NativeImage; scaleFactor: number } | null;
+  opts.onStage?.('capturing');
+  let cap: { image: Electron.NativeImage; scale: CaptureScale } | null;
   try {
     cap = await captureRegion(region, displayId);
   } catch (err) {
@@ -382,16 +541,29 @@ export async function ocrRegion(
   }
   if (!cap) return EMPTY({ error: 'capture-failed' });
 
-  const { image, scaleFactor: sf } = cap;
+  const { image, scale } = cap;
   const hash = crypto.createHash('sha1').update(image.toBitmap()).digest('hex');
+  if (opts.signal?.aborted) return EMPTY({ error: 'cancelled', hash });
 
+  const key = ocrCacheKey(hash, engine, lang);
+  const cached = ocrCacheGet(key);
+  if (cached) {
+    return {
+      ...cached,
+      cached: true,
+      screenshotDataUrl: opts.includeScreenshot ? boundedScreenshotDataUrl(image) : undefined,
+    };
+  }
+
+  opts.onStage?.('reading');
   let result: AutoOcrResult;
   let zoom = 1;
   try {
-    const adaptive = await ocrAdaptive(image, lang, engine);
+    const adaptive = await ocrAdaptive(image, lang, engine, opts);
     result = adaptive.result;
     zoom = adaptive.zoom;
   } catch (err) {
+    if (err instanceof LensScanCancelled) return EMPTY({ error: 'cancelled', hash });
     return EMPTY({
       engine: engine === 'manga' ? 'manga' : 'web',
       available: paddleOcrAvailable(),
@@ -399,6 +571,7 @@ export async function ocrRegion(
       error: err instanceof Error ? err.message : 'ocr-failed',
     });
   }
+  if (opts.signal?.aborted) return EMPTY({ error: 'cancelled', hash });
 
   // Preserve an engine's own whitespace when its order was already sound.
   // Once geometry repairs the order, the passage must follow the same array
@@ -411,7 +584,7 @@ export async function ocrRegion(
       const [x0, y0, x1, y1] = l.box; // original crop-pixel coords
       return {
         text: l.text,
-        box: [x0 / sf, y0 / sf, Math.max(1, (x1 - x0) / sf), Math.max(1, (y1 - y0) / sf)],
+        box: [x0 / scale.x, y0 / scale.y, Math.max(1, (x1 - x0) / scale.x), Math.max(1, (y1 - y0) / scale.y)],
         vertical: l.vertical,
         confidence: l.confidence,
       };
@@ -427,7 +600,7 @@ export async function ocrRegion(
   // in provider order while the passage claimed reading order.
   const alt = result.alternate;
   const alternate = alt ? { engine: alt.engine, lang: alt.lang, ...toLens(alt.lines, alt.text) } : undefined;
-  return {
+  const read: CachedRead = {
     ok: true,
     engine: result.engine,
     lang: result.lang,
@@ -437,6 +610,10 @@ export async function ocrRegion(
     available: true,
     hash,
     zoom,
+  };
+  ocrCachePut(key, read);
+  return {
+    ...read,
     screenshotDataUrl: opts.includeScreenshot ? boundedScreenshotDataUrl(image) : undefined,
   };
 }
@@ -452,6 +629,8 @@ export async function ocrClipboardImage(image: Electron.NativeImage): Promise<{
   engine: string;
   lang: string;
   screenshotDataUrl?: string;
+  /** Mean line confidence 0–1, weighted by line length (Snip to cards' garbage gate). */
+  confidence?: number;
   error?: string;
 }> {
   const lang = getMainStudyLang();
@@ -476,19 +655,25 @@ export async function ocrClipboardImage(image: Electron.NativeImage): Promise<{
       })),
     );
     const text = lines.map((l) => l.text).join('\n').trim() || result.text.trim();
+    const chars = totalChars(result.lines);
+    const confidence = chars
+      ? result.lines.reduce((s, l) => s + l.confidence * l.text.length, 0) / chars
+      : undefined;
     return {
       ok: Boolean(text),
       text,
       engine: result.engine,
       lang: result.lang || lang,
       screenshotDataUrl: boundedScreenshotDataUrl(image),
+      ...(confidence !== undefined && Number.isFinite(confidence) ? { confidence } : {}),
     };
   } catch (err) {
     return { ok: false, text: '', engine: 'none', lang, error: err instanceof Error ? err.message : 'ocr-failed' };
   }
 }
 
-function boundedScreenshotDataUrl(image: Electron.NativeImage): string {
+/** A JPEG of `image` bounded to 1280 px and ~900 KB, as a data URL (cards, previews). */
+export function boundedScreenshotDataUrl(image: Electron.NativeImage): string {
   const size = image.getSize();
   const longest = Math.max(size.width, size.height);
   let resized = longest > 1280
@@ -516,6 +701,11 @@ function boundedScreenshotDataUrl(image: Electron.NativeImage): string {
 }
 
 export const __screenOcrTestables = {
+  clearOcrCache: (): void => ocrCache.clear(),
+  ocrCacheSize: (): number => ocrCache.size,
+  OCR_CACHE_LIMIT,
+  captureScale,
+  fallbackImageOf,
   regionToPixels,
   pickScreenSource,
   decideZoom,

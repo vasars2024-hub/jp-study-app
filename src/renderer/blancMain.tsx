@@ -36,7 +36,7 @@ import { startAiSetupSync } from './aiSetupClient';
 import { installBlancConsoleCapture } from './blancConsole';
 import { installNotificationCapture } from './notificationStore';
 import { clearOnExitIfConfigured } from './clipboardHistory';
-import { markLockscreenUnlocked, shouldShowLockscreen, syncLockscreenToMain } from './lockscreenSettings';
+import { markLockscreenUnlocked, refreshLockscreenMirror, shouldShowLockscreen, syncLockscreenToMain } from './lockscreenSettings';
 import { initAgentOperationalState } from './agentOperationalClient';
 import { awaitStartupRestore } from './startupRestore';
 
@@ -144,6 +144,12 @@ setPopupStyleLoader(ensureStudyOsCompat);
 void import('./blancBackgroundJobs')
   .then(({ installBlancBackgroundJobs }) => installBlancBackgroundJobs())
   .catch((err) => console.warn('[blanc] background jobs unavailable:', err));
+// Snip to cards: Blanc can read and mine a snip too. Main sends each snip to ONE window
+// (Study OS when it is up, else Blanc), so it is never mined twice. Three listeners;
+// everything heavy loads only when a snip arrives.
+void import('./snipToCards')
+  .then(({ installSnipToCards }) => installSnipToCards())
+  .catch((err) => console.warn('[blanc] snip to cards unavailable:', err));
 // Anki review sync: a card graded here is queued for Anki even while Study OS
 // runs the background jobs (opt-in; shared/ankiReviewSync.ts). Loaded after
 // first paint, not as startup cost.
@@ -163,6 +169,7 @@ function BlancRoot() {
   // lock main holds or arms later, and drop it when another window unlocks.
   useEffect(() => {
     syncLockscreenToMain(undefined, shouldShowLockscreen());
+    void refreshLockscreenMirror();
     let alive = true;
     void window.api?.lockscreenIsLocked?.()
       .then((mainLocked) => {
@@ -184,7 +191,12 @@ function BlancRoot() {
   const onUnlocked = useCallback(() => {
     markLockscreenUnlocked();
     setLocked(false);
-    void window.api?.lockscreenUnlock?.();
+    // lock3: main still holding the lock means back to the PIN pad.
+    void Promise.resolve(window.api?.lockscreenUnlock?.())
+      .then((res) => {
+        if (res && res.ok === false) setLocked(true);
+      })
+      .catch(() => undefined);
   }, []);
 
   return (
@@ -196,8 +208,9 @@ function BlancRoot() {
         // Opening a book from the Read tab is BlancShell's own internal state.
         <BlancShell initialBook={null} onInitialBookConsumed={() => undefined} />
       )}
-      <GlobalDictionaryOverlay />
-      <ToastHost />
+      {/* lock3: no popup dictionary (clipboard lookups) behind the PIN pad. */}
+      {!locked && <GlobalDictionaryOverlay />}
+      <ToastHost locked={locked} />
     </>
   );
 }

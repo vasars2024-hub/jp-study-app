@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
 import type { WidgetSnapshot } from '../../shared/desktop';
 import { getWidgetDef } from '../widgets/registry';
 import { readSetting } from '../widgets/types';
+import WidgetSettingsPopover from '../widgets/WidgetSettingsPopover';
+import { isNudgeKey, nudgeWidget, type WidgetGeometry } from '../widgets/widgetKeyboard';
 import { getZoomFactor } from '../appZoom';
 import { useT } from '../i18n';
 import { useAeroMaterials, useWiredMaterials } from './ui';
@@ -35,7 +37,7 @@ const snap = (n: number): number => Math.round(n / GRID) * GRID;
 
 export interface WidgetFrameProps {
   widget: WidgetSnapshot;
-  deskRef: React.RefObject<HTMLDivElement>;
+  deskRef: React.RefObject<HTMLDivElement | null>;
   focused: boolean;
   onFocus: () => void;
   onPatch: (p: Partial<WidgetSnapshot>) => void;
@@ -54,6 +56,13 @@ export default function WidgetFrame({
   const def = getWidgetDef(widget.type);
   const frameRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** wid5: the widget's own settings popover. */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** wid5: keyboard move/resize mode, holding the geometry to restore on Escape. */
+  const [keyboardFrom, setKeyboardFrom] = useState<WidgetGeometry | null>(null);
+  useEffect(() => {
+    if (keyboardFrom) frameRef.current?.focus({ preventScroll: true });
+  }, [keyboardFrom]);
   // §6 module-rack mount: scan-reveal + title lamp blink, wired only.
   const [mounting, setMounting] = useState(wired);
   useEffect(() => {
@@ -87,6 +96,89 @@ export default function WidgetFrame({
 
   const setSettings = (patch: Record<string, unknown>) =>
     onPatch({ settings: { ...(widget.settings ?? {}), ...patch } });
+
+  const schema = def.settingsSchema ?? [];
+
+  const startKeyboardMove = (): void => {
+    setMenuOpen(false);
+    if (locked) return;
+    onFocus();
+    setKeyboardFrom({ x: widget.x, y: widget.y, w: widget.w, h: widget.h });
+  };
+
+  /** Arrows move, Shift+arrows resize, Ctrl x5; Enter keeps, Escape restores. */
+  const onKeyboardMove = (e: RKeyboardEvent<HTMLElement>): void => {
+    if (!keyboardFrom) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onPatch({ ...keyboardFrom });
+      setKeyboardFrom(null);
+      return;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      if (e.key === 'Enter') e.preventDefault();
+      e.stopPropagation();
+      setKeyboardFrom(null);
+      return;
+    }
+    if (!isNudgeKey(e.key)) return;
+    // Ahead of the global shortcut manager: Ctrl+Arrow is music volume and
+    // Ctrl+Alt+Arrow window snapping, and neither should fire while placing this.
+    e.preventDefault();
+    e.stopPropagation();
+    const desk = deskRef.current;
+    const bounds = {
+      width: desk?.clientWidth || 1200,
+      height: (desk?.clientHeight || 720) - TASKBAR,
+    };
+    const next = nudgeWidget(
+      { x: widget.x, y: widget.y, w: widget.w, h: widget.h },
+      e.key,
+      { shift: e.shiftKey, ctrl: e.ctrlKey },
+      bounds,
+      def.minSize,
+    );
+    onPatch(next);
+  };
+
+  const keyboardHint = keyboardFrom ? (
+    <div className="widget-keyboard-hint" role="status">
+      {t('wid5.keyboard.hint')}
+    </div>
+  ) : null;
+
+  const settingsPopover = settingsOpen && schema.length > 0 && !collapsed ? (
+    <WidgetSettingsPopover
+      title={t('wid5.settings.title', { name: t(def.titleKey) })}
+      schema={schema}
+      settings={widget.settings ?? {}}
+      setSettings={setSettings}
+      onClose={() => setSettingsOpen(false)}
+    />
+  ) : null;
+
+  const wid5MenuItems = (role?: 'menuitem') => (
+    <>
+      {schema.length > 0 && (
+        <button
+          role={role}
+          data-widget-menu="settings"
+          onClick={() => {
+            setMenuOpen(false);
+            setSettingsOpen(true);
+          }}
+        >
+          {t('wid5.menu.settings')}
+        </button>
+      )}
+      {!locked && (
+        <button role={role} data-widget-menu="keyboard-move" onClick={startKeyboardMove}>
+          {t('wid5.menu.keyboardMove')}
+        </button>
+      )}
+    </>
+  );
 
   const dragStart = (e: RPointerEvent<HTMLDivElement>) => {
     if (locked) return;
@@ -173,7 +265,7 @@ export default function WidgetFrame({
     return (
       <section
         ref={frameRef}
-        className={`widget-frame aero-gadget ${focused ? 'focused' : ''} ${blur ? 'blur' : ''} ${collapsed ? 'collapsed' : ''} ${locked ? 'locked' : ''} ${menuOpen ? 'is-menu-open' : ''} ${toolsLeft ? 'aero-gadget--tools-left' : ''}`}
+        className={`widget-frame aero-gadget ${focused ? 'focused' : ''} ${blur ? 'blur' : ''} ${collapsed ? 'collapsed' : ''} ${locked ? 'locked' : ''} ${menuOpen ? 'is-menu-open' : ''} ${toolsLeft ? 'aero-gadget--tools-left' : ''} ${keyboardFrom ? 'is-keyboard-moving' : ''}`}
         style={{
           left: widget.x,
           top: widget.y,
@@ -183,6 +275,11 @@ export default function WidgetFrame({
           opacity,
         }}
         aria-label={title}
+        tabIndex={keyboardFrom ? -1 : undefined}
+        onKeyDown={keyboardFrom ? onKeyboardMove : undefined}
+        onBlur={(e) => {
+          if (keyboardFrom && !e.currentTarget.contains(e.relatedTarget as Node | null)) setKeyboardFrom(null);
+        }}
         onPointerDown={onFocus}
       >
         {collapsed && (
@@ -232,6 +329,7 @@ export default function WidgetFrame({
             <>
               <div className="widget-menu-backdrop" onPointerDown={(ev) => { ev.stopPropagation(); setMenuOpen(false); }} />
               <div className="widget-menu" role="menu" onPointerDown={(ev) => ev.stopPropagation()}>
+                {wid5MenuItems('menuitem')}
                 <button role="menuitem" onClick={() => { onPatch({ locked: !locked }); setMenuOpen(false); }}>{locked ? t('widgetFrame.unlock') : t('widgetFrame.lock')}</button>
                 <button role="menuitem" onClick={() => { onPatch({ collapsed: !collapsed }); setMenuOpen(false); }}>{collapsed ? t('widgetFrame.expand') : t('widgetFrame.collapse')}</button>
                 <button role="menuitem" onClick={() => { setSettings({ __blur: !blur }); setMenuOpen(false); }}>{blur ? t('aeroVista.gadget.smokedGlass') : t('aeroVista.gadget.clearGlass')}</button>
@@ -243,6 +341,8 @@ export default function WidgetFrame({
           )}
         </div>
         {!collapsed && !locked && <div className="widget-resize" title={t('widgetFrame.resize')} onPointerDown={resizeStart} />}
+        {settingsPopover}
+        {keyboardHint}
       </section>
     );
   }
@@ -250,7 +350,7 @@ export default function WidgetFrame({
   return (
     <section
       ref={frameRef}
-      className={`widget-frame ${focused ? 'focused' : ''} ${blur ? 'blur' : ''} ${collapsed ? 'collapsed' : ''} ${locked ? 'locked' : ''} ${wired && mounting ? 'widget-anim-mounting' : ''}`}
+      className={`widget-frame ${focused ? 'focused' : ''} ${blur ? 'blur' : ''} ${collapsed ? 'collapsed' : ''} ${locked ? 'locked' : ''} ${wired && mounting ? 'widget-anim-mounting' : ''} ${keyboardFrom ? 'is-keyboard-moving' : ''}`}
       style={{
         left: widget.x,
         top: widget.y,
@@ -258,6 +358,11 @@ export default function WidgetFrame({
         height: collapsed ? 30 : widget.h,
         zIndex: widget.z,
         opacity,
+      }}
+      tabIndex={keyboardFrom ? -1 : undefined}
+      onKeyDown={keyboardFrom ? onKeyboardMove : undefined}
+      onBlur={(e) => {
+        if (keyboardFrom && !e.currentTarget.contains(e.relatedTarget as Node | null)) setKeyboardFrom(null);
       }}
       onPointerDown={onFocus}
     >
@@ -276,7 +381,17 @@ export default function WidgetFrame({
         {menuOpen && (
           <>
             <div className="widget-menu-backdrop" onPointerDown={(ev) => { ev.stopPropagation(); setMenuOpen(false); }} />
-            <div className="widget-menu" onPointerDown={(ev) => ev.stopPropagation()}>
+            <div
+              className="widget-menu"
+              onPointerDown={(ev) => ev.stopPropagation()}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Escape') {
+                  ev.stopPropagation();
+                  setMenuOpen(false);
+                }
+              }}
+            >
+              {wid5MenuItems()}
               <button onClick={() => { onPatch({ locked: !locked }); setMenuOpen(false); }}>{locked ? t('widgetFrame.unlock') : t('widgetFrame.lock')}</button>
               <button onClick={() => { onPatch({ collapsed: !collapsed }); setMenuOpen(false); }}>{collapsed ? t('widgetFrame.expand') : t('widgetFrame.collapse')}</button>
               <button onClick={() => { setSettings({ __blur: !blur }); setMenuOpen(false); }}>{blur ? t('widgetFrame.disableBlur') : t('widgetFrame.enableBlur')}</button>
@@ -297,6 +412,8 @@ export default function WidgetFrame({
         </div>
       )}
       {!collapsed && !locked && <div className="widget-resize" title={t('widgetFrame.resize')} onPointerDown={resizeStart} />}
+      {settingsPopover}
+      {keyboardHint}
     </section>
   );
 }

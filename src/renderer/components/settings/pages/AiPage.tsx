@@ -2,8 +2,27 @@ import { useEffect, useMemo, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useT } from '../../../i18n';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
-import { AI_PROVIDERS, providerById, type AiProviderId } from '../../../../shared/aiProviders';
-import { aiKeySetFor } from '../../../../shared/aiSetup';
+import {
+  AI_PROVIDER_KEY_BUCKETS,
+  AI_PROVIDERS,
+  OPENAI_COMPATIBLE_PRESETS,
+  normalizeAiModelName,
+  normalizeCompatibleBaseUrl,
+  providerById,
+  type AiProviderId,
+  type AiProviderKeyBucket,
+} from '../../../../shared/aiProviders';
+import {
+  AI_CLOUD_FEATURES,
+  aiKeySetFor,
+  type AiFeatureSettingsPatch,
+  type AiSetupStatus,
+} from '../../../../shared/aiSetup';
+import {
+  aiErrorMessageKey,
+  normalizeAiConnectionTestResult,
+  type AiConnectionTestResult,
+} from '../../../../shared/aiConnectionTest';
 import {
   AGENT_PROVIDER_DEFAULT_PRICING,
   normalizeAgentProviderPrice,
@@ -25,6 +44,7 @@ import {
   saveLocalAgentSettings,
 } from '../../../localAgentSettingsStore';
 import { AiModelInstallControl } from '../../ai/AiModelInstall';
+import { loadAiImmersePrefs, onAiImmersePrefsChanged, saveAiImmersePrefs } from '../../../aiImmersePrefs';
 import { AgentAutomationEditor } from '../../agent/AgentAutomationEditor';
 import { AgentSpendPanel } from '../../agent/AgentSpendPanel';
 import '../../ai/aiSetup.css';
@@ -55,23 +75,77 @@ export default function AiPage() {
   const [savingKey, setSavingKey] = useState(false);
 
   useEffect(() => onLocalAgentSettingsChanged(setAgent), []);
+  const [immersePrefs, setImmersePrefs] = useState(loadAiImmersePrefs);
+  useEffect(() => onAiImmersePrefsChanged(setImmersePrefs), []);
+
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<AiConnectionTestResult | null>(null);
+  const [optionsError, setOptionsError] = useState(false);
 
   const enabled = status?.enabled ?? true;
   const engine = status?.engine ?? 'cloud';
   const providerId = status?.providerId ?? AI_PROVIDERS[0].id;
   const provider = providerById(providerId);
+  const vendor = provider.keyBucket;
+  const vendorModels = AI_PROVIDERS.filter((entry) => entry.keyBucket === vendor && !entry.modelConfigurable);
+  /** Usable: a key, or for the local server its URL and model. */
   const keySaved = status ? aiKeySetFor(providerId, status.apiKeysSet) : false;
+  const keyStored = provider.keyOptional ? false : keySaved;
+  const modelHintKey = MODEL_HINT_KEYS[providerId];
 
+  useEffect(() => setTestResult(null), [providerId]);
+
+  // Setters used to swallow every failure (`.catch(() => undefined)`), so a
+  // write main refused looked like it had worked. They say so now.
   const setEngine = async (next: 'cloud' | 'local-qwen'): Promise<void> => {
-    await window.api.aiSetEngine(next).catch(() => undefined);
+    try {
+      await window.api.aiSetEngine(next);
+      setOptionsError(false);
+    } catch {
+      setOptionsError(true);
+    }
     notifyAiSetupChanged();
   };
 
   const setProvider = async (next: AiProviderId): Promise<void> => {
-    await window.api.aiSetProvider(next).catch(() => undefined);
+    try {
+      await window.api.aiSetProvider(next);
+      setOptionsError(false);
+    } catch {
+      setOptionsError(true);
+    }
     setKeyDraft('');
     setKeyMessage(null);
     notifyAiSetupChanged();
+  };
+
+  /** A vendor change picks its first (cheapest) model, or keeps the current one. */
+  const setVendor = async (next: AiProviderKeyBucket): Promise<void> => {
+    if (next === vendor) return;
+    const first = AI_PROVIDERS.find((entry) => entry.keyBucket === next);
+    if (first) await setProvider(first.id);
+  };
+
+  const updateOptions = async (patch: AiFeatureSettingsPatch): Promise<void> => {
+    try {
+      await window.api.aiSetupUpdate(patch);
+      setOptionsError(false);
+    } catch {
+      setOptionsError(true);
+    }
+    notifyAiSetupChanged();
+  };
+
+  const testConnection = async (): Promise<void> => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult(normalizeAiConnectionTestResult(await window.api.aiSetupTestConnection(providerId)));
+    } catch {
+      setTestResult({ ok: false, code: 'generic' });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const saveKey = async (): Promise<void> => {
@@ -88,7 +162,7 @@ export default function AiPage() {
         return;
       }
       setKeyDraft('');
-      setKeyMessage({ kind: 'ok', text: t('settings.ai.key.saved', { provider: provider.label }) });
+      setKeyMessage({ kind: 'ok', text: t('settings.ai.key.saved', { provider: vendorLabel(vendor, t) }) });
       notifyAiSetupChanged();
     } catch {
       setKeyMessage({ kind: 'error', text: t('settings.ai.key.failed') });
@@ -153,6 +227,11 @@ export default function AiPage() {
                   ? t('settings.ai.notReady.key')
                   : t('settings.ai.notReady.model')}
             </p>
+            {optionsError && (
+              <p className="ai-model-install-status is-error" role="status" data-testid="ai-save-failed">
+                {t('aiProv.saveFailed')}
+              </p>
+            )}
           </SettingsCard>
 
           <SettingsCard
@@ -161,18 +240,51 @@ export default function AiPage() {
             description={t('settings.ai.provider.desc')}
           >
             <div className="ai-page-grid">
-              <label htmlFor="ai-provider-select">{t('settings.ai.provider.label')}</label>
+              <label htmlFor="ai-vendor-select">{t('settings.ai.provider.label')}</label>
               <select
-                id="ai-provider-select"
+                id="ai-vendor-select"
+                data-testid="ai-vendor"
                 className="set-select"
-                value={providerId}
-                onChange={(event) => void setProvider(event.currentTarget.value as AiProviderId)}
+                value={vendor}
+                onChange={(event) => void setVendor(event.currentTarget.value as AiProviderKeyBucket)}
               >
-                {AI_PROVIDERS.map((entry) => (
-                  <option key={entry.id} value={entry.id}>{entry.label}</option>
+                {AI_PROVIDER_KEY_BUCKETS.map((bucket) => (
+                  <option key={bucket} value={bucket}>{vendorLabel(bucket, t)}</option>
                 ))}
               </select>
-              <label htmlFor="ai-key-input">{t('settings.ai.key.label')}</label>
+              {vendorModels.length > 1 && (
+                <>
+                  <label htmlFor="ai-provider-select">{t('aiProv.model.label')}</label>
+                  <select
+                    id="ai-provider-select"
+                    data-testid="ai-model"
+                    className="set-select"
+                    value={providerId}
+                    onChange={(event) => void setProvider(event.currentTarget.value as AiProviderId)}
+                  >
+                    {vendorModels.map((entry) => (
+                      <option key={entry.id} value={entry.id}>{entry.label}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+              {vendor === 'openai' && status && (
+                <>
+                  <label htmlFor="ai-openai-model">{t('aiProv.model.label')}</label>
+                  <ModelField
+                    id="ai-openai-model"
+                    value={status.openaiModel}
+                    placeholder={provider.model}
+                    onCommit={(openaiModel) => updateOptions({ openaiModel })}
+                  />
+                </>
+              )}
+              {vendor === 'openai-compatible' && status && (
+                <LocalServerFields status={status} onCommit={updateOptions} />
+              )}
+              <label htmlFor="ai-key-input">
+                {provider.keyOptional ? t('aiProv.key.optional') : t('settings.ai.key.label')}
+              </label>
               <div className="ai-page-key-row">
                 <input
                   id="ai-key-input"
@@ -180,28 +292,87 @@ export default function AiPage() {
                   type="password"
                   autoComplete="off"
                   value={keyDraft}
-                  placeholder={keySaved
+                  placeholder={keyStored
                     ? t('settings.ai.key.replacePlaceholder')
-                    : t('settings.ai.key.placeholder', { provider: provider.label })}
+                    : t('settings.ai.key.placeholder', { provider: vendorLabel(vendor, t) })}
                   onChange={(event) => setKeyDraft(event.currentTarget.value)}
                 />
                 <button type="button" className="btn primary" disabled={savingKey} onClick={() => void saveKey()}>
                   {t('settings.ai.key.save')}
                 </button>
-                <button type="button" className="btn small" onClick={() => void window.api.openExternal(provider.keyUrl)}>
-                  {t('settings.ai.key.get')}
-                </button>
+                {!provider.keyOptional && (
+                  <button type="button" className="btn small" onClick={() => void window.api.openExternal(provider.keyUrl)}>
+                    {t('settings.ai.key.get')}
+                  </button>
+                )}
               </div>
             </div>
+            {modelHintKey && <p className="muted os-set-hint" data-testid="ai-model-hint">{t(modelHintKey)}</p>}
             <p className={`ai-page-status${keySaved ? ' is-ok' : ' muted'}`}>
-              {keySaved ? t('settings.ai.key.isSaved') : t('settings.ai.key.none')}
+              {provider.keyOptional
+                ? keySaved ? t('aiProv.local.ready') : t('aiProv.local.notReady')
+                : keySaved ? t('settings.ai.key.isSaved') : t('settings.ai.key.none')}
             </p>
             {keyMessage && (
               <p className={`ai-page-status${keyMessage.kind === 'ok' ? ' is-ok' : ' ai-model-install-status is-error'}`} role="status">
                 {keyMessage.text}
               </p>
             )}
+            <div className="ai-page-key-row">
+              <button
+                type="button"
+                className="btn"
+                data-testid="ai-test-connection"
+                disabled={testing || !keySaved}
+                onClick={() => void testConnection()}
+              >
+                {testing ? t('aiProv.test.running') : t('aiProv.test.button')}
+              </button>
+              {testResult && (
+                <span
+                  className={`ai-page-status${testResult.ok ? ' is-ok' : ' ai-model-install-status is-error'}`}
+                  role="status"
+                  data-testid="ai-test-result"
+                >
+                  {testResultText(testResult, t)}
+                </span>
+              )}
+            </div>
             <p className="muted os-set-hint">{t('settings.ai.key.vaultNote')}</p>
+            <p className="muted os-set-hint">{t('aiProv.test.note')}</p>
+          </SettingsCard>
+
+          <SettingsCard
+            id="ai-cloud-features"
+            title={t('aiProv.features.title')}
+            description={t('aiProv.features.desc')}
+          >
+            {AI_CLOUD_FEATURES.map((feature) => (
+              <div key={feature.id} className="ai-page-feature">
+                <Toggle
+                  className="os-toggle"
+                  data-testid={`ai-cloud-${feature.id}`}
+                  checked={status?.cloudFeatures[feature.id] ?? feature.defaultAllowed}
+                  disabled={!status}
+                  onChange={(event) => updateOptions({ cloudFeatures: { [feature.id]: event.currentTarget.checked } })}
+                  label={t(feature.labelKey)}
+                />
+                <p className="muted os-set-hint">{t(feature.descKey)}</p>
+              </div>
+            ))}
+            {/* Not a cloud opt-in but the one AI action that may run without a press,
+                so it sits with them: off by default, and it uses whichever engine
+                (and, for the cloud, the "Translate VN lines" opt-in above) applies. */}
+            <div className="ai-page-feature" data-ai-immerse-auto="">
+              <Toggle
+                className="os-toggle"
+                data-testid="ai-immerse-vn-auto-translate"
+                checked={immersePrefs.vnAutoTranslate}
+                onChange={(event) => setImmersePrefs(saveAiImmersePrefs({ vnAutoTranslate: event.currentTarget.checked }))}
+                label={t('aiImmerse.settings.vnAutoTranslate')}
+              />
+              <p className="muted os-set-hint">{t('aiImmerse.settings.vnAutoTranslate.desc')}</p>
+            </div>
           </SettingsCard>
 
           <SettingsCard
@@ -285,6 +456,152 @@ export default function AiPage() {
   );
 }
 
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
+/** Vendor names are brands (rendered as-is); only the local server is app chrome. */
+const VENDOR_BRANDS: Partial<Record<AiProviderKeyBucket, string>> = {
+  gemini: 'Google Gemini',
+  deepseek: 'DeepSeek',
+  anthropic: 'Anthropic Claude',
+  openai: 'OpenAI',
+};
+
+function vendorLabel(bucket: AiProviderKeyBucket, t: TFn): string {
+  return VENDOR_BRANDS[bucket] ?? t('aiProv.vendor.local');
+}
+
+/** What each fixed model is for, so the choice is not a guess between names. */
+const MODEL_HINT_KEYS: Partial<Record<AiProviderId, string>> = {
+  'claude-haiku-5-5': 'aiProv.modelHint.haiku',
+  'claude-sonnet-5-5': 'aiProv.modelHint.sonnet',
+  'claude-opus-5-5': 'aiProv.modelHint.opus',
+  'deepseek-v4-flash': 'aiProv.modelHint.deepseekFlash',
+  'deepseek-v4-pro': 'aiProv.modelHint.deepseekPro',
+  openai: 'aiProv.modelHint.openai',
+  'openai-compatible': 'aiProv.modelHint.local',
+};
+
+function testResultText(result: AiConnectionTestResult, t: TFn): string {
+  if (result.ok) {
+    return result.model
+      ? t('aiProv.test.okModel', { model: result.model, ms: result.latencyMs })
+      : t('aiProv.test.ok', { ms: result.latencyMs });
+  }
+  const reason = t(aiErrorMessageKey(result.code));
+  return result.status !== undefined ? t('aiProv.test.failedStatus', { reason, status: result.status }) : reason;
+}
+
+/** A model-name field that saves on blur or Enter, and refuses what no server accepts. */
+function ModelField({
+  id,
+  value,
+  placeholder,
+  onCommit,
+}: {
+  id: string;
+  value: string;
+  placeholder: string;
+  onCommit: (value: string) => void;
+}) {
+  const { t } = useT();
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const invalid = draft.trim() !== '' && !normalizeAiModelName(draft);
+  const commit = (): void => {
+    if (invalid || draft.trim() === value) return;
+    onCommit(draft.trim());
+  };
+  return (
+    <div className="ai-page-key-row">
+      <input
+        id={id}
+        className="ui-input"
+        type="text"
+        spellCheck={false}
+        autoComplete="off"
+        value={draft}
+        placeholder={placeholder}
+        aria-invalid={invalid}
+        onChange={(event) => setDraft(event.currentTarget.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit();
+        }}
+      />
+      {invalid && <span className="ai-model-install-status is-error">{t('aiProv.model.invalid')}</span>}
+    </div>
+  );
+}
+
+/**
+ * The OpenAI-compatible server: its base URL (with Ollama / LM Studio presets)
+ * and the model it should run. Nothing here is a secret; an optional key goes
+ * in the key field below, never in the URL (the URL field refuses one).
+ */
+function LocalServerFields({
+  status,
+  onCommit,
+}: {
+  status: AiSetupStatus;
+  onCommit: (patch: AiFeatureSettingsPatch) => void;
+}) {
+  const { t } = useT();
+  const [urlDraft, setUrlDraft] = useState(status.compatBaseUrl);
+  useEffect(() => setUrlDraft(status.compatBaseUrl), [status.compatBaseUrl]);
+  const normalized = normalizeCompatibleBaseUrl(urlDraft);
+  const invalid = urlDraft.trim() !== '' && !normalized;
+  const commitUrl = (value: string): void => {
+    const next = normalizeCompatibleBaseUrl(value);
+    if (value.trim() && !next) return;
+    if (next === status.compatBaseUrl) return;
+    onCommit({ compatBaseUrl: next });
+  };
+  return (
+    <>
+      <label htmlFor="ai-compat-url">{t('aiProv.local.url')}</label>
+      <div className="ai-page-key-row">
+        <input
+          id="ai-compat-url"
+          data-testid="ai-compat-url"
+          className="ui-input"
+          type="url"
+          spellCheck={false}
+          autoComplete="off"
+          value={urlDraft}
+          placeholder="http://localhost:11434/v1"
+          aria-invalid={invalid}
+          onChange={(event) => setUrlDraft(event.currentTarget.value)}
+          onBlur={() => commitUrl(urlDraft)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commitUrl(urlDraft);
+          }}
+        />
+        {OPENAI_COMPATIBLE_PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            className="btn small"
+            onClick={() => {
+              setUrlDraft(preset.baseUrl);
+              commitUrl(preset.baseUrl);
+            }}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      {invalid && <p className="ai-model-install-status is-error">{t('aiProv.local.urlInvalid')}</p>}
+      <label htmlFor="ai-compat-model">{t('aiProv.model.label')}</label>
+      <ModelField
+        id="ai-compat-model"
+        value={status.compatModel}
+        placeholder="qwen3:8b"
+        onCommit={(compatModel) => onCommit({ compatModel })}
+      />
+    </>
+  );
+}
+
 /**
  * The per-provider rates. Every row shows the figure that governs it; a row the
  * user has not overridden is labelled as the built-in estimate, and clearing an
@@ -335,8 +652,8 @@ function AiRatesEditor() {
             const own = userRates[entry.id];
             const governing = own ?? AGENT_PROVIDER_DEFAULT_PRICING[entry.id];
             const draft = drafts[entry.id] ?? {
-              input: String(governing.inputPerMillionTokens),
-              output: String(governing.outputPerMillionTokens),
+              input: governing ? String(governing.inputPerMillionTokens) : '',
+              output: governing ? String(governing.outputPerMillionTokens) : '',
             };
             const edit = (half: 'input' | 'output', value: string): void => {
               setDrafts((current) => ({ ...current, [entry.id]: { ...draft, [half]: value } }));
@@ -348,10 +665,12 @@ function AiRatesEditor() {
                   <div className="ai-page-rate-tag">
                     {own
                       ? t('settings.ai.rates.yours')
-                      : t('settings.ai.rates.estimate', {
-                        input: number.format(governing.inputPerMillionTokens),
-                        output: number.format(governing.outputPerMillionTokens),
-                      })}
+                      : governing
+                        ? t('settings.ai.rates.estimate', {
+                          input: number.format(governing.inputPerMillionTokens),
+                          output: number.format(governing.outputPerMillionTokens),
+                        })
+                        : t('aiProv.rates.none')}
                   </div>
                 </td>
                 <td>

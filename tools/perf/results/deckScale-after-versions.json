@@ -1,0 +1,162 @@
+{
+  "label": "after-versions",
+  "cards": 20000,
+  "logRows": 200000,
+  "deckJsonChars": 8233956,
+  "cacheFits": false,
+  "node": "v24.19.0",
+  "at": "2026-10-09T09:32:28.447Z",
+  "results": [
+    {
+      "op": "deck.load.durable (IndexedDB whole-deck + card records)",
+      "coldMs": 814.12,
+      "medianMs": 814.092,
+      "runs": 3
+    },
+    {
+      "op": "deck.restore (boot reconciliation)",
+      "coldMs": 850.544,
+      "medianMs": 850.544,
+      "runs": 1,
+      "note": "cache overflowed: deck held in memory + IndexedDB"
+    },
+    {
+      "op": "deck.read.warm (loadDeck x1000)",
+      "coldMs": 3.611,
+      "medianMs": 2.688,
+      "runs": 5
+    },
+    {
+      "op": "due.list (dueDeckCards)",
+      "coldMs": 8.222,
+      "medianMs": 3.288,
+      "runs": 6
+    },
+    {
+      "op": "due.pickerCounts (reviewSessionCounts)",
+      "coldMs": 10.112,
+      "medianMs": 9.548,
+      "runs": 6
+    },
+    {
+      "op": "review.grade (reviewDeckCard)",
+      "coldMs": 8.096,
+      "medianMs": 0.205,
+      "runs": 60
+    },
+    {
+      "op": "review.uiRefresh (due + counts + search after a grade)",
+      "coldMs": 55.479,
+      "medianMs": 21.416,
+      "runs": 6
+    },
+    {
+      "op": "review.settle (cache + whole-deck catch-up)",
+      "coldMs": 0.538,
+      "medianMs": 0.538,
+      "runs": 1
+    },
+    {
+      "op": "review.gradeAfterSettle (reviewDeckCard)",
+      "coldMs": 0.493,
+      "medianMs": 0.213,
+      "runs": 30
+    },
+    {
+      "op": "edit.singleCard (updateDeckCard)",
+      "coldMs": 1.919,
+      "medianMs": 0.412,
+      "runs": 20
+    },
+    {
+      "op": "mine.addCard (addDeckCards, one card)",
+      "coldMs": 1.298,
+      "medianMs": 0.388,
+      "runs": 10
+    },
+    {
+      "op": "search.flashcards (searchDeckCards, 6 queries)",
+      "coldMs": 17.804,
+      "medianMs": 14.605,
+      "runs": 5
+    },
+    {
+      "op": "filter.folder (filterDeckCards)",
+      "coldMs": 1.467,
+      "medianMs": 0.66,
+      "runs": 6
+    },
+    {
+      "op": "group.byBook (groupDeckByBook)",
+      "coldMs": 18.327,
+      "medianMs": 7.492,
+      "runs": 6
+    },
+    {
+      "op": "workbench.draft (loadDeckAsAnkiDraft)",
+      "coldMs": 317.95,
+      "medianMs": 293.933,
+      "runs": 3
+    },
+    {
+      "op": "workbench.rows (buildBrowserRows)",
+      "coldMs": 84.589,
+      "medianMs": 91.761,
+      "runs": 3
+    },
+    {
+      "op": "workbench.search (filterBrowserRows, 3 queries)",
+      "coldMs": 11.773,
+      "medianMs": 9.192,
+      "runs": 4
+    },
+    {
+      "op": "log.normalize (all rows -> capped log)",
+      "coldMs": 126.85,
+      "medianMs": 100.376,
+      "runs": 3
+    },
+    {
+      "op": "log.load (IndexedDB scan + normalize)",
+      "coldMs": 498.38,
+      "medianMs": 498.38,
+      "runs": 1
+    },
+    {
+      "op": "stats.insights (Statistics review insights, 365 d)",
+      "coldMs": 69.349,
+      "medianMs": 46.855,
+      "runs": 4
+    },
+    {
+      "op": "stats.summary (summarizeReviewLog 30 d)",
+      "coldMs": 3.026,
+      "medianMs": 1.931,
+      "runs": 4
+    },
+    {
+      "op": "stats.heatmap (year grid + 365-day strip)",
+      "coldMs": 3.069,
+      "medianMs": 1.216,
+      "runs": 4
+    },
+    {
+      "op": "known.setInferred (one review, deck-sized store)",
+      "coldMs": 15.054,
+      "medianMs": 5.044,
+      "runs": 30
+    },
+    {
+      "op": "known.counts (knowledgeCounts)",
+      "coldMs": 5.735,
+      "medianMs": 0.002,
+      "runs": 6
+    },
+    {
+      "op": "dict.inDeck (deckPresenceByWord, 10 words)",
+      "coldMs": 7.641,
+      "medianMs": 0.006,
+      "runs": 10
+    }
+  ]
+}

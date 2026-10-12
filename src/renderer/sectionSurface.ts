@@ -54,7 +54,7 @@ export function openSectionSurface(section: string): boolean {
     new CustomEvent(SECTION_OPEN_EVENT, { detail: section, cancelable: true }),
   );
   if (claimed) return true;
-  const api = (window as PopOutCapableWindow).api;
+  const api = (window as unknown as PopOutCapableWindow).api;
   if (typeof api?.popOut !== 'function') return false;
   void api.popOut(section).catch(() => undefined);
   return false;

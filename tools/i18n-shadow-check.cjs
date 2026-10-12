@@ -38,7 +38,7 @@
  * Usage:
  *   node tools/i18n-shadow-check.cjs                 # gate: exit 1 on growth
  *   node tools/i18n-shadow-check.cjs --report        # every hit, grouped by file
- *   node tools/i18n-shadow-check.cjs --file <path>   # one file
+ *   node tools/i18n-shadow-check.cjs --file <path>   # one file (relative to src/, or absolute)
  *   node tools/i18n-shadow-check.cjs --update-baseline
  */
 'use strict';

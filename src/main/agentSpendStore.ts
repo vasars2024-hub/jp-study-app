@@ -25,7 +25,6 @@
 import path from 'node:path';
 import { app } from 'electron';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
-import type { AiProviderId } from '../shared/aiProviders';
 import {
   agentSpendPeriod,
   agentSpendTotals,
@@ -35,6 +34,7 @@ import {
   normalizeAgentSpendLedger,
   recordAgentSpend,
   type AgentSpendLedger,
+  type AgentSpendProviderId,
   type AgentSpendTotals,
   type AgentSpendVerdict,
 } from '../shared/agentSpendLedger';
@@ -57,7 +57,7 @@ export interface AgentSpendStore {
    * Adds one completed cloud request. `costUsd` of `undefined` means the user
    * has entered no rates for that provider, and is counted without being valued.
    */
-  record(providerId: AiProviderId, costUsd: number | undefined): AgentSpendSnapshot;
+  record(providerId: AgentSpendProviderId, costUsd: number | undefined): AgentSpendSnapshot;
   /**
    * The privacy control: erases the spending record, keeping the ceiling.
    *

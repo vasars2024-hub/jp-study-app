@@ -504,7 +504,7 @@ export function finalizeRegions(
 
 function pick2dMask(outputs: OrtNamespace.Tensor[]): Float32Array | null {
   // Prefer the output whose spatial size is closest to DETECT_SIZE²
-  let best: { t: ort.Tensor; score: number } | null = null;
+  let best: { t: OrtNamespace.Tensor; score: number } | null = null;
   for (const t of outputs) {
     if (t.dims.length < 2) continue;
     const h = t.dims[t.dims.length - 2];
@@ -2012,7 +2012,7 @@ export function registerMangaOcrIpc(): void {
       itemId: r.itemId,
       mediaUrl: r.mediaUrl,
       regionId: r.regionId,
-      ...(hasLines ? { lines: r.lines.map(String) } : null),
+      ...(hasLines && r.lines ? { lines: r.lines.map(String) } : null),
       ...(hasKind ? { kind: r.kind } : null),
       ...(hasVertical ? { vertical: r.vertical } : null),
     });

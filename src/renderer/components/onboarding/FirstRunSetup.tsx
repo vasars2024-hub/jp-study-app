@@ -52,6 +52,7 @@ import {
   whisperJob,
 } from './firstRunDownloads';
 import HelpLink from './HelpLink';
+import PlacementQuiz, { FirstRunAiRow } from './FirstRunAi';
 import Icon, { type IconName } from '../Icons';
 import './firstRun.css';
 
@@ -324,6 +325,8 @@ function LevelStep({
 }) {
   const { t } = useT();
   const seedCount = useMemo(() => seedWordsFor(studyLang, level).length, [studyLang, level]);
+  // Optional: a short placement check that only SUGGESTS a level (FirstRunAi.tsx).
+  const [placementOpen, setPlacementOpen] = useState(false);
   return (
     <>
       <div className="frs-choice-list" role="radiogroup" aria-label={t('onb2.step.level.title')}>
@@ -341,6 +344,15 @@ function LevelStep({
           </button>
         ))}
       </div>
+      {placementOpen ? (
+        <PlacementQuiz studyLang={studyLang} onLevel={onLevel} onClose={() => setPlacementOpen(false)} />
+      ) : (
+        <div className="frs-row">
+          <button type="button" className="btn" onClick={() => setPlacementOpen(true)}>
+            {t('aiTutor.placement.open')}
+          </button>
+        </div>
+      )}
       <label className={`frs-check${seedCount === 0 ? ' is-disabled' : ''}`}>
         <input
           type="checkbox"
@@ -501,6 +513,7 @@ function DownloadsStep({ studyLang }: { studyLang: StudyLang }) {
         {rows.map((row) => (
           <DownloadRow key={row.id} row={row} />
         ))}
+        <FirstRunAiRow />
       </ul>
       <p className="frs-note">
         {t('onb2.dl.background')}

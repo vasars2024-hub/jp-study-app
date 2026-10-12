@@ -10,7 +10,12 @@ import type { SourceLang } from './types';
 import { writeLocalStorageJson } from '../localStorageWrite';
 
 export type ArenaLevelOverride = 'auto' | LevelTier;
-export type MirrorEvaluatorBackend = 'local' | 'api';
+/**
+ * `local`: the instant rubric. `app-ai`: the provider and engine set in
+ * Settings > AI (falls back to the rubric while AI is not set up). `api`: the
+ * user's own OpenAI-compatible endpoint (OpenAI, Ollama, LM Studio, …).
+ */
+export type MirrorEvaluatorBackend = 'local' | 'app-ai' | 'api';
 
 export interface GameArenaSettings {
   gameLength: number;
@@ -18,8 +23,15 @@ export interface GameArenaSettings {
   levelOverride: ArenaLevelOverride;
   sounds: boolean;
   mirrorBackend: MirrorEvaluatorBackend;
+  /**
+   * The user picked `mirrorBackend` themselves. Until they do, the default is
+   * `app-ai` — so a learner who sets up AI gets real feedback without finding
+   * this setting — and an older stored `local` that nobody chose follows it.
+   */
+  mirrorBackendChosen: boolean;
   mirrorApiUrl: string;
-  mirrorApiKey: string;
+  /** Sent as `model`: OpenAI and every local server reject a request without one. */
+  mirrorApiModel: string;
   /** Kana Sprint scope — auto widens with progress, manual is the user's pick. */
   kana: KanaSelection;
   /**
@@ -54,9 +66,10 @@ export const DEFAULT_GAME_ARENA_SETTINGS: GameArenaSettings = {
   sourceLang: 'en',
   levelOverride: 'auto',
   sounds: true,
-  mirrorBackend: 'local',
+  mirrorBackend: 'app-ai',
+  mirrorBackendChosen: false,
   mirrorApiUrl: '',
-  mirrorApiKey: '',
+  mirrorApiModel: '',
   kana: DEFAULT_KANA_SELECTION,
   material: 'auto',
   arcadeStudyGate: true,
@@ -100,6 +113,59 @@ function validLevelOverride(value: unknown): value is ArenaLevelOverride {
   return value === 'auto' || value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7;
 }
 
+function mirrorBackendFrom(parsed: Partial<GameArenaSettings>): MirrorEvaluatorBackend {
+  const stored = parsed.mirrorBackend;
+  if (parsed.mirrorBackendChosen === true && (stored === 'local' || stored === 'app-ai' || stored === 'api')) {
+    return stored;
+  }
+  // Never chosen: an endpoint someone configured is still theirs; anything else
+  // takes the default.
+  return stored === 'api' ? 'api' : DEFAULT_GAME_ARENA_SETTINGS.mirrorBackend;
+}
+
+/**
+ * The Mirror Writing key an older build left in plain localStorage, or ''.
+ * Read only to move it into the credential vault (`migrateMirrorApiKey`).
+ */
+export function legacyMirrorApiKey(): string {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return '';
+    const parsed = JSON.parse(raw) as { mirrorApiKey?: unknown };
+    return typeof parsed.mirrorApiKey === 'string' ? parsed.mirrorApiKey.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Rewrites the stored settings without the legacy key. */
+function dropLegacyMirrorApiKey(): void {
+  writeLocalStorageJson(KEY, loadGameArenaSettings());
+}
+
+interface MirrorKeyBridge {
+  setCredentialSecret?: (id: string, field: string, secret: string) => Promise<{ ok: boolean }>;
+}
+
+/**
+ * Moves a key an older build stored in localStorage into the encrypted vault.
+ * The plaintext copy is removed only after the vault confirms the write — the
+ * policy `credentials/ai.ts` follows — so a machine without OS encryption keeps
+ * the only copy rather than losing it.
+ */
+export async function migrateMirrorApiKey(credentialId: string): Promise<void> {
+  const key = legacyMirrorApiKey();
+  if (!key) return;
+  const api = typeof window !== 'undefined' ? (window as { api?: MirrorKeyBridge }).api : undefined;
+  if (typeof api?.setCredentialSecret !== 'function') return;
+  try {
+    const result = await api.setCredentialSecret(credentialId, 'apiKey', key);
+    if (result.ok) dropLegacyMirrorApiKey();
+  } catch {
+    // Tried again next time the settings are opened.
+  }
+}
+
 export function loadGameArenaSettings(): GameArenaSettings {
   try {
     const raw = localStorage.getItem(KEY);
@@ -110,9 +176,10 @@ export function loadGameArenaSettings(): GameArenaSettings {
       sourceLang: validSourceLang(parsed.sourceLang) ? parsed.sourceLang : DEFAULT_GAME_ARENA_SETTINGS.sourceLang,
       levelOverride: validLevelOverride(parsed.levelOverride) ? parsed.levelOverride : DEFAULT_GAME_ARENA_SETTINGS.levelOverride,
       sounds: typeof parsed.sounds === 'boolean' ? parsed.sounds : DEFAULT_GAME_ARENA_SETTINGS.sounds,
-      mirrorBackend: parsed.mirrorBackend === 'api' ? 'api' : 'local',
+      mirrorBackend: mirrorBackendFrom(parsed),
+      mirrorBackendChosen: parsed.mirrorBackendChosen === true,
       mirrorApiUrl: typeof parsed.mirrorApiUrl === 'string' ? parsed.mirrorApiUrl : '',
-      mirrorApiKey: typeof parsed.mirrorApiKey === 'string' ? parsed.mirrorApiKey : '',
+      mirrorApiModel: typeof parsed.mirrorApiModel === 'string' ? parsed.mirrorApiModel.trim().slice(0, 128) : '',
       kana: sanitizeKana(parsed.kana),
       material: validMaterial(parsed.material) ? parsed.material : 'auto',
       arcadeStudyGate: typeof parsed.arcadeStudyGate === 'boolean' ? parsed.arcadeStudyGate : DEFAULT_GAME_ARENA_SETTINGS.arcadeStudyGate,
@@ -133,8 +200,11 @@ export function saveGameArenaSettings(patch: Partial<GameArenaSettings>): GameAr
     kana: sanitizeKana(patch.kana ?? current.kana),
     material: validMaterial(patch.material) ? patch.material : current.material,
   };
-  // A failed write only means the defaults come back on next boot.
-  writeLocalStorageJson(KEY, next);
+  // A failed write only means the defaults come back on next boot. A legacy
+  // plaintext key is carried over until `migrateMirrorApiKey` has it safely in
+  // the vault: dropping it on an unrelated save would lose the user's only copy.
+  const legacyKey = legacyMirrorApiKey();
+  writeLocalStorageJson(KEY, legacyKey ? { ...next, mirrorApiKey: legacyKey } : next);
   window.dispatchEvent(new CustomEvent(GAME_ARENA_SETTINGS_EVENT));
   return next;
 }

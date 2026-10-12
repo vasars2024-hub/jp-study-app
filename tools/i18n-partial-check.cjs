@@ -119,7 +119,10 @@ const PROP = /\b(label|hint|description|placeholder|emptyText|subtitle)\s*:\s*([
 const TEXT = /(?<![=!<>-])>([^<>{}\n]{2,120})<(?!=)/g;
 
 function scan(rel) {
-  const raw = fs.readFileSync(path.join(SRC, rel), 'utf8');
+  // `resolve`, not `join`: an absolute path is taken as-is, which is what lets
+  // the shadow gate's test scan a planted COPY in a temp dir instead of editing
+  // a real source file that other test workers are importing at the same time.
+  const raw = fs.readFileSync(path.resolve(SRC, rel), 'utf8');
   // A file that adopted NO string system is the OTHER tool's business, not this
   // one's. `sx(` counts, and leaving it out was D417: `i18n-hardcoded-check`
   // treats `sx(` as adoption (correctly — the Scraper app is on its own string

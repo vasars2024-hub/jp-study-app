@@ -61,7 +61,10 @@ export default function CalendarView() {
     {
       id: 'file',
       label: t('calendar.aero.menu.file'),
-      items: [{ id: 'new', label: t('calendar.newEvent'), onSelect: () => openNew(toKey(cursor)) }],
+      items: [
+        { id: 'new', label: t('calendar.newEvent'), onSelect: () => openNew(toKey(cursor)) },
+        { id: 'export-ics', label: t('planner.ics.export'), disabled: events.length === 0, onSelect: state.exportIcs },
+      ],
     },
     {
       id: 'view',

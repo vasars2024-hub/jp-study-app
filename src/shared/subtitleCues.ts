@@ -173,17 +173,106 @@ export function keepJapaneseStyleCues(cues: Cue[]): StyleScriptSplit {
   };
 }
 
-export function parseSrtVtt(raw: string): Cue[] {
-  const cues: Cue[] = [];
-  for (const block of raw.split(/\n\s*\n/)) {
-    const lines = block.split('\n');
-    const i = lines.findIndex((l) => l.includes('-->'));
-    if (i === -1) continue;
-    const [a, b] = lines[i].split('-->');
-    const text = cleanLine(lines.slice(i + 1).join('\n'));
-    if (text) cues.push({ start: toSeconds(a), end: toSeconds(b), text });
+/** YouTube's word-timing tag inside an auto-caption cue: `<00:00:01.234>`. */
+const INLINE_CUE_TIMESTAMP = /<(?:\d{1,2}:)?\d{2}:\d{2}[.,]\d{3}>/;
+
+interface RawCue {
+  start: number;
+  end: number;
+  lines: string[];
+}
+
+/**
+ * Cue blocks, line by line. A cue's text runs until a truly EMPTY line; a line
+ * holding only spaces is part of the cue. YouTube's auto-captions open every
+ * cue with such a spacer line, and splitting on `\n\s*\n` cut those cues in
+ * half, so the line being spoken was lost and only the 10 ms "carry" cues were
+ * left. An SRT index line right before a timing line is not text either.
+ */
+function rawSrtVttCues(raw: string): RawCue[] {
+  const lines = raw.split('\n');
+  const cues: RawCue[] = [];
+  let current: RawCue | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes('-->')) {
+      const [a, b] = line.split('-->');
+      current = { start: toSeconds(a), end: toSeconds(b), lines: [] };
+      cues.push(current);
+      continue;
+    }
+    if (!current) continue;
+    if (line === '') {
+      current = null;
+      continue;
+    }
+    if (!line.trim()) continue;
+    // A sloppy SRT separates cues with whitespace-only lines: its index line is not text.
+    if (/^\s*\d+\s*$/.test(line) && (lines[i + 1] ?? '').includes('-->')) continue;
+    current.lines.push(line);
   }
   return cues;
+}
+
+/**
+ * YouTube auto-captions "roll": each cue repeats the line before it above the
+ * new one, and a 10 ms cue between them holds the old line alone. Played as
+ * is, every subtitle shows two lines, mining takes both, and auto-pause stops
+ * on the 10 ms cues. Each line is kept once, from the cue that introduced it.
+ */
+function collapseRollingCues(cues: readonly RawCue[]): Cue[] {
+  const out: Cue[] = [];
+  let shown = new Set<string>();
+  for (const cue of cues) {
+    const lines = cue.lines.map((line) => cleanLine(line)).filter(Boolean);
+    let k = 0;
+    while (k < lines.length && shown.has(lines[k])) k++;
+    shown = new Set(lines);
+    const fresh = lines.slice(k);
+    const last = out[out.length - 1];
+    if (!fresh.length) {
+      // A carry cue: the line just shown, held on. It extends that line.
+      if (last && lines.length && cue.start - last.end < 0.05) last.end = Math.max(last.end, cue.end);
+      continue;
+    }
+    const text = fresh.join('\n');
+    if (last && last.text === text && cue.start - last.end < 0.05) {
+      last.end = Math.max(last.end, cue.end);
+      continue;
+    }
+    out.push({ start: cue.start, end: cue.end, text });
+  }
+  // A line stays up until the next one starts, not only for its typing cue.
+  for (let i = 0; i + 1 < out.length; i++) {
+    if (out[i + 1].start > out[i].end && out[i + 1].start - out[i].end < 0.05) out[i].end = out[i + 1].start;
+  }
+  return out;
+}
+
+/** Whether a track is in YouTube's rolling auto-caption form. */
+export function isRollingCaptionTrack(raw: string): boolean {
+  if (INLINE_CUE_TIMESTAMP.test(raw)) return true;
+  // The same shape converted to SRT (no timing tags left): most cues open with the previous cue's last line.
+  const cues = rawSrtVttCues(raw.replace(/\r/g, ''));
+  if (cues.length < 6) return false;
+  let carried = 0;
+  for (let i = 1; i < cues.length; i++) {
+    const previous = cues[i - 1].lines.map((line) => cleanLine(line)).filter(Boolean);
+    const first = cues[i].lines.map((line) => cleanLine(line)).find(Boolean);
+    if (first && previous.length && previous[previous.length - 1] === first) carried += 1;
+  }
+  return carried / (cues.length - 1) >= 0.6;
+}
+
+export function parseSrtVtt(raw: string): Cue[] {
+  const cues = rawSrtVttCues(raw);
+  if (isRollingCaptionTrack(raw)) return collapseRollingCues(cues);
+  const out: Cue[] = [];
+  for (const cue of cues) {
+    const text = cleanLine(cue.lines.join('\n'));
+    if (text) out.push({ start: cue.start, end: cue.end, text });
+  }
+  return out;
 }
 // LRC lyric files: `[mm:ss.xx] lyric line` (a line may carry several time tags).
 // Each lyric shows until the next one starts — synced karaoke-style.

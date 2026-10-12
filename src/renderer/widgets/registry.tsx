@@ -2,7 +2,7 @@
 // means writing a small component and appending one WidgetDef here. WidgetFrame
 // and WidgetGallery both read from WIDGETS, so nothing else needs to change.
 
-import type { WidgetDef } from './types';
+import type { WidgetDef, WidgetSettingField } from './types';
 import {
   DigitalClock,
   AnalogClock,
@@ -24,6 +24,8 @@ import {
   ReadingListProgressWidget,
   ReadingNextUpWidget,
   ReadingRecentlyFinishedWidget,
+  useChallengeListOptions,
+  useReadingListOptions,
 } from './readingLists';
 import { MiniPlayer } from './music';
 import { SoundscapeWidget } from './soundscape';
@@ -41,17 +43,43 @@ import {
 } from './system';
 import { ReviewMeterGadget, WordSlideShowGadget } from './aeroStudyGadgets';
 
+// wid5: each configurable widget's popover fields. `fallback` repeats the
+// default the widget passes to `readSetting`; widgetSettingsPopover.test.tsx
+// renders every widget with a recording settings bag and fails on any setting
+// a widget reads that is not declared here.
+const CLOCK_SETTINGS: readonly WidgetSettingField[] = [
+  { key: 'hour24', kind: 'toggle', labelKey: 'wid5.settings.hour24', fallback: true },
+  { key: 'showSeconds', kind: 'toggle', labelKey: 'wid5.settings.showSeconds', fallback: true },
+];
+const POMODORO_SETTINGS: readonly WidgetSettingField[] = [
+  { key: 'workMin', kind: 'number', labelKey: 'wid5.settings.workMin', fallback: 25, min: 1, max: 90 },
+  { key: 'breakMin', kind: 'number', labelKey: 'wid5.settings.breakMin', fallback: 5, min: 1, max: 60 },
+];
+const COUNTDOWN_SETTINGS: readonly WidgetSettingField[] = [
+  { key: 'minutes', kind: 'number', labelKey: 'wid5.settings.countdownMin', fallback: 10, min: 1, max: 999 },
+];
+const READING_LIST_SETTINGS: readonly WidgetSettingField[] = [
+  { key: 'listId', kind: 'select', labelKey: 'wid5.settings.readingList', fallback: '', useOptions: useReadingListOptions },
+];
+const CHALLENGE_SETTINGS: readonly WidgetSettingField[] = [
+  { key: 'listId', kind: 'select', labelKey: 'wid5.settings.readingList', fallback: '', useOptions: useChallengeListOptions },
+];
+const SLIDESHOW_SETTINGS: readonly WidgetSettingField[] = [
+  { key: 'intervalSec', kind: 'number', labelKey: 'wid5.settings.slideSeconds', fallback: 8, min: 3, max: 60 },
+  { key: 'paused', kind: 'toggle', labelKey: 'wid5.settings.paused', fallback: false },
+];
+
 export const WIDGETS: WidgetDef[] = [
   // ---- Productivity ----
-  { type: 'clock-digital', titleKey: 'widgets.title.clock-digital', category: 'Productivity', descKey: 'widgets.desc.clock-digital', defaultSize: { w: 240, h: 140 }, minSize: { w: 160, h: 96 }, component: DigitalClock },
+  { type: 'clock-digital', titleKey: 'widgets.title.clock-digital', category: 'Productivity', descKey: 'widgets.desc.clock-digital', defaultSize: { w: 240, h: 140 }, minSize: { w: 160, h: 96 }, component: DigitalClock, settingsSchema: CLOCK_SETTINGS },
   { type: 'clock-analog', titleKey: 'widgets.title.clock-analog', category: 'Productivity', descKey: 'widgets.desc.clock-analog', defaultSize: { w: 200, h: 200 }, minSize: { w: 120, h: 120 }, component: AnalogClock },
   { type: 'calendar', titleKey: 'widgets.title.calendar', category: 'Productivity', descKey: 'widgets.desc.calendar', defaultSize: { w: 280, h: 260 }, minSize: { w: 220, h: 220 }, component: CalendarWidget },
-  { type: 'pomodoro', titleKey: 'widgets.title.pomodoro', category: 'Productivity', descKey: 'widgets.desc.pomodoro', defaultSize: { w: 240, h: 240 }, minSize: { w: 200, h: 220 }, component: Pomodoro },
+  { type: 'pomodoro', titleKey: 'widgets.title.pomodoro', category: 'Productivity', descKey: 'widgets.desc.pomodoro', defaultSize: { w: 240, h: 240 }, minSize: { w: 200, h: 220 }, component: Pomodoro, settingsSchema: POMODORO_SETTINGS },
   { type: 'stopwatch', titleKey: 'widgets.title.stopwatch', category: 'Productivity', descKey: 'widgets.desc.stopwatch', defaultSize: { w: 240, h: 140 }, minSize: { w: 180, h: 120 }, component: Stopwatch },
   { type: 'world-clock', titleKey: 'widgets.title.world-clock', category: 'Productivity', descKey: 'widgets.desc.world-clock', defaultSize: { w: 260, h: 220 }, minSize: { w: 200, h: 160 }, component: WorldClock },
   { type: 'daily-goals', titleKey: 'widgets.title.daily-goals', category: 'Productivity', descKey: 'widgets.desc.daily-goals', defaultSize: { w: 280, h: 280 }, minSize: { w: 220, h: 180 }, component: DailyGoals },
   { type: 'habit-tracker', titleKey: 'widgets.title.habit-tracker', category: 'Productivity', descKey: 'widgets.desc.habit-tracker', defaultSize: { w: 300, h: 260 }, minSize: { w: 240, h: 180 }, component: HabitTracker },
-  { type: 'countdown', titleKey: 'widgets.title.countdown', category: 'Productivity', descKey: 'widgets.desc.countdown', defaultSize: { w: 260, h: 150 }, minSize: { w: 200, h: 130 }, component: Countdown },
+  { type: 'countdown', titleKey: 'widgets.title.countdown', category: 'Productivity', descKey: 'widgets.desc.countdown', defaultSize: { w: 260, h: 150 }, minSize: { w: 200, h: 130 }, component: Countdown, settingsSchema: COUNTDOWN_SETTINGS },
   { type: 'todo', titleKey: 'widgets.title.todo', category: 'Productivity', descKey: 'widgets.desc.todo', defaultSize: { w: 280, h: 300 }, minSize: { w: 200, h: 180 }, component: TodoList },
 
   // ---- Study ----
@@ -69,9 +97,9 @@ export const WIDGETS: WidgetDef[] = [
   // Reading Lists §11.2. `reading-list-finished` derives its row count from its
   // own height, so its minimum is the height that still shows one row plus the
   // frame's 30px title bar and `.widget-body`'s padding.
-  { type: 'reading-list-progress', titleKey: 'widgets.title.reading-list-progress', category: 'Study', descKey: 'widgets.desc.reading-list-progress', defaultSize: { w: 300, h: 260 }, minSize: { w: 220, h: 200 }, component: ReadingListProgressWidget },
-  { type: 'reading-next-up', titleKey: 'widgets.title.reading-next-up', category: 'Study', descKey: 'widgets.desc.reading-next-up', defaultSize: { w: 220, h: 240 }, minSize: { w: 170, h: 180 }, component: ReadingNextUpWidget },
-  { type: 'reading-challenge-pace', titleKey: 'widgets.title.reading-challenge-pace', category: 'Study', descKey: 'widgets.desc.reading-challenge-pace', defaultSize: { w: 300, h: 160 }, minSize: { w: 230, h: 130 }, component: ReadingChallengePaceWidget },
+  { type: 'reading-list-progress', titleKey: 'widgets.title.reading-list-progress', category: 'Study', descKey: 'widgets.desc.reading-list-progress', defaultSize: { w: 300, h: 260 }, minSize: { w: 220, h: 200 }, component: ReadingListProgressWidget, settingsSchema: READING_LIST_SETTINGS },
+  { type: 'reading-next-up', titleKey: 'widgets.title.reading-next-up', category: 'Study', descKey: 'widgets.desc.reading-next-up', defaultSize: { w: 220, h: 240 }, minSize: { w: 170, h: 180 }, component: ReadingNextUpWidget, settingsSchema: READING_LIST_SETTINGS },
+  { type: 'reading-challenge-pace', titleKey: 'widgets.title.reading-challenge-pace', category: 'Study', descKey: 'widgets.desc.reading-challenge-pace', defaultSize: { w: 300, h: 160 }, minSize: { w: 230, h: 130 }, component: ReadingChallengePaceWidget, settingsSchema: CHALLENGE_SETTINGS },
   { type: 'reading-list-finished', titleKey: 'widgets.title.reading-list-finished', category: 'Study', descKey: 'widgets.desc.reading-list-finished', defaultSize: { w: 300, h: 200 }, minSize: { w: 220, h: 90 }, component: ReadingRecentlyFinishedWidget },
 
   // ---- Statistics ----
@@ -79,7 +107,7 @@ export const WIDGETS: WidgetDef[] = [
   { type: 'learner-map', titleKey: 'widgets.title.learner-map', category: 'Statistics', descKey: 'widgets.desc.learner-map', defaultSize: { w: 420, h: 280 }, minSize: { w: 280, h: 180 }, component: LearnerMapWidget },
   // Sidebar-gadget-shaped study meters (Aero mechanics); ordinary widgets in every theme.
   { type: 'review-meter', titleKey: 'aeroMech.widget.reviewMeter.title', category: 'Statistics', descKey: 'aeroMech.widget.reviewMeter.desc', defaultSize: { w: 220, h: 150 }, minSize: { w: 170, h: 110 }, component: ReviewMeterGadget },
-  { type: 'word-slideshow', titleKey: 'aeroMech.widget.slides.title', category: 'Study', descKey: 'aeroMech.widget.slides.desc', defaultSize: { w: 240, h: 180 }, minSize: { w: 180, h: 130 }, component: WordSlideShowGadget },
+  { type: 'word-slideshow', titleKey: 'aeroMech.widget.slides.title', category: 'Study', descKey: 'aeroMech.widget.slides.desc', defaultSize: { w: 240, h: 180 }, minSize: { w: 180, h: 130 }, component: WordSlideShowGadget, settingsSchema: SLIDESHOW_SETTINGS },
 
   // ---- Music ----
   { type: 'mini-player', titleKey: 'widgets.title.mini-player', category: 'Music', descKey: 'widgets.desc.mini-player', defaultSize: { w: 300, h: 200 }, minSize: { w: 240, h: 180 }, component: MiniPlayer },

@@ -20,7 +20,7 @@ import {
   type LocalDeckFieldPatch,
   type LocalDeckWritableField,
 } from '../../../shared/ankiWorkbenchPersistence';
-import { applyDeckFieldPatches, loadDeck, loadDeckAsAnkiDraft } from '../../flashcardDeck';
+import { applyDeckFieldPatches, loadDeck, loadDeckFingerprint } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 
 type Outcome =
@@ -64,8 +64,9 @@ export default function DeckWorkbenchLocalApply({
   const write = (): void => {
     // The deck may have changed since the workbench read it — a review, a mined
     // card, an edit in Flashcards. Writing a patch computed against the old
-    // deck could overwrite that, so it is refused and the reason said.
-    if (loadDeckAsAnkiDraft().draft.source.fingerprint !== draft.source.fingerprint) {
+    // deck could overwrite that, so it is refused and the reason said. Only the
+    // fingerprint is compared, so the draft is not rebuilt for it.
+    if (loadDeckFingerprint() !== draft.source.fingerprint) {
       setOutcome({ kind: 'stale' });
       return;
     }

@@ -13,6 +13,7 @@ import {
   // every v3 patch.
   type ScraperSettingsPatch,
 } from '../shared/scraperSettings';
+import type { ScraperSettingsIssue } from '../shared/scraperSettingsPrimitives';
 import { syncQbitConfigToMain } from './mediaIngestBridge';
 import { syncSchedulerConfigToMain } from './scraperSchedulerBridge';
 

@@ -16,10 +16,12 @@
  * else's), so they are decided here and tested without a filesystem.
  */
 
+import { hasCardAiExtras, pickCardAiExtras, type CardAiExtras } from './cardAiExtras';
+import { cardAiExtrasHtml, type CardAiExtrasLabels } from './cardAiExtrasHtml';
 import type { LocalSrsState } from './localSrs';
 
 /** The card fields this export reads. Structural, so both card shapes fit. */
-export interface DeckMediaExportCard {
+export interface DeckMediaExportCard extends CardAiExtras {
   id: string;
   word?: string;
   reading?: string;
@@ -42,6 +44,11 @@ export interface DeckMediaExportOptions {
   includeImages?: boolean;
   /** Return each card's schedule so the package keeps reviewed cards reviewed. */
   includeSchedule?: boolean;
+  /**
+   * Headings for the `Notes` column (`shared/cardAiExtras.ts`), in the UI
+   * language. The column itself is added whenever a card carries saved extras.
+   */
+  notesLabels?: CardAiExtrasLabels;
 }
 
 /** One file to write next to the text export. */
@@ -62,6 +69,8 @@ export interface DeckMediaExport {
   withoutAudio: number;
   /** Per card row, with `includeSchedule`: what the package writes as Anki scheduling columns. */
   schedules?: Array<{ srs?: LocalSrsState; suspended?: boolean } | null>;
+  /** Per card row, when any card has saved extras: the package builds its Notes field from these. */
+  notes?: Array<CardAiExtras | null>;
 }
 
 export const DECK_EXPORT_HEADERS = [
@@ -115,10 +124,19 @@ export function buildDeckMediaExport(
   cards: readonly DeckMediaExportCard[],
   options: DeckMediaExportOptions = {},
 ): DeckMediaExport {
-  const rows: string[][] = [options.includeImages ? [...DECK_EXPORT_HEADERS, 'Image'] : [...DECK_EXPORT_HEADERS]];
+  // The learner-approved extras (memory aid, notes, kept examples, accepted
+  // answers) ride in a `Notes` column — added only when some card has them, so
+  // a deck without them exports exactly the columns it always did.
+  const withNotes = cards.some(hasCardAiExtras);
+  const rows: string[][] = [[
+    ...DECK_EXPORT_HEADERS,
+    ...(options.includeImages ? ['Image'] : []),
+    ...(withNotes ? ['Notes'] : []),
+  ]];
   const media: DeckMediaItem[] = [];
   const used = new Set<string>();
   const schedules: Array<{ srs?: LocalSrsState; suspended?: boolean } | null> = [];
+  const notes: Array<CardAiExtras | null> = [];
   let withoutAudio = 0;
   // Two cards sharing an id would be a bug elsewhere, but a collision here
   // would silently export one card's media under another's name.
@@ -157,6 +175,10 @@ export function buildDeckMediaExport(
       }
       row.push(imageName ? `<img src="${imageName}">` : '');
     }
+    if (withNotes) {
+      row.push(cardAiExtrasHtml(card, options.notesLabels));
+      notes.push(pickCardAiExtras(card) ?? null);
+    }
     rows.push(row);
     if (options.includeSchedule) {
       schedules.push(card.srs || card.suspended
@@ -165,7 +187,7 @@ export function buildDeckMediaExport(
     }
   }
 
-  return { rows, media, withoutAudio, ...(options.includeSchedule ? { schedules } : {}) };
+  return { rows, media, withoutAudio, ...(options.includeSchedule ? { schedules } : {}), ...(withNotes ? { notes } : {}) };
 }
 
 const IMAGE_EXTENSION = /\.(png|jpe?g|webp|gif|avif)$/i;

@@ -45,7 +45,11 @@ module.exports = {
       await rowsFor(word);
       levels[word] = await readRow(word);
     }
-    result.check('every imported word is listed as Known, set by hand', list.unique.every((w) => levels[w] && /Known/i.test(levels[w].level) && /hand|manual/i.test(levels[w].source)), levels);
+    // A word the profile already knew (e.g. read in the EPUB earlier in the run) is
+    // "already at that level" and keeps its source; every other one is set by hand.
+    const already = tally[2] ?? 0;
+    const byHand = list.unique.filter((w) => levels[w] && /hand|manual/i.test(levels[w].source)).length;
+    result.check('every imported word is listed as Known; the new ones set by hand', list.unique.every((w) => levels[w] && /Known/i.test(levels[w].level)) && byHand >= list.unique.length - already, { levels, already });
 
     // Bulk: select two of them and set them to Learning.
     const pick = ['雀', '台所'];

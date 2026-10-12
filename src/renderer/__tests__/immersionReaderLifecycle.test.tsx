@@ -47,7 +47,7 @@ let state: ImmersionState;
 /** Resolvers for every in-flight `extractReadableArticle`, oldest first. */
 let pending: Array<(value: unknown) => void>;
 const extract = vi.fn(() => new Promise((resolve) => { pending.push(resolve); }));
-const recordVisit = vi.fn(async () => ({ ok: true }));
+const recordVisit = vi.fn(async (_visit?: unknown) => ({ ok: true }));
 
 async function mount() {
   const { useImmersion } = await import('../components/immersion/ImmersionContent');

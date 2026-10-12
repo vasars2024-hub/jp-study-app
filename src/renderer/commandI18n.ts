@@ -1,5 +1,6 @@
 import type { CommandCategory } from './keyboardShortcuts';
 import type { TVars } from '../shared/i18n/core';
+import { fillNoteKeys } from './shortcutHints';
 
 type TFn = (key: string, vars?: TVars) => string;
 
@@ -47,8 +48,11 @@ export function commandNote(
 ): string | undefined {
   if (!fallback) return fallback;
   const key = commandNoteKey(id);
-  const out = t(key);
-  if (out === key) return fallback;
+  const translated = t(key);
+  // kbd5: a note that names another command's keys carries `{keys}`, filled
+  // with that command's live binding (shortcutHints.NOTE_KEY_REFS).
+  if (translated === key) return fillNoteKeys(id, fallback);
+  const out = fillNoteKeys(id, translated);
   if (!scope) return out;
   const scopeKey = `shortcut.scope.${scope}`;
   const scopeText = t(scopeKey);

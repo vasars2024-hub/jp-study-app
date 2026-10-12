@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, shell, ipcMain, dialog, globalShortcut, session, type OpenDialogOptions } from 'electron';
+import { app, BrowserWindow, protocol, net, shell, ipcMain, dialog, globalShortcut, session, powerMonitor, type OpenDialogOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -17,10 +17,13 @@ import { createLockGate, registerLockscreenPinIpc, type LockGate } from './main/
 import {
   createLockGuard,
   installLockGuard,
+  refuseRestartWhileLocked,
   refuseWhileLocked,
   type LockBlockNotice,
   type LockGuard,
 } from './main/lockGuard';
+import { installIpcLockGate } from './main/lockIpcGate';
+import { installLockAutoArm } from './main/lockAutoArm';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, listLibraryItems, onLibraryItemsAdded } from './main/library';
 import { loadAfterCacheClear, loadWindowWithRetry, loadWithRetry } from './main/bootLoad';
 import { registerReadingListsIpc } from './main/readingListsIpc';
@@ -58,6 +61,10 @@ import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
 import { registerSentenceAnalysisIpc } from './main/sentenceAnalysis';
 import { registerVideoClipIpc } from './main/videoClip';
 import { registerMediaStudyAssistantIpc } from './main/mediaStudyAssistant';
+import { registerAiStudyAssistIpc } from './main/aiStudyAssist';
+import { registerAiImmerseAssistIpc } from './main/aiImmerseAssist';
+import { registerAiTutorAssistIpc } from './main/aiTutorAssist';
+import { registerAiSpeakAssistIpc } from './main/aiSpeakAssist';
 import { registerMediaStudyOrchestratorIpc } from './main/mediaStudyOrchestrator';
 import { registerLocalAgentIpc, stopLocalAgentRuntime } from './main/localAgent';
 import { setAgentNavigationOpener } from './main/agentNavigationIpc';
@@ -83,7 +90,7 @@ import {
   installWebContentsHardening,
   makeAppOriginPolicy,
 } from './main/securityHardening';
-import { flushAllJsonWriters, readJsonSync, setAtomicJsonLogger, writeJsonAtomicSync } from './main/atomicJson';
+import { flushAllJsonWriters, readJsonDetailedSync, readJsonSync, setAtomicJsonLogger, writeJsonAtomicSync } from './main/atomicJson';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
 import { registerStatsIpc } from './main/stats';
@@ -162,6 +169,13 @@ import {
   stopCompanion,
 } from './main/companion';
 import { stopCompanionContext } from './main/companionContext';
+import {
+  configureSnipToCards,
+  registerSnipToCardsIpc,
+  snipTrayItems,
+  startSnipToCards,
+  stopSnipToCards,
+} from './main/snipToCards';
 import {
   isOsHotkeyHelperInstalled,
   registerOsHotkeyHelperIpc,
@@ -247,7 +261,7 @@ let pendingOpenSection: string | null = null;
 const ARGV_OPEN_SECTIONS = new Set([
   'library', 'novels', 'reading', 'dictionary', 'grammar', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
-  'calendar', 'settings', 'youtube', 'scraper', 'files', 'visualnovels',
+  'calendar', 'settings', 'youtube', 'scraper', 'files', 'visualnovels', 'snips', 'conversation',
 ]);
 
 export function argvWantsToggle(argv: string[] = process.argv): boolean {
@@ -296,10 +310,17 @@ let lockGateInstance: LockGate | null = null;
 function lockGate(): LockGate {
   if (!lockGateInstance) {
     const file = path.join(app.getPath('userData'), 'lockscreen-lock.json');
+    // Restored from last-good, or unreadable: the attempt state is not trusted (risk4).
+    let lockFileDamaged = false;
     lockGateInstance = createLockGate(
       {
-        read: () => readJsonSync<unknown>(file, null) as ReturnType<LockGate['record']>,
+        read: () => {
+          const res = readJsonDetailedSync<unknown>(file, null);
+          lockFileDamaged = res.source === 'backup' || res.source === 'fallback';
+          return res.value as ReturnType<LockGate['record']>;
+        },
         write: (record) => writeJsonAtomicSync(file, record),
+        damaged: () => lockFileDamaged,
       },
       // Arming hides every content window; a verified PIN restores them (lockGuard.ts).
       (locked) => (locked ? lockGuard.engage() : lockGuard.release()),
@@ -372,6 +393,8 @@ app.on('second-instance', (_event, argv, workingDirectory) => {
     return;
   }
   if (argvWantsRestart(argv)) {
+    // Locked: no restart (risk4). The refusal brings the PIN pad forward.
+    if (refuseRestartWhileLocked('second-instance')) return;
     app.relaunch();
     app.exit(0);
     return;
@@ -418,6 +441,10 @@ const appOriginPolicy = makeAppOriginPolicy(isDevServer() ? MAIN_WINDOW_VITE_DEV
 installIpcSenderGuard(ipcMain, appOriginPolicy, (channel, info) => {
   logDiagnostic('warn', 'security', 'ipc-refused', `${channel} from ${info.senderType} ${info.frameOrigin ?? 'no-frame'}`);
 });
+// lock3 (main/lockIpcGate.ts): while locked, no handler registered from here on
+// runs for any renderer except the lock's own channels; calls are held until
+// the PIN is entered. Installed before any handler, like the sender guard.
+installIpcLockGate(ipcMain, { log: (message) => logDiagnostic('info', 'lock', 'ipc', message) });
 installWebContentsHardening(app, appOriginPolicy, {
   openExternal: (url) => void shell.openExternal(url),
   onBlocked: (what, url) => logDiagnostic('warn', 'security', `blocked-${what}`, url.slice(0, 300)),
@@ -580,6 +607,7 @@ function registerShellIpc(): void {
 
 function registerAppLifecycleIpc(): void {
   ipcMain.handle('app:relaunch', (): { ok: boolean } => {
+    if (refuseRestartWhileLocked('ipc')) return { ok: false };
     app.relaunch();
     app.exit(0);
     return { ok: true };
@@ -1307,6 +1335,7 @@ function registerBlancIpc(): void {
     mainWindow.focus();
   }
   function fullyRestartApp(): void {
+    if (refuseRestartWhileLocked('command')) return;
     app.relaunch();
     app.exit(0);
   }
@@ -1325,6 +1354,10 @@ function registerBlancIpc(): void {
     available: () => !isOsHotkeyHelperInstalled(),
   });
   registerGlobalCommand('app.focus', () => focusApp());
+  // lock3: "Lock Gum now" from a chord, the tray or the palette. Needs a PIN.
+  registerGlobalCommand('app.lock', () => {
+    lockGate().lock();
+  });
 
   ipcMain.handle('app:toggle', (): { ok: boolean } => {
     toggleAppVisibility();
@@ -1623,7 +1656,8 @@ function registerLockscreenIpc(): void {
   ipcMain.handle(
     'lockscreen:open',
     (_e, size?: { width?: number; height?: number }): { ok: boolean } => {
-      lockGate().lock();
+      // No PIN, no lock: a PIN widget main is not locked behind could only trap the user.
+      if (!lockGate().lock()) return { ok: false };
       createLockscreenWindow(size);
       return { ok: true };
     },
@@ -1679,7 +1713,7 @@ const POPOUT_SECTIONS = new Set([
   'agent',
   'library', 'novels', 'reading', 'dictionary', 'grammar', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
-  'calendar', 'settings', 'youtube', 'scraper', 'files', 'visualnovels',
+  'calendar', 'settings', 'youtube', 'scraper', 'files', 'visualnovels', 'snips', 'conversation',
 ]);
 
 // One real OS window per section, max. Keyed here (not just left to the
@@ -2027,7 +2061,8 @@ app.whenReady().then(async () => {
   // Electron grants every permission by default; these are allow-lists.
   const onDenied = (permission: string, origin: string | null) =>
     logDiagnostic('info', 'security', 'permission-denied', `${permission} for ${origin ?? 'unknown'}`);
-  installPermissionPolicy(session.defaultSession, 'app', appOriginPolicy, onDenied);
+  // lock3: no clipboard reads or web notifications from an app page while locked.
+  installPermissionPolicy(session.defaultSession, 'app', appOriginPolicy, onDenied, { isLocked: isAppLocked });
   installPermissionPolicy(session.fromPartition('persist:immersion'), 'immersion', appOriginPolicy, onDenied);
   // The e2e harness drives an unpackaged PRODUCTION build (tools/e2e/build.cjs), which has
   // no dev server; startDebugBridge itself still refuses any packaged build.
@@ -2131,6 +2166,10 @@ app.whenReady().then(async () => {
   registerSentenceAnalysisIpc();
   registerVideoClipIpc();
   registerMediaStudyAssistantIpc();
+  registerAiStudyAssistIpc();
+  registerAiImmerseAssistIpc();
+  registerAiTutorAssistIpc();
+  registerAiSpeakAssistIpc();
   registerMediaStudyOrchestratorIpc();
   registerLocalAgentIpc();
   registerLocalAgentSchedulerIpc();
@@ -2205,6 +2244,15 @@ app.whenReady().then(async () => {
   registerMiniWidgetIpc();
   registerLockscreenIpc();
   registerLockscreenPinIpc(lockGate());
+  // lock3: idle / sleep / Windows-lock auto-lock, each opt-in, stored in main's record.
+  installLockAutoArm({
+    power: powerMonitor,
+    options: () => lockGate().autoLock(),
+    canLock: () => lockGate().status().hasPin,
+    isLocked: isAppLocked,
+    lock: () => lockGate().lock(),
+    log: (message) => logDiagnostic('info', 'lock', 'auto', message),
+  });
   registerPlayerSyncIpc();
   registerCompanionPacksIpc();
   configureCompanionHost({
@@ -2261,6 +2309,20 @@ app.whenReady().then(async () => {
     },
   });
   registerCompanionIpc();
+  // Snip to cards: a Win+Shift+S snip on the clipboard becomes cards, mined in the
+  // main window's renderer (or Blanc's, on a Blanc-only launch).
+  configureSnipToCards({
+    rendererUrl,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+    getMainWindow: () => mainWindow,
+    getBlancWindow: () => blancWindow,
+    ensureMainWindow: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) createWindow({ visible: false });
+    },
+  });
+  registerSnipToCardsIpc();
   // The VN reader window beside a running game (Visual Novels ▸ Launch).
   configureVisualNovelReader({
     rendererUrl,
@@ -2304,6 +2366,8 @@ app.whenReady().then(async () => {
     startRegionRecorder();
     // Companion wheel, card preview, mine-last, Mini View: their chords go live now.
     startCompanion();
+    // Snip to cards: start watching the clipboard for Win+Shift+S snips.
+    startSnipToCards();
     // Provision the offline dictionaries and load their metadata (pitch, IPA,
     // frequency) in the background. Its first step opens the dictionary database
     // synchronously, which is why it waits for the first frame. The term
@@ -2349,6 +2413,13 @@ function installAppTrayItems(): void {
       },
       // No "Record a region" row here: the companion half of this menu
       // (systemDictionary.ts) already runs `recorder.region`, and both rows showed.
+      // lock3: arm the lock from the tray (a no-op without a PIN).
+      {
+        label: mt('lock3.tray.lockNow'),
+        click: () => {
+          lockGate().lock();
+        },
+      },
       {
         label: mt('polish.tray.keepRunning'),
         type: 'checkbox' as const,
@@ -2357,6 +2428,8 @@ function installAppTrayItems(): void {
           setAppLifecyclePrefs({ keepRunningInTray: !loadAppLifecyclePrefs().keepRunningInTray });
         },
       },
+      // Snip to cards: watch the clipboard for snips (checkbox), and open its view.
+      ...snipTrayItems(),
       { type: 'separator' as const },
     ];
   });
@@ -2385,6 +2458,7 @@ app.on('will-quit', () => {
   stopSystemDictionary();
   stopReadingLens();
   stopCompanion();
+  stopSnipToCards();
   stopCompanionContext();
   stopGlobalCommands();
   stopDebugBridge();

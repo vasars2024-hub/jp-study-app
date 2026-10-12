@@ -32,7 +32,7 @@ export function useDebouncedValue<T>(value: T, delayMs: number): T {
  */
 export function useElementSize<T extends HTMLElement>(
   axis: 'both' | 'height' | 'width' = 'both',
-): [React.RefObject<T>, { width: number; height: number }] {
+): [React.RefObject<T | null>, { width: number; height: number }] {
   const ref = useRef<T>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   useEffect(() => {

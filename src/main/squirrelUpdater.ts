@@ -17,13 +17,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   classifyUpdateError,
+  DEFAULT_APP_UPDATE_PREFS,
+  sanitizeAppUpdatePrefs,
+  type AppUpdateChannel,
   type AppUpdateDetails,
   type AppUpdateErrorCode,
+  type AppUpdatePrefs,
+  type AppUpdateRestartResult,
   type AppUpdateStateKind,
   type AppUpdateStatus,
+  type AppUpdateUnsavedKind,
   type InstallKind,
 } from '../shared/appUpdate';
-import { GITHUB_OWNER, GITHUB_REPO } from '../shared/release';
+import { compareVersions, GITHUB_OWNER, GITHUB_REPO } from '../shared/release';
+import { squirrelFeedForRelease, type FeedFetch } from './releaseFeed';
 import { updateExePath } from './squirrelEvents';
 
 export const SQUIRREL_FEED_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download`;
@@ -97,6 +104,17 @@ export interface AppUpdateControllerDeps {
   /** Where the last check time survives a restart. */
   lastCheckedStore?: { load(): number | null; save(at: number): void };
   now?: () => number;
+  /** Channel + skipped version, kept beside the last check time. Absent: stable, nothing skipped. */
+  prefsStore?: { load(): AppUpdatePrefs; save(prefs: AppUpdatePrefs): void };
+  /**
+   * Read the channel's release from the feed BEFORE Squirrel is asked. With it, a
+   * check that finds nothing newer (or only the skipped version) never starts
+   * Update.exe, and beta points Squirrel at the picked pre-release's assets.
+   * Without it, every check goes straight to Squirrel (the old behaviour).
+   */
+  resolveRelease?: (channel: AppUpdateChannel) => Promise<FeedFetch>;
+  /** What a restart would cut short (a recording); a restart asks first when it is not empty. */
+  unsavedWork?: () => AppUpdateUnsavedKind[];
 }
 
 export interface AppUpdateController {
@@ -109,6 +127,14 @@ export interface AppUpdateController {
   checkNow(): AppUpdateDetails;
   /** Quit and apply a downloaded update. `false` when there is none to apply. */
   restart(): boolean;
+  /**
+   * The panel's "Restart to update": refuses (and says what) while a window
+   * reports unsaved work, unless `force` — the user has seen the warning.
+   */
+  requestRestart(force?: boolean): AppUpdateRestartResult;
+  prefs(): AppUpdatePrefs;
+  /** Change channel / skipped version. A channel change forgets the last check's answer. */
+  setPrefs(patch: Partial<AppUpdatePrefs>): AppUpdateDetails;
 }
 
 export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpdateController {
@@ -126,14 +152,28 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
     }
   })();
   const now = deps.now ?? Date.now;
+  let prefs: AppUpdatePrefs = (() => {
+    try {
+      return sanitizeAppUpdatePrefs(deps.prefsStore?.load() ?? DEFAULT_APP_UPDATE_PREFS);
+    } catch {
+      return { ...DEFAULT_APP_UPDATE_PREFS };
+    }
+  })();
+  const stableFeed = deps.feedUrl ?? SQUIRREL_FEED_URL;
+  let activeFeed = stableFeed;
+  let latestVersion: string | undefined;
+  /** Bumped by a channel change, so a feed answer for the old channel is dropped. */
+  let checkEpoch = 0;
 
   const status = (): AppUpdateStatus => ({ install: deps.install, state, ...(version ? { version } : {}) });
   const details = (): AppUpdateDetails => ({
     ...status(),
     current: deps.currentVersion ?? '',
-    channel: 'stable',
-    feedUrl: deps.feedUrl ?? SQUIRREL_FEED_URL,
+    channel: prefs.channel,
+    feedUrl: activeFeed,
     lastCheckedAt,
+    skippedVersion: prefs.skippedVersion,
+    ...(latestVersion ? { latestVersion } : {}),
     ...(state === 'downloading' && downloadStartedAt ? { downloadStartedAt } : {}),
     ...(state === 'error' ? { error: error ?? 'unknown' } : {}),
     ...(skippedMetered ? { skippedMetered: true } : {}),
@@ -168,6 +208,67 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
     } catch {
       /* the time is still right for this session */
     }
+    if (!deps.resolveRelease) {
+      askSquirrel();
+      return;
+    }
+    // Feed first: Squirrel (and its several-hundred-MB download) only for a
+    // newer release on this channel that the user has not skipped.
+    const epoch = ++checkEpoch;
+    set('checking');
+    void deps.resolveRelease(prefs.channel).then(
+      (answer) => {
+        if (epoch !== checkEpoch || state !== 'checking') return;
+        if (answer.kind === 'none') {
+          latestVersion = undefined;
+          set('idle');
+          return;
+        }
+        if (answer.kind === 'failed') {
+          if (answer.reason === 'disabled') {
+            set('idle');
+            return;
+          }
+          // Stable can still ask Squirrel (its feed is a download redirect, not the
+          // rate-limited API); beta cannot know which tag to fetch.
+          if (prefs.channel === 'stable') {
+            askSquirrel();
+            return;
+          }
+          fail(answer.reason === 'offline' ? 'network: release feed unreachable' : `release feed: ${answer.reason}`);
+          return;
+        }
+        latestVersion = answer.release.version;
+        const current = deps.currentVersion ?? '';
+        if (current && compareVersions(answer.release.version, current) <= 0) {
+          set('idle');
+          return;
+        }
+        if (prefs.skippedVersion && prefs.skippedVersion === answer.release.version) {
+          deps.log?.(`[update] ${answer.release.version} is skipped; not downloading it`);
+          set('idle');
+          return;
+        }
+        const feed = squirrelFeedForRelease(stableFeed, prefs.channel, answer.release);
+        if (feed !== activeFeed) {
+          try {
+            deps.updater.setFeedURL({ url: feed });
+            activeFeed = feed;
+          } catch (err) {
+            fail(err instanceof Error ? err.message : String(err));
+            return;
+          }
+        }
+        askSquirrel();
+      },
+      (err: unknown) => {
+        if (epoch !== checkEpoch) return;
+        fail(err instanceof Error ? err.message : String(err));
+      },
+    );
+  };
+
+  const askSquirrel = () => {
     try {
       deps.updater.checkForUpdates();
     } catch (err) {
@@ -248,6 +349,40 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
       deps.markQuitting?.();
       deps.updater.quitAndInstall();
       return true;
+    },
+    requestRestart(force = false): AppUpdateRestartResult {
+      if (state !== 'downloaded') return { ok: false, reason: 'not-downloaded' };
+      if (!force) {
+        let unsaved: AppUpdateUnsavedKind[] = [];
+        try {
+          unsaved = deps.unsavedWork?.() ?? [];
+        } catch {
+          unsaved = [];
+        }
+        if (unsaved.length) return { ok: false, reason: 'unsaved', unsaved };
+      }
+      deps.markQuitting?.();
+      deps.updater.quitAndInstall();
+      return { ok: true };
+    },
+    prefs: () => ({ ...prefs }),
+    setPrefs(patch) {
+      const next = sanitizeAppUpdatePrefs(patch, prefs);
+      const channelChanged = next.channel !== prefs.channel;
+      prefs = next;
+      try {
+        deps.prefsStore?.save(prefs);
+      } catch (err) {
+        deps.log?.(`[update] could not save update preferences: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      if (channelChanged) {
+        // The last answer was another channel's; a feed answer still on its way is too.
+        checkEpoch += 1;
+        latestVersion = undefined;
+        if (state === 'checking' && deps.resolveRelease) set('idle');
+      }
+      pushDetails();
+      return details();
     },
   };
 }

@@ -1,19 +1,25 @@
 import type { AiEnrichmentResult } from '../shared/mining';
 import { deckBookId } from '../shared/deckImport';
-import { replaceImportedDeck } from './flashcardDeck';
+import { upsertImportedDeck } from './flashcardDeck';
 
 /**
- * @param bookId Overrides the id derived from the title.
+ * Save a Card Studio batch into its deck group — as an UPDATE, never a
+ * replacement.
  *
- * `deckBookId` used to slug on `[^\w]+`, and `\w` is ASCII-only, so every
- * Japanese title collapsed to the same id (fixed 2026-09; a title-derived id is
- * now unique per title, but still changes when the title does). That never bit
- * this function because its only caller passed an English
- * preset label, but an Agent-generated `book` batch is named after the book, and
- * `replaceImportedDeck` DELETES the matched `(bookId, bookTitle)` group before
- * inserting. So a caller that already holds a collision-free id — the one
- * `miningDeckIdentity` derives from the library item id — passes it rather than
- * letting it be re-derived from the title and lost.
+ * This used to go through `replaceImportedDeck`, which deletes every card in the
+ * `(bookId, bookTitle)` group before inserting. Every studio batch for one
+ * preset lands under the same `<preset> studio` title, so saving a second batch
+ * silently destroyed the first one and every review it had collected. It now
+ * goes through `upsertImportedDeck` (`shared/deckUpsert.ts`): a card already in
+ * the group for the same word keeps its id and review state and takes the new
+ * text, new words are appended, and nothing is ever removed — `removeMissing` is
+ * never passed, so deleting earlier cards is left to the deck UI's own,
+ * confirmed, controls.
+ *
+ * @param bookIdOverride Overrides the id derived from the title. A caller that
+ * already holds a collision-free id — the one `miningDeckIdentity` derives from
+ * the library item id — passes it rather than letting it be re-derived from a
+ * title that may change.
  */
 export function saveAiResultsToDeck(
   results: AiEnrichmentResult[],
@@ -22,7 +28,7 @@ export function saveAiResultsToDeck(
 ): number {
   const title = deckTitle.trim() || 'AI card studio';
   const bookId = bookIdOverride?.trim() || deckBookId(title).replace(/^import-/, 'ai-');
-  const entries: Parameters<typeof replaceImportedDeck>[2] = [];
+  const entries: Parameters<typeof upsertImportedDeck>[1][number][] = [];
 
   for (const result of results) {
     for (const card of result.cards) {
@@ -41,6 +47,6 @@ export function saveAiResultsToDeck(
   }
 
   if (!entries.length) return 0;
-  replaceImportedDeck(bookId, title, entries);
+  upsertImportedDeck(bookId, entries);
   return entries.length;
 }

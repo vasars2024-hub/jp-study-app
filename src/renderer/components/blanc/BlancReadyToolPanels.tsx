@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import type { BookLevelEstimate } from '../../../shared/bookLevelEstimate';
 import type { DictEntry, DictResult } from '../../../shared/types';
 import type { ImmersionSite } from '../../../shared/immersion';
@@ -87,11 +87,19 @@ import {
 } from '../../agentToolRegistry';
 import { AgentProfileOperationsEditor, agentPermissionLabelKey } from './AgentProfileOperations';
 import { AgentAutomationEditor } from '../agent/AgentAutomationEditor';
+import { localizeAgentStepError } from '../agent/agentExecutionTargets';
 
 // No Study OS stylesheet here: every panel in this file renders Blanc's own
 // classes (`blanc-*`), so it does not need `studyos-compat.css` (~500 KB). It
 // used to pull it at module load, which — while the shell imported this file
 // statically — put the whole Study OS sheet into Blanc's startup.
+
+/**
+ * Optional AI (`BlancAiAssist.tsx`): a memory aid in the Kanji Inspector and a
+ * summary in the Difficulty Analyzer. Loaded on the first press of the button,
+ * never with the panel; the buttons carry `data-ai-entry`.
+ */
+const BlancSummaryAi = lazy(() => import('./BlancAiAssist').then((m) => ({ default: m.BlancSummaryAi })));
 
 export type BlancAnalyzerResult = {
   level: BookLevelEstimate | null;
@@ -787,7 +795,7 @@ export function LocalAgentPanel() {
                     <td>{step.label}</td>
                     <td>{step.request.operation}</td>
                     <td>{t(agentStepLabelKey(step.status))}</td>
-                    <td>{step.error ?? (step.result ? JSON.stringify(step.result).slice(0, 240) : '—')}</td>
+                    <td>{(step.error ? localizeAgentStepError(step.error, t) : null) ?? (step.result ? JSON.stringify(step.result).slice(0, 240) : '—')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -799,7 +807,7 @@ export function LocalAgentPanel() {
         <fieldset>
           <legend>{t('blanc.agent.section.executionLog')}</legend>
           <ul className="blanc-note-list">
-            {events.slice(-20).map((event, index) => <li key={`${event.timestamp}-${index}`}>{event.type} · {event.operation}{event.error ? ` · ${event.error}` : ''}{event.durationMs != null ? ` · ${t('blanc.ready.agent.durationMs', { ms: event.durationMs })}` : ''}</li>)}
+            {events.slice(-20).map((event, index) => <li key={`${event.timestamp}-${index}`}>{event.type} · {event.operation}{event.error ? ` · ${localizeAgentStepError(event.error, t)}` : ''}{event.durationMs != null ? ` · ${t('blanc.ready.agent.durationMs', { ms: event.durationMs })}` : ''}</li>)}
           </ul>
         </fieldset>
       )}
@@ -838,8 +846,10 @@ export function DifficultyAnalyzerPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<BlancAnalyzerResult | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const runCheck = async (): Promise<void> => {
+    setSummaryOpen(false);
     const sample = text.trim();
     if (!sample) {
       setError(t('blanc.ready.difficulty.pasteFirst'));
@@ -923,6 +933,30 @@ export function DifficultyAnalyzerPanel() {
         {result && !result.level && score && score.totalWords === 0 && (
           <p className="blanc-warning">{t('blanc.ready.difficulty.noLevel')}</p>
         )}
+        {result && text.trim() && (!summaryOpen ? (
+          <div className="blanc-row-actions">
+            <button type="button" data-ai-entry onClick={() => setSummaryOpen(true)}>
+              {t('aiTutor.blanc.summarize')}
+            </button>
+          </div>
+        ) : (
+          <Suspense fallback={null}>
+            <BlancSummaryAi
+              kind="text"
+              subject={text.trim().slice(0, 800)}
+              reading=""
+              meaning=""
+              level={result.level?.label ?? ''}
+              unknownWords={unknownLemmas.slice(0, 20)}
+              fallbackLines={[
+                result.level ? t('aiTutor.blanc.fallbackLevel', { level: result.level.label }) : '',
+                score && score.totalWords > 0 ? t('aiTutor.blanc.fallbackKnown', { pct: knownPercent(score) }) : '',
+                unknownLemmas.length ? t('aiTutor.blanc.fallbackFirst', { list: unknownLemmas.slice(0, 5).join(', ') }) : '',
+              ].filter(Boolean)}
+              onClose={() => setSummaryOpen(false)}
+            />
+          </Suspense>
+        ))}
       </fieldset>
     </div>
   );
@@ -1150,9 +1184,11 @@ export function KanjiInspectorPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [entry, setEntry] = useState<DictEntry | null>(null);
+  const [aidOpen, setAidOpen] = useState(false);
   const char = [...value.trim()][0] ?? '';
 
   const inspect = async (): Promise<void> => {
+    setAidOpen(false);
     if (!char) {
       setError(t('blanc.ready.kanji.enterOne'));
       setEntry(null);
@@ -1215,6 +1251,33 @@ export function KanjiInspectorPanel() {
             {firstSenseSummary(entry) && <p className="blanc-note">{firstSenseSummary(entry)}</p>}
           </div>
         )}
+        {entry && (!aidOpen ? (
+          <div className="blanc-row-actions">
+            <button type="button" data-ai-entry onClick={() => setAidOpen(true)}>
+              {t('aiTutor.blanc.memoryAid')}
+            </button>
+          </div>
+        ) : (
+          <Suspense fallback={null}>
+            <BlancSummaryAi
+              kind="kanji"
+              subject={char}
+              reading={entry.reading ?? ''}
+              meaning={firstSenseSummary(entry)}
+              level=""
+              unknownWords={[]}
+              fallbackLines={[
+                t('aiTutor.blanc.fallbackKanji', {
+                  char: entry.word || char,
+                  reading: entry.reading ?? '',
+                  meaning: firstSenseSummary(entry),
+                }),
+                t(isRadical ? 'blanc.ready.kanji.isRadical' : 'blanc.ready.kanji.notRadical', { char }),
+              ]}
+              onClose={() => setAidOpen(false)}
+            />
+          </Suspense>
+        ))}
       </fieldset>
     </div>
   );

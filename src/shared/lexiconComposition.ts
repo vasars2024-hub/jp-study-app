@@ -1,4 +1,4 @@
-import type { LexiconInterlinearResult } from './lexiconInterlinear';
+import type { LexiconInterlinearResult, LexiconInterlinearToken } from './lexiconInterlinear';
 
 export type LexiconCompositionIssueKind = 'duplicate-function' | 'repeated-punctuation' | 'unclosed-pair' | 'unexpected-close';
 
@@ -42,11 +42,12 @@ export function checkLexiconComposition(result: LexiconInterlinearResult): Lexic
   }
 
   for (const match of result.text.matchAll(/([。！？!?])\1+/gu)) {
-    const start = match.index;
+    // `matchAll` always sets `index`; the lib types it optional.
+    const start = match.index ?? 0;
     issues.push({ kind: 'repeated-punctuation', start, end: start + match[0].length, text: match[0] });
   }
 
-  const tokens = result.parts.filter((part) => part.kind === 'token');
+  const tokens = result.parts.filter((part): part is LexiconInterlinearToken => part.kind === 'token');
   for (let index = 1; index < tokens.length; index += 1) {
     const previous = tokens[index - 1];
     const current = tokens[index];

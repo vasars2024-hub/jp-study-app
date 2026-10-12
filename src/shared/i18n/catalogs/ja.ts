@@ -31,6 +31,8 @@ import { RESOURCES_CATALOG_JA } from '../resourcesCatalog/ja';
 import { RESOURCE_BUNDLES_JA } from '../resourceBundles/ja';
 import { INSTALL_UI_JA } from '../installUi/ja';
 import { LOCK_UPDATE_UI_JA } from '../lockUpdateUi/ja';
+import { RISK4_UI_JA } from '../risk4Ui/ja';
+import { LOCK3_UI_JA } from '../lock3Ui/ja';
 import { WIDGETS_UI_JA } from '../widgetsUi/ja';
 import { BLANC_UI_JA } from '../blancUi/ja';
 import { BLANC_MECH_UI_JA } from '../blancMechUi/ja';
@@ -40,11 +42,17 @@ import { SYSTEM_UI_JA } from '../systemUi/ja';
 import { CAPTIONS_UI_JA } from '../captionsUi/ja';
 import { QUALITY_UI_JA } from '../qualityUi/ja';
 import { POLISH_UI_JA } from '../polishUi/ja';
+import { PRODUCT5_UI_JA } from '../product5Ui/ja';
 import { DICT3_UI_JA } from '../dict3Ui/ja';
 import { RECORDER_V2_JA } from '../recorderV2/ja';
 import { SCRAPER_V2_JA } from '../scraperV2/ja';
 import { STUDY_AREAS_UI_JA } from '../studyAreasUi/ja';
 import { TRANSLATE_ENGINES_UI_JA } from '../translateEnginesUi/ja';
+import { AI_EAGER_UI_JA } from '../aiEagerUi/ja';
+import { LENS_OCR_UI_JA } from '../lensOcrUi/ja';
+import { MEDIA5_JA } from '../media5/ja';
+import { PLANNER_UI_JA } from '../plannerUi/ja';
+import { SNIP_UI_JA } from '../snipUi/ja';
 
 export const ja: Catalog = {
   'common.download': 'ダウンロード',
@@ -757,6 +765,8 @@ export const ja: Catalog = {
   ...RESOURCE_BUNDLES_JA,
   ...INSTALL_UI_JA,
   ...LOCK_UPDATE_UI_JA,
+  ...RISK4_UI_JA,
+  ...LOCK3_UI_JA,
   ...WIDGETS_UI_JA,
   ...BLANC_UI_JA,
   ...BLANC_MECH_UI_JA,
@@ -766,11 +776,19 @@ export const ja: Catalog = {
   ...CAPTIONS_UI_JA,
   ...QUALITY_UI_JA,
   ...POLISH_UI_JA,
+  ...PRODUCT5_UI_JA,
   ...DICT3_UI_JA,
   ...RECORDER_V2_JA,
   ...SCRAPER_V2_JA,
   ...STUDY_AREAS_UI_JA,
   ...TRANSLATE_ENGINES_UI_JA,
+  // The AI features' strings are a lazy pack (../aiPack, merged by ../catalogs.ts);
+  // only the few that non-AI surfaces render at startup are eager.
+  ...AI_EAGER_UI_JA,
+  ...LENS_OCR_UI_JA,
+  ...MEDIA5_JA,
+  ...PLANNER_UI_JA,
+  ...SNIP_UI_JA,
 
   'settings.appTitle': '設定',
   'settings.group.personalization': '個人設定',
@@ -1274,8 +1292,8 @@ export const ja: Catalog = {
   'subtitle.autoTranslate': '足りない字幕を自動で翻訳',
   'subtitle.autoTranslateDesc': '片方の言語しか見つからないとき、バックグラウンドで翻訳します。対象は再生したエピソードと「視聴中」にした作品だけです。機械翻訳にはその旨が表示されます。',
   'subtitle.translationEngine': '翻訳エンジン',
-  'subtitle.translationEngine.auto': '自動 — クラウドのキーがあればクラウド、なければオフラインモデル',
-  'subtitle.translationEngine.cloud': 'クラウドのみ（Gemini または DeepSeek のキー）',
+  'subtitle.translationEngine.auto': '自動 — 「設定 → AI」で許可していれば選択中の AI プロバイダー、そうでなければオフラインモデル',
+  'subtitle.translationEngine.cloud': 'クラウドのみ（「設定 → AI」で許可した AI プロバイダー）',
   'subtitle.translationEngine.local': 'オフラインモデルのみ（Qwen3）',
   'subtitle.autoStudyTrack': '英語字幕から日本語字幕を作る',
   'subtitle.autoStudyTrackDesc': '英語字幕しかないとき、日本語の音声を英語字幕のタイミングで Whisper により文字起こしします。音声が日本語でなければ英語字幕を翻訳します。',
@@ -2543,7 +2561,7 @@ export const ja: Catalog = {
   'novel.reader.closeArticle': '記事を閉じて本に戻る',
   'novel.reader.book': '本',
   'novel.reader.prevShort': '前へ',
-  'novel.reader.collectShortcut': '選択部分をコレクションに追加 (Ctrl+Shift+S)',
+  'novel.reader.collectShortcut': '選択部分をコレクションに追加',
   'novel.reader.collect': '追加',
   'novel.reader.jumpToChapter': '章に移動',
   'novel.reader.jumpToChapterEllipsis': '章に移動…',
@@ -2815,6 +2833,8 @@ export const ja: Catalog = {
   'palette.section.flashcards': 'フラッシュカード',
   'palette.section.stats': '統計',
   'palette.section.calendar': 'カレンダー',
+  'palette.section.snips': 'スニップ',
+  'palette.section.conversation': '会話パートナー',
   'palette.section.resources': 'リソース',
   'palette.section.settings': '設定',
   'palette.section.immersion': 'イマージョン',
@@ -3363,7 +3383,7 @@ export const ja: Catalog = {
   'agent.undo.error.superseded': '同じ項目が新しい操作で変更されたため、元に戻せません。',
   'agent.undo.error.entity-not-found': '対象の項目が存在しないため、元に戻せません。',
   'agent.undo.error.operation-unavailable': 'このビルドには、その操作を安全に戻す機能がありません。',
-  'agent.undo.error.operation-denied': '有効なプロファイルでは逆操作が許可されなくなりました。',
+  'agent.undo.error.operation-denied': '有効なプロファイルまたは権限レベルでは、これを元に戻す操作が許可されていません。エージェント設定で許可するか、手動で元に戻してください。',
   'agent.undo.error.busy': 'その操作はすでに元に戻している途中です。',
   'agent.undo.error.undo-failed': '変更を元に戻せませんでした。',
   'agent.undo.error.store-failed': '現在の項目状態を読み込めませんでした。',
@@ -4301,7 +4321,15 @@ export const ja: Catalog = {
   'perf.interact': '操作中',
   'perf.yes': 'はい',
   'perf.no': 'いいえ',
-  'perf.hint': 'Ctrl+Shift+F で非表示 · 目標 60 FPS',
+  'perf.hint': '{keys} で非表示 · 目標 60 FPS',
+  'perf.label.title': 'パフォーマンス',
+  'perf.label.frame': 'フレーム',
+  'perf.label.quality': '品質',
+  'perf.label.particles': 'パーティクル',
+  'perf.label.heap': 'ヒープ',
+  'perf.label.interact': '操作中',
+  'perf.label.yes': 'はい',
+  'perf.label.no': 'いいえ',
   'common.back': '戻る',
   'bundleDetail.beginnerChecklist': '初心者向けチェックリスト',
   'bundleDetail.checklistProgress': '進捗：{done}/{total}',
@@ -4414,7 +4442,7 @@ export const ja: Catalog = {
   'focus.brand': 'Focus',
   'focus.exit': 'フォーカス終了',
   'focus.exitLocked': 'ロック中',
-  'focus.exitHint': 'フォーカスモードを終了 (Ctrl+Shift+E)',
+  'focus.exitHint': 'フォーカスモードを終了',
   'focus.navAria': 'フォーカスアプリ',
   'focus.tab.library': 'ライブラリ',
   'focus.tab.dictionary': '辞書',
@@ -4424,7 +4452,7 @@ export const ja: Catalog = {
     'デスクトップ・パーティクル・ウィジェットを非表示。ライブラリ・リーダー・辞書・Ankiと任意の音楽バーだけ残します。',
   'focus.settings.enable': 'フォーカスモードを有効化',
   'focus.settings.shortcutHint':
-    'ショートカット: Ctrl+Shift+E。ロック中を除きいつでも終了できます。',
+    'ショートカット: {keys}。ロック中を除きいつでも終了できます。',
   'focus.lock.title': 'フォーカスロック',
   'focus.lock.desc': '学習ブロックにコミット — タイマー終了まで終了・Esc・ショートカットは無効。',
   'focus.lock.hint': 'フォーカスに入るたびタイマー開始。時間の変更は次回から適用。',
@@ -4507,7 +4535,7 @@ export const ja: Catalog = {
   'desktop.task.closeAll': 'すべてのアプリを閉じる',
   'desktop.task.minimize': '最小化',
   'desktop.task.restore': '元に戻す',
-  'desktop.clipboardHistory': 'クリップボード履歴（Ctrl+Alt+Shift+V）',
+  'desktop.clipboardHistory': 'クリップボード履歴',
   'desktop.tray.hiddenIcons': '隠れているアイコンを表示',
   'desktop.desktopN': 'デスクトップ {n}',
   'desktop.dragToDesktop': 'デスクトップへドラッグ・クリックで開く',
@@ -6135,7 +6163,7 @@ export const ja: Catalog = {
   'manga.translate.warning.none': 'OCRは完了しましたが、翻訳できたページはありません（{total} ページ中 0）。ページはOCRのみ保存されています。',
   'manga.translate.warning.some': 'OCRは完了しましたが、翻訳できなかったページがあります（{total} ページ中 {failed}）。それらはOCRのみ保存されています。',
   'manga.translate.target': '翻訳先',
-  'manga.translate.toggleVisibility': '翻訳の表示／非表示（Ctrl+Shift+T）',
+  'manga.translate.toggleVisibility': '翻訳の表示／非表示',
   'manga.translate.show': '翻訳を表示',
   'manga.translate.hide': '翻訳を隠す',
   'manga.translate.ahead': '先のページを翻訳',
@@ -6454,6 +6482,16 @@ export const ja: Catalog = {
   'anki3.sync.mappingTitle': '各プロファイルの追加先',
   'anki3.sync.mapping': '{profile}：デッキ「{deck}」、ノートタイプ「{model}」',
   'anki3.sync.unlinked.title': 'Anki で削除され、Gum のスケジュールに戻ったカード',
+  'anki4.sync.paused': { other: '問題が解決するまで同期を一時停止しています。待機中の {count} 件の回答は保持されます。解決してから「今すぐ同期」を押してください（Anki を再起動しても再開します）。' },
+  'anki4.sync.retryAt': { other: '{time} に自動で再試行します。待機中の {count} 件の回答は保持されます。' },
+  'anki4.sync.link.now': '既存のノートと紐付ける',
+  'anki4.sync.link.result': { other: '{count} 枚のカードを既存のノートと紐付けました（{looked} 枚を確認）。' },
+  'anki4.sync.link.none': '確認したカード: {looked} 枚。一致する既存のノートはありませんでした。',
+  'anki4.sync.link.hintOn': '同期がオンの間は、Anki にすでにあるカードを Gum が自動で紐付けます。検索するのは各プロファイルのデッキとノートタイプだけです。',
+  'anki4.sync.link.hintOff': '同期がオフなので、Gum は自動では紐付けません。このボタンは、Anki にすでにありそうなカードを各プロファイルのデッキとノートタイプの中だけで探し、どのノートに当たるかを記録します。',
+  'anki4.sync.failed.title': 'Anki が受け付けなかった回答',
+  'anki4.sync.failed.hint': 'Anki が何度も受け付けなかったため、これらの回答はキューから外されました。復習記録は Gum に残っています。Anki のスケジュールを合わせたい場合は、Anki でこれらのカードを復習してください。',
+  'anki4.sync.failed.clear': '一覧を消去',
   'anki3.queue.linked': { other: '{count} 枚はすでに Anki にあったためリンクしました。' },
   'anki3.export.keepSchedule': 'Anki パッケージに復習の進捗を含める',
   'anki3.export.scheduled': { other: '{count} 枚のカードがスケジュールを保持します。' },
@@ -6829,6 +6867,8 @@ export const ja: Catalog = {
   'media.jobs.cancelAll': 'すべてキャンセル',
   'media.jobs.eta': '残り {time}',
   'media.jobs.modelSubstituted': '{model} で実行中',
+  'media.jobs.modelDownloading': 'Whisper モデルをダウンロード中… {percent}%',
+  'media.jobs.modelLoading': 'Whisper モデルを読み込み中…',
   'media.jobs.modelSubstituted.detail':
     'このPCではブラウザランタイムで {requested} を実行できないため、{used} がこの文字起こしを生成しています。品質は明らかに低下します。',
   'media.jobs.phase.queued': '待機中',
@@ -7170,7 +7210,7 @@ export const ja: Catalog = {
   'immersion.mode.titleDesc.live': ' — 閲覧',
   'immersion.mode.titleDesc.reader': ' — 読む＋ハイライト',
   'immersion.mode.titleDesc.focus': ' — 集中モード',
-  'immersion.saveSite': 'サイトを保存（Ctrl+D）',
+  'immersion.saveSite': 'サイトを保存',
   'immersion.saveAsTool': 'ツールとして保存',
   'immersion.toolSaved': 'マイツールに保存しました',
   'immersion.toolAlready': 'すでにマイツールにあります',
@@ -7187,7 +7227,7 @@ export const ja: Catalog = {
   'immersion.exitFocus': 'フォーカスを終了',
   'immersion.loading': '読み込み中…',
   'immersion.openPageToBegin': 'ページを開いてイマージョン読書を始めましょう。',
-  'immersion.hint': '検索するとライブで開く · F8でモード切替 · F6でフォーカス · Ctrl+LでURLバー',
+  'immersion.hint': '検索するとライブで開く · {cycle}でモード切替 · {focus}でフォーカス · {url}でURLバー',
   'immersion.sites': 'サイト',
   'immersion.rail.loadFailed': '保存済みサイトを読み込めませんでした。表示中のサイトは保持されます。',
   'immersion.rail.retry': '再試行',
@@ -7615,6 +7655,22 @@ export const ja: Catalog = {
   'aiStudio.hint.starOrPreset': '辞書で語を調べてスターを付けるか、ソースをプリセット生成に切り替えてください。',
   'aiStudio.status.generatedPreset': '{count} 件の考案項目から {cards} カードを生成 · 下で確認してから「フラッシュカードに保存」を押してください。',
   'aiStudio.status.generatedDict': '{count} 語から {cards} カードを生成 · 下で確認してから「フラッシュカードに保存」を押してください。',
+  'aiStudio.progress.msg.enriching': '「{term}」を作成中（{n} / {total}）…',
+  'aiStudio.progress.msg.builtDict': '{count} 語から {cards} 枚のカードを作成しました。',
+  'aiStudio.progress.msg.inventing': '語彙を {count} 件考案中…',
+  'aiStudio.progress.msg.inventingBatch': '{count} 件を考案中（バッチ {n} / {total}）…',
+  'aiStudio.progress.msg.invented': '{total} 件中 {done} 件を考案しました…',
+  'aiStudio.progress.msg.building': '{count} 件のカードセットを作成中（1 件あたり {cards} 枚）…',
+  'aiStudio.progress.msg.cardSet': 'カードセット {n} / {total}：{term}',
+  'aiStudio.progress.msg.generated': '考案した {count} 件から {cards} 枚のカードを生成しました。',
+  'aiStudio.progress.msg.partial': '{count} 件（{cards} 枚）が完了、{failed} 件が失敗しました。失敗分は再試行できます。',
+  'aiStudio.status.generatedPartial': '{count} 件から {cards} 枚のカードを用意しました · {failed} 件は失敗。完成分はそのまま残ります。残りは下で再試行できます。',
+  'aiStudio.status.retryDone': '再試行が完了しました：合計 {cards} 枚 · まだ失敗：{failed} 件',
+  'aiStudio.failed.title': '生成できなかった項目',
+  'aiStudio.failed.lead': '以下の項目は失敗しました。生成済みのものはすべて残っています。',
+  'aiStudio.failed.invent': 'まだ考案されていない項目：{count} 件',
+  'aiStudio.btn.retryFailed': '失敗した項目を再試行（{count}）',
+  'aiStudio.presets.studyLang': '学習言語のプリセット：{lang}',
   'aiStudio.status.csvSaved': 'CSV を {path} に保存しました',
   'aiStudio.status.csvFail': 'CSV を保存できませんでした。',
   'aiStudio.status.sentAnki': '{total} 枚中 {ok} 枚を Anki に送信しました。',
@@ -7796,7 +7852,7 @@ export const ja: Catalog = {
   'flash.session.summary': '{total}枚中{reviewed}枚を復習',
   'flash.reviewDictionaryCount': '辞書を復習（{count}）',
   'flash.undoRating': '直前の評価を取り消す',
-  'flash.undoRating.hint': '直前のカードを元のスケジュールに戻します（Ctrl+Z）',
+  'flash.undoRating.hint': '直前のカードを元のスケジュールに戻します',
   'flash.ankiQueue.pending': { other: 'Anki への追加待ち：{count} 枚' },
   'flash.ankiQueue.retry': '今すぐ Anki に追加',
   'flash.ankiQueue.busy': '追加中…',
@@ -7948,7 +8004,7 @@ export const ja: Catalog = {
   'epub.translate.panelTitle': '書籍翻訳の設定',
   'epub.translate.target': '翻訳先',
   'epub.translate.targetChanged': '翻訳先を変更しました — 再翻訳してください',
-  'epub.translate.toggleVisibility': '翻訳の表示／非表示（Ctrl+Shift+T）',
+  'epub.translate.toggleVisibility': '翻訳の表示／非表示',
   'epub.translate.show': '翻訳を表示',
   'epub.translate.hide': '翻訳を隠す',
   'epub.translate.view': '表示',
@@ -8102,6 +8158,8 @@ export const ja: Catalog = {
   'epub.mining.failSwitch': 'フェイルスイッチエンジン',
   'epub.mining.engine.qwen': 'オフライン Qwen3',
   'epub.mining.engine.api': 'クラウドAPI',
+  'epub.mining.translateAgain': 'もう一度翻訳',
+  'epub.mining.translateAgain.hint': '保存済みの訳を使わず、翻訳したすべての項目を {provider} にもう一度依頼してからデッキをダウンロードします。辞書の値はそのまま残ります。',
   'epub.mining.qwen.checking': 'ローカルQwenモデルを確認中…',
   'epub.mining.qwen.ready': 'Qwen3モデルあり — ローカル実行、APIキー不要。',
   'epub.mining.qwen.missing': 'オフライン翻訳モデルがインストールされていません。下のボタンか 設定 → AI 機能 でインストールしてください。',

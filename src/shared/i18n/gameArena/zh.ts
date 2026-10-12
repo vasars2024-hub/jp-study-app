@@ -222,7 +222,7 @@ export const GAME_ARENA_CHROME_ZH: Catalog = {
   'games.settings.apiUrl': 'API 地址',
   'games.settings.apiKey': 'API 密钥',
   'games.settings.privacy':
-    '只有在选择并配置了 API 后端时，镜像写作才会把草稿发送到设备之外。本地后端始终离线运行。',
+    '快速检查不会离开这台电脑。应用 AI 遵循“设置 → AI”：使用离线模型，或在允许镜像写作使用云端时使用你的云端提供商。只有选择 API 端点时，草稿才会发送到该端点。',
   'games.mirror.backend.local': '快速检查（即时，无需下载）',
   'games.mirror.backend.api': 'API 地址',
   'games.mirror.draft': '你的草稿',
@@ -276,7 +276,7 @@ export const GAME_ARENA_CHROME_ZH: Catalog = {
   'games.mirror.summary.strong': '复现得很好。只需稍作润色即可完整表达题目内容。',
   'games.mirror.summary.solid': '草稿不错。在对照参考答案之前，先补齐遗漏的要点并理顺行文。',
   'games.mirror.summary.early': '仍处于初稿阶段。请专注于用清晰的日语句子涵盖每一个要点。',
-  'games.mirror.error.apiMissing': '请在游戏竞技场设置中配置 API 端点和密钥。',
+  'games.mirror.error.apiMissing': '请在游戏竞技场设置中配置 API 端点。',
   'games.mirror.error.network': '评估请求失败（{status}）。',
   'games.mirror.error.schemaInvalid': '评估返回的结果与评分结构不匹配。',
   'games.mirror.error.requestFailed': '评估请求失败。',

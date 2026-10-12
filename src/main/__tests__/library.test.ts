@@ -150,7 +150,7 @@ describe('importMangaFromImageUrls', () => {
   });
 
   it('hard-fails only when every image fails', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: false, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) }) as unknown as Response);
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({ ok: false, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) }) as unknown as Response);
     vi.stubGlobal('fetch', fetchMock);
     const out = await importMangaFromImageUrls({
       url: 'https://example.com/manga/ch3',

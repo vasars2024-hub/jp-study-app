@@ -82,6 +82,34 @@ export interface EnrichmentOutcome {
 /** When `glossOnly` is true, skip the Qwen phase (fast analyze / Jiten-style index). */
 export interface EnrichmentOptions {
   glossOnly?: boolean;
+  /**
+   * "Translate again": values an engine (offline model or cloud API) filled on
+   * an earlier run are dropped so they are translated anew; dictionary values
+   * are kept. The caller also tells its engine to skip its own cache.
+   */
+  fresh?: boolean;
+}
+
+/** Drops every value a translation engine wrote on an earlier run, keeping dictionary ones. */
+export function dropEngineTranslations(candidate: MiningCandidate): void {
+  const sources = candidate.fieldSources;
+  if (!sources) return;
+  const engine = (key: string): boolean => sources[key] === 'qwen' || sources[key] === 'api';
+  if (candidate.translations) {
+    for (const key of Object.keys(candidate.translations)) {
+      if (engine(key)) delete candidate.translations[key];
+    }
+    if (candidate.translations.translation !== undefined && engine('translation')) delete candidate.translations.translation;
+    if (!Object.keys(candidate.translations).length) candidate.translations = undefined;
+  }
+  if (candidate.glosses) {
+    for (const lang of Object.keys(candidate.glosses)) {
+      if (engine(`meaning:${lang}`)) delete candidate.glosses[lang];
+    }
+  }
+  for (const key of Object.keys(sources)) {
+    if (engine(key)) delete sources[key];
+  }
 }
 
 const GLOSS_BATCH_SIZE = 500;
@@ -142,7 +170,17 @@ export async function runEnrichment(
   const warnings: string[] = [];
   const cancelled = (): boolean => io.shouldCancel?.() ?? false;
 
-  const out = candidates.map((c) => ({ ...c }));
+  const out = candidates.map((c) => ({
+    ...c,
+    ...(options?.fresh
+      ? {
+          translations: c.translations ? { ...c.translations } : undefined,
+          glosses: c.glosses ? { ...c.glosses } : undefined,
+          fieldSources: c.fieldSources ? { ...c.fieldSources } : undefined,
+        }
+      : {}),
+  }));
+  if (options?.fresh) for (const candidate of out) dropEngineTranslations(candidate);
 
   // Drop cached values that fail current validation (old garbage from
   // previous runs must not survive into a fresh analysis).

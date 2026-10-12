@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
+  applyAiFeatureSettingsPatch,
   agentModelInstalled,
   deriveAiReadiness,
   normalizeAiFeatureSettings,
@@ -17,6 +18,29 @@ function status(over: Partial<AiSetupStatus> = {}): AiSetupStatus {
 }
 
 const SMALL_MODEL = { fileName: 'Qwen3-1.7B-Q8_0.gguf', sizeBytes: 1, location: 'app-models' as const };
+
+/** The grammar, statistics, planning, onboarding and Blanc helpers (aiTutorCommon.ts): all OFF for the cloud. */
+const TUTOR_FEATURES_OFF = {
+  grammarExplain: false,
+  grammarExamples: false,
+  grammarProduction: false,
+  grammarSighting: false,
+  statsCoach: false,
+  goalSuggest: false,
+  eventParse: false,
+  placementQuiz: false,
+  settingsHelp: false,
+  blancMistake: false,
+  blancSummary: false,
+};
+
+/** Speaking and writing helpers (aiShadowing/aiConversation/aiWritingCorrection): all OFF for the cloud. */
+const SPEAK_FEATURES_OFF = {
+  shadowingFeedback: false,
+  conversationPartner: false,
+  writingCorrection: false,
+  journalGrade: false,
+};
 
 describe('AI readiness', () => {
   it('a first-time user with nothing set up is not ready and cannot plan', () => {
@@ -85,6 +109,77 @@ describe('what crosses the bridge', () => {
     expect(normalizeAiSetupStatus({ engine: 'cloud' })).toBeNull();
     expect(normalizeAiSetupStatus({ enabled: false, providerId: 'nonsense', models: [null, SMALL_MODEL] }))
       .toMatchObject({ enabled: false, providerId: 'gemini-2.5-flash', models: [SMALL_MODEL] });
+  });
+
+  it('cloud opt-ins default per feature: buttons on, background subtitle translation off', () => {
+    expect(normalizeAiFeatureSettings(undefined).cloudFeatures).toEqual({
+      cardGen: true,
+      mirror: true,
+      subtitleTranslate: false,
+      agentChat: true,
+      mediaAssistant: true,
+      subtitleFusion: true,
+      ankiAdditions: true,
+      // The optional study helpers start off for the cloud (local and fallback still work).
+      whyWrong: false,
+      exampleSentences: false,
+      leechRescue: false,
+      contextExplain: false,
+      // The watching and reading helpers start off for the cloud as well.
+      mediaBrief: false,
+      linePick: false,
+      readerExplain: false,
+      readerSimplify: false,
+      vnExplain: false,
+      vnTranslate: false,
+      studyCommand: false,
+      // Grammar, statistics, planning, onboarding and Blanc helpers: off for the cloud too.
+      ...TUTOR_FEATURES_OFF,
+      ...SPEAK_FEATURES_OFF,
+    });
+    const patched = applyAiFeatureSettingsPatch(normalizeAiFeatureSettings(undefined), {
+      cloudFeatures: { subtitleTranslate: true, bogus: true, mirror: 'yes' },
+    });
+    expect(patched.cloudFeatures).toEqual({
+      cardGen: true,
+      mirror: true,
+      subtitleTranslate: true,
+      agentChat: true,
+      mediaAssistant: true,
+      subtitleFusion: true,
+      ankiAdditions: true,
+      whyWrong: false,
+      exampleSentences: false,
+      leechRescue: false,
+      contextExplain: false,
+      // The watching and reading helpers start off for the cloud as well.
+      mediaBrief: false,
+      linePick: false,
+      readerExplain: false,
+      readerSimplify: false,
+      vnExplain: false,
+      vnTranslate: false,
+      studyCommand: false,
+      ...TUTOR_FEATURES_OFF,
+      ...SPEAK_FEATURES_OFF,
+    });
+  });
+
+  it('keeps provider options clean: no credentials in a URL, no spaces in a model', () => {
+    const base = normalizeAiFeatureSettings(undefined);
+    expect(applyAiFeatureSettingsPatch(base, { compatBaseUrl: 'http://localhost:11434/v1/chat/completions/' }).compatBaseUrl)
+      .toBe('http://localhost:11434/v1');
+    expect(applyAiFeatureSettingsPatch(base, { compatBaseUrl: 'http://user:pw@host/v1' }).compatBaseUrl).toBe('');
+    expect(applyAiFeatureSettingsPatch(base, { compatBaseUrl: 'file:///etc/passwd' }).compatBaseUrl).toBe('');
+    expect(applyAiFeatureSettingsPatch(base, { compatModel: 'qwen3:8b' }).compatModel).toBe('qwen3:8b');
+    expect(applyAiFeatureSettingsPatch(base, { openaiModel: 'gpt 5' }).openaiModel).toBe('');
+  });
+
+  it('reads every provider bucket off the bridge, missing ones as unset', () => {
+    const status = normalizeAiSetupStatus({ enabled: true, providerId: 'claude-opus-5-5', apiKeysSet: { anthropic: true } });
+    expect(status?.providerId).toBe('claude-opus-5-5');
+    expect(status?.apiKeysSet).toEqual({ gemini: false, deepseek: false, anthropic: true, openai: false, 'openai-compatible': false });
+    expect(deriveAiReadiness(status!, AGENT_ON).cloudReady).toBe(true);
   });
 
   it('only an explicit false turns AI off in the stored switch', () => {

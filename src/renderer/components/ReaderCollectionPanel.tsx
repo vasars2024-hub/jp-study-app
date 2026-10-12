@@ -18,6 +18,7 @@ import { translateTo, onModelProgress, type TransLang } from '../translator';
 import { pushUndo } from '../actionHistory';
 import type { VisualNovelStudyCardKind } from '../../shared/visualNovelStudyCards';
 import { getLevel } from '../knownWords';
+import { pickCardAiExtras, type CardAiExtras } from '../../shared/cardAiExtras';
 import Icon from './Icons';
 import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
 import { normalizeStudyLang, studyLangOfText, type StudyLang } from '../../shared/studyLang';
@@ -265,7 +266,7 @@ export default function ReaderCollectionPanel({
         jlptLevel?: string;
         sceneReference?: string;
         studyLang?: StudyLang;
-      },
+      } & CardAiExtras,
       deckOverride?: string,
     ): Promise<{ ok: boolean; noteId?: number; error?: string; deck?: string }> => {
       const deck = (deckOverride ?? prefsRef.current.ankiDeck).trim() || undefined;
@@ -314,6 +315,8 @@ export default function ReaderCollectionPanel({
           audioFilename,
           deckName: deck,
           frequencies: c.frequency ? { 'Visual Novel': c.frequency } : undefined,
+          // The card's saved extras ride along; main sanitizes and places them.
+          cardExtras: pickCardAiExtras(c),
           extraTags: c.studyKind
             ? [
                 'JapaneseStudyOS::VisualNovel',

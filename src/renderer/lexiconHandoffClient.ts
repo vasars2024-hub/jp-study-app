@@ -33,7 +33,7 @@ function bridgeMethod<K extends keyof LexiconHandoffBridge>(
   name: K,
 ): LexiconHandoffBridge[K] | null {
   if (typeof window === 'undefined') return null;
-  const api = (window as { api?: Partial<LexiconHandoffBridge> }).api;
+  const api = (window as unknown as { api?: Partial<LexiconHandoffBridge> }).api;
   const method = api?.[name];
   return typeof method === 'function' ? (method.bind(api) as LexiconHandoffBridge[K]) : null;
 }

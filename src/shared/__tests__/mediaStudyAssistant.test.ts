@@ -17,6 +17,9 @@ describe('media study assistant contract', () => {
       text: '雨が降っている。',
       context: 'Episode 1',
       jlptLevel: 'N3',
+      // Absent fields read as what every request meant before they existed.
+      studyLang: 'ja',
+      answerLang: 'en',
     });
     expect(normalizeMediaStudyAssistantRequest({ mode: 'invalid', text: '日本語' })).toBeNull();
     expect(normalizeMediaStudyAssistantRequest({ mode: 'explain-dialogue', text: ' ' })).toBeNull();

@@ -17,6 +17,7 @@ import type {
   StudyProfile,
 } from '../../shared/profiles';
 import { invoke } from './client';
+import { getModelFieldNames, primeModelFieldNames } from './modelFields';
 import { hashFieldList, KINOMOTO_PRESET, resolveFieldMap } from './fieldMapper';
 import { DEFAULT_CARD_CSS } from '../../shared/kinomotoCard';
 
@@ -148,7 +149,7 @@ export async function ensureModel(profile: StudyProfile): Promise<EnsureModelRes
 
   if (models.indexOf(modelName) !== -1) {
     // Runtime discovery is authoritative.
-    const fields = (await invoke('modelFieldNames', { modelName })) ?? [];
+    const fields = await getModelFieldNames(modelName);
     const fieldMap = resolveFieldMap(profile, modelName, fields);
     const unmappedRoles = blueprintRoles.filter((r) => !fieldMap[r as FieldRole]) as FieldRole[];
     const minimumMet = Boolean(fieldMap.term && (fieldMap.meaning || fieldMap.translation));
@@ -173,6 +174,8 @@ export async function ensureModel(profile: StudyProfile): Promise<EnsureModelRes
       css: profileCss,
       cardTemplates: buildAnkiCardTemplates(profile),
     });
+    // The note type now exists with exactly these fields: no need to ask.
+    primeModelFieldNames(modelName, createFields);
     const fieldMap: Partial<Record<FieldRole, string>> = {};
     for (const preset of KINOMOTO_PRESET) {
       if (createFields.includes(preset.field)) fieldMap[preset.role] = preset.field;

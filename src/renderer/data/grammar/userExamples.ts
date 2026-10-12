@@ -17,6 +17,8 @@ export const USER_EXAMPLES_EVENT = 'grammar-user-examples-changed';
 
 export interface UserGrammarExample extends GrammarExample {
   addedAt: number;
+  /** Written by the optional AI helper and kept because the learner approved it; shown as such. */
+  generated?: true;
 }
 
 export interface ExampleImportRow {
@@ -29,6 +31,8 @@ export interface ExampleImportRow {
   tatoebaId?: string;
   /** Kept from a Tatoeba search on the card (the search returns no ids). */
   fromTatoeba?: boolean;
+  /** Written by the optional AI helper (`GrammarAiTools`), approved by the learner. */
+  generated?: boolean;
 }
 
 type Store = Record<string, UserGrammarExample[]>;
@@ -87,6 +91,7 @@ export function addUserExamples(
       ...(row.reading?.trim() ? { reading: row.reading.trim() } : {}),
       ...(row.tatoebaId || row.fromTatoeba ? { source: 'tatoeba' as const } : {}),
       ...(row.tatoebaId ? { sourceId: row.tatoebaId } : {}),
+      ...(row.generated ? { generated: true as const } : {}),
       addedAt: now,
     });
   }

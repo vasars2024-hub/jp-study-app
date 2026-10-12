@@ -1,3 +1,5 @@
+import { VN5_DEFAULT_LINE_FILTERS, vn5NormalizeLineFilters, type Vn5LineFilters } from './visualNovelLineFilters';
+
 export const VISUAL_NOVEL_DATABASE_VERSION = 1;
 export const VISUAL_NOVEL_CAPTURE_LIMIT = 20_000;
 /** The library store, relative to userData. Main writes it; the Files app reads it. */
@@ -160,10 +162,13 @@ export interface VisualNovelSettings {
   /** Optional user-installed Locale Emulator `LEProc.exe`; never bundled. */
   localeEmulatorPath: string;
   reader: VisualNovelReaderSettings;
+  /** Cleanup and the user's regex filters, applied to every hooked or copied line before it is saved. */
+  lineFilters: Vn5LineFilters;
 }
 
-export type VisualNovelSettingsPatch = Partial<Omit<VisualNovelSettings, 'reader'>> & {
+export type VisualNovelSettingsPatch = Partial<Omit<VisualNovelSettings, 'reader' | 'lineFilters'>> & {
   reader?: Partial<VisualNovelReaderSettings>;
+  lineFilters?: Partial<Vn5LineFilters>;
 };
 
 export interface VisualNovelTextCapture {
@@ -348,6 +353,7 @@ export const DEFAULT_VISUAL_NOVEL_SETTINGS: VisualNovelSettings = {
   websocketUrl: 'ws://localhost:6677',
   localeEmulatorPath: '',
   reader: { opacity: 0.94, fontSize: 20, bounds: null, autoShow: true },
+  lineFilters: VN5_DEFAULT_LINE_FILTERS,
 };
 
 function finiteIn(value: unknown, min: number, max: number, fallback: number): number {
@@ -402,6 +408,7 @@ export function normalizeVisualNovelSettings(value: unknown): VisualNovelSetting
       bounds: normalizeBounds(reader.bounds),
       autoShow: reader.autoShow !== false,
     },
+    lineFilters: vn5NormalizeLineFilters(raw.lineFilters),
   };
 }
 
@@ -424,6 +431,7 @@ export function updateVisualNovelSettings(
       ...current,
       ...patch,
       reader: { ...current.reader, ...(patch.reader ?? {}) },
+      lineFilters: { ...current.lineFilters, ...(patch.lineFilters ?? {}) },
     }),
   };
 }

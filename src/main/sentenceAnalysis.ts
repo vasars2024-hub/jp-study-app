@@ -8,7 +8,9 @@ import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import crypto from 'node:crypto';
 import type { AiProviderId } from '../shared/mining';
+import { aiErrorCodeOf, type AiErrorCode } from '../shared/aiErrorCodes';
 import {
+  SENTENCE_ANALYSIS_PROMPT_VERSION,
   analysisItemCount,
   buildSentenceAnalysisPrompt,
   buildSentenceAnalysisSchema,
@@ -27,7 +29,13 @@ import {
 import type { AnalysisSnapshot } from '../shared/analysisSnapshot';
 import { callAiProvider } from './aiProviderClient';
 import { getConfiguredAiEngine, getConfiguredAiProvider } from './mining';
-import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
+import type { AiCloudFeatureId } from '../shared/aiSetup';
+import {
+  AI_CLOUD_FEATURE_OFF_MESSAGE,
+  AI_FEATURES_OFF_MESSAGE,
+  aiCloudAllowedFor,
+  aiFeaturesEnabled,
+} from './aiFeatureGate';
 
 export interface SentenceAnalyzeResponse {
   ok: boolean;
@@ -39,8 +47,12 @@ export interface SentenceAnalyzeResponse {
   needsLocalModel?: boolean;
   /** True when "Use AI features" is off in Settings > AI; the surface hides itself. */
   aiOff?: boolean;
+  /** True when the caller named a cloud opt-in (`AnalyzeSentenceOptions.feature`) and it is off. */
+  needsConsent?: boolean;
   /** True when the result came from the on-disk cache (no cloud/local call was made). */
   cached?: boolean;
+  /** Why it failed, as a code the surface says in the UI language (`error` is English, for logs). */
+  code?: AiErrorCode;
   /**
    * The preferences the analysis was produced under. Echoed so the caller does
    * not have to fetch them separately to know which sections to render, or
@@ -122,17 +134,30 @@ function flushCache(): void {
 // Provider/engine, language and the preference fingerprint are all folded in: the
 // same sentence explained in Russian, or at "brief" depth with examples off, is a
 // different artifact, and serving the wrong one makes the settings look broken.
-function cacheKey(
+// So are the prompt version and every other prompt input — the surrounding
+// context and the learner level — which the key used to leave out, so a
+// sentence first analyzed without context was served that answer forever after.
+export function sentenceAnalysisCacheKey(
   sentence: string,
   lang: string,
   providerKey: string,
   prefsFingerprint: string,
+  context = '',
+  learnerLevel = '',
 ): string {
   return crypto
     .createHash('sha256')
-    .update(`${providerKey}\0${lang}\0${prefsFingerprint}\0${normalizeAnalysisText(sentence)}`)
+    .update([
+      `v${SENTENCE_ANALYSIS_PROMPT_VERSION}`,
+      providerKey,
+      lang,
+      prefsFingerprint,
+      normalizeAnalysisText(sentence),
+      normalizeAnalysisText(context),
+      learnerLevel.trim(),
+    ].join('\0'))
     .digest('hex')
-    .slice(0, 24);
+    .slice(0, 32);
 }
 
 function trimCache(entries: Record<string, SentenceAnalysisResult>): void {
@@ -150,8 +175,21 @@ function trimCache(entries: Record<string, SentenceAnalysisResult>): void {
  * HTTP route, so an OCR in the browser and the same line read by the Lens hit
  * the same cached analysis.
  */
+export interface AnalyzeSentenceOptions {
+  /** Aborts the model call (the extension's Cancel); the reply is then `code: 'cancelled'`. */
+  signal?: AbortSignal;
+  /** Overrides the configured engine: the extension's breakdown prefers the offline model. */
+  engine?: 'cloud' | 'local-qwen';
+  /**
+   * The Settings > AI cloud opt-in this call is checked against. Without one the
+   * call behaves as it always has (the Reading Lens and the in-app callers).
+   */
+  feature?: AiCloudFeatureId;
+}
+
 export async function analyzeSentence(
   req: SentenceAnalyzeRequest,
+  options: AnalyzeSentenceOptions = {},
 ): Promise<SentenceAnalyzeResponse> {
   // Preferences always come from the store, never from the caller: the
   // extension's HTTP route is reachable by anything on localhost, and a request
@@ -159,20 +197,24 @@ export async function analyzeSentence(
   const prefs = readAnalysisPrefs();
   const sentence = normalizeAnalysisText(req.text);
   if (!isAnalyzableText(sentence)) {
-    return { ok: false, error: 'Nothing to analyze — select a sentence first.', prefs };
+    return { ok: false, code: 'empty-input', error: 'Nothing to analyze — select a sentence first.', prefs };
   }
   const lang = String(req.lang || 'ja').slice(0, 8);
   const explainIn = resolveExplainLang(prefs, String(req.explainIn || 'en').slice(0, 8));
   if (!aiFeaturesEnabled()) {
-    return { ok: false, aiOff: true, error: AI_FEATURES_OFF_MESSAGE, prefs };
+    return { ok: false, aiOff: true, code: 'ai-off', error: AI_FEATURES_OFF_MESSAGE, prefs };
   }
-  const engine = getConfiguredAiEngine();
+  const engine = options.engine ?? getConfiguredAiEngine();
   const { providerId, apiKey } = getConfiguredAiProvider();
 
+  if (engine === 'cloud' && options.feature && !aiCloudAllowedFor(options.feature)) {
+    return { ok: false, needsConsent: true, code: 'consent', error: AI_CLOUD_FEATURE_OFF_MESSAGE, prefs };
+  }
   if (engine === 'cloud' && !apiKey) {
     return {
       ok: false,
       needsKey: true,
+      code: 'no-key',
       error: 'No AI API key configured. Add one in Settings > AI.',
       prefs,
     };
@@ -183,6 +225,7 @@ export async function analyzeSentence(
       return {
         ok: false,
         needsLocalModel: true,
+        code: 'no-local-model',
         error: 'The offline AI model is not installed. Install it in Settings > AI, or switch to Cloud there.',
         prefs,
       };
@@ -190,8 +233,16 @@ export async function analyzeSentence(
   }
 
   const providerKey: string = engine === 'local-qwen' ? 'local-qwen' : (providerId as AiProviderId);
-  const key = cacheKey(sentence, lang, providerKey, analysisPrefsFingerprint(prefs, explainIn));
-  const cached = loadCache().entries[key];
+  const context = typeof req.context === 'string' ? req.context.slice(0, 2000) : '';
+  const learnerLevel = typeof req.learnerLevel === 'string' && req.learnerLevel
+    ? req.learnerLevel.slice(0, 16)
+    : prefs.learnerLevel ?? '';
+  const key = sentenceAnalysisCacheKey(
+    sentence, lang, providerKey, analysisPrefsFingerprint(prefs, explainIn), context, learnerLevel,
+  );
+  // "Re-analyze" sends `refresh`: it used to answer from this cache every time,
+  // so the button did nothing once a sentence had been analyzed.
+  const cached = req.refresh === true ? undefined : loadCache().entries[key];
   if (cached) return { ok: true, result: cached, cached: true, prefs };
 
   try {
@@ -204,6 +255,7 @@ export async function analyzeSentence(
         {
           maxTokens: Math.min(8192, Math.max(2048, analysisItemCount(sentence) * 450)),
           timeoutMs: 120_000,
+          ...(options.signal ? { signal: options.signal } : {}),
         },
       );
     } else {
@@ -211,19 +263,28 @@ export async function analyzeSentence(
       raw = await callAiProvider(providerId, apiKey, prompt, schema, {
         itemCount: analysisItemCount(sentence),
         timeoutMs: 60_000,
+        ...(options.signal ? { signal: options.signal } : {}),
+        ...(options.feature ? { feature: options.feature } : {}),
       });
     }
+    if (options.signal?.aborted) return { ok: false, code: 'cancelled', prefs };
+    // Throws on malformed JSON and on an analysis with neither a translation nor
+    // an annotation, so neither is ever cached.
     const result = parseSentenceAnalysis(raw, sentence);
     // Only successful parses are cached — network, auth and timeout failures
-    // stay retryable, matching translateAnalysis.ts.
+    // stay retryable, matching translateAnalysis.ts. Re-set rather than
+    // overwritten in place, so a refreshed entry moves to the young end and
+    // `trimCache` evicts the least recently written.
     const entries = loadCache().entries;
+    delete entries[key];
     entries[key] = result;
     trimCache(entries);
     cacheDirty = true;
     flushCache();
     return { ok: true, result, prefs };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err), prefs };
+    if (options.signal?.aborted) return { ok: false, code: 'cancelled', prefs };
+    return { ok: false, code: aiErrorCodeOf(err), error: err instanceof Error ? err.message : String(err), prefs };
   }
 }
 

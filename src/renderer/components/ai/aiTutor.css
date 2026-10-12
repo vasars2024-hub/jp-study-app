@@ -1,0 +1,129 @@
+/* The optional AI helpers for grammar, statistics, planning, onboarding and the
+   Blanc study tools. Built on aiStudy.css (panel, badge, spinner, answer box);
+   these rules only add the forms, the fallback block and the small tags. Theme
+   tokens only, so Study OS, Aero, WIRED and Blanc each restyle them, and every
+   control keeps the 24px target floor. */
+.ai-tutor-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px dashed var(--border, currentColor);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.ai-tutor-fallback p {
+  margin: 0;
+}
+
+.ai-tutor-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.ai-tutor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.ai-tutor-field input,
+.ai-tutor-field textarea,
+.ai-tutor-field select {
+  min-height: 28px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ai-tutor-tips {
+  margin: 0;
+  padding-inline-start: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-tutor-basis {
+  margin-inline-start: 6px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.ai-tutor-entry {
+  min-height: 24px;
+  min-width: 24px;
+}
+
+.ai-tutor-tag {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--border, currentColor);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.ai-tutor-tag.is-yes {
+  border-color: var(--success, var(--accent, currentColor));
+}
+
+.ai-tutor-tag.is-no {
+  border-color: var(--danger, currentColor);
+}
+
+.ai-tutor-quiz {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-tutor-quiz fieldset {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border, currentColor);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.ai-tutor-quiz legend {
+  padding: 0 4px;
+}
+
+.ai-tutor-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.ai-tutor-choice.is-right {
+  font-weight: 600;
+}
+
+.ai-tutor-choice.is-wrong {
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.ai-tutor-draft {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+}
+
+.ai-tutor-draft dt {
+  font-weight: 600;
+}
+
+.ai-tutor-draft dd {
+  margin: 0;
+}

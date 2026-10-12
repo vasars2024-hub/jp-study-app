@@ -119,12 +119,30 @@ export function withAnkiDuplicates(
 }
 
 const ANKI_CHECK_TTL_MS = 60_000;
-const ankiCache = new Map<string, { at: number; duplicates: Record<string, boolean> }>();
+/**
+ * A check that could not be made (Anki unreachable, a refused request) is
+ * remembered too, for less time: before, a failure was never cached, so every
+ * re-render of the popup asked again — part of a 348-call `modelFieldNames`
+ * storm in one five-minute E2E run.
+ */
+const ANKI_CHECK_FAILED_TTL_MS = 15_000;
+const ankiCache = new Map<string, { at: number; ttl: number; duplicates: Record<string, boolean> }>();
+/** One ask per key at a time: renders that land while it runs share it. */
+const ankiInflight = new Map<string, Promise<Record<string, boolean>>>();
+
+function remember(key: string, at: number, ttl: number, duplicates: Record<string, boolean>): void {
+  ankiCache.set(key, { at, ttl, duplicates });
+  if (ankiCache.size > 100) {
+    const oldest = ankiCache.keys().next().value;
+    if (oldest !== undefined) ankiCache.delete(oldest);
+  }
+}
 
 /**
  * Ask Anki which of `words` the target deck/note type already holds. Cached per
- * target and word set for a minute, so the popup's re-renders do not each ask.
- * Resolves to an empty record whenever the check cannot be made.
+ * target and word set for a minute (a failed check for 15 s), and concurrent
+ * asks for the same key share one request, so the popup's re-renders do not
+ * each ask. Resolves to an empty record whenever the check cannot be made.
  */
 export async function checkAnkiPresence(
   words: readonly string[],
@@ -136,28 +154,37 @@ export async function checkAnkiPresence(
   if (!list.length || !target.deckName || !target.modelName || typeof api !== 'function') return {};
   const key = `${target.deckName}\u0000${target.modelName}\u0000${target.termField ?? ''}\u0000${list.join('\u0001')}`;
   const hit = ankiCache.get(key);
-  if (hit && now - hit.at < ANKI_CHECK_TTL_MS) return hit.duplicates;
-  try {
-    const reply = await api(list, {
-      deckName: target.deckName,
-      modelName: target.modelName,
-      ...(target.termField ? { termField: target.termField } : {}),
-    });
-    if (!reply?.ok) return {};
-    ankiCache.set(key, { at: now, duplicates: reply.duplicates ?? {} });
-    if (ankiCache.size > 100) {
-      const oldest = ankiCache.keys().next().value;
-      if (oldest !== undefined) ankiCache.delete(oldest);
+  if (hit && now - hit.at < hit.ttl) return hit.duplicates;
+  const pending = ankiInflight.get(key);
+  if (pending) return pending;
+  const ask = (async (): Promise<Record<string, boolean>> => {
+    try {
+      const reply = await api(list, {
+        deckName: target.deckName,
+        modelName: target.modelName,
+        ...(target.termField ? { termField: target.termField } : {}),
+      });
+      if (!reply?.ok) {
+        remember(key, now, ANKI_CHECK_FAILED_TTL_MS, {});
+        return {};
+      }
+      remember(key, now, ANKI_CHECK_TTL_MS, reply.duplicates ?? {});
+      return reply.duplicates ?? {};
+    } catch {
+      remember(key, now, ANKI_CHECK_FAILED_TTL_MS, {});
+      return {};
+    } finally {
+      ankiInflight.delete(key);
     }
-    return reply.duplicates ?? {};
-  } catch {
-    return {};
-  }
+  })();
+  ankiInflight.set(key, ask);
+  return ask;
 }
 
 /** Forget every cached Anki verdict — after an Add, whose result changes them. */
 export function resetAnkiPresenceCache(): void {
   ankiCache.clear();
+  ankiInflight.clear();
 }
 
 export interface AnkiPresenceAcross {

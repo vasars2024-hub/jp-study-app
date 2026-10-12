@@ -3,7 +3,7 @@
 // process is the only writer of profiles.json (invariant P-6); this module
 // only ever reads snapshots and relays mutation requests over IPC.
 
-import type { ProfileId, ProfileSnapshot, StudyProfile } from '../shared/profiles';
+import type { ProfileId, ProfileSnapshot, StudyProfile, StudyProfilePatch } from '../shared/profiles';
 import { DEFAULT_PROFILE_ID, PROFILE_IDS, SEED_PROFILES } from '../shared/seedProfiles';
 
 export { DEFAULT_PROFILE_ID };
@@ -56,7 +56,7 @@ export async function switchProfile(id: ProfileId): Promise<{ ok: boolean; error
 
 export async function updateProfile(
   id: ProfileId,
-  patch: Partial<StudyProfile>,
+  patch: StudyProfilePatch,
 ): Promise<{ ok: boolean; error?: string }> {
   const res = await window.api.profileUpdate(id, patch);
   return { ok: res.ok, error: res.error };

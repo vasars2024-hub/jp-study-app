@@ -7,7 +7,7 @@
  * counts, separately, as an override rather than quietly as a correct answer.
  * Exit is always on screen, as in Match.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildWriteRound,
   gradeWrittenAnswer,
@@ -19,6 +19,7 @@ import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
 import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import './autoAudio.css';
+import { LazyAiWhyWrongPanel, whyWrongCardFor } from './aiStudyEntry';
 
 export default function WriteMode({ onExit, deck = 'all' }: {
   onExit?: () => void;
@@ -27,6 +28,8 @@ export default function WriteMode({ onExit, deck = 'all' }: {
 }) {
   const { t } = useT();
   const [round, setRound] = useState<WriteRound | null>(null);
+  /** The cards the round was dealt from, for the optional "Why was I wrong?". */
+  const [dealt, setDealt] = useState<ReturnType<typeof loadPracticeDeck>>([]);
   const [index, setIndex] = useState(0);
   const [typed, setTyped] = useState('');
   const [grade, setGrade] = useState<WriteGrade | null>(null);
@@ -37,7 +40,9 @@ export default function WriteMode({ onExit, deck = 'all' }: {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const deal = useCallback((): void => {
-    setRound(buildWriteRound(loadPracticeDeck(deck)));
+    const cards = loadPracticeDeck(deck);
+    setDealt(cards);
+    setRound(buildWriteRound(cards));
     setIndex(0);
     setTyped('');
     setGrade(null);
@@ -50,6 +55,9 @@ export default function WriteMode({ onExit, deck = 'all' }: {
   useEffect(() => { deal(); }, [deal]);
 
   const question = round && !round.refusal ? round.questions[index] : undefined;
+  const missed = grade?.verdict === 'close' || grade?.verdict === 'wrong';
+  // The card behind a missed question, for the optional "Why was I wrong?".
+  const whyCard = useMemo(() => (missed ? whyWrongCardFor(dealt, question?.cardId) : null), [missed, dealt, question?.cardId]);
 
   // Focus follows the question, so the next answer can be typed without reaching
   // for the pointer. Only when a question is actually on screen.
@@ -163,7 +171,7 @@ export default function WriteMode({ onExit, deck = 'all' }: {
           lang={question.direction === 'meaning-to-jp' ? 'ja' : 'en'}
           autoComplete="off"
           spellCheck={false}
-          disabled={Boolean(grade) && grade.verdict !== 'empty'}
+          disabled={grade !== null && grade.verdict !== 'empty'}
           onChange={(event) => setTyped(event.target.value)}
         />
         {(!grade || grade.verdict === 'empty') && (
@@ -180,6 +188,19 @@ export default function WriteMode({ onExit, deck = 'all' }: {
         {grade?.verdict === 'close' && t('flash.write.close')}
         {grade?.verdict === 'wrong' && t('flash.write.wrong', { answer: question.answer })}
       </p>
+
+      {missed && whyCard && grade && (
+        <Suspense fallback={null}>
+          <LazyAiWhyWrongPanel
+            key={`${question.cardId}\u0000${typed}`}
+            card={whyCard}
+            typed={typed}
+            expected={question.answer}
+            direction={question.direction === 'meaning-to-jp' ? 'meaning-to-target' : 'target-to-meaning'}
+            verdict={grade.verdict === 'close' ? 'close' : 'wrong'}
+          />
+        </Suspense>
+      )}
 
       {grade?.verdict === 'close' && (
         <div className="flash-match-actions">

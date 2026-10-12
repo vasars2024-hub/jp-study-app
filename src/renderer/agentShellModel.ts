@@ -45,6 +45,8 @@ export interface AgentConversationSummary {
   context: AgentContextDisclosure;
   /** True when any stored message discloses a cloud provider as its target. */
   usedCloud: boolean;
+  /** Oldest messages the history budget removed (0 when the conversation is whole). */
+  trimmedMessages: number;
 }
 
 export function agentContextDisclosure(
@@ -67,6 +69,7 @@ function summarize(conversation: AgentConversation): AgentConversationSummary {
     messageCount: conversation.messages.length,
     context: agentContextDisclosure(conversation.context),
     usedCloud: conversation.messages.some((message) => message.provider?.cloud === true),
+    trimmedMessages: conversation.trimmedMessages ?? 0,
   };
 }
 

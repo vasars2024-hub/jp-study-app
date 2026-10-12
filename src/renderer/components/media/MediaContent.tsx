@@ -104,6 +104,12 @@ import { inspectStudyListeningAudio } from '../../studyListeningAudio';
 import { STUDY_LANG_NATIVE_NAME } from '../../../shared/studyLang';
 import { formatNumber } from '../../stats';
 import { Select } from '../ui';
+import {
+  PLAYER_TRANSCRIPTION_CARD_OPTIONS,
+  latestWhisperRecord,
+  playerWhisperErrorKey,
+  playerWhisperView,
+} from '../../../media/playerTranscription';
 
 const CARD_MIN_WIDTH = 230;
 const CARD_GAP = 12;
@@ -217,7 +223,7 @@ export interface MediaState {
   mode: MediaViewMode;
   showLibrary: boolean;
   showPlayer: boolean;
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   videoWrapRef: React.RefObject<HTMLDivElement | null>;
   sigBurst: boolean;
   fireSigBurst: () => void;
@@ -356,6 +362,8 @@ export interface MediaState {
   openSecondarySubs: () => Promise<void>;
   convertAndPlay: () => Promise<void>;
   runGeneration: (url: string) => Promise<void>;
+  /** Stops the transcription this player started: the queue job is cancelled, or its worker terminated. */
+  stopGeneration: () => void;
   jumpLine: (delta: number) => void;
   replayLine: () => void;
   translateLine: () => Promise<void>;
@@ -388,6 +396,15 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     [],
   );
   const workerRef = useRef<Worker | null>(null);
+  /**
+   * Which transcription this player is following. Bumped on every new run, on
+   * file change and on stop, so a late message from an older run — a worker
+   * that was replaced, a queue job for the previous file — is ignored instead
+   * of writing its cues into the file now open.
+   */
+  const genRunRef = useRef(0);
+  /** The queue job a library file's transcription runs as (routed to THIS window by main). */
+  const queueJobRef = useRef<{ mediaId: string; lang: string; run: number } | null>(null);
   const resumeRef = useRef(0);
   const cuesRef = useRef<Cue[]>([]);
   const secondaryCuesRef = useRef<Cue[]>([]);
@@ -740,7 +757,31 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     return parsed.length > 0;
   }, [t]);
 
+  /**
+   * Stops following the current transcription. The in-window worker is
+   * terminated (its cues belong to the file being left); a queue job keeps
+   * running in main and still writes its track onto ITS library item.
+   */
+  const detachGeneration = useCallback(() => {
+    genRunRef.current += 1;
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    queueJobRef.current = null;
+  }, []);
+
+  const stopGeneration = useCallback(() => {
+    const job = queueJobRef.current;
+    if (job && typeof window.api?.cancelTranscription === 'function') {
+      void window.api.cancelTranscription(job.mediaId).catch(() => undefined);
+    }
+    detachGeneration();
+    setGenState('idle');
+    setGenMsg('');
+    setGenProgress(0);
+  }, [detachGeneration]);
+
   const loadOpened = useCallback((r: MediaOpen) => {
+    detachGeneration();
     setCurrent(r.item);
     currentYoutubeIdRef.current = r.item.youtubeId;
     setSrc(r.url);
@@ -772,7 +813,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setAbStart(null);
     setAbEnd(null);
     setAbLoop(false);
-  }, [applySubtitleFile]);
+  }, [applySubtitleFile, detachGeneration]);
 
   // Deep-open from playlist manager / external open request.
   useEffect(() => {
@@ -785,14 +826,51 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   }, [mode, loadOpened]);
 
   // Run Whisper on a given playable URL (used by the button and by YouTube auto-transcribe).
+  //
+  // A local library file goes through the transcription queue: main routes its
+  // chunks to THIS window only (not to every open window), the job is
+  // cancellable mid-chunk, and the track lands on the library item. A stream
+  // with no library file (YouTube) still runs an in-window worker — one at a
+  // time, replaced cleanly, and ignored once the player moved on.
   const runGeneration = useCallback(
     async (targetUrl: string) => {
+      detachGeneration();
+      const run = genRunRef.current;
+      const stale = (): boolean => run !== genRunRef.current;
       setGenError('');
       setCues([]);
       setSubName('');
       setSubStatus('');
       setSubOffset(0);
       setGenProgress(0);
+
+      const libraryItem = current && !current.youtubeId && current.path ? current : null;
+      if (libraryItem && typeof window.api?.enqueueTranscription === 'function') {
+        setGenState('loading');
+        setGenMsg(t('media.jobs.phase.queued'));
+        // Followed before the request goes out: the queue broadcasts at once.
+        queueJobRef.current = { mediaId: libraryItem.id, lang: subLang, run };
+        try {
+          const result = await window.api.enqueueTranscription({
+            mediaId: libraryItem.id,
+            lang: subLang,
+            cardOptions: PLAYER_TRANSCRIPTION_CARD_OPTIONS,
+          });
+          if (stale()) return;
+          if (!result?.ok) {
+            queueJobRef.current = null;
+            setGenState('error');
+            setGenError(t(playerWhisperErrorKey(result?.error)));
+          }
+        } catch (e) {
+          if (stale()) return;
+          queueJobRef.current = null;
+          setGenState('error');
+          setGenError(t('media.gen.subtitleFailed', { detail: msg(e) }));
+        }
+        return;
+      }
+
       setGenState('extracting');
       setGenMsg(t('media.gen.extractingAudio'));
       let audio: Float32Array;
@@ -801,10 +879,12 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         audio = new Float32Array(buf);
         if (audio.length === 0) throw new Error('no audio track found');
       } catch (e) {
+        if (stale()) return;
         setGenState('error');
         setGenError(t('media.gen.extractAudioFailed', { detail: msg(e) }));
         return;
       }
+      if (stale()) return;
       setGenState('loading');
       setGenMsg(t('media.gen.loadingModel'));
 
@@ -813,6 +893,11 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       });
       workerRef.current = worker;
       worker.onmessage = (ev: MessageEvent) => {
+        // A worker this player already replaced or stopped: never its cues.
+        if (stale() || workerRef.current !== worker) {
+          worker.terminate();
+          return;
+        }
         const m = ev.data;
         if (m.type === 'progress' && m.status === 'progress' && typeof m.progress === 'number') {
           const f = typeof m.file === 'string' ? m.file.split('/').pop() : 'model';
@@ -857,6 +942,9 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         }
       };
       worker.onerror = (err) => {
+        if (stale() || workerRef.current !== worker) return;
+        worker.terminate();
+        workerRef.current = null;
         setGenState('error');
         setGenError(t('media.gen.transcriberStartFailed', { detail: err.message }));
       };
@@ -865,8 +953,71 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         [audio.buffer],
       );
     },
-    [modelTier, prefer, subLang, t],
+    [current, detachGeneration, modelTier, prefer, subLang, t],
   );
+
+  /** Mounts the track the queue wrote for this player's job. */
+  const mountQueueTranscript = useCallback(
+    async (job: { mediaId: string; lang: string; run: number }): Promise<void> => {
+      try {
+        const listed = await window.api.listMedia();
+        const record = latestWhisperRecord(listed.find((entry) => entry.id === job.mediaId), job.lang);
+        const pick = record ? await window.api.readSubtitleRecord(job.mediaId, record.id) : null;
+        if (job.run !== genRunRef.current) return;
+        queueJobRef.current = null;
+        if (!record || !pick?.text) {
+          setGenState('error');
+          setGenError(t('mediaWorkspace.study.noWhisperCues'));
+          return;
+        }
+        const parsed = parseSubtitles(pick.text);
+        setCues(parsed);
+        setSubName(record.label || t('media.subName.whisperGenerated'));
+        setSubStatus(t('media.subStatus.generated', { count: parsed.length }));
+        setGenState('done');
+        setGenMsg('');
+        setGenProgress(1);
+      } catch {
+        if (job.run !== genRunRef.current) return;
+        queueJobRef.current = null;
+        setGenState('error');
+        setGenError(t('mediaWorkspace.study.whisperMountFailed'));
+      }
+    },
+    [t],
+  );
+  const mountQueueTranscriptRef = useRef(mountQueueTranscript);
+  mountQueueTranscriptRef.current = mountQueueTranscript;
+
+  // Follows the queue for this player's job (one subscription for the hook's life).
+  useEffect(() => {
+    if (typeof window.api?.onTranscriptionProgress !== 'function') return undefined;
+    return window.api.onTranscriptionProgress((progress) => {
+      const job = queueJobRef.current;
+      if (!job || progress.mediaId !== job.mediaId || job.run !== genRunRef.current) return;
+      const view = playerWhisperView(progress);
+      if (view.state === 'done') {
+        void mountQueueTranscriptRef.current(job);
+        return;
+      }
+      if (view.state === 'error') {
+        queueJobRef.current = null;
+        setGenState('error');
+        setGenError(t(view.messageKey, view.messageParams));
+        return;
+      }
+      if (view.state === 'idle') {
+        queueJobRef.current = null;
+        setGenState('idle');
+        setGenMsg('');
+        setGenProgress(0);
+        return;
+      }
+      setGenState(view.state === 'extracting' ? 'extracting' : view.state === 'transcribing' ? 'transcribing' : 'loading');
+      setGenMsg(t(view.messageKey, view.messageParams));
+      setGenProgress(view.progress);
+    });
+  }, [t]);
 
   const openFile = useCallback(async () => {
     const r = await window.api.pickMedia();
@@ -1622,6 +1773,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     openSecondarySubs,
     convertAndPlay,
     runGeneration,
+    stopGeneration,
     jumpLine,
     replayLine,
     translateLine,
@@ -1837,6 +1989,7 @@ export function MediaYoutubeBar({ state }: { state: MediaState }) {
 
 /** Transcription progress, error, and subtitle status. Player modes only. */
 export function MediaGenerationStatus({ state }: { state: MediaState }) {
+  const { t } = useT();
   return (
     <>
       {state.generating && (
@@ -1853,6 +2006,14 @@ export function MediaGenerationStatus({ state }: { state: MediaState }) {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            className="btn subtle"
+            data-testid="media-gen-cancel"
+            onClick={() => state.stopGeneration()}
+          >
+            {t('common.cancel')}
+          </button>
         </div>
       )}
       {state.genError && <div className="media-error">{state.genError}</div>}

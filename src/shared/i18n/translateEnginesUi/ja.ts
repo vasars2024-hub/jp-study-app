@@ -34,6 +34,19 @@ export const TRANSLATE_ENGINES_UI_JA: Catalog = {
   'xlate2.result.by': '翻訳：{provider}',
   'xlate2.result.fellBack': '{provider} で翻訳できなかったため（{reason}）、オフラインモデルで翻訳しました。',
   'xlate2.error.cloud': '{provider} で翻訳できませんでした：{reason}。',
+  'xlate2.error.chain': 'どのエンジンでも翻訳できませんでした。{details}。',
+  'xlate2.error.attempt': '{provider}：{reason}',
+  'xlate2.result.cached': '即時（以前の翻訳）',
+  'xlate2.result.cachedHint': '同じ文章を同じエンジン・設定で少し前に翻訳したため、その翻訳を再利用しました。何も送信していません。',
+  'xlate2.result.partial': '不完全：再試行しても {total} 文中 {missing} 文が翻訳されませんでした（{sentences} 文目）。この結果は保存していません。もう一度翻訳すると再試行します。',
+
+  'xlate2.back.action': '逆翻訳',
+  'xlate2.back.actionAll': 'すべて逆翻訳',
+  'xlate2.back.hint': '{lang}に訳し戻して、意味が保たれているか確かめます',
+  'xlate2.back.label': '{lang}に訳し戻すと：',
+  'xlate2.back.working': '逆翻訳中…',
+  'xlate2.back.failed': '逆翻訳できませんでした：{reason}',
+  'xlate2.keysHintMore': 'Esc で中止 · Alt+B で全文を逆翻訳',
 
   // ---- Why a cloud engine did not answer ----
   'xlate2.fallback.consent': '文章の送信を許可していません',
@@ -42,6 +55,7 @@ export const TRANSLATE_ENGINES_UI_JA: Catalog = {
   'xlate2.fallback.rateLimit': 'リクエストが多すぎます。少し待ってから再試行してください',
   'xlate2.fallback.quota': 'アカウントの利用枠を使い切りました',
   'xlate2.fallback.spend': '月間の支出上限を超えてしまいます',
+  'xlate2.fallback.offline': 'このコンピューターはオフラインのため、何も送信していません',
   'xlate2.fallback.network': 'サービスに接続できませんでした',
   'xlate2.fallback.timeout': 'リクエストがタイムアウトしました',
   'xlate2.fallback.invalid': '返答が使える翻訳ではありませんでした',
@@ -70,6 +84,8 @@ export const TRANSLATE_ENGINES_UI_JA: Catalog = {
   'xlate2.glossary.otherPairs': {
     other: 'ほかの言語の組み合わせに適用される用語があと {count} 件あります。',
   },
+  'xlate2.glossary.namesTitle': 'この文章の固有名詞（{count}）',
+  'xlate2.glossary.namesHint': '名前をどの翻訳でも同じ綴りにします。綴りは本文ではなく辞書の読みから作るので、保存前に確認してください。',
   'xlate2.glossary.report': '用語集どおりの訳：{total} 件中 {count} 件。',
   'xlate2.glossary.missing': '反映されなかった用語：{terms}。',
 

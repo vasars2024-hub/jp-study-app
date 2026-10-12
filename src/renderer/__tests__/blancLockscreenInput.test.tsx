@@ -16,6 +16,10 @@ vi.mock('../lockscreenSettings', () => ({
   verifyLockscreenPin: (pin: string) => verify(pin),
   // BlancLockscreen reads the detailed answer (it carries main's backoff).
   verifyLockscreenPinDetailed: (pin: string) => ({ ok: verify(pin) }),
+  // lock3: the PIN step (no study step, no study panel) of a profile with a PIN.
+  loadLockscreen: () => ({ enabled: true, pinHash: 'scrypt1:a:b', tint: 'auto', study: 'off', answerToUnlock: false }),
+  markLockscreenUnlocked: () => undefined,
+  recoverLockscreen: async () => ({ ok: false, settings: {} }),
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

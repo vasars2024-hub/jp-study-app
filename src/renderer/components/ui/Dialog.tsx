@@ -8,9 +8,26 @@ export interface DialogProps {
   title?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  /** Close when the backdrop is clicked (default true). */
+  /**
+   * Close when the backdrop is clicked or Escape is pressed (default true). A
+   * non-dismissable dialog closes only through its own buttons: Escape is
+   * consumed (so nothing behind it reacts) but does not close it (risk4).
+   */
   dismissable?: boolean;
   className?: string;
+}
+
+/**
+ * Open dialogs, oldest first (risk4). Every dialog listens on `document`, so
+ * with two open (a confirm over a settings dialog) one Escape used to close
+ * both, and Tab was trapped by whichever registered last. Only the top-most
+ * dialog handles keys now.
+ */
+const openDialogs: symbol[] = [];
+
+/** How many dialogs are open (tests). */
+export function openDialogCountForTests(): number {
+  return openDialogs.length;
 }
 
 export function Dialog({ open, onClose, title, children, footer, dismissable = true, className = '' }: DialogProps) {
@@ -23,14 +40,24 @@ export function Dialog({ open, onClose, title, children, footer, dismissable = t
   // typing in a field inside the dialog lost their place on every re-render.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const dismissableRef = useRef(dismissable);
+  dismissableRef.current = dismissable;
 
   useEffect(() => {
     if (!open) return;
+    const token = Symbol('dialog');
+    openDialogs.push(token);
     const prev = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
+      // A dialog under another one is inert to the keyboard.
+      if (openDialogs[openDialogs.length - 1] !== token) return;
       if (e.key === 'Escape') {
         e.stopPropagation();
+        if (!dismissableRef.current) {
+          e.preventDefault();
+          return;
+        }
         onCloseRef.current();
       } else if (e.key === 'Tab') {
         trapTab(e, panelRef.current);
@@ -39,6 +66,8 @@ export function Dialog({ open, onClose, title, children, footer, dismissable = t
     document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('keydown', onKey, true);
+      const at = openDialogs.indexOf(token);
+      if (at >= 0) openDialogs.splice(at, 1);
       if (prev?.isConnected) prev.focus();
     };
   }, [open]);

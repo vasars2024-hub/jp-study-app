@@ -1,4 +1,4 @@
-import type { AiMiningCardFormat, AiPromptPreset } from './mining';
+import type { AiMiningCardFormat, AiPresetStudyLang, AiPromptPreset } from './mining';
 
 type PresetDef = AiPromptPreset & { format: AiMiningCardFormat };
 
@@ -9,6 +9,7 @@ function preset(
   description: string,
   instruction: string,
   format: Omit<AiMiningCardFormat, 'presetId' | 'id'> & { id: string },
+  studyLangs?: readonly AiPresetStudyLang[],
 ): PresetDef {
   return {
     id,
@@ -16,9 +17,14 @@ function preset(
     category,
     description,
     instruction,
+    ...(studyLangs ? { studyLangs } : {}),
     format: { ...format, presetId: id },
   };
 }
+
+/** The Chinese presets' note type: Chinese headword, pinyin and English gloss. */
+const ZH_PROFILE = 'seed-zh-en';
+const ZH: readonly AiPresetStudyLang[] = ['zh'];
 
 const CATALOG: PresetDef[] = [
   preset(
@@ -1089,6 +1095,147 @@ const CATALOG: PresetDef[] = [
       ],
     },
   ),
+  // ---- Chinese (Mandarin) presets. The ones above are about kanji, kana,
+  // keigo and JLPT; a Chinese learner used to be offered only those, while the
+  // prompt asked for Chinese items — Japanese-shaped cards for Chinese words.
+  preset(
+    'zh-chengyu',
+    'Chengyu / Set Phrases',
+    'core',
+    'Four-character idioms and fixed expressions, with their story and usage.',
+    'Explain the chengyu or set phrase: literal character-by-character gloss, figurative meaning, the classical story or source when there is one, register, and a typical collocation. Give the reading as pinyin with tone marks.',
+    {
+      id: 'zh-chengyu-recognition',
+      label: 'Chengyu recognition (ZH → gloss)',
+      profileId: ZH_PROFILE,
+      outputFormat: 'anki',
+      description: 'Chengyu in context on the front; pinyin, figurative meaning, origin and usage on the back.',
+      cardTemplates: [
+        {
+          label: 'Chengyu recognition',
+          front: '{expression}\n\n{sentence}',
+          back: '{reading}\n\nMeaning: {meaning}\n\nLiteral: {grammarBreakdown}\n\nOrigin: {culturalContext}\n\nUsage: {nuance}',
+          tags: ['ai-chengyu', 'recognition'],
+        },
+      ],
+    },
+    ZH,
+  ),
+  preset(
+    'zh-measure-words',
+    'Measure Words',
+    'core',
+    'Which classifier goes with which noun, and why.',
+    'For each noun, give the standard measure word (量词) and common alternatives, the semantic reason the classifier fits (shape, category, unit), and a short example phrase. Give readings as pinyin with tone marks.',
+    {
+      id: 'zh-measure-word-pair',
+      label: 'Noun → measure word',
+      profileId: ZH_PROFILE,
+      outputFormat: 'anki',
+      description: 'Noun on the front; its measure word, pinyin, reason and an example phrase on the back.',
+      cardTemplates: [
+        {
+          label: 'Measure word recall',
+          front: '一 ___ {expression}\n\nWhich measure word?',
+          back: '{grammarBreakdown}\n{reading}\n\n{meaning}\n\nWhy: {nuance}\n\n{sentence}',
+          tags: ['ai-measure-word'],
+        },
+      ],
+    },
+    ZH,
+  ),
+  preset(
+    'zh-tones-pinyin',
+    'Tones and Pinyin',
+    'core',
+    'Tone pairs, tone sandhi and easily confused readings.',
+    'Focus on pronunciation: pinyin with tone marks, tone numbers, any tone sandhi (third-tone, 一, 不), and near-homophones a learner confuses it with.',
+    {
+      id: 'zh-tone-drill',
+      label: 'Hanzi → tones drill',
+      profileId: ZH_PROFILE,
+      outputFormat: 'anki',
+      description: 'Characters on the front; pinyin, tones, sandhi and confusable readings on the back.',
+      cardTemplates: [
+        {
+          label: 'Tone recall',
+          front: '{expression}\n\nRead it aloud — which tones?',
+          back: '{reading}\n\nSandhi: {grammarBreakdown}\n\nConfusable: {nuance}\n\n{meaning}',
+          tags: ['ai-tones', 'pinyin'],
+        },
+      ],
+    },
+    ZH,
+  ),
+  preset(
+    'zh-hsk-core',
+    'HSK Core Vocabulary',
+    'core',
+    'High-frequency words for HSK study, with a natural example.',
+    'Pick useful HSK-level vocabulary. Give pinyin with tone marks, the HSK level when known, the core meaning, a natural example sentence, and one collocation.',
+    {
+      id: 'zh-hsk-recognition',
+      label: 'HSK word recognition',
+      profileId: ZH_PROFILE,
+      outputFormat: 'anki',
+      description: 'Word and example on the front; pinyin, meaning, HSK level and collocation on the back.',
+      cardTemplates: [
+        {
+          label: 'HSK recognition',
+          front: '{expression}\n\n{sentence}',
+          back: '{reading}\n\n{meaning}\n\nLevel: {culturalContext}\n\nCollocation: {nuance}\n\n{sentenceTranslationEn}',
+          tags: ['ai-hsk'],
+        },
+      ],
+    },
+    ZH,
+  ),
+  preset(
+    'zh-aspect-particles',
+    'Aspect Particles (了 / 过 / 着)',
+    'specialized',
+    'Completed, experiential and continuous aspect in real sentences.',
+    'Explain which aspect particle the sentence uses and why the others would change or break the meaning. Give pinyin with tone marks.',
+    {
+      id: 'zh-aspect-contrast',
+      label: 'Aspect particle contrast',
+      profileId: ZH_PROFILE,
+      outputFormat: 'anki',
+      description: 'Sentence with the particle blanked; the back explains the choice against the alternatives.',
+      cardTemplates: [
+        {
+          label: 'Aspect cloze',
+          front: '{cloze-before}[ … ]{cloze-after}\n\n了, 过 or 着?',
+          back: '{expression}\n\n{grammarBreakdown}\n\nWhy not the others: {nuance}\n\n{sentenceTranslationEn}',
+          tags: ['ai-aspect', 'grammar'],
+        },
+      ],
+    },
+    ZH,
+  ),
+  preset(
+    'zh-net-slang',
+    'Chinese Internet Slang',
+    'specialized',
+    'Net slang, abbreviations and meme phrasing from Chinese platforms.',
+    'Explain the Chinese internet slang: pinyin, the platform or community it comes from, literal versus intended meaning, tone (ironic/sincere), and whether it is safe to use with strangers.',
+    {
+      id: 'zh-net-slang-gloss',
+      label: 'Chinese net slang gloss',
+      profileId: ZH_PROFILE,
+      outputFormat: 'anki',
+      description: 'Slang in context on the front; pinyin, origin, tone and plain gloss on the back.',
+      cardTemplates: [
+        {
+          label: 'Chinese internet slang',
+          front: '{expression}\n\n{sentence}',
+          back: '{reading}\n\nGloss: {meaning}\n\nOrigin/tone: {culturalContext}\n\nNuance: {nuance}',
+          tags: ['ai-net-slang', 'zh'],
+        },
+      ],
+    },
+    ZH,
+  ),
 ];
 
 export const AI_PROMPT_PRESETS: readonly AiPromptPreset[] = CATALOG.map(
@@ -1100,4 +1247,22 @@ export const AI_MINING_FORMATS: readonly AiMiningCardFormat[] = CATALOG.map((ent
 export function formatsForPreset(presetId: string): AiMiningCardFormat[] {
   const matches = AI_MINING_FORMATS.filter((format) => format.presetId === presetId);
   return matches.length ? matches : AI_MINING_FORMATS.filter((format) => format.presetId === 'idiom-slang');
+}
+
+/** The Card Studio preset language for a study language: Chinese has its own set; everything else gets the Japanese one. */
+export function presetStudyLang(studyLang: string | undefined): AiPresetStudyLang {
+  return studyLang?.trim().toLowerCase().startsWith('zh') ? 'zh' : 'ja';
+}
+
+/** Whether a preset writes cards for this study language (a preset with no list is Japanese). */
+export function presetFitsStudyLang(preset: Pick<AiPromptPreset, 'studyLangs'>, studyLang: string | undefined): boolean {
+  return (preset.studyLangs ?? ['ja']).includes(presetStudyLang(studyLang));
+}
+
+/** The presets Card Studio offers for this study language. */
+export function presetsForStudyLang<T extends Pick<AiPromptPreset, 'studyLangs'>>(
+  presets: readonly T[],
+  studyLang: string | undefined,
+): T[] {
+  return presets.filter((entry) => presetFitsStudyLang(entry, studyLang));
 }

@@ -41,7 +41,8 @@ describe('lock blocked notice', () => {
     const root = createRoot(host);
     act(() => root.render(createElement(Probe)));
     act(() => listener?.({ kind: 'command', action: 'command:lens.region' }));
-    expect(toasts).toEqual([{ message: 'Gum is locked. Unlock to use that shortcut.', kind: 'warn', action: undefined }]);
+    // lock3: marked as the lock's own notice, the only kind ToastHost draws over a lock screen.
+    expect(toasts).toEqual([{ message: 'Gum is locked. Unlock to use that shortcut.', kind: 'warn', lockSurface: true }]);
     act(() => root.unmount());
     expect(off).toHaveBeenCalledTimes(1);
     window.removeEventListener('os:toast', onToast);

@@ -70,6 +70,7 @@ import {
   translateFallbackCodeFor,
   withPairProvider,
   withTranslateConsent,
+  type TranslateEngineAttempt,
   type TranslateFallbackCode,
   type TranslateProviderAvailability,
   type TranslateProviderId,
@@ -77,11 +78,18 @@ import {
   type TranslateProviderSnapshot,
   type TranslateResultMeta,
 } from '../shared/translateProviders';
+import { TranslateResultCache, translateCacheKey } from '../shared/translateCache';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { readSecret } from './credentials/vault';
 import { listLocalModelFiles, resolveQwenSmallModelPath } from './localModelFiles';
 import { RateLimiter } from './providers/providerHttp';
-import { AiProviderRuntimeError, cloudSpendAllows, getAiProviderHealth, runCloudAiRequest } from './providerRuntime';
+import {
+  AiProviderRuntimeError,
+  cloudSpendAllows,
+  getAiProviderHealth,
+  recordCloudSpend,
+  runCloudAiRequest,
+} from './providerRuntime';
 
 /** One finished sentence, reported the moment it exists (progressive display). */
 export type TranslateSegmentListener = (index: number, segment: TranslateSegment, total: number) => void;
@@ -95,6 +103,8 @@ export interface LocalTranslateArgs {
   /** A GGUF other than the default small model: the higher-quality local tier. */
   modelFileName?: string;
   onSegment?: TranslateSegmentListener;
+  /** The user's cancel (risk4); the runner stops between sentences. */
+  signal?: AbortSignal;
 }
 
 export type LocalTranslateRunner = (args: LocalTranslateArgs) => Promise<{ text: string; segments: TranslateSegment[] }>;
@@ -111,8 +121,21 @@ export interface TranslateRouterDeps {
   runCloud?: typeof runCloudAiRequest;
   fetchImpl?: typeof fetch;
   spendAllows?: (estimatedCostUsd: number | undefined) => boolean;
+  /** Adds a completed DeepL request to the monthly ledger (risk4). */
+  recordSpend?: (providerId: 'deepl', costUsd: number | undefined) => void;
   /** Skips the pacing delay; tests only. */
   unpaced?: boolean;
+  /**
+   * Whether the computer has a network connection (Electron's `net.isOnline`).
+   * A cloud engine is not even tried while offline: the reason shown is
+   * "you are offline", not a timeout thirty seconds later. Absent = assume online.
+   */
+  isOnline?: () => boolean;
+  /**
+   * The interactive result cache (`shared/translateCache.ts`). Absent = no
+   * caching, which is what every caller but the Translate IPC wants.
+   */
+  cache?: TranslateResultCache | null;
 }
 
 export interface RoutedTranslateRequest {
@@ -129,6 +152,40 @@ export interface RoutedTranslateRequest {
   /** The renderer's glossary terms. Sanitized here, and only those in the passage are used. */
   glossary?: unknown;
   onSegment?: TranslateSegmentListener;
+  /**
+   * The user's cancel (risk4). Reaches every engine (the local runner between
+   * sentences, the cloud request's fetch), and a cancelled request is never
+   * retried on the offline fallback: cancel means stop, not "try elsewhere".
+   */
+  signal?: AbortSignal;
+  /** Skip the cache lookup (the result still refreshes it): "translate this again". */
+  fresh?: boolean;
+}
+
+/** The user cancelled the translation; nothing is retried or fallen back to. */
+export class TranslateCancelledError extends Error {
+  constructor() {
+    super('Translation cancelled.');
+    this.name = 'TranslateCancelledError';
+  }
+}
+
+function throwIfCancelled(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new TranslateCancelledError();
+}
+
+/** The timeout and the user's cancel as one signal, whichever comes first. */
+function withCancel(timeoutMs: number, signal: AbortSignal | undefined): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeout;
+  const anyOf = (AbortSignal as unknown as { any?: (signals: AbortSignal[]) => AbortSignal }).any;
+  if (typeof anyOf === 'function') return anyOf([timeout, signal]);
+  const controller = new AbortController();
+  const abort = (): void => controller.abort();
+  if (signal.aborted || timeout.aborted) controller.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  timeout.addEventListener('abort', abort, { once: true });
+  return controller.signal;
 }
 
 export interface RoutedTranslateResult {
@@ -137,23 +194,45 @@ export interface RoutedTranslateResult {
   meta: TranslateResultMeta;
 }
 
-/** A translation that could not be produced by the chosen engine nor by the fallback. */
+/**
+ * A translation that could not be produced by the chosen engine nor by the fallback.
+ *
+ * `provider`/`code` are the engine the learner asked for and why it failed;
+ * `attempts` is every engine tried, in order, so a cloud failure followed by an
+ * offline model that could not stand in reads as both, not as whichever came last.
+ */
 export class TranslateRouteError extends Error {
+  readonly attempts: TranslateEngineAttempt[];
+
   constructor(
     readonly provider: TranslateProviderId,
     readonly code: TranslateFallbackCode,
     message?: string,
+    attempts?: TranslateEngineAttempt[],
   ) {
     super(message ?? `Translation with ${provider} failed (${code}).`);
     this.name = 'TranslateRouteError';
+    this.attempts = attempts?.length ? attempts : [{ provider, code }];
   }
 }
 
-function routeCode(error: unknown): TranslateFallbackCode {
+function routeCode(error: unknown, online = true): TranslateFallbackCode {
   if (error instanceof TranslateRouteError) return error.code;
-  if (error instanceof AiProviderRuntimeError) return translateFallbackCodeFor(error.code);
-  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) return 'timeout';
-  if (error instanceof TypeError) return 'network';
+  if (error instanceof AiProviderRuntimeError) {
+    const code = translateFallbackCodeFor(error.code);
+    return code === 'network' && !online ? 'offline' : code;
+  }
+  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) return online ? 'timeout' : 'offline';
+  // `fetch` rejects with a TypeError when the request never got a response.
+  if (error instanceof TypeError) return online ? 'network' : 'offline';
+  return 'other';
+}
+
+/** Why the offline model could not stand in. Its errors are English prose; this is all the UI needs. */
+function localFailureCode(error: unknown): TranslateFallbackCode {
+  if (error instanceof Error && error.name === 'TimeoutError') return 'timeout';
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (/not (?:installed|found)|no (?:translation )?model|missing/i.test(message)) return 'not-installed';
   return 'other';
 }
 
@@ -278,13 +357,22 @@ interface EngineInput {
   hints: TranslateSenseHint[];
   terms: TranslateGlossaryTerm[];
   onSegment?: TranslateSegmentListener;
+  signal?: AbortSignal;
+}
+
+/** An engine's answer. `missing` lists the sentences (0-based) it could not translate. */
+interface EngineResult {
+  text: string;
+  segments: TranslateSegment[];
+  missing?: number[];
 }
 
 async function translateWithCloudLlm(
   providerId: AiProviderId,
   input: EngineInput,
   deps: TranslateRouterDeps,
-): Promise<{ text: string; segments: TranslateSegment[] }> {
+  fresh = false,
+): Promise<EngineResult> {
   if (!(deps.cloudConfigured ?? cloudKeyConfigured)(providerId)) throw new TranslateRouteError(providerId, 'no-key');
   const { sentences, source, target } = input;
   const total = sentences.length;
@@ -294,27 +382,48 @@ async function translateWithCloudLlm(
     results[index] = text;
     input.onSegment?.(index, { source: sentences[index], target: text }, total);
   };
-  const stream = createCloudLineStream(total, accept);
-  await pace(providerId, deps);
-  const response = await (deps.runCloud ?? runCloudAiRequest)({
-    providerId,
-    prompt: buildCloudTranslatePrompt(sentences, source, target, input.style, input.hints),
-    systemPrompt: CLOUD_TRANSLATE_SYSTEM_PROMPT,
-    // Generous: Gemini spends part of this on thinking, and a cut-off answer is a
-    // failed translation. The preflight prices the worst case against the ceiling.
-    maxOutputTokens: Math.min(16_384, 2_048 + input.text.length * 6),
-    temperature: 0.2,
-    retryAttempts: 1,
-    timeoutMs: 90_000,
-    cache: 'session',
-    onTextChunk: (chunk) => stream.push(chunk),
-  });
-  stream.flush();
-  // A cache hit, or a provider that answered unstreamed, delivers everything here.
-  for (const [index, text] of parseCloudTranslateLines(response.text, total)) accept(index, text);
+  const ask = async (indices: number[], onLine: (index: number, text: string) => void, retry: boolean): Promise<void> => {
+    const subset = indices.map((index) => sentences[index]);
+    const stream = createCloudLineStream(subset.length, (n, text) => onLine(indices[n], text));
+    await pace(providerId, deps);
+    const response = await (deps.runCloud ?? runCloudAiRequest)({
+      providerId,
+      prompt: buildCloudTranslatePrompt(subset, source, target, input.style, input.hints),
+      systemPrompt: CLOUD_TRANSLATE_SYSTEM_PROMPT,
+      // Generous: Gemini spends part of this on thinking, and a cut-off answer is a
+      // failed translation. The preflight prices the worst case against the ceiling.
+      maxOutputTokens: Math.min(16_384, 2_048 + subset.join('').length * 6),
+      temperature: 0.2,
+      retryAttempts: 1,
+      timeoutMs: 90_000,
+      // The runtime's session cache would hand back the same incomplete reply
+      // for a retry or a "translate again": both go to the provider.
+      cache: retry || fresh ? 'off' : 'session',
+      onTextChunk: (chunk) => stream.push(chunk),
+      ...(input.signal ? { signal: input.signal } : {}),
+    });
+    stream.flush();
+    // A cache hit, or a provider that answered unstreamed, delivers everything here.
+    for (const [n, text] of parseCloudTranslateLines(response.text, subset.length)) onLine(indices[n], text);
+  };
+  await ask(sentences.map((_, index) => index), accept, false);
   if (results.every((text) => !text)) throw new TranslateRouteError(providerId, 'invalid');
+  // A reply that skipped sentences is not a translation of the passage. The
+  // skipped ones are asked for once more on their own; whatever is still
+  // missing after that is reported, never papered over.
+  let missing = results.flatMap((text, index) => (text ? [] : [index]));
+  if (missing.length) {
+    throwIfCancelled(input.signal);
+    try {
+      await ask(missing, accept, true);
+    } catch {
+      if (input.signal?.aborted) throw new TranslateCancelledError();
+      // The first answer stands, marked partial; the retry's failure is not the passage's.
+    }
+    missing = results.flatMap((text, index) => (text ? [] : [index]));
+  }
   const segments = sentences.map((sentence, index) => ({ source: sentence, target: results[index] }));
-  return { text: joinTranslatedSentences(results, target), segments };
+  return { text: joinTranslatedSentences(results, target), segments, ...(missing.length ? { missing } : {}) };
 }
 
 function deeplStatusCode(status: number): TranslateFallbackCode {
@@ -335,13 +444,17 @@ async function translateWithDeepl(
   const sourceLang = deeplLangCode(input.source, 'source');
   const targetLang = deeplLangCode(input.target, 'target');
   if (!sourceLang || !targetLang) throw new TranslateRouteError('deepl', 'unsupported');
-  if (!(deps.spendAllows ?? cloudSpendAllows)(deeplEstimatedCostUsd(key, input.text.length))) {
-    throw new TranslateRouteError('deepl', 'spend');
-  }
   const { sentences, terms } = input;
   // One text, one sentence per line: DeepL keeps the passage's context across
   // sentences, and the newlines it preserves give the alignment back.
   const joined = sentences.map((sentence) => sentence.replace(/\s*\n\s*/g, ' ')).join('\n');
+  // DeepL bills source characters; the plan (Free `:fx` key, or Pro) sets the
+  // rate. Priced from what is actually sent, checked against the monthly
+  // ceiling first and added to the ledger once DeepL accepts it (risk4).
+  const costUsd = deeplEstimatedCostUsd(key, Math.max(joined.length, input.text.length));
+  if (!(deps.spendAllows ?? cloudSpendAllows)(costUsd)) {
+    throw new TranslateRouteError('deepl', 'spend');
+  }
   const body: Record<string, unknown> = {
     text: [terms.length ? protectGlossaryForDeepl(joined, terms) : joined],
     source_lang: sourceLang,
@@ -350,13 +463,21 @@ async function translateWithDeepl(
     ...(terms.length ? { tag_handling: 'xml', ignore_tags: [GLOSSARY_IGNORE_TAG] } : {}),
   };
   await pace('deepl', deps);
+  throwIfCancelled(input.signal);
   const response = await (deps.fetchImpl ?? fetch)(`${deeplApiBase(key)}/v2/translate`, {
     method: 'POST',
     headers: { Authorization: `DeepL-Auth-Key ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30_000),
+    signal: withCancel(30_000, input.signal),
   });
   if (!response.ok) throw new TranslateRouteError('deepl', deeplStatusCode(response.status));
+  // Accepted means billed, whatever the body turns out to hold. A ledger that
+  // cannot be written is a bookkeeping loss, never a failed translation.
+  try {
+    (deps.recordSpend ?? recordCloudSpend)('deepl', costUsd);
+  } catch {
+    /* the guard logs its own failures */
+  }
   let json: unknown;
   try {
     json = await response.json();
@@ -418,20 +539,95 @@ export async function routeTranslation(
   const hints = mergeGlossaryHints(terms, req.hints, MAX_SENSE_HINTS);
   const localAvailable = deps.localAvailable ?? ((): boolean => resolveQwenSmallModelPath() !== null);
 
-  const runLocal = (modelFileName?: string) => deps.local({
-    text, source, target, hints, style, onSegment: req.onSegment,
-    ...(modelFileName ? { modelFileName } : {}),
-  });
+  const signal = req.signal;
+  throwIfCancelled(signal);
+  const online = (): boolean => {
+    try {
+      return deps.isOnline ? deps.isOnline() !== false : true;
+    } catch {
+      return true;
+    }
+  };
+  const runLocal = async (modelFileName?: string) => {
+    throwIfCancelled(signal);
+    try {
+      return await deps.local({
+        text, source, target, hints, style, onSegment: req.onSegment,
+        ...(modelFileName ? { modelFileName } : {}),
+        ...(signal ? { signal } : {}),
+      });
+    } catch (error) {
+      throwIfCancelled(signal);
+      throw error;
+    }
+  };
 
-  if (requested === 'local') return finish(await runLocal(), terms, target, { provider: 'local' });
+  // ---- cache ----
+  const cache = deps.cache ?? null;
+  const keyFor = (provider: TranslateProviderId, modelFileName?: string): string => translateCacheKey({
+    provider, source, target, style, text, terms, hints, ...(modelFileName ? { modelFileName } : {}),
+  });
+  const fromCache = (provider: TranslateProviderId, modelFileName?: string): RoutedTranslateResult | null => {
+    if (!cache || req.fresh) return null;
+    const hit = cache.get(keyFor(provider, modelFileName));
+    if (!hit) return null;
+    // The progressive display gets every sentence at once, as if it had streamed.
+    hit.segments.forEach((segment, index) => req.onSegment?.(index, segment, hit.segments.length));
+    return { text: hit.text, segments: hit.segments, meta: { ...hit.meta, cached: true } };
+  };
+  const remember = (provider: TranslateProviderId, result: RoutedTranslateResult, modelFileName?: string): void => {
+    if (!cache || !result.text.trim()) return;
+    // Stored as the engine's own answer: no fallback story, no cache flag.
+    const meta: TranslateResultMeta = { provider, ...(result.meta.glossary ? { glossary: result.meta.glossary } : {}) };
+    cache.set(keyFor(provider, modelFileName), { text: result.text, segments: result.segments, meta });
+  };
+
+  /**
+   * The offline model standing in after `attempts` failed. A stand-in that
+   * fails too is reported with the whole chain — the cloud engine's reason and
+   * the offline model's — never only the last one.
+   */
+  const fallBackToLocal = async (attempts: TranslateEngineAttempt[]): Promise<RoutedTranslateResult> => {
+    const [first] = attempts;
+    try {
+      const done = finish(await runLocal(), terms, target, {
+        provider: 'local', fallbackFrom: first.provider, fallbackCode: first.code, attempts,
+      });
+      // A real offline translation of this passage: the next offline request hits.
+      remember('local', done);
+      return done;
+    } catch (error) {
+      if (error instanceof TranslateCancelledError || signal?.aborted) throw new TranslateCancelledError();
+      throw new TranslateRouteError(first.provider, first.code, undefined, [
+        ...attempts,
+        { provider: 'local', code: localFailureCode(error) },
+      ]);
+    }
+  };
+
+  if (requested === 'local') {
+    const hit = fromCache('local');
+    if (hit) return hit;
+    const done = finish(await runLocal(), terms, target, { provider: 'local' });
+    remember('local', done);
+    return done;
+  }
 
   if (requested === 'local-large') {
     const large = (deps.largeModel ?? resolveLargeTranslateModelFile)();
-    if (large) return finish(await runLocal(large), terms, target, { provider: 'local-large' });
-    if (!settings.fallbackToLocal || !localAvailable()) throw new TranslateRouteError('local-large', 'not-installed');
-    return finish(await runLocal(), terms, target, {
-      provider: 'local', fallbackFrom: 'local-large', fallbackCode: 'not-installed',
-    });
+    if (large) {
+      const hit = fromCache('local-large', large);
+      if (hit) return hit;
+      const done = finish(await runLocal(large), terms, target, { provider: 'local-large' });
+      remember('local-large', done, large);
+      return done;
+    }
+    const attempts: TranslateEngineAttempt[] = [{ provider: 'local-large', code: 'not-installed' }];
+    if (!settings.fallbackToLocal) throw new TranslateRouteError('local-large', 'not-installed');
+    if (!localAvailable()) {
+      throw new TranslateRouteError('local-large', 'not-installed', undefined, [...attempts, { provider: 'local', code: 'not-installed' }]);
+    }
+    return fallBackToLocal(attempts);
   }
 
   // Cloud. Consent is checked before anything else, so a refused request has
@@ -441,21 +637,49 @@ export async function routeTranslation(
       throw new TranslateRouteError(requested, 'consent');
     }
     if (text.length > CLOUD_TRANSLATE_MAX_CHARS) throw new TranslateRouteError(requested, 'too-long');
+    const hit = fromCache(requested);
+    if (hit) return hit;
+    // Offline: say so now instead of a timeout half a minute from now.
+    if (!online()) throw new TranslateRouteError(requested, 'offline');
     const sentences = splitTranslationSentences(text);
     if (!sentences.length) return { text: '', segments: [], meta: { provider: requested } };
-    const input: EngineInput = { text, sentences, source, target, style, hints, terms, onSegment: req.onSegment };
-    const raw = requested === 'deepl'
+    const input: EngineInput = {
+      text, sentences, source, target, style, hints, terms, onSegment: req.onSegment, ...(signal ? { signal } : {}),
+    };
+    const raw: EngineResult = requested === 'deepl'
       ? await translateWithDeepl(input, deps)
-      : await translateWithCloudLlm(requested as AiProviderId, input, deps);
-    return finish(raw, terms, target, { provider: requested });
+      : await translateWithCloudLlm(requested as AiProviderId, input, deps, req.fresh === true);
+    throwIfCancelled(signal);
+    const missing = raw.missing ?? [];
+    const done = finish(raw, terms, target, {
+      provider: requested,
+      ...(missing.length ? { partial: { missing, total: sentences.length } } : {}),
+    });
+    // An incomplete answer is shown as such and never cached: the next request asks again.
+    if (!missing.length) remember(requested, done);
+    return done;
   } catch (error) {
-    const code = routeCode(error);
-    if (!settings.fallbackToLocal || !localAvailable()) {
-      throw error instanceof TranslateRouteError ? error : new TranslateRouteError(requested, code);
-    }
-    return finish(await runLocal(), terms, target, { provider: 'local', fallbackFrom: requested, fallbackCode: code });
+    // Cancelled: stop. Never re-run the passage on the offline fallback.
+    if (error instanceof TranslateCancelledError || signal?.aborted) throw new TranslateCancelledError();
+    const code = routeCode(error, online());
+    const attempts: TranslateEngineAttempt[] = [{ provider: requested, code }];
+    const failed = (chain: TranslateEngineAttempt[]): TranslateRouteError => (
+      error instanceof TranslateRouteError && chain.length === 1
+        ? error
+        : new TranslateRouteError(requested, code, error instanceof TranslateRouteError ? error.message : undefined, chain)
+    );
+    if (!settings.fallbackToLocal) throw failed(attempts);
+    if (!localAvailable()) throw failed([...attempts, { provider: 'local', code: 'not-installed' }]);
+    return fallBackToLocal(attempts);
   }
 }
+
+/**
+ * The Translate workbench's cache, shared by every window (main owns it so a
+ * passage translated in one window is instant in another). See
+ * `shared/translateCache.ts` for its bounds.
+ */
+export const workbenchTranslateCache = new TranslateResultCache();
 
 // ---------------------------------------------------------------------------
 // IPC

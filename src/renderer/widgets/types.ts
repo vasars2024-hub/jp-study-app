@@ -32,6 +32,27 @@ export interface WidgetProps {
   instanceId?: string;
 }
 
+/**
+ * wid5 — one setting a widget exposes in its settings popover. Labels are i18n
+ * KEYS (resolved with t() where rendered), so the registry stays module data.
+ * `fallback` must be the same default the widget itself passes to `readSetting`.
+ */
+export type WidgetSettingField =
+  | { key: string; kind: 'toggle'; labelKey: string; fallback: boolean }
+  | { key: string; kind: 'number'; labelKey: string; fallback: number; min: number; max: number; step?: number }
+  | {
+      key: string;
+      kind: 'select';
+      labelKey: string;
+      fallback: string;
+      /**
+       * A hook (called unconditionally by the field component) that lists the
+       * choices; labels are already resolved — user content such as a reading
+       * list's name is shown as written.
+       */
+      useOptions: () => { value: string; label: string }[];
+    };
+
 export interface WidgetDef {
   /** Stable key stored in WidgetSnapshot.type and the registry. */
   type: string;
@@ -43,6 +64,8 @@ export interface WidgetDef {
   defaultSize: { w: number; h: number };
   minSize: { w: number; h: number };
   component: ComponentType<WidgetProps>;
+  /** wid5: what the widget's "Widget settings" popover offers; absent = nothing to configure. */
+  settingsSchema?: readonly WidgetSettingField[];
 }
 
 /** Typed, tolerant read of a persisted setting with a fallback. */

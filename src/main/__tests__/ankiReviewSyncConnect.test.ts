@@ -30,6 +30,7 @@ import {
   storeAnkiMediaOnce,
 } from '../anki/mediaUpload';
 import { APP_TAG } from '../../shared/anki';
+import { resetModelFieldCacheForTests } from '../anki/modelFields';
 
 const DAY = 86_400_000;
 let fake: FakeAnkiConnect;
@@ -38,6 +39,7 @@ beforeEach(() => {
   fake = new FakeAnkiConnect();
   vi.stubGlobal('fetch', fake.fetch);
   resetAnkiMediaIndexForTests(path.join(tmp, `media-index-${Math.random().toString(36).slice(2)}.json`));
+  resetModelFieldCacheForTests();
   profiles.list = [];
 });
 
@@ -92,15 +94,52 @@ describe('push: Gum answers into Anki', () => {
     expect(fake.count('answerCards')).toBe(0);
   });
 
-  it('collapses two answers to one note in one request into the later one', async () => {
-    const note = fake.addNote({ modelName: 'Gum', fields: { Term: '猫' }, cards: [reviewCard()] });
+  it('replays every answer to one card in review order, so "again then good" reaches Anki as a lapse', async () => {
+    const note = fake.addNote({ modelName: 'Gum', fields: { Term: '猫' }, cards: [reviewCard({ lapses: 0 })] });
+    const other = fake.addNote({ modelName: 'Gum', fields: { Term: '犬' }, cards: [reviewCard()] });
     const now = Date.now();
     const result = await pushAnkiReviewAnswers([
-      { reviewId: 'late', noteId: note.noteId, ease: 3, reviewedAt: now - 30_000 },
-      { reviewId: 'early', noteId: note.noteId, ease: 1, reviewedAt: now - 90_000 },
+      { reviewId: 'good', noteId: note.noteId, ease: 3, reviewedAt: now - 30_000 },
+      { reviewId: 'dog', noteId: other.noteId, ease: 4, reviewedAt: now - 60_000 },
+      { reviewId: 'again', noteId: note.noteId, ease: 1, reviewedAt: now - 90_000 },
     ], 'User 1', now);
-    expect(result.outcomes).toEqual({ early: 'superseded', late: 'answered' });
+    expect(result.outcomes).toEqual({ again: 'answered', dog: 'answered', good: 'answered' });
+    // One request, in the order the answers were given.
+    expect(fake.count('answerCards')).toBe(1);
+    expect(fake.calls.find((c) => c.action === 'answerCards')?.params).toEqual({
+      answers: [
+        { cardId: note.cards[0], ease: 1 },
+        { cardId: other.cards[0], ease: 4 },
+        { cardId: note.cards[0], ease: 3 },
+      ],
+    });
+    const card = fake.cards.get(note.cards[0]);
+    expect(card).toMatchObject({ lapses: 1, reps: 7 });
+  });
+
+  it('skips only the answers older than a review made in Anki, and replays the later ones', async () => {
+    const now = Date.now();
+    const ankiReviewedAt = Math.floor((now - 120_000) / 1000);
+    const note = fake.addNote({ modelName: 'Gum', fields: { Term: '猫' }, cards: [reviewCard({ mod: ankiReviewedAt })] });
+    const result = await pushAnkiReviewAnswers([
+      { reviewId: 'before', noteId: note.noteId, ease: 1, reviewedAt: now - 300_000 },
+      { reviewId: 'after', noteId: note.noteId, ease: 3, reviewedAt: now - 60_000 },
+    ], 'User 1', now);
+    expect(result.outcomes).toEqual({ before: 'anki-newer', after: 'answered' });
     expect(fake.calls.find((c) => c.action === 'answerCards')?.params).toEqual({ answers: [{ cardId: note.cards[0], ease: 3 }] });
+  });
+
+  it('a replay of answers that already landed sends nothing again (idempotent by review id + rule 2)', async () => {
+    const note = fake.addNote({ modelName: 'Gum', fields: { Term: '猫' }, cards: [reviewCard()] });
+    const now = Date.now() - 5_000;
+    const answers = [
+      { reviewId: 'a1', noteId: note.noteId, ease: 1 as const, reviewedAt: now - 90_000 },
+      { reviewId: 'a2', noteId: note.noteId, ease: 3 as const, reviewedAt: now - 30_000 },
+    ];
+    await pushAnkiReviewAnswers(answers, 'User 1', now);
+    const again = await pushAnkiReviewAnswers(answers, 'User 1', now);
+    expect(again.outcomes).toEqual({ a1: 'anki-newer', a2: 'anki-newer' });
+    expect(fake.count('answerCards')).toBe(1);
   });
 
   it('pauses on an Anki profile switch before reading or writing anything', async () => {
@@ -167,10 +206,10 @@ describe('link discovery: notes created on another machine', () => {
   });
 
   it('links by the profile\'s term field, prefers Gum-made notes, and never matches other note types', async () => {
-    const synced = fake.addNote({ modelName: 'Gum JA', fields: { Front: '', Term: '猫', Back: 'cat' }, tags: [APP_TAG] });
-    fake.addNote({ modelName: 'Gum JA', fields: { Front: '', Term: '犬', Back: 'dog' } });
-    const tagged = fake.addNote({ modelName: 'Gum JA', fields: { Front: '', Term: '犬', Back: 'dog' }, tags: [`${APP_TAG}::ja`] });
-    fake.addNote({ modelName: 'Basic', fields: { Front: '鳥', Back: 'bird' } });
+    const synced = fake.addNote({ modelName: 'Gum JA', deckName: 'Mining', fields: { Front: '', Term: '猫', Back: 'cat' }, tags: [APP_TAG] });
+    fake.addNote({ modelName: 'Gum JA', deckName: 'Mining', fields: { Front: '', Term: '犬', Back: 'dog' } });
+    const tagged = fake.addNote({ modelName: 'Gum JA', deckName: 'Mining', fields: { Front: '', Term: '犬', Back: 'dog' }, tags: [`${APP_TAG}::ja`] });
+    fake.addNote({ modelName: 'Basic', deckName: 'Mining', fields: { Front: '鳥', Back: 'bird' } });
 
     const result = await findAnkiNoteLinks([
       { key: 'c1', term: '猫' },
@@ -185,6 +224,46 @@ describe('link discovery: notes created on another machine', () => {
     ]);
     // Read-only: link discovery never writes.
     expect(fake.calls.map((c) => c.action).filter((a) => !['getActiveProfile', 'modelFieldNames', 'findNotes', 'notesInfo'].includes(a))).toEqual([]);
+  });
+
+  it('searches only the profile\'s deck (and its subdecks), never the same note type elsewhere', async () => {
+    fake.addNote({ modelName: 'Gum JA', deckName: 'Core 2k', fields: { Front: '', Term: '猫', Back: 'cat' }, tags: [APP_TAG] });
+    const sub = fake.addNote({ modelName: 'Gum JA', deckName: 'Mining::N3', fields: { Front: '', Term: '犬', Back: 'dog' } });
+    const result = await findAnkiNoteLinks([{ key: 'c1', term: '猫' }, { key: 'c2', term: '犬' }], 'User 1');
+    expect(result.matches).toEqual([{ key: 'c1', noteId: null }, { key: 'c2', noteId: sub.noteId }]);
+    const queries = fake.calls.filter((c) => c.action === 'findNotes').map((c) => String(c.params.query));
+    expect(queries.length).toBeGreaterThan(0);
+    for (const query of queries) {
+      expect(query).toContain('"deck:Mining"');
+      expect(query).toContain('"note:Gum JA"');
+    }
+  });
+
+  it('keeps each profile to its own deck, and a card that records its deck to that deck', async () => {
+    profiles.list = [
+      ...profiles.list,
+      { id: 'zh', label: 'Chinese', anki: { deckName: 'Hanzi', modelName: 'Gum JA', fieldTemplates: { Term: '{expression}' } } },
+    ];
+    const ja = fake.addNote({ modelName: 'Gum JA', deckName: 'Mining', fields: { Front: '', Term: '日本', Back: '' } });
+    const zh = fake.addNote({ modelName: 'Gum JA', deckName: 'Hanzi', fields: { Front: '', Term: '日本', Back: '' } });
+    const result = await findAnkiNoteLinks([
+      { key: 'from-ja', term: '日本', deck: 'Mining' },
+      { key: 'from-zh', term: '日本', deck: 'Hanzi' },
+      { key: 'elsewhere', term: '日本', deck: 'Somewhere else' },
+    ], 'User 1');
+    expect(result.matches).toEqual([
+      { key: 'from-ja', noteId: ja.noteId },
+      { key: 'from-zh', noteId: zh.noteId },
+      { key: 'elsewhere', noteId: null },
+    ]);
+  });
+
+  it('skips a profile with no deck: it mines nowhere, so it has nothing to link', async () => {
+    profiles.list = [{ id: 'x', label: 'X', anki: { deckName: '', modelName: 'Gum JA', fieldTemplates: { Term: '{expression}' } } }];
+    fake.addNote({ modelName: 'Gum JA', deckName: 'Mining', fields: { Front: '', Term: '猫', Back: '' } });
+    const result = await findAnkiNoteLinks([{ key: 'c1', term: '猫' }], 'User 1');
+    expect(result.matches).toEqual([{ key: 'c1', noteId: null }]);
+    expect(fake.count('findNotes')).toBe(0);
   });
 
   it('skips a profile whose note type this collection does not have', async () => {

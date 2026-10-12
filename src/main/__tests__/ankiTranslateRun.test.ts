@@ -86,14 +86,15 @@ describe('runTranslateField', () => {
     const { results } = await runTranslateField(request(TRANSLATE_CHUNK_SIZE + 2), {
       call: async (prompt) => {
         call += 1;
-        if (call === 1) throw new Error('AI request timed out after 60s');
+        if (call === 1) throw Object.assign(new Error('AI request timed out after 60s'), { code: 'timeout' });
         return answerAll(prompt);
       },
       isCancelled: () => false,
     });
     const failed = results.filter((r) => !r.ok);
     expect(failed).toHaveLength(TRANSLATE_CHUNK_SIZE);
-    expect(failed[0]).toMatchObject({ ok: false, error: 'AI request timed out after 60s' });
+    // F8: a code the panel says in the UI language, not the provider's English prose.
+    expect(failed[0]).toMatchObject({ ok: false, error: 'timeout' });
     expect(results.slice(TRANSLATE_CHUNK_SIZE).every((r) => r.ok)).toBe(true);
   });
 

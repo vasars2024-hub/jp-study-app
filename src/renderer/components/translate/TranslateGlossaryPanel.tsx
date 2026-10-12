@@ -7,9 +7,14 @@
  * added to the glossary without a click. Shared by every Translate shell through
  * `TranslateOptionsBar`.
  */
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
-import { suggestGlossaryFromDeck, type TranslateGlossaryEntry } from '../../../shared/translateGlossary';
+import {
+  suggestGlossaryFromDeck,
+  suggestNameTerms,
+  type TranslateGlossaryEntry,
+  type TranslateGlossaryTerm,
+} from '../../../shared/translateGlossary';
 import { loadDeck } from '../../flashcardDeck';
 import {
   deleteTranslateGlossaryTerm,
@@ -54,6 +59,28 @@ export function TranslateGlossaryPanel({
     }
     return suggestGlossaryFromDeck(cards, passage, target, forPair);
   }, [passage, target, forPair]);
+
+  // Names in the passage, from the tokenizer's proper-noun tags. Loaded on
+  // demand: the dictionary behind the tokenizer is not something opening a
+  // glossary should pay for until there is Japanese text to read.
+  const [names, setNames] = useState<TranslateGlossaryTerm[]>([]);
+  useEffect(() => {
+    if (source !== 'ja' || !passage.trim()) {
+      setNames([]);
+      return undefined;
+    }
+    let alive = true;
+    void import('../../tokenizer')
+      .then(async (tokenizer) => {
+        await tokenizer.getTokenizer();
+        if (!alive || !tokenizer.tokenizerReady()) return;
+        setNames(suggestNameTerms(tokenizer.tokenizeSync(passage), target, forPair));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [passage, source, target, forPair]);
 
   const pairTag = `${source.toUpperCase()} → ${target.toUpperCase()}`;
 
@@ -107,6 +134,44 @@ export function TranslateGlossaryPanel({
         </button>
       </form>
       {note && <p className="xlate2-note muted" role="status">{note}</p>}
+
+      {names.length > 0 && (
+        <div className="xlate2-glossary-suggest xlate2-glossary-names">
+          <h4>{t('xlate2.glossary.namesTitle', { count: names.length })}</h4>
+          <p className="muted">{t('xlate2.glossary.namesHint')}</p>
+          <ul>
+            {names.map((name) => (
+              <li key={name.source}>
+                <span lang={source}>{name.source}</span>
+                {' → '}
+                <span lang={target}>{name.target}</span>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-label={`${t('xlate2.glossary.useSuggestion')} — ${name.source}`}
+                  onClick={() => {
+                    saveTranslateGlossaryTerm({ ...name, sourceLang: source, targetLang: target });
+                  }}
+                >
+                  {t('xlate2.glossary.useSuggestion')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-label={`${t('xlate2.glossary.edit')} — ${name.source}`}
+                  onClick={() => {
+                    setTerm(name.source);
+                    setRendering(name.target);
+                    setPairOnly(true);
+                  }}
+                >
+                  {t('xlate2.glossary.edit')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {suggestions.length > 0 && (
         <div className="xlate2-glossary-suggest">

@@ -85,6 +85,8 @@ export function compareLibraryLength(a: LibraryItem, b: LibraryItem): number {
 
 export const LIBRARY_LANG_CHIPS = ['all', 'ja', 'zh', 'en', 'unknown'] as const;
 export const LIBRARY_LEVEL_CHIPS = ['all', '1', '2', '3', '4', '5', '6', '7'] as const;
+export type LibraryLangChip = (typeof LIBRARY_LANG_CHIPS)[number];
+export type LibraryLevelChip = (typeof LIBRARY_LEVEL_CHIPS)[number];
 
 /**
  * Which language / level filter chips can actually return something for a given list.
@@ -103,7 +105,7 @@ export function availableFilterChips(
   scoped: readonly LibraryItem[],
   bookLevels: Readonly<Record<string, BookLevelEstimate | null | undefined>>,
   selected: { lang: string; level: string },
-): { langs: LibraryLang[] | string[]; levels: string[] } {
+): { langs: LibraryLangChip[]; levels: LibraryLevelChip[] } {
   const langs = new Set<string>();
   const levels = new Set<string>();
   for (const it of scoped) {
@@ -114,10 +116,10 @@ export function availableFilterChips(
   return {
     langs: LIBRARY_LANG_CHIPS.filter(
       (l) => l === 'all' || langs.has(l) || selected.lang === l,
-    ) as string[],
+    ),
     levels: LIBRARY_LEVEL_CHIPS.filter(
       (lv) => lv === 'all' || levels.has(lv) || selected.level === lv,
-    ) as string[],
+    ),
   };
 }
 

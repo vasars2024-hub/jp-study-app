@@ -6,6 +6,7 @@ import {
 } from '../shared/localAgentProfiles';
 import type { AgentPermissionLevel, AgentToolOperationId } from '../shared/localAgent';
 import {
+  AGENT_UNDO_RESTORING_OPERATIONS,
   agentUndoInvocations,
   resolveAgentUndo,
   type AgentUndoFailureCode,
@@ -99,17 +100,21 @@ export async function performAgentUndo(
   const target: AgentUndoTarget = resolution.target;
   const handler = createCentralAgentToolRegistry(t)[target.operation];
   if (!handler) return { ok: false, code: 'operation-unavailable' };
+  const restoring = AGENT_UNDO_RESTORING_OPERATIONS.has(target.operation);
   try {
     // One call per invocation: the single-entity deletes take an `id` each, and
     // only `flashcard.delete-cards` accepts the whole list at once.
-    for (const invocation of agentUndoInvocations(target.operation, target.entityIds)) {
+    for (const invocation of agentUndoInvocations(target.operation, target.entityIds, target.arguments)) {
       await handler(invocation);
     }
-    // Re-read live state for THIS entity type. Every supported inverse removes,
-    // so a surviving id means the adapter reported success without doing it.
-    const remaining = (await readLiveEntities())(target.entityType);
-    if (target.entityIds.some((id) => remaining.has(id))) {
-      return { ok: false, code: 'undo-failed' };
+    // Re-read live state for THIS entity type. A removing inverse must leave no id
+    // behind; a restoring one (a move put back) checked its own precondition and
+    // threw if the event had moved since, so reaching here is its proof.
+    if (!restoring) {
+      const remaining = (await readLiveEntities())(target.entityType);
+      if (target.entityIds.some((id) => remaining.has(id))) {
+        return { ok: false, code: 'undo-failed' };
+      }
     }
   } catch {
     return { ok: false, code: 'undo-failed' };
@@ -119,7 +124,7 @@ export async function performAgentUndo(
     ok: true,
     operation: {
       operation: target.operation,
-      claim: 'deleted',
+      claim: restoring ? 'updated' : 'deleted',
       entityType: target.entityType,
       entityIds: [...target.entityIds],
       // An undo has one real input: the step it reverses. Naming it is what

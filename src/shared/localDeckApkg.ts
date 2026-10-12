@@ -18,6 +18,15 @@ export interface LocalDeckApkgRequest {
    * Absent or null entries export as new cards — the format before this existed.
    */
   schedules?: Array<LocalDeckApkgSchedule | null>;
+  /**
+   * Per card row (aligned with `rows.slice(1)`): the card's saved extras, which
+   * the writer turns into the `Notes` column's markup itself
+   * (`shared/cardAiExtrasHtml.ts`) — a renderer-built HTML string is never
+   * trusted as markup, only escaped.
+   */
+  notes?: Array<import('./cardAiExtras').CardAiExtras | null>;
+  /** Headings for that block, from main's own catalog. */
+  notesLabels?: import('./cardAiExtrasHtml').CardAiExtrasLabels;
 }
 
 export interface LocalDeckApkgSchedule {

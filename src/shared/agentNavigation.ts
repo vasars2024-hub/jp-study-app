@@ -80,6 +80,8 @@ export const AGENT_NAVIGABLE_SECTIONS: readonly DesktopWinSection[] = [
   'scraper',
   'files',
   'visualnovels',
+  'snips',
+  'conversation',
 ];
 
 const NAVIGABLE = new Set<string>(AGENT_NAVIGABLE_SECTIONS);
@@ -198,6 +200,8 @@ export const AGENT_NAVIGATION_SECTION_LABEL_KEYS: Record<DesktopWinSection, stri
   scraper: 'palette.section.scraper',
   files: 'palette.section.files',
   visualnovels: 'palette.section.visualnovels',
+  snips: 'palette.section.snips',
+  conversation: 'palette.section.conversation',
   // Present so the record stays exhaustive over `DesktopWinSection`; neither is
   // navigable, so neither key is ever resolved. `note` borrowed the Notebook
   // section's key until gate 7b deleted that section; it now names the sticky

@@ -174,4 +174,36 @@ describe('extension server port resolution', () => {
     }
     // See the note on the collision case above — same cause, same reasoning.
   }, 60_000);
+
+  it('/v1/health names the port it is actually on, not the stored one', async () => {
+    // The extension (and the e2e harness) ask /v1/health which Gum answered. Found by
+    // the headless extension flow: an instance on a JP_EXTENSION_PORT override still
+    // answered `port: 18765`, the stored default — the status-route defect above, one
+    // route over.
+    vi.resetModules();
+    const mod = await import('../extensionServer');
+    const http = await import('node:http');
+    const { EXTENSION_PORT } = await import('../../shared/inboxMeta');
+    const scout = http.createServer(() => undefined);
+    await new Promise<void>((resolve) => scout.listen(0, '127.0.0.1', resolve));
+    const free = (scout.address() as { port: number }).port;
+    await new Promise<void>((resolve) => scout.close(() => resolve()));
+    expect(free).not.toBe(EXTENSION_PORT);
+    try {
+      process.env.JP_EXTENSION_PORT = String(free);
+      mod.startExtensionServer();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const health = await new Promise<{ ok: boolean; port: number }>((resolve, reject) => {
+        http.get({ host: '127.0.0.1', port: free, path: '/v1/health', agent: false }, (res) => {
+          let body = '';
+          res.on('data', (c) => { body += c; });
+          res.on('end', () => resolve(JSON.parse(body)));
+        }).on('error', reject);
+      });
+      expect(health.ok).toBe(true);
+      expect(health.port).toBe(free);
+    } finally {
+      mod.stopExtensionServer();
+    }
+  }, 60_000);
 });

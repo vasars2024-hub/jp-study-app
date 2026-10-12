@@ -1,0 +1,118 @@
+/* kbd5 — command palette footer and the unified shortcut editor. */
+
+.palette-foot {
+  border-top: 1px solid var(--border);
+  padding: 6px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  min-width: 0;
+}
+.palette-desc {
+  margin: 0;
+  color: var(--text);
+  opacity: 0.85;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.palette-keys-hint {
+  margin: 0;
+}
+
+/* Scope chip on each shortcut row: where the keys are heard. */
+.sc-scope {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--muted);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.sc-scope[data-scope='system'] {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.sc-info {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Conflict resolver: shown in place of the row's message when a chord is taken. */
+.sc-resolve {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-2));
+  font-size: 12px;
+  min-width: 0;
+}
+.sc-resolve-list {
+  margin: 0;
+  padding-left: 18px;
+}
+.sc-resolve-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sc-live {
+  flex: 1 1 100%;
+  font-size: 11px;
+  color: var(--accent-2);
+  margin: 2px 0 0 2px;
+}
+
+/* Custom shortcut edited in place (D264). */
+.sc-edit {
+  flex: 1 1 100%;
+  margin-top: 6px;
+}
+
+/* The Chrome card. */
+.sc-ext {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  font-size: 12px;
+}
+.sc-ext-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  min-width: 0;
+}
+.sc-ext-row > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sc-ext-keys {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sc-ext-url {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+.sc-fixed {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}

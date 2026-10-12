@@ -136,7 +136,7 @@ export interface MusicState {
   liveLyrics: ReturnType<typeof useLiveLyrics>;
   activeIndex: number;
   activeCueText: string | undefined;
-  activeLineRef: React.RefObject<HTMLDivElement>;
+  activeLineRef: React.RefObject<HTMLDivElement | null>;
   userScrollUntil: React.MutableRefObject<number>;
   popup: { query: string; x: number; y: number } | null;
   setPopup: (p: { query: string; x: number; y: number } | null) => void;

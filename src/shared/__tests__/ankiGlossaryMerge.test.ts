@@ -39,7 +39,7 @@ function draftOf(rows: string[][], types: RawAnkiNoteTypeRow[] = [noteType()]): 
     revlog: [],
   };
   return buildAnkiDraft(raw, {
-    source: { kind: 'apkg', label: 'glossary.apkg' },
+    source: { kind: 'apkg', label: 'glossary.apkg', fingerprint: 'test-fingerprint' },
     normalize: (v) => v.replace(/<[^>]*>/g, '').trim(),
   });
 }

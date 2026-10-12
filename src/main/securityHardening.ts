@@ -282,22 +282,44 @@ export function permissionAllowed(
   return false;
 }
 
+/**
+ * lock3: what an app page may NOT do while Gum is locked, whatever the
+ * allow-list says. Reading the clipboard would let a page behind the PIN pad
+ * pick up whatever was copied, and a web Notification is an OS banner drawn
+ * over the lock screen.
+ */
+const DENIED_WHILE_LOCKED = new Set(['clipboard-read', 'notifications']);
+
+export function permissionDeniedWhileLocked(permission: string): boolean {
+  return DENIED_WHILE_LOCKED.has(permission);
+}
+
 export function installPermissionPolicy(
   ses: Session,
   kind: SessionKind,
   policy: AppOriginPolicy,
   onDenied?: (permission: string, origin: string | null) => void,
+  opts: { isLocked?: () => boolean } = {},
 ): void {
+  const lockedNow = (): boolean => {
+    try {
+      return opts.isLocked?.() === true;
+    } catch {
+      return false;
+    }
+  };
   ses.setPermissionRequestHandler((wc, permission, callback, details) => {
     const origin = urlOrigin((details as { requestingUrl?: string }).requestingUrl) ?? urlOrigin(wc?.getURL());
     const mediaTypes = (details as { mediaTypes?: string[] }).mediaTypes;
     const ok =
-      permissionAllowed(kind, permission, origin, policy, mediaTypes)
-      || (kind === 'app' && policy.isAppOrigin(origin) && displayCaptureAllowed(wc?.id, permission, mediaTypes));
+      !(permissionDeniedWhileLocked(permission) && lockedNow())
+      && (permissionAllowed(kind, permission, origin, policy, mediaTypes)
+        || (kind === 'app' && policy.isAppOrigin(origin) && displayCaptureAllowed(wc?.id, permission, mediaTypes)));
     if (!ok) onDenied?.(permission, origin);
     callback(ok);
   });
   ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+    if (permissionDeniedWhileLocked(permission) && lockedNow()) return false;
     const mediaType = (details as { mediaType?: string }).mediaType;
     const origin = urlOrigin(requestingOrigin) ?? requestingOrigin;
     const types = mediaType ? [mediaType] : permission === 'media' ? [] : undefined;

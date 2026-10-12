@@ -74,7 +74,11 @@ export default function MediaJobStrip() {
               <Icon name={JOB_ICON[job.kind]} size={13} />
               <span className="medialib-jobs__name" title={job.title}>{job.title}</span>
               <span className="medialib-jobs__phase">
-                {job.error ?? t(`media.jobs.phase.${job.phase}`)}
+                {job.error ?? (job.modelDownload && !job.finished
+                  ? job.modelDownload.percent === null
+                    ? t('media.jobs.modelLoading')
+                    : t('media.jobs.modelDownloading', { percent: job.modelDownload.percent })
+                  : t(`media.jobs.phase.${job.phase}`))}
               </span>
               {pct !== null && !job.finished && (
                 <span className="medialib-jobs__bar" role="progressbar" aria-label={job.title} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>

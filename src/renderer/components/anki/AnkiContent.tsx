@@ -12,7 +12,7 @@
  * `ProfileSettingsSection` (which lives in `SettingsView` and would drag the
  * whole settings surface into Blanc's bundle).
  */
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   computeCloze,
   hasFieldTemplates,
@@ -161,7 +161,20 @@ export function useAnkiConfig(): AnkiConfigState {
     });
   }, [check]);
 
+  // "Retry" is the explicit refresh: it also asks Anki for the note type's
+  // fields again, past main's per-note-type cache.
+  const [fieldsTick, setFieldsTick] = useState(0);
+  const forceFieldsRefresh = useRef(false);
+  const retry = useCallback(async () => {
+    forceFieldsRefresh.current = true;
+    setFieldsTick((n) => n + 1);
+    await check();
+  }, [check]);
+
   // Re-fetch the field list whenever the bound note type changes (or we connect).
+  // Keyed by the spec fields' CONTENT: every profile push hands over a new
+  // array, and depending on its identity re-asked on each unrelated edit.
+  const noteFieldsKey = (active.anki.noteFields ?? []).join('\u0001');
   useEffect(() => {
     const specFields = active.anki.noteFields ?? [];
     if (!status?.connected || !model) {
@@ -171,7 +184,9 @@ export function useAnkiConfig(): AnkiConfigState {
     let alive = true;
     setFieldsLoading(true);
     setFieldsErr(null);
-    window.api.ankiModelFields(model).then((r) => {
+    const refresh = forceFieldsRefresh.current;
+    forceFieldsRefresh.current = false;
+    (refresh ? window.api.ankiModelFields(model, { refresh: true }) : window.api.ankiModelFields(model)).then((r) => {
       if (!alive) return;
       setFieldsLoading(false);
       if (r.ok && r.fields.length) {
@@ -188,7 +203,7 @@ export function useAnkiConfig(): AnkiConfigState {
     };
     // `t` is stable by design (CLAUDE.md i18n rule 6) — depending on it would go
     // stale rather than error, so it is deliberately not in this list.
-  }, [model, status?.connected, active.id, active.anki.noteFields]);
+  }, [model, status?.connected, active.id, noteFieldsKey, fieldsTick]);
 
   const changeDeck = useCallback(
     (value: string) => {
@@ -292,7 +307,8 @@ export function useAnkiConfig(): AnkiConfigState {
     setPreviewCss,
     waitingCollection,
     connLabel,
-    check,
+    // The user-facing check (Retry) refreshes the cached note-type fields too.
+    check: retry,
     changeDeck,
     ensureNoteType,
     term,

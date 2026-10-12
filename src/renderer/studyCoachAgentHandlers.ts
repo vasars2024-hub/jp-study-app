@@ -32,17 +32,16 @@ import {
   type WeekPlanDay,
 } from '../shared/agentStudyCoach';
 import { summarizeReviewLog } from '../shared/reviewLog';
-import { localDueForecast } from '../shared/reviewForecast';
 import { normalizeStudyLang } from '../shared/studyLang';
 import { segmentStudyText, studyWordKey } from '../shared/studySegmentation';
 import { studyWordStatus } from '../shared/gameStudyMix';
 import type { TVars } from '../shared/i18n/core';
-import { dueDeckCards, loadDeck, type DeckFlashcard } from './flashcardDeck';
+import { deckDueForecast, dueDeckCards, loadDeck, type DeckFlashcard } from './flashcardDeck';
 import { getLevel } from './knownWords';
 import { getStudyLang } from './studyEnvironment';
 import { getSummary, getStudyDayActivity, todayDayKey } from './stats';
 import { loadReviewLog } from './reviewLog';
-import { addEvent, CATEGORY_COLORS, expandOccurrences, loadEvents } from './calendar';
+import { addEvent, CATEGORY_COLORS, expandOccurrences, isCalendarDateKey, loadEvents } from './calendar';
 import { getActiveProfile } from './profileState';
 import { getTokenizer, tokenizeSync } from './tokenizer';
 import { requestArenaGame } from './games/arenaIntent';
@@ -271,8 +270,10 @@ export async function computeWeekPlan(t: Translate, startTime = '19:00'): Promis
 }> {
   const now = new Date();
   const cards = studyCards();
-  const forecast = localDueForecast(cards, 7, now.getTime());
-  const duePerDay = forecast.days.map((day, i) => (i === 0 ? dueDeckCards(cards, now.getTime()).length : day.due));
+  // The deck's own queue rules (suspended / Anki-owned cards excluded, today's new-card
+  // allowance applied) — the same counts the Calendar shows for each of these days.
+  const forecast = deckDueForecast(cards, 7, now.getTime());
+  const duePerDay = forecast.days.map((day, i) => (i === 0 ? forecast.overdue + day.due : day.due));
   const log = summarizeReviewLog(await loadReviewLog().catch(() => []), 14, now.getTime());
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6);
   const busyDays = new Set(
@@ -328,8 +329,10 @@ function scheduleSessions(t: Translate, args: Readonly<Record<string, unknown>>)
     const title = typeof session.title === 'string' ? session.title.trim().slice(0, 200) : '';
     const date = typeof session.date === 'string' ? session.date : '';
     const startTime = typeof session.startTime === 'string' && TIME.test(session.startTime) ? session.startTime : undefined;
-    const endTime = typeof session.endTime === 'string' && TIME.test(session.endTime) ? session.endTime : undefined;
-    if (!title || !DATE.test(date)) {
+    const rawEnd = typeof session.endTime === 'string' && TIME.test(session.endTime) ? session.endTime : undefined;
+    // An end before the start would print the range backwards in the Day view (D162).
+    const endTime = rawEnd && startTime && rawEnd < startTime ? undefined : rawEnd;
+    if (!title || !DATE.test(date) || !isCalendarDateKey(date)) {
       skipped += 1;
       continue;
     }

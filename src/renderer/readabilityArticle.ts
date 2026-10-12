@@ -162,7 +162,7 @@ function pickRemovalTarget(label: Element, root: Element): Element {
     if (isDiscoveryBlock(probe) || isTagChipContainer(probe) || containsRecommendationLabel(node)) {
       module = node;
     }
-    const parent = node.parentElement;
+    const parent: HTMLElement | null = node.parentElement;
     if (parent && (containsArticleTitle(parent) || parent === root)) break;
     node = parent;
   }
@@ -240,7 +240,7 @@ function pruneTailFromFirstPromoLabel(root: Element): void {
 
     let node: Element | null = labels[0];
     while (node?.parentElement) {
-      const parent = node.parentElement;
+      const parent: HTMLElement = node.parentElement;
       const children = Array.from(parent.children);
       const idx = children.indexOf(node);
       if (idx < 0) break;
@@ -526,6 +526,64 @@ export function articleBodyHtml(title: string, html: string, meta?: ReaderArticl
   return parts.join('');
 }
 
+const CJK_TEXT = /[぀-ヿ㐀-鿿]/;
+const CJK_SENTENCE_END = /[。！？!?」』）)]$/;
+
+function compactText(el: Element | null): string {
+  return (el?.textContent ?? '').replace(/\s+/g, '');
+}
+
+/**
+ * Put back the lead paragraph(s) Readability drops on Japanese pages.
+ *
+ * Readability keeps a short sibling paragraph of the article body only when it
+ * looks like a sentence — and its test is an ASCII full stop followed by a
+ * space. A Japanese lead ends in 。, so NHK's summary paragraph (a sibling just
+ * above the body text) vanished from every article. This finds the extracted
+ * body's first paragraph in the original page and restores up to three
+ * paragraphs directly before it, one or two levels up, that read as prose:
+ * Japanese text ending a sentence, few links, no boilerplate class. Anything
+ * that is not such a paragraph (a header, a date line, a tag list) stops it.
+ */
+function recoverCjkLeadParagraphs(originalHtml: string, contentHtml: string): string {
+  const holder = document.createElement('div');
+  holder.innerHTML = contentHtml;
+  const first = Array.from(holder.querySelectorAll('p')).find((p) => compactText(p).length >= 10);
+  if (!first) return contentHtml;
+  const firstText = compactText(first);
+  if (!CJK_TEXT.test(firstText)) return contentHtml;
+  const doc = new DOMParser().parseFromString(originalHtml, 'text/html');
+  const anchor = Array.from(doc.body?.querySelectorAll('p') ?? []).find((p) => compactText(p) === firstText);
+  if (!anchor) return contentHtml;
+  const have = compactText(holder);
+  const recovered: Element[] = [];
+  let node: Element | null = anchor.parentElement;
+  scan: for (let depth = 1; node && node !== doc.body && depth <= 2; depth += 1) {
+    for (let sib = node.previousElementSibling; sib; sib = sib.previousElementSibling) {
+      if (recovered.length >= 3) break scan;
+      if (sib.tagName !== 'P') break scan;
+      const text = compactText(sib);
+      const probe = probeBlock(sib);
+      const prose = CJK_TEXT.test(text)
+        && text.length >= 15
+        && text.length <= 600
+        && CJK_SENTENCE_END.test(text)
+        && probe.linkChars / Math.max(1, probe.totalChars) < 0.25
+        && !elementHintsBoilerplate(sib);
+      if (!prose) break scan;
+      if (!have.includes(text)) recovered.unshift(sib);
+    }
+    node = node.parentElement;
+  }
+  if (!recovered.length) return contentHtml;
+  for (const el of recovered) {
+    const p = document.createElement('p');
+    p.innerHTML = el.innerHTML;
+    first.before(p);
+  }
+  return holder.innerHTML;
+}
+
 const READABILITY_OPTIONS = {
   charThreshold: 140,
   nbTopCandidates: 5,
@@ -581,7 +639,7 @@ async function parseReadableArticleFromDocument(doc: Document, url: string): Pro
   };
   return {
     title,
-    html: cleanReaderArticleHtml(art.content, title, meta),
+    html: cleanReaderArticleHtml(recoverCjkLeadParagraphs(snapshot, art.content), title, meta),
     url,
     meta,
   };
@@ -607,6 +665,8 @@ async function fetchNhkArticleFromWebview(
   webview: WebviewGuest,
   url: string,
 ): Promise<ReadableArticle | null> {
+  // The caller has already checked; this narrows the optional method for the call.
+  if (!webview.executeJavaScript) return null;
   const payload = (await webview.executeJavaScript(NHK_WEBVIEW_EXTRACT_SCRIPT, false)) as NhkWebviewPayload;
   if (!payload?.ready || !payload.html) return null;
   const guestUrl = webview.getURL?.() ?? payload.url ?? url;

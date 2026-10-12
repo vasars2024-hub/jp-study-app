@@ -11,7 +11,7 @@
  * group's first ord; the rest are queued. `ambiguous` groups are listed and
  * not offered: "alike on some notes" is not a reason to delete cards.
  */
-import { useState } from 'react';
+import { useState, type JSX } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import { draftTemplateGroups, type TemplateGroup } from '../../../shared/ankiSiblingAudit';
 import { useT } from '../../i18n';

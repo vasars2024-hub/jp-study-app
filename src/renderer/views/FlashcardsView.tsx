@@ -12,6 +12,7 @@ import Icon from '../components/Icons';
 import DeckActionMenu from '../components/DeckActionMenu';
 import DeckImportPanel from '../components/DeckImportPanel';
 import FlashcardFileMenu from '../components/flashcards/FlashcardFileMenu';
+import DeckCardExtrasPanel from '../components/flashcards/DeckCardExtrasPanel';
 import GrammarDueChip from '../components/grammar/GrammarDueChip';
 import {
   BookCoverThumb,
@@ -31,7 +32,7 @@ import {
 } from '../flashcardDeck';
 import { removeSaved } from '../savedWords';
 import { useT } from '../i18n';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { cardContentLang, studyContentLang } from '../studyEnvironment';
 
 interface FlashcardsViewProps {
@@ -58,6 +59,8 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
   // Keyed by group, so expanding one deck does not silently expand the others —
   // and so collapsing a group and reopening it comes back at page one.
   const [cardPage, setCardPage] = useState<Record<string, number>>({});
+  // The deck row whose saved extras are open (memory aid, notes, examples).
+  const [extrasCardId, setExtrasCardId] = useState<string | null>(null);
   const {
     saved,
     folders,
@@ -473,60 +476,79 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                             {!collapsed && (
                               <div className="aero-flash-card-rows" role="list">
                                 {group.cards.slice(0, shown).map((card) => (
-                                  <div
-                                    key={card.id}
-                                    className="aero-flash-card-row"
-                                    role="listitem"
-                                    draggable
-                                    onDragStart={(e) => state.onCardDragStart(e, card.id)}
-                                  >
-                                    <span className="aero-flash-word" lang={cardContentLang(card)}>
-                                      {card.word}
-                                    </span>
-                                    <span className="aero-flash-reading" lang={cardContentLang(card)}>
-                                      {card.reading && card.reading !== card.word ? card.reading : ''}
-                                    </span>
-                                    <span className="aero-flash-meaning">{card.meaning || card.back || '-'}</span>
-                                    <span className="aero-flash-row-actions">
-                                      {state.cardHasScene(card.id) && (
+                                  <Fragment key={card.id}>
+                                    <div
+                                      className="aero-flash-card-row"
+                                      role="listitem"
+                                      draggable
+                                      onDragStart={(e) => state.onCardDragStart(e, card.id)}
+                                    >
+                                      <span className="aero-flash-word" lang={cardContentLang(card)}>
+                                        {card.word}
+                                      </span>
+                                      <span className="aero-flash-reading" lang={cardContentLang(card)}>
+                                        {card.reading && card.reading !== card.word ? card.reading : ''}
+                                      </span>
+                                      <span className="aero-flash-meaning">{card.meaning || card.back || '-'}</span>
+                                      <span className="aero-flash-row-actions">
+                                        {state.cardHasScene(card.id) && (
+                                          <Button
+                                            size="sm"
+                                            data-flash-action="row-play-in-video"
+                                            title={t('studyLoop.replayNamed', { term: card.word })}
+                                            aria-label={t('studyLoop.replayNamed', { term: card.word })}
+                                            onClick={() => void state.playCardInVideo(card.id)}
+                                          >
+                                            <Icon name="video" size={13} />
+                                          </Button>
+                                        )}
+                                        {state.cardBookPositionOf(card.id) && (
+                                          <Button
+                                            size="sm"
+                                            data-flash-action="row-open-in-book"
+                                            title={t('read2.flash.openInBook', { term: card.word })}
+                                            aria-label={t('read2.flash.openInBook', { term: card.word })}
+                                            onClick={() => state.openCardInBook(card.id)}
+                                          >
+                                            <Icon name="bookmark" size={13} />
+                                          </Button>
+                                        )}
+                                        {/* The same entry as the Study OS deck row: the card's saved
+                                            extras, editable with AI off (not `data-ai-entry`; only
+                                            "Generate" inside the panel is AI). */}
                                         <Button
                                           size="sm"
-                                          data-flash-action="row-play-in-video"
-                                          title={t('studyLoop.replayNamed', { term: card.word })}
-                                          aria-label={t('studyLoop.replayNamed', { term: card.word })}
-                                          onClick={() => void state.playCardInVideo(card.id)}
+                                          data-flash-action="row-card-extras"
+                                          aria-pressed={extrasCardId === card.id}
+                                          title={t('aiStudy.extras.open', { word: card.word })}
+                                          aria-label={t('aiStudy.extras.open', { word: card.word })}
+                                          onClick={() => setExtrasCardId(extrasCardId === card.id ? null : card.id)}
                                         >
-                                          <Icon name="video" size={13} />
+                                          <Icon name="note" size={13} />
                                         </Button>
-                                      )}
-                                      {state.cardBookPositionOf(card.id) && (
-                                        <Button
-                                          size="sm"
-                                          data-flash-action="row-open-in-book"
-                                          title={t('read2.flash.openInBook', { term: card.word })}
-                                          aria-label={t('read2.flash.openInBook', { term: card.word })}
-                                          onClick={() => state.openCardInBook(card.id)}
+                                        <FlashcardFileMenu
+                                          open={fileMenu === card.id}
+                                          folders={folders}
+                                          onOpenChange={(open) => state.setFileMenu(open ? card.id : null)}
+                                          onMove={(folder) => state.setDeck(setDeckCardFolder(card.id, folder))}
+                                        />
+                                        <button
+                                          type="button"
+                                          className="aero-flash-row-x"
+                                          title={t('flash.aero.remove')}
+                                          aria-label={t('fu1.flash.aero.removeNamed', { word: card.word })}
+                                          onClick={() => state.setDeck(removeDeckCard(card.id))}
                                         >
-                                          <Icon name="bookmark" size={13} />
-                                        </Button>
-                                      )}
-                                      <FlashcardFileMenu
-                                        open={fileMenu === card.id}
-                                        folders={folders}
-                                        onOpenChange={(open) => state.setFileMenu(open ? card.id : null)}
-                                        onMove={(folder) => state.setDeck(setDeckCardFolder(card.id, folder))}
-                                      />
-                                      <button
-                                        type="button"
-                                        className="aero-flash-row-x"
-                                        title={t('flash.aero.remove')}
-                                        aria-label={t('fu1.flash.aero.removeNamed', { word: card.word })}
-                                        onClick={() => state.setDeck(removeDeckCard(card.id))}
-                                      >
-                                        <span aria-hidden>x</span>
-                                      </button>
-                                    </span>
-                                  </div>
+                                          <span aria-hidden>x</span>
+                                        </button>
+                                      </span>
+                                    </div>
+                                    {extrasCardId === card.id && (
+                                      <div className="aero-flash-card-extras" role="listitem">
+                                        <DeckCardExtrasPanel card={card} onClose={() => setExtrasCardId(null)} />
+                                      </div>
+                                    )}
+                                  </Fragment>
                                 ))}
                                 {/*
                                   The header cell beside this list has always rendered

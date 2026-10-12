@@ -197,7 +197,7 @@ async function stageHandoffImage(
  */
 export async function openAgentSurface(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
-  const api = (window as { api?: { popOut?: (section: string) => Promise<void> } }).api;
+  const api = (window as unknown as { api?: { popOut?: (section: string) => Promise<void> } }).api;
   if (typeof api?.popOut !== 'function') return false;
   try {
     // A first-class pop-out, full-screen reader and Blanc window do not mount

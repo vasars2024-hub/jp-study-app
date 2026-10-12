@@ -31,6 +31,8 @@ import { RESOURCES_CATALOG_RU } from '../resourcesCatalog/ru';
 import { RESOURCE_BUNDLES_RU } from '../resourceBundles/ru';
 import { INSTALL_UI_RU } from '../installUi/ru';
 import { LOCK_UPDATE_UI_RU } from '../lockUpdateUi/ru';
+import { RISK4_UI_RU } from '../risk4Ui/ru';
+import { LOCK3_UI_RU } from '../lock3Ui/ru';
 import { WIDGETS_UI_RU } from '../widgetsUi/ru';
 import { BLANC_UI_RU } from '../blancUi/ru';
 import { BLANC_MECH_UI_RU } from '../blancMechUi/ru';
@@ -40,11 +42,17 @@ import { SYSTEM_UI_RU } from '../systemUi/ru';
 import { CAPTIONS_UI_RU } from '../captionsUi/ru';
 import { QUALITY_UI_RU } from '../qualityUi/ru';
 import { POLISH_UI_RU } from '../polishUi/ru';
+import { PRODUCT5_UI_RU } from '../product5Ui/ru';
 import { DICT3_UI_RU } from '../dict3Ui/ru';
 import { RECORDER_V2_RU } from '../recorderV2/ru';
 import { SCRAPER_V2_RU } from '../scraperV2/ru';
 import { STUDY_AREAS_UI_RU } from '../studyAreasUi/ru';
 import { TRANSLATE_ENGINES_UI_RU } from '../translateEnginesUi/ru';
+import { AI_EAGER_UI_RU } from '../aiEagerUi/ru';
+import { LENS_OCR_UI_RU } from '../lensOcrUi/ru';
+import { MEDIA5_RU } from '../media5/ru';
+import { PLANNER_UI_RU } from '../plannerUi/ru';
+import { SNIP_UI_RU } from '../snipUi/ru';
 
 export const ru: Catalog = {
   'common.download': 'Скачать',
@@ -886,6 +894,8 @@ export const ru: Catalog = {
   ...RESOURCE_BUNDLES_RU,
   ...INSTALL_UI_RU,
   ...LOCK_UPDATE_UI_RU,
+  ...RISK4_UI_RU,
+  ...LOCK3_UI_RU,
   ...WIDGETS_UI_RU,
   ...BLANC_UI_RU,
   ...BLANC_MECH_UI_RU,
@@ -895,11 +905,19 @@ export const ru: Catalog = {
   ...CAPTIONS_UI_RU,
   ...QUALITY_UI_RU,
   ...POLISH_UI_RU,
+  ...PRODUCT5_UI_RU,
   ...DICT3_UI_RU,
   ...RECORDER_V2_RU,
   ...SCRAPER_V2_RU,
   ...STUDY_AREAS_UI_RU,
   ...TRANSLATE_ENGINES_UI_RU,
+  // The AI features' strings are a lazy pack (../aiPack, merged by ../catalogs.ts);
+  // only the few that non-AI surfaces render at startup are eager.
+  ...AI_EAGER_UI_RU,
+  ...LENS_OCR_UI_RU,
+  ...MEDIA5_RU,
+  ...PLANNER_UI_RU,
+  ...SNIP_UI_RU,
 
   'settings.appTitle': 'Настройки',
   'settings.group.personalization': 'Персонализация',
@@ -1424,8 +1442,8 @@ export const ru: Catalog = {
   'subtitle.autoTranslate': 'Автоматически переводить недостающие субтитры',
   'subtitle.autoTranslateDesc': 'Если найден только один язык, он переводится в фоне — только для серий, которые вы смотрите, и тайтлов со статусом «Смотрю». Машинный перевод помечается.',
   'subtitle.translationEngine': 'Движок перевода',
-  'subtitle.translationEngine.auto': 'Автоматически — облачный ключ, если задан, иначе офлайн-модель',
-  'subtitle.translationEngine.cloud': 'Только облако (ключ Gemini или DeepSeek)',
+  'subtitle.translationEngine.auto': 'Автоматически — ваш провайдер ИИ, если это разрешено в «Настройки → ИИ», иначе офлайн-модель',
+  'subtitle.translationEngine.cloud': 'Только облако (ваш провайдер ИИ, если разрешено в «Настройки → ИИ»)',
   'subtitle.translationEngine.local': 'Только офлайн-модель (Qwen3)',
   'subtitle.autoStudyTrack': 'Делать японскую дорожку из английской',
   'subtitle.autoStudyTrackDesc': 'Если есть только английские субтитры: расшифровать японский звук по таймингу английских с помощью Whisper или перевести английские, если звук не японский.',
@@ -2758,7 +2776,7 @@ export const ru: Catalog = {
   'novel.reader.closeArticle': 'Закрыть статью и вернуться к книге',
   'novel.reader.book': 'Книга',
   'novel.reader.prevShort': 'Назад',
-  'novel.reader.collectShortcut': 'Добавить выделенное в коллекцию (Ctrl+Shift+S)',
+  'novel.reader.collectShortcut': 'Добавить выделенное в коллекцию',
   'novel.reader.collect': 'Сохранить',
   'novel.reader.jumpToChapter': 'Перейти к главе',
   'novel.reader.jumpToChapterEllipsis': 'Перейти к главе…',
@@ -3041,6 +3059,8 @@ export const ru: Catalog = {
   'palette.section.flashcards': 'Карточки',
   'palette.section.stats': 'Статистика',
   'palette.section.calendar': 'Календарь',
+  'palette.section.snips': 'Снимки',
+  'palette.section.conversation': 'Собеседник',
   'palette.section.resources': 'Ресурсы',
   'palette.section.settings': 'Настройки',
   'palette.section.immersion': 'Погружение',
@@ -3631,7 +3651,7 @@ export const ru: Catalog = {
   'agent.undo.error.superseded': 'Тот же объект изменён более новой операцией, поэтому отмена отклонена.',
   'agent.undo.error.entity-not-found': 'Объект больше не существует, поэтому отменить изменение нельзя.',
   'agent.undo.error.operation-unavailable': 'В этой версии нет безопасной обратной операции.',
-  'agent.undo.error.operation-denied': 'Активный профиль больше не разрешает обратную операцию.',
+  'agent.undo.error.operation-denied': 'Активный профиль или уровень разрешений не допускает действие, которое отменило бы это. Разрешите его в настройках агента или отмените вручную.',
   'agent.undo.error.busy': 'Эта операция уже отменяется.',
   'agent.undo.error.undo-failed': 'Не удалось отменить изменение.',
   'agent.undo.error.store-failed': 'Не удалось прочитать текущее состояние объекта.',
@@ -4654,7 +4674,15 @@ export const ru: Catalog = {
   'perf.interact': 'Взаимодействие',
   'perf.yes': 'да',
   'perf.no': 'нет',
-  'perf.hint': 'Ctrl+Shift+F — скрыть · цель 60 FPS',
+  'perf.hint': '{keys} — скрыть · цель 60 FPS',
+  'perf.label.title': 'Производительность',
+  'perf.label.frame': 'Кадр',
+  'perf.label.quality': 'Качество',
+  'perf.label.particles': 'Частицы',
+  'perf.label.heap': 'Куча',
+  'perf.label.interact': 'Взаимодействие',
+  'perf.label.yes': 'да',
+  'perf.label.no': 'нет',
   'common.back': 'Назад',
   'bundleDetail.beginnerChecklist': 'Список для начинающих',
   'bundleDetail.checklistProgress': 'Прогресс: {done}/{total}',
@@ -4781,7 +4809,7 @@ export const ru: Catalog = {
   'focus.brand': 'Focus',
   'focus.exit': 'Выйти из фокуса',
   'focus.exitLocked': 'Заблокировано',
-  'focus.exitHint': 'Выйти из режима фокуса (Ctrl+Shift+E)',
+  'focus.exitHint': 'Выйти из режима фокуса',
   'focus.navAria': 'Приложения фокуса',
   'focus.tab.library': 'Библиотека',
   'focus.tab.dictionary': 'Словарь',
@@ -4790,7 +4818,7 @@ export const ru: Catalog = {
   'focus.settings.desc':
     'Скрыть рабочий стол, частицы и виджеты. Оставить библиотеку, читалку, словарь, Anki и опциональную музыку.',
   'focus.settings.enable': 'Включить режим фокуса',
-  'focus.settings.shortcutHint': 'Горячая клавиша: Ctrl+Shift+E. Выход в любой момент, если нет блокировки.',
+  'focus.settings.shortcutHint': 'Горячая клавиша: {keys}. Выход в любой момент, если нет блокировки.',
   'focus.lock.title': 'Блокировка фокуса',
   'focus.lock.desc':
     'Обязательство на блок учёбы — выход, Esc и горячая клавиша отключены до конца таймера.',
@@ -4875,7 +4903,7 @@ export const ru: Catalog = {
   'desktop.task.closeAll': 'Закрыть все приложения',
   'desktop.task.minimize': 'Свернуть',
   'desktop.task.restore': 'Восстановить',
-  'desktop.clipboardHistory': 'История буфера обмена (Ctrl+Alt+Shift+V)',
+  'desktop.clipboardHistory': 'История буфера обмена',
   'desktop.tray.hiddenIcons': 'Показать скрытые значки',
   'desktop.desktopN': 'Стол {n}',
   'desktop.dragToDesktop': 'Перетащите на рабочий стол · нажмите, чтобы открыть',
@@ -6721,7 +6749,7 @@ export const ru: Catalog = {
   'manga.translate.warning.none': 'OCR завершён, но ни одну страницу перевести не удалось (0 из {total}). Страницы сохранены только с OCR.',
   'manga.translate.warning.some': 'OCR завершён, но страниц без перевода: {failed} из {total}. Они сохранены только с OCR.',
   'manga.translate.target': 'Переводить на',
-  'manga.translate.toggleVisibility': 'Показать / скрыть перевод (Ctrl+Shift+T)',
+  'manga.translate.toggleVisibility': 'Показать / скрыть перевод',
   'manga.translate.show': 'Показать перевод',
   'manga.translate.hide': 'Скрыть перевод',
   'manga.translate.ahead': 'Перевести дальше',
@@ -7056,6 +7084,16 @@ export const ru: Catalog = {
   'anki3.sync.mappingTitle': 'Куда добавляет каждый профиль',
   'anki3.sync.mapping': '{profile}: колода «{deck}», тип записи «{model}»',
   'anki3.sync.unlinked.title': 'Удалены в Anki и вернулись в расписание Gum',
+  'anki4.sync.paused': { one: 'Синхронизация приостановлена, пока проблема не решена; {count} ожидающий ответ сохранён. Устраните её и нажмите «Синхронизировать сейчас» (перезапуск Anki тоже возобновит её).', few: 'Синхронизация приостановлена, пока проблема не решена; {count} ожидающих ответа сохранены. Устраните её и нажмите «Синхронизировать сейчас» (перезапуск Anki тоже возобновит её).', many: 'Синхронизация приостановлена, пока проблема не решена; {count} ожидающих ответов сохранены. Устраните её и нажмите «Синхронизировать сейчас» (перезапуск Anki тоже возобновит её).', other: 'Синхронизация приостановлена, пока проблема не решена; {count} ожидающих ответа сохранены. Устраните её и нажмите «Синхронизировать сейчас» (перезапуск Anki тоже возобновит её).' },
+  'anki4.sync.retryAt': { one: 'Gum повторит попытку сам в {time}; {count} ожидающий ответ сохранён.', few: 'Gum повторит попытку сам в {time}; {count} ожидающих ответа сохранены.', many: 'Gum повторит попытку сам в {time}; {count} ожидающих ответов сохранены.', other: 'Gum повторит попытку сам в {time}; {count} ожидающих ответа сохранены.' },
+  'anki4.sync.link.now': 'Связать с существующими заметками',
+  'anki4.sync.link.result': { one: '{count} карточка связана с существующей заметкой (проверено: {looked}).', few: '{count} карточки связаны с существующими заметками (проверено: {looked}).', many: '{count} карточек связано с существующими заметками (проверено: {looked}).', other: '{count} карточки связаны с существующими заметками (проверено: {looked}).' },
+  'anki4.sync.link.none': 'Проверено карточек: {looked}. Подходящих существующих заметок нет.',
+  'anki4.sync.link.hintOn': 'Пока синхронизация включена, Gum сам связывает карточки, которые уже есть в Anki, и ищет только в колоде и типе заметок каждого профиля.',
+  'anki4.sync.link.hintOff': 'Синхронизация выключена, поэтому Gum сам ничего не связывает. Эта кнопка ищет карточки, которые уже могут быть в Anki, только в колоде и типе заметок каждого профиля, и запоминает, какой заметке соответствует каждая.',
+  'anki4.sync.failed.title': 'Ответы, которые Anki не принял',
+  'anki4.sync.failed.hint': 'Anki несколько раз отклонил эти ответы, поэтому они убраны из очереди. Повторения сохранены в Gum; если хотите, чтобы расписание Anki совпадало, повторите эти карточки в Anki.',
+  'anki4.sync.failed.clear': 'Очистить список',
   'anki3.queue.linked': { one: '{count} карточка уже была в Anki и теперь связана.', few: '{count} карточки уже были в Anki и теперь связаны.', many: '{count} карточек уже были в Anki и теперь связаны.', other: '{count} карточки уже были в Anki и теперь связаны.' },
   'anki3.export.keepSchedule': 'Сохранить прогресс повторений в пакете Anki',
   'anki3.export.scheduled': { one: '{count} карточка сохраняет расписание.', few: '{count} карточки сохраняют расписание.', many: '{count} карточек сохраняют расписание.', other: '{count} карточки сохраняют расписание.' },
@@ -7456,6 +7494,8 @@ export const ru: Catalog = {
   'media.jobs.cancelAll': 'Отменить все',
   'media.jobs.eta': 'осталось {time}',
   'media.jobs.modelSubstituted': 'работает {model}',
+  'media.jobs.modelDownloading': 'Загрузка модели Whisper… {percent}%',
+  'media.jobs.modelLoading': 'Загрузка модели Whisper в память…',
   'media.jobs.modelSubstituted.detail':
     'На этой машине {requested} не запускается в браузерной среде, поэтому расшифровку создаёт {used}. Её качество заметно ниже.',
   'media.jobs.phase.queued': 'В очереди',
@@ -7819,7 +7859,7 @@ export const ru: Catalog = {
   'immersion.mode.titleDesc.live': ' — просмотр',
   'immersion.mode.titleDesc.reader': ' — чтение + подсветка',
   'immersion.mode.titleDesc.focus': ' — без отвлечений',
-  'immersion.saveSite': 'Сохранить сайт (Ctrl+D)',
+  'immersion.saveSite': 'Сохранить сайт',
   'immersion.saveAsTool': 'Сохранить как инструмент',
   'immersion.toolSaved': 'Сохранено в «Мои инструменты»',
   'immersion.toolAlready': 'Уже в «Моих инструментах»',
@@ -7836,7 +7876,7 @@ export const ru: Catalog = {
   'immersion.exitFocus': 'Выйти из фокуса',
   'immersion.loading': 'Загрузка…',
   'immersion.openPageToBegin': 'Откройте страницу, чтобы начать чтение на погружении.',
-  'immersion.hint': 'Поиск открывается в прямом режиме · F8 — смена режима · F6 — фокус · Ctrl+L — строка адреса',
+  'immersion.hint': 'Поиск открывается в прямом режиме · {cycle} — смена режима · {focus} — фокус · {url} — строка адреса',
   'immersion.sites': 'Сайты',
   'immersion.rail.loadFailed': 'Не удалось загрузить сохранённые сайты. Уже показанные сайты сохранены на экране.',
   'immersion.rail.retry': 'Повторить',
@@ -8377,6 +8417,22 @@ export const ru: Catalog = {
   'aiStudio.hint.starOrPreset': 'Откройте Словарь, найдите слова и нажмите звезду — или переключите источник на пресет.',
   'aiStudio.status.generatedPreset': 'Создано {cards} карт из {count} придуманных элементов · проверьте их ниже и нажмите «Сохранить во флэш-карточки».',
   'aiStudio.status.generatedDict': 'Создано {cards} карт из {count} слов · проверьте их ниже и нажмите «Сохранить во флэш-карточки».',
+  'aiStudio.progress.msg.enriching': 'Обработка «{term}» ({n} из {total})…',
+  'aiStudio.progress.msg.builtDict': 'Создано карточек: {cards} из слов: {count}.',
+  'aiStudio.progress.msg.inventing': 'Придумываю элементы лексики: {count}…',
+  'aiStudio.progress.msg.inventingBatch': 'Придумываю элементы: {count} (пакет {n} из {total})…',
+  'aiStudio.progress.msg.invented': 'Придумано {done} из {total}…',
+  'aiStudio.progress.msg.building': 'Сборка наборов карточек: {count} (по {cards} на элемент)…',
+  'aiStudio.progress.msg.cardSet': 'Набор {n} из {total}: {term}',
+  'aiStudio.progress.msg.generated': 'Создано карточек: {cards} из придуманных элементов: {count}.',
+  'aiStudio.progress.msg.partial': 'Готово элементов: {count} (карточек: {cards}); не удалось: {failed}, их можно повторить.',
+  'aiStudio.status.generatedPartial': 'Готово карточек: {cards} из элементов: {count} · не удалось: {failed}. Готовое сохранено; остальное можно повторить ниже.',
+  'aiStudio.status.retryDone': 'Повтор завершён: всего карточек {cards} · всё ещё не удалось: {failed}.',
+  'aiStudio.failed.title': 'Не создано',
+  'aiStudio.failed.lead': 'Эти элементы не удались. Всё уже созданное сохранено.',
+  'aiStudio.failed.invent': 'Ещё не придумано элементов: {count}',
+  'aiStudio.btn.retryFailed': 'Повторить неудачные ({count})',
+  'aiStudio.presets.studyLang': 'Пресеты для вашего изучаемого языка: {lang}',
   'aiStudio.status.csvSaved': 'CSV сохранён в {path}',
   'aiStudio.status.csvFail': 'Не удалось сохранить CSV.',
   'aiStudio.status.sentAnki': 'Отправлено в Anki {ok} из {total} карт.',
@@ -8591,7 +8647,7 @@ export const ru: Catalog = {
   'flash.session.summary': 'Повторено {reviewed} из {total}',
   'flash.reviewDictionaryCount': 'Повторить словарь ({count})',
   'flash.undoRating': 'Отменить оценку',
-  'flash.undoRating.hint': 'Возвращает последнюю карточку с прежним расписанием (Ctrl+Z)',
+  'flash.undoRating.hint': 'Возвращает последнюю карточку с прежним расписанием',
   'flash.ankiQueue.pending': { one: '{count} карточка ждёт Anki', few: '{count} карточки ждут Anki', many: '{count} карточек ждут Anki', other: '{count} карточки ждут Anki' },
   'flash.ankiQueue.retry': 'Добавить в Anki сейчас',
   'flash.ankiQueue.busy': 'Добавление…',
@@ -8767,7 +8823,7 @@ export const ru: Catalog = {
   'epub.translate.panelTitle': 'Настройки перевода книги',
   'epub.translate.target': 'Переводить на',
   'epub.translate.targetChanged': 'Язык перевода изменён — переведите заново',
-  'epub.translate.toggleVisibility': 'Показать / скрыть перевод (Ctrl+Shift+T)',
+  'epub.translate.toggleVisibility': 'Показать / скрыть перевод',
   'epub.translate.show': 'Показать перевод',
   'epub.translate.hide': 'Скрыть перевод',
   'epub.translate.view': 'Вид',
@@ -8924,6 +8980,8 @@ export const ru: Catalog = {
   'epub.mining.failSwitch': 'Движок fail-switch',
   'epub.mining.engine.qwen': 'Офлайн Qwen3',
   'epub.mining.engine.api': 'Облачный API',
+  'epub.mining.translateAgain': 'Перевести заново',
+  'epub.mining.translateAgain.hint': 'Запрашивает у {provider} все переведённые поля заново, не используя сохранённые ответы, затем скачивает колоду. Значения из словаря сохраняются.',
   'epub.mining.qwen.checking': 'Проверка локальной модели Qwen…',
   'epub.mining.qwen.ready': 'Модель Qwen3 найдена — локально, без API-ключа.',
   'epub.mining.qwen.missing':

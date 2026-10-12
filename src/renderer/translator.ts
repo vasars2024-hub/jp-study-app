@@ -112,10 +112,43 @@ export interface TranslateRunOptions {
   onSegment?: (index: number, segment: TranslateSegment, total: number) => void;
   /** Which engine produced the result, any fallback, and the glossary report. */
   onMeta?: (meta: TranslateResultMeta) => void;
+  /**
+   * Cancels the request in main (risk4): the running engine stops and nothing is
+   * retried on the fallback. The promise rejects with `TranslationCancelledError`.
+   */
+  signal?: AbortSignal;
+  /** Translate again rather than answer from main's cache of recent translations. */
+  fresh?: boolean;
 }
 
-/** The message for a translation that failed with no fallback: who failed and why, in the UI language. */
+/** The user cancelled the translation; callers show nothing, not an error. */
+export class TranslationCancelledError extends Error {
+  constructor() {
+    super('Translation cancelled.');
+    this.name = 'AbortError';
+  }
+}
+
+export function isTranslationCancelled(error: unknown): boolean {
+  return error instanceof TranslationCancelledError;
+}
+
+/**
+ * The message for a translation that failed with no usable fallback: who failed
+ * and why, in the UI language — every engine tried, each with its own reason,
+ * when more than one was (DeepL out of quota, then the offline model missing).
+ */
 export function translateFailureMessage(failure: TranslateRouteFailure): string {
+  if (failure.attempts && failure.attempts.length > 1) {
+    return t('xlate2.error.chain', {
+      details: failure.attempts
+        .map((attempt) => t('xlate2.error.attempt', {
+          provider: translateProviderLabel(attempt.provider, t),
+          reason: t(TRANSLATE_FALLBACK_KEYS[attempt.code]),
+        }))
+        .join(' · '),
+    });
+  }
   return t('xlate2.error.cloud', {
     provider: translateProviderLabel(failure.provider, t),
     reason: t(TRANSLATE_FALLBACK_KEYS[failure.code]),
@@ -131,7 +164,13 @@ export function translateTo(
   options?: TranslateRunOptions,
 ): Promise<string> {
   ensureIpcHooks();
+  if (options?.signal?.aborted) return Promise.reject(new TranslationCancelledError());
   const id = nextId++;
+  const signal = options?.signal;
+  const onAbort = (): void => {
+    void window.api.translateCancel?.(id)?.catch?.(() => undefined);
+  };
+  signal?.addEventListener('abort', onAbort, { once: true });
   const onPartial = (p: PartialEvent): void => {
     if (p.id !== id) return;
     onProgress?.(p.progress);
@@ -152,8 +191,10 @@ export function translateTo(
       ...(options?.style === 'literal' ? { style: 'literal' as const } : {}),
       ...(options?.provider ? { provider: options.provider } : {}),
       ...(options?.glossary?.length ? { glossary: options.glossary.map((term) => ({ ...term })) } : {}),
+      ...(options?.fresh ? { fresh: true } : {}),
     })
     .then((res) => {
+      if (res.cancelled || signal?.aborted) throw new TranslationCancelledError();
       if (!res.ok) {
         const failure = sanitizeTranslateRouteFailure(res.failure);
         if (failure) throw new Error(translateFailureMessage(failure));
@@ -166,5 +207,8 @@ export function translateTo(
       if (meta) options?.onMeta?.(meta);
       return res.text ?? '';
     })
-    .finally(() => partialListeners.delete(onPartial));
+    .finally(() => {
+      partialListeners.delete(onPartial);
+      signal?.removeEventListener('abort', onAbort);
+    });
 }

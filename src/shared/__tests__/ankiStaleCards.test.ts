@@ -70,7 +70,7 @@ function draftOf(
 }
 
 /** A review card, `due` days set so it is `overdueBy` days late. */
-function reviewCard(id: string, overdueBy: number, over: Partial<RawAnkiCardRow> = {}): CardSpec {
+function reviewCard(id: string, overdueBy: number, over: Partial<Omit<RawAnkiCardRow, 'id' | 'nid'>> = {}): CardSpec {
   return { id, nid: `n${id}`, type: 2, queue: 2, due: 1000 - overdueBy, ivl: 30, reps: 4, ...over };
 }
 

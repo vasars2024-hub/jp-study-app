@@ -211,9 +211,11 @@ module.exports = {
     result.check('still nothing on the desktop', end.visibleWindows === 0 && end.violations.length === 0, end.windows);
     await ctx.shot('unlocked');
 
-    // Leave the profile unlocked and without a lock for whatever runs next.
+    // Leave the profile unlocked and without a lock for whatever runs next. lock3: main
+    // is the only writer of the PIN, and clearing it needs the current one.
+    const cleared = await ev(`window.api.lockscreenClearPin(${JSON.stringify(PIN)})`, { await: true }).catch(() => null);
+    result.check('the PIN is cleared through main with the current PIN (lock3)', cleared?.ok === true && cleared?.status?.hasPin === false, cleared);
     await ev(`(() => { localStorage.setItem('jp-study-lockscreen-v1', JSON.stringify({ enabled: false, pinHash: '', tint: 'auto' })); return true; })()`);
-    await ev(`window.api.lockscreenSyncConfig({ enabled: false, pinHash: '' }, false)`, { await: true }).catch(() => null);
     for (const w of (await status()).windows.filter((x) => /popout=|blanc/i.test(x.url))) {
       await ctx.request('/eval', { window: w.id, js: 'window.close(), true' }).catch(() => null);
     }

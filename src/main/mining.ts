@@ -13,6 +13,7 @@ import type {
   AiEnrichmentResult,
   AiDeckGenerationRequest,
   AiGeneratedCard,
+  AiGenerationItemFailure,
   AiGenerationProgress,
   AiLanguageOptions,
   AiMiningCardFormat,
@@ -32,12 +33,17 @@ import type {
   // import is the only reason it worked at runtime.
 } from '../shared/mining';
 import { buildAiPromptPreview, renderAiTemplate } from '../shared/aiPromptBuilder';
+import { failedAiEnrichmentResult } from '../shared/aiCardStudioRetry';
 // Used at the EPUB deck-export call site but never imported — a latent ReferenceError
 // that predated this change and only surfaced once tsc could see past the duplicate
 // DEFAULT_TRADITIONAL_MINING_CONFIG import above. Taken from the defining module
 // rather than the mining barrel, per the bundle note in shared/mining.ts.
 import { buildEpubDeckExport } from '../shared/epubDeck';
-import { callAiProvider, parseAiJson } from './aiProviderClient';
+import { z } from 'zod';
+import { callAiProviderJson } from './aiProviderClient';
+import { parseAiReplyWith } from './aiStructuredOutput';
+import { assertAiFeatureAllowed } from './aiFeatureGate';
+import { aiErrorMessageKey } from '../shared/aiConnectionTest';
 import {
   needsEnrichmentLookup,
   resolveTraditionalTemplates,
@@ -73,7 +79,6 @@ import {
   formatsForPreset,
 } from '../shared/aiMiningCatalog';
 import {
-  AI_PROVIDERS,
   DEFAULT_AI_LANGUAGE_OPTIONS,
   DEFAULT_AI_PROVIDER_ID,
   DEFAULT_MINING_LIMITS,
@@ -86,14 +91,16 @@ import {
   providerKeyBucket,
   runEnrichment,
 } from '../shared/mining';
+import { AI_PROVIDER_KEY_BUCKETS, parseAiProviderId } from '../shared/aiProviders';
 import type { LibraryItem } from '../shared/types';
 import { getProfileStore } from './profiles';
 import {
   getMainJapaneseTokenizer,
   type MainKuromojiToken as KuromojiToken,
 } from './japaneseTokenizer';
-import { readAiProviderSecret, writeAiProviderSecret } from './credentials/ai';
-import { getAiProviderHealthReport } from './providerRuntime';
+import { aiCredentialsUsable, readAiProviderSecret, writeAiProviderSecret } from './credentials/ai';
+import { AiProviderRuntimeError, getAiProviderHealthReport } from './providerRuntime';
+import { getAiSetupStore } from './aiSetupStore';
 
 interface FrequencyDictionaryFile {
   summary: FrequencyDictionarySummary;
@@ -119,16 +126,118 @@ function languageOptionsFromRaw(raw?: Partial<MiningConfigFile>): AiLanguageOpti
   });
 }
 
+/**
+ * Which provider buckets are usable. The local OpenAI-compatible server counts
+ * as usable once its URL and model are set, since it takes no key.
+ */
 function readApiKeysSet(): AiApiKeysSet {
-  return {
-    gemini: Boolean(readAiProviderSecret('gemini')),
-    deepseek: Boolean(readAiProviderSecret('deepseek')),
-  };
+  let options = { compatBaseUrl: '', compatModel: '' };
+  try {
+    options = getAiSetupStore().read();
+  } catch {
+    // No userData (a unit test): no local server configured.
+  }
+  return aiCredentialsUsable(options);
 }
 
 function readApiKeyForProvider(providerId: AiProviderId): string {
   const bucket = providerKeyBucket(providerId);
   return readAiProviderSecret(bucket);
+}
+
+/** Whether the provider can be called: a key, or for the local server its URL and model. */
+function providerUsable(providerId: AiProviderId): boolean {
+  return Boolean(readApiKeysSet()[providerKeyBucket(providerId)]);
+}
+
+/**
+ * The provider a Card Studio request names, validated (audit R1). Absent means
+ * the configured one; anything present must be a provider this build knows —
+ * an unknown id is refused here, never mapped onto another vendor's key.
+ */
+function requestedProviderId(raw: unknown, fallback: AiProviderId): AiProviderId {
+  if (raw === undefined || raw === null || raw === '') return fallback;
+  const id = parseAiProviderId(raw);
+  if (!id) throw new AiProviderRuntimeError(`Unknown AI provider "${String(raw)}".`, 'unknown-provider');
+  return id;
+}
+
+/**
+ * An AI failure as the renderer shows it: translated, by code. Card Studio
+ * prints `error.message`, which used to be English inside every UI language.
+ */
+function localizedAiError(error: unknown): Error {
+  if (error instanceof AiProviderRuntimeError) {
+    const localized = new Error(mt(aiErrorMessageKey(error.code)));
+    localized.name = error.code;
+    return localized;
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+/** Card Studio runs in flight; `ai:cancelGenerate` aborts them all. */
+const activeAiGenerations = new Set<AbortController>();
+
+async function withGenerationSignal<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  activeAiGenerations.add(controller);
+  try {
+    return await run(controller.signal);
+  } catch (error) {
+    throw localizedAiError(controller.signal.aborted ? new AiProviderRuntimeError('Cancelled.', 'cancelled') : error);
+  } finally {
+    activeAiGenerations.delete(controller);
+  }
+}
+
+function throwIfGenerationCancelled(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new AiProviderRuntimeError('Cancelled.', 'cancelled');
+}
+
+/**
+ * Failures that end a Card Studio run: no later word or batch can succeed
+ * either (the user cancelled, AI was switched off, the key was refused, the
+ * monthly ceiling is reached). Anything else — a timeout, a reply that did not
+ * parse — costs only its own item.
+ */
+const RUN_STOPPING_AI_CODES = new Set([
+  'cancelled',
+  'ai-off',
+  'cloud-disabled',
+  'missing-credential',
+  'authentication',
+  'spend-budget',
+  'sensitive-context',
+  'unknown-provider',
+  'local-model-missing',
+]);
+
+function stopsGenerationRun(error: unknown, signal: AbortSignal | undefined): boolean {
+  if (signal?.aborted) return true;
+  return error instanceof AiProviderRuntimeError && RUN_STOPPING_AI_CODES.has(error.code);
+}
+
+/** One failed item, as the renderer shows it: localized, with the code kept for logic. */
+function generationItemFailure(
+  error: unknown,
+  signal: AbortSignal | undefined,
+  retry: AiGenerationItemFailure['retry'],
+): AiGenerationItemFailure {
+  const cause = signal?.aborted ? new AiProviderRuntimeError('Cancelled.', 'cancelled') : error;
+  const localized = localizedAiError(cause);
+  const code = cause instanceof AiProviderRuntimeError ? cause.code : undefined;
+  return { message: localized.message, ...(code ? { code } : {}), retry };
+}
+
+/** Broadcasts a Card Studio progress line by catalog key, so each window can render it in its language. */
+function aiGenerateProgress(
+  phase: AiGenerationProgress['phase'],
+  done: number,
+  total: number,
+  messageKey: string,
+  messageVars: Record<string, string | number>,
+): void {
+  broadcastAiGenerateProgress({ phase, done, total, message: mt(messageKey, messageVars), messageKey, messageVars });
 }
 
 function normalizeApiKeyString(value: unknown): string {
@@ -144,8 +253,9 @@ function parseApiKeyPayload(raw: unknown): { bucket: AiProviderKeyBucket; apiKey
   if (raw && typeof raw === 'object') {
     const obj = raw as Record<string, unknown>;
     const providerRaw = obj.provider ?? obj.bucket ?? obj.keyBucket;
-    const bucket: AiProviderKeyBucket =
-      providerRaw === 'deepseek' || providerRaw === 'gemini' ? providerRaw : 'gemini';
+    const bucket: AiProviderKeyBucket = AI_PROVIDER_KEY_BUCKETS.includes(providerRaw as AiProviderKeyBucket)
+      ? providerRaw as AiProviderKeyBucket
+      : 'gemini';
     const keyRaw = obj.apiKey ?? obj.key ?? obj.value;
     return { bucket, apiKey: normalizeApiKeyString(keyRaw) };
   }
@@ -158,7 +268,7 @@ function setApiKeyForBucket(bucket: AiProviderKeyBucket, value: unknown) {
 }
 
 function providerIdFromRaw(raw: string | undefined): AiProviderId {
-  return AI_PROVIDERS.some((provider) => provider.id === raw) ? (raw as AiProviderId) : DEFAULT_AI_PROVIDER_ID;
+  return parseAiProviderId(raw) ?? DEFAULT_AI_PROVIDER_ID;
 }
 
 function aiEngineConfigFromFile(config: MiningConfigFile): AiEngineConfig {
@@ -167,7 +277,7 @@ function aiEngineConfigFromFile(config: MiningConfigFile): AiEngineConfig {
   const providerId = config.providerId ?? DEFAULT_AI_PROVIDER_ID;
   return {
     apiKeysSet,
-    apiKeySet: Boolean(readApiKeyForProvider(providerId)),
+    apiKeySet: Boolean(apiKeysSet[providerKeyBucket(providerId)]),
     engine: config.engine ?? 'cloud',
     providerId,
     selectedPresetId: config.selectedPresetId,
@@ -1281,6 +1391,42 @@ function buildBatchSchema(): unknown {
   };
 }
 
+/**
+ * The shape check for one enrichment object. Lenient on purpose — every field is
+ * optional and a `null` reads as absent, because the card builder fills gaps
+ * from the request — but a field that is present must be the right TYPE: a
+ * number where a reading belongs used to flow straight into a card.
+ */
+const optionalText = z.union([z.string(), z.null()]).optional().transform((value) => value ?? undefined);
+const AI_ENRICHMENT_SHAPE = z.object({
+  expression: optionalText,
+  reading: optionalText,
+  meaning: optionalText,
+  nuance: optionalText,
+  sentence: optionalText,
+  sentenceTranslationEn: optionalText,
+  sentenceTranslationRu: optionalText,
+  sentenceTranslationZh: optionalText,
+  meaningRu: optionalText,
+  meaningZh: optionalText,
+  grammarBreakdown: optionalText,
+  culturalContext: optionalText,
+  properNameNotes: optionalText,
+  toponymNotes: optionalText,
+  tags: z.array(z.unknown()).optional().transform((tags) => (tags ?? []).filter((tag): tag is string => typeof tag === 'string')),
+  imageQuery: optionalText,
+  suggestedFront: optionalText,
+  suggestedBack: optionalText,
+}).passthrough();
+const AI_ENRICHMENT_BATCH_SHAPE = z.object({ items: z.array(AI_ENRICHMENT_SHAPE) });
+
+type ParsedEnrichment = z.infer<typeof AI_ENRICHMENT_SHAPE>;
+
+/** Strips `undefined` so the result reads as the `Partial` the card builder takes. */
+function asPartialEnrichment(parsed: ParsedEnrichment): Partial<AiEnrichmentResult> {
+  return parsed as unknown as Partial<AiEnrichmentResult>;
+}
+
 const AI_INVENT_CHUNK_SIZE = 10;
 
 function presetById(id: string): AiPromptPreset {
@@ -1328,23 +1474,35 @@ function buildGeneratedCards(
   return cards;
 }
 
-async function enrichWithAi(req: AiEnrichmentRequest): Promise<AiEnrichmentResult> {
-  const config = readMiningConfig();
+/**
+ * The checks every Card Studio run makes before any work, local or cloud:
+ * a known provider, "Use AI features" on (it used to gate only the cloud
+ * branch — the offline model ran with AI switched off), the feature's cloud
+ * opt-in, and a usable credential or installed model.
+ */
+async function preflightCardGeneration(
+  rawProviderId: unknown,
+  config: MiningConfigFile,
+): Promise<{ engine: AiEngineKind; providerId: AiProviderId; apiKey: string }> {
   const engine = config.engine ?? 'cloud';
-  const providerId = req.providerId ?? config.providerId ?? DEFAULT_AI_PROVIDER_ID;
-  const provider = providerById(providerId);
-  const apiKey = engine === 'cloud' ? readApiKeyForProvider(providerId) : '';
-  if (engine === 'cloud' && !apiKey) {
-    throw new Error(`Add a ${provider.label} API key before using AI enrichment.`);
-  }
-  if (engine === 'local-qwen') {
-    const { isTranslateAvailable } = await import('./translate');
-    if (!isTranslateAvailable()) {
-      throw new Error(
-        'Local Qwen model not found. Install Qwen3-1.7B via Translate, or switch the engine to Cloud.',
-      );
+  const providerId = requestedProviderId(rawProviderId, config.providerId ?? DEFAULT_AI_PROVIDER_ID);
+  assertAiFeatureAllowed('cardGen', engine === 'cloud' ? 'cloud' : 'local');
+  if (engine === 'cloud') {
+    if (!providerUsable(providerId)) {
+      throw new Error(mt('aiProv.mining.needKey', { provider: providerById(providerId).label }));
     }
+    return { engine, providerId, apiKey: readApiKeyForProvider(providerId) };
   }
+  const { isTranslateAvailable } = await import('./translate');
+  if (!isTranslateAvailable()) throw new Error(mt('aiProv.mining.needLocalModel'));
+  return { engine, providerId, apiKey: '' };
+}
+
+async function enrichWithAi(req: AiEnrichmentRequest, signal?: AbortSignal): Promise<AiEnrichmentResult> {
+  const config = readMiningConfig();
+  const { engine, providerId, apiKey } = await preflightCardGeneration(req.providerId, config);
+  const provider = providerById(providerId);
+  throwIfGenerationCancelled(signal);
   const preset = presetById(req.presetId);
   const format = formatById(req.formatId, preset.id);
   const langOptions = normalizeLanguageOptions({
@@ -1372,14 +1530,23 @@ async function enrichWithAi(req: AiEnrichmentRequest): Promise<AiEnrichmentResul
     targetLang: profile.targetLang,
     sampleTerm: req,
   });
-  const text =
+  const parsed = asPartialEnrichment(
     engine === 'local-qwen'
-      ? await (await import('./translate')).runLocalQwenPrompt(
-          `${prompt}\n\nRespond with a single JSON object only — no markdown fences.`,
-          { maxTokens: 2048, timeoutMs: 120_000 },
+      ? parseAiReplyWith(
+          await (await import('./translate')).runLocalQwenPrompt(
+            `${prompt}\n\nRespond with a single JSON object only — no markdown fences.`,
+            { maxTokens: 2048, timeoutMs: 120_000, ...(signal ? { signal } : {}) },
+          ),
+          AI_ENRICHMENT_SHAPE,
+          'Local Qwen',
         )
-      : await callAiProvider(providerId, apiKey, prompt, buildSchema());
-  const parsed = parseAiJson<Partial<AiEnrichmentResult>>(text, engine === 'local-qwen' ? 'Local Qwen' : provider.label);
+      : await callAiProviderJson(providerId, apiKey, prompt, buildSchema(), AI_ENRICHMENT_SHAPE, {
+          feature: 'cardGen',
+          context: provider.label,
+          ...(signal ? { signal } : {}),
+        }),
+  );
+  const text = JSON.stringify(parsed);
   const image = await findImageHtml(parsed.imageQuery || req.term, preset.label);
   const values = {
     expression: parsed.expression || req.term,
@@ -1501,23 +1668,10 @@ async function buildEnrichmentResult(
   };
 }
 
-async function generateDeckWithAi(req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]> {
+async function generateDeckWithAi(req: AiDeckGenerationRequest, signal?: AbortSignal): Promise<AiEnrichmentResult[]> {
   const config = readMiningConfig();
-  const engine = config.engine ?? 'cloud';
-  const providerId = req.providerId ?? config.providerId ?? DEFAULT_AI_PROVIDER_ID;
+  const { engine, providerId, apiKey } = await preflightCardGeneration(req.providerId, config);
   const provider = providerById(providerId);
-  const apiKey = engine === 'cloud' ? readApiKeyForProvider(providerId) : '';
-  if (engine === 'cloud' && !apiKey) {
-    throw new Error(`Add a ${provider.label} API key before generating cards.`);
-  }
-  if (engine === 'local-qwen') {
-    const { isTranslateAvailable } = await import('./translate');
-    if (!isTranslateAvailable()) {
-      throw new Error(
-        'Local Qwen model not found. Install Qwen3-1.7B via Translate, or switch the engine to Cloud.',
-      );
-    }
-  }
   const preset = presetById(req.presetId);
   const format = formatById(req.formatId, preset.id);
   const langOptions = normalizeLanguageOptions({
@@ -1534,169 +1688,218 @@ async function generateDeckWithAi(req: AiDeckGenerationRequest): Promise<AiEnric
   const cardCount = Math.max(1, Math.min(50, Math.round(req.cardCount ?? config.cardCount)));
   const outputFormat = req.outputFormat ?? config.outputFormat;
 
+  const failedItem = (failure: AiGenerationItemFailure): AiEnrichmentResult =>
+    failedAiEnrichmentResult({ presetId: preset.id, formatId: format.id, failure });
+  /** How a run ends: what it made, with every failure in place, unless it made nothing at all. */
+  const finish = (results: AiEnrichmentResult[], firstError: unknown, doneKey: string, doneVars: Record<string, string | number>): AiEnrichmentResult[] => {
+    const finished = results.filter((result) => !result.failure);
+    // Nothing paid for is kept, so there is nothing to lose: refuse as before,
+    // with the reason, instead of a batch of empty retries.
+    if (!finished.length) throw firstError ?? new Error(mt('aiProv.mining.noUsable'));
+    const failed = results.length - finished.length;
+    const cards = finished.reduce((n, r) => n + r.cards.length, 0);
+    if (failed) {
+      aiGenerateProgress('done', finished.length, results.length, 'aiStudio.progress.msg.partial', {
+        cards,
+        count: finished.length,
+        failed,
+      });
+    } else {
+      aiGenerateProgress('done', finished.length, finished.length, doneKey, { ...doneVars, cards, count: finished.length });
+    }
+    return results;
+  };
+
   if (req.source === 'dictionary') {
     const terms = req.terms ?? [];
     if (!terms.length) {
-      throw new Error('Star words in Dictionary first, or switch to preset generation.');
+      throw new Error(mt('aiProv.mining.noTerms'));
     }
     const results: AiEnrichmentResult[] = [];
+    let firstError: unknown;
     const total = terms.length;
     for (let i = 0; i < terms.length; i++) {
       const entry = terms[i];
-      broadcastAiGenerateProgress({
-        phase: 'enrich',
-        done: i,
-        total,
-        message: `Enriching “${entry.term}” (${i + 1} of ${total})…`,
-      });
-      results.push(
-        await enrichWithAi({
-          term: entry.term,
-          reading: entry.reading,
-          sentence: entry.sentence ?? '',
-          bookTitle: preset.label,
-          presetId: preset.id,
-          formatId: format.id,
-          cardCount,
-          outputFormat,
-          providerId,
-          frontLang: langOptions.frontLang,
-          backLang: langOptions.backLang,
-          reverse: langOptions.reverse,
-          backGlossLangs: langOptions.backGlossLangs,
-        }),
-      );
+      aiGenerateProgress('enrich', i, total, 'aiStudio.progress.msg.enriching', { term: entry.term, n: i + 1, total });
+      try {
+        throwIfGenerationCancelled(signal);
+        results.push(
+          await enrichWithAi({
+            term: entry.term,
+            reading: entry.reading,
+            sentence: entry.sentence ?? '',
+            bookTitle: preset.label,
+            presetId: preset.id,
+            formatId: format.id,
+            cardCount,
+            outputFormat,
+            providerId,
+            frontLang: langOptions.frontLang,
+            backLang: langOptions.backLang,
+            reverse: langOptions.reverse,
+            backGlossLangs: langOptions.backGlossLangs,
+          }, signal),
+        );
+      } catch (error) {
+        firstError ??= error;
+        const retryOf = (term: (typeof terms)[number]): AiGenerationItemFailure['retry'] => ({
+          kind: 'term',
+          term: term.term,
+          ...(term.reading ? { reading: term.reading } : {}),
+          ...(term.sentence ? { sentence: term.sentence } : {}),
+        });
+        if (!stopsGenerationRun(error, signal)) {
+          // This word only: the next one may well succeed.
+          results.push(failedItem(generationItemFailure(error, signal, retryOf(entry))));
+          continue;
+        }
+        // The run cannot go on. This word and every one after it are owed,
+        // each retryable; the words already made are kept.
+        for (const rest of terms.slice(i)) {
+          results.push(failedItem(generationItemFailure(error, signal, retryOf(rest))));
+        }
+        break;
+      }
     }
-    broadcastAiGenerateProgress({
-      phase: 'done',
-      done: total,
-      total,
-      message: `Built ${results.reduce((n, r) => n + r.cards.length, 0)} cards from ${results.length} words.`,
-    });
-    return results;
+    return finish(results, firstError, 'aiStudio.progress.msg.builtDict', {});
   }
 
   const wordCount = Math.max(1, Math.min(50, Math.round(req.wordCount ?? 10)));
   const inventBatches = Math.ceil(wordCount / AI_INVENT_CHUNK_SIZE);
   const items: Partial<AiEnrichmentResult>[] = [];
   const inventedExpressions: string[] = [];
+  // A retry of items an earlier run could not invent: its finished expressions
+  // must not come back as "new" ones.
+  const avoidFromRequest = (req.avoidExpressions ?? [])
+    .filter((expression): expression is string => typeof expression === 'string' && Boolean(expression.trim()))
+    .map((expression) => expression.trim())
+    .slice(0, 200);
+  let firstError: unknown;
+  let inventFailure: AiGenerationItemFailure | null = null;
 
-  broadcastAiGenerateProgress({
-    phase: 'invent',
-    done: 0,
-    total: wordCount,
-    message: `Inventing ${wordCount} vocabulary items…`,
-  });
+  aiGenerateProgress('invent', 0, wordCount, 'aiStudio.progress.msg.inventing', { count: wordCount });
 
   for (let batchIndex = 0; batchIndex < inventBatches && items.length < wordCount; batchIndex++) {
     const chunkCount = Math.min(AI_INVENT_CHUNK_SIZE, wordCount - items.length);
-    const batchLabel =
-      inventBatches > 1 ? ` (batch ${batchIndex + 1}/${inventBatches})` : '';
-    broadcastAiGenerateProgress({
-      phase: 'invent',
-      done: items.length,
-      total: wordCount,
-      message: `Inventing ${chunkCount} items${batchLabel}…`,
-    });
-    const prompt = buildAiPromptPreview({
-      mode: 'preset',
-      preset,
-      localizedFormat,
-      langOptions,
-      cardCount,
-      outputFormat,
-      templateFront,
-      templateBack,
-      targetLang: profile.targetLang,
-      wordCount: chunkCount,
-      avoidExpressions: inventedExpressions.length ? inventedExpressions : undefined,
-      inventBatch:
-        inventBatches > 1 ? { index: batchIndex + 1, total: inventBatches } : undefined,
-    });
-    const text =
-      engine === 'local-qwen'
-        ? await (await import('./translate')).runLocalQwenPrompt(
-            `${prompt}\n\nRespond with a single JSON object only — no markdown fences.`,
-            { maxTokens: Math.min(8192, Math.max(2048, chunkCount * 450)), timeoutMs: 180_000 },
+    if (inventBatches > 1) {
+      aiGenerateProgress('invent', items.length, wordCount, 'aiStudio.progress.msg.inventingBatch', {
+        count: chunkCount,
+        n: batchIndex + 1,
+        total: inventBatches,
+      });
+    }
+    try {
+      throwIfGenerationCancelled(signal);
+      const avoid = [...avoidFromRequest, ...inventedExpressions];
+      const prompt = buildAiPromptPreview({
+        mode: 'preset',
+        preset,
+        localizedFormat,
+        langOptions,
+        cardCount,
+        outputFormat,
+        templateFront,
+        templateBack,
+        targetLang: profile.targetLang,
+        wordCount: chunkCount,
+        avoidExpressions: avoid.length ? avoid : undefined,
+        inventBatch:
+          inventBatches > 1 ? { index: batchIndex + 1, total: inventBatches } : undefined,
+      });
+      const parsed = engine === 'local-qwen'
+        ? parseAiReplyWith(
+            await (await import('./translate')).runLocalQwenPrompt(
+              `${prompt}\n\nRespond with a single JSON object only — no markdown fences.`,
+              {
+                maxTokens: Math.min(8192, Math.max(2048, chunkCount * 450)),
+                timeoutMs: 180_000,
+                ...(signal ? { signal } : {}),
+              },
+            ),
+            AI_ENRICHMENT_BATCH_SHAPE,
+            'Local Qwen',
           )
-        : await callAiProvider(providerId, apiKey, prompt, buildBatchSchema(), {
+        : await callAiProviderJson(providerId, apiKey, prompt, buildBatchSchema(), AI_ENRICHMENT_BATCH_SHAPE, {
             itemCount: chunkCount,
+            feature: 'cardGen',
+            context: provider.label,
+            ...(signal ? { signal } : {}),
           });
-    const parsed = parseAiJson<{ items?: Partial<AiEnrichmentResult>[] }>(
-      text,
-      engine === 'local-qwen' ? 'Local Qwen' : provider.label,
-    );
-    const chunkItems = Array.isArray(parsed.items) ? parsed.items : [];
-    if (!chunkItems.length) {
-      throw new Error(
-        `AI returned no vocabulary items${batchLabel || ''} for this preset.`,
-      );
+      const chunkItems = parsed.items.map(asPartialEnrichment);
+      if (!chunkItems.length) {
+        throw new Error(mt('aiProv.mining.noItems'));
+      }
+      const before = items.length;
+      for (const item of chunkItems) {
+        const expression = (item.expression || '').trim();
+        if (!expression || inventedExpressions.includes(expression) || avoidFromRequest.includes(expression)) continue;
+        inventedExpressions.push(expression);
+        items.push(item);
+        if (items.length >= wordCount) break;
+      }
+      if (items.length === before) {
+        throw new Error(mt('aiProv.mining.onlyDuplicates'));
+      }
+      aiGenerateProgress('invent', items.length, wordCount, 'aiStudio.progress.msg.invented', {
+        done: items.length,
+        total: wordCount,
+      });
+    } catch (error) {
+      firstError ??= error;
+      // Recorded once; the count owed is settled after the loop.
+      inventFailure ??= generationItemFailure(error, signal, { kind: 'invent', count: 0, avoid: [] });
+      // A batch that failed costs its own items; the next batch may still
+      // succeed. A run-stopping failure ends the inventing here.
+      if (stopsGenerationRun(error, signal)) break;
     }
-    const before = items.length;
-    for (const item of chunkItems) {
-      const expression = (item.expression || '').trim();
-      if (!expression || inventedExpressions.includes(expression)) continue;
-      inventedExpressions.push(expression);
-      items.push(item);
-      if (items.length >= wordCount) break;
-    }
-    if (items.length === before) {
-      throw new Error(
-        `AI returned only duplicate vocabulary items${batchLabel || ''}. Try again or switch provider.`,
-      );
-    }
-    broadcastAiGenerateProgress({
-      phase: 'invent',
-      done: items.length,
-      total: wordCount,
-      message: `Invented ${items.length} of ${wordCount} items…`,
-    });
   }
 
   if (!items.length) {
-    throw new Error('AI returned no vocabulary items for this preset.');
+    throw firstError ?? new Error(mt('aiProv.mining.noItems'));
   }
-  broadcastAiGenerateProgress({
-    phase: 'enrich',
-    done: 0,
-    total: items.length,
-    message: `Building ${items.length} card sets (${cardCount} card${cardCount === 1 ? '' : 's'} each)…`,
+  aiGenerateProgress('enrich', 0, items.length, 'aiStudio.progress.msg.building', {
+    count: items.length,
+    cards: cardCount,
   });
   const results: AiEnrichmentResult[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const term = (item.expression || '').trim();
     if (!term) continue;
-    broadcastAiGenerateProgress({
-      phase: 'enrich',
-      done: i,
-      total: items.length,
-      message: `Card set ${i + 1} of ${items.length}: ${term}`,
-    });
-    results.push(
-      await buildEnrichmentResult(item, {
-        preset,
-        format,
-        localizedFormat,
-        cardCount,
-        config,
+    aiGenerateProgress('enrich', i, items.length, 'aiStudio.progress.msg.cardSet', { n: i + 1, total: items.length, term });
+    try {
+      // No provider call here: the invented item is already paid for, so a
+      // cancel at this point keeps it rather than throwing it away.
+      results.push(
+        await buildEnrichmentResult(item, {
+          preset,
+          format,
+          localizedFormat,
+          cardCount,
+          config,
+          term,
+          reading: item.reading,
+          sentence: item.sentence,
+        }),
+      );
+    } catch (error) {
+      firstError ??= error;
+      results.push(failedItem(generationItemFailure(error, undefined, {
+        kind: 'term',
         term,
-        reading: item.reading,
-        sentence: item.sentence,
-      }),
-    );
+        ...(item.reading ? { reading: item.reading } : {}),
+        ...(item.sentence ? { sentence: item.sentence } : {}),
+      })));
+    }
   }
-  if (!results.length) {
-    throw new Error('AI returned items, but none had usable expressions.');
+  const missing = wordCount - items.length;
+  if (missing > 0) {
+    results.push(failedItem({
+      ...(inventFailure ?? generationItemFailure(new Error(mt('aiProv.mining.noItems')), signal, { kind: 'invent', count: 0, avoid: [] })),
+      retry: { kind: 'invent', count: missing, avoid: [...avoidFromRequest, ...inventedExpressions] },
+    }));
   }
-  const cardTotal = results.reduce((n, r) => n + r.cards.length, 0);
-  broadcastAiGenerateProgress({
-    phase: 'done',
-    done: results.length,
-    total: results.length,
-    message: `Generated ${cardTotal} cards from ${results.length} invented items.`,
-  });
-  return results;
+  return finish(results, firstError, 'aiStudio.progress.msg.generated', {});
 }
 
 /**
@@ -1708,7 +1911,7 @@ async function generateDeckWithAi(req: AiDeckGenerationRequest): Promise<AiEnric
 async function enrichCandidates(
   candidates: MiningCandidate[],
   traditional: TraditionalMiningConfig,
-  options?: { glossOnly?: boolean },
+  options?: { glossOnly?: boolean; fresh?: boolean },
 ): Promise<{ candidates: MiningCandidate[]; warnings: string[]; cancelled: boolean }> {
   const { lookupTermsBatch } = await import('./dictionary');
   const { runTranslationBatch, isTranslateAvailable } = await import('./translate');
@@ -1730,6 +1933,8 @@ async function enrichCandidates(
           ? runApiTranslationBatch(items, apiProviderId, apiKey, {
               shouldCancel: () => analyzeCancelRequested,
               onProgress: opts?.onProgress,
+              // "Translate again": skip this provider's cached answers (they are refreshed).
+              ...(options?.fresh ? { fresh: true } : {}),
             })
           : runTranslationBatch(items, {
               shouldCancel: () => analyzeCancelRequested,
@@ -2033,9 +2238,14 @@ export interface EpubDeckExportResult {
 async function exportEpubDeckFromAnalysis(
   analysis: EpubMiningAnalysis,
   traditional: TraditionalMiningConfig,
+  options?: { freshTranslations?: boolean },
 ): Promise<EpubDeckExportResult> {
   analyzeCancelRequested = false;
-  const outcome = await enrichCandidates(analysis.candidates, traditional);
+  const outcome = await enrichCandidates(
+    analysis.candidates,
+    traditional,
+    options?.freshTranslations ? { fresh: true } : undefined,
+  );
   const enrichedAnalysis: EpubMiningAnalysis = {
     ...analysis,
     candidates: outcome.candidates,
@@ -2158,7 +2368,12 @@ export function registerMiningIpc(): void {
   );
   bind(
     'mining:renderEpubDeck',
-    async (_e, analysis: EpubMiningAnalysis, config?: Partial<TraditionalMiningConfig>) => {
+    async (
+      _e,
+      analysis: EpubMiningAnalysis,
+      config?: Partial<TraditionalMiningConfig>,
+      opts?: { freshTranslations?: unknown },
+    ) => {
       await ensureAllFrequencyDictionariesReady();
       const fullConfig = readMiningConfig();
       const traditional: TraditionalMiningConfig = {
@@ -2168,7 +2383,11 @@ export function registerMiningIpc(): void {
         templates: { ...fullConfig.traditional.templates, ...(config?.templates ?? {}) },
         export: { ...fullConfig.traditional.export, ...(config?.export ?? {}) },
       };
-      return exportEpubDeckFromAnalysis(analysis, traditional);
+      // "Translate again" (the EPUB panel): engine-filled values and the
+      // provider's cached answers are not reused; dictionary values are.
+      return exportEpubDeckFromAnalysis(analysis, traditional, {
+        freshTranslations: opts?.freshTranslations === true,
+      });
     },
   );
   bind('mining:saveEpubDeckCsv', (_e, csv: string, title?: string) => {
@@ -2210,7 +2429,7 @@ export function registerMiningIpc(): void {
       return {
         ok: true,
         apiKeysSet,
-        apiKeySet: Boolean(readApiKeyForProvider(config.providerId)),
+        apiKeySet: Boolean(apiKeysSet[providerKeyBucket(config.providerId)]),
         savedBucket: bucket,
       };
     } catch (err) {
@@ -2230,7 +2449,7 @@ export function registerMiningIpc(): void {
     return {
       ok: true,
       providerId: nextProvider,
-      apiKeySet: Boolean(readApiKeyForProvider(nextProvider)),
+      apiKeySet: providerUsable(nextProvider),
       apiKeysSet: readApiKeysSet(),
     };
   });
@@ -2296,7 +2515,15 @@ export function registerMiningIpc(): void {
       return { ok: true, ...next };
     },
   );
-  bind('ai:enrichCard', (_e, req: AiEnrichmentRequest) => enrichWithAi(req));
-  bind('ai:generateDeck', (_e, req: AiDeckGenerationRequest) => generateDeckWithAi(req));
+  bind('ai:enrichCard', (_e, req: AiEnrichmentRequest) => withGenerationSignal((signal) => enrichWithAi(req, signal)));
+  bind('ai:generateDeck', (_e, req: AiDeckGenerationRequest) =>
+    withGenerationSignal((signal) => generateDeckWithAi(req, signal)));
+  // Stops every Card Studio run in flight: the HTTP request (or the offline
+  // model's prompt) is aborted, not merely ignored when it returns.
+  bind('ai:cancelGenerate', () => {
+    const count = activeAiGenerations.size;
+    for (const controller of activeAiGenerations) controller.abort();
+    return { ok: true as const, cancelled: count };
+  });
   bind('ai:saveCsv', (_e, csv: string) => saveCsv(csv));
 }

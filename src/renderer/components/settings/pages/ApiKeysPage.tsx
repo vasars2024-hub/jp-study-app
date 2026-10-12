@@ -26,6 +26,7 @@ import { confirmDialog } from '../../ui';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import { useSettings } from '../SettingsContext';
 import SettingsCard from '../SettingsCard';
+import { notifyAiSetupChanged } from '../../../aiSetupClient';
 import {
   CREDENTIAL_REGISTRY,
   credentialCategoryLabelKey,
@@ -120,6 +121,9 @@ export default function ApiKeysPage() {
           setVaultStatuses(response.snapshot.statuses);
           setCanStore(response.snapshot.canStore);
           setResult(spec.id, response.ok, response.messageKey);
+          // An AI key saved here makes AI "ready" in every window, same as one
+          // saved in Settings > AI.
+          if (response.ok && spec.category === 'ai') notifyAiSetupChanged();
           // A new TMDB key re-opens every film the library could not look up;
           // sweep now rather than at the next launch. Fire-and-forget: the
           // sweep reports through its own progress channel, and one already
@@ -177,6 +181,7 @@ export default function ApiKeysPage() {
           const snapshot = await window.api.clearCredential(spec.id);
           setVaultStatuses(snapshot.statuses);
           setCanStore(snapshot.canStore);
+          if (spec.category === 'ai') notifyAiSetupChanged();
           break;
         }
         case 'mining': {

@@ -1,4 +1,4 @@
-import type { AiProviderId } from './aiProviders';
+import { AI_PROVIDERS, type AiProviderId } from './aiProviders';
 import type { AgentProviderPrice } from './agentProviderPricing';
 
 export const AGENT_WORKSPACE_SCHEMA_VERSION = 1 as const;
@@ -215,6 +215,12 @@ export interface AgentConversation {
   archived: boolean;
   context: AgentContextItem[];
   messages: AgentMessage[];
+  /**
+   * How many of this conversation's oldest messages the history budget has removed
+   * (`capAgentWorkspaceHistory`), in total. Said in the rail and the conversation header,
+   * so a long conversation that lost its beginning never reads as complete.
+   */
+  trimmedMessages?: number;
 }
 
 export interface AgentWorkspaceState {
@@ -233,6 +239,11 @@ export interface AgentWorkspaceState {
    * field whenever a producer supplies it.
    */
   prompts?: AgentReusablePrompt[];
+  /**
+   * How many whole conversations the history budget has removed, in total — shown in the
+   * conversation list. Optional for the same reason as `prompts`.
+   */
+  droppedConversations?: number;
 }
 
 export interface AgentCardActionCoordinate {
@@ -306,9 +317,9 @@ const CONTEXT_KINDS = new Set<AgentContextKind>([
 const ATTACHMENT_KINDS = new Set<AgentAttachmentKind>([
   'text', 'image', 'document', 'audio', 'video', 'other',
 ]);
-const CLOUD_PROVIDERS = new Set<AiProviderId>([
-  'gemini-2.5-flash', 'deepseek-v4-flash', 'deepseek-v4-pro',
-]);
+// Every routable provider. A hand-kept copy of the first three rows dropped the
+// disclosure of any Claude/OpenAI/compatible reply when the workspace was read back.
+const CLOUD_PROVIDERS: ReadonlySet<AiProviderId> = new Set(AI_PROVIDERS.map((provider) => provider.id));
 const CARD_KINDS = new Set<AgentResultCard['kind']>([
   'navigation', 'dictionary', 'reading', 'media', 'flashcards', 'plan', 'generic',
 ]);
@@ -557,7 +568,13 @@ function normalizeConversation(value: unknown): AgentConversation | null {
       .filter((entry): entry is AgentContextItem => entry !== null)
       .slice(0, 100),
     messages: unambiguousIdEntries(messages),
+    ...(positiveCount(raw.trimmedMessages) ? { trimmedMessages: positiveCount(raw.trimmedMessages) } : {}),
   };
+}
+
+/** A stored tally: a positive whole number, or 0 for anything else. */
+function positiveCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.min(Math.floor(value), 1e9) : 0;
 }
 
 function normalizeReusablePrompt(value: unknown): AgentReusablePrompt | null {
@@ -608,6 +625,91 @@ export function normalizeAgentWorkspaceState(value: unknown): AgentWorkspaceStat
     activeConversationId: active && conversations.some((entry) => entry.id === active) ? active : null,
     conversations,
     ...(prompts ? { prompts } : {}),
+    ...(positiveCount(raw.droppedConversations) ? { droppedConversations: positiveCount(raw.droppedConversations) } : {}),
+  };
+}
+
+/**
+ * Ceiling for the persisted workspace file. The normalizer bounds each field, but its
+ * bounds multiply (500 conversations × 2,000 messages × 200,000 characters) into a file
+ * that would be rewritten atomically on every send — so history needs a real budget.
+ */
+export const AGENT_WORKSPACE_MAX_BYTES = 8 * 1024 * 1024;
+/** The newest messages a conversation keeps on disk. */
+export const AGENT_CONVERSATION_MAX_MESSAGES = 1_000;
+/** Trimming a pinned or open conversation never takes it below this many messages. */
+const AGENT_CONVERSATION_MIN_MESSAGES = 20;
+
+function utf8Bytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+
+/**
+ * Hold the workspace to `maxBytes`, oldest history first:
+ *
+ *   1. each conversation keeps its newest `AGENT_CONVERSATION_MAX_MESSAGES` messages;
+ *   2. then whole conversations go, least recently used first — never a pinned one and
+ *      never the open one;
+ *   3. only if pinned/open conversations alone are still over budget are THEIR oldest
+ *      messages trimmed, largest conversation first, down to a floor of 20.
+ *
+ * Saved prompts are not history and are never touched. Pure; returns the input unchanged
+ * when it already fits.
+ */
+export function capAgentWorkspaceHistory(
+  state: AgentWorkspaceState,
+  maxBytes: number = AGENT_WORKSPACE_MAX_BYTES,
+): AgentWorkspaceState {
+  // Every cut is counted on what it cut from, so the shell can say history was shortened.
+  const trimmed = (conversation: AgentConversation, messages: AgentMessage[]): AgentConversation => {
+    const removed = conversation.messages.length - messages.length;
+    return removed > 0
+      ? { ...conversation, messages, trimmedMessages: (conversation.trimmedMessages ?? 0) + removed }
+      : conversation;
+  };
+  let conversations = state.conversations.map((conversation) => (
+    conversation.messages.length > AGENT_CONVERSATION_MAX_MESSAGES
+      ? trimmed(conversation, conversation.messages.slice(-AGENT_CONVERSATION_MAX_MESSAGES))
+      : conversation
+  ));
+  const shell = utf8Bytes({ ...state, conversations: [] });
+  const sizes = new Map(conversations.map((conversation) => [conversation.id, utf8Bytes(conversation) + 1]));
+  let total = shell + [...sizes.values()].reduce((sum, size) => sum + size, 0);
+  if (total <= maxBytes) {
+    return conversations.every((conversation, i) => conversation === state.conversations[i])
+      ? state
+      : { ...state, conversations };
+  }
+  const evictable = conversations
+    .filter((conversation) => !conversation.pinned && conversation.id !== state.activeConversationId)
+    .sort((a, b) => a.updatedAt - b.updatedAt);
+  const dropped = new Set<string>();
+  for (const conversation of evictable) {
+    if (total <= maxBytes) break;
+    dropped.add(conversation.id);
+    total -= sizes.get(conversation.id) ?? 0;
+  }
+  conversations = conversations.filter((conversation) => !dropped.has(conversation.id));
+  if (total > maxBytes) {
+    const bySize = [...conversations].sort((a, b) => (sizes.get(b.id) ?? 0) - (sizes.get(a.id) ?? 0));
+    for (const conversation of bySize) {
+      if (total <= maxBytes) break;
+      let messages = conversation.messages;
+      let size = sizes.get(conversation.id) ?? 0;
+      while (total > maxBytes && messages.length > AGENT_CONVERSATION_MIN_MESSAGES) {
+        const cut = Math.max(1, Math.floor(messages.length / 10));
+        messages = messages.slice(Math.min(cut, messages.length - AGENT_CONVERSATION_MIN_MESSAGES));
+        const next = utf8Bytes({ ...conversation, messages }) + 1;
+        total -= size - next;
+        size = next;
+      }
+      conversations = conversations.map((entry) => (entry.id === conversation.id ? trimmed(entry, messages) : entry));
+    }
+  }
+  return {
+    ...state,
+    conversations,
+    ...(dropped.size ? { droppedConversations: (state.droppedConversations ?? 0) + dropped.size } : {}),
   };
 }
 

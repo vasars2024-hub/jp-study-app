@@ -44,6 +44,12 @@ export interface VisualNovelCaptureState {
   lastLine: VisualNovelCaptureLine | null;
   lastError: string;
   startedAt: number | null;
+  /** Consecutive failed websocket connections since the last stable one (absent before any). */
+  reconnectAttempt?: number;
+  /** When the next websocket attempt is due (epoch ms), or null when none is scheduled. */
+  nextRetryAt?: number | null;
+  /** Lines the cleanup rules or duplicate filter threw away this session. */
+  filtered?: number;
 }
 
 export interface VisualNovelSessionState {

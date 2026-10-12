@@ -51,6 +51,7 @@ import {
 import { stripFuriganaFragments } from '../../shared/mangaOcrText';
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../wordLookup';
 import { registerCommandHandler } from '../keyboardShortcuts';
+import { withShortcut } from '../shortcutHints';
 import AssetInstallPrompt from '../components/AssetInstallPrompt';
 import { openSectionSurface } from '../sectionSurface';
 import {
@@ -164,7 +165,8 @@ function findBlockNearBox(page: MokuroPage, box: MokuroBox): MokuroBlock | null 
 function mangaTargetLang(): string {
   const source = getActiveProfile().targetLang;
   const saved = getTranslateTarget();
-  if (saved === source) return source === 'en' ? 'ru' : 'en';
+  // A study language is never English, so English is always a different target.
+  if (saved === source) return 'en';
   return saved;
 }
 
@@ -1279,7 +1281,7 @@ export default function MangaReader({ item, onClose }: Props) {
   }, [mokuroPage, translating, translatedPage, showTranslated, runTranslatePage, ensureTextOverlayMode]);
 
   const setTranslateTarget = useCallback((code: string) => {
-    const finalTarget = code === sourceLang ? (sourceLang === 'en' ? 'ru' : 'en') : code;
+    const finalTarget = code === sourceLang ? 'en' : code;
     writeMangaTargetLang(finalTarget);
     setTargetLang(finalTarget);
     setTranslatedPage(null);
@@ -1816,7 +1818,7 @@ export default function MangaReader({ item, onClose }: Props) {
                 <button
                   className={`btn small${showTranslated ? ' active' : ''}`}
                   disabled={!mokuroPage || translating || volumeBusy}
-                  title={t('manga.translate.toggleVisibility')}
+                  title={withShortcut(t('manga.translate.toggleVisibility'), 'reader.toggleTranslation')}
                   onClick={() => toggleTranslationVisibility()}
                 >
                   <Icon name="eye" size={14} />

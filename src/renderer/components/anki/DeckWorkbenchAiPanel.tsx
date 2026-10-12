@@ -34,11 +34,13 @@ import {
   cancelAiBatch,
   clearAiDecision,
   aiRetryTargets,
+  failPendingAiNotes,
   recordAiResult,
   rejectAiVariant,
   summarizeAiReview,
   type AiAdditionKind,
   type AiBatch,
+  type AiBatchRequest,
 } from '../../../shared/ankiAiAdditions';
 import {
   AI_ADDITIONS_MAX_VARIANTS,
@@ -57,6 +59,8 @@ import {
   translateDestinationProblem,
   type TranslateSkippedNote,
 } from '../../../shared/ankiTranslate';
+import { aiErrorKey, isAiErrorCode, type AiErrorCode } from '../../../shared/aiErrorCodes';
+import type { TVars } from '../../../shared/i18n/core';
 import { loadAgentProviderPricing } from '../../agentProviderPricingStore';
 import { useT } from '../../i18n';
 import { getStudyLang } from '../../studyEnvironment';
@@ -81,6 +85,21 @@ const KNOWN_ERRORS = [
   'no-batch-id',
   'bridge-missing',
 ];
+
+/** Old per-note codes, folded into the shared AI error codes. */
+const NOTE_ERROR_ALIASES: Readonly<Record<string, AiErrorCode>> = { 'no-variants': 'no-answer' };
+
+/**
+ * Say a refusal or failure code in the UI language. Codes this panel or the
+ * shared AI layer define are translated; anything else is a provider's own
+ * message, shown verbatim and labelled as such.
+ */
+function describeAiError(code: string, t: (key: string, vars?: TVars) => string): string {
+  if (KNOWN_ERRORS.includes(code)) return t(`ankiWorkbench.ai.error.${code}`);
+  const shared = NOTE_ERROR_ALIASES[code] ?? code;
+  if (isAiErrorCode(shared)) return t(aiErrorKey(shared));
+  return t('ankiWorkbench.ai.error.provider', { detail: code });
+}
 
 /** What the panel is asked to generate for: one word per selected note. */
 export interface AiPanelNote {
@@ -254,73 +273,120 @@ export default function DeckWorkbenchAiPanel({
   }
 
   const generate = async (retryOf?: AiBatch): Promise<void> => {
-    // Narrowed once, at the top: exactly one of these is non-null for the whole
-    // run, so the branches below cannot read the other question's request.
-    const translateReq = mode === 'translate' ? translateRequest : null;
-    const additionsReq = mode === 'translate' ? null : request;
-    const send = translateReq
+    // The question being asked. A retry re-asks the batch's OWN question — the
+    // kind, field and language it was generated with — never whatever the form
+    // has been switched to since; a fresh run asks what the form shows now.
+    let asked: AiBatchRequest | null = null;
+    // One list, whichever question is being asked: `{ noteId, term }` where
+    // `term` is the word for an addition and the source text for a translation.
+    let requested: Array<{ noteId: string; term: string }> = [];
+    if (retryOf) {
+      asked = retryOf.request ?? null;
+      requested = retryOf.notes.map((note) => ({ noteId: note.noteId, term: note.term }));
+      if (!asked) {
+        // A batch from before requests were recorded: refuse rather than guess.
+        setError('no-request');
+        return;
+      }
+    } else if (mode === 'translate') {
+      if (!translateRequest) return;
+      asked = {
+        mode: 'translate',
+        fromField: translateRequest.fromField,
+        targetLanguage: translateRequest.targetLanguage,
+        variantCount: translateRequest.variantCount,
+      };
+      requested = translateRequest.notes.map((note) => ({ noteId: note.noteId, term: note.text }));
+    } else {
+      if (!request) return;
+      const glosses: Record<string, string> = {};
+      for (const note of request.notes) if (note.gloss) glosses[note.noteId] = note.gloss;
+      asked = {
+        mode: 'additions',
+        kind: request.kind,
+        variantCount: request.variantCount,
+        sendGloss: request.sendGloss,
+        explainLanguage: request.explainLanguage,
+        ...(request.studyLang ? { studyLang: request.studyLang } : {}),
+        ...(request.sendGloss && Object.keys(glosses).length ? { glosses } : {}),
+      };
+      requested = request.notes.map((note) => ({ noteId: note.noteId, term: note.term }));
+    }
+    if (!asked) return;
+    const q: AiBatchRequest = asked;
+    const send = q.mode === 'translate'
       ? window.api?.ankiAiTranslateField
       : window.api?.ankiAiGenerateAdditions;
-    if (!translateReq && !additionsReq) return;
     if (typeof send !== 'function') {
       setError('bridge-missing');
       return;
     }
-    // One list, whichever question is being asked: `{ noteId, term }` where
-    // `term` is the word for an addition and the source text for a translation.
-    const requested = translateReq
-      ? translateReq.notes.map((note) => ({ noteId: note.noteId, term: note.text }))
-      : (additionsReq?.notes ?? []).map((note) => ({ noteId: note.noteId, term: note.term }));
     const retryIds = retryOf ? new Set(aiRetryTargets(retryOf)) : null;
     const scoped = retryIds ? requested.filter((note) => retryIds.has(note.noteId)) : requested;
     if (scoped.length === 0) return;
+    // Restored if main refuses a fresh run: the batch on screen (and its
+    // approvals) must not vanish because a new run could not start.
+    const previous = batchBox.current;
     // A retry keeps the batch it is retrying, so the approvals already made
     // survive it; a fresh run gets a new id, which is what invalidates a tray
     // step built for the previous generation.
     const id = retryOf ? retryOf.id : `ai-${(nextBatchSeq += 1)}-${Date.now()}`;
-    const started = retryOf
+    const started: AiBatch = retryOf
       ? beginAiRetry(retryOf)
-      : beginAiBatch(id, translateReq ? 'translate-field' : kind, '', providerId, requested);
+      : {
+        ...beginAiBatch(id, q.mode === 'translate' ? 'translate-field' : q.kind, '', providerId, requested),
+        request: asked,
+      };
     liveBatchId.current = id;
     publish(started);
     setRunning(true);
     setError(null);
     try {
-      const result = translateReq
+      const result = q.mode === 'translate'
         ? await window.api.ankiAiTranslateField({
           batchId: id,
-          fromField: translateReq.fromField,
-          targetLanguage: translateReq.targetLanguage,
+          fromField: q.fromField,
+          targetLanguage: q.targetLanguage,
           notes: scoped.map((note) => ({ noteId: note.noteId, text: note.term })),
-          variantCount: translateReq.variantCount,
+          variantCount: q.variantCount,
         })
         : await window.api.ankiAiGenerateAdditions({
           batchId: id,
-          kind,
+          kind: q.kind,
           notes: scoped.map((note) => {
-            const source = additionsReq?.notes.find((n) => n.noteId === note.noteId);
-            return { noteId: note.noteId, term: note.term, ...(source?.gloss ? { gloss: source.gloss } : {}) };
+            const gloss = q.mode === 'additions' ? q.glosses?.[note.noteId] : undefined;
+            return { noteId: note.noteId, term: note.term, ...(gloss ? { gloss } : {}) };
           }),
-          variantCount: additionsReq?.variantCount ?? variantCount,
-          sendGloss: additionsReq?.sendGloss ?? sendGloss,
-          explainLanguage: additionsReq?.explainLanguage ?? lang,
-          studyLang: additionsReq?.studyLang ?? getStudyLang(),
+          variantCount: q.variantCount,
+          sendGloss: q.sendGloss,
+          explainLanguage: q.explainLanguage,
+          ...(q.studyLang ? { studyLang: q.studyLang } : {}),
         });
       if (!result.ok) {
         setError(result.error ?? 'unknown');
-        // Nothing was sent, so nothing was generated: the batch is withdrawn
-        // rather than left showing a row of notes that will never be answered.
-        publish(undefined);
-        liveBatchId.current = null;
+        // Nothing was sent, so nothing was generated. A refused retry keeps its
+        // batch — every approval in it — with the retried notes failed again,
+        // still retryable; a refused fresh run puts back the batch it replaced.
+        publish(retryOf
+          ? failPendingAiNotes(batchBox.current ?? started, result.error ?? 'unknown')
+          : previous);
         return;
       }
       const answered = applyResults(batchBox.current, result.results);
-      const settled = answered && result.cancelled ? cancelAiBatch(answered) : answered;
+      // Notes the run never reached were cancelled; any still pending after a
+      // run that was NOT cancelled were skipped by main and are retryable.
+      const settled = answered
+        ? (result.cancelled ? cancelAiBatch(answered) : failPendingAiNotes(answered, 'no-answer'))
+        : answered;
       // The batch records who actually answered, which the refusal path above
       // never reaches.
       publish(settled ? { ...settled, provider: result.provider, model: result.model } : settled);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+    } catch {
+      setError('ipc-failed');
+      // The bridge threw: whatever was not answered failed, and stays retryable
+      // instead of `pending` forever.
+      const current = batchBox.current;
+      if (current && current.id === id) publish(failPendingAiNotes(current, 'ipc-failed'));
     } finally {
       setRunning(false);
       liveBatchId.current = null;
@@ -521,9 +587,7 @@ export default function DeckWorkbenchAiPanel({
             {/* Only the refusal codes this app defines have a translation. A
                 provider's own message is text we did not write and must not
                 pretend to have translated — it is shown verbatim. */}
-            {KNOWN_ERRORS.includes(error)
-              ? t(`ankiWorkbench.ai.error.${error}`)
-              : t('ankiWorkbench.ai.error.provider', { detail: error })}
+            {describeAiError(error, t)}
           </span>
         )}
       </div>
@@ -545,7 +609,7 @@ export default function DeckWorkbenchAiPanel({
                 <span className="wb-ai-term">{note.term}</span>
                 <span className="muted wb-ai-status">
                   {t(`ankiWorkbench.ai.status.${note.status}`)}
-                  {note.status === 'failed' && note.error ? ` (${note.error})` : ''}
+                  {note.status === 'failed' && note.error ? ` (${describeAiError(note.error, t)})` : ''}
                 </span>
                 <ul className="wb-ai-variants">
                   {note.variants.map((variant) => {
@@ -560,7 +624,7 @@ export default function DeckWorkbenchAiPanel({
                           type="button"
                           className="btn"
                           aria-pressed={approved}
-                          onClick={() => publish(approveAiVariant(batch, note.noteId, variant.id))}
+                          onClick={() => publish(approveAiVariant(batchBox.current ?? batch, note.noteId, variant.id))}
                         >
                           {t('ankiWorkbench.ai.approve')}
                         </button>
@@ -568,7 +632,7 @@ export default function DeckWorkbenchAiPanel({
                           type="button"
                           className="btn"
                           aria-pressed={Boolean(variant.rejected)}
-                          onClick={() => publish(rejectAiVariant(batch, note.noteId, variant.id))}
+                          onClick={() => publish(rejectAiVariant(batchBox.current ?? batch, note.noteId, variant.id))}
                         >
                           {t('ankiWorkbench.ai.reject')}
                         </button>
@@ -576,7 +640,7 @@ export default function DeckWorkbenchAiPanel({
                           <button
                             type="button"
                             className="btn"
-                            onClick={() => publish(clearAiDecision(batch, note.noteId, variant.id))}
+                            onClick={() => publish(clearAiDecision(batchBox.current ?? batch, note.noteId, variant.id))}
                           >
                             {t('ankiWorkbench.ai.undo')}
                           </button>

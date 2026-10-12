@@ -79,6 +79,19 @@ interface LensLine {
   tokens: JpToken[];
 }
 
+/** Models a read was made without, offered for install beside it. */
+interface LensInstallOffer {
+  ids: string[];
+  startIds: string[];
+}
+
+/**
+ * Where the running scan is. `capturing` paints nothing at all: the pill would
+ * otherwise be in the very screenshot being taken (a whole-screen auto read
+ * used to OCR its own "Scanning…" label). `basic` is the bundled recognizer.
+ */
+type LensScanStage = 'capturing' | 'reading' | 'refining' | 'basic';
+
 /** A finished read of the current region that is not the one on screen. */
 type LensAlternateRead = {
   engine: string;
@@ -101,6 +114,13 @@ type LensState =
     engine: string;
     capture: ReadingLensCapture;
     screenshotDataUrl?: string;
+    /** Served from main's result cache: the same pixels were read a moment ago. */
+    cached?: boolean;
+    /**
+     * Set when this read came from the bundled offline recognizer because the
+     * downloaded engine is missing: the models to offer beside the read.
+     */
+    install?: LensInstallOffer;
     /**
      * The other engine's read of these same pixels, already finished.
      *
@@ -117,7 +137,7 @@ type LensState =
       capture: ReadingLensCapture;
       tokens: JpToken[];
     }
-  | { kind: 'empty'; region: Rect }
+  | { kind: 'empty'; region: Rect; install?: LensInstallOffer }
   | {
     kind: 'error';
     region: Rect | null;
@@ -280,6 +300,15 @@ export default function ReadingLensOverlay() {
   const interactiveRef = useRef(true);
   /** The configured default recognizer, filled from `LensInit` on every open. */
   const defaultEngineRef = useRef<ReadingLensEngine>(READING_LENS_ENGINE_DEFAULT);
+  /**
+   * The running scan's progress. Kept out of `state` on purpose: the OCR effect
+   * runs on every `state` change, so a progress tick stored there would start
+   * the scan over.
+   */
+  const [scanProgress, setScanProgress] = useState<{ scanId: number; stage: LensScanStage; percent?: number } | null>(null);
+  const scanSeqRef = useRef(0);
+  /** Stops the bundled recognizer's remaining passes when the reader cancels. */
+  const scanAbortRef = useRef<AbortController | null>(null);
 
   const setInteractive = useCallback((on: boolean) => {
     if (interactiveRef.current === on) return;
@@ -287,14 +316,41 @@ export default function ReadingLensOverlay() {
     window.api.lensSetInteractive(on);
   }, []);
 
+  /** Stop a scan in main and here; harmless when nothing is running. */
+  const stopScan = useCallback(() => {
+    scanAbortRef.current?.abort();
+    scanAbortRef.current = null;
+    setScanProgress(null);
+    void window.api.lensOcrCancel?.()?.catch?.(() => undefined);
+  }, []);
+
   const close = useCallback(() => {
+    stopScan();
     setPopup(null);
     setAnalysisText(null);
     setReadOpen(false);
     setState({ kind: 'idle' });
     setInteractive(true);
     void window.api.lensClose();
-  }, [setInteractive]);
+  }, [setInteractive, stopScan]);
+
+  /** The scanning pill's Cancel: stop the scan and let the reader draw again. */
+  const cancelScan = useCallback(() => {
+    stopScan();
+    setState({ kind: 'selecting' });
+  }, [stopScan]);
+
+  // Main reports where each scan is; only the newest scan's reports count.
+  useEffect(() => {
+    const off = window.api.onLensOcrProgress?.((progress) => {
+      setScanProgress((current) => (
+        current && current.scanId === progress.scanId && current.stage !== 'basic'
+          ? { ...current, stage: progress.stage }
+          : current
+      ));
+    });
+    return () => off?.();
+  }, []);
 
   const setMode = useCallback((next: LensMode) => {
     setModeState(next);
@@ -459,6 +515,52 @@ export default function ReadingLensOverlay() {
     if (state.kind !== 'scanning') return;
     const { region, engine } = state;
     let alive = true;
+    const scanId = ++scanSeqRef.current;
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+    setScanProgress({ scanId, stage: 'capturing' });
+
+    /** A finished read lands: kept in history, shown, and the cursor's word opened. */
+    const land = (
+      capture: ReadingLensCapture | null,
+      lines: LensLine[],
+      extra: { engine: string; alternate?: LensAlternateRead; cached?: boolean; install?: LensInstallOffer },
+    ): void => {
+      setScanProgress(null);
+      if (!capture || !lines.length) {
+        setState({ kind: 'empty', region, ...(extra.install ? { install: extra.install } : {}) });
+        return;
+      }
+      // Keep the capture past this window's life. The lens is destroyed
+      // per capture, so this has to be fire-and-forget from here — a
+      // failed record must never cost the read that is already on screen.
+      void window.api.lensHistoryRecord(capture).catch(() => undefined);
+      setState({
+        kind: 'reading',
+        region,
+        lines,
+        engine: extra.engine,
+        capture,
+        screenshotDataUrl: capture.screenshotDataUrl,
+        alternate: extra.alternate,
+        ...(extra.cached ? { cached: true } : {}),
+        ...(extra.install ? { install: extra.install } : {}),
+      });
+      // "Look up the word under the cursor": open the word the pointer was on.
+      const point = cursorPointRef.current;
+      cursorPointRef.current = null;
+      const hit = point ? pickLensWordAt(lines, point) : null;
+      if (point && hit) {
+        setPopup({
+          query: hit.token.surface,
+          context: hit.line.text,
+          tokens: hit.line.tokens,
+          x: region.x + point.x,
+          y: region.y + point.y,
+        });
+      }
+    };
+
     const run = () => {
       window.api
         // Every scan keeps its screenshot now, where this used to ask for one
@@ -471,10 +573,46 @@ export default function ReadingLensOverlay() {
         // captured either way (`main/screenOcr.ts` crops before it reads); the
         // flag only decides whether the bounded JPEG rides back, and
         // `boundedScreenshotDataUrl` holds that under 900 KB.
-        .lensOcr({ ...region, engine, includeScreenshot: true })
-        .then((res) => {
+        .lensOcr({ ...region, engine, includeScreenshot: true, scanId })
+        .then(async (res) => {
           if (!alive) return;
           if (!res.available) {
+            const offer: LensInstallOffer | undefined = res.missingAssets
+              ? { ids: res.missingAssets.ids, startIds: res.missingAssets.startIds }
+              : undefined;
+            // No downloaded engine yet: read with the bundled one meanwhile,
+            // and offer the accurate model beside the read instead of in place
+            // of it. Loaded on demand so the recognizer never weighs on boot.
+            if (res.fallbackImage && res.engine !== 'manga') {
+              setScanProgress({ scanId, stage: 'basic', percent: 0 });
+              try {
+                const { readLensFallbackImage } = await import('../../lensOfflineOcr');
+                const read = await readLensFallbackImage(res.fallbackImage, {
+                  signal: controller.signal,
+                  onProgress: (fraction) => {
+                    if (alive) setScanProgress({ scanId, stage: 'basic', percent: Math.round(fraction * 100) });
+                  },
+                });
+                if (!alive) return;
+                const target = captureTargetRef.current;
+                const basicCapture = normalizeReadingLensCapture({
+                  source: 'screen',
+                  sourceLabel: target?.sourceLabel,
+                  sourceRef: target?.sourceRef,
+                  language: 'ja',
+                  engine: 'basic',
+                  hash: res.hash,
+                  text: read.text,
+                  lines: read.lines,
+                  screenshotDataUrl: res.screenshotDataUrl,
+                });
+                land(basicCapture, basicCapture ? buildLines(basicCapture.lines) : [], { engine: 'basic', install: offer });
+                return;
+              } catch {
+                if (!alive) return;
+                // The bundled read failed too: the model offer below is all there is.
+              }
+            }
             // `downloading` is now only ever true when main actually queued the
             // models; the prompt below shows that download's own progress.
             const message =
@@ -483,13 +621,14 @@ export default function ReadingLensOverlay() {
                 : res.downloading
                   ? t('lens.error.downloading')
                   : t('lens.error.web');
-            const install = res.missingAssets
-              ? { ids: res.missingAssets.ids, startIds: res.missingAssets.startIds, engine }
-              : undefined;
+            const install = offer ? { ...offer, engine } : undefined;
+            setScanProgress(null);
             setState({ kind: 'error', region, message, canRetry: true, install });
             return;
           }
+          if (res.error === 'cancelled') return;
           if (!res.ok) {
+            setScanProgress(null);
             const message =
               res.error === 'capture-display-ambiguous'
                 ? t('lens.error.captureDisplay')
@@ -540,46 +679,26 @@ export default function ReadingLensOverlay() {
               ? { engine: altRead.engine, capture: altCapture, lines: altLines }
               : undefined;
 
-          const lines = capture ? buildLines(capture.lines) : [];
-          if (!capture || !lines.length) {
-            setState({ kind: 'empty', region });
-          } else {
-            // Keep the capture past this window's life. The lens is destroyed
-            // per capture, so this has to be fire-and-forget from here — a
-            // failed record must never cost the read that is already on screen.
-            void window.api.lensHistoryRecord(capture).catch(() => undefined);
-            setState({
-              kind: 'reading',
-              region,
-              lines,
-              engine: res.engine,
-              capture,
-              screenshotDataUrl: capture.screenshotDataUrl,
-              alternate,
-            });
-            // "Look up the word under the cursor": open the word the pointer was on.
-            const point = cursorPointRef.current;
-            cursorPointRef.current = null;
-            const hit = point ? pickLensWordAt(lines, point) : null;
-            if (point && hit) {
-              setPopup({
-                query: hit.token.surface,
-                context: hit.line.text,
-                tokens: hit.line.tokens,
-                x: region.x + point.x,
-                y: region.y + point.y,
-              });
-            }
-          }
+          land(capture, capture ? buildLines(capture.lines) : [], {
+            engine: res.engine,
+            alternate,
+            cached: res.cached === true,
+          });
         })
         .catch(() => {
-          if (alive) setState({ kind: 'error', region, message: t('lens.error.generic'), canRetry: true });
+          if (!alive) return;
+          setScanProgress(null);
+          setState({ kind: 'error', region, message: t('lens.error.generic'), canRetry: true });
         });
     };
     const raf1 = requestAnimationFrame(() => requestAnimationFrame(run));
     return () => {
       alive = false;
       cancelAnimationFrame(raf1);
+      // Leaving the scan (finished, cancelled, superseded) ends any bundled
+      // passes still to come; a finished controller is unaffected.
+      controller.abort();
+      if (scanAbortRef.current === controller) scanAbortRef.current = null;
     };
   }, [state, t]);
 
@@ -1159,9 +1278,22 @@ export default function ReadingLensOverlay() {
         </div>
       )}
 
-      {/* Scanning — deliberately paints nothing over the region. */}
-      {state.kind === 'scanning' && (
-        <div className="lens-status-pill lens-scanning">{t('lens.scanning')}</div>
+      {/* Scanning — paints nothing at all until the capture is taken (the pill
+          would be in the screenshot), then says where the read is and offers
+          Cancel. */}
+      {state.kind === 'scanning' && scanProgress && scanProgress.stage !== 'capturing' && (
+        <div className="lens-status-pill lens-scanning" role="status">
+          <span className="lens-scan-label">
+            {scanProgress.stage === 'basic'
+              ? t('lensOcr.stage.basic', { percent: scanProgress.percent ?? 0 })
+              : scanProgress.stage === 'refining'
+                ? t('lensOcr.stage.refining')
+                : t('lens.scanning')}
+          </span>
+          <button type="button" className="lens-scan-cancel" onClick={cancelScan} title={t('lensOcr.cancelHint')}>
+            {t('lensOcr.cancel')}
+          </button>
+        </div>
       )}
 
       {/* Reading — interactive text over each detected line. */}
@@ -1246,9 +1378,24 @@ export default function ReadingLensOverlay() {
               </div>
             );
           })}
+          {state.install && (
+            <div
+              className={`lens-basic-banner lens-interactive lens-basic-banner-${resolveLensChromeDock(state.region, viewport(), dock) === 'top' ? 'bottom' : 'top'}`}
+              role="note"
+            >
+              <p>{t('lensOcr.basic.notice')}</p>
+              <AssetInstallPrompt
+                className="lens-install"
+                ids={state.install.ids}
+                startIds={state.install.startIds}
+                onInstalled={() => rescan('auto')}
+              />
+            </div>
+          )}
           <LensChrome
             t={t}
             engine={state.engine}
+            cached={state.cached === true}
             confidence={summarizeReadingLensConfidence(state.lines)}
             mode={mode}
             onModeChange={setMode}
@@ -1330,6 +1477,17 @@ export default function ReadingLensOverlay() {
             {state.kind === 'empty' ? t('lens.empty.title') : state.message}
           </div>
           {state.kind === 'empty' && <div className="lens-message-sub">{t('lens.empty.hint')}</div>}
+          {state.kind === 'empty' && state.install && (
+            <>
+              <div className="lens-message-sub">{t('lensOcr.basic.notice')}</div>
+              <AssetInstallPrompt
+                className="lens-install"
+                ids={state.install.ids}
+                startIds={state.install.startIds}
+                onInstalled={() => rescan('auto')}
+              />
+            </>
+          )}
           {state.kind === 'error' && state.install && (
             <AssetInstallPrompt
               className="lens-install"
@@ -1339,7 +1497,7 @@ export default function ReadingLensOverlay() {
             />
           )}
           <div className="lens-message-actions">
-            {state.kind === 'empty' && (
+            {state.kind === 'empty' && !state.install && (
               <button type="button" onClick={() => rescan('manga')}>
                 {t('lens.action.manga')}
               </button>
@@ -1419,6 +1577,7 @@ export default function ReadingLensOverlay() {
 export function LensChrome({
   t,
   engine,
+  cached = false,
   confidence,
   mode,
   onModeChange,
@@ -1447,6 +1606,8 @@ export function LensChrome({
 }: {
   t: (k: string, v?: Record<string, unknown>) => string;
   engine: string;
+  /** The read came from main's result cache (same pixels, same engine). */
+  cached?: boolean;
   confidence: ReturnType<typeof summarizeReadingLensConfidence>;
   mode: LensMode;
   onModeChange: (mode: LensMode) => void;
@@ -1496,6 +1657,16 @@ export function LensChrome({
   return (
     <div className={`lens-chrome lens-chrome-${dockSide} lens-interactive`}>
       <span className="lens-source-badge">{t('lens.badge.source.screen')}</span>
+      {engine === 'basic' && (
+        <span className="lens-source-badge lens-basic-badge" title={t('lensOcr.basic.badgeHint')}>
+          {t('lensOcr.basic.badge')}
+        </span>
+      )}
+      {cached && (
+        <span className="lens-source-badge lens-cached-badge" title={t('lensOcr.cachedHint')}>
+          {t('lensOcr.cached')}
+        </span>
+      )}
       {originLabel && (
         <span className="lens-source-badge lens-origin-badge" title={originLabel}>
           {originLabel}
@@ -1591,7 +1762,7 @@ export function LensChrome({
       <button type="button" onClick={() => onRescan('auto')} title={t('lens.action.rescan')}>
         {t('lens.action.rescan')}
       </button>
-      {(() => {
+      {engine !== 'basic' && (() => {
         // The swap already exists; what is new is that it is sometimes free.
         // When `auto` ran both engines the loser came back with the winner, so
         // this reaches for that read instead of paying for a second OCR pass —

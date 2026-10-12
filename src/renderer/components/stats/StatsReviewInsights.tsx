@@ -7,7 +7,7 @@
  * text, and the exact figures in a table. The pure arithmetic is
  * `shared/reviewStats.ts`, tested on its own.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { loadDeck, onDeckChanged, UNKNOWN_BOOK_TITLE, type DeckFlashcard } from '../../flashcardDeck';
 import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
 import { getStudyDaysByKey, onStatsChanged } from '../../stats';
@@ -43,6 +43,12 @@ type Range = (typeof RANGES)[number];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * "Explain my stats": rule-based tips from the same numbers, with an optional AI
+ * phrasing on request. Loaded only when the card is opened.
+ */
+const StatsAiCoach = lazy(() => import('./StatsAiCoach'));
+
+/**
  * A local YYYY-MM-DD as the tooltip and table say it ("Thu, Oct 8"), the same
  * format the 14-day chart uses. Local rather than imported: `StatsContent`
  * pulls the whole Statistics page (and its bridges) in with it.
@@ -69,6 +75,7 @@ export default function StatsReviewInsights() {
   const [deck, setDeck] = useState<DeckFlashcard[]>(() => loadDeck());
   const [statsVersion, setStatsVersion] = useState(0);
   const [range, setRange] = useState<Range>(30);
+  const [coachOpen, setCoachOpen] = useState(false);
   // One clock per render pass of the data, so every chart agrees about "today".
   const [now, setNow] = useState(() => Date.now());
 
@@ -180,7 +187,18 @@ export default function StatsReviewInsights() {
             ))}
           </select>
         </label>
+        {!coachOpen && (
+          <button type="button" className="btn small stats2-coach-open" onClick={() => setCoachOpen(true)}>
+            {t('aiTutor.stats.button')}
+          </button>
+        )}
       </div>
+
+      {coachOpen && entries && (
+        <Suspense fallback={null}>
+          <StatsAiCoach entries={entries} deck={deck} rangeDays={range} now={now} onClose={() => setCoachOpen(false)} />
+        </Suspense>
+      )}
 
       <StatsBarChart
         title={t('stats2.reviews.title')}

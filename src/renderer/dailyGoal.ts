@@ -53,6 +53,20 @@ export function stepDailyGoalTarget(metric: DailyGoalMetric, direction: 1 | -1):
   saveDailyGoalOverrides(adjustDailyGoalTarget(loadDailyGoalOverrides(), metric, direction, activeNewPerDay()));
 }
 
+/**
+ * Set every target at once (a suggestion the user chose to apply). Like the
+ * − / + buttons: clamped, and a target equal to its profile default is dropped
+ * from the overrides so it keeps following the profile.
+ */
+export function setDailyGoalTargets(targets: DailyGoalTargets): void {
+  const defaults = resolveDailyGoalTargets({}, activeNewPerDay());
+  const overrides = normalizeDailyGoalOverrides(targets);
+  for (const metric of Object.keys(overrides) as DailyGoalMetric[]) {
+    if (overrides[metric] === defaults[metric]) delete overrides[metric];
+  }
+  saveDailyGoalOverrides(overrides);
+}
+
 /** Forget the user's targets; every metric follows the active profile again. */
 export function resetDailyGoalTargets(): void {
   saveDailyGoalOverrides({});

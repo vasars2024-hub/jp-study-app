@@ -164,11 +164,25 @@ export function TranslateResultSource({ meta }: { meta: TranslateResultMeta | nu
       <span className="xlate2-source-chip">
         {t('xlate2.result.by', { provider: translateProviderLabel(meta.provider, t) })}
       </span>
+      {meta.cached && (
+        <span className="xlate2-source-chip xlate2-cached" title={t('xlate2.result.cachedHint')}>
+          {t('xlate2.result.cached')}
+        </span>
+      )}
       {meta.fallbackFrom && (
         <span className="xlate2-fallback" role="status">
           {t('xlate2.result.fellBack', {
             provider: translateProviderLabel(meta.fallbackFrom, t),
             reason: t(TRANSLATE_FALLBACK_KEYS[meta.fallbackCode ?? 'other']),
+          })}
+        </span>
+      )}
+      {meta.partial && (
+        <span className="xlate2-fallback xlate2-partial" role="status">
+          {t('xlate2.result.partial', {
+            missing: meta.partial.missing.length,
+            total: meta.partial.total,
+            sentences: meta.partial.missing.map((index) => index + 1).join(', '),
           })}
         </span>
       )}

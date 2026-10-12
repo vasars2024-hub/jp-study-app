@@ -160,6 +160,18 @@
     "visualnovels": {
       "status": "pending",
       "reason": "New Study OS section 2026-09-24 (the Visual Novel platform, previously reachable only inside Immersion, which Blanc covers). Its live-capture and reader loop runs in main and in a dedicated reader window, so a Blanc tool would be a library/route view over the same visual-novel IPC; not built yet."
+    },
+    "snips": {
+      "status": "covered",
+      "blancToolId": "snips",
+      "studyOsView": "SnipsView",
+      "note": "Snip to cards (2026-10-11). BlancSnipsPanel composes the SAME SnipPanel content component as the Study OS view, compact and lazy, with no Study OS compat sheet; the pipeline itself runs in whichever main window is up (Study OS or Blanc)."
+    },
+    "conversation": {
+      "status": "covered",
+      "blancToolId": "conversation",
+      "studyOsView": "ConversationView",
+      "note": "Conversation partner (2026-10-11, docs/AI_AUDIT.md N20). BlancConversationPanel composes the SAME ConversationPartner content component as the Study OS view, compact and lazy, with its own small stylesheet only; the history is shared per profile and study language."
     }
   }
 }

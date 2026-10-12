@@ -7,6 +7,7 @@
  * the day's study statistics (see `renderer/dailyGoal.ts`), so it starts over
  * at local midnight without anything being reset.
  */
+import { lazy, Suspense, useState } from 'react';
 import { DAILY_GOAL_MAX, DAILY_GOAL_METRICS, dailyGoalMet, dailyGoalRatio, type DailyGoalMetric } from '../../shared/dailyGoal';
 import { resetDailyGoalTargets, stepDailyGoalTarget, useDailyGoal } from '../dailyGoal';
 import { formatNumber } from '../stats';
@@ -25,10 +26,18 @@ const METRIC_HINT_KEY: Record<DailyGoalMetric, string> = {
   minutes: 'dailyGoal.hint.minutes',
 };
 
+/**
+ * "Suggest targets": a rule over the last two weeks, with an optional AI
+ * proposal; applied only on the learner's press. Loaded on first use, and never
+ * offered in the compact desktop widget.
+ */
+const DailyGoalSuggest = lazy(() => import('./DailyGoalSuggest'));
+
 export default function DailyGoalPanel({ compact = false }: { compact?: boolean }) {
   const { t } = useT();
   const { targets, progress, customized } = useDailyGoal();
   const met = dailyGoalMet(progress, targets);
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   return (
     <div className={`daily-goal${compact ? ' is-compact' : ''}${met ? ' is-met' : ''}`}>
@@ -94,7 +103,17 @@ export default function DailyGoalPanel({ compact = false }: { compact?: boolean 
             {t('dailyGoal.useDefaults')}
           </button>
         )}
+        {!compact && !suggestOpen && (
+          <button type="button" className="daily-goal-defaults" onClick={() => setSuggestOpen(true)}>
+            {t('aiTutor.goal.button')}
+          </button>
+        )}
       </div>
+      {!compact && suggestOpen && (
+        <Suspense fallback={null}>
+          <DailyGoalSuggest current={targets} onClose={() => setSuggestOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

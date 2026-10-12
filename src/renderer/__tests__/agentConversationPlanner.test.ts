@@ -166,6 +166,7 @@ import {
   enqueueAgentTask,
   normalizeAgentTaskQueue,
   type AgentQueueItem,
+  type AgentTaskQueue,
 } from '../../shared/localAgentTaskQueue';
 import type { AgentConversation } from '../../shared/agentWorkspace';
 import {
@@ -279,7 +280,7 @@ describe('Agent conversation planner', () => {
     });
     expect(harness.queue.items).toHaveLength(2);
     const queued = queueItems().find((item) => item.id === 'task-1');
-    expect(queued.origin).toEqual({
+    expect(queued?.origin).toEqual({
       conversationId: 'chat-1',
       contextIds: Array.from({ length: 16 }, (_, index) => `ctx-${index + 2}`),
     });
@@ -437,8 +438,9 @@ describe('Agent conversation planner', () => {
     expect(handler).not.toHaveBeenCalled();
 
     harness.allowedOperations = [];
+    // The executor's sentence rides along, so the surface can say WHICH rule refused.
     expect(await runAgentConversationPlan('chat-1', 'task-1', 'run-next', t))
-      .toEqual({ ok: false, code: 'operation-denied' });
+      .toEqual({ ok: false, code: 'operation-denied', reason: expect.stringContaining('not enabled for the active agent profile') });
     expect(handler).not.toHaveBeenCalled();
     expect(queueItems()[0].status).toBe('queued');
 
@@ -554,7 +556,7 @@ describe('Agent conversation planner', () => {
     const running = runAgentConversationPlan('chat-1', 'task-1', 'run-next', t);
     await vi.waitFor(() => expect(release).not.toBeNull());
     expect((await updateAgentConversationPlanQueue('chat-1', 'task-1', 'pause')).ok).toBe(true);
-    release?.({ entries: [] });
+    (release as ((value: unknown) => void) | null)?.({ entries: [] }); // set in a callback flow analysis does not follow
     expect((await running).ok).toBe(true);
     expect(queueItems()[0]).toMatchObject({ status: 'paused', task: { status: 'completed' } });
   });
@@ -582,7 +584,7 @@ describe('Agent conversation planner', () => {
         origin: { conversationId: 'chat-1', contextIds: ['ctx-replaced'] },
       })),
     };
-    release?.({ entries: [] });
+    (release as ((value: unknown) => void) | null)?.({ entries: [] }); // set in a callback flow analysis does not follow
     expect(await originRun).toMatchObject({
       ok: false,
       code: 'outcome-not-recorded',
@@ -606,7 +608,7 @@ describe('Agent conversation planner', () => {
         task: { ...item.task, objective: 'Replacement task' },
       })),
     };
-    release?.({ entries: [] });
+    (release as ((value: unknown) => void) | null)?.({ entries: [] }); // set in a callback flow analysis does not follow
     expect(await taskRun).toMatchObject({
       ok: false,
       code: 'outcome-not-recorded',
@@ -696,7 +698,7 @@ describe('Agent conversation plan queue surface', () => {
     await act(async () => {
       root.render(createElement(AgentConversationPlanQueue, {
         conversationId: 'chat-1',
-        queue: harness.queue,
+        queue: harness.queue as AgentTaskQueue,
         disabled: false,
         onFailure: () => undefined,
       }));
@@ -726,7 +728,7 @@ describe('Agent conversation plan queue surface', () => {
     await act(async () => {
       root.render(createElement(AgentConversationPlanQueue, {
         conversationId: 'chat-1',
-        queue: harness.queue,
+        queue: harness.queue as AgentTaskQueue,
         disabled: false,
         onFailure: () => undefined,
       }));
@@ -768,7 +770,7 @@ describe('Agent conversation plan queue surface', () => {
     await act(async () => {
       root.render(createElement(AgentConversationPlanQueue, {
         conversationId: 'chat-1',
-        queue: harness.queue,
+        queue: harness.queue as AgentTaskQueue,
         disabled: false,
         onFailure: () => undefined,
         onTimeline,

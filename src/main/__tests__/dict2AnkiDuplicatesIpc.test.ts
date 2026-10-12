@@ -10,19 +10,25 @@ const client = vi.hoisted(() => ({
   impl: (async () => null) as Impl,
   calls: [] as Array<[string, unknown]>,
 }));
-vi.mock('../anki/client', () => ({
-  invoke: (action: string, params: unknown) => {
-    client.calls.push([action, params]);
-    return client.impl(action, params);
-  },
-  isUnreachable: (err: unknown) => err instanceof Error && err.message === 'ECONNREFUSED',
-}));
+vi.mock('../anki/client', async () => {
+  const actual = await vi.importActual<typeof import('../anki/client')>('../anki/client');
+  return {
+    ...actual,
+    invoke: (action: string, params: unknown) => {
+      client.calls.push([action, params]);
+      return client.impl(action, params);
+    },
+    isUnreachable: (err: unknown) => err instanceof Error && err.message === 'ECONNREFUSED',
+  };
+});
 
 import { checkAnkiDuplicatesFromIpc } from '../anki/extensionDuplicates';
+import { resetModelFieldCacheForTests } from '../anki/modelFields';
 
 beforeEach(() => {
   client.impl = async () => null;
   client.calls = [];
+  resetModelFieldCacheForTests();
 });
 
 describe('checkAnkiDuplicatesFromIpc', () => {

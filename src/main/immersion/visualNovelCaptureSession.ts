@@ -20,6 +20,19 @@ import {
   type VisualNovelCaptureState,
 } from '../../shared/visualNovelCapture';
 import { parseVisualNovelTextBox, type VisualNovelHookLine } from '../../shared/visualNovelHook';
+import {
+  VN5_CONNECT_TIMEOUT_MS,
+  VN5_STABLE_CONNECTION_MS,
+  vn5ReconnectDelay,
+} from '../../shared/visualNovelStudy5';
+import {
+  VN5_DEDUPE_WINDOW,
+  VN5_DEFAULT_LINE_FILTERS,
+  vn5CleanLine,
+  vn5CompileRule,
+  vn5NormalizeLineFilters,
+  type Vn5LineFilters,
+} from '../../shared/visualNovelLineFilters';
 
 export interface CaptureSocket {
   onopen: ((event: unknown) => void) | null;
@@ -46,6 +59,8 @@ export interface CaptureSessionDeps {
   clearInterval?: (handle: unknown) => void;
   setTimeout?: (fn: () => void, ms: number) => unknown;
   clearTimeout?: (handle: unknown) => void;
+  /** Jitter source for the reconnect backoff (tests pin it). */
+  random?: () => number;
 }
 
 export interface CaptureStartOptions {
@@ -53,11 +68,11 @@ export interface CaptureStartOptions {
   websocket: boolean;
   websocketUrl?: string;
   test?: boolean;
+  /** Cleanup and the user's filters (Capture settings). Defaults when absent. */
+  lineFilters?: Vn5LineFilters;
 }
 
 export const CLIPBOARD_POLL_MS = 400;
-const RECONNECT_MIN_MS = 1_500;
-const RECONNECT_MAX_MS = 15_000;
 /** A test session ends itself; it exists to answer "is my hooker wired up?". */
 export const TEST_CAPTURE_MS = 60_000;
 /** The same text again from the same hook inside this window is the hook re-firing, not the game. */
@@ -77,7 +92,11 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
   let lastClipboard = '';
   let socket: CaptureSocket | null = null;
   let reconnectTimer: unknown = null;
-  let reconnectDelay = RECONNECT_MIN_MS;
+  /** Failed connections in a row; reset only after a connection stayed up (VN5_STABLE_CONNECTION_MS). */
+  let reconnectAttempt = 0;
+  let connectTimer: unknown = null;
+  let openedAt = 0;
+  const random = deps.random ?? Math.random;
   let testTimer: unknown = null;
   let generation = 0;
   /**
@@ -92,6 +111,15 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
   let lastTextAt = 0;
   let lastSource: VisualNovelCaptureSource | null = null;
   let echoedBy = new Set<VisualNovelCaptureSource>();
+  let filters: Vn5LineFilters = VN5_DEFAULT_LINE_FILTERS;
+  let compiledRules: (RegExp | null)[] = [];
+  /** The last few accepted lines, for `dedupeRecent`. */
+  let recentLines: string[] = [];
+
+  const setFilters = (next: Vn5LineFilters | undefined): void => {
+    filters = vn5NormalizeLineFilters(next ?? VN5_DEFAULT_LINE_FILTERS);
+    compiledRules = filters.rules.map(vn5CompileRule);
+  };
 
   const publish = (patch: Partial<VisualNovelCaptureState>): VisualNovelCaptureState => {
     state = { ...state, ...patch };
@@ -109,14 +137,28 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     return true;
   };
 
-  const receive = (text: string, source: VisualNovelCaptureSource): void => {
-    if (!state.active || !isCapturableText(text)) return;
+  const receive = (raw: string, source: VisualNovelCaptureSource): void => {
+    if (!state.active) return;
+    // Cleanup and the user's rules first: a line a rule drops never counts as
+    // "the last line" for echo detection either.
+    const cleaned = vn5CleanLine(raw, filters, compiledRules);
+    if (cleaned.dropped) {
+      if (isCapturableText(raw)) publish({ filtered: (state.filtered ?? 0) + 1 });
+      return;
+    }
+    const text = cleaned.text;
+    if (!isCapturableText(text)) return;
     const collapsed = text.replace(/\s+/g, '');
     if (isEchoOfLastLine(collapsed, source)) return;
+    if (filters.dedupeRecent && recentLines.includes(collapsed)) {
+      publish({ filtered: (state.filtered ?? 0) + 1 });
+      return;
+    }
     lastText = collapsed;
     lastTextAt = now();
     lastSource = source;
     echoedBy = new Set();
+    recentLines = [...recentLines, collapsed].slice(-VN5_DEDUPE_WINDOW);
     const line = parseVisualNovelTextBox(text);
     if (!line) return;
     let added = 1;
@@ -160,23 +202,57 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
       return;
     }
     socket = opened;
+    openedAt = 0;
+    // `token` alone is not enough: a socket replaced by a reconnect within the
+    // same session shares it, and its late close used to schedule a second,
+    // parallel reconnect. Every callback checks it is still THE socket.
+    const current = (): boolean => token === generation && socket === opened;
+    const markOpen = (): void => {
+      if (openedAt) return;
+      openedAt = now();
+      if (connectTimer) cancel(connectTimer);
+      connectTimer = null;
+      publish({ websocket: 'connected', lastError: '', nextRetryAt: null });
+    };
+    // A server that accepts the TCP connection but never completes the upgrade
+    // would otherwise leave the session "connecting" forever.
+    connectTimer = later(() => {
+      connectTimer = null;
+      if (!current() || openedAt) return;
+      socket = null;
+      opened.onclose = null;
+      try {
+        opened.close();
+      } catch {
+        /* never opened */
+      }
+      publish({ websocket: 'error' });
+      scheduleReconnect(url, token);
+    }, VN5_CONNECT_TIMEOUT_MS);
     opened.onopen = () => {
-      if (token !== generation) return;
-      reconnectDelay = RECONNECT_MIN_MS;
-      publish({ websocket: 'connected', lastError: '' });
+      if (!current()) return;
+      markOpen();
     };
     opened.onmessage = (event) => {
-      if (token !== generation) return;
+      if (!current()) return;
+      // Some servers push before the open event reaches us; a line is proof of life.
+      markOpen();
       const text = parseTexthookerMessage(event.data);
       if (text) receive(text, 'websocket');
     };
     opened.onerror = () => {
-      if (token !== generation) return;
+      if (!current()) return;
       publish({ websocket: 'error' });
     };
     opened.onclose = () => {
-      if (token !== generation) return;
+      if (!current()) return;
       socket = null;
+      if (connectTimer) cancel(connectTimer);
+      connectTimer = null;
+      // Only a connection that held counts as recovered; a server that accepts
+      // and drops at once keeps backing off instead of being hammered.
+      if (openedAt && now() - openedAt >= VN5_STABLE_CONNECTION_MS) reconnectAttempt = 0;
+      openedAt = 0;
       if (state.websocket !== 'error') publish({ websocket: 'connecting' });
       scheduleReconnect(url, token);
     };
@@ -184,11 +260,13 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
 
   const scheduleReconnect = (url: string, token: number): void => {
     if (token !== generation || !state.active || reconnectTimer) return;
+    const delay = vn5ReconnectDelay(reconnectAttempt, random);
+    reconnectAttempt += 1;
     reconnectTimer = later(() => {
       reconnectTimer = null;
       connect(url, token);
-    }, reconnectDelay);
-    reconnectDelay = Math.min(RECONNECT_MAX_MS, reconnectDelay * 2);
+    }, delay);
+    publish({ reconnectAttempt, nextRetryAt: now() + delay });
   };
 
   const teardown = (): void => {
@@ -197,6 +275,9 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     clipboardTimer = null;
     if (reconnectTimer) cancel(reconnectTimer);
     reconnectTimer = null;
+    if (connectTimer) cancel(connectTimer);
+    connectTimer = null;
+    openedAt = 0;
     if (testTimer) cancel(testTimer);
     testTimer = null;
     const open = socket;
@@ -236,7 +317,9 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
       lastText = '';
       lastSource = null;
       echoedBy = new Set();
-      reconnectDelay = RECONNECT_MIN_MS;
+      recentLines = [];
+      setFilters(options.lineFilters);
+      reconnectAttempt = 0;
       state = {
         ...idleVisualNovelCaptureState(),
         visualNovelId,
@@ -246,6 +329,7 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
         websocket: options.websocket ? 'connecting' : 'off',
         websocketUrl,
         startedAt: now(),
+        filtered: 0,
       };
       deps.broadcast(state);
       if (options.clipboard) clipboardTimer = every(pollClipboard, CLIPBOARD_POLL_MS);
@@ -259,6 +343,9 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     },
 
     stop,
+
+    /** New filters from the Capture settings apply to the running session at once. */
+    setLineFilters: setFilters,
 
     /** Test seam and hook-file entry point: feed text as if a source produced it. */
     receive,

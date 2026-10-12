@@ -13,7 +13,7 @@
  * Aero dresses them as glass gadgets (aero-mechanics.css).
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { WidgetProps } from './types';
+import { readSetting, type WidgetProps } from './types';
 import { useT } from '../i18n';
 import { useAeroDeck } from '../aeroMechanics/useAeroDeck';
 import { useStudyMeters } from '../aeroMechanics/useStudyMeters';
@@ -149,14 +149,16 @@ export function WordSlideShowGadget({ settings, setSettings }: WidgetProps) {
   const [index, setIndex] = useState(() => Math.floor(Math.random() * 1000));
   const paused = settings.paused === true;
   const still = wantsStillness();
+  // wid5: how long each card stays up is now a setting (its popover); 8 s as before.
+  const intervalSec = Math.min(60, Math.max(3, Number(readSetting(settings, 'intervalSec', SLIDE_MS / 1000)) || SLIDE_MS / 1000));
 
   useEffect(() => {
     if (paused || pool.length < 2) return undefined;
     const id = window.setInterval(() => {
       if (!document.hidden) setIndex((i) => i + 1);
-    }, SLIDE_MS);
+    }, intervalSec * 1000);
     return () => window.clearInterval(id);
-  }, [paused, pool.length]);
+  }, [paused, pool.length, intervalSec]);
 
   if (!pool.length) {
     return (

@@ -115,7 +115,32 @@ export interface AiBatch {
   /** The model id, same. */
   model: string;
   notes: AiNoteGeneration[];
+  /**
+   * The question this batch asked, kept so a retry re-asks exactly it. Without
+   * it a retry read the panel's *current* form — a different kind, field or
+   * language — and sent that against the old batch's notes.
+   */
+  request?: AiBatchRequest;
 }
+
+/** What a batch asked, minus the per-note text (that lives on `notes`). */
+export type AiBatchRequest =
+  | {
+    mode: 'additions';
+    kind: AiAdditionKind;
+    variantCount: number;
+    sendGloss: boolean;
+    explainLanguage: string;
+    studyLang?: 'ja' | 'zh' | 'ru';
+    /** The glosses sent, by note id — only present when `sendGloss` was on. */
+    glosses?: Record<string, string>;
+  }
+  | {
+    mode: 'translate';
+    fromField: string;
+    targetLanguage: string;
+    variantCount: number;
+  };
 
 /** Build the batch for a selection, before any provider has answered. */
 export function beginAiBatch(
@@ -165,19 +190,45 @@ export function recordAiResult(
   return mapNote(batch, noteId, (note) => {
     if (note.approvedVariantId) return note;
     if (!result.ok) {
+      // A note already answered keeps its answer: a later failure report for
+      // it (a duplicate progress event) must not wipe what the user is reviewing.
+      if (note.status === 'generated') return note;
       return { ...note, status: 'failed', variants: [], error: result.error };
     }
     // An answer with no usable alternative is a failure of the request, not an
     // empty success — a note showing zero variants and no error reads as
     // "reviewed and found nothing", which nobody decided.
-    const variants = result.variants
+    const incoming = result.variants
       .map((v) => ({ id: v.id, text: v.text.trim() }))
       .filter((v) => v.text.length > 0);
-    if (variants.length === 0) {
+    if (incoming.length === 0) {
+      if (note.status === 'generated') return note;
       return { ...note, status: 'failed', variants: [], error: 'no-variants' };
     }
+    // The same answer delivered twice — once by a progress event, once more in
+    // the run's final result — must not reset the decisions made in between.
+    // A rejection is a decision, so it survives on any variant with the same
+    // text, even if the answer is otherwise new.
+    const rejectedTexts = new Set(note.variants.filter((v) => v.rejected).map((v) => v.text));
+    const variants: AiVariant[] = incoming.map((v) => (
+      rejectedTexts.has(v.text) ? { ...v, rejected: true } : v
+    ));
     return { ...note, status: 'generated', variants, error: undefined };
   });
+}
+
+/**
+ * Settle every note still `pending` as `failed` with `error`.
+ *
+ * For a run that ended without answering them — the IPC call threw, or main
+ * refused the request. Left `pending` they could never be retried (only
+ * `failed` is), and the batch would show work that is never coming.
+ */
+export function failPendingAiNotes(batch: AiBatch, error: string): AiBatch {
+  return {
+    ...batch,
+    notes: batch.notes.map((n) => (n.status === 'pending' ? { ...n, status: 'failed', error } : n)),
+  };
 }
 
 /**
@@ -373,8 +424,50 @@ export function wrapAiProvenance(value: string, provider: string, model: string)
   const attr = escapeAttr([provider.trim(), model.trim()].filter(Boolean).join('|'));
   return (
     `<span class="${AI_PROVENANCE_CLASS}" ${AI_PROVENANCE_ATTR}="${attr}">`
-    + `${value}</span>`
+    + `${sanitizeAiFieldHtml(value)}</span>`
   );
+}
+
+/**
+ * Formatting a generated value may keep. Bare tags only: no attribute is ever
+ * allowed, so nothing here can carry a handler, a URL or a style.
+ */
+const AI_ALLOWED_TAGS = new Set(['b', 'i', 'u', 'em', 'strong', 'br', 'ruby', 'rt', 'rp', 'sub', 'sup']);
+
+/**
+ * Make model output safe to put in an Anki field.
+ *
+ * Anki renders fields as HTML and card templates run JavaScript, so a value
+ * like `<img src=x onerror=…>` — which a prompt-injected term in a shared deck
+ * can make a model produce — would execute on every review. Everything is
+ * escaped, then only the allowlisted bare tags (`<b>`, `</b>`, `<br>`, `<br/>`
+ * …) are turned back into markup. Existing character references (`&amp;`,
+ * `&#12354;`) are kept as they are rather than double-escaped.
+ */
+export function sanitizeAiFieldHtml(value: string): string {
+  const escaped = value
+    .replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#\d{1,7}|#x[0-9a-fA-F]{1,6});)/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  // Re-enabled tags are kept balanced, so a stray `<b>` cannot embolden the
+  // rest of the card, nor a stray `</b>` close the template's own markup.
+  const open: string[] = [];
+  const out = escaped.replace(/&lt;(\/?)([a-zA-Z]+)\s*(\/?)&gt;/g, (whole, close: string, name: string, self: string) => {
+    const tag = name.toLowerCase();
+    if (!AI_ALLOWED_TAGS.has(tag)) return whole;
+    if (tag === 'br') return close ? '' : '<br>';
+    if (self) return whole;
+    if (!close) {
+      open.push(tag);
+      return `<${tag}>`;
+    }
+    const at = open.lastIndexOf(tag);
+    if (at < 0) return '';
+    const closing = open.splice(at).reverse();
+    return closing.map((t) => `</${t}>`).join('');
+  });
+  return out + open.reverse().map((t) => `</${t}>`).join('');
 }
 
 export interface AiProvenanceRead {

@@ -55,11 +55,27 @@ export const EMPTY_AGENT_PROVIDER_PRICING: AgentProviderPricingTable = {};
  * limit a little early, one that errs low lets the month end above it.
  * - Gemini 2.5 Flash, standard paid tier: $0.30 input / $2.50 output (thinking included).
  * - DeepSeek V4 Flash: $0.30 / $1.20. DeepSeek V4 Pro: $1.32 / $3.96.
+ *
+ * Added 2026-10-11, and ESTIMATES in the plainest sense — set at the published
+ * rates of each family's tier, rounded up, and editable like the rest:
+ * - Claude Haiku 5.5 $1 / $5, Sonnet 5.5 $3 / $15, Opus 5.5 $5 / $25.
+ * - OpenAI: the default model's (`gpt-5-mini`) $0.25 / $2. A user who names a
+ *   larger model should enter its rate; until then the estimate errs low, which
+ *   is why the row says "estimate".
+ *
+ * The OpenAI-compatible server has NO built-in figure. On this computer
+ * (Ollama, LM Studio) it costs nothing and is not recorded at all; pointed at a
+ * paid host, its requests are counted as unpriced until the user enters a rate —
+ * a made-up number would be worse than an honest "unknown".
  */
-export const AGENT_PROVIDER_DEFAULT_PRICING: Readonly<Record<AiProviderId, AgentProviderPrice>> = {
+export const AGENT_PROVIDER_DEFAULT_PRICING: Readonly<Partial<Record<AiProviderId, AgentProviderPrice>>> = {
   'gemini-2.5-flash': { inputPerMillionTokens: 0.3, outputPerMillionTokens: 2.5 },
   'deepseek-v4-flash': { inputPerMillionTokens: 0.3, outputPerMillionTokens: 1.2 },
   'deepseek-v4-pro': { inputPerMillionTokens: 1.32, outputPerMillionTokens: 3.96 },
+  'claude-haiku-5-5': { inputPerMillionTokens: 1, outputPerMillionTokens: 5 },
+  'claude-sonnet-5-5': { inputPerMillionTokens: 3, outputPerMillionTokens: 15 },
+  'claude-opus-5-5': { inputPerMillionTokens: 5, outputPerMillionTokens: 25 },
+  openai: { inputPerMillionTokens: 0.25, outputPerMillionTokens: 2 },
 };
 
 /** The user's rate for a provider, else the built-in estimate. */

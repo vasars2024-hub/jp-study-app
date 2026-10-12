@@ -67,12 +67,15 @@ import { AgentConversationPlanQueue } from '../agent/AgentConversationPlanQueue'
 import { AgentMessageText } from '../agent/AgentMessageText';
 import {
   AGENT_CLOUD_TARGETS,
+  agentOfflinePreflight,
   agentTargetLabel,
   executionErrorKey,
   newAgentConversationId,
   newAgentExecutionId,
+  readOnline,
   type AgentTargetChoice,
 } from '../agent/agentExecutionTargets';
+import { cloudMayReceiveStudyData } from '../../../shared/agentCloudStudyDataGate';
 import type { AgentTaskQueue } from '../../../shared/localAgentTaskQueue';
 import {
   loadLocalAgentTaskQueue,
@@ -236,6 +239,13 @@ export function BlancCentralAgentPanel() {
 
   const send = useCallback(async (): Promise<void> => {
     if (!selected || !prompt || running || overBudget) return;
+    // Same preflight as the Study OS composer: with no network a cloud request
+    // cannot leave, so say so now instead of after main's round trip.
+    const offline = agentOfflinePreflight(target, readOnline(), allowLocalFallback);
+    if (offline) {
+      setFailure(offline);
+      return;
+    }
     const requestId = newAgentExecutionId();
     const basePolicy = defaultAgentExecutionPolicy(target);
     // Read HERE and not held in state, for the same reason the Study OS shell
@@ -248,6 +258,11 @@ export function BlancCentralAgentPanel() {
       prompt,
       policy: {
         ...basePolicy,
+        // The Agent's configured model, as in Study OS. Blanc used to omit it,
+        // so local chat here always ran on the translation model (audit A2).
+        ...(basePolicy.target.kind === 'local' && executionSettings.modelFileName
+          ? { target: { ...basePolicy.target, model: executionSettings.modelFileName } }
+          : {}),
         excludeSensitiveContext: executionSettings.excludeSensitiveContext,
         // Blanc's execution surface ships no sensitive-context consent control,
         // so it never claims consent it did not collect. A conversation holding
@@ -260,6 +275,7 @@ export function BlancCentralAgentPanel() {
       },
       allowLocalFallback: target === 'local' ? false : allowLocalFallback,
       attachments: [],
+      shareStudyData: cloudMayReceiveStudyData(executionSettings.agentCloudShareStudyData),
     };
     setRunning(true);
     setStreamedText('');

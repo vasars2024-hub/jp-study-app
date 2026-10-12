@@ -28,6 +28,12 @@ describe('AI provider health', () => {
       ['gemini-2.5-flash', 'gemini', true],
       ['deepseek-v4-flash', 'deepseek', false],
       ['deepseek-v4-pro', 'deepseek', false],
+      ['claude-haiku-5-5', 'anthropic', false],
+      ['claude-sonnet-5-5', 'anthropic', false],
+      ['claude-opus-5-5', 'anthropic', false],
+      ['openai', 'openai', false],
+      // No server URL or model set: not configured, whatever the vault holds.
+      ['openai-compatible', 'openai-compatible', false],
     ]);
   });
 
@@ -60,6 +66,11 @@ describe('AI provider health', () => {
       'gemini-2.5-flash',
       'deepseek-v4-flash',
       'deepseek-v4-pro',
+      'claude-haiku-5-5',
+      'claude-sonnet-5-5',
+      'claude-opus-5-5',
+      'gpt-5-mini',
+      '',
     ]);
   });
 });

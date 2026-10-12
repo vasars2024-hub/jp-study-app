@@ -27,7 +27,7 @@ const ITEMS = ['吾輩は猫である', '坊っちゃん', 'こころ'].map((tit
 }));
 
 let harness: ReadingSurfaceHarness | null = null;
-const sampleBookText = vi.fn(() => new Promise<string>(() => undefined));
+const sampleBookText = vi.fn((..._args: unknown[]) => new Promise<string>(() => undefined));
 
 beforeEach(() => {
   installResizeObserver();

@@ -30,6 +30,8 @@ export default function AiGenerationProgressPanel({
   const pct = phasePercent(progress);
   const indeterminate = isIndeterminate(progress);
   const phaseLabel = t(PHASE_KEYS[progress.phase] ?? 'aiStudio.progress.enrich');
+  // By key when main sent one, so the line follows THIS window's language.
+  const message = progress.messageKey ? t(progress.messageKey, progress.messageVars) : progress.message;
 
   return (
     <div className="mining-progress-panel ai-gen-progress">
@@ -50,7 +52,7 @@ export default function AiGenerationProgressPanel({
           style={indeterminate ? undefined : { width: `${pct}%` }}
         />
       </div>
-      {progress.message && <p className="mining-progress-message">{progress.message}</p>}
+      {message && <p className="mining-progress-message">{message}</p>}
       {progress.total > 0 && (
         <p className="muted mining-progress-count">
           {formatNumber(progress.done)} / {formatNumber(progress.total)}

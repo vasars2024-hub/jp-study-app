@@ -19,8 +19,22 @@ import {
   type VaultWriteResult,
 } from './vault';
 import { readJsonSync, removeJsonStore, writeJsonAtomicSync } from '../atomicJson';
+import {
+  AI_PROVIDER_KEY_BUCKETS,
+  type AiApiKeysSet,
+  type AiProviderKeyBucket,
+} from '../../shared/aiProviders';
 
-export type AiCredentialId = 'gemini' | 'deepseek';
+/**
+ * One vault entry per provider bucket. Only `gemini` and `deepseek` ever had a
+ * legacy plaintext file; the newer buckets (Anthropic, OpenAI, a local
+ * OpenAI-compatible server's optional key) were born in the vault.
+ */
+export type AiCredentialId = AiProviderKeyBucket;
+
+function hasLegacyStore(id: AiCredentialId): id is 'gemini' | 'deepseek' {
+  return id === 'gemini' || id === 'deepseek';
+}
 
 interface LegacyAiKeyFile {
   gemini?: string;
@@ -52,6 +66,7 @@ function decodeLegacy(value: unknown, encrypted: boolean): string {
 }
 
 function legacyValue(id: AiCredentialId): string {
+  if (!hasLegacyStore(id)) return '';
   const file = readLegacyFile();
   const fromStore = decodeLegacy(file[id], file._encrypted === true);
   if (fromStore || id !== 'gemini') return fromStore;
@@ -69,6 +84,7 @@ function atomicWriteLegacy(file: LegacyAiKeyFile): void {
 
 /** Removes only the migrated provider, preserving another provider not yet moved. */
 function removeLegacyValue(id: AiCredentialId): void {
+  if (!hasLegacyStore(id)) return;
   if (id === 'gemini') {
     try {
       fs.rmSync(legacyGeminiPath(), { force: true });
@@ -117,4 +133,31 @@ export function writeAiProviderSecret(id: AiCredentialId, value: string): VaultW
   const result = writeSecret(id, 'apiKey', normalized);
   if (result.ok) removeLegacyValue(id);
   return result;
+}
+
+function safeSecretSet(bucket: AiCredentialId): boolean {
+  try {
+    return Boolean(readAiProviderSecret(bucket).trim());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Which provider buckets can be used right now — booleans only, never a key.
+ *
+ * The OpenAI-compatible server (Ollama, LM Studio) needs no key: it is usable
+ * once its URL and model are set in Settings > AI, so that is what its entry
+ * reports. Every other bucket is usable when the vault holds a key.
+ */
+export function aiCredentialsUsable(
+  options: { compatBaseUrl: string; compatModel: string },
+): Required<AiApiKeysSet> {
+  const out = {} as Required<AiApiKeysSet>;
+  for (const bucket of AI_PROVIDER_KEY_BUCKETS) {
+    out[bucket] = bucket === 'openai-compatible'
+      ? Boolean(options.compatBaseUrl && options.compatModel)
+      : safeSecretSet(bucket);
+  }
+  return out;
 }

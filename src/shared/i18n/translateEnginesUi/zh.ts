@@ -34,6 +34,19 @@ export const TRANSLATE_ENGINES_UI_ZH: Catalog = {
   'xlate2.result.by': '翻译引擎：{provider}',
   'xlate2.result.fellBack': '{provider} 无法翻译这段文本（{reason}），已改用离线模型。',
   'xlate2.error.cloud': '{provider} 无法翻译这段文本：{reason}。',
+  'xlate2.error.chain': '没有引擎能翻译这段文本。{details}。',
+  'xlate2.error.attempt': '{provider}：{reason}',
+  'xlate2.result.cached': '即时（之前的译文）',
+  'xlate2.result.cachedHint': '刚才已用同一引擎和设置翻译过相同的文本，因此直接复用了那次译文，没有发送任何内容。',
+  'xlate2.result.partial': '不完整：重试后仍有 {missing}/{total} 个句子未翻译（第 {sentences} 句）。此结果未保存；再次翻译即可重试。',
+
+  'xlate2.back.action': '回译',
+  'xlate2.back.actionAll': '全部回译',
+  'xlate2.back.hint': '把这句译回{lang}，检查意思是否保留',
+  'xlate2.back.label': '译回{lang}：',
+  'xlate2.back.working': '正在回译…',
+  'xlate2.back.failed': '无法回译：{reason}',
+  'xlate2.keysHintMore': 'Esc 停止 · Alt+B 回译所有句子',
 
   // ---- Why a cloud engine did not answer ----
   'xlate2.fallback.consent': '你尚未允许向它发送文本',
@@ -42,6 +55,7 @@ export const TRANSLATE_ENGINES_UI_ZH: Catalog = {
   'xlate2.fallback.rateLimit': '请求过多，请稍后再试',
   'xlate2.fallback.quota': '账户额度已用完',
   'xlate2.fallback.spend': '将超出每月支出上限',
+  'xlate2.fallback.offline': '这台电脑处于离线状态，未发送任何内容',
   'xlate2.fallback.network': '无法连接到该服务',
   'xlate2.fallback.timeout': '请求超时',
   'xlate2.fallback.invalid': '返回的内容不是可用的译文',
@@ -70,6 +84,8 @@ export const TRANSLATE_ENGINES_UI_ZH: Catalog = {
   'xlate2.glossary.otherPairs': {
     other: '另有 {count} 个术语用于其他语言对。',
   },
+  'xlate2.glossary.namesTitle': '本段中的专有名词（{count}）',
+  'xlate2.glossary.namesHint': '让名字在每次翻译中拼写一致。拼写来自词典读音而非原文，保存前请核对。',
   'xlate2.glossary.report': '遵循术语表的词条：{count} / {total}。',
   'xlate2.glossary.missing': '未遵循：{terms}。',
 

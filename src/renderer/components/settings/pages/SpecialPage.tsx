@@ -218,7 +218,7 @@ export default function SpecialPage() {
   const summonWiredShimeji = () => {
     const present = toggleSummonedCompanion('wired');
     setWiredSummonOn(present);
-    const features = present
+    const features: WiredFindingFeature[] = present
       ? [...wiredSettings.findingFeatures.filter((f) => f !== 'wiredShimeji'), 'wiredShimeji']
       : wiredSettings.findingFeatures.filter((f) => f !== 'wiredShimeji');
     saveFindingFeatures(features);
@@ -250,7 +250,7 @@ export default function SpecialPage() {
   const summonAeroBuddy = () => {
     const present = toggleSummonedCompanion('aero');
     setAeroSummonOn(present);
-    const features = present
+    const features: AeroLegacyFeature[] = present
       ? [...aeroSettings.features.filter((f) => f !== 'desktopBuddy'), 'desktopBuddy']
       : aeroSettings.features.filter((f) => f !== 'desktopBuddy');
     saveAeroFeatures(features);

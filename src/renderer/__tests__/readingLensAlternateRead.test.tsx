@@ -55,8 +55,8 @@ const WITHOUT_ALTERNATE = { ...WITH_ALTERNATE, alternate: undefined };
 const EMPTY_RESULT = new Proxy({}, { get: () => [] });
 
 let ocrResult: Record<string, unknown> = WITH_ALTERNATE;
-const lensOcr = vi.fn(async () => ocrResult);
-const lensHistoryRecord = vi.fn(async () => null);
+const lensOcr = vi.fn(async (_request?: unknown) => ocrResult);
+const lensHistoryRecord = vi.fn(async (_entry?: unknown) => null);
 
 function installApiStub(): void {
   const api: Record<string, unknown> = {

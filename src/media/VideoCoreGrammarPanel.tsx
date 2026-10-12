@@ -85,6 +85,8 @@ interface Props {
   onLookup: (surface: string, context: string) => void;
   /** Analyze the current line without waiting for a pause. */
   onAnalyzeNow: () => void;
+  /** Ask again for a line that already has an AI analysis (bypasses the caches). */
+  onReanalyze?: () => void;
   /**
    * The playing file and line. Optional: without it a mined span is an `analysis` card
    * with no way back to the video, which is what a detached window without a source
@@ -100,6 +102,7 @@ export default function VideoCoreGrammarPanel({
   onSelectedIndexChange,
   onLookup,
   onAnalyzeNow,
+  onReanalyze,
   mineContext,
 }: Props) {
   const { t, lang: uiLang } = useT();
@@ -198,7 +201,8 @@ export default function VideoCoreGrammarPanel({
             onSaveSentence: actions.saveSentence,
             onSnapshot: actions.snapshot,
             onLookup,
-            onReanalyze: onAnalyzeNow,
+            // An offline highlight has no AI answer to redo: asking is analyzing.
+            onReanalyze: state.kind === 'ready' && !state.offline ? (onReanalyze ?? onAnalyzeNow) : onAnalyzeNow,
           }}
         />
       )}

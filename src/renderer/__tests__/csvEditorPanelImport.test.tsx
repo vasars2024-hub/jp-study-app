@@ -24,7 +24,7 @@ vi.mock('../csvParseAsync', async () => {
   return { parseCsvTextAsync: async (raw: string, opts?: object) => parseCsvText(raw, opts) };
 });
 const dialogs = vi.hoisted(() => ({
-  promptDialog: vi.fn(async (): Promise<string | null> => null),
+  promptDialog: vi.fn(async (_options?: unknown): Promise<string | null> => null),
   confirmDialog: vi.fn(async () => false),
 }));
 vi.mock('../components/ui', async (importOriginal) => ({

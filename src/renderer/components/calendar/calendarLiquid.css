@@ -195,3 +195,83 @@
 .cal-study-line .cal-study-due {
   color: var(--accent);
 }
+
+/*
+ * Drag-to-reschedule: the day a dragged event would land on. A dashed outline in the
+ * theme accent (outline, so forced-colors keeps it); every theme already styles the cell
+ * itself, so nothing else changes. Chips advertise that they can be picked up.
+ */
+.cal-month-cell.cal-drop-over,
+.cal-week-col.cal-drop-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+}
+/* Read by a screen reader, never drawn: the keyboard-move status and the week grid's hint. */
+.cal-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* "This event / this and following / all events" in the editor of a repeating event. */
+.cal-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+}
+.cal-scope > legend {
+  padding: 0 4px;
+  font-size: 0.85em;
+}
+.cal-scope-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+/* The .ics import preview. */
+.cal-import-summary {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.cal-import-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+.cal-import-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.cal-import-title {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cal-chip[draggable='true'] {
+  cursor: grab;
+}
+.cal-chip[draggable='true']:active {
+  cursor: grabbing;
+}

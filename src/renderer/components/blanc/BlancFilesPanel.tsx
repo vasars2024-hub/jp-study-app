@@ -38,7 +38,7 @@
  * here and not a dead button. Nothing about the Study OS Files app changes.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type JSX } from 'react';
 import Icon from '../Icons';
 import { useT } from '../../i18n';
 import { openSectionSurface } from '../../sectionSurface';

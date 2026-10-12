@@ -264,6 +264,7 @@ function mutatingCalls() {
 const fieldEdit: ApkgExportChangeSet = {
   notes: [{ noteId: String(NOTE_A), fields: ['犬（いぬ）', 'dog'] }],
   cardMoves: [],
+  deckRenames: [],
 };
 
 describe('commitConnectDraft', () => {
@@ -280,6 +281,7 @@ describe('commitConnectDraft', () => {
       changes: {
         notes: [{ noteId: String(NOTE_A), fields: ['犬（いぬ）', 'dog'], tags: ['core', 'jlpt5'] }],
         cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 3 }],
+        deckRenames: [],
       },
     });
 
@@ -313,7 +315,7 @@ describe('commitConnectDraft', () => {
     const result = await commitConnectDraft({
       fingerprint,
       read: READ,
-      changes: { notes: [{ noteId: String(NOTE_A), tags: ['core', 'jlpt5'] }], cardMoves: [] },
+      changes: { notes: [{ noteId: String(NOTE_A), tags: ['core', 'jlpt5'] }], cardMoves: [], deckRenames: [] },
     });
 
     expect(result.ok).toBe(true);
@@ -326,7 +328,7 @@ describe('commitConnectDraft', () => {
     const result = await commitConnectDraft({
       fingerprint,
       read: READ,
-      changes: { notes: [{ noteId: String(NOTE_A), tags: [] }], cardMoves: [] },
+      changes: { notes: [{ noteId: String(NOTE_A), tags: [] }], cardMoves: [], deckRenames: [] },
     });
 
     expect(result.ok).toBe(true);
@@ -390,7 +392,7 @@ describe('commitConnectDraft', () => {
     const result = await commitConnectDraft({
       fingerprint: 'connect:2:1782214626',
       read: READ,
-      changes: { notes: [], cardMoves: [] },
+      changes: { notes: [], cardMoves: [], deckRenames: [] },
     });
     expect(result.ok).toBe(false);
     expect(result.errorCode).toBe('nothing-to-commit');
@@ -425,6 +427,7 @@ describe('commitConnectDraft', () => {
           { noteId: '1782214626999', fields: ['x', 'y'] },
         ],
         cardMoves: [],
+        deckRenames: [],
       },
     });
 
@@ -439,7 +442,7 @@ describe('commitConnectDraft', () => {
     const result = await commitConnectDraft({
       fingerprint,
       read: READ,
-      changes: { notes: [{ noteId: String(NOTE_A), fields: ['a', 'b', 'c'] }], cardMoves: [] },
+      changes: { notes: [{ noteId: String(NOTE_A), fields: ['a', 'b', 'c'] }], cardMoves: [], deckRenames: [] },
     });
 
     expect(result.errorCode).toBe('field-count-mismatch');
@@ -456,6 +459,7 @@ describe('commitConnectDraft', () => {
       changes: {
         notes: [{ noteId: String(NOTE_A), fields: ['犬（いぬ）', 'dog'] }],
         cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 3 }],
+        deckRenames: [],
       },
     });
 
@@ -479,6 +483,7 @@ describe('commitConnectDraft', () => {
           { noteId: String(NOTE_B), fields: ['猫（ねこ）', 'cat'] },
         ],
         cardMoves: [],
+        deckRenames: [],
       },
     });
 
@@ -505,6 +510,7 @@ describe('commitConnectDraft', () => {
           { noteId: String(NOTE_B), fields: ['猫（ねこ）', 'cat'] },
         ],
         cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 3 }],
+        deckRenames: [],
       },
     });
 
@@ -529,7 +535,7 @@ describe('commitConnectDraft', () => {
     const result = await commitConnectDraft({
       fingerprint,
       read: READ,
-      changes: { notes: [], cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 7 }] },
+      changes: { notes: [], cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 7 }], deckRenames: [] },
     });
 
     expect(typeof (callsTo('setSpecificValueOfCard')[0][1] as { newValues: unknown[] }).newValues[0]).toBe(
@@ -550,7 +556,7 @@ describe('commitConnectDraft', () => {
     const result = await commitConnectDraft({
       fingerprint,
       read: READ,
-      changes: { notes: [], cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 7 }] },
+      changes: { notes: [], cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 7 }], deckRenames: [] },
     });
 
     expect(result.ok).toBe(false);
@@ -595,6 +601,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
       cardMoves: [],
       cardDeckMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), deckId }],
       deckCreates: [{ deckId, name, configId: '1782214589999' }],
+      deckRenames: [],
     };
   }
 
@@ -661,6 +668,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
           { cardId: String(CARD_B), noteId: String(NOTE_B), deckId: MINTED },
         ],
         deckCreates: [{ deckId: MINTED, name: 'JP::N5' }],
+        deckRenames: [],
       },
     });
 
@@ -684,6 +692,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
         cardDeckMoves: [
           { cardId: String(CARD_A), noteId: String(NOTE_A), deckId: '1782214589500' },
         ],
+        deckRenames: [],
       },
     });
 
@@ -727,6 +736,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
         cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 7 }],
         cardDeckMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), deckId: MINTED }],
         deckCreates: [{ deckId: MINTED, name: 'JP::N5' }],
+        deckRenames: [],
       },
     });
 
@@ -747,6 +757,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
         notes: [],
         cardMoves: [],
         cardDeckMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), deckId: MINTED }],
+        deckRenames: [],
       },
     });
 
@@ -774,6 +785,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
         cardDeckMoves: [
           { cardId: String(CARD_A), noteId: String(NOTE_A), deckId: '1782214589700' },
         ],
+        deckRenames: [],
       },
     });
 
@@ -810,6 +822,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
           { cardId: String(CARD_B), noteId: String(NOTE_B), deckId: MINTED },
         ],
         deckCreates: [{ deckId: MINTED, name: 'JP::N5' }],
+        deckRenames: [],
       },
     });
 
@@ -863,6 +876,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
       { noteId: String(NOTE_B), fields: ['猫（ねこ）', 'cat'] },
     ],
     cardMoves: [],
+    deckRenames: [],
   };
 
   /** Cancels `commitId` the moment the write for `noteId` is sent, not before. */
@@ -959,7 +973,7 @@ describe('commitConnectDraft — recipe 13 split', () => {
       fingerprint: await currentFingerprint(),
       read: READ,
       commitId,
-      changes: { notes: [{ noteId: String(NOTE_A), fields: ['犬', 'dog'] }], cardMoves: [] },
+      changes: { notes: [{ noteId: String(NOTE_A), fields: ['犬', 'dog'] }], cardMoves: [], deckRenames: [] },
     });
     expect(first.ok).toBe(true);
 

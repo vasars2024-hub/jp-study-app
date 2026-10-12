@@ -39,7 +39,12 @@ import {
 } from './providerRuntime';
 import { getAgentPricingStore } from './agentPricingStore';
 import { listLocalModelFiles, resolveLocalModelForRole } from './localModelFiles';
-import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
+import {
+  AI_CLOUD_FEATURE_OFF_MESSAGE,
+  AI_FEATURES_OFF_MESSAGE,
+  aiCloudAllowedFor,
+  aiFeaturesEnabled,
+} from './aiFeatureGate';
 import { registerAiSetupIpc } from './aiSetupIpc';
 import { errorDetail, logDiagnostic } from './errorLog';
 export { getAgentWorkspaceStore } from './agentWorkspaceStore';
@@ -279,6 +284,11 @@ async function planWithCloud(
   request: LocalAgentPlanRequest,
   startedAt: number,
 ): Promise<LocalAgentPlanResponse> {
+  // The Agent's cloud opt-in covers its planner too: a scheduled automation
+  // that falls back to the cloud must not bypass it.
+  if (!aiCloudAllowedFor('agentChat')) {
+    return refusal('cloud-disabled', AI_CLOUD_FEATURE_OFF_MESSAGE, startedAt);
+  }
   if (!getAiProviderHealth(providerId).configured) {
     return refusal('cloud-key-missing', 'No API key is saved for the cloud planner.', startedAt);
   }

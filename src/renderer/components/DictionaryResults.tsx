@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { AnkiStatus, DictEntry, DictResult, ExampleSentence } from '../../shared/types';
 import type { StudyProfile } from '../../shared/profiles';
 import {
@@ -87,6 +87,13 @@ import {
 import { FLASHCARD_DECK_EVENT, loadDeck } from '../flashcardDeck';
 import { exampleCoverage, rankByCoverage, type ExampleCoverage } from '../exampleCoverage';
 import { studyTokens, studyTokensReady } from '../studyTokens';
+
+/**
+ * "Explain in context" (optional AI, docs/AI_AUDIT.md N5). Lazy: this module is
+ * in Blanc's startup graph, and the panel, its request hook and its stylesheet
+ * are only fetched once a popup with a sentence is shown.
+ */
+const AiContextExplain = lazy(() => import('./lexicon/AiContextExplain'));
 
 // The de-inflection reason names (and their grammar links) live in
 // `shared/deinflectTrace.ts`, rendered by `lexicon/DeinflectTrace.tsx`; the
@@ -1449,6 +1456,21 @@ export default function DictionaryResults({
           );
         })}
       </div>
+
+      {/* The popup knows the sentence the word was met in; which sense it has
+          THERE is the question a glance asks. Optional AI, asked by a button. */}
+      {variant === 'popup' && entries.length > 0 && context?.trim() && (
+        <Suspense fallback={null}>
+          <AiContextExplain
+            word={entries[0].word}
+            reading={entries[0].reading ?? ''}
+            lang={lang}
+            sentence={context.trim()}
+            senses={entries[0].senses ?? []}
+            contentLang={contentLang}
+          />
+        </Suspense>
+      )}
 
       {/* The character panel (KANJIDIC readings, strokes, components) and its "not
           installed" note come after the meanings, not before them: above the entries

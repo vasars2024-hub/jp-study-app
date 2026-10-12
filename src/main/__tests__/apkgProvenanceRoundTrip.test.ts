@@ -147,7 +147,7 @@ describe('field-level provenance survives export and reimport', () => {
 
     const result = await exportApkg({
       fingerprint: src.fingerprint,
-      changes: { notes: [{ noteId: '2001', fields: ['猫', written] }], cardMoves: [] },
+      changes: { notes: [{ noteId: '2001', fields: ['猫', written] }], cardMoves: [], deckRenames: [] },
       sourcePath: src.filePath,
       outPath,
     });
@@ -180,7 +180,7 @@ describe('field-level provenance survives export and reimport', () => {
 
     const result = await exportApkg({
       fingerprint: src.fingerprint,
-      changes: { notes: [{ noteId: '2001', fields: [written, 'cat'] }], cardMoves: [] },
+      changes: { notes: [{ noteId: '2001', fields: [written, 'cat'] }], cardMoves: [], deckRenames: [] },
       sourcePath: src.filePath,
       outPath,
     });
@@ -212,7 +212,7 @@ describe('field-level provenance survives export and reimport', () => {
 
     const first = await exportApkg({
       fingerprint: src.fingerprint,
-      changes: { notes: [{ noteId: '2001', fields: ['猫', written] }], cardMoves: [] },
+      changes: { notes: [{ noteId: '2001', fields: ['猫', written] }], cardMoves: [], deckRenames: [] },
       sourcePath: src.filePath,
       outPath: firstOut,
     });
@@ -224,7 +224,7 @@ describe('field-level provenance survives export and reimport', () => {
     const secondOut = path.join(workDir, 'prov-twice (2).apkg');
     const second = await exportApkg({
       fingerprint: `sha1:${crypto.createHash('sha1').update(firstBytes).digest('hex')}`,
-      changes: { notes: [{ noteId: '2002', fields: ['犬', 'dog'] }], cardMoves: [] },
+      changes: { notes: [{ noteId: '2002', fields: ['犬', 'dog'] }], cardMoves: [], deckRenames: [] },
       sourcePath: firstOut,
       outPath: secondOut,
     });
@@ -247,7 +247,7 @@ describe('field-level provenance survives export and reimport', () => {
 
     const result = await exportApkg({
       fingerprint: src.fingerprint,
-      changes: { notes: [{ noteId: '2001', fields: ['猫', written] }], cardMoves: [] },
+      changes: { notes: [{ noteId: '2001', fields: ['猫', written] }], cardMoves: [], deckRenames: [] },
       sourcePath: src.filePath,
       outPath,
     });

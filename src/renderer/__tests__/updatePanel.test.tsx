@@ -137,6 +137,52 @@ describe('update panel', () => {
     expect(auditAria(host)).toEqual([]);
   });
 
+  it('says it is checking until main answers — never "Development build" or "Unknown" first (risk4)', async () => {
+    let answer: ((d: AppUpdateDetails) => void) | null = null;
+    api.appUpdateDetails.mockImplementation(() => new Promise<AppUpdateDetails>((resolve) => (answer = resolve)));
+    await mount();
+    expect(text()).toContain('Checking version');
+    expect(text()).not.toContain('Development build');
+    expect(text()).not.toContain('Unknown');
+    expect(host.querySelector('.upd2-facts')?.getAttribute('aria-busy')).toBe('true');
+    expect(button('Check now')?.disabled).toBe(true);
+    expect(auditAria(host)).toEqual([]);
+    await act(async () => answer?.({ ...base, install: 'dev' }));
+    expect(text()).not.toContain('Checking version');
+    expect(text()).toContain('Development build');
+    expect(host.querySelector('.upd2-facts')?.getAttribute('aria-busy')).toBe('false');
+  });
+
+  it('a failed details call shows an error with a retry that asks again (risk4)', async () => {
+    api.appUpdateDetails.mockRejectedValueOnce(new Error('ipc gone'));
+    await mount();
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not read this copy');
+    expect(text()).not.toContain('Development build');
+    expect(text()).not.toContain('Checking version');
+    expect(auditAria(host)).toEqual([]);
+    await act(async () => button('Try again')?.click());
+    expect(api.appUpdateDetails).toHaveBeenCalledTimes(2);
+    expect(text()).toContain('1.0.2');
+    expect(text()).toContain('Installed (updates itself)');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('a details call that never answers turns into the error state (risk4)', async () => {
+    vi.useFakeTimers();
+    try {
+      api.appUpdateDetails.mockImplementation(() => new Promise<AppUpdateDetails>(() => undefined));
+      await mount();
+      expect(text()).toContain('Checking version');
+      await act(async () => {
+        vi.advanceTimersByTime(16_000);
+      });
+      expect(button('Try again')).toBeDefined();
+      expect(text()).not.toContain('Development build');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a portable copy checks GitHub only when asked', async () => {
     api.appUpdateDetails.mockResolvedValue({ ...base, install: 'portable' });
     api.releaseStatus.mockResolvedValue({ kind: 'update', current: '1.0.1', latest: '1.0.3', url: 'https://x', checkedAt: Date.now() });

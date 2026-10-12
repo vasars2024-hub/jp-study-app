@@ -25,6 +25,8 @@ export const ANKI_SYNC_STATE_EVENT = 'jp-anki-sync-state-changed';
 
 /** Unlinked cards the panel lists (rule 6), newest first. */
 const UNLINKED_KEEP = 50;
+/** Answers that left the queue after repeated refusals, listed in the panel (rule 10). */
+const FAILED_KEEP = 50;
 
 export function ankiPushReviewsEnabled(): boolean {
   try {
@@ -72,10 +74,28 @@ export interface AnkiSyncSnapshot {
   outboxCount: number;
   /** Rotation cursor through the linked cards a pull reads. */
   pullCursor: number;
+  /**
+   * Rule 10: this AnkiConnect cannot do the job until the user fixes something
+   * (too old, API key, old API). The queue is kept; background runs stop until
+   * "Sync now" or Anki reconnecting.
+   */
+  paused?: { kind: AnkiSyncErrorKind; at: number; detail?: string };
+  /** Rule 10: consecutive retryable failures, and when a background run may try again. */
+  retry?: { failures: number; nextAt: number };
+  /** Answers Anki refused one by one until they left the queue (rule 10), newest first. */
+  failedAnswers: AnkiSyncFailedAnswer[];
+}
+
+export interface AnkiSyncFailedAnswer {
+  reviewId: string;
+  cardId: string;
+  word: string;
+  reviewedAt: number;
+  at: number;
 }
 
 export function emptyAnkiSyncSnapshot(): AnkiSyncSnapshot {
-  return { answeredTotal: 0, unlinked: [], outboxCount: 0, pullCursor: 0 };
+  return { answeredTotal: 0, unlinked: [], outboxCount: 0, pullCursor: 0, failedAnswers: [] };
 }
 
 function finite(value: unknown): number | undefined {
@@ -109,7 +129,34 @@ export function normalizeAnkiSyncSnapshot(raw: unknown): AnkiSyncSnapshot {
   }
   out.outboxCount = Math.max(0, Math.floor(finite(value.outboxCount) ?? 0));
   out.pullCursor = Math.max(0, Math.floor(finite(value.pullCursor) ?? 0));
+  if (value.paused && typeof value.paused === 'object' && typeof value.paused.kind === 'string') {
+    out.paused = {
+      kind: value.paused.kind,
+      at: finite(value.paused.at) ?? 0,
+      ...(typeof value.paused.detail === 'string' ? { detail: value.paused.detail.slice(0, 300) } : {}),
+    };
+  }
+  if (value.retry && typeof value.retry === 'object') {
+    const failures = Math.max(0, Math.floor(finite(value.retry.failures) ?? 0));
+    const nextAt = finite(value.retry.nextAt);
+    if (failures > 0 && nextAt !== undefined) out.retry = { failures, nextAt };
+  }
+  if (Array.isArray(value.failedAnswers)) {
+    out.failedAnswers = value.failedAnswers
+      .filter((row): row is AnkiSyncFailedAnswer => Boolean(row) && typeof row.reviewId === 'string' && typeof row.cardId === 'string')
+      .slice(0, FAILED_KEEP);
+  }
   return out;
+}
+
+/** Record answers that left the queue because Anki kept refusing them. */
+export function withFailedAnswers(state: AnkiSyncSnapshot, answers: readonly AnkiSyncFailedAnswer[]): AnkiSyncSnapshot {
+  if (!answers.length) return state;
+  const seen = new Set(answers.map((answer) => answer.reviewId));
+  return {
+    ...state,
+    failedAnswers: [...answers, ...state.failedAnswers.filter((answer) => !seen.has(answer.reviewId))].slice(0, FAILED_KEEP),
+  };
 }
 
 let cached: AnkiSyncSnapshot | null = null;
@@ -158,6 +205,11 @@ export async function updateAnkiSyncState(
   cached = next ?? cached ?? emptyAnkiSyncSnapshot();
   emitAnkiSyncStateChanged();
   return cached;
+}
+
+/** The user read the "not sent" list and cleared it. */
+export async function clearAnkiFailedAnswers(): Promise<void> {
+  await updateAnkiSyncState((s) => ({ ...s, failedAnswers: [] }));
 }
 
 /** Record cards that were unlinked because their note is gone from Anki. */

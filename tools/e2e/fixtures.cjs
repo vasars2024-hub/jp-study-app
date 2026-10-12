@@ -212,4 +212,46 @@ function wordList(dir) {
   return { file, unique: ['窓辺', '雀', '台所', '眺める', '静か'] };
 }
 
-module.exports = { yomitanFrequencyZip, kanjidicXml, epub, manga, video, wordList, SUBS };
+/** Two invented songs (sine tones, AAC) with a synced `.lrc` beside each. */
+const SONGS = [
+  { title: 'E2E 雨の歌', freq: 392, lines: [[1.0, '雨が静かに降っている'], [4.0, '窓辺で一緒に歌おう'], [8.0, '明日は晴れるかな']] },
+  { title: 'E2E 朝の歌', freq: 523, lines: [[1.0, 'おはよう、新しい朝'], [5.0, 'パンを食べて出かけよう']] },
+];
+const lrcTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${(s % 60).toFixed(2).padStart(5, '0')}`;
+
+async function music(dir) {
+  const folder = path.join(dir, 'music');
+  fs.mkdirSync(folder, { recursive: true });
+  const out = [];
+  for (const song of SONGS) {
+    const file = path.join(folder, `${song.title}.m4a`);
+    await ffmpeg(['-f', 'lavfi', '-i', `sine=frequency=${song.freq}:sample_rate=44100:duration=12`, '-c:a', 'aac', '-b:a', '96k',
+      '-metadata', `title=${song.title}`, '-metadata', 'artist=Gum E2E', file]);
+    const lrc = path.join(folder, `${song.title}.lrc`);
+    fs.writeFileSync(lrc, [`[ti:${song.title}]`, '[ar:Gum E2E]', ...song.lines.map(([t, l]) => `[${lrcTime(t)}]${l}`), ''].join('\n'), 'utf8');
+    out.push({ ...song, file, lrc });
+  }
+  return out;
+}
+
+/**
+ * A "downloaded" YouTube video the way yt-dlp leaves one: `<title> [<id>].mp4` with its
+ * Japanese subtitle beside it (`.ja.srt`), in a folder of the run.
+ */
+async function youtubeDownload(dir) {
+  const folder = path.join(dir, 'yt-downloads');
+  fs.mkdirSync(folder, { recursive: true });
+  const id = 'E2Eyt0001aa';
+  const base = path.join(folder, `朝の会話 E2E [${id}]`);
+  const mp4 = `${base}.mp4`;
+  const srt = `${base}.ja.srt`;
+  fs.writeFileSync(srt, SUBS.map(([a, b, text], i) => `${i + 1}\n${srtTime(a)} --> ${srtTime(b)}\n${text}\n`).join('\n'), 'utf8');
+  await ffmpeg([
+    '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=25:duration=20',
+    '-f', 'lavfi', '-i', 'sine=frequency=262:sample_rate=44100:duration=20',
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-c:a', 'aac', '-shortest', mp4,
+  ]);
+  return { id, mp4, srt, title: '朝の会話 E2E' };
+}
+
+module.exports = { yomitanFrequencyZip, kanjidicXml, epub, manga, video, wordList, music, youtubeDownload, SUBS, SONGS };

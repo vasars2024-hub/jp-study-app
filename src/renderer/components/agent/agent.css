@@ -1644,3 +1644,42 @@
     transition: none;
   }
 }
+
+/* History budget: said where it happened — a chip on a trimmed conversation's rail row, a
+   line atop its messages, and one line under the list when whole conversations went. */
+.agent-chip-trimmed {
+  color: var(--agent-muted);
+  border-style: dashed;
+}
+
+.agent-history-notice {
+  margin: 0 0 var(--space-sm, 8px);
+  padding: 6px 10px;
+  border: 1px dashed var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}
+
+.agent-history-dropped {
+  margin: var(--space-sm, 8px) var(--space-sm, 8px) 0;
+}
+
+/* The composer's offline note (cloud target, no network). */
+.agent-offline-note {
+  margin: 0;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--danger-text, var(--agent-muted));
+}
+/* Undo on a completed plan step. */
+.agent-plan-undo {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-plan-undo-status {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}

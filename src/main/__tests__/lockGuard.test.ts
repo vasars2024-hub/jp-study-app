@@ -15,6 +15,7 @@ import {
   extensionRouteAllowedWhileLocked,
   installLockGuard,
   LOCK_SAFE_COMMANDS,
+  refuseRestartWhileLocked,
   refuseWhileLocked,
   type GuardWindow,
   type LockBlockNotice,
@@ -24,11 +25,13 @@ import { createLockGate, hashPin, resetPinAttemptsForTests } from '../lockscreen
 
 class FakeContents {
   sent: string[] = [];
+  payloads: Array<[string, ...unknown[]]> = [];
   devtools = false;
   destroyed = false;
   private listeners: Array<() => void> = [];
-  send(channel: string): void {
+  send(channel: string, ...args: unknown[]): void {
     this.sent.push(channel);
+    this.payloads.push([channel, ...args]);
   }
   on(_event: 'devtools-opened', listener: () => void): this {
     this.listeners.push(listener);
@@ -224,8 +227,35 @@ describe('lock guard: refusals', () => {
     expect(blockKindOf('whatever')).toBe('window');
   });
 
-  it('only the commands that bring the lock UI forward stay live', () => {
-    expect([...LOCK_SAFE_COMMANDS].sort()).toEqual(['app.focus', 'app.restart', 'app.toggle']);
+  it('only the commands that bring the lock UI forward stay live — restart is not one (risk4)', () => {
+    expect([...LOCK_SAFE_COMMANDS].sort()).toEqual(['app.focus', 'app.toggle']);
+    expect(LOCK_SAFE_COMMANDS.has('app.restart')).toBe(false);
+  });
+
+  it('restart / relaunch are refused while locked, with a lock-screen notice', () => {
+    const { guard, notices, setLocked } = setup();
+    installLockGuard(guard as never);
+    expect(refuseRestartWhileLocked('second-instance')).toBe(true);
+    expect(notices.map((n) => n.action)).toEqual(['command:app.restart:second-instance']);
+    setLocked(false);
+    expect(refuseRestartWhileLocked('ipc')).toBe(false);
+  });
+});
+
+describe('lock guard: every window hears the transition (risk4)', () => {
+  it('engage and release broadcast `lockscreen:state` to content, gated and lock windows alike', () => {
+    const { make, guard, setLocked } = setup({ locked: false });
+    const pop = make('content', 'popout');
+    const main = make('gated', 'main');
+    const widget = make('lock', 'lockscreen');
+    setLocked(true);
+    guard.engage();
+    for (const w of [pop, main, widget]) expect(w.webContents.payloads).toContainEqual(['lockscreen:state', true]);
+    // Only gated windows are asked to draw a PIN pad.
+    expect(pop.webContents.sent).not.toContain('lockscreen:locked');
+    setLocked(false);
+    guard.release();
+    for (const w of [pop, main, widget]) expect(w.webContents.payloads).toContainEqual(['lockscreen:state', false]);
   });
 });
 

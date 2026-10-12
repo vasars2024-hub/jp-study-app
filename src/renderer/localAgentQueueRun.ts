@@ -32,7 +32,9 @@
  * module, in `evaluateAgentToolAccess`, exactly as Phase 7 requires.
  */
 import {
+  agentStepErrorText,
   executeAgentTaskStep,
+  updateAgentTask,
   type AgentExecutionEvent,
   type AgentPermissionLevel,
   type AgentTask,
@@ -113,6 +115,27 @@ export interface AgentQueueRunResult {
   };
   leaseRefusal?: { code: AgentExecutionLeaseFailureCode };
   leaseCommitFailure?: { code: AgentExecutionLeaseFailureCode };
+}
+
+/**
+ * The task as it reads after `stepId` failed with `error`, built from the
+ * pre-run snapshot. `null` when the snapshot cannot take that transition.
+ */
+export function failedAgentTaskSnapshot(
+  task: AgentTask,
+  stepId: string,
+  error: unknown,
+  now: number,
+): AgentTask | null {
+  try {
+    const step = task.steps.find((candidate) => candidate.id === stepId);
+    const running = step?.status === 'running'
+      ? task
+      : updateAgentTask(task, { type: 'start-step', stepId }, now);
+    return updateAgentTask(running, { type: 'fail-step', stepId, error: agentStepErrorText(error) }, now);
+  } catch {
+    return null;
+  }
 }
 
 export function pendingAgentTaskStep(task: AgentTask, pick: AgentStepPick): AgentTaskStep | null {
@@ -236,6 +259,34 @@ export async function runAgentTaskStep(
     });
   } catch (error) {
     stopRenewing();
+    // `executeAgentTaskStep` records a handler's own failure itself, so reaching
+    // here means the bookkeeping around the tool threw. Rethrowing used to leave
+    // the row `running` under a held lease until someone recovered it by hand
+    // (audit A5). Settle it instead: record the step as failed with a bounded
+    // error and commit that, which clears the claim. Failed, not released back
+    // to `queued` — the tool may have run, and a retry is the user's decision.
+    const failedTask = failedAgentTaskSnapshot(task, step.id, error, options.now?.() ?? Date.now());
+    if (failedTask) {
+      const committed = await leaseClient.commit(expectedItem.id, acquired.token, failedTask).catch(() => null);
+      if (committed?.ok) {
+        const message = failedTask.steps.find((candidate) => candidate.id === step.id)?.error ?? '';
+        return {
+          queue: committed.state.queue,
+          task: failedTask,
+          events: [{
+            type: 'tool-failed',
+            taskId: task.id,
+            stepId: step.id,
+            callId: step.request.callId,
+            operation: step.request.operation,
+            timestamp: failedTask.updatedAt,
+            error: message,
+          }],
+        };
+      }
+    }
+    // Commit was refused or the task could not be settled: never keep the lease.
+    await leaseClient.release(expectedItem.id, acquired.token).catch(() => undefined);
     throw error;
   }
   if (result.refusal) {

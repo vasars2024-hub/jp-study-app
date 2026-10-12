@@ -1317,6 +1317,205 @@ function jpAppErrorText(res, fallbackKey) {
   return (res && res.error) || (fallbackKey ? jpMsg(fallbackKey) : '');
 }
 
+/* ------------------------------ optional AI ------------------------------ */
+/*
+ * The client half of the app's `/v1/ai/*` routes (src/main/extensionAiRoutes.ts).
+ * The extension holds no key and chooses no provider: it names a feature and
+ * sends the text, and the app applies "Use AI features", the per-feature cloud
+ * opt-in and the offline model. These helpers are pure so they can be tested in
+ * a sandbox; content.js owns the UI and background.js the requests.
+ */
+
+/** Feature → bridge route. */
+const AI_ASSIST_ROUTES = {
+  explain: '/v1/ai/explain-context',
+  breakdown: '/v1/ai/breakdown',
+  simplify: '/v1/ai/simplify',
+  meaning: '/v1/ai/word-meaning',
+};
+
+/** Caps the extension applies before anything leaves the page (the app caps again). */
+const AI_LIMITS = { word: 60, sentence: 400, sense: 200, senses: 12, paragraph: 1500, context: 1000 };
+
+const AI_REQUEST_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+function aiAssistRoute(feature) {
+  return Object.prototype.hasOwnProperty.call(AI_ASSIST_ROUTES, feature) ? AI_ASSIST_ROUTES[feature] : '';
+}
+
+function aiClip(value, max) {
+  if (typeof value !== 'string') return '';
+  const chars = [...value.replace(/\s+/g, ' ').trim()];
+  return chars.length > max ? chars.slice(0, max).join('') : chars.join('');
+}
+
+function aiLangCode(value) {
+  const v = String(value || '').slice(0, 2).toLowerCase();
+  return ['ja', 'zh', 'ru', 'en'].includes(v) ? v : '';
+}
+
+function aiRequestId(value) {
+  return typeof value === 'string' && AI_REQUEST_ID.test(value) ? value : '';
+}
+
+/**
+ * The body one feature sends, from what the content script hands over: only the
+ * fields that feature needs, each capped. `null` when there is nothing to ask.
+ */
+function aiAssistPayload(feature, input) {
+  const i = input && typeof input === 'object' ? input : {};
+  const lang = aiLangCode(i.lang) || 'ja';
+  const uiLang = aiLangCode(i.uiLang) || 'en';
+  if (feature === 'explain') {
+    const word = aiClip(i.word, AI_LIMITS.word);
+    const sentence = aiClip(i.sentence, AI_LIMITS.sentence);
+    const senses = Array.isArray(i.senses)
+      ? i.senses.map((s) => aiClip(s, AI_LIMITS.sense)).filter(Boolean).slice(0, AI_LIMITS.senses)
+      : [];
+    if (!word || !sentence || !senses.length) return null;
+    return { word, reading: aiClip(i.reading, AI_LIMITS.word), sentence, senses, lang, uiLang };
+  }
+  if (feature === 'breakdown') {
+    const text = aiClip(i.text, AI_LIMITS.sentence);
+    if (!text) return null;
+    return { text, context: aiClip(i.context, AI_LIMITS.context), lang, uiLang };
+  }
+  if (feature === 'simplify') {
+    const text = typeof i.text === 'string' ? [...i.text.replace(/[ \t]+/g, ' ').trim()].slice(0, AI_LIMITS.paragraph).join('') : '';
+    if (!text) return null;
+    return { text, lang, uiLang };
+  }
+  if (feature === 'meaning') {
+    const word = aiClip(i.word, 40);
+    if (!word) return null;
+    return { word, sentence: aiClip(i.sentence, AI_LIMITS.sentence), lang, uiLang };
+  }
+  return null;
+}
+
+/**
+ * The senses "Explain in context" offers the model, one line each, and for each
+ * line the index of the sense it came from — so the answer can be marked on the
+ * list the popup drew (senses without a gloss are skipped, as the app does).
+ */
+function aiSenseLines(entry) {
+  const lines = [];
+  const indexes = [];
+  if (!entry || typeof entry !== 'object') return { lines, indexes };
+  const senses = Array.isArray(entry.senses) ? entry.senses.filter(Boolean) : [];
+  if (senses.length) {
+    senses.forEach((sense, index) => {
+      if (lines.length >= AI_LIMITS.senses) return;
+      const defs = Array.isArray(sense.definitions) ? sense.definitions.filter((d) => typeof d === 'string' && d.trim()) : [];
+      if (!defs.length) return;
+      lines.push(aiClip(defs.join('; '), AI_LIMITS.sense));
+      indexes.push(index);
+    });
+  } else if (Array.isArray(entry.meanings)) {
+    entry.meanings.forEach((meaning, index) => {
+      if (lines.length >= AI_LIMITS.senses) return;
+      const line = aiClip(meaning, AI_LIMITS.sense);
+      if (!line) return;
+      lines.push(line);
+      indexes.push(index);
+    });
+  }
+  return { lines, indexes };
+}
+
+/** Does this dictionary entry have no gloss a card could use? (The "suggest a meaning" case.) */
+function aiEntryLacksGloss(entry) {
+  return !entry || aiSenseLines(entry).lines.length === 0;
+}
+
+/** What a card stores for a meaning the user approved from the AI: marked as AI. */
+function aiCardMeaning(meaning) {
+  const text = aiClip(meaning, 900);
+  return text ? `(AI) ${text}` : '';
+}
+
+/**
+ * The extension's own failure codes, beside the app's (shared/aiErrorCodes.ts):
+ *   app-closed  nothing answered on the port
+ *   outdated    the app answered 404: it predates these routes
+ *   auth        the pairing token was refused
+ *   locked      the app's lockscreen is engaged
+ */
+const AI_STATE_KEYS = {
+  'ai-off': 'content_aiStateOff',
+  off: 'content_aiStateOff',
+  'no-key': 'content_aiStateNoKey',
+  'no-local-model': 'content_aiStateNoLocal',
+  consent: 'content_aiStateConsent',
+  offline: 'content_aiStateOffline',
+  network: 'content_aiStateOffline',
+  'app-closed': 'content_aiStateAppClosed',
+  outdated: 'content_aiStateOutdated',
+  'rate-limit': 'content_aiStateRateLimit',
+  'too-long': 'content_aiStateTooLong',
+  timeout: 'content_aiStateTimeout',
+  spend: 'content_aiStateSpend',
+  'no-answer': 'content_aiStateNoAnswer',
+  'empty-input': 'content_aiStateNoAnswer',
+  cancelled: 'content_aiCancelled',
+  auth: 'bg_authFailed',
+  locked: 'bg_errLocked',
+};
+
+/** A reply's failure as one code: the app's `code`, else what the worker learned about the request. */
+function aiReplyCode(res) {
+  if (!res || typeof res !== 'object') return 'app-closed';
+  if (res.ok) return '';
+  if (res.cancelled) return 'cancelled';
+  if (res.locked) return 'locked';
+  if (res.offline) return 'app-closed';
+  if (res.aiOff) return 'ai-off';
+  if (typeof res.code === 'string' && res.code) return res.code;
+  if (res.needsConsent) return 'consent';
+  if (res.needsKey) return 'no-key';
+  if (res.needsLocalModel) return 'no-local-model';
+  return 'other';
+}
+
+/** The _locales key that says a code or a feature state; failures nobody named read as "could not answer". */
+function aiStateKey(code) {
+  return Object.prototype.hasOwnProperty.call(AI_STATE_KEYS, code) ? AI_STATE_KEYS[code] : 'content_aiStateFailed';
+}
+
+/**
+ * The reply the worker gives when the request itself failed (apiFetch threw):
+ * never the raw text, always a code the content script can say.
+ */
+function aiFailureReply(err) {
+  const e = err || {};
+  if (e.cancelled) return { ok: false, cancelled: true, code: 'cancelled' };
+  if (e.offline) return { ok: false, offline: true, code: 'app-closed' };
+  if (e.locked) return { ok: false, locked: true, code: 'locked' };
+  if (e.auth) return { ok: false, code: 'auth' };
+  if (e.status === 404) return { ok: false, code: 'outdated' };
+  if (e.status === 429) return { ok: false, code: 'rate-limit' };
+  if (e.status === 413) return { ok: false, code: 'too-long' };
+  const code = e.payload && typeof e.payload.code === 'string' ? e.payload.code : 'other';
+  return { ok: false, code };
+}
+
+/**
+ * Whether a feature's controls are drawn. Hidden only when the app said AI is
+ * off; an unknown status (the app closed, an older app) still draws them, and
+ * pressing one says why it cannot run.
+ */
+function aiControlsVisible(status) {
+  return !(status && status.ok !== false && status.enabled === false);
+}
+
+/** A feature's state from `/v1/ai/status`: 'ready', a state code, or '' when unknown. */
+function aiFeatureState(status, feature) {
+  if (!status || status.ok === false) return '';
+  if (status.enabled === false) return 'off';
+  const s = status.features && status.features[feature];
+  return typeof s === 'string' ? s : '';
+}
+
 if (typeof globalThis !== 'undefined') {
   globalThis.jpStudyShared = {
     DEFAULT_PORT,
@@ -1364,5 +1563,17 @@ if (typeof globalThis !== 'undefined') {
     aiPrimaryTranslation,
     aiSentenceHtml,
     aiPanelHtml,
+    AI_ASSIST_ROUTES,
+    aiAssistRoute,
+    aiAssistPayload,
+    aiRequestId,
+    aiSenseLines,
+    aiEntryLacksGloss,
+    aiCardMeaning,
+    aiReplyCode,
+    aiStateKey,
+    aiFailureReply,
+    aiControlsVisible,
+    aiFeatureState,
   };
 }

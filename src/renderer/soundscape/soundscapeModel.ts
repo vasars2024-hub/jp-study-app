@@ -22,9 +22,18 @@ export type SoundLayerId =
   | 'crickets'
   | 'cafe'
   | 'train'
-  | 'chimes';
+  | 'chimes'
+  // snd5 — eight more, every one synthesized in soundscapeEngine.ts.
+  | 'umbrella'
+  | 'cicadas'
+  | 'carriage'
+  | 'konbini'
+  | 'cityNight'
+  | 'templeBell'
+  | 'furin'
+  | 'shishiOdoshi';
 
-export type SoundLayerGroup = 'noise' | 'weather' | 'nature' | 'places';
+export type SoundLayerGroup = 'noise' | 'weather' | 'nature' | 'japan' | 'places';
 
 export interface SoundLayerDef {
   id: SoundLayerId;
@@ -48,12 +57,21 @@ export const SOUND_LAYERS: readonly SoundLayerDef[] = [
   { id: 'cafe', group: 'places', labelKey: 'soundscape.layer.cafe' },
   { id: 'train', group: 'places', labelKey: 'soundscape.layer.train' },
   { id: 'chimes', group: 'places', labelKey: 'soundscape.layer.chimes' },
+  { id: 'umbrella', group: 'weather', labelKey: 'snd5.layer.umbrella' },
+  { id: 'cicadas', group: 'nature', labelKey: 'snd5.layer.cicadas' },
+  { id: 'templeBell', group: 'japan', labelKey: 'snd5.layer.templeBell' },
+  { id: 'furin', group: 'japan', labelKey: 'snd5.layer.furin' },
+  { id: 'shishiOdoshi', group: 'japan', labelKey: 'snd5.layer.shishiOdoshi' },
+  { id: 'carriage', group: 'places', labelKey: 'snd5.layer.carriage' },
+  { id: 'konbini', group: 'places', labelKey: 'snd5.layer.konbini' },
+  { id: 'cityNight', group: 'places', labelKey: 'snd5.layer.cityNight' },
 ];
 
 export const SOUND_LAYER_GROUPS: readonly { id: SoundLayerGroup; labelKey: string }[] = [
   { id: 'noise', labelKey: 'soundscape.group.noise' },
   { id: 'weather', labelKey: 'soundscape.group.weather' },
   { id: 'nature', labelKey: 'soundscape.group.nature' },
+  { id: 'japan', labelKey: 'snd5.group.japan' },
   { id: 'places', labelKey: 'soundscape.group.places' },
 ];
 
@@ -64,7 +82,8 @@ export type MusicStyleId =
   | 'jazz-cafe'
   | 'jazz-ballad'
   | 'piano-emotional'
-  | 'ambient-drift';
+  | 'ambient-drift'
+  | 'koto-garden';
 
 export const MUSIC_STYLES: readonly { id: MusicStyleId; labelKey: string }[] = [
   { id: 'off', labelKey: 'soundscape.music.off' },
@@ -74,6 +93,7 @@ export const MUSIC_STYLES: readonly { id: MusicStyleId; labelKey: string }[] = [
   { id: 'jazz-ballad', labelKey: 'soundscape.music.jazzBallad' },
   { id: 'piano-emotional', labelKey: 'soundscape.music.pianoEmotional' },
   { id: 'ambient-drift', labelKey: 'soundscape.music.ambientDrift' },
+  { id: 'koto-garden', labelKey: 'snd5.music.kotoGarden' },
 ];
 
 /** What is sounding: the layers in the mix with their levels, plus one music style. */
@@ -130,7 +150,138 @@ export const BUILT_IN_SCENES: readonly SoundscapeScene[] = [
     labelKey: 'soundscape.scene.nightTrain',
     mix: { layers: { train: 0.55, rain: 0.3 }, music: 'lofi-chill', musicVolume: 0.45 },
   },
+  // snd5 — scenes built on the new layers.
+  {
+    id: 'temple-dawn',
+    labelKey: 'snd5.scene.templeDawn',
+    mix: { layers: { templeBell: 0.55, birds: 0.25, wind: 0.15 }, music: 'off', musicVolume: 0.5 },
+  },
+  {
+    id: 'umbrella-walk',
+    labelKey: 'snd5.scene.umbrellaWalk',
+    mix: { layers: { umbrella: 0.6, cityNight: 0.25 }, music: 'off', musicVolume: 0.5 },
+  },
+  {
+    id: 'local-train',
+    labelKey: 'snd5.scene.localTrain',
+    mix: { layers: { carriage: 0.6, rain: 0.15 }, music: 'off', musicVolume: 0.5 },
+  },
+  {
+    id: 'summer-afternoon',
+    labelKey: 'snd5.scene.summerAfternoon',
+    mix: { layers: { cicadas: 0.5, furin: 0.35, stream: 0.2 }, music: 'off', musicVolume: 0.5 },
+  },
+  {
+    id: 'konbini-night',
+    labelKey: 'snd5.scene.konbiniNight',
+    mix: { layers: { konbini: 0.55, cityNight: 0.2 }, music: 'off', musicVolume: 0.5 },
+  },
+  {
+    id: 'city-lights',
+    labelKey: 'snd5.scene.cityLights',
+    mix: { layers: { cityNight: 0.55, rain: 0.2 }, music: 'lofi-dusk', musicVolume: 0.4 },
+  },
+  {
+    id: 'zen-garden',
+    labelKey: 'snd5.scene.zenGarden',
+    mix: { layers: { shishiOdoshi: 0.5, furin: 0.2, wind: 0.1 }, music: 'koto-garden', musicVolume: 0.4 },
+  },
 ];
+
+// ---------------------------------------------------------------------------
+// snd5 — study-mode presets, fade schedules, per-scene volume
+// ---------------------------------------------------------------------------
+
+/** The study surfaces a scene can follow. */
+export type StudyModeId = 'reading' | 'review' | 'listening';
+export const STUDY_MODES: readonly { id: StudyModeId; labelKey: string }[] = [
+  { id: 'reading', labelKey: 'snd5.modes.reading' },
+  { id: 'review', labelKey: 'snd5.modes.review' },
+  { id: 'listening', labelKey: 'snd5.modes.listening' },
+];
+
+/** '' leaves the mixer alone, 'pause' fades it out for the mode, anything else is a scene or saved mix id. */
+export const MODE_PRESET_KEEP = '';
+export const MODE_PRESET_PAUSE = 'pause';
+
+export interface StudyModePresets {
+  /** Off by default: sound must be asked for. */
+  enabled: boolean;
+  reading: string;
+  review: string;
+  listening: string;
+}
+
+/**
+ * Reading wants a bed with no melody to compete with the text; a review session
+ * a light, lively one; listening practice the ear to itself, so it pauses.
+ */
+export const DEFAULT_STUDY_MODE_PRESETS: StudyModePresets = {
+  enabled: false,
+  reading: 'deep-focus',
+  review: 'summer-afternoon',
+  listening: MODE_PRESET_PAUSE,
+};
+
+export function normalizeStudyModePresets(raw: unknown): StudyModePresets {
+  const base = { ...DEFAULT_STUDY_MODE_PRESETS };
+  if (!raw || typeof raw !== 'object') return base;
+  const source = raw as Partial<StudyModePresets>;
+  const pick = (value: unknown, fallback: string): string =>
+    typeof value === 'string' && value.length <= 80 ? value : fallback;
+  return {
+    enabled: source.enabled === true,
+    reading: pick(source.reading, base.reading),
+    review: pick(source.review, base.review),
+    listening: pick(source.listening, base.listening),
+  };
+}
+
+export type FadeScheduleId = 'quick' | 'gentle' | 'slow' | 'sleep';
+
+export interface FadeSchedule {
+  id: FadeScheduleId;
+  labelKey: string;
+  /** Seconds from silence to the mix when playback starts. */
+  fadeInSec: number;
+  /** Seconds the sleep timer spends fading out before it stops. */
+  fadeOutSec: number;
+  /** Seconds the focus link fades over when a Pomodoro work block ends. */
+  breakFadeSec: number;
+}
+
+export const FADE_SCHEDULES: readonly FadeSchedule[] = [
+  { id: 'quick', labelKey: 'snd5.fade.quick', fadeInSec: 0.6, fadeOutSec: 8, breakFadeSec: 6 },
+  { id: 'gentle', labelKey: 'snd5.fade.gentle', fadeInSec: 5, fadeOutSec: 30, breakFadeSec: 12 },
+  { id: 'slow', labelKey: 'snd5.fade.slow', fadeInSec: 20, fadeOutSec: 180, breakFadeSec: 30 },
+  { id: 'sleep', labelKey: 'snd5.fade.sleep', fadeInSec: 45, fadeOutSec: 600, breakFadeSec: 60 },
+];
+
+export function fadeScheduleOf(id: unknown): FadeSchedule {
+  return FADE_SCHEDULES.find((s) => s.id === id) ?? (FADE_SCHEDULES[0] as FadeSchedule);
+}
+
+/**
+ * When a sleep timer of `minutes` starts its fade and how long the fade runs,
+ * in ms from now. The fade ENDS at the timer's end; a fade longer than the
+ * timer starts at once and is shortened to fit.
+ */
+export function sleepFadePlan(minutes: number, schedule: FadeSchedule): { fadeStartsInMs: number; fadeMs: number; stopInMs: number } {
+  const stopInMs = Math.max(0, minutes) * 60_000;
+  const fadeMs = Math.min(stopInMs, schedule.fadeOutSec * 1000);
+  return { fadeStartsInMs: stopInMs - fadeMs, fadeMs, stopInMs };
+}
+
+/** Clean a stored scene-volume map: known-shaped ids, levels clamped. */
+export function normalizeSceneVolumes(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (id.length > 80 || typeof value !== 'number' || !Number.isFinite(value)) continue;
+    out[id] = Math.min(1, Math.max(0, value));
+  }
+  return out;
+}
 
 /** A mix the owner named and kept. The name is their content and is never translated. */
 export interface SavedMix extends SoundscapeMix {
@@ -150,6 +301,10 @@ export interface SoundscapeState {
   /** Lower the soundscape while the app's own music player is playing. */
   duckWithMedia: boolean;
   saved: SavedMix[];
+  /** snd5: how playback fades in, and how the sleep timer and focus breaks fade out. */
+  fade: FadeScheduleId;
+  /** snd5: the overall volume the owner last chose while each scene or saved mix was on. */
+  sceneVolumes: Record<string, number>;
 }
 
 export const SOUNDSCAPE_STORAGE_KEY = 'jp-soundscape-v1';
@@ -191,6 +346,8 @@ export function defaultSoundscapeState(): SoundscapeState {
     musicVolume: 0.5,
     duckWithMedia: true,
     saved: [],
+    fade: 'quick',
+    sceneVolumes: {},
   };
 }
 
@@ -248,6 +405,8 @@ export function normalizeSoundscapeState(raw: unknown): SoundscapeState {
     musicVolume: clamp01(source.musicVolume, base.musicVolume),
     duckWithMedia: source.duckWithMedia !== false,
     saved,
+    fade: fadeScheduleOf(source.fade).id,
+    sceneVolumes: normalizeSceneVolumes(source.sceneVolumes),
   };
 }
 
@@ -354,6 +513,12 @@ export const NATURAL_MINOR: readonly number[] = [0, 2, 3, 5, 7, 8, 10];
 /** Natural minor with the seventh raised: what a major V chord asks of a minor key. */
 export const HARMONIC_MINOR: readonly number[] = [0, 2, 3, 5, 7, 8, 11];
 export const MAJOR_PENTATONIC: readonly number[] = [0, 2, 4, 7, 9];
+/**
+ * snd5: the in (miyako-bushi) scale of koto music — two half steps in five
+ * notes, which is what makes it sound like a koto piece rather than a
+ * pentatonic exercise.
+ */
+export const MIYAKO_BUSHI: readonly number[] = [0, 1, 5, 7, 8];
 
 /** Every note in [low, high] on the given scale of the key whose tonic is `tonicPc`. */
 export function keyNotes(tonicPc: number, steps: readonly number[], low: number, high: number): number[] {

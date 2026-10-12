@@ -112,7 +112,7 @@ describe('liquid presentation — conventional stays the default', () => {
     // Standard IS the absence of the field. Keeping `{mode:'standard'}` would
     // make every conventional window carry a key it never needed.
     expect(parsePresentation({ v: 1, mode: 'standard' })).toBeUndefined();
-    const withStandard = { ...WINDOW, presentation: { v: 1, mode: 'standard' as const } };
+    const withStandard = { ...WINDOW, presentation: { v: 1 as const, mode: 'standard' as const } };
     const clean = sanitizeWindowPresentation(withStandard);
     expect('presentation' in clean).toBe(false);
     expect(clean).toEqual(WINDOW);

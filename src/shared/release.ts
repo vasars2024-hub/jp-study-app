@@ -1,6 +1,92 @@
 export const GITHUB_OWNER = 'vasars2024-hub';
 export const GITHUB_REPO = 'jp-study-app';
-export const GITHUB_RELEASES_LATEST = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
+/** The GitHub API's repository root; the release feed is `<base>/releases[/latest]`. */
+export const GITHUB_API_REPO_BASE = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
+/** Where the project's release pages live; any link from a release payload must be under it. */
+export const GITHUB_RELEASES_PAGE = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
+
+/** stable = GitHub's latest full release; beta = the newest release, pre-releases included. */
+export type ReleaseChannel = 'stable' | 'beta';
+
+export function isReleaseChannel(value: unknown): value is ReleaseChannel {
+  return value === 'stable' || value === 'beta';
+}
+
+/** `1.2.3`, `v1.2`, `1.2.3-beta.1`, `1.2.3+build` — what a release tag must look like to be compared. */
+const RELEASE_VERSION_RE = /^v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+export function isReleaseVersion(tag: string): boolean {
+  return RELEASE_VERSION_RE.test(String(tag ?? '').trim());
+}
+
+/** One release as the feed describes it, after validation. */
+export interface FeedRelease {
+  /** The tag exactly as published (`v1.2.0`), for download URLs. */
+  tag: string;
+  version: string;
+  name: string;
+  body: string;
+  url: string;
+  publishedAt?: string;
+  prerelease: boolean;
+}
+
+/**
+ * A GitHub release object, validated: a tag that is a version, strings where
+ * strings belong, a release-page link only under this project's releases.
+ * Drafts and anything malformed are `null` — never compared, never shown.
+ */
+export function parseFeedRelease(raw: unknown): FeedRelease | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (r.draft === true) return null;
+  const tag = typeof r.tag_name === 'string' ? r.tag_name.trim() : '';
+  if (!isReleaseVersion(tag)) return null;
+  const version = normalizeVersion(tag);
+  const name = typeof r.name === 'string' && r.name.trim() ? r.name.trim().slice(0, 200) : `v${version}`;
+  return {
+    tag,
+    version,
+    name,
+    body: typeof r.body === 'string' ? r.body : '',
+    url: safeReleaseUrl(r.html_url, version),
+    ...(typeof r.published_at === 'string' ? { publishedAt: r.published_at } : {}),
+    prerelease: r.prerelease === true,
+  };
+}
+
+/**
+ * The release-page link to hand to `openExternal`: the payload's own when it is
+ * an https page of THIS project's releases, else the tag page we know. A feed
+ * (or a man in the middle of it) cannot make the button open somewhere else.
+ */
+export function safeReleaseUrl(raw: unknown, version: string): string {
+  const fallback = version ? `${GITHUB_RELEASES_PAGE}/tag/v${version}` : GITHUB_RELEASES_PAGE;
+  if (typeof raw !== 'string') return fallback;
+  try {
+    const u = new URL(raw);
+    const page = new URL(GITHUB_RELEASES_PAGE);
+    if (u.protocol !== 'https:' || u.host !== page.host) return fallback;
+    if (u.pathname !== page.pathname && !u.pathname.startsWith(`${page.pathname}/`)) return fallback;
+    if (u.username || u.password) return fallback;
+    return u.toString();
+  } catch {
+    return fallback;
+  }
+}
+
+/** The release a channel follows, out of a `/releases` list: the highest version, pre-releases only on beta. */
+export function pickChannelRelease(list: unknown, channel: ReleaseChannel): FeedRelease | null {
+  if (!Array.isArray(list)) return null;
+  let best: FeedRelease | null = null;
+  for (const raw of list) {
+    const release = parseFeedRelease(raw);
+    if (!release) continue;
+    if (release.prerelease && channel !== 'beta') continue;
+    if (!best || compareVersions(release.version, best.version) > 0) best = release;
+  }
+  return best;
+}
 
 export interface AppReleaseInfo {
   version: string;
@@ -73,12 +159,28 @@ export function compareVersions(a: string, b: string): number {
  */
 export type ReleaseStatusKind = 'update' | 'current' | 'newer' | 'no-releases' | 'unavailable';
 
+/**
+ * Why a check came back `unavailable`, so the panel can say something useful:
+ *   offline       no connection / DNS / timeout
+ *   rate-limited  GitHub answered 403/429 with its rate limit spent (`retryAt` when it said)
+ *   http          any other non-success status
+ *   invalid       an answer that is not a release (bad JSON, a tag that is not a version)
+ *   disabled      checks are switched off here (a headless test run without a fake feed)
+ */
+export type ReleaseUnavailableReason = 'offline' | 'rate-limited' | 'http' | 'invalid' | 'disabled';
+
 export interface ReleaseStatus {
   kind: ReleaseStatusKind;
   current: string;
   latest?: string;
   url?: string;
   checkedAt: number;
+  reason?: ReleaseUnavailableReason;
+  /** Epoch ms when GitHub's rate limit resets (from `x-ratelimit-reset` / `retry-after`). */
+  retryAt?: number;
+  channel?: ReleaseChannel;
+  /** The latest release is the one the user chose to skip. */
+  skipped?: boolean;
 }
 
 export function classifyRelease(current: string, latest: string | null | undefined): ReleaseStatusKind {

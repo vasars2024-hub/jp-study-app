@@ -44,6 +44,7 @@ import {
   parseVisualNovelHookChunk,
   type VisualNovelHookState,
 } from '../../shared/visualNovelHook';
+import { vn5CleanLine, vn5CompileRule } from '../../shared/visualNovelLineFilters';
 import type { VisualNovelCandidateRequest } from '../../shared/visualNovelRecommendations';
 import type {
   VisualNovelCaptureSource,
@@ -279,7 +280,14 @@ async function readHookRelay(id: string): Promise<void> {
       const decoded = relay.remainder + decodeScript(buffer.subarray(0, bytesRead));
       const chunks = decoded.split(/\r?\n/u);
       relay.remainder = chunks.pop()?.slice(-2_000) ?? '';
-      const lines = parseVisualNovelHookChunk(chunks.join('\n'));
+      // The same cleanup and user filters the live capture session applies.
+      const filters = visualNovelSettings(loadDatabase()).lineFilters;
+      const compiled = filters.rules.map(vn5CompileRule);
+      const kept = chunks.flatMap((chunk) => {
+        const cleaned = vn5CleanLine(chunk, filters, compiled);
+        return cleaned.dropped ? [] : [cleaned.text];
+      });
+      const lines = parseVisualNovelHookChunk(kept.join('\n'));
       if (lines.length) {
         const database = loadDatabase();
         const entry = database.entries.find((candidate) => candidate.id === id);
@@ -514,6 +522,7 @@ function startCapture(id: string, test = false) {
     websocket: test || settings.websocketEnabled,
     websocketUrl: settings.websocketUrl,
     test,
+    lineFilters: settings.lineFilters,
   });
 }
 
@@ -1328,6 +1337,9 @@ export function registerVisualNovelIpc(): void {
     const live = captureSession.state();
     if (live.active && !live.test && (patch?.websocketEnabled !== undefined || patch?.websocketUrl !== undefined)) {
       startCapture(live.visualNovelId);
+    } else if (patch?.lineFilters) {
+      // Filters apply to the running session without reconnecting anything.
+      captureSession.setLineFilters(settings.lineFilters);
     }
     return database;
   });

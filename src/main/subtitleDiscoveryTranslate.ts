@@ -7,9 +7,10 @@
  *   helper language → Japanese, when only an English track exists and the audio
  *     is not Japanese, so Whisper cannot hear a Japanese line to transcribe.
  *
- * Engines are the app's existing ones, nothing new: a cloud provider through
- * `providerRuntime` (Gemini / DeepSeek, with the user's key and monthly spend
- * ceiling), else the offline Qwen model through `runLocalQwenPrompt`, which
+ * Engines are the app's existing ones, nothing new: the provider chosen in
+ * Settings > AI through `providerRuntime` (with the user's key and monthly spend
+ * ceiling, and ONLY after the user opted in to cloud subtitle translation),
+ * else the offline Qwen model through `runLocalQwenPrompt`, which
  * shares the translator's serialized queue so an interactive translation is
  * never stuck behind a whole episode. Lines already translated anywhere in the
  * app are read from the shared translation cache and cost nothing.
@@ -18,8 +19,9 @@
  * `shared/subtitleDiscoveryTranslate.ts`.
  */
 
-import { AI_PROVIDERS, type AiProviderId } from '../shared/aiProviders';
+import type { AiProviderId } from '../shared/aiProviders';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
+import { hasTranslateConsent } from '../shared/translateProviders';
 import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
 import type { SubtitleTranslationEnginePreference } from '../shared/subtitleDiscoveryIpc';
 import {
@@ -34,16 +36,72 @@ import {
 } from '../shared/subtitleDiscoveryTranslate';
 import { AiProviderRuntimeError, getAiProviderHealth, runCloudAiRequest } from './providerRuntime';
 import {
+  AI_FEATURES_OFF_MESSAGE,
+  AI_CLOUD_FEATURE_OFF_MESSAGE,
+  aiCloudAllowedFor,
+  aiFeaturesEnabled,
+  configuredAiProviderId,
+} from './aiFeatureGate';
+import {
   flushTranslationCache,
   getCachedTranslation,
   isTranslateAvailable,
   runLocalQwenPrompt,
   setCachedTranslation,
 } from './translate';
+import { readTranslateProviderSettings } from './translateRouter';
 
 export type SubtitleTranslationEngine =
   | { kind: 'cloud'; providerId: AiProviderId; label: string }
   | { kind: 'local'; label: 'local-qwen' };
+
+/**
+ * What the engine choice depends on, injectable so the consent rules are
+ * testable without a profile on disk.
+ */
+export interface SubtitleEngineDeps {
+  /** "Use AI features" (Settings > AI). Off means no engine at all, offline included. */
+  aiEnabled(): boolean;
+  /** The provider chosen in Settings > AI — never "the first one with a key". */
+  configuredProvider(): AiProviderId | null;
+  /** A usable credential exists (a key, or a local server's URL and model). */
+  providerConfigured(id: AiProviderId): boolean;
+  /**
+   * The user opted in to sending subtitle lines to this provider: the
+   * "Subtitle translation" cloud toggle in Settings > AI, or the Translate
+   * workbench's consent for the same provider.
+   */
+  cloudAllowed(id: AiProviderId): boolean;
+  localAvailable(): boolean;
+}
+
+function translateConsentFor(id: AiProviderId): boolean {
+  try {
+    // The router owns the Translate settings file; this module only reads it.
+    return hasTranslateConsent(readTranslateProviderSettings(), id);
+  } catch {
+    return false;
+  }
+}
+
+/** Whether subtitle lines may go to this cloud provider right now. */
+export function subtitleCloudAllowed(id: AiProviderId): boolean {
+  return aiCloudAllowedFor('subtitleTranslate') || translateConsentFor(id);
+}
+
+const DEFAULT_ENGINE_DEPS: SubtitleEngineDeps = {
+  aiEnabled: aiFeaturesEnabled,
+  configuredProvider: configuredAiProviderId,
+  providerConfigured: (id) => {
+    try {
+      return getAiProviderHealth(id).configured;
+    } catch {
+      return false;
+    }
+  },
+  cloudAllowed: subtitleCloudAllowed,
+  localAvailable: isTranslateAvailable,
+};
 
 /** Lines per request. A cloud model takes a whole scene; the 1.7B local model does best with a few. */
 const CLOUD_CHUNK = 40;
@@ -62,30 +120,31 @@ const FATAL_CLOUD_CODES = new Set([
   'cost-budget',
   'cloud-disabled',
   'sensitive-context',
+  'ai-off',
+  'unknown-provider',
 ]);
 
 /**
- * The engine a translation may use now, or null when none is configured.
+ * The engine a translation may use now, or null when none may run.
  *
- * `auto` prefers a configured cloud key (fast, and far better than a 1.7B model
- * at dialogue), then the offline model. The first configured provider in the
- * app's own table wins, which puts DeepSeek Flash ahead of Pro.
+ * Nothing runs with "Use AI features" off — the offline model included. The
+ * cloud is used only for the provider chosen in Settings > AI, only when it is
+ * set up, and only when the user opted in to sending subtitle lines there
+ * (audit F1: `auto` used to pick the first provider with a key and send whole
+ * episodes with no opt-in). Otherwise `auto` falls back to the offline model.
  */
 export function resolveSubtitleTranslationEngine(
   preference: SubtitleTranslationEnginePreference,
+  deps: SubtitleEngineDeps = DEFAULT_ENGINE_DEPS,
 ): SubtitleTranslationEngine | null {
+  if (!deps.aiEnabled()) return null;
   if (preference !== 'local') {
-    for (const provider of AI_PROVIDERS) {
-      try {
-        if (getAiProviderHealth(provider.id).configured) {
-          return { kind: 'cloud', providerId: provider.id, label: provider.id };
-        }
-      } catch {
-        /* an unreadable vault is the same as no key */
-      }
+    const providerId = deps.configuredProvider();
+    if (providerId && deps.cloudAllowed(providerId) && deps.providerConfigured(providerId)) {
+      return { kind: 'cloud', providerId, label: providerId };
     }
   }
-  if (preference !== 'cloud' && isTranslateAvailable()) return { kind: 'local', label: 'local-qwen' };
+  if (preference !== 'cloud' && deps.localAvailable()) return { kind: 'local', label: 'local-qwen' };
   return null;
 }
 
@@ -103,8 +162,35 @@ export interface TranslatedTrack {
   stoppedBy?: string;
 }
 
+/**
+ * The subtitle namespace of the shared translation cache, versioned.
+ *
+ * v1 (`<lang>#subtitle`) stored EVERY engine's lines under the offline model's
+ * key, so a cloud translation was served later as "offline" — after the user
+ * withdrew the cloud opt-in, or switched provider. Those entries cannot be told
+ * apart from genuine offline ones (the key is a hash), so the namespace moved:
+ * v1 entries are never read again, whichever engine wrote them.
+ */
+export const SUBTITLE_TRANSLATION_CACHE_VERSION = 2;
+
+export function subtitleCacheSource(source: string): string {
+  return `${source}#subtitle.v${SUBTITLE_TRANSLATION_CACHE_VERSION}`;
+}
+
+/** Whose answers a run may read and write: the provider id for the cloud, `local` for the offline model. */
+export function subtitleCacheScope(engine: SubtitleTranslationEngine): string {
+  return engine.kind === 'cloud' ? engine.providerId : 'local';
+}
+
 async function askEngine(engine: SubtitleTranslationEngine, prompt: string, lines: number): Promise<string> {
+  // Re-checked per chunk, at send time: a run that started before the user
+  // switched AI off, or withdrew the opt-in, stops at the next chunk instead of
+  // finishing the episode.
+  if (!aiFeaturesEnabled()) throw new AiProviderRuntimeError(AI_FEATURES_OFF_MESSAGE, 'ai-off');
   if (engine.kind === 'cloud') {
+    if (!subtitleCloudAllowed(engine.providerId)) {
+      throw new AiProviderRuntimeError(AI_CLOUD_FEATURE_OFF_MESSAGE, 'cloud-disabled');
+    }
     const result = await runCloudAiRequest({
       providerId: engine.providerId,
       prompt,
@@ -142,12 +228,14 @@ export async function translateSubtitleTrack(
   if (!units.length || units.length > MAX_UNITS) return null;
 
   // Namespaced so a subtitle line never borrows a glossary entry's "meaning only"
-  // answer for the same text, and the reverse.
-  const cacheSource = `${source}#subtitle`;
+  // answer for the same text, and the reverse; scoped by engine so a cloud line
+  // is never served later as the offline model's, nor one provider's as another's.
+  const cacheSource = subtitleCacheSource(source);
+  const scope = subtitleCacheScope(engine);
   const translations = new Map<string, string>();
   const pending: SubtitleTranslationUnit[] = [];
   for (const unit of units) {
-    const hit = getCachedTranslation(unit.text, cacheSource, target);
+    const hit = getCachedTranslation(unit.text, cacheSource, target, scope);
     if (hit && isValidCrossLangTranslation(source, target, unit.text, hit)) translations.set(unit.id, hit);
     else pending.push(unit);
   }
@@ -179,7 +267,7 @@ export async function translateSubtitleTrack(
         const text = parsed.get(unit.id);
         if (!text || !isValidCrossLangTranslation(source, target, unit.text, text)) continue;
         translations.set(unit.id, text);
-        setCachedTranslation(unit.text, cacheSource, target, text);
+        setCachedTranslation(unit.text, cacheSource, target, text, scope);
       }
       options.onProgress?.(translations.size, units.length);
     }

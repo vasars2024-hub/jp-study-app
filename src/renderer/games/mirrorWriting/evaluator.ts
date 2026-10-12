@@ -1,6 +1,12 @@
 import type { MirrorText } from '../../data/mirrorTexts';
-import type { GameArenaSettings } from '../settings';
+import { migrateMirrorApiKey, type GameArenaSettings, type MirrorEvaluatorBackend } from '../settings';
 import type { StudyLang } from '../../../shared/levelScale';
+import { aiErrorMessageKey } from '../../../shared/aiConnectionTest';
+import {
+  MIRROR_CREDENTIAL_ID,
+  mirrorChatCompletionsUrl,
+  type MirrorAppAiResponse,
+} from '../../../shared/mirrorEvaluatorIpc';
 
 export type MirrorAxis = 'grammar' | 'vocabulary' | 'flow' | 'fidelity';
 
@@ -95,6 +101,20 @@ export function validateMirrorEvaluation(value: unknown): MirrorEvaluation | nul
   };
 }
 
+/**
+ * The JSON inside a model's text: a ```json fence's body, else the outermost
+ * object. Models fence their JSON whatever the prompt says, and a bare
+ * `JSON.parse` of a fenced reply failed every time (audit E11).
+ */
+function unfence(content: string): string {
+  const trimmed = content.trim();
+  const fence = trimmed.match(/```(?:json|JSON)?\s*([\s\S]*?)```/u);
+  if (fence?.[1]?.trim()) return fence[1].trim();
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  return start >= 0 && end > start ? trimmed.slice(start, end + 1) : trimmed;
+}
+
 function extractJson(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
   const maybeChoices = value as { choices?: unknown };
@@ -103,7 +123,7 @@ function extractJson(value: unknown): unknown {
     const content = choice?.message?.content ?? choice?.text;
     if (typeof content === 'string') {
       try {
-        return JSON.parse(content);
+        return JSON.parse(unfence(content));
       } catch {
         return value;
       }
@@ -277,9 +297,14 @@ export function localRubricEvaluate(text: MirrorText, draft: string): MirrorEval
   };
 }
 
-/** The request body an OpenAI-compatible chat endpoint is sent. */
-function requestBody(text: MirrorText, draft: string): unknown {
+/**
+ * The request body an OpenAI-compatible chat endpoint is sent. `model` is
+ * included whenever one is set: api.openai.com answers 400 without it, and
+ * Ollama / LM Studio need it to pick the loaded model (audit E11).
+ */
+function requestBody(text: MirrorText, draft: string, model: string): unknown {
   return {
+    ...(model.trim() ? { model: model.trim() } : {}),
     temperature: 0,
     messages: [
       {
@@ -302,17 +327,17 @@ type ApiReply = { ok: true; data: unknown } | { ok: false; status?: number; deta
  * is kept only for a page with no preload bridge (tests, harness pages).
  */
 async function postToEndpoint(settings: GameArenaSettings, body: unknown): Promise<ApiReply> {
-  const url = settings.mirrorApiUrl.trim();
-  const apiKey = settings.mirrorApiKey.trim();
+  const url = mirrorChatCompletionsUrl(settings.mirrorApiUrl);
+  // No key crosses here: main reads it from the credential vault.
   const bridge = typeof window !== 'undefined' ? window.api?.gamesMirrorEvaluate : undefined;
   if (bridge) {
-    const reply = await bridge({ url, apiKey, body });
+    const reply = await bridge({ url, body });
     if (reply.ok) return { ok: true, data: reply.data };
     return { ok: false, status: reply.reason === 'http' ? reply.status : undefined, detail: reply.detail };
   }
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!response.ok) return { ok: false, status: response.status };
@@ -320,17 +345,20 @@ async function postToEndpoint(settings: GameArenaSettings, body: unknown): Promi
 }
 
 async function callApi(settings: GameArenaSettings, text: MirrorText, draft: string, retry: boolean): Promise<MirrorEvaluationResult> {
-  if (!settings.mirrorApiUrl.trim() || !settings.mirrorApiKey.trim()) {
+  // Only the URL is required: a local server (Ollama, LM Studio) takes no key.
+  if (!settings.mirrorApiUrl.trim()) {
     return {
       ok: false,
       reason: 'api-missing',
-      message: 'Configure an API endpoint and key in Game Arena settings.',
+      message: 'Configure an API endpoint in Game Arena settings.',
       messageKey: 'games.mirror.error.apiMissing',
     };
   }
 
   try {
-    const reply = await postToEndpoint(settings, requestBody(text, draft));
+    // An older build's plaintext key moves into the vault before main reads it there.
+    if (!retry) await migrateMirrorApiKey(MIRROR_CREDENTIAL_ID);
+    const reply = await postToEndpoint(settings, requestBody(text, draft, settings.mirrorApiModel));
     if (!reply.ok) {
       if (reply.status !== undefined) {
         return {
@@ -371,19 +399,65 @@ async function callApi(settings: GameArenaSettings, text: MirrorText, draft: str
 }
 
 /**
+ * Grades through the app's own AI (Settings > AI): main sends the prompt with
+ * the evaluation schema through the central client, or to the offline model.
+ */
+async function callAppAi(text: MirrorText, draft: string): Promise<MirrorEvaluationResult> {
+  const bridge = typeof window !== 'undefined' ? window.api?.gamesMirrorEvaluateAppAi : undefined;
+  if (!bridge) {
+    return { ok: false, reason: 'api-missing', message: 'App AI is not available here.', messageKey: 'aiProv.error.generic' };
+  }
+  let reply: MirrorAppAiResponse;
+  try {
+    reply = await bridge({ prompt: buildPrompt(text, draft), lang: text.lang ?? 'ja' });
+  } catch {
+    return { ok: false, reason: 'network', message: 'The evaluator request failed.', messageKey: 'games.mirror.error.requestFailed' };
+  }
+  if (!reply.ok) {
+    return {
+      ok: false,
+      reason: reply.code === 'invalid-response' ? 'schema-invalid' : 'network',
+      message: reply.code,
+      messageKey: aiErrorMessageKey(reply.code),
+    };
+  }
+  const evaluation = validateMirrorEvaluation(reply.data);
+  if (evaluation) return { ok: true, evaluation: { ...evaluation, evaluatorVersion: 'app-ai-v1' } };
+  return {
+    ok: false,
+    reason: 'schema-invalid',
+    message: 'The evaluator response did not match the score schema.',
+    messageKey: 'games.mirror.error.schemaInvalid',
+  };
+}
+
+/**
+ * The backend a draft is actually sent to. `app-ai` needs AI to be set up
+ * (Settings > AI); until it is, the instant rubric answers instead of an error,
+ * so the game never stops working because a key is missing.
+ */
+export function resolveMirrorBackend(
+  settings: Pick<GameArenaSettings, 'mirrorBackend'>,
+  appAiReady: boolean,
+): MirrorEvaluatorBackend {
+  if (settings.mirrorBackend === 'app-ai' && !appAiReady) return 'local';
+  return settings.mirrorBackend;
+}
+
+/**
  * Score a draft. `local` is the quick check: a rubric over script, sentence
- * shape, connectives and idea coverage, instant and with nothing to download
- * (a 28.9 MB "evaluator" download used to gate it, and that model was never
- * run). `api` sends the draft to the endpoint set in Game Arena settings.
- * Detailed feedback from the app's own AI goes through the Agent instead.
+ * shape, connectives and idea coverage, instant and with nothing to download.
+ * `app-ai` uses the provider set in Settings > AI; `api` sends the draft to the
+ * endpoint set in Game Arena settings.
  */
 export async function evaluateMirrorWriting(
   settings: GameArenaSettings,
   text: MirrorText,
   draft: string,
+  options: { appAiReady?: boolean } = {},
 ): Promise<MirrorEvaluationResult> {
-  if (settings.mirrorBackend === 'api') {
-    return callApi(settings, text, draft, false);
-  }
+  const backend = resolveMirrorBackend(settings, options.appAiReady === true);
+  if (backend === 'api') return callApi(settings, text, draft, false);
+  if (backend === 'app-ai') return callAppAi(text, draft);
   return { ok: true, evaluation: localRubricEvaluate(text, draft) };
 }

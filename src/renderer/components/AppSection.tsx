@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type JSX } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import type { DesktopWinSection } from '../../shared/desktop';
 import { useT } from '../i18n';
@@ -31,6 +31,8 @@ const YouTubePlaylistsView = lazy(() => import('../views/YouTubePlaylistsView'))
 const SettingsApp = lazy(() => import('./settings/SettingsApp'));
 const FilesApp = lazy(() => import('./filesapp/FilesApp'));
 const VisualNovelsView = lazy(() => import('../views/VisualNovelsView'));
+const SnipsView = lazy(() => import('../views/SnipsView'));
+const ConversationView = lazy(() => import('../views/ConversationView'));
 
 function openVisualizerSettings(): void {
   openSectionSurface('settings');
@@ -149,6 +151,12 @@ export default function AppSection({
       break;
     case 'visualnovels':
       view = <VisualNovelsView />;
+      break;
+    case 'snips':
+      view = <SnipsView />;
+      break;
+    case 'conversation':
+      view = <ConversationView />;
       break;
     default:
       // NOT `null`. A section the switch does not recognise used to render an

@@ -122,6 +122,13 @@
         aiPanel.remove();
         aiPanel = null;
       }
+      if (aiSheetHost) {
+        closeAiSheet();
+        aiSheetHost.remove();
+        aiSheetHost = null;
+        aiSheetRoot = null;
+        aiSheet = null;
+      }
       clearLookupMarks();
       document.documentElement.classList.remove('jp-study-hl-mode');
       for (const t of THEMES) {
@@ -558,8 +565,22 @@
 
   const lookupCache = new Map(); // `${lang}:${text}` → response
   const LOOKUP_CACHE_MAX = 200;
+  /**
+   * Gum's lockscreen is engaged (risk4). Learned from a 423 reply or from the
+   * background's `gum-app-locked` broadcast. While it holds, nothing is read
+   * from or written to this cache — a hover on a word looked up before the lock
+   * would otherwise show its answer without asking the app — and engaging it
+   * purges what was cached.
+   */
+  let appLockedSeen = false;
+
+  function noteAppLockState(locked) {
+    if (locked) lookupCache.clear();
+    appLockedSeen = !!locked;
+  }
 
   function cacheGet(key) {
+    if (appLockedSeen) return undefined;
     if (!lookupCache.has(key)) return undefined;
     const hit = lookupCache.get(key);
     lookupCache.delete(key);
@@ -568,6 +589,7 @@
   }
 
   function cachePut(key, value) {
+    if (appLockedSeen) return;
     lookupCache.set(key, value);
     while (lookupCache.size > LOOKUP_CACHE_MAX) lookupCache.delete(lookupCache.keys().next().value);
   }
@@ -582,6 +604,8 @@
     if (hit) return hit;
     const res = await safeRuntimeSend({ type: 'lookup', query, lang });
     if (res?.invalidated) return res;
+    if (isLockedReply(res)) noteAppLockState(true);
+    else if (res && res.ok && !res.fromCache) noteAppLockState(false);
     // Cache only definitive answers (hits and true misses) — never offline
     // errors, so results recover as soon as the app starts.
     if (res && res.ok) cachePut(key, res);
@@ -611,6 +635,8 @@
     if (hit) return hit;
     const res = await safeRuntimeSend({ type: 'scan', text, lang });
     if (res?.invalidated) return { matched: '', entries: [], invalidated: true };
+    if (isLockedReply(res)) noteAppLockState(true);
+    else if (res && res.ok && !res.fromCache) noteAppLockState(false);
     if (!res || !res.ok) return { matched: '', entries: [], offline: !!res?.offline, locked: isLockedReply(res), error: res?.error };
     const entries = (res.entries || []).filter(isRealMatch);
     const out = entries.length
@@ -808,6 +834,8 @@
       const menu = popup.querySelector('.rp-overflow-menu');
       if (menu) menu.hidden = true;
     }
+    // A closed popup asks the AI nothing more (the sheet keeps its own request).
+    if (currentHit) cancelHitAiTasks(currentHit);
     popupPinned = false;
     updatePinButton();
     hitHistory = [];
@@ -1045,6 +1073,8 @@
         ? uiMsg('content_rpDictOffline')
         : uiMsg('content_rpNoEntries');
       body.innerHTML = `<div class="rp-empty">${esc(offlineNote)}</div>`;
+      // No dictionary entry: the AI can suggest a meaning, applied only on approval.
+      if (!hit.lookupLocked) appendAiMeaningTools(body, hit);
       return;
     }
     body.innerHTML = '';
@@ -1060,6 +1090,7 @@
       more.textContent = tn('content_rpMoreEntries', cards.length - 5);
       body.appendChild(more);
     }
+    appendAiMeaningTools(body, hit);
     void checkInDeck(hit);
   }
 
@@ -1462,6 +1493,7 @@
         <button type="button" class="rp-mini" data-act="save-sentence">${uiHtml('content_rpSaveSentence')}</button>
         <button type="button" class="rp-mini" data-act="card-sentence">${uiHtml('content_rpCreateCard')}</button>
       </div>`;
+    appendAiSentenceTools(body, hit);
     const statsEl = body.querySelector('.rp-sentence-stats');
     const token = lookupToken;
     const [level, comp] = await Promise.all([
@@ -1796,6 +1828,38 @@
         if (term) void nestedLookup(term);
         return;
       }
+      case 'ai-explain':
+        void runAiExplain();
+        return;
+      case 'ai-meaning':
+        void runAiMeaning();
+        return;
+      case 'ai-meaning-apply': {
+        // Applied only on this press: the card gets the meaning, marked as AI.
+        const task = hit.ai && hit.ai.meaning;
+        if (task && task.status === 'done' && task.result && task.result.meaning) {
+          hit.aiMeaning = task.result.meaning;
+          renderAiMeaningOut(hit);
+        }
+        return;
+      }
+      case 'ai-meaning-dismiss':
+        if (hit.ai && hit.ai.meaning) hit.ai.meaning = { status: 'idle' };
+        hit.aiMeaning = '';
+        renderAiMeaningOut(hit);
+        return;
+      case 'ai-cancel': {
+        const feature = btn.getAttribute('data-feature') || '';
+        cancelAiTask(hit.ai && hit.ai[feature]);
+        renderAiMeaningOut(hit);
+        return;
+      }
+      case 'ai-breakdown':
+        runAiBreakdown();
+        return;
+      case 'ai-simplify':
+        runAiSimplify();
+        return;
       default:
         break;
     }
@@ -1842,6 +1906,10 @@
     } else if (k === 'a') {
       e.preventDefault();
       handlePopupAction('tts', popup);
+    } else if (k === 'e' && !shift && popup.querySelector('[data-ai-tools]:not([hidden]) [data-act="ai-explain"]')) {
+      // "Explain in context", only where its button is shown (AI on, a sentence, senses).
+      e.preventDefault();
+      handlePopupAction('ai-explain', popup);
     } else if (e.key === 'Backspace' && hitHistory.length) {
       e.preventDefault();
       popHitHistory();
@@ -1973,10 +2041,12 @@
             : '')
       : '';
     const sentence = hit.sentence && hit.sentence.text && hit.sentence.text !== hit.term ? hit.sentence.text : '';
+    // No dictionary gloss: the meaning the reader approved from the AI, marked as AI.
+    const meaning = gloss || (hit.aiMeaning && S.aiCardMeaning ? S.aiCardMeaning(hit.aiMeaning) : '');
     return {
       ...(sentence ? { sentence: sentence.slice(0, 200) } : {}),
       ...(entry && entry.reading && entry.reading !== (entry.word || '') ? { reading: entry.reading } : {}),
-      ...(gloss ? { meaning: gloss.slice(0, 1000) } : {}),
+      ...(meaning ? { meaning: meaning.slice(0, 1000) } : {}),
       lemma: (entry && entry.word) || hit.deinflection?.term || hit.term,
       surface: hit.term,
       entryIndex: Math.max(0, entryIndex | 0),
@@ -2038,6 +2108,595 @@
   function translateError(res) {
     if (res?.status === 503) return uiMsg('content_rpTranslateFailed');
     return res?.error || uiMsg('content_translationFailed');
+  }
+
+  /* ------------------------------ optional AI ------------------------------ */
+  //
+  // On demand only: nothing here runs while hovering. The popup draws its
+  // dictionary exactly as before; the AI controls are extra buttons, and a model
+  // is asked only when one is pressed. The app owns the key, the provider, the
+  // master switch, the per-feature cloud opt-in and the offline model
+  // (src/main/extensionAiRoutes.ts); background.js owns the request and its
+  // Cancel; the pure helpers live in shared.js ("optional AI").
+  //
+  // Model text is only ever set with textContent — never markup — because it is
+  // drawn on someone else's page.
+
+  /** How long an `/v1/ai/status` answer is trusted before a popup asks again. */
+  const AI_STATUS_TTL_MS = 20000;
+  let aiStatus = null;
+  let aiStatusAt = 0;
+  let aiStatusInFlight = null;
+  let aiSeq = 0;
+
+  /** Ask the app what AI it offers (cheap; no model is called). Unknown while the app is closed. */
+  function refreshAiStatus(force) {
+    if (aiStatusInFlight) return aiStatusInFlight;
+    if (!force && aiStatusAt && Date.now() - aiStatusAt < AI_STATUS_TTL_MS) return Promise.resolve(aiStatus);
+    aiStatusInFlight = safeRuntimeSend({ type: 'ai-status' }).then((res) => {
+      aiStatusInFlight = null;
+      if (res?.invalidated) return aiStatus;
+      aiStatus = res && res.ok ? res : null;
+      aiStatusAt = Date.now();
+      syncAiControls();
+      return aiStatus;
+    });
+    return aiStatusInFlight;
+  }
+
+  /**
+   * Whether AI controls are shown: once the app has answered the status (an
+   * answer that failed — the app closed — counts, so pressing one can say why),
+   * and unless it said AI is off. Before the first answer they wait hidden, so a
+   * reader with AI off never sees them flash.
+   */
+  function aiControlsShown() {
+    return aiStatusAt > 0 && (S.aiControlsVisible ? S.aiControlsVisible(aiStatus) : true);
+  }
+
+  /** Show or hide every AI control already drawn, after the status changed. */
+  function syncAiControls() {
+    const show = aiControlsShown();
+    for (const root of [popup, aiSheet]) {
+      if (!root) continue;
+      root.querySelectorAll('[data-ai-tools]').forEach((el) => {
+        el.hidden = !show;
+      });
+    }
+  }
+
+  function aiEl(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = String(text);
+    return node;
+  }
+
+  function aiButton(act, label, opts = {}) {
+    const btn = aiEl('button', `rp-mini rp-ai-btn${opts.primary ? ' rp-ai-primary' : ''}`, label);
+    btn.type = 'button';
+    btn.setAttribute('data-act', act);
+    if (opts.feature) btn.setAttribute('data-feature', opts.feature);
+    return btn;
+  }
+
+  /** The "AI" mark every model answer carries. */
+  function aiBadge() {
+    return aiEl('span', 'rp-ai-badge', uiMsg('content_aiBadge'));
+  }
+
+  /** Spinner, "Asking AI…" and Cancel — Cancel aborts the request in the app too. */
+  function aiBusyNode(feature) {
+    const wrap = aiEl('div', 'rp-ai-busy');
+    wrap.setAttribute('role', 'status');
+    const spin = aiEl('span', 'rp-spinner');
+    spin.setAttribute('aria-hidden', 'true');
+    wrap.append(spin, aiEl('span', 'rp-ai-busy-text', uiMsg('content_aiBusy')), aiButton('ai-cancel', uiMsg('common_cancel'), { feature }));
+    return wrap;
+  }
+
+  /** A state the reader can act on (off, not set up, offline, …) in the UI language; never the raw error. */
+  function aiStateNode(code, retryAct) {
+    const wrap = aiEl('div', 'rp-ai-state', uiMsg(S.aiStateKey ? S.aiStateKey(code) : 'content_aiStateFailed'));
+    wrap.setAttribute('role', 'status');
+    const retryable = !['ai-off', 'off', 'no-key', 'no-local-model', 'consent', 'auth', 'locked', 'outdated', 'too-long'].includes(code);
+    if (retryAct && retryable) {
+      const row = aiEl('div', 'rp-row');
+      row.appendChild(aiButton(retryAct, uiMsg('content_aiRetry')));
+      wrap.appendChild(row);
+    }
+    return wrap;
+  }
+
+  function aiTask(hit, feature) {
+    if (!hit.ai) hit.ai = {};
+    if (!hit.ai[feature]) hit.ai[feature] = { status: 'idle' };
+    return hit.ai[feature];
+  }
+
+  function newAiRequestId() {
+    aiSeq += 1;
+    return `c${Date.now().toString(36)}_${aiSeq.toString(36)}`;
+  }
+
+  /** The feature's state from the last status, if it rules the request out ('' = ask). */
+  function aiBlockedState(feature) {
+    const state = S.aiFeatureState ? S.aiFeatureState(aiStatus, feature) : '';
+    return state && state !== 'ready' ? state : '';
+  }
+
+  /** Send one feature's request and settle `task` with the reply. Returns false when superseded. */
+  async function runAiTask(task, feature, payload) {
+    const requestId = newAiRequestId();
+    Object.assign(task, { status: 'busy', requestId, result: null, code: '', engine: '' });
+    const res = await safeRuntimeSend({ type: 'ai-assist', feature, requestId, payload });
+    if (task.requestId !== requestId) return false;
+    task.requestId = '';
+    if (res?.invalidated) {
+      task.status = 'idle';
+    } else if (res && res.ok && res.result) {
+      task.status = 'done';
+      task.result = res.result;
+      task.engine = res.engine || '';
+    } else {
+      task.status = 'error';
+      task.code = S.aiReplyCode ? S.aiReplyCode(res) : 'other';
+      // The app says AI is off: say so now, and hide the controls from the next popup on.
+      if (task.code === 'ai-off') {
+        aiStatus = { ok: true, enabled: false, features: {} };
+        aiStatusAt = Date.now();
+      }
+    }
+    return true;
+  }
+
+  function cancelAiTask(task) {
+    if (!task || task.status !== 'busy') return;
+    const requestId = task.requestId;
+    task.requestId = '';
+    task.status = 'error';
+    task.code = 'cancelled';
+    if (requestId) void safeRuntimeSend({ type: 'ai-cancel', requestId });
+  }
+
+  function cancelHitAiTasks(hit) {
+    if (!hit || !hit.ai) return;
+    for (const feature of Object.keys(hit.ai)) cancelAiTask(hit.ai[feature]);
+  }
+
+  /* ----- in the popup: Explain in context, Suggest a meaning ----- */
+
+  function focusedEntryOf(hit) {
+    const entries = hit.entries || [];
+    return entries[focusedEntryIdx || 0] || entries[0] || null;
+  }
+
+  /** The sentence the word was read in, when there is one beyond the word itself. */
+  function hitSentenceText(hit) {
+    const s = hit.sentence && hit.sentence.text ? hit.sentence.text : '';
+    return s && s !== hit.term ? s : '';
+  }
+
+  /** Meaning tab: the AI row under the entries (hidden when the app says AI is off). */
+  function appendAiMeaningTools(body, hit) {
+    const entry = focusedEntryOf(hit);
+    const canExplain = !!hitSentenceText(hit) && !!entry && S.aiSenseLines && S.aiSenseLines(entry).lines.length > 0;
+    const lacksGloss = S.aiEntryLacksGloss ? S.aiEntryLacksGloss(entry) : !entry;
+    if (!canExplain && !lacksGloss) return;
+    const box = aiEl('div', 'rp-ai');
+    box.setAttribute('data-ai-tools', '');
+    box.hidden = !aiControlsShown();
+    const row = aiEl('div', 'rp-row rp-ai-row');
+    if (canExplain) row.appendChild(aiButton('ai-explain', uiMsg('content_aiExplain')));
+    if (lacksGloss) row.appendChild(aiButton('ai-meaning', uiMsg('content_aiSuggestMeaning')));
+    const out = aiEl('div', 'rp-ai-out');
+    out.setAttribute('aria-live', 'polite');
+    box.append(row, out);
+    body.appendChild(box);
+    renderAiMeaningOut(hit);
+  }
+
+  function renderAiMeaningOut(hit) {
+    if (!popup || currentHit !== hit || popupTab !== 'meaning') return;
+    const body = popup.querySelector('.rp-body');
+    const out = body && body.querySelector('.rp-ai-out');
+    if (!out) return;
+    out.textContent = '';
+    const explain = hit.ai && hit.ai.explain;
+    if (explain && explain.status === 'busy') out.appendChild(aiBusyNode('explain'));
+    else if (explain && explain.status === 'error') out.appendChild(aiStateNode(explain.code, 'ai-explain'));
+    else if (explain && explain.status === 'done') out.appendChild(aiExplainNode(explain));
+    markAiSense(body, hit);
+
+    const meaning = hit.ai && hit.ai.meaning;
+    if (meaning && meaning.status === 'busy') out.appendChild(aiBusyNode('meaning'));
+    else if (meaning && meaning.status === 'error') out.appendChild(aiStateNode(meaning.code, 'ai-meaning'));
+    else if (meaning && meaning.status === 'done') out.appendChild(aiMeaningNode(hit, meaning));
+  }
+
+  /** Keep the AI answer (or its spinner and Cancel) in view: the row sits under the entries. */
+  function revealAiOut() {
+    const out = popup && popup.querySelector('.rp-body .rp-ai-out');
+    const target = out && (out.lastElementChild || out);
+    if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'nearest' });
+  }
+
+  function aiExplainNode(task) {
+    const r = task.result || {};
+    const card = aiEl('div', 'rp-ai-card');
+    card.setAttribute('data-ai-result', 'explain');
+    const head = aiEl('div', 'rp-ai-head');
+    head.append(aiBadge(), aiEl('span', 'rp-ai-title', uiMsg('content_aiExplain')));
+    card.appendChild(head);
+    const idx = Number(r.senseIndex);
+    if (Number.isInteger(idx) && idx >= 0 && idx < (task.lines || []).length) {
+      card.appendChild(aiEl('div', 'rp-ai-sense', uiMsg('content_aiSenseFits', String(idx + 1))));
+      card.appendChild(aiEl('div', 'rp-ai-quote', task.lines[idx]));
+    } else {
+      card.appendChild(aiEl('div', 'rp-ai-sense', uiMsg('content_aiNoSenseFits')));
+    }
+    card.appendChild(aiEl('p', 'rp-ai-text', r.explanation || ''));
+    const conf = { high: 'content_aiConfHigh', medium: 'content_aiConfMedium', low: 'content_aiConfLow' }[r.confidence];
+    const foot = aiEl('div', 'rp-ai-foot', `${conf ? `${uiMsg(conf)} · ` : ''}${uiMsg('content_aiDisclaimer')}`);
+    card.appendChild(foot);
+    return card;
+  }
+
+  /** Mark the sense the model picked on the entry list itself. */
+  function markAiSense(body, hit) {
+    body.querySelectorAll('.rp-ai-pick').forEach((li) => {
+      li.classList.remove('rp-ai-pick');
+      li.removeAttribute('aria-current');
+      li.querySelectorAll('.rp-ai-badge').forEach((b) => b.remove());
+    });
+    const task = hit.ai && hit.ai.explain;
+    if (!task || task.status !== 'done' || !task.result) return;
+    const idx = Number(task.result.senseIndex);
+    if (!Number.isInteger(idx) || idx < 0 || !task.indexes || idx >= task.indexes.length) return;
+    const block = body.querySelector(`.rp-entry[data-idx="${Number(task.entryIdx) || 0}"]`) || body.querySelector('.rp-entry');
+    const list = block && block.querySelector('ol.rp-senses');
+    const li = list && list.children[task.indexes[idx]];
+    if (!li) return;
+    li.classList.add('rp-ai-pick');
+    li.setAttribute('aria-current', 'true');
+    li.insertBefore(aiBadge(), li.firstChild);
+  }
+
+  function aiMeaningNode(hit, task) {
+    const r = task.result || {};
+    const card = aiEl('div', 'rp-ai-card');
+    card.setAttribute('data-ai-result', 'meaning');
+    const head = aiEl('div', 'rp-ai-head');
+    head.append(aiBadge(), aiEl('span', 'rp-ai-title', uiMsg('content_aiMeaningLabel')));
+    card.append(head, aiEl('p', 'rp-ai-text', r.meaning || ''));
+    if (hit.aiMeaning && hit.aiMeaning === r.meaning) {
+      card.appendChild(aiEl('div', 'rp-ai-foot', uiMsg('content_aiMeaningApplied')));
+    } else {
+      const row = aiEl('div', 'rp-row');
+      row.append(
+        aiButton('ai-meaning-apply', uiMsg('content_aiMeaningApply'), { primary: true }),
+        aiButton('ai-meaning-dismiss', uiMsg('content_aiMeaningDismiss')),
+      );
+      card.append(row, aiEl('div', 'rp-ai-foot', uiMsg('content_aiDisclaimer')));
+    }
+    return card;
+  }
+
+  async function runAiExplain() {
+    const hit = currentHit;
+    if (!hit) return;
+    const task = aiTask(hit, 'explain');
+    if (task.status === 'busy') return;
+    const blocked = aiBlockedState('explain');
+    const entry = focusedEntryOf(hit);
+    const sentence = hitSentenceText(hit);
+    const { lines, indexes } = S.aiSenseLines ? S.aiSenseLines(entry) : { lines: [], indexes: [] };
+    if (blocked || !sentence || !lines.length) {
+      Object.assign(task, { status: 'error', code: blocked || 'empty-input' });
+      renderAiMeaningOut(hit);
+      return;
+    }
+    const entries = hit.entries || [];
+    const entryIdx = entries[focusedEntryIdx || 0] === entry ? focusedEntryIdx || 0 : 0;
+    Object.assign(task, { entryIdx, lines, indexes });
+    const word = entry.word || entry.term || hit.deinflection?.term || hit.term;
+    const pending = runAiTask(task, 'explain', {
+      word,
+      reading: entry.reading || '',
+      sentence,
+      senses: lines,
+      lang: lookupLangFor(word) || 'ja',
+      uiLang: aiUiLang(),
+    });
+    renderAiMeaningOut(hit);
+    revealAiOut();
+    if (await pending) {
+      renderAiMeaningOut(hit);
+      revealAiOut();
+    }
+  }
+
+  async function runAiMeaning() {
+    const hit = currentHit;
+    if (!hit) return;
+    const task = aiTask(hit, 'meaning');
+    if (task.status === 'busy') return;
+    const blocked = aiBlockedState('meaning');
+    if (blocked) {
+      Object.assign(task, { status: 'error', code: blocked });
+      renderAiMeaningOut(hit);
+      return;
+    }
+    const word = hit.deinflection?.term || hit.term;
+    const pending = runAiTask(task, 'meaning', {
+      word,
+      sentence: hitSentenceText(hit),
+      lang: lookupLangFor(word) || 'ja',
+      uiLang: aiUiLang(),
+    });
+    renderAiMeaningOut(hit);
+    revealAiOut();
+    if (await pending) {
+      renderAiMeaningOut(hit);
+      revealAiOut();
+    }
+  }
+
+  /* ----- the AI sheet: sentence breakdown, simplified paragraph ----- */
+  //
+  // Wider than the popup (side by side needs the room), in its own CLOSED shadow
+  // root like the popup, styled by the same sheet (popup-css.js), so a page can
+  // neither restyle it nor read it.
+
+  let aiSheetHost = null;
+  let aiSheetRoot = null;
+  let aiSheet = null;
+  /** { feature, task, input } for what the sheet shows. */
+  let aiSheetState = null;
+  let aiSheetReturnFocus = null;
+
+  function ensureAiSheet() {
+    if (aiSheet) return aiSheet;
+    aiSheetHost = document.createElement('div');
+    aiSheetHost.id = 'jp-study-ai-sheet';
+    aiSheetHost.setAttribute('data-gum-host', 'ai-sheet');
+    aiSheetHost.style.cssText =
+      'all: initial; position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 2147483647; overflow: visible;';
+    aiSheetRoot = aiSheetHost.attachShadow({ mode: 'closed' });
+    const style = document.createElement('style');
+    style.textContent = typeof GUM_POPUP_CSS === 'string' ? GUM_POPUP_CSS : '';
+    aiSheetRoot.appendChild(style);
+    // Same id as the popup's dialog: ids are per shadow tree, and it gives the
+    // sheet the popup's whole look (theme, buttons, type) from one stylesheet.
+    aiSheet = aiEl('div', 'rp-sheet');
+    aiSheet.id = 'jp-study-popup';
+    aiSheet.setAttribute('role', 'dialog');
+    aiSheet.setAttribute('aria-labelledby', 'rp-sheet-title');
+    const head = aiEl('div', 'rp-head');
+    const title = aiEl('span', 'rp-term rp-sheet-title');
+    title.id = 'rp-sheet-title';
+    const actions = aiEl('div', 'rp-head-actions');
+    const close = aiEl('button', 'rp-icon', '×');
+    close.type = 'button';
+    close.setAttribute('data-act', 'ai-sheet-close');
+    close.setAttribute('aria-label', uiMsg('content_close'));
+    close.title = uiMsg('content_close');
+    actions.appendChild(close);
+    head.append(aiBadge(), title, actions);
+    const body = aiEl('div', 'rp-body rp-sheet-body');
+    body.tabIndex = -1;
+    body.setAttribute('aria-live', 'polite');
+    aiSheet.append(head, body);
+    aiSheet.addEventListener('mousedown', (e) => e.stopPropagation());
+    aiSheet.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const act = btn.getAttribute('data-act');
+      if (act === 'ai-sheet-close') closeAiSheet();
+      else if (act === 'ai-cancel') {
+        if (aiSheetState) cancelAiTask(aiSheetState.task);
+        renderAiSheet();
+      } else if (act === 'ai-sheet-retry' && aiSheetState) void runAiSheet(aiSheetState.feature, aiSheetState.input);
+    });
+    aiSheet.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        closeAiSheet();
+      }
+    });
+    aiSheetRoot.appendChild(aiSheet);
+    document.documentElement.appendChild(aiSheetHost);
+    return aiSheet;
+  }
+
+  function aiSheetOpen() {
+    return !!(aiSheet && aiSheet.classList.contains('open'));
+  }
+
+  function closeAiSheet() {
+    if (!aiSheet) return;
+    if (aiSheetState) cancelAiTask(aiSheetState.task);
+    aiSheetState = null;
+    aiSheet.classList.remove('open');
+    const back = aiSheetReturnFocus;
+    aiSheetReturnFocus = null;
+    if (back && back.isConnected && typeof back.focus === 'function') back.focus();
+  }
+
+  function renderAiSheet() {
+    if (!aiSheet || !aiSheetState) return;
+    const { feature, task, input } = aiSheetState;
+    aiSheet.dataset.theme = popupThemeFor();
+    aiSheet.style.setProperty('--rp-font', `${cfg.popupFontSize}px`);
+    aiSheet.querySelector('.rp-sheet-title').textContent = uiMsg(
+      feature === 'simplify' ? 'content_aiSheetSimplify' : 'content_aiSheetBreakdown',
+    );
+    const body = aiSheet.querySelector('.rp-sheet-body');
+    body.textContent = '';
+    if (task.status === 'busy') {
+      body.appendChild(aiBusyNode(feature));
+      return;
+    }
+    if (task.status === 'error') {
+      const node = aiStateNode(task.code, 'ai-sheet-retry');
+      body.appendChild(node);
+      return;
+    }
+    if (task.status !== 'done' || !task.result) return;
+    if (feature === 'simplify') body.appendChild(aiSimplifyNode(input, task));
+    else body.appendChild(aiBreakdownNode(input, task));
+  }
+
+  function aiEngineLabel(engine) {
+    if (engine === 'local') return uiMsg('content_aiEngineLocal');
+    if (engine === 'cloud') return uiMsg('content_aiEngineCloud');
+    return '';
+  }
+
+  /** Original and simplified side by side, the AI side labelled as such. */
+  function aiSimplifyNode(input, task) {
+    const wrap = aiEl('div', 'rp-ai-sheet-content');
+    wrap.setAttribute('data-ai-result', 'simplify');
+    const grid = aiEl('div', 'rp-ai-sbs');
+    const lang = langAttrOf(input.lang);
+    const orig = aiEl('section', 'rp-ai-col');
+    orig.append(aiEl('h3', 'rp-ai-col-title', uiMsg('content_aiOriginal')));
+    const origText = aiEl('p', 'rp-ai-col-text', input.text);
+    origText.lang = lang;
+    orig.appendChild(origText);
+    const simp = aiEl('section', 'rp-ai-col rp-ai-col-ai');
+    const simpTitle = aiEl('h3', 'rp-ai-col-title');
+    simpTitle.append(aiBadge(), document.createTextNode(` ${uiMsg('content_aiSimplifiedText')}`));
+    simp.appendChild(simpTitle);
+    const simpText = aiEl('p', 'rp-ai-col-text', task.result.simplified || '');
+    simpText.lang = lang;
+    simp.appendChild(simpText);
+    grid.append(orig, simp);
+    wrap.appendChild(grid);
+    const notes = Array.isArray(task.result.notes) ? task.result.notes.filter((n) => typeof n === 'string' && n) : [];
+    if (notes.length) {
+      wrap.appendChild(aiEl('h3', 'rp-ai-col-title', uiMsg('content_aiNotes')));
+      const ul = aiEl('ul', 'rp-ai-notes');
+      for (const n of notes) ul.appendChild(aiEl('li', '', n));
+      wrap.appendChild(ul);
+    }
+    wrap.appendChild(aiEl('div', 'rp-ai-foot', [aiEngineLabel(task.engine), uiMsg('content_aiDisclaimer')].filter(Boolean).join(' · ')));
+    return wrap;
+  }
+
+  /** The sentence, its translation, and each word with its reading and meaning. */
+  function aiBreakdownNode(input, task) {
+    const wrap = aiEl('div', 'rp-ai-sheet-content');
+    wrap.setAttribute('data-ai-result', 'breakdown');
+    const lang = langAttrOf(input.lang);
+    const sentence = aiEl('div', 'rp-sentence-line big', input.text);
+    sentence.lang = lang;
+    wrap.appendChild(sentence);
+    const analysis = task.result.analysis || null;
+    const translation = analysis
+      ? S.aiPrimaryTranslation
+        ? S.aiPrimaryTranslation(analysis, aiUiLang(), input.lang)
+        : ''
+      : task.result.translation || '';
+    if (translation) {
+      wrap.appendChild(aiEl('h3', 'rp-ai-col-title', uiMsg('content_aiTranslation')));
+      wrap.appendChild(aiEl('p', 'rp-ai-text', translation));
+    }
+    const words = analysis && Array.isArray(analysis.annotations) ? analysis.annotations : [];
+    if (words.length) {
+      wrap.appendChild(aiEl('h3', 'rp-ai-col-title', uiMsg('content_aiWords')));
+      const table = aiEl('table', 'rp-ai-words');
+      const tbody = aiEl('tbody');
+      for (const a of words.slice(0, 40)) {
+        if (!a || typeof a !== 'object') continue;
+        const tr = aiEl('tr');
+        const w = aiEl('td', 'rp-ai-word', a.headword || a.text || '');
+        w.lang = lang;
+        const reading = aiEl('td', 'rp-ai-reading', a.reading || '');
+        reading.lang = lang;
+        tr.append(w, reading, aiEl('td', 'rp-ai-meaning', a.meaning || ''));
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+    } else if (task.result.analysisCode) {
+      // Only the offline translation came back; say why there is no word list.
+      wrap.appendChild(aiEl('div', 'rp-ai-state', uiMsg(S.aiStateKey ? S.aiStateKey(task.result.analysisCode) : 'content_aiStateFailed')));
+    }
+    wrap.appendChild(aiEl('div', 'rp-ai-foot', [aiEngineLabel(task.engine), uiMsg('content_aiDisclaimer')].filter(Boolean).join(' · ')));
+    return wrap;
+  }
+
+  function positionAiSheet() {
+    const pad = 12;
+    const width = Math.min(760, window.innerWidth - pad * 2);
+    aiSheet.style.width = `${width}px`;
+    aiSheet.style.left = `${Math.max(pad, Math.round((window.innerWidth - width) / 2))}px`;
+    aiSheet.style.top = `${Math.min(64, Math.round(window.innerHeight * 0.08))}px`;
+    aiSheet.style.maxHeight = `${Math.max(200, window.innerHeight - 96)}px`;
+  }
+
+  async function runAiSheet(feature, input) {
+    const sheet = ensureAiSheet();
+    if (aiSheetState) cancelAiTask(aiSheetState.task);
+    const task = { status: 'idle' };
+    aiSheetState = { feature, task, input };
+    if (!aiSheetOpen()) {
+      const active = popupShadow && popupShadow.activeElement;
+      aiSheetReturnFocus = active || null;
+    }
+    positionAiSheet();
+    sheet.classList.add('open');
+    const blocked = aiBlockedState(feature);
+    if (blocked) {
+      Object.assign(task, { status: 'error', code: blocked });
+      renderAiSheet();
+      sheet.querySelector('.rp-sheet-body').focus();
+      return;
+    }
+    const pending = runAiTask(task, feature, { text: input.text, context: input.context || '', lang: input.lang, uiLang: aiUiLang() });
+    renderAiSheet();
+    const cancel = sheet.querySelector('[data-act="ai-cancel"]');
+    if (cancel) cancel.focus();
+    if ((await pending) && aiSheetState && aiSheetState.task === task) {
+      renderAiSheet();
+      sheet.querySelector('.rp-sheet-body').focus();
+    }
+  }
+
+  function runAiBreakdown() {
+    const hit = currentHit;
+    const text = hit && hit.sentence && hit.sentence.text ? hit.sentence.text : '';
+    if (!text) return;
+    void runAiSheet('breakdown', { text, lang: lookupLangFor(text) || aiStudyLang(), context: document.title || '' });
+  }
+
+  /** The paragraph around the word: the block the popup read its sentence from. */
+  function hitParagraph(hit) {
+    return String((hit && hit.blockText) || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function runAiSimplify() {
+    const text = hitParagraph(currentHit).slice(0, 1500);
+    if (!text) return;
+    void runAiSheet('simplify', { text, lang: lookupLangFor(text) || aiStudyLang() });
+  }
+
+  /** Sentence tab: the AI row (hidden when the app says AI is off). */
+  function appendAiSentenceTools(body, hit) {
+    const sentence = hit.sentence && hit.sentence.text ? hit.sentence.text : '';
+    const paragraph = hitParagraph(hit);
+    if (!sentence && !paragraph) return;
+    const box = aiEl('div', 'rp-ai');
+    box.setAttribute('data-ai-tools', '');
+    box.hidden = !aiControlsShown();
+    const row = aiEl('div', 'rp-row rp-ai-row');
+    if (sentence) row.appendChild(aiButton('ai-breakdown', uiMsg('content_aiBreakdown')));
+    if (paragraph.length >= 8) row.appendChild(aiButton('ai-simplify', uiMsg('content_aiSimplify')));
+    box.appendChild(row);
+    body.appendChild(box);
   }
 
   /* ----- opening the popup ----- */
@@ -2105,6 +2764,10 @@
     }
     const el = ensurePopup();
     lookupToken++;
+    if (currentHit) cancelHitAiTasks(currentHit);
+    // What AI the app offers: one cheap request, cached, never awaited — the
+    // dictionary is drawn first and the AI row appears (or hides) when it lands.
+    void refreshAiStatus(false);
     hitHistory = [];
     let sentence = null;
     if (hitInfo.blockText) {
@@ -2233,6 +2896,12 @@
       }
       if (moreMenuEl && !moreMenuEl.hidden) {
         closeMoreMenu();
+        return;
+      }
+      if (aiSheetOpen()) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeAiSheet();
         return;
       }
       if (cardPreviewEl && cardPreviewEl.classList.contains('open')) {
@@ -2472,7 +3141,7 @@
     if (e.button !== 0) return;
     if (
       e.target.closest(
-        '#jp-study-popup, #jp-study-fab, #jp-study-toast, #jp-study-ocr-overlay, #jp-study-ocr-select, #jp-study-wheel, #jp-study-more-menu, #jp-study-card-preview',
+        '#jp-study-popup, #jp-study-ai-sheet, #jp-study-fab, #jp-study-toast, #jp-study-ocr-overlay, #jp-study-ocr-select, #jp-study-wheel, #jp-study-more-menu, #jp-study-card-preview',
       )
     ) {
       return;
@@ -2509,7 +3178,7 @@
     if (ocrSelectActive) return;
     if (
       e.target.closest(
-        '#jp-study-popup, #jp-study-fab, #jp-study-toast, #jp-study-ocr-overlay, #jp-study-ocr-select, #jp-study-wheel, #jp-study-more-menu, #jp-study-card-preview',
+        '#jp-study-popup, #jp-study-ai-sheet, #jp-study-fab, #jp-study-toast, #jp-study-ocr-overlay, #jp-study-ocr-select, #jp-study-wheel, #jp-study-more-menu, #jp-study-card-preview',
       )
     ) {
       return;
@@ -2741,7 +3410,14 @@
       return;
     }
     hideCardPreview();
-    await doSave(text, cardKind, true);
+    // A word whose dictionary had no gloss carries the meaning the reader approved
+    // from the AI (marked as AI) — only for that same word, unedited.
+    const hit = cardSource && cardSource.hit;
+    const approved =
+      hit && hit.aiMeaning && cardKind === 'word' && text === (hit.deinflection?.term || hit.term) && S.aiCardMeaning
+        ? { meaning: S.aiCardMeaning(hit.aiMeaning) }
+        : undefined;
+    await doSave(text, cardKind, true, approved);
   }
 
   /* ------------------------------ radial wheel ------------------------------ */
@@ -4753,6 +5429,11 @@
       sendResponse({ ok: true });
       return true;
     }
+    // risk4: the background saw Gum lock (or unlock): purge cached answers.
+    if (msg?.type === 'gum-app-locked') {
+      noteAppLockState(msg.locked === true);
+      return false;
+    }
     if (msg?.type === 'jp-get-save-payload' || msg?.type === 'jp-get-mine-payload') {
       sendResponse(getSavePayload());
       return true;
@@ -4980,6 +5661,14 @@
       sanitizeDictHtml,
       planPopupPlacement,
       rubySegments,
+      // risk4: the lookup cache and the lock it is purged on.
+      cachedLookup,
+      prefixLookup,
+      lookupCacheSize: () => lookupCache.size,
+      appLockedSeen: () => appLockedSeen,
+      // Optional AI: the sheet (closed shadow root) and the status the controls follow.
+      aiSheet: () => aiSheet,
+      aiStatus: () => aiStatus,
     };
   }
 

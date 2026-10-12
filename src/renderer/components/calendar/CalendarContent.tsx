@@ -7,7 +7,16 @@
  * form. Both shells now compose these, so Blanc never mounts `CalendarView`.
  * Nothing here may import `AppChrome`/`MenuBar`/`StatusBar`.
  */
-import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react';
 import Icon from '../Icons';
 import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface';
 import { confirmDialog } from '../ui/dialogService';
@@ -17,6 +26,9 @@ import {
   CATEGORY_COLORS,
   CATEGORY_LABEL_KEYS,
   deleteEvent,
+  deleteRepeatingScope,
+  detachOccurrence,
+  excludeOccurrence,
   expandOccurrences,
   getOverdueReminders,
   getTodayOccurrences,
@@ -26,11 +38,16 @@ import {
   onCalendarChanged,
   REMINDER_LABEL_KEYS,
   REMINDER_OFFSETS,
+  rescheduleEventPatch,
   resolveWeekStart,
+  saveRepeatingEdit,
+  shiftClockTime,
+  shiftDateKey,
   startOfWeekOn,
   toDateKey,
   updateEvent,
   type CalendarEvent,
+  type RepeatEditScope,
   type EventCategory,
   type EventOccurrence,
   type RecurrenceFreq,
@@ -40,9 +57,10 @@ import {
 import { loadDesktopPrefs, onDesktopPrefsChanged } from '../../desktopPrefs';
 import { useT } from '../../i18n';
 import { formatDuration, getMediaActivityByDay, getStreakRestDates, getStudyDaysByKey, onStatsChanged } from '../../stats';
-import { loadDeck, onDeckChanged } from '../../flashcardDeck';
-import { localDueForecast } from '../../../shared/reviewForecast';
-import { calendarStudyDay, dueByDate } from '../../../shared/studyActivityHeatmap';
+import { deckDueForecast, loadDeck, onDeckChanged } from '../../flashcardDeck';
+import { calendarStudyDay, dueByDate, gameAnswersByDay } from '../../../shared/studyActivityHeatmap';
+import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
+import { exportCalendarIcsFile } from '../../calendarIcs';
 import { heatLevelsFor } from '../../../shared/calendarDayDetail';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { writeLocalStorage } from '../../localStorageWrite';
@@ -50,6 +68,9 @@ import { mediaActivitySummary } from './calendarMediaActivity';
 import { useStreakMarkers } from './calendarDayData';
 import { CalendarDayPanel } from './CalendarDayPanel';
 import { CalendarYearGrid } from './CalendarYearGrid';
+import { CalendarIcsImportButton } from './CalendarIcsImport';
+import { CalendarWeekGrid } from './CalendarWeekGrid';
+import { CAL_DRAG_TYPE, KEYBOARD_MOVE_KEYS, keyboardMoveFor, readDraggedOccurrence } from './calendarKeyboardMove';
 
 export type ViewMode = 'month' | 'week' | 'day' | 'agenda' | 'year';
 
@@ -90,9 +111,18 @@ const EMPTY_FORM = {
   recurrence: 'none' as RecurrenceFreq,
   recurrenceInterval: 1,
   recurrenceEndDate: '',
+  /** The occurrence the editor was opened from (a repeating event's chip). Never saved. */
+  occurrenceDate: '',
 };
 
 export type EventForm = typeof EMPTY_FORM;
+
+/**
+ * "Describe it": a sentence → the form's fields, shown for confirmation
+ * (`EventQuickEntry.tsx`; a deterministic parser, plus the optional AI). Loaded
+ * on first press, so the event form costs nothing more until it is used.
+ */
+const EventQuickEntry = lazy(() => import('./EventQuickEntry'));
 
 export function EventModal({
   initial,
@@ -101,9 +131,46 @@ export function EventModal({
   initial: Partial<EventForm> & { date?: string };
   onClose: () => void;
 }) {
-  const { t } = useT();
-  const [form, setForm] = useState({ ...EMPTY_FORM, ...initial });
+  const { t, lang } = useT();
+  /**
+   * Opened from one date of a repeating event: the edit can apply to that date, to it and
+   * every later one, or to the whole series. "This event" is the default — the date the user
+   * clicked is the one they meant — so the date field starts on that occurrence, and only
+   * "All events" shows (and moves) the series' first date.
+   */
+  const openedFromOccurrence = Boolean(initial.id) && (initial.recurrence ?? 'none') !== 'none' && Boolean(initial.occurrenceDate);
+  const seriesDate = initial.date ?? EMPTY_FORM.date;
+  const [scope, setScope] = useState<RepeatEditScope>(openedFromOccurrence ? 'this' : 'all');
+  const [form, setForm] = useState(() => ({
+    ...EMPTY_FORM,
+    ...initial,
+    ...(openedFromOccurrence && initial.occurrenceDate ? { date: initial.occurrenceDate } : {}),
+  }));
   const isEditing = !!form.id;
+  const [quickOpen, setQuickOpen] = useState(false);
+  /** Other weekdays of a described weekly event ("Tue/Thu"): one more weekly event each, on Create. */
+  const [extraDates, setExtraDates] = useState<string[]>([]);
+  const applyDraft = (
+    draft: { title: string; date: string; startTime: string | null; endTime: string | null; recurrence: 'none' | 'daily' | 'weekly' },
+    extra: string[],
+  ): void => {
+    setForm((f) => ({
+      ...f,
+      title: draft.title || f.title,
+      date: draft.date,
+      allDay: !draft.startTime,
+      startTime: draft.startTime ?? f.startTime,
+      endTime: draft.endTime ?? f.endTime,
+      recurrence: draft.recurrence,
+      recurrenceInterval: 1,
+    }));
+    setExtraDates(draft.recurrence === 'weekly' ? extra : []);
+    setQuickOpen(false);
+  };
+  const changeScope = (next: RepeatEditScope): void => {
+    setScope(next);
+    setForm((f) => ({ ...f, date: next === 'all' ? seriesDate : (f.occurrenceDate || f.date) }));
+  };
 
   /**
    * Escape closes. Measured live 2026-09-03: it did not — this modal was a
@@ -136,7 +203,7 @@ export function EventModal({
   // ISO date keys compare correctly as strings. An end before the first
   // occurrence leaves zero occurrences, so the event would vanish from every view.
   const repeatEndsBeforeStart =
-    form.recurrence !== 'none' && Boolean(form.recurrenceEndDate) && Boolean(form.date) && form.recurrenceEndDate < form.date;
+    scope !== 'this' && form.recurrence !== 'none' && Boolean(form.recurrenceEndDate) && Boolean(form.date) && form.recurrenceEndDate < form.date;
 
   const save = () => {
     if (!form.title.trim() || missingDate || endsBeforeStart || repeatEndsBeforeStart) return;
@@ -155,8 +222,14 @@ export function EventModal({
         form.recurrence === 'custom' ? normalizeRecurrenceInterval(form.recurrenceInterval) : undefined,
       recurrenceEndDate: form.recurrenceEndDate || undefined,
     };
-    if (isEditing) updateEvent(form.id, payload);
-    else addEvent(payload);
+    const series = openedFromOccurrence ? loadEvents().find((candidate) => candidate.id === form.id) : undefined;
+    if (series && form.occurrenceDate) saveRepeatingEdit(series, form.occurrenceDate, scope, payload);
+    else if (isEditing) updateEvent(form.id, payload);
+    else {
+      addEvent(payload);
+      // A described "every Tue/Thu" is one weekly event per weekday, listed above Create.
+      if (form.recurrence === 'weekly') for (const date of extraDates) addEvent({ ...payload, date });
+    }
     onClose();
   };
 
@@ -170,17 +243,57 @@ export function EventModal({
       return;
     }
     const name = form.title.trim() || t('calendar.modal.untitled');
+    const series = openedFromOccurrence ? loadEvents().find((candidate) => candidate.id === form.id) : undefined;
+    const when = form.occurrenceDate
+      ? fromKey(form.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { weekday: 'short', month: 'long', day: 'numeric' })
+      : '';
+    // The scope the editor is set to decides what goes, and the question names it.
+    const message = !series || scope === 'all'
+      ? form.recurrence === 'none' && !series
+        ? t('calendar.modal.deleteConfirm.message', { name })
+        : t('calendar.modal.deleteConfirm.recurring', { name })
+      : scope === 'this'
+        ? t('planner.skip.message', { name, date: when })
+        : t('planner.scope.deleteFollowing', { name, date: when });
     const ok = await confirmDialog({
       title: t('calendar.modal.deleteConfirm.title'),
-      message:
-        form.recurrence === 'none'
-          ? t('calendar.modal.deleteConfirm.message', { name })
-          : t('calendar.modal.deleteConfirm.recurring', { name }),
+      message,
       confirmLabel: t('calendar.modal.delete'),
       danger: true,
     });
     if (!ok) return;
-    deleteEvent(form.id);
+    if (series && form.occurrenceDate) deleteRepeatingScope(series, form.occurrenceDate, scope);
+    else deleteEvent(form.id);
+    onClose();
+  };
+
+  // A repeating event opened from one of its chips: that one date can go on its own.
+  const canSkipOccurrence = isEditing && form.recurrence !== 'none' && Boolean(form.occurrenceDate);
+  const skipOccurrence = async () => {
+    const event = loadEvents().find((candidate) => candidate.id === form.id);
+    if (!event || !form.occurrenceDate) return;
+    const ok = await confirmDialog({
+      title: t('planner.skip.title'),
+      message: t('planner.skip.message', {
+        name: event.title,
+        date: fromKey(form.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { weekday: 'short', month: 'long', day: 'numeric' }),
+      }),
+      confirmLabel: t('planner.skip.confirm'),
+      danger: true,
+    });
+    if (!ok) return;
+    excludeOccurrence(event, form.occurrenceDate);
+    onClose();
+  };
+  // The keyboard route to what a drag does: move only this date of the series.
+  const [moveOneTo, setMoveOneTo] = useState('');
+  const moveOne = () => {
+    const event = loadEvents().find((candidate) => candidate.id === form.id);
+    if (!event || !form.occurrenceDate || !moveOneTo) return;
+    const split = detachOccurrence(event, form.occurrenceDate, moveOneTo);
+    if (!split) return;
+    updateEvent(event.id, split.seriesPatch);
+    addEvent(split.single);
     onClose();
   };
 
@@ -206,6 +319,16 @@ export function EventModal({
         </div>
 
         <div className="cal-form">
+          {!isEditing && (quickOpen ? (
+            <Suspense fallback={null}>
+              <EventQuickEntry onApply={applyDraft} onClose={() => setQuickOpen(false)} />
+            </Suspense>
+          ) : (
+            <button type="button" className="btn small cal-quick-open" onClick={() => setQuickOpen(true)}>
+              {t('aiTutor.event.open')}
+            </button>
+          ))}
+
           <label className="cal-field">
             <span>{t('calendar.modal.title')}</span>
             <input
@@ -220,6 +343,24 @@ export function EventModal({
             <span>{t('calendar.modal.description')}</span>
             <textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={2} />
           </label>
+
+          {openedFromOccurrence && (
+            <fieldset className="cal-scope">
+              <legend>{t('planner.scope.legend')}</legend>
+              {(['this', 'following', 'all'] as const).map((option) => (
+                <label key={option} className="cal-scope-option">
+                  <input
+                    type="radio"
+                    name="cal-edit-scope"
+                    value={option}
+                    checked={scope === option}
+                    onChange={() => changeScope(option)}
+                  />
+                  <span>{t(`planner.scope.${option}`)}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
 
           <div className="cal-field-row">
             <label className="cal-field">
@@ -297,6 +438,7 @@ export function EventModal({
             </select>
           </label>
 
+          {scope !== 'this' && (
           <div className="cal-field-row">
             <label className="cal-field">
               <span>{t('calendar.modal.repeat')}</span>
@@ -321,8 +463,9 @@ export function EventModal({
               </label>
             )}
           </div>
+          )}
 
-          {form.recurrence !== 'none' && (
+          {form.recurrence !== 'none' && scope !== 'this' && (
             <label className="cal-field">
               <span>{t('calendar.modal.repeatUntil')}</span>
               <input
@@ -338,11 +481,46 @@ export function EventModal({
           {repeatEndsBeforeStart && (
             <p id="cal-repeat-error" className="cal-field-error" role="alert">{t('calendar.modal.repeatEndBeforeStart')}</p>
           )}
+
+          {!isEditing && form.recurrence === 'weekly' && extraDates.length > 0 && (
+            <div className="cal-field-row" role="note">
+              <p className="muted">
+                {t('aiTutor.event.alsoCreates', {
+                  dates: extraDates
+                    .map((date) => fromKey(date).toLocaleDateString(LANG_TAGS[lang], { weekday: 'short', month: 'short', day: 'numeric' }))
+                    .join(', '),
+                })}
+              </p>
+              <button type="button" className="btn small" onClick={() => setExtraDates([])}>
+                {t('aiTutor.event.dropExtra')}
+              </button>
+            </div>
+          )}
+
+          {canSkipOccurrence && (
+            <div className="cal-field-row cal-move-one">
+              <label className="cal-field">
+                <span>{t('planner.moveOne.label')}</span>
+                <input type="date" value={moveOneTo} onChange={(e) => setMoveOneTo(e.target.value)} />
+              </label>
+              <button
+                type="button"
+                className="btn small"
+                onClick={moveOne}
+                disabled={!moveOneTo || moveOneTo === form.occurrenceDate}
+              >
+                {t('planner.moveOne.button')}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="cal-modal-actions">
           {isEditing && (
             <button type="button" className="cbh-btn danger" onClick={() => void remove()}>{t('calendar.modal.delete')}</button>
+          )}
+          {canSkipOccurrence && (
+            <button type="button" className="cbh-btn" onClick={() => void skipOccurrence()}>{t('planner.skip.button')}</button>
           )}
           <div className="cal-modal-spacer" />
           <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
@@ -355,9 +533,55 @@ export function EventModal({
   );
 }
 
-export function EventChip({ ev, onClick }: { ev: EventOccurrence; onClick: () => void }) {
+
+/**
+ * Drop-target props for one day: a chip dragged onto it moves that occurrence there.
+ * `dragover` only accepts the calendar's own payload, so a file dragged over the grid
+ * still reaches the app's file drop router.
+ */
+function useDayDropTarget(moveOccurrence: CalendarState['moveOccurrence'] | undefined) {
+  const [overKey, setOverKey] = useState<string | null>(null);
+  const props = (key: string) => (moveOccurrence ? {
+    onDragOver: (e: ReactDragEvent) => {
+      if (!Array.from(e.dataTransfer.types).includes(CAL_DRAG_TYPE)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (overKey !== key) setOverKey(key);
+    },
+    onDragLeave: () => setOverKey((current) => (current === key ? null : current)),
+    onDrop: (e: ReactDragEvent) => {
+      const dragged = readDraggedOccurrence(e);
+      setOverKey(null);
+      if (!dragged) return;
+      e.preventDefault();
+      void moveOccurrence(dragged.id, dragged.from, key);
+    },
+  } : {});
+  return { overKey, props };
+}
+
+export function EventChip({ ev, onClick, onMoveDays }: { ev: EventOccurrence; onClick: () => void; onMoveDays?: (days: number) => void }) {
   return (
-    <button type="button" className="cal-chip" style={{ borderLeftColor: ev.color }} onClick={onClick}>
+    <button
+      type="button"
+      className="cal-chip"
+      style={{ borderLeftColor: ev.color }}
+      onClick={onClick}
+      data-occurrence={`${ev.id}|${ev.occurrenceDate}`}
+      aria-keyshortcuts={onMoveDays ? KEYBOARD_MOVE_KEYS : undefined}
+      onKeyDown={onMoveDays ? (e) => {
+        const move = keyboardMoveFor(e, 'week');
+        if (!move) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onMoveDays(move.days);
+      } : undefined}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(CAL_DRAG_TYPE, JSON.stringify({ id: ev.id, from: ev.occurrenceDate }));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+    >
       {!ev.allDay && ev.startTime && <span className="cal-chip-time">{ev.startTime}</span>}
       <span className="cal-chip-title">{ev.title}</span>
     </button>
@@ -493,7 +717,15 @@ export function useCalendar() {
     // is what actually needs to trigger a redo.
   }, [mode, cursor, lang, weekStart]);
 
-  const openNew = (date: string) => setModal({ ...EMPTY_FORM, date });
+  /** A new event on `date`; at a slot of the week grid, an hour from its start, or all-day. */
+  const openNew = (date: string, at?: { startTime?: string; allDay?: boolean }) => setModal({
+    ...EMPTY_FORM,
+    date,
+    ...(at?.startTime ? { startTime: at.startTime, endTime: shiftClockTime(at.startTime, 60) } : {}),
+    ...(at?.allDay ? { allDay: true } : {}),
+  });
+  /** What the last keyboard move did, for the screen-reader status line. */
+  const [moveNotice, setMoveNotice] = useState('');
   const openEdit = (ev: EventOccurrence) =>
     setModal({
       id: ev.id,
@@ -509,7 +741,83 @@ export function useCalendar() {
       recurrence: ev.recurrence,
       recurrenceInterval: ev.recurrenceInterval ?? 1,
       recurrenceEndDate: ev.recurrenceEndDate ?? '',
+      occurrenceDate: ev.occurrenceDate,
     });
+
+  /**
+   * Drag-to-reschedule: move the occurrence picked up on `from` to `to`. A one-off event
+   * just moves. For a repeating event the drag means THIS occurrence — it is split off as
+   * its own event on the drop day and the series keeps every other date — and that is
+   * asked first, because the chip does not say it belongs to a series. (Moving the whole
+   * series is the editor's date field.) `times` re-times it too (the week grid's drops and
+   * Alt+Up/Down). The id of the event that now holds the occurrence, or null when nothing moved.
+   */
+  const moveOccurrence = async (
+    id: string,
+    from: string,
+    to: string,
+    times?: Partial<Pick<CalendarEvent, 'startTime' | 'endTime' | 'allDay'>>,
+  ): Promise<string | null> => {
+    const event = loadEvents().find((candidate) => candidate.id === id);
+    if (!event) return null;
+    const retime = times && (
+      times.startTime !== event.startTime || times.endTime !== event.endTime || (times.allDay ?? event.allDay) !== event.allDay
+    ) ? times : undefined;
+    if (from === to && !retime) return null;
+    if (event.recurrence === 'none') {
+      const patch = { ...(rescheduleEventPatch(event, from, to) ?? {}), ...(retime ?? {}) };
+      if (!Object.keys(patch).length) return null;
+      updateEvent(id, patch);
+      return id;
+    }
+    const split = detachOccurrence(event, from, to);
+    if (!split) return null;
+    const ok = await confirmDialog({
+      title: t('planner.move.occurrenceTitle'),
+      message: t('planner.move.occurrenceMessage', { name: event.title }),
+      confirmLabel: t('planner.move.occurrenceConfirm'),
+    });
+    if (!ok) return null;
+    updateEvent(id, split.seriesPatch);
+    return addEvent({ ...split.single, ...(retime ?? {}) }).id;
+  };
+
+  /**
+   * A keyboard move (Alt+Arrow on a focused event): moved, announced, and focus follows the
+   * event to where it landed — its chip is a new element in another cell.
+   */
+  const moveByKeyboard = async (
+    ev: EventOccurrence,
+    days: number,
+    minutes = 0,
+  ): Promise<boolean> => {
+    const to = shiftDateKey(ev.occurrenceDate, days);
+    let times: Partial<Pick<CalendarEvent, 'startTime' | 'endTime'>> | undefined;
+    if (minutes && !ev.allDay && ev.startTime) {
+      const startTime = shiftClockTime(ev.startTime, minutes);
+      const length = ev.endTime && ev.endTime > ev.startTime
+        ? (Number(ev.endTime.slice(0, 2)) * 60 + Number(ev.endTime.slice(3))) - (Number(ev.startTime.slice(0, 2)) * 60 + Number(ev.startTime.slice(3)))
+        : 0;
+      times = { startTime, ...(ev.endTime ? { endTime: shiftClockTime(startTime, length) } : {}) };
+    }
+    const movedId = await moveOccurrence(ev.id, ev.occurrenceDate, to, times);
+    if (!movedId) return false;
+    const date = fromKey(to).toLocaleDateString(LANG_TAGS[lang], { weekday: 'long', month: 'long', day: 'numeric' });
+    setMoveNotice(t('planner.keyboardMove.moved', { name: ev.title, date: times?.startTime ? `${date} ${times.startTime}` : date }));
+    // Keep the moved day on screen (a move can cross into the next week or month), then put
+    // focus back on the event.
+    if (mode === 'month' || mode === 'week') setCursor(fromKey(to));
+    window.setTimeout(() => {
+      const target = `${movedId}|${to}`;
+      Array.from(document.querySelectorAll<HTMLElement>('[data-occurrence]'))
+        .find((el) => el.getAttribute('data-occurrence') === target)
+        ?.focus();
+    }, 0);
+    return true;
+  };
+
+  /** Every event, as a `.ics` file the user saves (Google / Outlook / Apple Calendar import it). */
+  const exportIcs = (): void => exportCalendarIcsFile(loadEvents(), t('planner.ics.calendarName'));
 
   const modeLabels: Record<ViewMode, string> = {
     month: t('calendar.mode.month'),
@@ -546,6 +854,10 @@ export function useCalendar() {
     setModal,
     openNew,
     openEdit,
+    moveOccurrence,
+    moveByKeyboard,
+    moveNotice,
+    exportIcs,
     modeLabels,
   };
 }
@@ -611,6 +923,18 @@ export function CalendarNav({ state, actions }: { state: CalendarState; actions?
           </details>
         </AnchorSurface>
       )}
+      {typeof state.exportIcs === 'function' && (
+        <button
+          type="button"
+          className="btn small cal-export-ics"
+          onClick={state.exportIcs}
+          disabled={state.events.length === 0}
+          title={state.events.length === 0 ? t('planner.ics.empty') : t('planner.ics.hint')}
+        >
+          {t('planner.ics.export')}
+        </button>
+      )}
+      {typeof state.exportIcs === 'function' && <CalendarIcsImportButton />}
       {actions ? <div className="cal-toolbar-actions">{actions}</div> : null}
     </ContextualSurface>
   );
@@ -663,7 +987,7 @@ function MonthGrid({ state }: { state: CalendarState }) {
   useEffect(() => onDeckChanged(() => setDeckVersion((v) => v + 1)), []);
   const todayKey = toKey(today);
   const dueByDay = useMemo(
-    () => dueByDate(localDueForecast(loadDeck(), CALENDAR_DUE_DAYS), new Date()),
+    () => dueByDate(deckDueForecast(loadDeck(), CALENDAR_DUE_DAYS), new Date()),
     // `deckVersion` and `todayKey` are the change signals.
     [deckVersion, todayKey],
   );
@@ -680,10 +1004,28 @@ function MonthGrid({ state }: { state: CalendarState }) {
   }, [currentKey]);
   // The current streak's days, and (when switched on) each day shaded by how much was studied.
   const streakMarks = useStreakMarkers(statsVersion);
+  // Game answers count as study in the year view's shading; the month grid used to leave
+  // them out, so a games-only day was blank here and shaded there. Read only while shading.
+  const [games, setGames] = useState<Readonly<Record<string, number>>>({});
+  const [logVersion, setLogVersion] = useState(0);
+  useEffect(() => onReviewLogChanged(() => setLogVersion((v) => v + 1)), []);
+  useEffect(() => {
+    if (!state.heatmap) return undefined;
+    let alive = true;
+    void loadReviewLog()
+      .then((rows) => {
+        if (alive) setGames(gameAnswersByDay(rows));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [state.heatmap, logVersion]);
   const heat = useMemo(
-    () => (state.heatmap ? heatLevelsFor(keys, studyByDay) : null),
-    [state.heatmap, keys, studyByDay],
+    () => (state.heatmap ? heatLevelsFor(keys, studyByDay, games) : null),
+    [state.heatmap, keys, studyByDay, games],
   );
+  const drop = useDayDropTarget(state.moveOccurrence);
 
   const move = (delta: number) => {
     const at = currentKey ? keys.indexOf(currentKey) : 0;
@@ -694,6 +1036,9 @@ function MonthGrid({ state }: { state: CalendarState }) {
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     // Never swallow a chord — Ctrl/Alt/Meta belong to the shell's shortcuts.
     if (e.ctrlKey || e.altKey || e.metaKey) return;
+    // A key on an event chip inside a cell is the chip's: Enter opens THAT event, it must
+    // not also start a new one on the active day.
+    if (e.target !== e.currentTarget) return;
     switch (e.key) {
       case 'ArrowLeft': move(-1); break;
       case 'ArrowRight': move(1); break;
@@ -772,10 +1117,11 @@ function MonthGrid({ state }: { state: CalendarState }) {
                 className={`cal-month-cell ${inMonth ? '' : 'out'} ${isToday ? 'today' : ''}${
                   isRest ? ' rest' : ''}${inStreak ? ' in-streak' : ''}${heat ? ' heat' : ''}${
                   key === currentKey ? ' is-active' : ''
-                }`}
+                }${drop.overKey === key ? ' cal-drop-over' : ''}`}
                 data-heat={heatLevel}
                 onClick={() => setActiveKey(key)}
                 onDoubleClick={() => openNew(key)}
+                {...drop.props(key)}
               >
                 <div className="cal-month-daynum">
                   {d.getDate()}
@@ -797,7 +1143,16 @@ function MonthGrid({ state }: { state: CalendarState }) {
                 )}
                 <div className="cal-month-events">
                   {dayEvents.slice(0, 3).map((ev) => (
-                    <EventChip key={`${ev.id}-${ev.occurrenceDate}`} ev={ev} onClick={() => openEdit(ev)} />
+                    <EventChip
+                      key={`${ev.id}-${ev.occurrenceDate}`}
+                      ev={ev}
+                      onClick={() => openEdit(ev)}
+                      onMoveDays={state.moveByKeyboard ? (days) => {
+                        void state.moveByKeyboard(ev, days).then((moved) => {
+                          if (moved) setActiveKey(shiftDateKey(ev.occurrenceDate, days));
+                        });
+                      } : undefined}
+                    />
                   ))}
                   {dayEvents.length > 3 && (
                     <div className="cal-more muted">
@@ -836,7 +1191,6 @@ export function CalendarBody({ state }: { state: CalendarState }) {
   const {
     mode,
     cursor,
-    today,
     occsByDay,
     agendaToday,
     agendaUpcoming,
@@ -847,13 +1201,18 @@ export function CalendarBody({ state }: { state: CalendarState }) {
 
   // The day panel needs the live calendar state (a hand-built one in a test has no setter).
   const withDay = typeof state.setSelectedDay === 'function';
+  // Said once per keyboard move, for a screen reader; nothing visible.
+  const moveStatus = (
+    <p className="cal-sr-only" role="status" aria-live="polite">{state.moveNotice ?? ''}</p>
+  );
 
   if (mode === 'month') {
-    if (!withDay) return <MonthGrid state={state} />;
+    if (!withDay) return <><MonthGrid state={state} />{moveStatus}</>;
     return (
       <div className="cal-body">
         <MonthGrid state={state} />
         <CalendarDayPanel dateKey={state.selectedDay} />
+        {moveStatus}
       </div>
     );
   }
@@ -869,28 +1228,10 @@ export function CalendarBody({ state }: { state: CalendarState }) {
 
   if (mode === 'week') {
     return (
-      <div className="cal-week-grid">
-        {Array.from({ length: 7 }, (_, i) => {
-          const d = new Date(startOfWeek(cursor, state.weekStart));
-          d.setDate(d.getDate() + i);
-          const key = toKey(d);
-          const isToday = key === toKey(today);
-          const dayEvents = occsByDay.get(key) ?? [];
-          return (
-            <div key={i} className={`cal-week-col ${isToday ? 'today' : ''}`}>
-              <div className="cal-week-daylabel">
-                {d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'short' })} <span className="muted">{d.getDate()}</span>
-              </div>
-              <div className="cal-week-events">
-                {dayEvents.map((ev) => (
-                  <EventChip key={`${ev.id}-${ev.occurrenceDate}`} ev={ev} onClick={() => openEdit(ev)} />
-                ))}
-                <button type="button" className="cal-add-inline muted" onClick={() => openNew(key)}>{t('calendar.addInline')}</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <>
+        <CalendarWeekGrid state={state} />
+        {moveStatus}
+      </>
     );
   }
 

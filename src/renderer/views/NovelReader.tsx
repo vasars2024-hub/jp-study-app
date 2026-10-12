@@ -86,6 +86,7 @@ import {
 } from '../annotations';
 import { detectSentenceBounds, sentenceAt } from '../../shared/sentenceBounds';
 import { registerCommandHandler } from '../keyboardShortcuts';
+import { withShortcut } from '../shortcutHints';
 import { recordReaderCopy } from '../clipboardHistory';
 import ReaderCollectionPanel, {
   type CollectionAddPayload,
@@ -3271,7 +3272,7 @@ export default function NovelReader({ item, onClose }: Props) {
             <button
               type="button"
               className={`btn primary ${translateMode !== 'original' ? 'active' : ''}`}
-              title={t('epub.translate.toggleVisibility')}
+              title={withShortcut(t('epub.translate.toggleVisibility'), 'reader.toggleTranslation')}
               aria-label={t('epub.translate.toggleVisibility')}
               aria-pressed={translateMode !== 'original'}
               onClick={() => toggleTranslationVisibility()}
@@ -3373,7 +3374,7 @@ export default function NovelReader({ item, onClose }: Props) {
           <button
             type="button"
             className="btn small"
-            title={t('novel.reader.collectShortcut')}
+            title={withShortcut(t('novel.reader.collectShortcut'), 'reader.saveToCollection')}
             onClick={() => addSelectionToCollection('selection')}
           >
             {t('novel.reader.collect')}

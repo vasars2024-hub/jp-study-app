@@ -10,6 +10,7 @@ import { useAnalysisActions } from '../../analysisActions';
 import { analysisCommandForKey, isTextEntryTarget } from '../../../shared/analysisShortcuts';
 import type { SentenceAnalysisResult } from '../../../shared/sentenceAnalysisCore';
 import { openAiSettings } from '../../aiSetupClient';
+import { aiErrorKey, isAiErrorCode } from '../../../shared/aiErrorCodes';
 
 /**
  * The Reading Lens' AI panel — what a scan opens when the mode toggle is on
@@ -63,29 +64,43 @@ export default function LensAnalysisPanel({ text, region, onLookup, onClose }: P
     result,
   });
 
+  // Set by "Re-analyze" / "Try again" and consumed by the next run, which then
+  // bypasses main's cache — without it the button re-served the cached answer.
+  const refreshNext = useRef(false);
+
   useEffect(() => {
     const id = ++reqRef.current;
+    const refresh = refreshNext.current;
+    refreshNext.current = false;
     setState({ kind: 'loading' });
     let alive = true;
     void (async () => {
       try {
-        const res = await window.api.sentenceAnalyze({ text, lang: studyLang, explainIn: uiLang });
+        const res = await window.api.sentenceAnalyze({
+          text,
+          lang: studyLang,
+          explainIn: uiLang,
+          ...(refresh ? { refresh: true } : {}),
+        });
         if (!alive || id !== reqRef.current) return;
         if (res.ok && res.result) setState({ kind: 'ready', result: res.result });
         else {
           setState({
             kind: 'error',
-            message: res.error || t('lens.ai.error'),
+            // Main's prose is English; its code is said in the UI language.
+            message: isAiErrorCode(res.code) ? t(aiErrorKey(res.code)) : t('lens.ai.error'),
             needsKey: !!res.needsKey,
             needsLocalModel: !!res.needsLocalModel,
             aiOff: !!res.aiOff,
           });
         }
-      } catch (err) {
+      } catch {
         if (!alive || id !== reqRef.current) return;
+        // The bridge itself threw (its message is Electron's English): said as
+        // the shared code, in the UI language.
         setState({
           kind: 'error',
-          message: err instanceof Error ? err.message : t('lens.ai.error'),
+          message: t(aiErrorKey('ipc-failed')),
           needsKey: false,
           needsLocalModel: false,
         });
@@ -96,7 +111,10 @@ export default function LensAnalysisPanel({ text, region, onLookup, onClose }: P
     };
   }, [text, studyLang, uiLang, attempt, t]);
 
-  const reanalyze = useCallback(() => setAttempt((n) => n + 1), []);
+  const reanalyze = useCallback(() => {
+    refreshNext.current = true;
+    setAttempt((n) => n + 1);
+  }, []);
 
   // The panel owns the keyboard while it is open. Capture phase, because the
   // Lens overlay also listens for Escape and would close the whole lens when

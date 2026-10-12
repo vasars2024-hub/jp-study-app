@@ -27,6 +27,7 @@
  * (Study OS's aero overview keeps those and stays in `FlashcardsView`).
  */
 import {
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -35,6 +36,7 @@ import {
   type CSSProperties,
   type DragEvent,
   type RefObject,
+  type JSX,
 } from 'react';
 import { confirmDialog, promptDialog } from '../ui/dialogService';
 import { ContextualSurface } from '../liquid/LiquidSurface';
@@ -122,12 +124,15 @@ import ListenMode from './ListenMode';
 import MatchMode from './MatchMode';
 import TestMode from './TestMode';
 import WriteMode from './WriteMode';
+import { LazyAiCardExtras, LazyAiLeechRescuePanel, LazyAiWhyWrongPanel } from './aiStudyEntry';
+import DeckCardExtrasPanel from './DeckCardExtrasPanel';
 import { PRACTICE_MODES, type PracticeMode } from '../../../shared/flashcardPractice';
 import { preferredVoiceFor } from '../../flashcardVoicePreference';
 import { normalizeStudyLang } from '../../../shared/studyLang';
 import { cardContentLang, studyContentLang } from '../../studyEnvironment';
 import PitchAccentContour from '../lexicon/PitchAccentContour';
 import { deckCardsToCsv } from '../../deckExport';
+import { cardAiExtrasLabels } from '../../../shared/cardAiExtrasHtml';
 import { loadSaved, loadSavedCards, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
   handOffToAgent,
@@ -137,6 +142,7 @@ import {
 } from '../../agentContextHandoff';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import { registerCommandHandler } from '../../keyboardShortcuts';
+import { withShortcut } from '../../shortcutHints';
 import { useT } from '../../i18n';
 import { SearchBox, Select, Tabs, Tile, TileList, useWiredMaterials } from '../ui';
 import type { LibraryItem } from '../../../shared/types';
@@ -202,6 +208,12 @@ export interface ReviewCard {
   imagePath?: string;
   /** Position in its deck for in-order sittings. */
   sourceOrder?: number;
+  /** The line or two before the sentence (visual novels), shown with the answer. */
+  contextBefore?: string;
+  /** The line or two after it (visual novels). */
+  contextAfter?: string;
+  /** The public page at the scene (a YouTube `&t=` link). */
+  webUrl?: string;
 }
 
 /** The review source picker's "several decks at once" choice. */
@@ -324,6 +336,10 @@ export interface FlashcardsState {
   /** Let the just-suspended leech back into the deck's reviews. */
   unsuspendLeech: () => void;
   dismissLeechNote: () => void;
+  /** The deck id of the card `leechNote` names, or ''. */
+  leechCardId: string;
+  /** The card the last Again was for, until the next rating (optional "Why was I wrong?"). */
+  lastMissed: ReviewCard | null;
   /** When the card on screen was shown — the answer timer's zero. */
   cardShownAt: number;
   editLeechMeaning: () => Promise<void>;
@@ -468,6 +484,8 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [leechNote, setLeechNote] = useState('');
   const [leechSuspended, setLeechSuspended] = useState(false);
   const leechCardId = useRef('');
+  /** The card the last Again was for, until the next rating: the optional "Why was I wrong?". */
+  const [lastMissed, setLastMissed] = useState<ReviewCard | null>(null);
   /** When the card on screen appeared; the gap to its grade is the answer time. */
   const [cardShownAt, setCardShownAt] = useState(() => Date.now());
   /** When a "Listen now" hand-off asked for a listening sitting to start. */
@@ -716,6 +734,9 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       cueStartSec: c.sourceRef?.cueStartSec,
       imagePath: c.imagePath,
       sourceOrder: c.sourceRef?.cueStartSec ?? c.addedAt / 1000,
+      contextBefore: c.contextBefore,
+      contextAfter: c.contextAfter,
+      webUrl: c.sourceRef?.webUrl,
     })), { mode: reviewMode, order: reviewOrder });
   }
 
@@ -760,6 +781,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   ): void {
     if (!cards.length) return;
     setLeechNote('');
+    setLastMissed(null);
     setLeechSuspended(false);
     const ordered = orderReviewCards(cards, initialMastered);
     setReviewSource(source);
@@ -813,6 +835,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     cardAudio.stop();
     setMode('overview');
     setLeechNote('');
+    setLastMissed(null);
     setSessionCards([]);
     setReviewIndex(0);
     setMasteredIds(new Set());
@@ -890,6 +913,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setUndoDepth(undoStackRef.current.length);
     if (!undone) return;
     setLeechNote('');
+    setLastMissed(null);
     setLeechSuspended(false);
     setDeck(undone.cards);
     const restored = undone.cards.find((c) => c.id === snapshot.cardId);
@@ -929,6 +953,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const card = sessionCards[reviewIndex];
     if (!card || masteredIds.has(card.id)) return;
     setLeechNote('');
+    setLastMissed(null);
     if (reviewSource === 'epub') rememberForUndo(card.id);
     if (wiredFx) window.dispatchEvent(new CustomEvent('wired:sync-ok'));
     setFlipped(false);
@@ -974,6 +999,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     if (!card) return;
     setLeechNote('');
     setLeechSuspended(false);
+    setLastMissed(card);
     if (reviewSource === 'epub') rememberForUndo(card.id);
     fireCardFx('resync', 260);
     setFlipped(false);
@@ -1357,7 +1383,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }
 
   async function saveGroupCsv(group: BookGroup): Promise<void> {
-    const csv = deckCardsToCsv(group.cards);
+    const csv = deckCardsToCsv(group.cards, ',', cardAiExtrasLabels(t));
     const safe = group.bookTitle.replace(/[^\w -]+/g, '').trim() || 'deck';
     const res = await window.api.miningSaveEpubDeckFile(csv, safe, 'csv');
     if (res.ok && res.path) setDeckMenuGroup(null);
@@ -1366,7 +1392,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   // File → Export: all EPUB cards in the current folder filter, as one CSV.
   async function exportAllEpubCsv(): Promise<void> {
     if (!filteredDeck.length) return;
-    const csv = deckCardsToCsv(filteredDeck);
+    const csv = deckCardsToCsv(filteredDeck, ',', cardAiExtrasLabels(t));
     await window.api.miningSaveEpubDeckFile(csv, 'flashcards-deck', 'csv');
   }
 
@@ -1507,6 +1533,8 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     leechSuspended,
     unsuspendLeech,
     dismissLeechNote: () => setLeechNote(''),
+    leechCardId: leechNote ? leechCardId.current : '',
+    lastMissed,
     cardShownAt,
     editLeechMeaning,
     playCurrentInVideo,
@@ -1880,6 +1908,18 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               <button type="button" className="btn small" onClick={state.dismissLeechNote}>{t('flash.leechNoticeDismiss')}</button>
             </span>
           )}
+          {/* Optional AI: a suggested mnemonic, clearer meaning and distinguishing
+              note for the leech, applied only on approval. Outside the status span
+              so the panel is not re-announced as part of the notice. */}
+          {state.leechNote && state.leechCardId && (
+            <Suspense fallback={null}>
+              <LazyAiLeechRescuePanel
+                key={state.leechCardId}
+                cardIds={[state.leechCardId]}
+                onApplied={() => state.setDeck(loadDeck())}
+              />
+            </Suspense>
+          )}
         </div>
 
         <div className={`flash-card${cardFx ? ` is-${cardFx}` : ''}`} onClick={flipped ? undefined : state.flip}>
@@ -1963,11 +2003,50 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
                 reading={current.reading}
                 lang={normalizeStudyLang(current.studyLang)}
               />
+              {current.contextBefore && (
+                <span
+                  className="flash-context muted"
+                  lang={cardContentLang(current)}
+                  title={t('vn5.card.context')}
+                  style={{ whiteSpace: 'pre-line', fontSize: '0.85em' }}
+                >
+                  {current.contextBefore}
+                </span>
+              )}
               {current.sentence && current.sentence !== current.word && (
                 <span className="flash-sentence" lang={cardContentLang(current)}>{current.sentence}</span>
               )}
+              {current.contextAfter && (
+                <span
+                  className="flash-context muted"
+                  lang={cardContentLang(current)}
+                  title={t('vn5.card.contextAfter')}
+                  style={{ whiteSpace: 'pre-line', fontSize: '0.85em' }}
+                >
+                  {current.contextAfter}
+                </span>
+              )}
               <span className="flash-meaning">{current.meaning || t('flash.noMeaningSaved')}</span>
+              {/* The memory aid, distinguishing note and kept example sentences the
+                  learner approved, plus the optional i+1 sentence generator. */}
+              <Suspense fallback={null}>
+                <LazyAiCardExtras key={current.id} cardId={current.id} />
+              </Suspense>
               {current.imagePath && <CardStill path={current.imagePath} />}
+              {current.webUrl && (
+                <button
+                  type="button"
+                  className="btn small flash-play-in-video"
+                  data-flash-action="open-web-scene"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void window.api.openExternal(current.webUrl as string);
+                  }}
+                >
+                  <Icon name="video" size={13} />
+                  {t('yt5.card.openAtScene')}
+                </button>
+              )}
               {(state.cardHasScene(current.id)
                 || (isLocalMediaPath(current.sourceUrl) && current.cueStartSec != null)) && (
                 <button
@@ -2046,13 +2125,32 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
             </button>
           </div>
         )}
+        {/* Optional AI after an Again: what the card is easily confused with,
+            and why. Offered until the next rating; the card itself has moved on. */}
+        {state.lastMissed && (state.lastMissed.word || state.lastMissed.front) && (
+          <Suspense fallback={null}>
+            <LazyAiWhyWrongPanel
+              key={`${state.lastMissed.id}:${state.reviewed}`}
+              card={{
+                id: state.lastMissed.id,
+                word: state.lastMissed.word || state.lastMissed.front || '',
+                reading: state.lastMissed.reading || '',
+                meaning: state.lastMissed.meaning || state.lastMissed.back || '',
+                ...(state.lastMissed.sentence ? { sentence: state.lastMissed.sentence } : {}),
+                ...(state.lastMissed.studyLang ? { studyLang: state.lastMissed.studyLang } : {}),
+              }}
+              direction="review"
+              verdict="again"
+            />
+          </Suspense>
+        )}
         {state.canUndoRating && (
           <div className="flash-undo-row">
             <button
               type="button"
               className="btn small flash-undo"
               onClick={state.undoRating}
-              title={t('flash.undoRating.hint')}
+              title={withShortcut(t('flash.undoRating.hint'), 'flashcards.undo')}
             >
               {t('flash.undoRating')}
             </button>
@@ -2317,6 +2415,9 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
   // piece of state, not one boolean each, so two modes can never be open at
   // once and every one of them exits back to the same place.
   const [practice, setPractice] = useState<PracticeMode>('none');
+  /** The deck card whose extras panel (kept examples, optional i+1 generator) is open. */
+  const [extrasCardId, setExtrasCardId] = useState<string | null>(null);
+  const extrasCard = extrasCardId ? epubCards.find((card) => card.id === extrasCardId) : undefined;
 
   // Counted over the same folder the find box narrows, so the number on the
   // button is the number of cards it shows.
@@ -2589,6 +2690,17 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
               {t('srs2.suspended.show', { count: suspendedCount })}
             </button>
           )}
+          {/* Optional AI: rescue suggestions for every leech the search shows,
+              each approved or rejected on its own. */}
+          {overviewTab === 'epub' && search.trim().toLowerCase() === LEECH_QUERY && filteredDeck.length > 0 && (
+            <Suspense fallback={null}>
+              <LazyAiLeechRescuePanel
+                key={filteredDeck.map((card) => card.id).join(',')}
+                cardIds={filteredDeck.map((card) => card.id)}
+                onApplied={() => state.setDeck(loadDeck())}
+              />
+            </Suspense>
+          )}
           {overviewTab === 'epub' && search.trim().toLowerCase() === SUSPENDED_QUERY && filteredDeck.length > 0 && (
             <button
               type="button"
@@ -2620,6 +2732,12 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             </>
           )}
         </div>
+        {/* One deck card's extras, opened from its row: the examples, memory aid,
+            distinguishing note and accepted answers it carries, editable with AI
+            off, plus the optional i+1 generator. */}
+        {overviewTab === 'epub' && extrasCard && (
+          <DeckCardExtrasPanel card={extrasCard} onClose={() => setExtrasCardId(null)} />
+        )}
       </ContextualSurface>
 
       <DeckImportPanel onImported={() => state.setDeck(loadDeck())} />
@@ -3062,6 +3180,19 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                     <Icon name="bookmark" size={14} />
                                   </button>
                                 )}
+                                {/* Not `data-ai-entry`: the saved extras are the learner's and
+                                    stay reachable with AI off; only "Generate" inside is AI. */}
+                                <button
+                                  type="button"
+                                  className="flash-row-x flash-row-play"
+                                  data-flash-action="row-card-extras"
+                                  aria-pressed={extrasCardId === card.id}
+                                  title={t('aiStudy.extras.open', { word: card.word })}
+                                  aria-label={t('aiStudy.extras.open', { word: card.word })}
+                                  onClick={() => setExtrasCardId(extrasCardId === card.id ? null : card.id)}
+                                >
+                                  <Icon name="note" size={14} />
+                                </button>
                                 <FlashcardFileMenu
                                   open={fileMenu === card.id}
                                   folders={folders}

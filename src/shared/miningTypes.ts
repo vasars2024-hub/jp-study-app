@@ -288,7 +288,17 @@ export interface AiPromptPreset {
   category: 'core' | 'specialized';
   description: string;
   instruction: string;
+  /**
+   * The study languages this preset writes cards for. Absent means Japanese
+   * only — every preset written before Chinese presets existed is about kanji,
+   * kana, keigo or JLPT. Card Studio lists only the presets of the active
+   * profile's study language.
+   */
+  studyLangs?: readonly AiPresetStudyLang[];
 }
+
+/** Study languages Card Studio has presets for. */
+export type AiPresetStudyLang = 'ja' | 'zh';
 
 export type AiMiningOutputFormat = 'anki' | 'csv';
 
@@ -378,13 +388,44 @@ export interface AiDeckGenerationRequest {
   backLang?: AiMiningLanguage;
   reverse?: boolean;
   backGlossLangs?: AiMiningLanguage[];
+  /**
+   * Preset source only: expressions a previous run already invented. A retry
+   * of the items a run could not invent passes them so it does not repeat them.
+   */
+  avoidExpressions?: string[];
 }
 
 export interface AiGenerationProgress {
   phase: 'invent' | 'enrich' | 'done';
   done: number;
   total: number;
+  /** The status line, already in the app language when it left main. */
   message?: string;
+  /**
+   * The catalog key `message` was made from, with its variables. A window
+   * renders `t(messageKey, messageVars)` so the line follows ITS language, not
+   * the one main resolved when it broadcast.
+   */
+  messageKey?: string;
+  messageVars?: Record<string, string | number>;
+}
+
+/**
+ * Why one Card Studio item has no cards, and how to make it again.
+ *
+ * A run used to throw on the first failed word or invent batch, discarding
+ * every result the provider had already been paid for. Now the finished items
+ * are kept and each failure is returned in their place, retryable on its own.
+ */
+export interface AiGenerationItemFailure {
+  /** Shown to the user; localized in main. */
+  message: string;
+  /** The provider runtime's error code, when there was one. */
+  code?: string;
+  /** What to send to `ai:generateDeck` to produce just this item again. */
+  retry:
+    | { kind: 'term'; term: string; reading?: string; sentence?: string }
+    | { kind: 'invent'; count: number; avoid: string[] };
 }
 
 export interface AiGeneratedCard {
@@ -421,6 +462,8 @@ export interface AiEnrichmentResult {
   csv: string;
   frequencies: Record<string, number>;
   rawJson: string;
+  /** Set on an item that failed: it has no cards and can be retried alone. */
+  failure?: AiGenerationItemFailure;
 }
 
 export const DEFAULT_TRADITIONAL_MINING_CONFIG: TraditionalMiningConfig = {

@@ -35,6 +35,14 @@ export interface StructuredSenseParts {
 
 type Node = Record<string, unknown>;
 
+/**
+ * How deep any walk here goes (risk4). Real Yomitan structured content nests a
+ * dozen levels at most; an imported dictionary is untrusted input, and a
+ * pathologically deep one would otherwise overflow the stack of whichever
+ * process parses it. Deeper branches are ignored, not walked.
+ */
+export const MAX_STRUCTURED_DEPTH = 64;
+
 const POS_MARK = 'part-of-speech-info';
 const USAGE_MARKS = new Set(['misc-info', 'field-info', 'dialect-info']);
 const SENSE_MARK = 'sense';
@@ -61,16 +69,16 @@ function childrenOf(node: unknown): unknown[] {
 }
 
 /** Visible text of a node, with list items and line breaks as separators. */
-function textOf(node: unknown): string {
-  if (node == null) return '';
+function textOf(node: unknown, depth = 0): string {
+  if (node == null || depth > MAX_STRUCTURED_DEPTH) return '';
   if (typeof node === 'string') return node;
   if (typeof node === 'number' || typeof node === 'boolean') return String(node);
-  if (Array.isArray(node)) return node.map(textOf).join('');
+  if (Array.isArray(node)) return node.map((child) => textOf(child, depth + 1)).join('');
   if (!isNode(node)) return '';
   if (node.type === 'image') return '';
   if (node.tag === 'br') return ' ';
   if (typeof node.text === 'string') return node.text;
-  return childrenOf(node).map(textOf).join('');
+  return childrenOf(node).map((child) => textOf(child, depth + 1)).join('');
 }
 
 function clean(text: string): string {
@@ -88,10 +96,11 @@ interface TagHarvest {
 }
 
 /** Tag nodes under `node`, not descending into nested senses (they own their own tags). */
-function harvestTags(node: unknown, out: TagHarvest, skipSenses: boolean): void {
+function harvestTags(node: unknown, out: TagHarvest, skipSenses: boolean, depth = 0): void {
+  if (depth > MAX_STRUCTURED_DEPTH) return;
   for (const child of childrenOf(node)) {
     if (!isNode(child)) {
-      if (Array.isArray(child)) harvestTags(child, out, skipSenses);
+      if (Array.isArray(child)) harvestTags(child, out, skipSenses, depth + 1);
       continue;
     }
     const mark = marker(child);
@@ -108,31 +117,34 @@ function harvestTags(node: unknown, out: TagHarvest, skipSenses: boolean): void 
       if (label && !out.usage.includes(label)) out.usage.push(label);
       continue;
     }
-    harvestTags(child, out, skipSenses);
+    harvestTags(child, out, skipSenses, depth + 1);
   }
 }
 
 /** A copy of `node` with every tag node removed (they are rendered as tags instead). */
-function withoutTags(node: unknown): unknown {
+function withoutTags(node: unknown, depth = 0): unknown {
+  // Past the limit the branch is dropped rather than walked (risk4).
+  if (depth > MAX_STRUCTURED_DEPTH) return '';
   if (Array.isArray(node)) {
-    return node.filter((child) => !(isNode(child) && isTagNode(child))).map(withoutTags);
+    return node.filter((child) => !(isNode(child) && isTagNode(child))).map((child) => withoutTags(child, depth + 1));
   }
   if (!isNode(node)) return node;
   if (!('content' in node)) return node;
-  return { ...node, content: withoutTags(childrenOf(node)) };
+  return { ...node, content: withoutTags(childrenOf(node), depth + 1) };
 }
 
-function findGlossaries(node: unknown, out: Node[]): void {
+function findGlossaries(node: unknown, out: Node[], depth = 0): void {
+  if (depth > MAX_STRUCTURED_DEPTH) return;
   for (const child of childrenOf(node)) {
     if (!isNode(child)) {
-      if (Array.isArray(child)) findGlossaries(child, out);
+      if (Array.isArray(child)) findGlossaries(child, out, depth + 1);
       continue;
     }
     if (marker(child) === GLOSSARY_MARK) {
       out.push(child);
       continue;
     }
-    findGlossaries(child, out);
+    findGlossaries(child, out, depth + 1);
   }
 }
 
@@ -156,10 +168,11 @@ function senseParts(sense: Node, inherited: TagHarvest): StructuredSenseParts {
   return { partsOfSpeech, tags, definitions, content };
 }
 
-function collect(node: unknown, inherited: TagHarvest, out: StructuredSenseParts[]): void {
+function collect(node: unknown, inherited: TagHarvest, out: StructuredSenseParts[], depth = 0): void {
+  if (depth > MAX_STRUCTURED_DEPTH) return;
   for (const child of childrenOf(node)) {
     if (!isNode(child)) {
-      if (Array.isArray(child)) collect(child, inherited, out);
+      if (Array.isArray(child)) collect(child, inherited, out, depth + 1);
       continue;
     }
     const mark = marker(child);
@@ -170,10 +183,10 @@ function collect(node: unknown, inherited: TagHarvest, out: StructuredSenseParts
     if (mark === GROUP_MARK) {
       const group: TagHarvest = { pos: [...inherited.pos], usage: [...inherited.usage] };
       harvestTags(child, group, true);
-      collect(child, group, out);
+      collect(child, group, out, depth + 1);
       continue;
     }
-    collect(child, inherited, out);
+    collect(child, inherited, out, depth + 1);
   }
 }
 

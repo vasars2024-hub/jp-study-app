@@ -19,6 +19,7 @@ import {
   JAZZ_PROGRESSIONS,
   LOFI_PROGRESSIONS,
   MAJOR_PENTATONIC,
+  MIYAKO_BUSHI,
   NATURAL_MINOR,
   PIANO_PROGRESSIONS,
   bassRoot,
@@ -43,7 +44,9 @@ const LOOKAHEAD = 1.4;
 type NoiseColor = 'white' | 'pink' | 'brown';
 type Tick = (now: number, horizon: number) => void;
 
-const rand = Math.random;
+// Looked up on every call, not captured: a captured `Math.random` ignores a test's
+// seeded spy, which left the offline render tests random despite their seed (snd5).
+const rand = (): number => Math.random();
 const between = (low: number, high: number): number => low + rand() * (high - low);
 const pickOne = <T>(items: readonly T[]): T => items[Math.floor(rand() * items.length)];
 
@@ -513,6 +516,306 @@ const LAYERS: Record<SoundLayerId, LayerBuilder> = {
       return between(1.6, 6.5);
     });
   },
+
+  // ---- snd5: eight more, all from the same primitives (noise beds, blips, bursts) ----
+
+  umbrella: (rig) => {
+    // The rain beyond the canopy, muffled by it.
+    rig.chain(rig.noise('pink'), rig.filter('highpass', 280), rig.filter('lowpass', 2200), rig.gain(0.32), rig.out);
+    // Drops drumming on taut fabric: dense, bright, resonant taps, and now and
+    // then a fat one that thuds, or water running off the edge in a heavier drip.
+    return scheduler(0, (t) => {
+      const fat = rand() < 0.12;
+      rig.burst({
+        t,
+        color: 'white',
+        dur: between(0.008, 0.022),
+        gain: between(0.05, 0.13) * (fat ? 1.7 : 1),
+        filter: 'bandpass',
+        freq: between(2000, 3400),
+        q: between(4, 9),
+        pan: between(-0.5, 0.5),
+      });
+      if (fat) rig.blip({ t, freq: between(160, 230), freqEnd: 110, dur: 0.06, gain: 0.1, pan: between(-0.4, 0.4) });
+      if (rand() < 0.02) {
+        rig.blip({ t: t + 0.05, freq: between(700, 1000), freqEnd: 480, dur: 0.05, gain: 0.07, pan: between(-0.9, 0.9) });
+      }
+      return between(0.025, 0.07);
+    });
+  },
+
+  cicadas: (rig) => {
+    // A field of them far off: in midsummer the chorus never quite stops, so the
+    // layer is never silent between the near cicadas' phrases.
+    const chorus = rig.gain(0.035);
+    rig.chain(rig.noise('white'), rig.filter('bandpass', 4800, 1.5), chorus, rig.out);
+    rig.drift(chorus.gain, 0.015, 0.2);
+    // Aburazemi: a sizzling band of noise, pulsing fast, that swells and fades
+    // in long phrases. Two of them, out of step.
+    const sizzlers = [0, 1].map(() => {
+      const band = rig.filter('bandpass', between(4200, 5600), 2.5);
+      const pulse = rig.gain(1);
+      const depth = rig.gain(0.55);
+      rig.osc('sine', between(45, 70)).connect(depth);
+      depth.connect(pulse.gain);
+      const swell = rig.gain(0);
+      rig.chain(rig.noise('white'), band, pulse, swell, rig.pan(between(-0.7, 0.7)), rig.out);
+      return { swell, level: between(0.05, 0.08), next: -1 };
+    });
+    // Minminzemi: a pitched "meen" call repeated in runs, then a rest.
+    const caller = scheduler(between(2, 6), (t) => {
+      const base = between(1600, 2000);
+      const pan = between(-0.6, 0.6);
+      let at = t;
+      for (let i = 0, n = 4 + Math.floor(rand() * 5); i < n; i++) {
+        rig.blip({ t: at, freq: base, freqEnd: base * 1.06, dur: 0.32, gain: 0.045, pan, attack: 0.06 });
+        at += 0.42;
+      }
+      return at - t + between(6, 14);
+    });
+    return (now, horizon) => {
+      for (const s of sizzlers) {
+        if (s.next < 0) s.next = now + rand() * 4;
+        if (s.next < now) s.next = now;
+        while (s.next < horizon) {
+          const t = s.next;
+          const rise = between(1.5, 3);
+          const hold = between(4, 10);
+          const fall = between(2, 4);
+          s.swell.gain.setValueAtTime(0, t);
+          s.swell.gain.linearRampToValueAtTime(s.level, t + rise);
+          s.swell.gain.setValueAtTime(s.level, t + rise + hold);
+          s.swell.gain.linearRampToValueAtTime(0, t + rise + hold + fall);
+          s.next = t + rise + hold + fall + between(1, 6);
+        }
+      }
+      caller(now, horizon);
+    };
+  },
+
+  carriage: (rig, reverb) => {
+    // Inside the carriage: the floor's rumble and the air conditioning.
+    const rumble = rig.gain(0.55);
+    rig.chain(rig.noise('brown'), rig.filter('lowpass', 140), rumble, rig.out);
+    rig.drift(rumble.gain, 0.12, 0.6);
+    rig.chain(rig.noise('pink'), rig.filter('bandpass', 1800, 0.5), rig.gain(0.025), rig.out);
+    // The traction motor's whine: rising as the train pulls away, quiet at speed,
+    // falling as it brakes for the next station.
+    const motor = rig.osc('triangle', 180);
+    const motorGain = rig.gain(0);
+    rig.chain(motor, rig.filter('lowpass', 1400), motorGain, rig.out);
+    const wet = rig.gain(0.3);
+    wet.connect(reverb());
+    // Rail joints, muffled by the floor.
+    const joints = scheduler(0.5, (t) => {
+      for (const offset of [0, 0.16]) {
+        rig.blip({ t: t + offset, freq: 70, freqEnd: 48, dur: 0.08, gain: 0.12 });
+        rig.burst({ t: t + offset, color: 'brown', dur: 0.05, gain: 0.08, filter: 'lowpass', freq: 260 });
+      }
+      return between(1.8, 2.6);
+    });
+    const run = scheduler(0.2, (t) => {
+      const accel = between(14, 20);
+      const cruise = between(30, 60);
+      const brake = between(12, 16);
+      const arrive = t + accel + cruise + brake;
+      const top = between(820, 980);
+      motor.frequency.setValueAtTime(180, t);
+      motor.frequency.linearRampToValueAtTime(top, t + accel);
+      motor.frequency.setValueAtTime(top, t + accel + cruise);
+      motor.frequency.linearRampToValueAtTime(160, arrive);
+      motorGain.gain.setValueAtTime(0, t);
+      motorGain.gain.linearRampToValueAtTime(0.035, t + 2);
+      motorGain.gain.setValueAtTime(0.035, t + accel);
+      motorGain.gain.linearRampToValueAtTime(0.012, t + accel + 4);
+      motorGain.gain.setValueAtTime(0.012, t + accel + cruise);
+      motorGain.gain.linearRampToValueAtTime(0.03, t + accel + cruise + 2);
+      motorGain.gain.linearRampToValueAtTime(0, arrive);
+      // At the platform: a plain falling two-tone, then the doors open and close.
+      [76, 72].forEach((note, i) => {
+        for (const dest of [rig.out, wet]) {
+          rig.blip({ t: arrive + 1.5 + i * 0.7, freq: midiToHz(note), dur: 1.6, gain: 0.06, dest });
+        }
+      });
+      for (const at of [arrive + 4, arrive + 14]) {
+        rig.burst({ t: at, color: 'pink', dur: 0.9, gain: 0.05, filter: 'bandpass', freq: 800, q: 0.8, attack: 0.3 });
+      }
+      return accel + cruise + brake + between(18, 26);
+    });
+    return (now, horizon) => {
+      joints(now, horizon);
+      run(now, horizon);
+    };
+  },
+
+  konbini: (rig, reverb) => {
+    // Refrigerated cases and the air conditioning: a low hum and its harmonic,
+    // over a soft room tone; the fluorescent tubes add a faint high buzz.
+    rig.chain(rig.osc('sine', 100), rig.gain(0.035), rig.out);
+    rig.chain(rig.osc('sine', 200), rig.gain(0.012), rig.out);
+    rig.chain(rig.noise('pink'), rig.filter('lowpass', 900), rig.gain(0.12), rig.out);
+    rig.chain(rig.noise('white'), rig.filter('bandpass', 7800, 8), rig.gain(0.02), rig.out);
+    const wet = rig.gain(0.35);
+    wet.connect(reverb());
+    // The entry chime: a plain rising arpeggio (deliberately no chain's jingle),
+    // and the sliding doors.
+    const arpeggios = [[72, 76, 79], [74, 77, 81], [71, 74, 79]];
+    const door = scheduler(between(4, 12), (t) => {
+      pickOne(arpeggios).forEach((note, i) => {
+        for (const dest of [rig.out, wet]) {
+          rig.blip({ t: t + i * 0.28, freq: midiToHz(note), dur: 1.1, gain: 0.07, dest });
+          rig.blip({ t: t + i * 0.28, freq: midiToHz(note) * 2, dur: 0.5, gain: 0.015, dest });
+        }
+      });
+      rig.burst({ t: t + 0.1, color: 'pink', dur: 1.2, gain: 0.05, filter: 'bandpass', freq: 600, q: 0.8, attack: 0.4 });
+      return between(25, 70);
+    });
+    // The register: a short beep or two as items are scanned.
+    const register = scheduler(between(2, 8), (t) => {
+      let at = t;
+      for (let i = 0, n = 1 + Math.floor(rand() * 3); i < n; i++) {
+        rig.blip({ t: at, freq: 2350, dur: 0.09, gain: 0.025, type: 'square', attack: 0.002, pan: 0.3 });
+        at += between(0.6, 1.4);
+      }
+      return between(8, 24);
+    });
+    return (now, horizon) => {
+      door(now, horizon);
+      register(now, horizon);
+    };
+  },
+
+  cityNight: (rig) => {
+    // The far-off roar a city keeps all night.
+    const roar = rig.gain(0.4);
+    rig.chain(rig.noise('brown'), rig.filter('lowpass', 320), roar, rig.out);
+    rig.drift(roar.gain, 0.12, 0.15);
+    rig.chain(rig.noise('pink'), rig.filter('bandpass', 700, 0.6), rig.gain(0.05), rig.out);
+    // A car going by on a wet street: a swell of filtered noise, its pitch
+    // falling as it passes from one side to the other.
+    const cars = scheduler(between(1, 4), (t) => {
+      const dur = between(3, 6);
+      const peak = between(0.08, 0.2);
+      const source = rig.ctx.createBufferSource();
+      source.buffer = rig.buffer('pink');
+      source.loop = true;
+      const band = rig.ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.Q.value = 0.9;
+      band.frequency.setValueAtTime(between(900, 1300), t);
+      band.frequency.exponentialRampToValueAtTime(between(380, 520), t + dur);
+      const env = rig.ctx.createGain();
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(peak, t + dur * 0.5);
+      env.gain.linearRampToValueAtTime(0, t + dur);
+      const panner = rig.ctx.createStereoPanner();
+      const from = rand() < 0.5 ? -0.8 : 0.8;
+      panner.pan.setValueAtTime(from, t);
+      panner.pan.linearRampToValueAtTime(-from, t + dur);
+      source.connect(band);
+      band.connect(env);
+      env.connect(panner);
+      panner.connect(rig.out);
+      source.start(t, rand() * 3);
+      source.stop(t + dur + 0.1);
+      return between(3, 11);
+    });
+    // Sometimes a horn, blocks away.
+    const horns = scheduler(between(10, 30), (t) => {
+      if (rand() < 0.5) {
+        const freq = between(330, 420);
+        const pan = between(-0.7, 0.7);
+        const dur = between(0.3, 0.6);
+        rig.blip({ t, freq, dur, gain: 0.022, type: 'sawtooth', attack: 0.03, pan });
+        rig.blip({ t, freq: freq * 1.26, dur, gain: 0.018, type: 'sawtooth', attack: 0.03, pan });
+      }
+      return between(20, 60);
+    });
+    return (now, horizon) => {
+      cars(now, horizon);
+      horns(now, horizon);
+    };
+  },
+
+  templeBell: (rig, reverb) => {
+    // Morning air around the temple: a little low wind.
+    rig.chain(rig.noise('pink'), rig.filter('lowpass', 380), rig.gain(0.07), rig.out);
+    const wet = rig.gain(0.6);
+    wet.connect(reverb());
+    // A large bronze bell (bonshou): a long hum an octave below the strike tone
+    // — two hums a few cents apart, which beat into the bell's slow waver — and
+    // higher inharmonic partials that die first. [ratio, level, seconds]
+    const f0 = between(96, 128);
+    const partials: [number, number, number][] = [
+      [0.5, 0.06, 26],
+      [0.503, 0.05, 24],
+      [1, 0.11, 18],
+      [1.19, 0.04, 9],
+      [2, 0.05, 7],
+      [2.74, 0.035, 5],
+      [3.84, 0.02, 3.2],
+      [5.4, 0.012, 2],
+    ];
+    return scheduler(between(1, 3), (t) => {
+      const strength = between(0.75, 1);
+      // The log beam (shumoku) meeting the bronze.
+      rig.burst({ t, color: 'brown', dur: 0.09, gain: 0.18 * strength, filter: 'lowpass', freq: 500 });
+      for (const [ratio, level, seconds] of partials) {
+        rig.blip({ t, freq: f0 * ratio, dur: seconds, gain: level * strength, attack: 0.006 });
+        rig.blip({ t, freq: f0 * ratio, dur: seconds, gain: level * strength * 0.6, attack: 0.006, dest: wet });
+      }
+      return between(22, 40);
+    });
+  },
+
+  furin: (rig, reverb) => {
+    // A breeze just strong enough to move the strip of paper.
+    rig.chain(rig.noise('pink'), rig.filter('bandpass', 500, 0.7), rig.gain(0.04), rig.out);
+    const wet = rig.gain(0.35);
+    wet.connect(reverb());
+    // One glass bell has one pitch; a gust sets the clapper going for a few
+    // strikes, each softer than the last.
+    const f0 = between(2300, 3000);
+    return scheduler(between(0.8, 3), (t) => {
+      let at = t;
+      for (let i = 0, n = 1 + Math.floor(rand() * 4); i < n; i++) {
+        const level = 0.06 * Math.pow(0.75, i) * between(0.7, 1);
+        const freq = f0 * between(0.997, 1.003);
+        const pan = between(-0.3, 0.3);
+        for (const dest of [rig.out, wet]) {
+          rig.blip({ t: at, freq, dur: between(1.4, 2.2), gain: level, pan, dest, attack: 0.002 });
+          rig.blip({ t: at, freq: freq * 2.32, dur: 0.7, gain: level * 0.35, pan, dest, attack: 0.002 });
+          rig.blip({ t: at, freq: freq * 4.25, dur: 0.25, gain: level * 0.15, pan, dest, attack: 0.002 });
+        }
+        at += between(0.12, 0.45);
+      }
+      return between(2.5, 9);
+    });
+  },
+
+  shishiOdoshi: (rig, reverb) => {
+    // The trickle filling the bamboo.
+    const trickle = rig.filter('bandpass', 1500, 1.8);
+    const trickleGain = rig.gain(0.12);
+    rig.chain(rig.noise('white'), trickle, trickleGain, rig.out);
+    rig.drift(trickle.frequency, 500, 5);
+    rig.drift(trickleGain.gain, 0.05, 4);
+    const wet = rig.gain(0.5);
+    wet.connect(reverb());
+    return scheduler(between(3, 8), (t) => {
+      // The tube tips and pours out…
+      rig.burst({ t, color: 'white', dur: 0.45, gain: 0.05, filter: 'bandpass', freq: 900, q: 1.2, attack: 0.08 });
+      // …and drops back onto its stone: a hollow knock, then a softer bounce.
+      const knock = t + 0.5;
+      for (const dest of [rig.out, wet]) {
+        rig.blip({ t: knock, freq: 440, freqEnd: 300, dur: 0.22, gain: 0.22, dest, attack: 0.002 });
+        rig.blip({ t: knock, freq: 1180, freqEnd: 900, dur: 0.08, gain: 0.06, dest, attack: 0.001 });
+      }
+      rig.burst({ t: knock, color: 'white', dur: 0.03, gain: 0.12, filter: 'bandpass', freq: 2200, q: 2 });
+      rig.blip({ t: knock + 0.16, freq: 420, freqEnd: 310, dur: 0.12, gain: 0.07, attack: 0.002 });
+      return between(12, 24);
+    });
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -666,6 +969,34 @@ class Instruments {
     send.gain.value = 0.5;
     env.connect(send);
     send.connect(this.wet);
+  }
+
+  /**
+   * snd5: a plucked koto string — a bright attack from a detuned saw that dies
+   * in a few tens of milliseconds, over a triangle body behind a closing
+   * filter. `bend` presses the string behind the bridge (oshide), raising the
+   * note a little after it sounds.
+   */
+  koto(t: number, midi: number, dur: number, vel: number, wet = 0.35, bend = false): void {
+    const freq = midiToHz(midi);
+    this.tone(t, dur, vel * 0.16, 0.55, 0.25, wet, (env, stopAt) => {
+      const tone = this.ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.setValueAtTime(Math.min(9000, freq * 8), t);
+      tone.frequency.setTargetAtTime(freq * 2.5 + 300, t, 0.12);
+      const body = this.oscAt('triangle', freq, t, stopAt);
+      if (bend) {
+        body.frequency.setValueAtTime(freq, t + 0.12);
+        body.frequency.linearRampToValueAtTime(freq * 1.06, t + 0.32);
+      }
+      body.connect(tone);
+      const pluck = this.ctx.createGain();
+      pluck.gain.setValueAtTime(0.5, t);
+      pluck.gain.setTargetAtTime(0, t, 0.05);
+      this.oscAt('sawtooth', freq, t, stopAt, 3).connect(pluck);
+      pluck.connect(tone);
+      tone.connect(env);
+    });
   }
 
   bell(t: number, midi: number, vel: number): void {
@@ -970,6 +1301,47 @@ function ambientBand(): BandSetup {
   };
 }
 
+/**
+ * snd5: koto in the in scale. Phrases step through the scale with the odd leap,
+ * a low string rings under every other bar, a phrase ends with an answer an
+ * octave down, and every eighth bar is one held note: room to breathe.
+ */
+function kotoBand(): BandSetup {
+  const tonic = pickOne([2, 4, 7, 9]);
+  const scale = keyNotes(tonic, MIYAKO_BUSHI, 55, 86);
+  const low = 43 + ((tonic - (43 % 12) + 12) % 12);
+  let pos = Math.floor(scale.length / 2);
+  const shapes: readonly number[][] = [
+    [0, 1, 2, 3],
+    [0, 0.5, 1, 2, 3],
+    [0, 1.5, 2, 2.5, 3.5],
+    [0, 2, 3],
+  ];
+  const step = (): number => pickOne([-2, -1, -1, 1, 1, 2]);
+  return {
+    bpm: 56,
+    beatsPerBar: 4,
+    tone: 5200,
+    wow: 0,
+    crackle: 0,
+    echo: true,
+    write: (t, bar, { play, beat }) => {
+      if (bar % 2 === 0) play.koto(t, low, beat * 4, 0.5, 0.35);
+      if (bar % 8 === 7) {
+        play.koto(t + humanize(), scale[pos] as number, beat * 3, 0.55, 0.45, true);
+        return;
+      }
+      for (const at of pickOne(shapes)) {
+        pos = Math.min(scale.length - 1, Math.max(0, pos + step()));
+        play.koto(t + at * beat + humanize(), scale[pos] as number, beat * 1.4, between(0.45, 0.7), 0.4, rand() < 0.15);
+      }
+      if (bar % 4 === 3) {
+        play.koto(t + 3.5 * beat, scale[Math.max(0, pos - 5)] as number, beat * 1.8, 0.4, 0.4);
+      }
+    },
+  };
+}
+
 const BANDS: Record<Exclude<MusicStyleId, 'off'>, () => BandSetup> = {
   'lofi-chill': () => lofiBand(false),
   'lofi-dusk': () => lofiBand(true),
@@ -977,6 +1349,7 @@ const BANDS: Record<Exclude<MusicStyleId, 'off'>, () => BandSetup> = {
   'jazz-ballad': jazzBalladBand,
   'piano-emotional': emotionalPianoBand,
   'ambient-drift': ambientBand,
+  'koto-garden': kotoBand,
 };
 
 function buildMusic(rig: Rig, style: Exclude<MusicStyleId, 'off'>, reverb: AudioNode): Tick {
@@ -1120,6 +1493,8 @@ export class SoundscapeEngine {
   private master: GainNode | null = null;
   private duck: GainNode | null = null;
   private fade: GainNode | null = null;
+  /** snd5: the long scheduled fade (sleep timer), separate from `fade`. */
+  private scheduled: GainNode | null = null;
   private reverb: GainNode | null = null;
   private readonly noiseBuffers = new Map<NoiseColor, AudioBuffer>();
   private readonly layers = new Map<SoundLayerId, { rig: Rig; level: GainNode; tick: Tick | undefined }>();
@@ -1144,7 +1519,8 @@ export class SoundscapeEngine {
     if (this.playing) this.reconcile();
   }
 
-  play(): void {
+  /** Start (or resume), rising from silence over `fadeInSeconds` (snd5 fade schedules). */
+  play(fadeInSeconds = 0.6): void {
     if (!SoundscapeEngine.isSupported()) return;
     if (this.stopTimer) {
       clearTimeout(this.stopTimer);
@@ -1154,14 +1530,40 @@ export class SoundscapeEngine {
     void ctx.resume();
     this.playing = true;
     this.reconcile();
+    this.cancelScheduledFade();
     const fade = this.fade;
     if (fade) {
       fade.gain.cancelScheduledValues(ctx.currentTime);
       fade.gain.setValueAtTime(fade.gain.value, ctx.currentTime);
-      fade.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.6);
+      fade.gain.linearRampToValueAtTime(1, ctx.currentTime + Math.max(0.05, fadeInSeconds));
     }
     if (!this.timer) this.timer = setInterval(() => this.tick(), TICK_MS);
     this.tick();
+  }
+
+  /**
+   * snd5: a long fade that does not stop anything — the sleep timer's last
+   * minutes. Runs on its own gain stage, so play/pause and the short fades keep
+   * working over it; the store stops playback when it has run out.
+   */
+  scheduleFadeOut(delaySeconds: number, durationSeconds: number): void {
+    const ctx = this.ctx;
+    const node = this.scheduled;
+    if (!ctx || !node) return;
+    const start = ctx.currentTime + Math.max(0, delaySeconds);
+    node.gain.cancelScheduledValues(ctx.currentTime);
+    node.gain.setValueAtTime(node.gain.value, ctx.currentTime);
+    node.gain.setValueAtTime(node.gain.value, start);
+    node.gain.linearRampToValueAtTime(0, start + Math.max(0.05, durationSeconds));
+  }
+
+  /** Undo `scheduleFadeOut`: back to full level at once. */
+  cancelScheduledFade(): void {
+    const ctx = this.ctx;
+    const node = this.scheduled;
+    if (!ctx || !node) return;
+    node.gain.cancelScheduledValues(ctx.currentTime);
+    node.gain.setValueAtTime(1, ctx.currentTime);
   }
 
   /** Fade out over `fadeSeconds`, then release every node and suspend the context. */
@@ -1194,8 +1596,10 @@ export class SoundscapeEngine {
     this.duck = ctx.createGain();
     this.fade = ctx.createGain();
     this.fade.gain.value = 0;
+    this.scheduled = ctx.createGain();
     this.master.gain.value = this.target.master;
-    this.fade.connect(this.duck);
+    this.fade.connect(this.scheduled);
+    this.scheduled.connect(this.duck);
     this.duck.connect(this.master);
     // Every slider at full adds up to well past full scale. A limiter on the way
     // out catches that instead of letting the output clip.

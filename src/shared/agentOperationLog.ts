@@ -75,9 +75,12 @@ export const AGENT_INVERSE_OPERATIONS: Readonly<
   'media.add-item': 'media.delete-item',
   'calendar.schedule-session': 'calendar.delete-event',
   'calendar.create-reminder': 'calendar.delete-event',
+  'calendar.schedule-sessions': 'calendar.delete-event',
   'study.filter-vocabulary': 'study.undo-filter',
   'settings.apply-theme': 'settings.undo-theme',
   'settings.apply-css': 'settings.reset-css',
+  // A move is undone by the same operation, aimed back (see `inverseArguments`).
+  'calendar.reschedule-event': 'calendar.reschedule-event',
 };
 
 /** The reverse operation, or `null` when the forward one cannot be undone. */
@@ -124,6 +127,14 @@ export interface AgentOperationEntry {
   recordedAt: number;
   /** Set when this entry is itself the inverse of an earlier one. */
   invertsSequence?: number;
+  /**
+   * The one exception to "ids only", and a narrow one: an `updated` effect that can be
+   * taken back carries the inverse call's arguments, as its adapter returned them. Today
+   * that is a calendar move — the event's previous date and times, nothing of its content —
+   * and its inverse refuses unless the event is still exactly where the move put it, so
+   * restoring can never overwrite a later edit (rule 3, checked against live state).
+   */
+  inverseArguments?: ReadonlyArray<Readonly<Record<string, unknown>>>;
 }
 
 /** An entry as a caller supplies it; the log assigns the rest. */
@@ -232,6 +243,8 @@ export interface AgentOperationInverse {
   operation: AgentToolOperationId;
   entityType: string;
   entityIds: readonly string[];
+  /** The inverse calls' arguments, when they are not derivable from the ids (a move). */
+  arguments?: ReadonlyArray<Readonly<Record<string, unknown>>>;
   taskId?: string;
   stepId?: string;
 }
@@ -266,7 +279,10 @@ export function resolveAgentOperationInverse(
   // not present fell off the bound rather than never having existed.
   if (!entry) return { ok: false, code: 'log-rolled' };
 
-  if (entry.claim !== 'created') return { ok: false, code: 'not-invertible' };
+  // `created` is inverted from ids alone; `updated` only with the inverse arguments its
+  // adapter returned.
+  const restorable = entry.claim === 'updated' && Boolean(entry.inverseArguments?.length);
+  if (entry.claim !== 'created' && !restorable) return { ok: false, code: 'not-invertible' };
   const inverse = agentInverseOperation(entry.operation);
   if (!inverse) return { ok: false, code: 'not-invertible' };
   // An entry that acted on nothing has no inverse to aim at. Refusing beats
@@ -295,6 +311,7 @@ export function resolveAgentOperationInverse(
       operation: inverse,
       entityType: entry.entityType,
       entityIds: [...entry.entityIds],
+      ...(restorable && entry.inverseArguments ? { arguments: entry.inverseArguments.map((call) => ({ ...call })) } : {}),
       ...(entry.taskId !== undefined ? { taskId: entry.taskId } : {}),
       ...(entry.stepId !== undefined ? { stepId: entry.stepId } : {}),
     },

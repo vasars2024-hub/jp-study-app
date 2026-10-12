@@ -188,6 +188,20 @@ function rememberAnswer(identity: LexiconAudioIdentity, sourceId: string): void 
   }
 }
 
+/**
+ * The largest local clip read into memory (risk4). A pronunciation is a few
+ * hundred KB at most; a multi-GB file in the folder (a misnamed video, a whole
+ * album) would otherwise be read whole and base64-copied over IPC.
+ */
+export const MAX_LOCAL_AUDIO_BYTES = 20 * 1024 * 1024;
+
+let audioLog: (message: string) => void = (message) => console.warn(`[audio-sources] ${message}`);
+
+/** Tests (and main, to route into diagnostics) can replace the skip log. */
+export function setAudioSourcesLogger(log: ((message: string) => void) | null): void {
+  audioLog = log ?? ((message) => console.warn(`[audio-sources] ${message}`));
+}
+
 async function playLocal(source: AudioSourceConfig, identity: LexiconAudioIdentity): Promise<AudioChainResult | null> {
   if (!source.folder) return null;
   const file = await findLocalAudioFile(source.folder, identity.term, identity.reading);
@@ -195,6 +209,15 @@ async function playLocal(source: AudioSourceConfig, identity: LexiconAudioIdenti
   const mimeType = localAudioMime(path.extname(file));
   if (!mimeType) return null;
   try {
+    const stat = await fs.promises.stat(file);
+    if (stat.size > MAX_LOCAL_AUDIO_BYTES) {
+      try {
+        audioLog(`skipped ${path.basename(file)}: ${stat.size} bytes is over the ${MAX_LOCAL_AUDIO_BYTES}-byte cap`);
+      } catch {
+        /* logging never breaks playback */
+      }
+      return null;
+    }
     const data = await fs.promises.readFile(file);
     if (!data.length) return null;
     return {
@@ -223,8 +246,10 @@ export async function resolveAudioChain(
   const label = query.term.trim();
   if (!identity) return { query: label, status: 'unsupported' };
   const enabled = prefs.sources.filter((source) => source.enabled);
+  // Picking one source still respects its switch (risk4): a source the user
+  // turned off in Settings never plays, even when a stale picker names it.
   let chain = query.sourceId
-    ? prefs.sources.filter((source) => source.id === query.sourceId)
+    ? enabled.filter((source) => source.id === query.sourceId)
     : enabled;
   if (!query.sourceId) {
     const last = answeredBy.get(`${identity.term}\u0001${identity.reading}`);

@@ -59,4 +59,22 @@ export const LOCK_UPDATE_UI_JA: Catalog = {
   'upd2.notes.open': 'GitHub で開く',
   'upd2.privacy':
     'プライバシー: インストール版はバックグラウンドで github.com を確認し、GitHub には IP アドレスが見えます。リリースノートと上のバージョン確認は、ボタンを押したときだけ GitHub から取得します。Gum はアカウント、デッキ、学習データを送信しません。',
+
+  'upd2.channel.beta': 'ベータ（プレリリースを含む）',
+  'upd2.channel.betaNote': 'ベータでは公開直後のプレリリースを受け取ります。不安定な点があることもあります。いつでも安定版に戻せます。',
+  'upd2.state.skipped': 'Gum {version} が公開されています。このバージョンはスキップする設定です。',
+  'upd2.skip': '{version} をスキップ',
+  'upd2.skippedNote': '{version} をスキップ中: Gum はこのバージョンを案内もダウンロードもしません。',
+  'upd2.unskip': 'スキップをやめる',
+  'upd2.unavailable.offline': 'GitHub に接続できませんでした。接続を確認して、もう一度お試しください。',
+  'upd2.unavailable.rateLimited': 'GitHub が現在このネットワークからのリクエストを制限しています。{time} 以降にもう一度お試しください。',
+  'upd2.unavailable.rateLimitedNoTime': 'GitHub が現在このネットワークからのリクエストを制限しています。1 時間ほどしてからもう一度お試しください。',
+  'upd2.unavailable.http': 'GitHub がエラーを返しました。しばらくしてからもう一度お試しください。',
+  'upd2.unavailable.invalid': 'GitHub の応答がリリース情報ではありませんでした。しばらくしてからもう一度お試しください。',
+  'upd2.unavailable.disabled': 'このテスト実行では更新の確認は無効です。',
+  'upd2.restart.unsaved': '今再起動すると、{list}が中断されます。',
+  'upd2.restart.anyway': 'それでも再起動',
+  'upd2.restart.notNow': '今はしない',
+  'upd2.unsaved.recording': '進行中の画面録画',
+  'upd2.unsaved.recording-finalize': '保存中の録画',
 };

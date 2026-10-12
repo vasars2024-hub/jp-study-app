@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { AiEnrichmentResult } from '../../shared/mining';
 import { saveAiResultsToDeck } from '../aiDeckSave';
-import { loadDeck, replaceImportedDeck } from '../flashcardDeck';
+import { loadDeck, replaceImportedDeck, reviewDeckCard } from '../flashcardDeck';
 
 const result = (expression: string, backs: string[]): AiEnrichmentResult =>
   ({
@@ -50,30 +50,45 @@ describe('saveAiResultsToDeck', () => {
   });
 
   /**
-   * The destructive half, pinned deliberately.
-   *
-   * `replaceImportedDeck` DELETES every card matching the `(bookId, bookTitle)`
-   * pair before inserting. That is correct for a re-save — it updates in place
-   * instead of duplicating — and it is exactly why `AiCardStudio.runGenerate`
-   * must not call this on its own: two batches generated under the same preset
-   * share a title, so an automatic save destroyed the earlier batch with no
-   * confirmation and nothing to undo.
+   * F3: two batches generated under the same preset share a title. The save
+   * used to go through `replaceImportedDeck`, which deleted the earlier batch
+   * and its review history with no confirmation. It now appends.
    */
-  it('REPLACES the deck it saves into — the reason generation must not call it', () => {
+  it('APPENDS a second batch to the deck instead of deleting the first', () => {
     saveAiResultsToDeck([result('猫', ['first-batch'])], 'Studio');
     expect(loadDeck().map((card) => card.back)).toEqual(['first-batch']);
 
     saveAiResultsToDeck([result('犬', ['second-batch'])], 'Studio');
-    const backs = loadDeck().map((card) => card.back);
-    expect(backs).toEqual(['second-batch']);
-    expect(backs).not.toContain('first-batch');
+    const backs = loadDeck().map((card) => card.back).sort();
+    expect(backs).toEqual(['first-batch', 'second-batch']);
   });
 
-  it('leaves a different deck title untouched when it replaces', () => {
+  it('keeps an earlier card\'s id and review state when the same word is saved again', () => {
+    saveAiResultsToDeck([result('猫', ['old'])], 'Studio');
+    const [before] = loadDeck();
+    reviewDeckCard(before.id, 'good');
+    const reviewed = loadDeck()[0].srs;
+    expect(reviewed).toBeTruthy();
+    saveAiResultsToDeck([result('猫', ['new'])], 'Studio');
+    const after = loadDeck();
+    expect(after).toHaveLength(1);
+    expect(after[0].id).toBe(before.id);
+    expect(after[0].back).toBe('new');
+    expect(after[0].srs).toEqual(reviewed);
+  });
+
+  it('never touches a different deck title', () => {
     saveAiResultsToDeck([result('猫', ['keep-me'])], 'Other studio');
     saveAiResultsToDeck([result('犬', ['first'])], 'Studio');
     saveAiResultsToDeck([result('狐', ['second'])], 'Studio');
-    expect(loadDeck().map((card) => card.back).sort()).toEqual(['keep-me', 'second']);
+    expect(loadDeck().map((card) => card.back).sort()).toEqual(['first', 'keep-me', 'second']);
+  });
+
+  it('the save source no longer calls the destructive replace', () => {
+    const save = readFileSync(resolve(process.cwd(), 'src/renderer/aiDeckSave.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    expect(save).not.toContain('replaceImportedDeck');
+    expect(save).not.toContain('removeMissing');
   });
 
   /**

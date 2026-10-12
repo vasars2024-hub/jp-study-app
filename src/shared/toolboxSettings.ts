@@ -225,7 +225,7 @@ export function sanitizeToolboxSettings(input: unknown): ToolboxSettings {
   for (const key of Object.keys(DEFAULT_TOOLBOX_SETTINGS) as (keyof ToolboxSettings)[]) {
     const value = raw[key];
     if (value !== undefined && typeof value === typeof DEFAULT_TOOLBOX_SETTINGS[key]) {
-      (next as Record<string, unknown>)[key] = value;
+      (next as unknown as Record<string, unknown>)[key] = value;
     }
   }
   next.version = 1;
@@ -283,7 +283,7 @@ export function resetToolboxSettingsSection(
   const next: ToolboxSettings = { ...settings };
   for (const definition of TOOLBOX_SETTING_DEFINITIONS) {
     if (definition.category === category) {
-      (next as Record<string, unknown>)[definition.id] = definition.defaultValue;
+      (next as unknown as Record<string, unknown>)[definition.id] = definition.defaultValue;
     }
   }
   return sanitizeToolboxSettings(next);

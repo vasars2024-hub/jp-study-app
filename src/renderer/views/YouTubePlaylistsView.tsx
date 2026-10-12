@@ -37,6 +37,8 @@ import {
 } from '../../shared/ytPlaylists';
 import { setHandoff } from '../pendingHandoff';
 import { requestMediaCenterPlay } from '../mediaCenterIntent';
+import YoutubePreStudyPanel, { useYt5Comprehension } from '../components/discover/YoutubePreStudyPanel';
+import YoutubePlaylistProgress from '../components/discover/YoutubePlaylistProgress';
 import type { MediaItem } from '../../shared/types';
 import {
   normalizeVideoCoreResumePositions,
@@ -185,6 +187,9 @@ export default function YouTubePlaylistsView() {
   const [error, setError] = useState('');
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [newsIds, setNewsIds] = useState<string[]>([]);
+  /** The video whose pre-study list is open (7.5), by YouTube id. */
+  const [preStudy, setPreStudy] = useState<{ videoId: string; title: string; playlistId: string } | null>(null);
+  const comprehension = useYt5Comprehension();
   /** The download queue (audit r2 #17): every video's state, with its own controls. */
   const [queue, setQueue] = useState<YtQueueEntry[]>([]);
   const [refreshProgress, setRefreshProgress] = useState<{
@@ -253,6 +258,13 @@ export default function YouTubePlaylistsView() {
   const playlistLangById = useMemo(() => new Map(playlists.map((p) => [p.id, p.lang])), [playlists]);
   const openVideo = (v: YtVideo): void => {
     if (!v.mediaItemId) return;
+    // Only YouTube's speech recognition came with this download: say so before the
+    // learner trusts (and mines) a misheard word.
+    if (v.hasAutoSubs && !v.hasOfficialSubs) {
+      window.dispatchEvent(new CustomEvent('os:toast', {
+        detail: { message: t('yt5.player.autoCaptions'), kind: 'warn' },
+      }));
+    }
     void openInVideoPlayer(v.mediaItemId, playlistLangById.get(v.playlistId), mediaById.get(v.mediaItemId), t);
   };
 
@@ -344,6 +356,12 @@ export default function YouTubePlaylistsView() {
     }
     return [];
   }, [newsIds, videos]);
+
+  /** Every video of the open playlist, unfiltered, for its study progress. */
+  const playlistVideos = useMemo(
+    () => (playlist ? videos.filter((v) => v.playlistId === playlist.id) : []),
+    [videos, playlist],
+  );
 
   const listVideos = useMemo(() => {
     if (side?.kind === 'plan') {
@@ -751,6 +769,11 @@ export default function YouTubePlaylistsView() {
             </span>
           ) : null}
           {v.transcribed ? <span className="yt-chip status tr">{t('yt.chip.transcribed')}</span> : null}
+          {comprehension[v.youtubeId] ? (
+            <span className="yt-chip status yt5-known" title={t('yt5.chip.knownHint')}>
+              {t('yt5.chip.known', { percent: comprehension[v.youtubeId].knownPct })}
+            </span>
+          ) : null}
           {watch?.kind === 'watched' ? (
             <span className="yt-chip status watched">{t('yt2.chip.watched')}</span>
           ) : null}
@@ -766,6 +789,19 @@ export default function YouTubePlaylistsView() {
           ) : null}
         </div>
         <div className="yt-row-actions" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="btn ghost small"
+            data-yt5-action="prestudy"
+            aria-label={t('yt5.action.prestudy')}
+            title={t('yt5.action.prestudy')}
+            aria-pressed={preStudy?.videoId === v.youtubeId}
+            onClick={() => setPreStudy((current) => (current?.videoId === v.youtubeId
+              ? null
+              : { videoId: v.youtubeId, title: v.title, playlistId: v.playlistId }))}
+          >
+            <Icon name="sparkle" size={14} />
+          </button>
           <button
             type="button"
             className="btn ghost small"
@@ -1002,6 +1038,19 @@ export default function YouTubePlaylistsView() {
               </button>
             </div>
 
+            {preStudy ? (
+              <YoutubePreStudyPanel
+                videoId={preStudy.videoId}
+                title={preStudy.title}
+                studyLang={playlistLangById.get(preStudy.playlistId) === 'zh' ? 'zh' : 'ja'}
+                localPath={(() => {
+                  const local = videos.find((v) => v.youtubeId === preStudy.videoId && v.playlistId === preStudy.playlistId && v.mediaItemId);
+                  return local?.mediaItemId ? mediaById.get(local.mediaItemId)?.path : undefined;
+                })()}
+                onClose={() => setPreStudy(null)}
+              />
+            ) : null}
+
             {queue.length > 0 ? (
               <div className="yt-queue" role="region" aria-label={t('yt.queue.label')}>
                 <div className="yt-queue-head">
@@ -1236,6 +1285,16 @@ export default function YouTubePlaylistsView() {
                     </div>
                   </div>
                 </ContextualSurface>
+
+                {side?.kind === 'playlist' && playlist ? (
+                  <YoutubePlaylistProgress
+                    videos={playlistVideos}
+                    watchByVideoId={watchByVideoId}
+                    mediaById={mediaById}
+                    comprehension={comprehension}
+                    onOpen={openVideo}
+                  />
+                ) : null}
 
                 {side?.kind === 'playlist' && playlist ? (
                   <AnchorSurface bare className="yt-prefs">

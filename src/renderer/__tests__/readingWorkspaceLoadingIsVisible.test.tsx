@@ -21,7 +21,7 @@
  * child on a promise that never settles, which is exactly the state a cold chunk
  * puts the boundary in.
  */
-import { Suspense, act, use } from 'react';
+import { Suspense, act, use, type JSX } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import ReadingWorkspaceView from '../views/ReadingWorkspaceView';

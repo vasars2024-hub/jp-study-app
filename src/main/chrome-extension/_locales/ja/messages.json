@@ -2221,5 +2221,125 @@
   },
   "bg_recSaveInApp": {
     "message": "この録音の一部はすでに Gum に送られているため、ブラウザーには完全なファイルが残っていません。Gum で開いてください。"
+  },
+  "content_aiExplain": {
+    "message": "文脈で説明"
+  },
+  "content_aiSuggestMeaning": {
+    "message": "意味を提案（AI）"
+  },
+  "content_aiBadge": {
+    "message": "AI生成"
+  },
+  "content_aiBusy": {
+    "message": "AI に問い合わせ中…"
+  },
+  "content_aiRetry": {
+    "message": "もう一度"
+  },
+  "content_aiCancelled": {
+    "message": "キャンセルしました。"
+  },
+  "content_aiSenseFits": {
+    "message": "この文では意味 $1"
+  },
+  "content_aiNoSenseFits": {
+    "message": "辞書のどの意味もこの文には合いません。"
+  },
+  "content_aiConfHigh": {
+    "message": "確信度: 高"
+  },
+  "content_aiConfMedium": {
+    "message": "確信度: 中"
+  },
+  "content_aiConfLow": {
+    "message": "確信度: 低"
+  },
+  "content_aiDisclaimer": {
+    "message": "AI は間違えることがあります。辞書で確かめてください。"
+  },
+  "content_aiMeaningLabel": {
+    "message": "提案された意味"
+  },
+  "content_aiMeaningApply": {
+    "message": "カードに使う"
+  },
+  "content_aiMeaningDismiss": {
+    "message": "閉じる"
+  },
+  "content_aiMeaningApplied": {
+    "message": "この単語を保存すると、AI の印付きでカードに入ります。"
+  },
+  "content_aiBreakdown": {
+    "message": "AI で文を分解"
+  },
+  "content_aiSimplify": {
+    "message": "段落をやさしく"
+  },
+  "content_aiSheetBreakdown": {
+    "message": "文の分解"
+  },
+  "content_aiSheetSimplify": {
+    "message": "やさしくした段落"
+  },
+  "content_aiOriginal": {
+    "message": "原文"
+  },
+  "content_aiSimplifiedText": {
+    "message": "AI がやさしくした文"
+  },
+  "content_aiNotes": {
+    "message": "変えたところ"
+  },
+  "content_aiTranslation": {
+    "message": "翻訳"
+  },
+  "content_aiWords": {
+    "message": "単語ごと"
+  },
+  "content_aiEngineLocal": {
+    "message": "オフラインモデル（データは PC の外に出ていません）"
+  },
+  "content_aiEngineCloud": {
+    "message": "クラウド AI"
+  },
+  "content_aiStateOff": {
+    "message": "AI はオフです。Gum の「設定 > AI」でオンにしてください。"
+  },
+  "content_aiStateNoKey": {
+    "message": "AI が未設定です。Gum の「設定 > AI」でプロバイダーを追加するか、オフラインモデルを入れてください。"
+  },
+  "content_aiStateNoLocal": {
+    "message": "オフライン AI モデルが入っていません。Gum の「設定 > AI」で入れてください。"
+  },
+  "content_aiStateConsent": {
+    "message": "この機能はクラウドへの送信が許可されていません。Gum の「設定 > AI」で許可するか、オフラインモデルを使ってください。"
+  },
+  "content_aiStateOffline": {
+    "message": "オフラインのため、クラウド AI に接続できません。オフラインモデルならネットなしで使えます。"
+  },
+  "content_aiStateAppClosed": {
+    "message": "Gum が起動していません。AI を使うにはアプリを開いてください（辞書はそのまま使えます）。"
+  },
+  "content_aiStateOutdated": {
+    "message": "この Gum にはブラウザー用の AI がありません。Gum を更新して、拡張機能を再読み込みしてください。"
+  },
+  "content_aiStateRateLimit": {
+    "message": "AI へのリクエストが多すぎます。1 分ほど待ってからもう一度どうぞ。"
+  },
+  "content_aiStateTooLong": {
+    "message": "AI には長すぎる文章です。もっと短い部分を選んでください。"
+  },
+  "content_aiStateTimeout": {
+    "message": "AI の応答に時間がかかりすぎました。もう一度どうぞ。"
+  },
+  "content_aiStateSpend": {
+    "message": "今月の AI 利用上限に達しました（Gum の「設定 > AI」）。"
+  },
+  "content_aiStateNoAnswer": {
+    "message": "AI はこれに答えられませんでした。"
+  },
+  "content_aiStateFailed": {
+    "message": "AI が回答できませんでした。もう一度どうぞ。"
   }
 }

@@ -591,7 +591,9 @@ export function validateScraperDeveloperSettings(
 // the aliasing bug the settings tests guard against.
 
 export function cloneScraperOutputGroup<
-  T extends Record<string, unknown>,
+  // `object`, not `Record<string, unknown>`: the settings groups are interfaces,
+  // which carry no index signature.
+  T extends object,
 >(value: T, arrayKeys: (keyof T)[], recordKeys: (keyof T)[] = []): T {
   const out = { ...value };
   for (const key of arrayKeys) {

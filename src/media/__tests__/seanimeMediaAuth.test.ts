@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 function installWithFetch() {
-  const fetchMock = vi.fn(async () => new Response('ok'));
+  const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('ok'));
   window.fetch = fetchMock as typeof window.fetch;
   release = installSeanimeMediaAuth({ baseUrl: BASE_URL, token: TOKEN });
   return fetchMock;

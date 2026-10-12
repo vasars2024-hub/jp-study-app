@@ -67,5 +67,8 @@ export default defineConfig({
     ],
     environment: 'node',
     testTimeout: 20000,
+    // The lazy i18n packs (the AI strings) merged up front, so a component test
+    // sees real text rather than the loading placeholder. See the file's header.
+    setupFiles: ['src/shared/i18n/testing/mergeLazyPacks.ts'],
   },
 });

@@ -190,7 +190,7 @@ export default function ScraperSearch() {
                           inputRef.current?.focus();
                         }}
                       >
-                        <Icon name="history" size={14} />
+                        <Icon name="refresh" size={14} />
                         <span>{recent}</span>
                       </button>
                     ))}

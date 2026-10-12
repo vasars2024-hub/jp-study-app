@@ -13,7 +13,7 @@
 // `styles.css`, which both shells load. Nothing here imports
 // `AppChrome`/`MenuBar`/`StatusBar` or the `components/ui` barrel.
 
-import { createElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createElement, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import DictionaryPopup from '../DictionaryPopup';
 import SentenceTranslatePopup from '../SentenceTranslatePopup';
 import Icon from '../Icons';
@@ -88,11 +88,18 @@ import { getTokenizer, tokenizerReady } from '../../tokenizer';
 import { onKnowledgeChanged } from '../../knownWords';
 import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
+import { keysOrUnset } from '../../shortcutHints';
 import { openMediaWorkspace } from '../../mediaWorkspaceBridge';
 import { youtubeErrorMessage } from '../../../shared/youtubeErrors';
 import { removeImmersionSiteWithConfirm } from './immersionSiteActions';
+import { Imm5ReaderBar, Imm5ReadingListView, Imm5SiteDayStats, useImm5Study } from './ImmersionStudy5';
+import { imm5RecordSiteDay } from '../../immersionStudy5Store';
+import { imm5ParseHistoryQuery, imm5SearchHistory } from '../../../shared/immersionStudy5';
 import { Select } from '../ui';
 import '../reading/readingEcosystem.css';
+
+/** The reader's optional AI tools (explain i+1, simplify, ask the Agent): loaded with the first article. */
+const ImmersionAiTools = lazy(() => import('./ImmersionAiTools'));
 
 export { IMMERSION_MODE_CYCLE, IMMERSION_STARTERS, WK_HIGHLIGHT_CSS };
 export type { ImmersionMode };
@@ -173,15 +180,18 @@ export function useImmersion() {
    * cannot change the answer to.
    */
   const siteHaystacks = useMemo(
-    () => sites.map((site) => `${site.title} ${site.url}`.normalize('NFKC').toLowerCase()),
+    () => sites.map((site) => `${site.title} ${site.url} ${(site.tags ?? []).join(' ')}`.normalize('NFKC').toLowerCase()),
     [sites],
   );
-  const filteredSites = useMemo(
-    () => (normalizedSiteQuery
-      ? sites.filter((_, index) => siteHaystacks[index].includes(normalizedSiteQuery))
-      : sites),
-    [sites, siteHaystacks, normalizedSiteQuery],
-  );
+  // History search (7.5): every word must match (title, tags or URL), `site:` narrows
+  // to a host, and the hits are ranked (title before tags before URL, then recency).
+  // The folded haystacks above still do the cheap pass; only survivors are ranked.
+  const filteredSites = useMemo(() => {
+    if (!normalizedSiteQuery) return sites;
+    const { terms } = imm5ParseHistoryQuery(siteQuery);
+    const survivors = sites.filter((_, index) => terms.every((term) => siteHaystacks[index].includes(term)));
+    return imm5SearchHistory(survivors, siteQuery);
+  }, [sites, siteHaystacks, normalizedSiteQuery, siteQuery]);
   const railView = railViewChoice ?? (bookmarks.length > 0 ? 'bookmarks' : 'history');
   const filteredBookmarks = useMemo(() => {
     if (!normalizedSiteQuery) return bookmarks;
@@ -272,6 +282,15 @@ export function useImmersion() {
     !!currentUrl && (mode === 'live' || mode === 'reader' || (mode === 'focus' && !readerHtml));
   const splitView = mode === 'reader' && showReader && showWebview;
 
+  // 7.5 study layer: furigana / i+1 / save for later in Reader Mode, mining from
+  // the popup, new words met, per-site per-day stats, the reading list.
+  const showOffline = useCallback((html: string, offlineTitle: string) => {
+    setReaderHtml(html);
+    setTitle(offlineTitle);
+    setMode('focus');
+  }, []);
+  const study5 = useImm5Study({ readerRef, readerHtml, showReader, currentUrl, title, studyLang, showOffline });
+
   // ----- Sites library -----
   const applySitesStore = useCallback((store: ImmersionSitesStore) => {
     // History is newest first; bookmarks keep the order they were starred in.
@@ -323,6 +342,8 @@ export function useImmersion() {
         ...(readPctRef.current > 0 ? { completionPct: readPctRef.current } : {}),
         countVisit: false,
       });
+      // The same seconds and lookups, per site AND per day (7.5).
+      void imm5RecordSiteDay(currentUrl, { seconds: secs, lookups });
     }
   }, [currentUrl]);
 
@@ -607,7 +628,7 @@ export function useImmersion() {
   useEffect(() => {
     const wv = webviewRef.current;
     if (!wv || (mode === 'focus' && !!readerHtml)) return;
-    let readerTimer: ReturnType<typeof window.setTimeout> | undefined;
+    let readerTimer: number | undefined;
     const onStart = () => {
       readerRequest.current += 1;
       loadFailure.current = null;
@@ -1178,6 +1199,7 @@ export function useImmersion() {
     saveCurrentSite, saveCurrentAsTool, exportToLibrary, captureVideo, openExternal,
     captureWithLens, refreshSites,
     onReaderPointerDown, onReaderMouseUp,
+    study5,
   };
 }
 
@@ -1544,7 +1566,13 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
               </div>
             </details>
           )}
-          <p className="muted immersion-hint">{t('immersion.hint')}</p>
+          <p className="muted immersion-hint">
+            {t('immersion.hint', {
+              cycle: keysOrUnset('immersion.cycleMode'),
+              focus: keysOrUnset('immersion.focusMode'),
+              url: keysOrUnset('immersion.focusUrl'),
+            })}
+          </p>
         </div>
       )}
 
@@ -1554,9 +1582,25 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
         })}
 
       {state.showReader && readerHtmlProp && (
+        <Imm5ReaderBar study={state.study5} canSave={!!currentUrl} />
+      )}
+      {state.showReader && readerHtmlProp && (
+        <Suspense fallback={null}>
+          <ImmersionAiTools
+            readerRef={state.readerRef}
+            readerHtml={state.readerHtml}
+            coverage={state.study5.coverage}
+            studyLang={state.studyLang}
+            currentUrl={currentUrl}
+            title={state.title}
+          />
+        </Suspense>
+      )}
+      {state.showReader && readerHtmlProp && (
         <div
           ref={state.readerRef}
-          className={`immersion-reader wk-on${splitView ? ' immersion-split-reader' : ''}`}
+          className={`immersion-reader wk-on${splitView ? ' immersion-split-reader' : ''}${state.study5.hideFurigana ? ' imm5-hide-furigana' : ''}${state.study5.vertical ? ' imm5-vertical' : ''}`}
+          lang={state.studyLang}
           onPointerDown={state.onReaderPointerDown}
           data-dict-owner=""
           onMouseUp={state.onReaderMouseUp}
@@ -1729,6 +1773,7 @@ export function ImmersionStatsCard({ state }: { state: ImmersionState }) {
         </p>
       )}
       <p className="immersion-stats-line muted">{t('immersion.stats.week', { minutes: minutes(weekSeconds) })}</p>
+      <Imm5SiteDayStats />
       {topSites.length > 0 && (
         <>
           <p className="immersion-stats-line muted">{t('read2.immersion.stats.topSites')}</p>
@@ -1945,17 +1990,32 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
             key={view}
             type="button"
             role="tab"
-            className={`immersion-rail-view${railView === view ? ' active' : ''}`}
-            aria-selected={railView === view}
+            className={`immersion-rail-view${railView === view && !state.study5.readingOpen ? ' active' : ''}`}
+            aria-selected={railView === view && !state.study5.readingOpen}
             data-view={view}
-            onClick={() => state.setRailView(view)}
+            onClick={() => {
+              state.study5.setReadingOpen(false);
+              state.setRailView(view);
+            }}
           >
             {t(`immersion.rail.view.${view}`)}
           </button>
         ))}
+        <button
+          type="button"
+          role="tab"
+          className={`immersion-rail-view${state.study5.readingOpen ? ' active' : ''}`}
+          aria-selected={state.study5.readingOpen}
+          data-view="reading"
+          onClick={() => state.study5.setReadingOpen(true)}
+        >
+          {t('imm5.rail.reading')}
+        </button>
       </div>
       <ImmersionSiteSearch state={state} />
-      {railView === 'bookmarks' ? (
+      {state.study5.readingOpen ? (
+        <Imm5ReadingListView study={state.study5} query={siteQuery} onOpen={(url) => state.navigate(url)} />
+      ) : railView === 'bookmarks' ? (
         <ImmersionBookmarkList state={state} />
       ) : (
         <>
@@ -2141,6 +2201,7 @@ export function ImmersionPopups({ state }: { state: ImmersionState }) {
           x={popup.x}
           y={popup.y}
           context={popup.context}
+          onMine={() => void state.study5.mine(popup.query, popup.context)}
           onClose={() => state.setPopup(null)}
         />
       )}

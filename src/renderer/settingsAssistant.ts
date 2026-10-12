@@ -25,7 +25,9 @@
  * assembled from a keyword match is how a search box starts lying.
  */
 import {
+  SETTINGS_REGISTRY,
   searchSettings,
+  settingsEntryRenders,
   type SettingsVisibility,
 } from './components/settings/settingsRegistry';
 import type { SettingsRegistryEntry } from './components/settings/types';
@@ -36,7 +38,7 @@ import type { SettingsRegistryEntry } from './components/settings/types';
  * different statement from "here is the answer", and the UI has to be able to
  * tell them apart.
  */
-export type AssistantStrategy = 'phrase' | 'keywords' | 'widest' | 'none';
+export type AssistantStrategy = 'phrase' | 'keywords' | 'widest' | 'model' | 'none';
 
 export interface AssistantAnswer {
   entries: SettingsRegistryEntry[];
@@ -177,4 +179,65 @@ export function answerSettingsQuestion(
   //    how a user concludes the search is broken rather than that the setting
   //    does not exist.
   return { entries: [], usedQuery: joined, strategy: 'none' };
+}
+
+/*
+ * The optional model fallback (docs/AI_AUDIT.md, Settings help). The design
+ * above stands: search first, always, and the model is asked ONLY when every
+ * keyword pass came back empty — and only when the user presses "Ask the AI".
+ * The model can name settings but cannot invent them: it is shown the real
+ * registry (id and title in the UI language, as the user's view renders it) and
+ * every id it returns is looked up in the registry again here. An id that is not
+ * a setting the user's current view would render is dropped, never shown.
+ */
+
+export interface SettingsModelCandidate {
+  id: string;
+  title: string;
+}
+
+/** The settings a model may choose from: every entry the current view renders, once. */
+export function settingsModelCandidates(t: (key: string) => string, opts?: SettingsVisibility): SettingsModelCandidate[] {
+  const seen = new Set<string>();
+  const out: SettingsModelCandidate[] = [];
+  for (const entry of SETTINGS_REGISTRY) {
+    if (seen.has(entry.id) || !settingsEntryRenders(entry, opts)) continue;
+    const title = (entry.titleKey ? t(entry.titleKey) : '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!title) continue;
+    seen.add(entry.id);
+    out.push({ id: entry.id, title });
+  }
+  return out;
+}
+
+/** The registry entries for ids a model named: real, rendered, de-duplicated, at most `MAX_ANSWERS`. */
+export function settingsEntriesForModelIds(ids: readonly string[], opts?: SettingsVisibility): SettingsRegistryEntry[] {
+  const out: SettingsRegistryEntry[] = [];
+  for (const id of ids) {
+    if (out.some((entry) => entry.id === id)) continue;
+    const entry = SETTINGS_REGISTRY.find((candidate) => candidate.id === id);
+    if (!entry || !settingsEntryRenders(entry, opts)) continue;
+    out.push(entry);
+    if (out.length >= MAX_ANSWERS) break;
+  }
+  return out;
+}
+
+/**
+ * `answerSettingsQuestion`, then — only when that found nothing — the model.
+ * `askModel` gets the candidate list and returns the ids it chose (or null when
+ * it could not answer); the answer keeps strategy `none` unless at least one id
+ * is a real setting.
+ */
+export async function answerSettingsQuestionWithModel(
+  question: string,
+  t: (key: string) => string,
+  opts: SettingsVisibility | undefined,
+  askModel: (candidates: SettingsModelCandidate[]) => Promise<readonly string[] | null>,
+): Promise<AssistantAnswer> {
+  const answer = answerSettingsQuestion(question, t, opts);
+  if (answer.strategy !== 'none' || !question.trim()) return answer;
+  const ids = await askModel(settingsModelCandidates(t, opts));
+  const entries = ids ? settingsEntriesForModelIds(ids, opts) : [];
+  return entries.length ? { entries, usedQuery: question.trim(), strategy: 'model' } : answer;
 }

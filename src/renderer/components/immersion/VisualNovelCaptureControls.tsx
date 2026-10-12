@@ -10,7 +10,11 @@ import {
   visualNovelSettings,
   type VisualNovelDatabase,
   type VisualNovelEntry,
+  type VisualNovelTextCapture,
 } from '../../../shared/visualNovel';
+import { vn5SessionStats } from '../../../shared/visualNovelStudy5';
+import { LANG_TAGS } from '../../../shared/i18n/core';
+import VisualNovelLineFilters from './VisualNovelLineFilters';
 
 /**
  * Live capture state, owned by main (`main/immersion/visualNovelCaptureSession.ts`)
@@ -66,10 +70,53 @@ function websocketLabel(state: VisualNovelCaptureState, t: (key: string, vars?: 
 }
 
 /**
+ * This capture session's reading in one line — lines, characters and an
+ * AFK-aware characters-per-hour, the number texthooker pages keep on screen —
+ * plus how many lines the filters threw away. Ticks every 15 s so the speed
+ * moves while the player reads a long line.
+ */
+export function Vn5SessionStatsLine({
+  captures,
+  state,
+}: {
+  captures: readonly Pick<VisualNovelTextCapture, 'japanese' | 'capturedAt' | 'source'>[];
+  state: VisualNovelCaptureState;
+}) {
+  const { t, lang } = useT();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!state.active || !state.startedAt) return undefined;
+    const id = window.setInterval(() => setTick((n) => n + 1), 15_000);
+    return () => window.clearInterval(id);
+  }, [state.active, state.startedAt]);
+  if (!state.active || state.test || !state.startedAt) return null;
+  const stats = vn5SessionStats(captures, state.startedAt, Date.now());
+  const nf = new Intl.NumberFormat(LANG_TAGS[lang]);
+  const parts = [
+    t('vn5.session.lines', { count: stats.lines }),
+    t('vn5.session.chars', { chars: nf.format(stats.chars) }),
+    stats.charsPerHour != null ? t('vn5.session.speed', { speed: nf.format(stats.charsPerHour) }) : '',
+    state.filtered ? t('vn5.session.filtered', { count: state.filtered }) : '',
+  ].filter(Boolean);
+  return (
+    <small className="vn5-session-stats" data-vn5-session-stats="" title={t('vn5.session.title')}>
+      {parts.join(' · ')}
+    </small>
+  );
+}
+
+/**
  * The capture strip at the top of the Read tab: is text arriving, from where,
  * what came last, and the three actions that matter while playing.
  */
-export function VisualNovelCaptureBar({ entry }: { entry: VisualNovelEntry }) {
+export function VisualNovelCaptureBar({
+  entry,
+  captures = [],
+}: {
+  entry: VisualNovelEntry;
+  /** The novel's lines, for this session's reading speed. */
+  captures?: readonly VisualNovelTextCapture[];
+}) {
   const { t } = useT();
   const state = useVisualNovelCapture();
   const [error, setError] = useState('');
@@ -98,9 +145,13 @@ export function VisualNovelCaptureBar({ entry }: { entry: VisualNovelEntry }) {
             {state.clipboard === 'listening' ? t('vnCapture.clipboard.listening') : t('vnCapture.clipboard.off')}
             {' · '}
             {websocketLabel(state, t)}
+            {state.websocket !== 'off' && state.websocket !== 'connected' && (state.reconnectAttempt ?? 0) > 0
+              ? ` · ${t('vn5.ws.retry', { count: state.reconnectAttempt ?? 0 })}`
+              : ''}
             {capturing ? ` · ${t('vnCapture.lines', { count: state.lines })}` : ''}
           </small>
         )}
+        {capturing && <Vn5SessionStatsLine captures={captures} state={state} />}
       </div>
       {testing && !state.lastLine && <p className="muted">{t('vnCapture.test.waiting')}</p>}
       {(testing || testEnded) && state.lastLine && (
@@ -206,6 +257,7 @@ export function VisualNovelCaptureSetup({
           {t('vnCapture.reader.autoShow')}
         </label>
       </div>
+      <VisualNovelLineFilters entry={entry} database={database} onDatabase={onDatabase} />
       <div className="vn-capture-le">
         <strong>{t('vnCapture.le.title')}</strong>
         <p className="muted">{t('vnCapture.le.desc')}</p>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MEDIA_STUDY_ASSISTANT_MODES,
   type MediaStudyAssistantMode,
@@ -9,6 +9,8 @@ import { useT } from '../../i18n';
 import type { TVars } from '../../../shared/i18n/core';
 import { AiSetupPrompt } from '../ai/AiSetupPrompt';
 import { useAiReadiness } from '../../aiSetupClient';
+import { aiErrorKey, isAiErrorCode } from '../../../shared/aiErrorCodes';
+import { useStudyLanguage } from '../../useStudyLanguage';
 
 type Translate = (key: string, vars?: TVars) => string;
 
@@ -17,7 +19,9 @@ type Translate = (key: string, vars?: TVars) => string;
  * `MEDIA_STUDY_ASSISTANT_MODES` and `mediaAssistant.mode.*` cannot drift apart
  * the way a module-level `Record<Mode, string>` of English strings did (D178).
  */
-function modeLabel(mode: MediaStudyAssistantMode, t: Translate): string {
+function modeLabel(mode: MediaStudyAssistantMode, t: Translate, studyLang = 'ja'): string {
+  // "Simplify Japanese" names the language; other learners get the neutral label.
+  if (mode === 'simplify-japanese' && studyLang !== 'ja') return t('aiAgent.assistant.mode.simplify');
   return t(`mediaAssistant.mode.${mode}`);
 }
 
@@ -44,6 +48,35 @@ interface MediaStudyAssistantPanelProps {
   mediaTitle: string;
   sentence: string;
   jlptLevel: string | null;
+  /**
+   * The line's own id (cue id, capture id). Two lines can share their text
+   * ("はい"), so an answer is matched to the line it was asked for by this, and
+   * by the text when a mount has no id.
+   */
+  lineId?: string;
+}
+
+/** The line an answer belongs to. */
+export function mediaAssistantLineKey(lineId: string | undefined, sentence: string): string {
+  return `${lineId ?? ''}\u0000${sentence.trim()}`;
+}
+
+/**
+ * An answer together with the line it answers. "Save as note" saves THIS pair,
+ * never the answer beside whatever line happens to be on screen.
+ */
+export interface MediaAssistantAnswer {
+  lineKey: string;
+  sentence: string;
+  result: MediaStudyAssistantResult;
+}
+
+/** The answer to show for the current line: only one asked for that exact line. */
+export function mediaAssistantAnswerForLine(
+  answer: MediaAssistantAnswer | null,
+  lineKey: string,
+): MediaAssistantAnswer | null {
+  return answer && answer.lineKey === lineKey ? answer : null;
 }
 
 export default function MediaStudyAssistantPanel({
@@ -51,10 +84,17 @@ export default function MediaStudyAssistantPanel({
   mediaTitle,
   sentence,
   jlptLevel,
+  lineId,
 }: MediaStudyAssistantPanelProps) {
-  const { t } = useT();
+  const { t, lang: uiLang } = useT();
+  const { lang: studyLang } = useStudyLanguage();
   const [mode, setMode] = useState<MediaStudyAssistantMode>('explain-dialogue');
-  const [result, setResult] = useState<MediaStudyAssistantResult | null>(null);
+  const lineKey = mediaAssistantLineKey(lineId, sentence);
+  const [answer, setAnswer] = useState<MediaAssistantAnswer | null>(null);
+  // Never render an answer for another line, even for the one render between a
+  // line change and the effect below clearing it.
+  const shown = mediaAssistantAnswerForLine(answer, lineKey);
+  const result = shown?.result ?? null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -64,14 +104,28 @@ export default function MediaStudyAssistantPanel({
   const [needsKey, setNeedsKey] = useState(false);
   const blockedOnKey = needsKey || (ai.loaded && ai.enabled && !ai.cloudReady);
 
+  // Every run is numbered; an answer for a run that is no longer the latest
+  // (the line moved on, or another mode was asked) is dropped. It used to land
+  // under the NEXT line, and "Save to notebook" then saved the wrong analysis.
+  const runRef = useRef(0);
+
   useEffect(() => {
-    setResult(null);
+    runRef.current += 1;
+    setAnswer(null);
     setError('');
     setStatus('');
-  }, [sentence]);
+    setBusy(false);
+  }, [lineKey]);
 
   const run = async (nextMode: MediaStudyAssistantMode): Promise<void> => {
     if (!sentence.trim()) return;
+    const ticket = ++runRef.current;
+    // Captured with the request: the reply is filed under the line it was asked
+    // for, whatever is on screen when it arrives.
+    const askedKey = lineKey;
+    const askedSentence = sentence;
+    // Asking for the mode already on screen means "ask again": skip the cache.
+    const refresh = Boolean(result && result.mode === nextMode);
     setMode(nextMode);
     setBusy(true);
     setError('');
@@ -79,36 +133,44 @@ export default function MediaStudyAssistantPanel({
     try {
       const response = await window.api.mediaStudyAssist({
         mode: nextMode,
-        text: sentence,
+        text: askedSentence,
         context: mediaTitle,
         jlptLevel,
+        // The prompt follows the study language and answers in the UI language.
+        studyLang,
+        answerLang: uiLang,
+        ...(refresh ? { refresh: true } : {}),
       });
+      if (ticket !== runRef.current) return;
       if (!response.ok || !response.result) {
         if (response.needsKey) {
           setNeedsKey(true);
           return;
         }
-        setError(response.error ?? t('mediaAssistant.failed'));
+        setError(isAiErrorCode(response.code) ? t(aiErrorKey(response.code)) : t('mediaAssistant.failed'));
         return;
       }
-      setResult(response.result);
+      setAnswer({ lineKey: askedKey, sentence: askedSentence, result: response.result });
       if (response.cached) setStatus(t('mediaAssistant.cached'));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      else if (response.partial) setStatus(t('aiFix.assistant.partial'));
+    } catch {
+      if (ticket !== runRef.current) return;
+      setError(t(aiErrorKey('ipc-failed')));
     } finally {
-      setBusy(false);
+      if (ticket === runRef.current) setBusy(false);
     }
   };
 
   const saveNote = (): void => {
-    if (!result) return;
+    if (!shown) return;
     appendNotebookEvent({
       stream: 'media',
-      title: `${mediaTitle}: ${modeLabel(result.mode, t)}`,
-      detail: resultAsNote(result, sentence, t),
+      title: `${mediaTitle}: ${modeLabel(shown.result.mode, t, studyLang)}`,
+      // The sentence the answer was asked for, not whatever line is current.
+      detail: resultAsNote(shown.result, shown.sentence, t),
       folder: 'Media study',
       href: 'video',
-      meta: { mediaId, assistantMode: result.mode },
+      meta: { mediaId, assistantMode: shown.result.mode },
     });
     setStatus(t('mediaAssistant.saved'));
   };
@@ -130,7 +192,7 @@ export default function MediaStudyAssistantPanel({
             disabled={busy}
             onClick={() => void run(assistantMode)}
           >
-            {modeLabel(assistantMode, t)}
+            {modeLabel(assistantMode, t, studyLang)}
           </button>
         ))}
       </div>
@@ -140,7 +202,7 @@ export default function MediaStudyAssistantPanel({
         <div className="media-study-assistant-result">
           {result.summary && <p>{result.summary}</p>}
           {result.translation && <p><strong>{t('mediaAssistant.translation')}</strong><span>{result.translation}</span></p>}
-          {result.simplifiedJapanese && <p><strong>{t('mediaAssistant.simplified')}</strong><span>{result.simplifiedJapanese}</span></p>}
+          {result.simplifiedJapanese && <p><strong>{studyLang === 'ja' ? t('mediaAssistant.simplified') : t('aiAgent.assistant.simplified')}</strong><span>{result.simplifiedJapanese}</span></p>}
           {result.grammar.length > 0 && (
             <div><strong>{t('mediaAssistant.grammar')}</strong><ul>{result.grammar.map((entry, index) => <li key={`${entry.pattern}-${index}`}>{entry.pattern}{entry.level ? ` · ${entry.level}` : ''} — {entry.explanation}</li>)}</ul></div>
           )}

@@ -1,0 +1,355 @@
+/* Speaking and writing: shadowing feedback, the conversation partner, writing
+   help. Theme tokens only (Study OS, Aero, WIRED and Blanc each define them),
+   so every panel follows the theme that hosts it. Every control keeps the 24px
+   target floor through min-height/min-width. Colour is never the only signal:
+   matched, partial, missed and extra sounds also differ by line style. */
+.speak-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--panel-2, var(--surface-1, transparent));
+  color: var(--text, inherit);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: start;
+  min-width: 0;
+}
+
+.speak-write.is-collapsed {
+  margin: 6px 0;
+}
+
+.speak-head,
+.speak-actions,
+.speak-controls,
+.speak-busy,
+.speak-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.speak-head .speak-title {
+  flex: 1 1 auto;
+}
+
+.speak-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.speak-btn {
+  min-height: 24px;
+  min-width: 24px;
+}
+
+.speak-btn.is-active {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: -2px;
+}
+
+.speak-note,
+.speak-error,
+.speak-label,
+.speak-meta,
+.speak-score,
+.speak-rate,
+.speak-translation {
+  margin: 0;
+}
+
+.speak-error {
+  color: var(--danger, inherit);
+}
+
+.speak-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.speak-meta {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.speak-score {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.speak-meter {
+  width: 100%;
+  max-width: 320px;
+}
+
+.speak-tokens {
+  margin: 0;
+  font-size: 16px;
+  line-height: 2;
+  overflow-wrap: anywhere;
+}
+
+.speak-tok {
+  padding: 0 1px;
+  border-radius: 3px;
+}
+
+.speak-tok.is-match {
+  text-decoration: underline solid var(--success, var(--accent, currentColor));
+  text-underline-offset: 4px;
+}
+
+.speak-tok.is-partial {
+  text-decoration: underline dashed var(--warning, var(--accent, currentColor));
+  text-underline-offset: 4px;
+  background: color-mix(in srgb, var(--warning, var(--accent, #c90)) 14%, transparent);
+}
+
+.speak-tok.is-miss {
+  text-decoration: line-through wavy var(--danger, currentColor);
+  background: color-mix(in srgb, var(--danger, #c33) 14%, transparent);
+}
+
+.speak-tok.is-extra {
+  border: 1px dotted var(--danger, currentColor);
+}
+
+.speak-facts {
+  margin: 0;
+  padding-inline-start: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.speak-install {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.speak-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---- the conversation partner ---- */
+
+.speak-chat {
+  max-width: 880px;
+  margin-inline: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.speak-chat.is-compact {
+  margin: 0;
+  max-width: none;
+}
+
+.speak-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.speak-field select {
+  min-height: 26px;
+}
+
+.speak-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.speak-check input {
+  min-width: 18px;
+  min-height: 18px;
+}
+
+.speak-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.speak-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 92%;
+}
+
+.speak-turn.is-user {
+  align-self: flex-end;
+}
+
+.speak-who {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.speak-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--panel, transparent);
+}
+
+.speak-bubble > p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.speak-turn.is-user .speak-bubble {
+  border-color: var(--accent, var(--border));
+}
+
+.speak-word {
+  display: inline;
+  min-height: 24px;
+  margin: 0;
+  padding: 0 1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.speak-word.is-new {
+  border-bottom-color: var(--danger, #c33);
+}
+
+.speak-word.is-learning {
+  border-bottom: 2px dashed var(--warning, var(--accent, #c90));
+}
+
+.speak-word.is-known {
+  border-bottom-color: transparent;
+}
+
+.speak-word[aria-pressed='true'] {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 1px;
+}
+
+.speak-word:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 1px;
+}
+
+.speak-rate {
+  font-size: 11px;
+}
+
+.speak-rate.is-off-target {
+  color: var(--danger, inherit);
+}
+
+.speak-correction {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border-inline-start: 3px solid var(--accent, currentColor);
+}
+
+.speak-correction p {
+  margin: 0;
+}
+
+.speak-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.speak-composer textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 15px;
+}
+
+/* ---- diffs and edits ---- */
+
+.speak-diff-del {
+  text-decoration: line-through;
+  color: var(--danger, inherit);
+  background: color-mix(in srgb, var(--danger, #c33) 12%, transparent);
+}
+
+.speak-diff-ins {
+  text-decoration: underline;
+  color: var(--success, var(--accent, inherit));
+  background: color-mix(in srgb, var(--success, #2a8) 12%, transparent);
+}
+
+.speak-edits {
+  margin: 0;
+  padding-inline-start: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.speak-edit p {
+  margin: 0;
+}
+
+.speak-edit.is-accepted {
+  outline: 1px solid var(--accent, currentColor);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.speak-journal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.speak-journal-words {
+  font-weight: 600;
+}
+
+/* Text for screen readers only. */
+.speak-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speak-log {
+    scroll-behavior: auto;
+  }
+}

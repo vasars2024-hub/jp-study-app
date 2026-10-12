@@ -121,6 +121,8 @@ module.exports = {
     const lapse = async (n) => {
       await ev(`__e2e.clickText('.flash-review-shell button', 'Exit')`);
       await poll(ctx, `!document.querySelector('.flash-review-shell')`, 5000);
+      // A sitting that ran out of cards ends on its summary instead: leave it with Done.
+      await ev(`(() => { const b = [...document.querySelectorAll('button')].find((x) => __e2e.vis(x) && x.innerText.trim() === 'Done' && [...(x.parentElement?.querySelectorAll('button') ?? [])].some((y) => y.innerText.trim() === 'Review again')); if (b) b.click(); return !!b; })()`);
       await advance(40 * DAY);
       const start = await poll(ctx, `__e2e.byText('button', /^Start review \\(\\d+\\)$/) ? true : null`, 10000);
       if (!start) return { error: 'no review offered' };
@@ -206,21 +208,42 @@ module.exports = {
     // Run until the worker reports progress, then cancel it mid-fit. The first run of a
     // session also reads the whole log from IndexedDB before the worker starts, so a run
     // that finishes before any progress was seen is simply started again.
+    // The progress bar is sampled IN the page (every animation frame plus a mutation
+    // observer), because a fit on a fast machine can show and finish between two bridge
+    // round trips — three attempts in a row did, and read as "no progress".
+    await ev(`(() => {
+      window.__e2eOpt = { shown: false, max: 0 };
+      const sample = () => { const p = document.querySelector('.srs3-optimizer-progress progress'); if (p) { window.__e2eOpt.shown = true; window.__e2eOpt.max = Math.max(window.__e2eOpt.max, Number(p.value) || 0); } };
+      if (!window.__e2eOptObs) {
+        window.__e2eOptObs = new MutationObserver(sample);
+        window.__e2eOptObs.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
+      }
+      return true;
+    })()`);
     let shown = null;
     let moved = null;
     for (let attempt = 0; attempt < 3 && moved === null; attempt++) {
       await ev(`__e2e.click(document.querySelector('.srs2-optimizer .btn'))`);
-      shown = shown || (await poll(ctx, `!!document.querySelector('.srs3-optimizer-progress progress')`, 10000, 50));
-      moved = await poll(ctx, `(() => { const p = document.querySelector('.srs3-optimizer-progress progress'); if (!p) return 'finished'; return Number(p.value) > 0 ? Number(p.value) : null; })()`, 60000, 50);
+      shown = shown || (await poll(ctx, `window.__e2eOpt.shown || null`, 10000, 50));
+      moved = await poll(ctx, `(() => { const p = document.querySelector('.srs3-optimizer-progress progress'); if (window.__e2eOpt.max > 0) return window.__e2eOpt.max; return p ? null : 'finished'; })()`, 60000, 50);
       if (moved === 'finished') {
-        result.note(`optimizer attempt ${attempt + 1} finished before progress was sampled; running it again to cancel mid-fit`);
+        result.note(`optimizer attempt ${attempt + 1} finished before any progress was seen; running it again`);
         moved = null;
       }
     }
+    await ev(`(window.__e2eOptObs?.disconnect(), delete window.__e2eOptObs, true)`);
     result.check('a run shows progress that moves (worker reports back)', Boolean(shown) && moved !== null, { shown, percent: moved });
-    const cancelled = await ev(`(() => { const b = __e2e.byText('.srs2-optimizer button', 'Cancel'); return b ? __e2e.click(b) : false; })()`);
-    const cancelMsg = await poll(ctx, `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return r && /cancel/i.test(r.textContent) ? r.textContent : null; })()`, 10000);
-    result.check('Cancel stops the worker and says so', cancelled && Boolean(cancelMsg), cancelMsg);
+    // Cancel mid-fit. A fit on a fast machine can finish between the progress sample and
+    // the click (measured: sampled at 93 %, done before Cancel landed), so a run that
+    // finished first is started again and cancelled the moment its progress shows.
+    let cancelled = await ev(`(() => { const b = __e2e.byText('.srs2-optimizer button', 'Cancel'); return b ? __e2e.click(b) : false; })()`);
+    let cancelMsg = cancelled ? await poll(ctx, `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return r && /cancel/i.test(r.textContent) ? r.textContent : null; })()`, 10000) : null;
+    for (let attempt = 0; attempt < 3 && !cancelMsg; attempt++) {
+      await ev(`__e2e.click(document.querySelector('.srs2-optimizer .btn'))`);
+      cancelled = await poll(ctx, `(() => { const b = __e2e.byText('.srs2-optimizer button', 'Cancel'); return b ? __e2e.click(b) : null; })()`, 10000, 20);
+      cancelMsg = cancelled ? await poll(ctx, `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return r && /cancel/i.test(r.textContent) ? r.textContent : null; })()`, 10000) : null;
+    }
+    result.check('Cancel stops the worker and says so', Boolean(cancelled) && Boolean(cancelMsg), cancelMsg);
 
     await ev(`__e2e.click(document.querySelector('.srs2-optimizer .btn'))`);
     const decision = await poll(ctx, `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return r && !/cancel/i.test(r.textContent) && r.textContent.trim() ? r.innerText : null; })()`, 180000, 500);

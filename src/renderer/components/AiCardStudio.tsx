@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  AiDeckGenerationRequest,
   AiDeckGenerationSource,
   AiEngineConfig,
   AiEnrichmentResult,
@@ -11,7 +12,19 @@ import type {
 } from '../../shared/mining';
 // Direct rather than via the shared/mining barrel — see the note in
 // shared/mining.ts about Blanc's boot chunk.
-import { AI_PROMPT_PRESETS, formatsForPreset } from '../../shared/aiMiningCatalog';
+import {
+  AI_PROMPT_PRESETS,
+  formatsForPreset,
+  presetFitsStudyLang,
+  presetStudyLang,
+  presetsForStudyLang,
+} from '../../shared/aiMiningCatalog';
+import {
+  aiRetryRequests,
+  failedAiItemCount,
+  isFailedAiResult,
+  mergeAiRetryResults,
+} from '../../shared/aiCardStudioRetry';
 import {
   AI_LANGUAGE_DIRECTION_PRESETS,
   AI_MINING_LANGUAGES,
@@ -23,6 +36,7 @@ import {
   providerById,
   providerKeyBucket,
 } from '../../shared/mining';
+import { normalizeApiKeysSet } from '../../shared/aiProviders';
 import type { ProfileId, StudyProfile } from '../../shared/profiles';
 import CollapsibleSection from './CollapsibleSection';
 import { AiSetupPrompt } from './ai/AiSetupPrompt';
@@ -44,10 +58,9 @@ import type { AnkiStatus } from '../../shared/types';
 import { useT } from '../i18n';
 
 function normalizeAiEngineConfig(raw?: Partial<AiEngineConfig> | null): AiEngineConfig {
-  const apiKeysSet = {
-    gemini: Boolean(raw?.apiKeysSet?.gemini),
-    deepseek: Boolean(raw?.apiKeysSet?.deepseek),
-  };
+  // Every provider bucket (Claude, OpenAI and the local server included), not
+  // just the original two: a dropped bucket read as "no key" for that provider.
+  const apiKeysSet = normalizeApiKeysSet(raw?.apiKeysSet);
   if (!raw?.apiKeysSet && raw?.apiKeySet) apiKeysSet.gemini = true;
   const lang = normalizeLanguageOptions(raw ?? undefined);
   const providerId = raw?.providerId ?? DEFAULT_AI_PROVIDER_ID;
@@ -231,7 +244,17 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
   const engineReady =
     aiConfig.engine === 'local-qwen' ? Boolean(aiConfig.localModelAvailable) : currentProviderKeySaved;
 
-  const allPresets = useMemo(() => (presets.length ? presets : [...AI_PROMPT_PRESETS]), [presets]);
+  // The active profile's study language picks the preset set: a Chinese
+  // learner is offered the Chinese presets, not kanji, keigo and JLPT ones.
+  const studyLang = useMemo(() => {
+    void profileRevision;
+    return presetStudyLang(getActiveProfile().targetLang);
+  }, [profileRevision]);
+  const allPresets = useMemo(() => {
+    const source = presets.length ? presets : [...AI_PROMPT_PRESETS];
+    const fitting = presetsForStudyLang(source, studyLang);
+    return fitting.length ? fitting : source;
+  }, [presets, studyLang]);
   const corePresets = useMemo(() => allPresets.filter((p) => p.category === 'core'), [allPresets]);
   const specializedPresets = useMemo(() => allPresets.filter((p) => p.category === 'specialized'), [allPresets]);
 
@@ -246,6 +269,20 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     () => presetById(aiConfig.selectedPresetId, presets),
     [aiConfig.selectedPresetId, presets],
   );
+
+  // A saved preset from the other study language (the user switched profile):
+  // move to the first preset of this language once, instead of generating
+  // Japanese-shaped cards for Chinese words.
+  const presetLangSyncRef = useRef('');
+  useEffect(() => {
+    if (!presets.length || !selectedPreset || presetFitsStudyLang(selectedPreset, studyLang)) return;
+    const next = allPresets[0];
+    if (!next || !presetFitsStudyLang(next, studyLang)) return;
+    const key = `${studyLang}:${selectedPreset.id}`;
+    if (presetLangSyncRef.current === key) return;
+    presetLangSyncRef.current = key;
+    void window.api.aiSelectPreset(next.id).then((result) => applyAiConfigPatch(result)).catch(() => undefined);
+  }, [presets.length, selectedPreset, studyLang, allPresets]);
 
   const selectedFormat = useMemo(
     () =>
@@ -420,6 +457,11 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     () => batchResults.reduce((sum, r) => sum + r.cards.length, 0),
     [batchResults],
   );
+  const failedResults = useMemo(() => batchResults.filter(isFailedAiResult), [batchResults]);
+  const finishedCount = batchResults.length - failedResults.length;
+  const failedCount = useMemo(() => failedAiItemCount(batchResults), [batchResults]);
+  /** The request the preview came from, so a retry asks for the same preset, format and languages. */
+  const lastRequestRef = useRef<AiDeckGenerationRequest | null>(null);
   const canGenerate =
     engineReady && (generationSource === 'preset' || savedWords.length > 0);
 
@@ -428,7 +470,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     [lang, aiConfig.frontLang, aiConfig.backLang, aiConfig.reverse, aiConfig.backGlossLangs],
   );
 
-  function deckGenerationRequest() {
+  function deckGenerationRequest(): AiDeckGenerationRequest {
     return {
       source: generationSource,
       wordCount: generationSource === 'preset' ? wordCount : undefined,
@@ -469,9 +511,26 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       ),
     );
     try {
-      const results = await window.api.aiGenerateDeck(deckGenerationRequest());
+      const request = deckGenerationRequest();
+      lastRequestRef.current = request;
+      const results = await window.api.aiGenerateDeck(request);
       setBatchResults(results);
       const cards = results.reduce((n, r) => n + r.cards.length, 0);
+      const failed = failedAiItemCount(results);
+      if (failed > 0) {
+        // Some items failed: the finished ones are kept (they were paid for)
+        // and the rest wait below with a retry, instead of the whole run lost.
+        const finished = results.filter((r) => !isFailedAiResult(r)).length;
+        setStatus(t('aiStudio.status.generatedPartial', { cards, count: finished, failed }));
+        setLogLines((lines) =>
+          appendStudioLog(
+            lines,
+            t('aiStudio.log.field.generate'),
+            t('aiStudio.progress.msg.partial', { cards, count: finished, failed }),
+          ),
+        );
+        return;
+      }
       // Generation does NOT write. It used to call `saveAiResultsToDeck` right
       // here — before this preview had rendered — and that goes through
       // `replaceImportedDeck`, which deletes every card in the matched
@@ -504,6 +563,31 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         ),
       );
     } finally {
+      setAiBusy(false);
+    }
+  }
+
+  /** Makes only the failed items again and folds them into the preview; finished items stay. */
+  async function retryFailed(): Promise<void> {
+    if (aiBusy || !failedResults.length) return;
+    const requests = aiRetryRequests(batchResults, lastRequestRef.current ?? deckGenerationRequest());
+    if (!requests.length) return;
+    setAiBusy(true);
+    setGenProgress(null);
+    setStatus('');
+    let merged = batchResults;
+    try {
+      for (const request of requests) {
+        const retried = await window.api.aiGenerateDeck(request);
+        merged = mergeAiRetryResults(merged, retried, request);
+      }
+      const cards = merged.reduce((n, r) => n + r.cards.length, 0);
+      setStatus(t('aiStudio.status.retryDone', { cards, failed: failedAiItemCount(merged) }));
+    } catch (error) {
+      // The retry itself was refused: the batch is unchanged, failures included.
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBatchResults(merged);
       setAiBusy(false);
     }
   }
@@ -750,6 +834,9 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             </select>
           </label>
         </div>
+        <p className="muted mining-preset-note" data-testid="ai-studio-preset-lang">
+          {t('aiStudio.presets.studyLang', { lang: langLabel(studyLang) })}
+        </p>
         {selectedPreset && <p className="muted mining-preset-note">{selectedPreset.description}</p>}
         {selectedFormat && (
           <p className="muted ai-studio-meta">
@@ -941,7 +1028,12 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         <div className="download-deck-footer ai-mine-footer">
           <span className="download-deck-result">
             {t('aiStudio.result.approx', { count: batchResults.length ? minedCardCount : estimatedCards })}
-            {genProgress?.message && aiBusy && <span className="muted"> · {genProgress.message}</span>}
+            {(genProgress?.messageKey || genProgress?.message) && aiBusy && (
+              <span className="muted">
+                {' · '}
+                {genProgress.messageKey ? t(genProgress.messageKey, genProgress.messageVars) : genProgress.message}
+              </span>
+            )}
             {!canGenerate && engineReady && generationSource === 'dictionary' && savedWords.length === 0 && (
               <span className="muted"> · {t('aiStudio.hint.starFirst')}</span>
             )}
@@ -956,6 +1048,27 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
               <Icon name="download" size={16} />
               {aiBusy ? t('aiStudio.btn.generating') : t('aiStudio.btn.generate')}
             </button>
+            {failedCount > 0 && (
+              <button
+                className="btn"
+                type="button"
+                data-testid="ai-studio-retry-failed"
+                disabled={aiBusy}
+                onClick={() => void retryFailed()}
+              >
+                {t('aiStudio.btn.retryFailed', { count: failedCount })}
+              </button>
+            )}
+            {aiBusy && (
+              <button
+                className="btn"
+                type="button"
+                data-testid="ai-studio-cancel"
+                onClick={() => void window.api.aiCancelGenerate?.().catch(() => undefined)}
+              >
+                {t('aiProv.cancel')}
+              </button>
+            )}
             <button
               className="btn"
               type="button"
@@ -967,7 +1080,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             <button
               className="btn"
               type="button"
-              disabled={!batchResults.length}
+              disabled={!minedCardCount}
               onClick={() => {
                 // An adopted batch keeps the name its stager resolved, so an
                 // Agent chapter-range run saves into the same group a manual
@@ -990,7 +1103,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             <button
               className="btn"
               type="button"
-              disabled={!batchResults.length}
+              disabled={!minedCardCount}
               onClick={() => void exportCsv()}
             >
               {t('aiStudio.btn.exportCsv')}
@@ -1004,7 +1117,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
           <div className="flash-strip-head">
             <span className="flash-section-title">{t('aiStudio.generated.title')}</span>
             <span className="muted">
-              {t('aiStudio.generated.summary', { cards: minedCardCount, count: batchResults.length })}
+              {t('aiStudio.generated.summary', { cards: minedCardCount, count: finishedCount })}
             </span>
           </div>
           {agentBatch && (
@@ -1023,7 +1136,9 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             {batchResults.flatMap((result) =>
               result.cards.map((card, i) => (
                 <article key={`${result.expression}-${card.label}-${i}`} className="flash-strip-card" role="listitem">
-                  <span className="flash-strip-word" lang="ja">
+                  {/* The batch's own language (a Chinese profile's words are Chinese), so
+                      the CJK font and line breaking follow it instead of always Japanese. */}
+                  <span className="flash-strip-word" lang={mappingProfile.targetLang || 'ja'}>
                     {result.expression}
                   </span>
                   <span className="flash-strip-meaning">{card.label}</span>
@@ -1031,6 +1146,29 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
               )),
             ).slice(0, 32)}
           </div>
+          {failedResults.length > 0 && (
+            // The items a run could not make. Each says why; the button above
+            // makes exactly these again and leaves the finished ones alone.
+            <div className="ai-studio-failed" data-testid="ai-studio-failed">
+              <p className="flash-section-title">{t('aiStudio.failed.title')}</p>
+              <p className="muted mining-preset-note">{t('aiStudio.failed.lead')}</p>
+              <ul className="ai-studio-failed-list">
+                {failedResults.map((result, i) => {
+                  const retry = result.failure?.retry;
+                  return (
+                    <li key={`${retry?.kind ?? 'item'}-${result.expression}-${i}`} className="form-msg err">
+                      {retry?.kind === 'invent' ? (
+                        t('aiStudio.failed.invent', { count: retry.count })
+                      ) : (
+                        <span lang={mappingProfile.targetLang || 'ja'}>{result.expression}</span>
+                      )}
+                      {result.failure?.message ? ` — ${result.failure.message}` : ''}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

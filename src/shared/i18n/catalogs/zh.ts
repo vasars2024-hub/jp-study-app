@@ -31,6 +31,8 @@ import { RESOURCES_CATALOG_ZH } from '../resourcesCatalog/zh';
 import { RESOURCE_BUNDLES_ZH } from '../resourceBundles/zh';
 import { INSTALL_UI_ZH } from '../installUi/zh';
 import { LOCK_UPDATE_UI_ZH } from '../lockUpdateUi/zh';
+import { RISK4_UI_ZH } from '../risk4Ui/zh';
+import { LOCK3_UI_ZH } from '../lock3Ui/zh';
 import { WIDGETS_UI_ZH } from '../widgetsUi/zh';
 import { BLANC_UI_ZH } from '../blancUi/zh';
 import { BLANC_MECH_UI_ZH } from '../blancMechUi/zh';
@@ -40,11 +42,17 @@ import { SYSTEM_UI_ZH } from '../systemUi/zh';
 import { CAPTIONS_UI_ZH } from '../captionsUi/zh';
 import { QUALITY_UI_ZH } from '../qualityUi/zh';
 import { POLISH_UI_ZH } from '../polishUi/zh';
+import { PRODUCT5_UI_ZH } from '../product5Ui/zh';
 import { DICT3_UI_ZH } from '../dict3Ui/zh';
 import { RECORDER_V2_ZH } from '../recorderV2/zh';
 import { SCRAPER_V2_ZH } from '../scraperV2/zh';
 import { STUDY_AREAS_UI_ZH } from '../studyAreasUi/zh';
 import { TRANSLATE_ENGINES_UI_ZH } from '../translateEnginesUi/zh';
+import { AI_EAGER_UI_ZH } from '../aiEagerUi/zh';
+import { LENS_OCR_UI_ZH } from '../lensOcrUi/zh';
+import { MEDIA5_ZH } from '../media5/zh';
+import { PLANNER_UI_ZH } from '../plannerUi/zh';
+import { SNIP_UI_ZH } from '../snipUi/zh';
 
 export const zh: Catalog = {
   'common.download': '下载',
@@ -755,6 +763,8 @@ export const zh: Catalog = {
   ...RESOURCE_BUNDLES_ZH,
   ...INSTALL_UI_ZH,
   ...LOCK_UPDATE_UI_ZH,
+  ...RISK4_UI_ZH,
+  ...LOCK3_UI_ZH,
   ...WIDGETS_UI_ZH,
   ...BLANC_UI_ZH,
   ...BLANC_MECH_UI_ZH,
@@ -764,11 +774,19 @@ export const zh: Catalog = {
   ...CAPTIONS_UI_ZH,
   ...QUALITY_UI_ZH,
   ...POLISH_UI_ZH,
+  ...PRODUCT5_UI_ZH,
   ...DICT3_UI_ZH,
   ...RECORDER_V2_ZH,
   ...SCRAPER_V2_ZH,
   ...STUDY_AREAS_UI_ZH,
   ...TRANSLATE_ENGINES_UI_ZH,
+  // The AI features' strings are a lazy pack (../aiPack, merged by ../catalogs.ts);
+  // only the few that non-AI surfaces render at startup are eager.
+  ...AI_EAGER_UI_ZH,
+  ...LENS_OCR_UI_ZH,
+  ...MEDIA5_ZH,
+  ...PLANNER_UI_ZH,
+  ...SNIP_UI_ZH,
 
   'settings.appTitle': '设置',
   'settings.group.personalization': '个性化',
@@ -1272,8 +1290,8 @@ export const zh: Catalog = {
   'subtitle.autoTranslate': '自动翻译缺失的字幕',
   'subtitle.autoTranslateDesc': '只找到一种语言时在后台翻译——仅限你播放的剧集和标记为“在看”的作品。机器翻译会有标注。',
   'subtitle.translationEngine': '翻译引擎',
-  'subtitle.translationEngine.auto': '自动——有云端密钥时用云端，否则用离线模型',
-  'subtitle.translationEngine.cloud': '仅云端（Gemini 或 DeepSeek 密钥）',
+  'subtitle.translationEngine.auto': '自动——若已在“设置 → AI”中允许则使用你的 AI 提供商，否则使用离线模型',
+  'subtitle.translationEngine.cloud': '仅云端（需先在“设置 → AI”中允许你的 AI 提供商）',
   'subtitle.translationEngine.local': '仅离线模型（Qwen3）',
   'subtitle.autoStudyTrack': '由英语字幕生成日语字幕',
   'subtitle.autoStudyTrackDesc': '只有英语字幕时：用 Whisper 按英语字幕的时间轴转写日语音频；若音频不是日语，则翻译英语字幕。',
@@ -2531,7 +2549,7 @@ export const zh: Catalog = {
   'novel.reader.closeArticle': '关闭文章并返回书籍',
   'novel.reader.book': '书籍',
   'novel.reader.prevShort': '上一页',
-  'novel.reader.collectShortcut': '将选中内容添加到收藏 (Ctrl+Shift+S)',
+  'novel.reader.collectShortcut': '将选中内容添加到收藏',
   'novel.reader.collect': '收藏',
   'novel.reader.jumpToChapter': '跳转到章节',
   'novel.reader.jumpToChapterEllipsis': '跳转到章节…',
@@ -2802,6 +2820,8 @@ export const zh: Catalog = {
   'palette.section.flashcards': '闪卡',
   'palette.section.stats': '统计',
   'palette.section.calendar': '日历',
+  'palette.section.snips': '截图',
+  'palette.section.conversation': '对话伙伴',
   'palette.section.resources': '资源',
   'palette.section.settings': '设置',
   'palette.section.immersion': '沉浸式浏览',
@@ -3347,7 +3367,7 @@ export const zh: Catalog = {
   'agent.undo.error.superseded': '较新的操作已更改同一项目，因此拒绝撤销。',
   'agent.undo.error.entity-not-found': '项目已不存在，无法撤销。',
   'agent.undo.error.operation-unavailable': '此版本没有该操作的安全逆操作。',
-  'agent.undo.error.operation-denied': '当前配置文件已不再允许逆操作。',
+  'agent.undo.error.operation-denied': '当前配置文件或权限级别不允许执行撤销此操作所需的操作。请在智能体设置中允许，或手动撤销。',
   'agent.undo.error.busy': '该操作正在撤销中。',
   'agent.undo.error.undo-failed': '无法撤销该更改。',
   'agent.undo.error.store-failed': '无法读取项目的当前状态。',
@@ -4281,7 +4301,15 @@ export const zh: Catalog = {
   'perf.interact': '交互中',
   'perf.yes': '是',
   'perf.no': '否',
-  'perf.hint': 'Ctrl+Shift+F 隐藏 · 目标 60 FPS',
+  'perf.hint': '{keys} 隐藏 · 目标 60 FPS',
+  'perf.label.title': '性能',
+  'perf.label.frame': '帧',
+  'perf.label.quality': '质量',
+  'perf.label.particles': '粒子',
+  'perf.label.heap': '堆内存',
+  'perf.label.interact': '交互中',
+  'perf.label.yes': '是',
+  'perf.label.no': '否',
   'common.back': '返回',
   'bundleDetail.beginnerChecklist': '新手清单',
   'bundleDetail.checklistProgress': '进度：{done}/{total}',
@@ -4393,7 +4421,7 @@ export const zh: Catalog = {
   'focus.brand': 'Focus',
   'focus.exit': '退出专注',
   'focus.exitLocked': '已锁定',
-  'focus.exitHint': '退出专注模式 (Ctrl+Shift+E)',
+  'focus.exitHint': '退出专注模式',
   'focus.navAria': '专注应用',
   'focus.tab.library': '书库',
   'focus.tab.dictionary': '词典',
@@ -4401,7 +4429,7 @@ export const zh: Catalog = {
   'focus.settings.title': '专注模式',
   'focus.settings.desc': '隐藏桌面、粒子和小组件。保留书库、阅读器、词典、Anki 和可选的音乐栏。',
   'focus.settings.enable': '启用专注模式',
-  'focus.settings.shortcutHint': '快捷键：Ctrl+Shift+E。未锁定时可随时退出。',
+  'focus.settings.shortcutHint': '快捷键：{keys}。未锁定时可随时退出。',
   'focus.lock.title': '专注锁定',
   'focus.lock.desc': '承诺一段学习时段——计时结束前无法退出、Esc 和快捷键均无效。',
   'focus.lock.hint': '每次进入专注模式时开始计时。更改时长对下次生效。',
@@ -4484,7 +4512,7 @@ export const zh: Catalog = {
   'desktop.task.closeAll': '关闭所有应用',
   'desktop.task.minimize': '最小化',
   'desktop.task.restore': '还原',
-  'desktop.clipboardHistory': '剪贴板历史（Ctrl+Alt+Shift+V）',
+  'desktop.clipboardHistory': '剪贴板历史',
   'desktop.tray.hiddenIcons': '显示隐藏的图标',
   'desktop.desktopN': '桌面 {n}',
   'desktop.dragToDesktop': '拖到桌面 · 点击打开',
@@ -6103,7 +6131,7 @@ export const zh: Catalog = {
   'manga.translate.warning.none': 'OCR 已完成，但没有页面能被翻译（{total} 页中 0 页）。这些页面仅保存了 OCR 结果。',
   'manga.translate.warning.some': 'OCR 已完成，但有页面未能翻译（{total} 页中 {failed} 页）。这些页面仅保存了 OCR 结果。',
   'manga.translate.target': '翻译到',
-  'manga.translate.toggleVisibility': '显示／隐藏翻译（Ctrl+Shift+T）',
+  'manga.translate.toggleVisibility': '显示／隐藏翻译',
   'manga.translate.show': '显示翻译',
   'manga.translate.hide': '隐藏翻译',
   'manga.translate.ahead': '翻译后续页',
@@ -6421,6 +6449,16 @@ export const zh: Catalog = {
   'anki3.sync.mappingTitle': '各配置文件的制卡去向',
   'anki3.sync.mapping': '{profile}：牌组“{deck}”，笔记类型“{model}”',
   'anki3.sync.unlinked.title': '在 Anki 中被删除、已回到 Gum 排程的卡片',
+  'anki4.sync.paused': { other: '同步已暂停，直到问题解决；等待中的 {count} 条回答会保留。解决后请按“立即同步”（重启 Anki 也会恢复）。' },
+  'anki4.sync.retryAt': { other: 'Gum 将在 {time} 自动重试；等待中的 {count} 条回答会保留。' },
+  'anki4.sync.link.now': '关联已有笔记',
+  'anki4.sync.link.result': { other: '已将 {count} 张卡片关联到已有笔记（共检查 {looked} 张）。' },
+  'anki4.sync.link.none': '已检查卡片：{looked} 张。没有匹配的已有笔记。',
+  'anki4.sync.link.hintOn': '同步开启时，Gum 会自动关联 Anki 中已有的卡片，只在各配置文件的牌组和笔记类型中查找。',
+  'anki4.sync.link.hintOff': '同步已关闭，Gum 不会自动关联。此按钮只在各配置文件的牌组和笔记类型中查找 Anki 可能已有的卡片，并记录每张卡片对应的笔记。',
+  'anki4.sync.failed.title': 'Anki 未接受的回答',
+  'anki4.sync.failed.hint': 'Anki 多次拒绝了这些回答，因此它们已移出队列。复习记录仍保留在 Gum 中；如果希望 Anki 的排程一致，请在 Anki 中复习这些卡片。',
+  'anki4.sync.failed.clear': '清除列表',
   'anki3.queue.linked': { other: '{count} 张已在 Anki 中，现已关联。' },
   'anki3.export.keepSchedule': '在 Anki 卡包中保留复习进度',
   'anki3.export.scheduled': { other: '{count} 张卡片保留了排程。' },
@@ -6791,6 +6829,8 @@ export const zh: Catalog = {
   'media.jobs.cancelAll': '全部取消',
   'media.jobs.eta': '剩余 {time}',
   'media.jobs.modelSubstituted': '正在使用 {model}',
+  'media.jobs.modelDownloading': '正在下载 Whisper 模型… {percent}%',
+  'media.jobs.modelLoading': '正在加载 Whisper 模型…',
   'media.jobs.modelSubstituted.detail':
     '本机的浏览器运行时无法运行 {requested}，因此这份转写由 {used} 生成，质量明显更弱。',
   'media.jobs.phase.queued': '排队中',
@@ -7131,7 +7171,7 @@ export const zh: Catalog = {
   'immersion.mode.titleDesc.live': ' — 浏览',
   'immersion.mode.titleDesc.reader': ' — 阅读＋高亮',
   'immersion.mode.titleDesc.focus': ' — 无干扰模式',
-  'immersion.saveSite': '保存站点（Ctrl+D）',
+  'immersion.saveSite': '保存站点',
   'immersion.saveAsTool': '保存为工具',
   'immersion.toolSaved': '已保存到我的工具',
   'immersion.toolAlready': '已在我的工具中',
@@ -7148,7 +7188,7 @@ export const zh: Catalog = {
   'immersion.exitFocus': '退出专注模式',
   'immersion.loading': '加载中…',
   'immersion.openPageToBegin': '打开一个页面开始沉浸式阅读。',
-  'immersion.hint': '搜索会以实时模式打开 · F8 切换模式 · F6 专注 · Ctrl+L 定位地址栏',
+  'immersion.hint': '搜索会以实时模式打开 · {cycle} 切换模式 · {focus} 专注 · {url} 定位地址栏',
   'immersion.sites': '站点',
   'immersion.rail.loadFailed': '无法加载已保存的网站。已显示的网站会保留。',
   'immersion.rail.retry': '重试',
@@ -7574,6 +7614,22 @@ export const zh: Catalog = {
   'aiStudio.hint.starOrPreset': '打开词典查词并点星标 — 或将来源切换为预设生成。',
   'aiStudio.status.generatedPreset': '从 {count} 个创造项生成了 {cards} 张卡 · 请在下方查看后点击「保存到抽认卡」。',
   'aiStudio.status.generatedDict': '从 {count} 个词生成了 {cards} 张卡 · 请在下方查看后点击「保存到抽认卡」。',
+  'aiStudio.progress.msg.enriching': '正在处理“{term}”（第 {n} / {total} 个）…',
+  'aiStudio.progress.msg.builtDict': '已从 {count} 个词生成 {cards} 张卡。',
+  'aiStudio.progress.msg.inventing': '正在创造 {count} 个词汇条目…',
+  'aiStudio.progress.msg.inventingBatch': '正在创造 {count} 个条目（第 {n} / {total} 批）…',
+  'aiStudio.progress.msg.invented': '已创造 {done} / {total} 个条目…',
+  'aiStudio.progress.msg.building': '正在构建 {count} 组卡片（每个条目 {cards} 张）…',
+  'aiStudio.progress.msg.cardSet': '卡组 {n} / {total}：{term}',
+  'aiStudio.progress.msg.generated': '已从 {count} 个创造的条目生成 {cards} 张卡。',
+  'aiStudio.progress.msg.partial': '已完成 {count} 个条目（{cards} 张卡）；{failed} 个失败，可以重试。',
+  'aiStudio.status.generatedPartial': '{count} 个条目的 {cards} 张卡已就绪 · {failed} 个失败。已完成的会保留，其余可在下方重试。',
+  'aiStudio.status.retryDone': '重试完成：共 {cards} 张卡 · 仍有 {failed} 个失败。',
+  'aiStudio.failed.title': '未生成',
+  'aiStudio.failed.lead': '以下条目失败。已生成的内容全部保留。',
+  'aiStudio.failed.invent': '仍待创造的条目：{count} 个',
+  'aiStudio.btn.retryFailed': '重试失败的条目（{count}）',
+  'aiStudio.presets.studyLang': '适用于你的学习语言的预设：{lang}',
   'aiStudio.status.csvSaved': 'CSV 已保存到 {path}',
   'aiStudio.status.csvFail': '无法保存 CSV。',
   'aiStudio.status.sentAnki': '已向 Anki 发送 {total} 张中的 {ok} 张。',
@@ -7755,7 +7811,7 @@ export const zh: Catalog = {
   'flash.session.summary': '已复习 {reviewed}/{total}',
   'flash.reviewDictionaryCount': '复习词典（{count}）',
   'flash.undoRating': '撤销上一次评分',
-  'flash.undoRating.hint': '将上一张卡片恢复到原来的复习安排（Ctrl+Z）',
+  'flash.undoRating.hint': '将上一张卡片恢复到原来的复习安排',
   'flash.ankiQueue.pending': { other: '{count} 张卡片等待加入 Anki' },
   'flash.ankiQueue.retry': '立即加入 Anki',
   'flash.ankiQueue.busy': '正在添加…',
@@ -7907,7 +7963,7 @@ export const zh: Catalog = {
   'epub.translate.panelTitle': '书籍翻译设置',
   'epub.translate.target': '翻译到',
   'epub.translate.targetChanged': '翻译目标已更改 — 请重新翻译',
-  'epub.translate.toggleVisibility': '显示／隐藏翻译（Ctrl+Shift+T）',
+  'epub.translate.toggleVisibility': '显示／隐藏翻译',
   'epub.translate.show': '显示翻译',
   'epub.translate.hide': '隐藏翻译',
   'epub.translate.view': '视图',
@@ -8061,6 +8117,8 @@ export const zh: Catalog = {
   'epub.mining.failSwitch': '失败切换引擎',
   'epub.mining.engine.qwen': '离线 Qwen3',
   'epub.mining.engine.api': '云端 API',
+  'epub.mining.translateAgain': '重新翻译',
+  'epub.mining.translateAgain.hint': '不复用已保存的译文，向 {provider} 重新请求所有翻译字段，然后下载卡组。词典提供的值会保留。',
   'epub.mining.qwen.checking': '正在检查本地 Qwen 模型…',
   'epub.mining.qwen.ready': '已找到 Qwen3 模型 — 本地运行，无需 API 密钥。',
   'epub.mining.qwen.missing': '尚未安装离线翻译模型。请在下方或 设置 → AI 功能 中安装。',

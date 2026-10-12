@@ -39,6 +39,7 @@ import {
 } from '../../../shared/vnActionReason';
 import { analyzeMediaStudyCues, createMediaLanguageProfile, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
 import { addVisualNovelStudyCards, mineVisualNovelLine, visualNovelMediaItem } from '../../visualNovelMining';
+import { vnLineForMining } from '../../vnAiTranslate';
 import { addMediaStudySessionProgress, loadMediaStudyDatabase, onMediaStudyDatabaseChanged, saveMediaLanguageProfile, startMediaStudySession } from '../../mediaStudyStore';
 import { isLookupClick, lookupWordFromMouseUp, noteLookupPointerDown } from '../../wordLookup';
 import { CAPTURE_KIND_KEYS } from './captureKindKeys';
@@ -61,6 +62,7 @@ import VisualNovelReleaseCatalog from './VisualNovelReleaseCatalog';
 import VisualNovelScriptImportPanel from './VisualNovelScriptImportPanel';
 import VisualNovelSentenceAssist from './VisualNovelSentenceAssist';
 import VisualNovelSourcePanel from './VisualNovelSourcePanel';
+import VisualNovelStudy5Panel from './VisualNovelStudy5Panel';
 import VisualNovelArt from './VisualNovelArt';
 import { TRACKING_KEYS, VisualNovelCaptureBar, VisualNovelCaptureSetup } from './VisualNovelCaptureControls';
 import { writeLocalStorageJson } from '../../localStorageWrite';
@@ -843,7 +845,9 @@ export default function VisualNovelPanel({
 
   const saveSelectedSentence = (): void => {
     if (!selected || !selectedCapture) return;
-    void mineVisualNovelLine(selected, selectedCapture)
+    // Unchanged unless the learner turned on automatic AI translation for lines with none.
+    void vnLineForMining(selectedCapture, captures)
+      .then((line) => mineVisualNovelLine(selected, line, { captures }))
       .then((added) => setStatus(added ? t('vnPanel.msg.sentenceSaved') : t('vnPanel.msg.sentenceExists')))
       .catch(() => undefined);
   };
@@ -1125,7 +1129,7 @@ export default function VisualNovelPanel({
                 ))}
               </div>
               <div {...tabPanelProps('read')}>
-              <VisualNovelCaptureBar entry={selected} />
+              <VisualNovelCaptureBar entry={selected} captures={captures} />
               {/* Automatic capture (above) is the everyday path; screen OCR, typing a line by
                   hand and the hook-file relay are the fallbacks, so they stay compact here. */}
               <div className="visual-novel-capture">
@@ -1189,6 +1193,7 @@ export default function VisualNovelPanel({
                   onDatabase={setDatabase}
                   onStatus={reportStatus}
                   onSaveCard={saveSelectedSentence}
+                  captures={captures}
                 />
               )}
               </div>
@@ -1240,6 +1245,7 @@ export default function VisualNovelPanel({
                   <span>{t('vnPanel.knownCoverage', { percent: Math.round(analysis.comprehensibility.knownRatio * 100) })}</span>
                 </div>
               )}
+              <VisualNovelStudy5Panel captures={captures} language={selected.language} active={tab === 'study'} />
               {characterProfiles.length > 0 && (
                 <section className="visual-novel-character-profiles" aria-label={t('vnPanel.aria.characters')}>
                   <div className="visual-novel-reading-head"><strong>{t('vnPanel.charactersHead')}</strong><span>{t('vnPanel.speakers', { count: characterProfiles.length })}</span></div>
@@ -1260,6 +1266,7 @@ export default function VisualNovelPanel({
                   mediaId={`vn:${selected.id}`}
                   mediaTitle={selected.title}
                   sentence={selectedCapture.japanese}
+                  lineId={selectedCapture.id}
                   jlptLevel={analysis?.level?.label ?? null}
                 />
               )}

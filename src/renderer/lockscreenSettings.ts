@@ -3,12 +3,22 @@
  * Local-only UI lock. The PIN is stored as a salted scrypt hash computed in main
  * (older profiles hold a reversible encoding, upgraded on the next unlock), and
  * main backs off after repeated wrong PINs.
+ *
+ * lock3: main is the only writer of the PIN and the launch flag. `enabled` and
+ * `pinHash` here are a MIRROR of main's record (`refreshLockscreenMirror`), kept
+ * so the first frame knows whether to draw the lock and so a profile whose lock
+ * file was lost is re-adopted at the backoff ceiling. Changing the PIN, clearing
+ * it or turning the launch lock off goes through main with the current PIN.
+ * The study options (`study`, `answerToUnlock`) and the tint are this window's
+ * own presentation choices and never weaken the PIN.
  */
+import type { AutoLockOptions, LockMutationResult, LockStatus } from '../shared/lockStatus';
+import { t } from './i18n';
 
 export interface LockscreenSettings {
   /** When true, show the lockscreen on cold launch of the main window. */
   enabled: boolean;
-  /** Obfuscated 4-digit PIN (empty = not set). */
+  /** Mirror of main's PIN hash (empty = not set). */
   pinHash: string;
   /**
    * Soft accent for the lock panel. `auto` derives it from the live `--accent`
@@ -17,11 +27,23 @@ export interface LockscreenSettings {
    * four fixed tints stay available for anyone who wants to pin one.
    */
   tint: LockscreenTint;
+  /**
+   * What the lock screen shows about study. `count`: how many cards are due (a
+   * number, nothing from the cards). `card`: one card's front from the deck,
+   * which anyone at the screen can read. `off`: nothing.
+   */
+  study: LockscreenStudyMode;
+  /** Recall one card (multiple choice) before the PIN pad. Without a PIN, the card alone opens Gum. */
+  answerToUnlock: boolean;
 }
 
 export const LOCKSCREEN_TINTS = ['auto', 'neutral', 'ember', 'slate', 'moss'] as const;
 
 export type LockscreenTint = (typeof LOCKSCREEN_TINTS)[number];
+
+export const LOCKSCREEN_STUDY_MODES = ['off', 'count', 'card'] as const;
+
+export type LockscreenStudyMode = (typeof LOCKSCREEN_STUDY_MODES)[number];
 
 const KEY = 'jp-study-lockscreen-v1';
 const EVENT = 'jp-lockscreen-changed';
@@ -35,15 +57,11 @@ const DEFAULTS: LockscreenSettings = {
   enabled: false,
   pinHash: '',
   tint: 'auto',
+  study: 'count',
+  answerToUnlock: false,
 };
 
-/** Lightweight reversible obfuscation — enough to avoid plain PIN in localStorage dumps. */
-export function encodePin(pin: string): string {
-  const digits = pin.replace(/\D/g, '').slice(0, 4);
-  if (digits.length !== 4) return '';
-  return btoa(`jp1:${digits.split('').reverse().join('')}`);
-}
-
+/** The pre-scrypt reversible encoding, still accepted once (main upgrades it). */
 export function decodePin(hash: string): string | null {
   if (!hash) return null;
   try {
@@ -71,15 +89,17 @@ export function loadLockscreen(): LockscreenSettings {
       tint: LOCKSCREEN_TINTS.includes(p.tint as LockscreenTint)
         ? (p.tint as LockscreenTint)
         : DEFAULTS.tint,
+      study: LOCKSCREEN_STUDY_MODES.includes(p.study as LockscreenStudyMode)
+        ? (p.study as LockscreenStudyMode)
+        : DEFAULTS.study,
+      answerToUnlock: p.answerToUnlock === true,
     };
   } catch {
     return { ...DEFAULTS };
   }
 }
 
-export function saveLockscreen(patch: Partial<LockscreenSettings>): LockscreenSettings {
-  const cur = loadLockscreen();
-  const next: LockscreenSettings = { ...cur, ...patch };
+function writeLockscreen(next: LockscreenSettings): LockscreenSettings {
   // Enabling without a PIN is not allowed — keep previous enabled state.
   if (next.enabled && !next.pinHash) {
     next.enabled = false;
@@ -94,14 +114,49 @@ export function saveLockscreen(patch: Partial<LockscreenSettings>): LockscreenSe
   } catch {
     /* ignore */
   }
-  syncLockscreenToMain(next, false);
   return next;
 }
 
 /**
+ * The window's own lock-screen choices: tint and the study options. The PIN and
+ * the launch flag are main's (`setLockscreenPin`, `setLockscreenEnabled`); a
+ * patch naming them here is ignored.
+ */
+export function saveLockscreen(
+  patch: Partial<Pick<LockscreenSettings, 'tint' | 'study' | 'answerToUnlock'>>,
+): LockscreenSettings {
+  const cur = loadLockscreen();
+  const next: LockscreenSettings = {
+    ...cur,
+    ...(patch.tint !== undefined ? { tint: patch.tint } : {}),
+    ...(patch.study !== undefined ? { study: patch.study } : {}),
+    ...(patch.answerToUnlock !== undefined ? { answerToUnlock: patch.answerToUnlock } : {}),
+  };
+  return writeLockscreen(next);
+}
+
+/** Copy main's truth into the mirror (after every change, and at boot). */
+function applyMainStatus(status: LockStatus | null | undefined): LockscreenSettings {
+  if (!status) return loadLockscreen();
+  const cur = loadLockscreen();
+  return writeLockscreen({ ...cur, enabled: status.enabled, pinHash: status.pinHash });
+}
+
+/** Ask main for the lock's state and refresh the mirror. Null without a bridge. */
+export async function refreshLockscreenMirror(): Promise<LockStatus | null> {
+  try {
+    const status = (await window.api?.lockscreenStatus?.()) ?? null;
+    if (status) applyMainStatus(status);
+    return status;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Main owns the lock and keeps its own copy of the PIN hash; this one is the
- * UI's mirror. Main adopts it once (profiles from before), then takes changes
- * only while unlocked.
+ * UI's mirror. Main adopts it once (profiles from before main kept it) and
+ * never afterwards.
  */
 export function syncLockscreenToMain(s: LockscreenSettings = loadLockscreen(), rendererLocked = false): void {
   try {
@@ -117,24 +172,77 @@ export function isHashedPin(stored: string): boolean {
   return stored.startsWith('scrypt1:');
 }
 
-/**
- * Store a new PIN. Main hashes it with scrypt; only where main is unreachable
- * (a harness without the bridge) does the legacy encoding stand in, and that
- * value is upgraded on the next successful unlock.
- */
-export async function setLockscreenPin(pin: string): Promise<LockscreenSettings | null> {
-  if (!isValidPin(pin)) return null;
-  let hashed: string | null = null;
-  try {
-    hashed = (await window.api?.lockscreenHashPin?.(pin)) ?? null;
-  } catch {
-    hashed = null;
-  }
-  return saveLockscreen({ pinHash: hashed && isHashedPin(hashed) ? hashed : encodePin(pin) });
+/** A change main made (or refused), with the mirror already refreshed. */
+export interface LockscreenChange {
+  ok: boolean;
+  error?: LockMutationResult['error'] | 'unavailable';
+  retryAfterMs?: number;
+  /** Shown once: main keeps only its hash. */
+  recoveryCode?: string;
+  settings: LockscreenSettings;
 }
 
-export function clearLockscreenPin(): LockscreenSettings {
-  return saveLockscreen({ pinHash: '', enabled: false });
+async function mutate(call: (() => Promise<LockMutationResult>) | null): Promise<LockscreenChange> {
+  if (!call) return { ok: false, error: 'unavailable', settings: loadLockscreen() };
+  try {
+    const res = await call();
+    const settings = applyMainStatus(res?.status);
+    return {
+      ok: res?.ok === true,
+      ...(res?.error ? { error: res.error } : {}),
+      ...(res?.retryAfterMs ? { retryAfterMs: res.retryAfterMs } : {}),
+      ...(res?.recoveryCode ? { recoveryCode: res.recoveryCode } : {}),
+      settings,
+    };
+  } catch {
+    return { ok: false, error: 'unavailable', settings: loadLockscreen() };
+  }
+}
+
+const bridge = () => (typeof window !== 'undefined' ? window.api : undefined);
+
+/**
+ * Set or change the PIN in main (scrypt there). A PIN already set must be
+ * given as `current`; the first PIN comes back with a recovery code.
+ */
+export function setLockscreenPin(current: string | null, next: string): Promise<LockscreenChange> {
+  if (!isValidPin(next)) return Promise.resolve({ ok: false, error: 'invalid', settings: loadLockscreen() });
+  const api = bridge();
+  const call = api?.lockscreenSetPin;
+  return mutate(call ? () => call(current, next) : null);
+}
+
+/** Remove the PIN (needs the current one); the launch lock and recovery code go with it. */
+export function clearLockscreenPin(current: string): Promise<LockscreenChange> {
+  const api = bridge();
+  const call = api?.lockscreenClearPin;
+  return mutate(call ? () => call(current) : null);
+}
+
+/** Lock at launch. Turning it off needs the current PIN. */
+export function setLockscreenEnabled(on: boolean, current?: string): Promise<LockscreenChange> {
+  const api = bridge();
+  const call = api?.lockscreenSetEnabled;
+  return mutate(call ? () => call(on, current) : null);
+}
+
+export function newLockscreenRecoveryCode(current: string): Promise<LockscreenChange> {
+  const api = bridge();
+  const call = api?.lockscreenNewRecoveryCode;
+  return mutate(call ? () => call(current) : null);
+}
+
+/** A forgotten PIN: the recovery code removes it (and unlocks main). */
+export function recoverLockscreen(code: string): Promise<LockscreenChange> {
+  const api = bridge();
+  const call = api?.lockscreenRecover;
+  return mutate(call ? () => call(code) : null);
+}
+
+export function setLockscreenAutoLock(options: Partial<AutoLockOptions>): Promise<LockscreenChange> {
+  const api = bridge();
+  const call = api?.lockscreenSetAutoLock;
+  return mutate(call ? () => call(options) : null);
 }
 
 export interface LockscreenVerifyResult {
@@ -158,7 +266,7 @@ export async function verifyLockscreenPinDetailed(pin: string): Promise<Lockscre
     try {
       const res = await verify(pin, stored);
       if (res.ok && res.upgradedHash && isHashedPin(res.upgradedHash)) {
-        saveLockscreen({ pinHash: res.upgradedHash });
+        writeLockscreen({ ...loadLockscreen(), pinHash: res.upgradedHash });
       }
       return { ok: res.ok === true, ...(res.retryAfterMs ? { retryAfterMs: res.retryAfterMs } : {}) };
     } catch {
@@ -174,10 +282,16 @@ export async function verifyLockscreenPin(pin: string): Promise<boolean> {
   return (await verifyLockscreenPinDetailed(pin)).ok;
 }
 
-/** True when the lockscreen should block the main shell right now. */
+/**
+ * True when the lockscreen should block the main shell right now: the PIN lock
+ * at launch, or — with no PIN at all — the "answer a card" study gate, which
+ * is a study habit and not a lock (main is never locked behind it).
+ */
 export function shouldShowLockscreen(): boolean {
   const s = loadLockscreen();
-  if (!s.enabled || !s.pinHash) return false;
+  const pinGate = s.enabled && !!s.pinHash;
+  const studyGate = !s.pinHash && s.answerToUnlock;
+  if (!pinGate && !studyGate) return false;
   try {
     if (sessionStorage.getItem(SESSION_UNLOCKED) === '1') return false;
   } catch {
@@ -200,6 +314,27 @@ export function clearLockscreenSession(): void {
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * "Lock Gum now" (palette, Shortcuts, Settings). Main arms the lock and every
+ * window follows; without a PIN there is nothing to lock, which is said.
+ */
+export async function lockGumNow(): Promise<boolean> {
+  let locked = false;
+  try {
+    locked = (await window.api?.lockscreenLock?.())?.locked === true;
+  } catch {
+    locked = false;
+  }
+  if (!locked) {
+    try {
+      window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('lock3.lockNow.needPin'), kind: 'warn' } }));
+    } catch {
+      /* no window */
+    }
+  }
+  return locked;
 }
 
 /** Re-arm main's lock too, so it guards every way back into the app (tray, hotkeys, file open). */

@@ -17,6 +17,7 @@ vi.mock('../i18n', () => ({
 const loadDeckAsAnkiDraft = vi.fn();
 vi.mock('../flashcardDeck', () => ({
   loadDeckAsAnkiDraft: () => loadDeckAsAnkiDraft(),
+  loadDeckFingerprint: () => (loadDeckAsAnkiDraft() as { draft?: { source?: { fingerprint?: string } } } | undefined)?.draft?.source?.fingerprint,
   // The local deck's own destination reads the deck to plan its patches.
   loadDeck: () => [],
   applyDeckFieldPatches: () => ({ updated: [], missing: [], cards: [] }),

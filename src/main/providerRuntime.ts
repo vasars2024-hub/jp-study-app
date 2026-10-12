@@ -1,13 +1,31 @@
 import crypto from 'node:crypto';
-import type { AiProviderHealth, AiProviderId, AiProviderKeyBucket } from '../shared/aiProviders';
-import { AI_PROVIDERS, providerAcceptsImageInput, providerKeyBucket } from '../shared/aiProviders';
+import type {
+  AiProviderDefinition,
+  AiProviderHealth,
+  AiProviderId,
+  AiProviderKeyBucket,
+} from '../shared/aiProviders';
+import {
+  AI_PROVIDER_BASE_URLS,
+  AI_PROVIDERS,
+  isLoopbackUrl,
+  providerAcceptsImageInput,
+} from '../shared/aiProviders';
+import { DEFAULT_AI_PROVIDER_OPTIONS, type AiProviderOptions } from '../shared/aiSetup';
 import type { AgentProviderPolicy } from '../shared/agentWorkspace';
 import type { AgentProviderPrice } from '../shared/agentProviderPricing';
 import { agentEstimatedTokens, estimateAgentProviderCostUsd } from '../shared/agentProviderPricing';
-import type { AgentSpendGuard } from '../shared/agentSpendLedger';
+import type { AgentSpendGuard, AgentSpendProviderId } from '../shared/agentSpendLedger';
 import { readAiProviderSecret } from './credentials/ai';
 
 export const AI_PROVIDER_TIMEOUT_MS = 120_000;
+
+/** The Messages API version this client speaks. */
+const ANTHROPIC_VERSION = '2023-06-01';
+/** The forced tool Anthropic answers structured requests through. */
+const ANTHROPIC_RESPONSE_TOOL = 'respond';
+/** A system prompt this long is worth marking for Anthropic prompt caching. */
+const ANTHROPIC_CACHE_MIN_CHARS = 4_000;
 
 export type AiProviderCacheMode = AgentProviderPolicy['cache'];
 export type AiProviderRuntimeEvent =
@@ -50,13 +68,29 @@ export type AiProviderErrorCode =
   | 'ai-off'
   | 'invalid-response'
   /**
-   * The model hit `maxOutputTokens` before finishing. Distinct from
-   * `invalid-response` because the fix is different and the caller can act on
-   * it: a truncated answer means ask for less, not that the provider is broken.
+   * The model hit its output limit before finishing (Gemini `MAX_TOKENS`,
+   * chat-completions `finish_reason: "length"`, Anthropic `max_tokens`).
+   * Distinct from `invalid-response` because the fix is different and the
+   * caller can act on it: a truncated answer means ask for less, not that the
+   * provider is broken.
    */
-  | 'output-truncated';
+  | 'output-truncated'
+  /**
+   * The provider id is not one this build knows. Refused before any key is read:
+   * an unknown id used to borrow Gemini's key and DeepSeek's endpoint (audit R1).
+   */
+  | 'unknown-provider';
 
 export class AiProviderRuntimeError extends Error {
+  /**
+   * Set when the failure happened AFTER the provider accepted the request, so the
+   * vendor bills it (a truncated answer, a reply that did not parse, a stream cut
+   * by cancel or timeout). The runtime records it in the monthly ledger: before
+   * this, only successes were counted, so billed failures were invisible to the
+   * spending limit (audit R3).
+   */
+  billedUsage?: AiProviderUsage;
+
   constructor(
     message: string,
     readonly code: AiProviderErrorCode,
@@ -153,21 +187,31 @@ const sessionCache = new Map<string, CachedProviderResult>();
 /**
  * The cumulative monthly ceiling, or `null` for none.
  *
- * A module-level registration rather than a field on `AiProviderRequest`, and
- * the reason is the same one written above `providerAcceptsImageInput` below:
- * this runtime is reachable from callers other than the Agent router. A ceiling
- * that each caller had to remember to pass would be bypassed by the first one
- * that forgot, and silently — which is the only failure mode a spending limit
- * really has. Enforced by default, opted out of explicitly.
+ * A module-level registration rather than a field on `AiProviderRequest`: this
+ * runtime is reachable from many callers, and a ceiling that each caller had to
+ * remember to pass would be bypassed by the first one that forgot, and silently.
  *
  * `null` until main registers the store at startup, so every unit test that
- * boots this module keeps its existing behaviour rather than acquiring a
- * ceiling it never asked for.
+ * boots this module keeps its existing behaviour.
  */
 let spendGuard: AgentSpendGuard | null = null;
 
+/**
+ * Worst-case cost of every cloud request currently in flight, already counted
+ * against the ceiling but not yet in the ledger.
+ *
+ * This is what makes the check and the record atomic (audit R3). The check used
+ * to read the ledger, then `await` the provider, then record — so ten parallel
+ * requests each saw the same spent total and together crossed the ceiling. Now
+ * the check includes every reservation, and the reservation is taken in the same
+ * synchronous turn as the check (no `await` between them), so the next request
+ * sees it. Settling releases the reservation and records the actual cost.
+ */
+let reservedUsd = 0;
+
 export function setAgentSpendGuard(guard: AgentSpendGuard | null): void {
   spendGuard = guard;
+  reservedUsd = 0;
 }
 
 /**
@@ -179,7 +223,8 @@ export function setAgentSpendGuard(guard: AgentSpendGuard | null): void {
 export function cloudSpendAllows(estimatedCostUsd: number | undefined): boolean {
   if (!spendGuard) return true;
   try {
-    return spendGuard.verdict(estimatedCostUsd).kind !== 'refuse';
+    const withReservations = estimatedCostUsd === undefined ? undefined : estimatedCostUsd + reservedUsd;
+    return spendGuard.verdict(withReservations).kind !== 'refuse';
   } catch {
     // An unreadable ledger refuses: a ceiling that cannot be read is not a reason to spend.
     return false;
@@ -187,16 +232,18 @@ export function cloudSpendAllows(estimatedCostUsd: number | undefined): boolean 
 }
 
 /**
- * Rates for a request whose caller supplied none.
- *
- * Registered for the same reason as the spend guard, and the two only work
- * together: a ceiling compares a request's estimated cost, and a request with no
- * rates has no cost, so it was always allowed. Only the Agent composer ever
- * passed rates; the other eight cloud callers in the app did not, which left the
- * monthly limit unable to stop most of the spending it was set against. With
- * this registered, every request is priced — by the user's own figure where
- * they entered one, by the labelled built-in estimate otherwise — and so every
- * request is both checked against the limit and valued in the ledger.
+ * Adds a completed request made outside `runCloudAiRequest` (DeepL) to the
+ * monthly ledger the ceiling is checked against (risk4). No-op with no guard
+ * registered, exactly as `cloudSpendAllows`.
+ */
+export function recordCloudSpend(providerId: AgentSpendProviderId, costUsd: number | undefined): void {
+  spendGuard?.record(providerId, costUsd);
+}
+
+/**
+ * Rates for a request whose caller supplied none: the user's own figure where
+ * they entered one, the labelled built-in estimate otherwise. Without this a
+ * request had no cost and the monthly limit could not stop it.
  *
  * `null` until main registers the store, so unit tests keep their behaviour.
  */
@@ -206,6 +253,26 @@ export function setAgentPricingResolver(
   resolver: ((providerId: AiProviderId) => AiProviderPricing | undefined) | null,
 ): void {
   pricingResolver = resolver;
+}
+
+/**
+ * The non-secret provider choices (OpenAI model, local server URL and model)
+ * from Settings > AI. Registered by main for the same reason as the guards
+ * above; `null` reads as the defaults — no local server configured.
+ */
+let providerOptionsReader: (() => AiProviderOptions) | null = null;
+
+export function setAiProviderOptionsReader(next: (() => AiProviderOptions) | null): void {
+  providerOptionsReader = next;
+}
+
+function providerOptions(): AiProviderOptions {
+  if (!providerOptionsReader) return DEFAULT_AI_PROVIDER_OPTIONS;
+  try {
+    return providerOptionsReader();
+  } catch {
+    return DEFAULT_AI_PROVIDER_OPTIONS;
+  }
 }
 
 function withResolvedPricing(request: AiProviderRequest): AiProviderRequest {
@@ -220,24 +287,70 @@ function withResolvedPricing(request: AiProviderRequest): AiProviderRequest {
   return pricing ? { ...request, pricing } : request;
 }
 
-function providerModel(providerId: AiProviderId): string {
-  if (providerId === 'gemini-2.5-flash') return 'gemini-2.5-flash';
-  return providerId === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash';
+/** Where one request goes and as what. */
+interface ResolvedTarget {
+  def: AiProviderDefinition;
+  model: string;
+  baseUrl: string;
+  /** A server on this computer: not the cloud, never billed, not in the ledger. */
+  local: boolean;
 }
 
-function credentialFor(providerId: AiProviderId, supplied?: string): string {
+function knownProvider(providerId: string): AiProviderDefinition {
+  const def = AI_PROVIDERS.find((provider) => provider.id === providerId);
+  if (!def) {
+    throw new AiProviderRuntimeError(`Unknown AI provider "${String(providerId)}".`, 'unknown-provider');
+  }
+  return def;
+}
+
+/**
+ * The model and endpoint for a provider. Throws `unknown-provider` for an id this
+ * build does not know — fail closed, before any key is read (audit R1).
+ */
+function resolveTarget(providerId: AiProviderId): ResolvedTarget {
+  const def = knownProvider(providerId);
+  const options = providerOptions();
+  if (def.keyBucket === 'openai-compatible') {
+    return {
+      def,
+      model: options.compatModel,
+      baseUrl: options.compatBaseUrl,
+      local: isLoopbackUrl(options.compatBaseUrl),
+    };
+  }
+  return {
+    def,
+    model: def.modelConfigurable && options.openaiModel ? options.openaiModel : def.model,
+    baseUrl: AI_PROVIDER_BASE_URLS[def.keyBucket],
+    local: false,
+  };
+}
+
+function credentialFor(def: AiProviderDefinition, supplied?: string): string {
   const direct = supplied?.trim() ?? '';
   if (direct) return direct;
-  return readAiProviderSecret(providerKeyBucket(providerId)).trim();
+  return readAiProviderSecret(def.keyBucket).trim();
+}
+
+function safeSecretSet(bucket: AiProviderKeyBucket): boolean {
+  try {
+    return Boolean(readAiProviderSecret(bucket).trim());
+  } catch {
+    return false;
+  }
 }
 
 export function getAiProviderHealth(providerId: AiProviderId): AiProviderHealth {
-  const credentialBucket = providerKeyBucket(providerId);
+  const target = resolveTarget(providerId);
+  const configured = target.def.keyBucket === 'openai-compatible'
+    ? Boolean(target.baseUrl && target.model)
+    : safeSecretSet(target.def.keyBucket);
   return {
     providerId,
-    model: providerModel(providerId),
-    credentialBucket,
-    configured: Boolean(readAiProviderSecret(credentialBucket).trim()),
+    model: target.model,
+    credentialBucket: target.def.keyBucket,
+    configured,
   };
 }
 
@@ -293,21 +406,20 @@ export function estimateAiProviderCostUsd(
   return estimateAgentProviderCostUsd(inputTokens, outputTokens, pricing);
 }
 
-function cacheKey(request: AiProviderRequest, model: string, maxOutputTokens: number): string {
+function cacheKey(request: AiProviderRequest, target: ResolvedTarget, maxOutputTokens: number): string {
   return crypto.createHash('sha256').update(JSON.stringify({
     providerId: request.providerId,
-    model,
+    model: target.model,
+    baseUrl: target.baseUrl,
     prompt: request.prompt,
     systemPrompt: request.systemPrompt ?? '',
     responseSchema: request.responseSchema ?? null,
     responseMimeType: request.responseMimeType ?? 'text/plain',
     temperature: request.temperature ?? null,
     maxOutputTokens,
-    // Digested rather than embedded: the payloads are megabytes, and
-    // JSON.stringify would materialise a second copy of every one of them just
-    // to compute a key. Omitting them entirely would be the real bug — two
-    // "what is in this screenshot" requests share a prompt, and the second would
-    // be served the first one's answer out of the session cache.
+    // Digested rather than embedded: the payloads are megabytes. Omitting them
+    // entirely would be the real bug — two "what is in this screenshot"
+    // requests share a prompt, and the second would get the first one's answer.
     images: (request.images ?? []).map((image) => ({
       mimeType: image.mimeType,
       digest: crypto.createHash('sha256').update(image.base64).digest('hex'),
@@ -343,19 +455,44 @@ function emitTextChunk(request: AiProviderRequest, text: string): void {
   }
 }
 
-function responseError(providerId: AiProviderId, status: number): AiProviderRuntimeError {
-  const label = providerId === 'gemini-2.5-flash' ? 'Gemini' : 'DeepSeek';
+/** The vendor's short name for messages. */
+function vendorLabel(def: AiProviderDefinition): string {
+  switch (def.keyBucket) {
+    case 'gemini':
+      return 'Gemini';
+    case 'deepseek':
+      return 'DeepSeek';
+    case 'anthropic':
+      return 'Anthropic';
+    case 'openai':
+      return 'OpenAI';
+    default:
+      return 'The local AI server';
+  }
+}
+
+function responseError(def: AiProviderDefinition, status: number): AiProviderRuntimeError {
+  const label = vendorLabel(def);
   if (status === 401 || status === 403) {
-    const suffix = label === 'Gemini'
-      ? 'Check the key and API access.'
-      : 'Check the key at platform.deepseek.com.';
-    return new AiProviderRuntimeError(`${label} rejected the API key. ${suffix}`, 'authentication', false, status);
+    return new AiProviderRuntimeError(`${label} rejected the API key. Check the key and API access.`, 'authentication', false, status);
   }
   if (status === 429) {
     return new AiProviderRuntimeError(`${label} rate limit reached. Wait a moment and try again.`, 'rate-limit', true, status);
   }
+  // 529 is Anthropic's "overloaded": a busy provider, worth a retry.
   const retriable = status === 408 || status === 425 || status >= 500;
   return new AiProviderRuntimeError(`${label} returned ${status}.`, 'upstream', retriable, status);
+}
+
+/** An error the vendor will still bill for: the reply arrived, with this usage. */
+function billedError(
+  message: string,
+  code: AiProviderErrorCode,
+  usage: AiProviderUsage | undefined,
+): AiProviderRuntimeError {
+  const error = new AiProviderRuntimeError(message, code);
+  if (usage && Object.keys(usage).length) error.billedUsage = usage;
+  return error;
 }
 
 function usageWithCost(
@@ -375,55 +512,504 @@ function usageWithCost(
   };
 }
 
-async function parseGeminiResponse(response: Response, pricing?: AiProviderPricing): Promise<{ text: string; usage: AiProviderUsage }> {
-  let json: {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
-    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
-  };
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function recordUsage(
+  rawInput: unknown,
+  rawOutput: unknown,
+  rawTotal: unknown,
+  pricing?: AiProviderPricing,
+): AiProviderUsage {
+  return usageWithCost(finiteNumber(rawInput), finiteNumber(rawOutput), finiteNumber(rawTotal), pricing);
+}
+
+async function readJson<T>(response: Response, label: string): Promise<T> {
   try {
-    json = await response.json() as typeof json;
+    return await response.json() as T;
   } catch {
-    throw new AiProviderRuntimeError('Gemini returned invalid JSON.', 'invalid-response');
+    throw new AiProviderRuntimeError(`${label} returned invalid JSON.`, 'invalid-response');
   }
-  const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+}
+
+// ---------------------------------------------------------------------------
+// Gemini
+// ---------------------------------------------------------------------------
+
+interface GeminiPart {
+  text?: unknown;
+  thought?: unknown;
+}
+
+/** Every answer part's text, in order. Thought summaries are not the answer. */
+function geminiPartsText(parts: readonly GeminiPart[] | undefined): string {
+  return (parts ?? [])
+    .filter((part) => part.thought !== true)
+    .map((part) => (typeof part.text === 'string' ? part.text : ''))
+    .join('');
+}
+
+async function parseGeminiResponse(response: Response, pricing?: AiProviderPricing): Promise<{ text: string; usage: AiProviderUsage }> {
+  const json = await readJson<{
+    candidates?: Array<{ content?: { parts?: GeminiPart[] }; finishReason?: string }>;
+    usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown; totalTokenCount?: unknown };
+  }>(response, 'Gemini');
+  const usage = recordUsage(
+    json.usageMetadata?.promptTokenCount,
+    json.usageMetadata?.candidatesTokenCount,
+    json.usageMetadata?.totalTokenCount,
+    pricing,
+  );
+  // Every text part, not `parts[0]` (audit R5): a reply split across parts lost
+  // everything after the first one.
+  const text = geminiPartsText(json.candidates?.[0]?.content?.parts).trim();
   // Checked before the empty test, because a thinking model that spends the
-  // whole budget on thoughts returns MAX_TOKENS *with no parts at all* — which
-  // read as "the provider returned nothing" and sent every caller looking in
-  // the wrong place. A truncated answer is the caller's size problem.
+  // whole budget on thoughts returns MAX_TOKENS *with no parts at all*.
   if (json.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
-    throw new AiProviderRuntimeError(
-      'Gemini hit its output token limit before finishing. Try fewer items.',
-      'output-truncated',
+    throw billedError('Gemini hit its output token limit before finishing. Try fewer items.', 'output-truncated', usage);
+  }
+  if (!text) throw billedError('Gemini returned an empty response.', 'invalid-response', usage);
+  return { text, usage };
+}
+
+async function parseGeminiStream(
+  response: Response,
+  request: AiProviderRequest,
+  stream: StreamState,
+): Promise<{ text: string; usage: AiProviderUsage }> {
+  let text = '';
+  let truncated = false;
+  await consumeSse(response, (payload) => {
+    if (typeof payload !== 'object' || payload === null) {
+      throw new AiProviderRuntimeError('Gemini returned an invalid stream event.', 'invalid-response');
+    }
+    const chunk = payload as {
+      candidates?: Array<{ content?: { parts?: GeminiPart[] }; finishReason?: string }>;
+      usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown; totalTokenCount?: unknown };
+    };
+    if (chunk.candidates?.[0]?.finishReason === 'MAX_TOKENS') truncated = true;
+    const delta = geminiPartsText(chunk.candidates?.[0]?.content?.parts);
+    if (delta) {
+      text += delta;
+      emitTextChunk(request, delta);
+    }
+    if (chunk.usageMetadata) {
+      stream.usage = recordUsage(
+        chunk.usageMetadata.promptTokenCount,
+        chunk.usageMetadata.candidatesTokenCount,
+        chunk.usageMetadata.totalTokenCount,
+        request.pricing,
+      );
+    }
+  });
+  // A stream cut mid-JSON is worse than one that produced nothing: the text
+  // parses far enough to look like an answer and is missing its tail.
+  if (truncated) {
+    throw billedError('Gemini hit its output token limit before finishing. Try fewer items.', 'output-truncated', stream.usage);
+  }
+  if (!text.trim()) throw billedError('Gemini returned an empty response.', 'invalid-response', stream.usage);
+  return { text: text.trim(), usage: stream.usage };
+}
+
+function geminiRequest(
+  request: AiProviderRequest,
+  target: ResolvedTarget,
+  apiKey: string,
+  maxOutputTokens: number,
+): { url: string; init: RequestInit } {
+  const streaming = Boolean(request.onTextChunk);
+  // The 2.5 series thinks by default and charges its thoughts against
+  // `maxOutputTokens`. A quarter of the budget, floored at 512 and ceilinged at
+  // the documented maximum; three quarters left for the answer.
+  const thinkingBudget = Math.min(24_576, Math.max(512, Math.floor(maxOutputTokens / 4)));
+  const generationConfig: Record<string, unknown> = {
+    maxOutputTokens,
+    thinkingConfig: { thinkingBudget },
+    ...(request.responseMimeType === 'application/json' || request.responseSchema
+      ? { responseMimeType: 'application/json' }
+      : {}),
+    ...(request.responseSchema ? { responseSchema: request.responseSchema } : {}),
+    ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+  };
+  return {
+    url: `${target.baseUrl}/models/${encodeURIComponent(target.model)}:${streaming ? 'streamGenerateContent?alt=sse' : 'generateContent'}`,
+    init: {
+      method: 'POST',
+      // In a header, never the query string (audit R4): a URL ends up in proxy
+      // logs, crash reports and error messages; a header does not.
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        ...(request.systemPrompt ? { systemInstruction: { parts: [{ text: request.systemPrompt }] } } : {}),
+        contents: [{
+          parts: [
+            // Images lead: Gemini reads parts in order.
+            ...(request.images ?? []).map((image) => ({
+              inlineData: { mimeType: image.mimeType, data: image.base64 },
+            })),
+            { text: request.prompt },
+          ],
+        }],
+        generationConfig,
+      }),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI-style chat completions (DeepSeek, OpenAI, Ollama, LM Studio)
+// ---------------------------------------------------------------------------
+
+function truncatedChatError(label: string, usage: AiProviderUsage): AiProviderRuntimeError {
+  return billedError(
+    `${label} hit its output token limit before finishing. Try fewer items.`,
+    'output-truncated',
+    usage,
+  );
+}
+
+async function parseChatResponse(
+  response: Response,
+  target: ResolvedTarget,
+  pricing?: AiProviderPricing,
+): Promise<{ text: string; usage: AiProviderUsage }> {
+  const label = vendorLabel(target.def);
+  const json = await readJson<{
+    choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }>;
+    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
+  }>(response, label);
+  const usage = recordUsage(json.usage?.prompt_tokens, json.usage?.completion_tokens, json.usage?.total_tokens, pricing);
+  // A reply cut at `max_tokens` is truncated JSON that used to be returned as a
+  // success (audit R2).
+  if (json.choices?.[0]?.finish_reason === 'length') throw truncatedChatError(label, usage);
+  const content = json.choices?.[0]?.message?.content;
+  const text = typeof content === 'string' ? content.trim() : '';
+  if (!text) throw billedError(`${label} returned an empty response.`, 'invalid-response', usage);
+  return { text, usage };
+}
+
+async function parseChatStream(
+  response: Response,
+  request: AiProviderRequest,
+  target: ResolvedTarget,
+  stream: StreamState,
+): Promise<{ text: string; usage: AiProviderUsage }> {
+  const label = vendorLabel(target.def);
+  let text = '';
+  let truncated = false;
+  await consumeSse(response, (payload) => {
+    if (typeof payload !== 'object' || payload === null) {
+      throw new AiProviderRuntimeError(`${label} returned an invalid stream event.`, 'invalid-response');
+    }
+    const chunk = payload as {
+      choices?: Array<{ delta?: { content?: unknown }; finish_reason?: unknown }>;
+      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown } | null;
+    };
+    if (chunk.choices?.[0]?.finish_reason === 'length') truncated = true;
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (typeof delta === 'string' && delta) {
+      text += delta;
+      emitTextChunk(request, delta);
+    }
+    if (chunk.usage) {
+      stream.usage = recordUsage(
+        chunk.usage.prompt_tokens,
+        chunk.usage.completion_tokens,
+        chunk.usage.total_tokens,
+        request.pricing,
+      );
+    }
+  });
+  if (truncated) throw truncatedChatError(label, stream.usage);
+  if (!text.trim()) throw billedError(`${label} returned an empty response.`, 'invalid-response', stream.usage);
+  return { text: text.trim(), usage: stream.usage };
+}
+
+function chatResponseFormat(request: AiProviderRequest, target: ResolvedTarget): Record<string, unknown> | undefined {
+  const wantsJson = request.responseMimeType === 'application/json' || Boolean(request.responseSchema);
+  if (!wantsJson) return undefined;
+  const schema = request.responseSchema as { type?: unknown } | undefined;
+  const objectSchema = schema && typeof schema === 'object' && schema.type === 'object';
+  switch (target.def.keyBucket) {
+    case 'deepseek':
+      // DeepSeek has JSON mode only; the schema travels in the system prompt.
+      return { type: 'json_object' };
+    case 'openai':
+      return objectSchema
+        ? { type: 'json_schema', json_schema: { name: 'response', schema: request.responseSchema } }
+        : { type: 'json_object' };
+    default:
+      // Local servers: LM Studio refuses `json_object`, and both it and Ollama
+      // accept a JSON schema. Without one, the prompt asks for JSON.
+      return objectSchema
+        ? { type: 'json_schema', json_schema: { name: 'response', schema: request.responseSchema } }
+        : undefined;
+  }
+}
+
+function chatRequest(
+  request: AiProviderRequest,
+  target: ResolvedTarget,
+  apiKey: string,
+  maxOutputTokens: number,
+): { url: string; init: RequestInit } {
+  const streaming = Boolean(request.onTextChunk);
+  const isOpenAi = target.def.keyBucket === 'openai';
+  const responseFormat = chatResponseFormat(request, target);
+  const images = request.images ?? [];
+  const userContent = images.length
+    ? [
+        ...images.map((image) => ({
+          type: 'image_url',
+          image_url: { url: `data:${image.mimeType};base64,${image.base64}` },
+        })),
+        { type: 'text', text: request.prompt },
+      ]
+    : request.prompt;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  return {
+    url: `${target.baseUrl}/chat/completions`,
+    init: {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: target.model,
+        messages: [
+          ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
+          { role: 'user', content: userContent },
+        ],
+        ...(responseFormat ? { response_format: responseFormat } : {}),
+        // OpenAI's current models take `max_completion_tokens` and reject a
+        // non-default temperature; everything else takes the classic pair.
+        ...(isOpenAi ? { max_completion_tokens: maxOutputTokens } : { max_tokens: maxOutputTokens }),
+        ...(!isOpenAi && request.temperature !== undefined ? { temperature: request.temperature } : {}),
+        stream: streaming,
+        // Usage on a stream: DeepSeek and OpenAI support it. Local servers are
+        // left alone — an unknown field is a 400 on some of them.
+        ...(streaming && target.def.keyBucket !== 'openai-compatible'
+          ? { stream_options: { include_usage: true } }
+          : {}),
+      }),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Anthropic Messages API
+// ---------------------------------------------------------------------------
+
+interface AnthropicUsageRaw {
+  input_tokens?: unknown;
+  output_tokens?: unknown;
+  cache_creation_input_tokens?: unknown;
+  cache_read_input_tokens?: unknown;
+}
+
+/** Input counts every token the request carried, cached or not; an estimate that errs high. */
+function anthropicInputTokens(raw: AnthropicUsageRaw | undefined): number | undefined {
+  const parts = [raw?.input_tokens, raw?.cache_creation_input_tokens, raw?.cache_read_input_tokens]
+    .map(finiteNumber)
+    .filter((value): value is number => value !== undefined);
+  return parts.length ? parts.reduce((sum, value) => sum + value, 0) : undefined;
+}
+
+function anthropicUsage(input: number | undefined, output: number | undefined, pricing?: AiProviderPricing): AiProviderUsage {
+  const total = input !== undefined && output !== undefined ? input + output : undefined;
+  return usageWithCost(input, output, total, pricing);
+}
+
+/** Structured output goes through a forced tool when the schema is an object. */
+function anthropicUsesTool(request: AiProviderRequest): boolean {
+  const schema = request.responseSchema as { type?: unknown } | undefined;
+  return Boolean(schema && typeof schema === 'object' && schema.type === 'object');
+}
+
+function anthropicRequest(
+  request: AiProviderRequest,
+  target: ResolvedTarget,
+  apiKey: string,
+  maxOutputTokens: number,
+): { url: string; init: RequestInit } {
+  const streaming = Boolean(request.onTextChunk);
+  const useTool = anthropicUsesTool(request);
+  const wantsJson = request.responseMimeType === 'application/json' || Boolean(request.responseSchema);
+  const systemParts: string[] = [];
+  if (request.systemPrompt) systemParts.push(request.systemPrompt);
+  if (wantsJson && !useTool) {
+    systemParts.push(
+      request.responseSchema
+        ? `Respond with JSON only, matching this schema:\n${JSON.stringify(request.responseSchema)}`
+        : 'Respond with a single JSON value only: no prose, no code fences.',
     );
   }
-  if (!text) throw new AiProviderRuntimeError('Gemini returned an empty response.', 'invalid-response');
-  const usage = json.usageMetadata;
+  const systemText = systemParts.join('\n\n');
   return {
-    text,
-    usage: usageWithCost(usage?.promptTokenCount, usage?.candidatesTokenCount, usage?.totalTokenCount, pricing),
+    url: `${target.baseUrl}/v1/messages`,
+    init: {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: target.model,
+        max_tokens: maxOutputTokens,
+        ...(systemText
+          ? {
+              system: [{
+                type: 'text',
+                text: systemText,
+                // A long, stable prefix (a schema, a grammar list) is cached by
+                // the provider; short ones are below the minimum and unaffected.
+                ...(systemText.length >= ANTHROPIC_CACHE_MIN_CHARS ? { cache_control: { type: 'ephemeral' } } : {}),
+              }],
+            }
+          : {}),
+        messages: [{
+          role: 'user',
+          content: [
+            ...(request.images ?? []).map((image) => ({
+              type: 'image',
+              source: { type: 'base64', media_type: image.mimeType, data: image.base64 },
+            })),
+            { type: 'text', text: request.prompt },
+          ],
+        }],
+        ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+        ...(useTool
+          ? {
+              tools: [{
+                name: ANTHROPIC_RESPONSE_TOOL,
+                description: 'Return the answer as structured data matching the input schema.',
+                input_schema: request.responseSchema,
+              }],
+              tool_choice: { type: 'tool', name: ANTHROPIC_RESPONSE_TOOL },
+            }
+          : {}),
+        ...(streaming ? { stream: true } : {}),
+      }),
+    },
   };
 }
 
-async function parseDeepSeekResponse(response: Response, pricing?: AiProviderPricing): Promise<{ text: string; usage: AiProviderUsage }> {
-  let json: {
-    choices?: Array<{ message?: { content?: string } }>;
-    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-  };
-  try {
-    json = await response.json() as typeof json;
-  } catch {
-    throw new AiProviderRuntimeError('DeepSeek returned invalid JSON.', 'invalid-response');
+function anthropicStopError(stopReason: unknown, usage: AiProviderUsage): AiProviderRuntimeError | null {
+  if (stopReason === 'max_tokens') {
+    return billedError('Anthropic hit its output token limit before finishing. Try fewer items.', 'output-truncated', usage);
   }
-  const text = json.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new AiProviderRuntimeError('DeepSeek returned an empty response.', 'invalid-response');
-  return {
-    text,
-    usage: usageWithCost(json.usage?.prompt_tokens, json.usage?.completion_tokens, json.usage?.total_tokens, pricing),
-  };
+  if (stopReason === 'refusal') {
+    return billedError('Anthropic declined to answer this request.', 'invalid-response', usage);
+  }
+  return null;
 }
 
-interface StreamAccumulator {
-  text: string;
+async function parseAnthropicResponse(
+  response: Response,
+  pricing?: AiProviderPricing,
+): Promise<{ text: string; usage: AiProviderUsage }> {
+  const json = await readJson<{
+    content?: Array<{ type?: unknown; text?: unknown; name?: unknown; input?: unknown }>;
+    stop_reason?: unknown;
+    usage?: AnthropicUsageRaw;
+  }>(response, 'Anthropic');
+  const usage = anthropicUsage(anthropicInputTokens(json.usage), finiteNumber(json.usage?.output_tokens), pricing);
+  const stop = anthropicStopError(json.stop_reason, usage);
+  if (stop) throw stop;
+  const blocks = Array.isArray(json.content) ? json.content : [];
+  const tool = blocks.find((block) => block.type === 'tool_use' && block.name === ANTHROPIC_RESPONSE_TOOL);
+  const text = tool
+    ? JSON.stringify(tool.input ?? null)
+    : blocks
+      .filter((block) => block.type === 'text' && typeof block.text === 'string')
+      .map((block) => block.text as string)
+      .join('')
+      .trim();
+  if (!text || text === 'null') throw billedError('Anthropic returned an empty response.', 'invalid-response', usage);
+  return { text, usage };
+}
+
+function anthropicStreamError(error: { type?: unknown; message?: unknown } | undefined): AiProviderRuntimeError {
+  const type = typeof error?.type === 'string' ? error.type : '';
+  if (type === 'rate_limit_error') {
+    return new AiProviderRuntimeError('Anthropic rate limit reached. Wait a moment and try again.', 'rate-limit', true);
+  }
+  if (type === 'authentication_error' || type === 'permission_error') {
+    return new AiProviderRuntimeError('Anthropic rejected the API key. Check the key and API access.', 'authentication');
+  }
+  return new AiProviderRuntimeError(`Anthropic stream failed (${type || 'error'}).`, 'upstream', type === 'overloaded_error');
+}
+
+async function parseAnthropicStream(
+  response: Response,
+  request: AiProviderRequest,
+  stream: StreamState,
+): Promise<{ text: string; usage: AiProviderUsage }> {
+  let text = '';
+  let toolJson = '';
+  let sawTool = false;
+  let inputTokens: number | undefined;
+  let outputTokens: number | undefined;
+  let stopReason: unknown;
+  const refresh = (): void => {
+    stream.usage = anthropicUsage(inputTokens, outputTokens, request.pricing);
+  };
+  await consumeSse(response, (payload) => {
+    if (typeof payload !== 'object' || payload === null) {
+      throw new AiProviderRuntimeError('Anthropic returned an invalid stream event.', 'invalid-response');
+    }
+    const event = payload as {
+      type?: unknown;
+      message?: { usage?: AnthropicUsageRaw };
+      content_block?: { type?: unknown; name?: unknown };
+      delta?: { type?: unknown; text?: unknown; partial_json?: unknown; stop_reason?: unknown };
+      usage?: AnthropicUsageRaw;
+      error?: { type?: unknown; message?: unknown };
+    };
+    switch (event.type) {
+      case 'message_start':
+        inputTokens = anthropicInputTokens(event.message?.usage);
+        outputTokens = finiteNumber(event.message?.usage?.output_tokens) ?? outputTokens;
+        refresh();
+        break;
+      case 'content_block_start':
+        if (event.content_block?.type === 'tool_use' && event.content_block.name === ANTHROPIC_RESPONSE_TOOL) {
+          sawTool = true;
+        }
+        break;
+      case 'content_block_delta':
+        if (event.delta?.type === 'text_delta' && typeof event.delta.text === 'string' && event.delta.text) {
+          text += event.delta.text;
+          emitTextChunk(request, event.delta.text);
+        } else if (event.delta?.type === 'input_json_delta' && typeof event.delta.partial_json === 'string') {
+          toolJson += event.delta.partial_json;
+          if (event.delta.partial_json) emitTextChunk(request, event.delta.partial_json);
+        }
+        break;
+      case 'message_delta':
+        if (event.delta?.stop_reason !== undefined) stopReason = event.delta.stop_reason;
+        outputTokens = finiteNumber(event.usage?.output_tokens) ?? outputTokens;
+        refresh();
+        break;
+      case 'error':
+        throw anthropicStreamError(event.error);
+      default:
+        break;
+    }
+  });
+  const stop = anthropicStopError(stopReason, stream.usage);
+  if (stop) throw stop;
+  const answer = (sawTool ? toolJson : text).trim();
+  if (!answer) throw billedError('Anthropic returned an empty response.', 'invalid-response', stream.usage);
+  return { text: answer, usage: stream.usage };
+}
+
+// ---------------------------------------------------------------------------
+// Transport
+// ---------------------------------------------------------------------------
+
+/** What a stream has reported so far; read on failure to bill a cut-off reply. */
+interface StreamState {
   usage: AiProviderUsage;
 }
 
@@ -476,176 +1062,46 @@ async function consumeSse(
   if (buffer.trim()) consumeEvent(buffer);
 }
 
-function recordUsage(
-  rawInput: unknown,
-  rawOutput: unknown,
-  rawTotal: unknown,
-  pricing?: AiProviderPricing,
-): AiProviderUsage {
-  const input = typeof rawInput === 'number' && Number.isFinite(rawInput) ? rawInput : undefined;
-  const output = typeof rawOutput === 'number' && Number.isFinite(rawOutput) ? rawOutput : undefined;
-  const total = typeof rawTotal === 'number' && Number.isFinite(rawTotal) ? rawTotal : undefined;
-  return usageWithCost(input, output, total, pricing);
-}
-
-async function parseGeminiStream(
-  response: Response,
+function buildRequest(
   request: AiProviderRequest,
-): Promise<StreamAccumulator> {
-  let text = '';
-  let usage: AiProviderUsage = {};
-  let truncated = false;
-  await consumeSse(response, (payload) => {
-    if (typeof payload !== 'object' || payload === null) {
-      throw new AiProviderRuntimeError('Gemini returned an invalid stream event.', 'invalid-response');
-    }
-    const chunk = payload as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
-      usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown; totalTokenCount?: unknown };
-    };
-    if (chunk.candidates?.[0]?.finishReason === 'MAX_TOKENS') truncated = true;
-    const delta = chunk.candidates?.[0]?.content?.parts
-      ?.map((part) => typeof part.text === 'string' ? part.text : '')
-      .join('') ?? '';
-    if (delta) {
-      text += delta;
-      emitTextChunk(request, delta);
-    }
-    if (chunk.usageMetadata) {
-      usage = recordUsage(
-        chunk.usageMetadata.promptTokenCount,
-        chunk.usageMetadata.candidatesTokenCount,
-        chunk.usageMetadata.totalTokenCount,
-        request.pricing,
-      );
-    }
-  });
-  // A stream that was cut mid-JSON is worse than one that produced nothing: the
-  // text parses far enough to look like an answer and is missing its tail. It
-  // fails as truncation whether or not any text arrived.
-  if (truncated) {
-    throw new AiProviderRuntimeError(
-      'Gemini hit its output token limit before finishing. Try fewer items.',
-      'output-truncated',
-    );
+  target: ResolvedTarget,
+  apiKey: string,
+  maxOutputTokens: number,
+): { url: string; init: RequestInit } {
+  switch (target.def.wire) {
+    case 'gemini':
+      return geminiRequest(request, target, apiKey, maxOutputTokens);
+    case 'anthropic':
+      return anthropicRequest(request, target, apiKey, maxOutputTokens);
+    default:
+      return chatRequest(request, target, apiKey, maxOutputTokens);
   }
-  if (!text.trim()) throw new AiProviderRuntimeError('Gemini returned an empty response.', 'invalid-response');
-  return { text: text.trim(), usage };
 }
 
-async function parseDeepSeekStream(
+async function parseReply(
   response: Response,
   request: AiProviderRequest,
-): Promise<StreamAccumulator> {
-  let text = '';
-  let usage: AiProviderUsage = {};
-  await consumeSse(response, (payload) => {
-    if (typeof payload !== 'object' || payload === null) {
-      throw new AiProviderRuntimeError('DeepSeek returned an invalid stream event.', 'invalid-response');
-    }
-    const chunk = payload as {
-      choices?: Array<{ delta?: { content?: string } }>;
-      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown } | null;
-    };
-    const delta = chunk.choices?.[0]?.delta?.content;
-    if (typeof delta === 'string' && delta) {
-      text += delta;
-      emitTextChunk(request, delta);
-    }
-    if (chunk.usage) {
-      usage = recordUsage(
-        chunk.usage.prompt_tokens,
-        chunk.usage.completion_tokens,
-        chunk.usage.total_tokens,
-        request.pricing,
-      );
-    }
-  });
-  if (!text.trim()) throw new AiProviderRuntimeError('DeepSeek returned an empty response.', 'invalid-response');
-  return { text: text.trim(), usage };
-}
-
-function requestBody(request: AiProviderRequest, model: string, maxOutputTokens: number): { url: string; init: RequestInit } {
+  target: ResolvedTarget,
+  stream: StreamState,
+): Promise<{ text: string; usage: AiProviderUsage }> {
   const streaming = Boolean(request.onTextChunk);
-  if (request.providerId === 'gemini-2.5-flash') {
-    // The 2.5 series thinks by default and charges its thoughts against
-    // `maxOutputTokens`, which is the cause of the MAX_TOKENS truncations read
-    // below: the answer is cut off before it starts. Left out until 2026-08-15
-    // only because an unknown `generationConfig` field is a 400 and a wrong guess
-    // breaks *every* cloud call in the app; the field is now confirmed against
-    // Google's own REST reference for `v1beta/models/gemini-2.5-flash`, where
-    // `thinkingBudget` is an integer 0..24576 (0 disables, -1 is the dynamic
-    // default).
-    //
-    // A quarter of the budget, floored at 512 so a small request still gets room
-    // to think and ceilinged at the documented maximum. Not 0: disabling thinking
-    // entirely is a quality change to every cloud answer in the app, and the
-    // defect being fixed is thoughts *consuming the reply's* budget, not thinking
-    // itself. Three quarters left for the answer is what the arbiter's split
-    // retry was compensating for.
-    const thinkingBudget = Math.min(24_576, Math.max(512, Math.floor(maxOutputTokens / 4)));
-    const generationConfig: Record<string, unknown> = {
-      maxOutputTokens,
-      thinkingConfig: { thinkingBudget },
-      ...(request.responseMimeType === 'application/json' || request.responseSchema
-        ? { responseMimeType: 'application/json' }
-        : {}),
-      ...(request.responseSchema ? { responseSchema: request.responseSchema } : {}),
-      ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-    };
-    return {
-      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:${streaming ? 'streamGenerateContent?alt=sse' : 'generateContent'}`,
-      init: {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...(request.systemPrompt ? { systemInstruction: { parts: [{ text: request.systemPrompt }] } } : {}),
-          contents: [{
-            parts: [
-              // Images lead. Gemini reads parts in order, and a prompt that says
-              // "what does this screenshot show" placed BEFORE the screenshot is
-              // a question about nothing yet.
-              ...(request.images ?? []).map((image) => ({
-                inlineData: { mimeType: image.mimeType, data: image.base64 },
-              })),
-              { text: request.prompt },
-            ],
-          }],
-          generationConfig,
-        }),
-      },
-    };
+  switch (target.def.wire) {
+    case 'gemini':
+      return streaming ? parseGeminiStream(response, request, stream) : parseGeminiResponse(response, request.pricing);
+    case 'anthropic':
+      return streaming ? parseAnthropicStream(response, request, stream) : parseAnthropicResponse(response, request.pricing);
+    default:
+      return streaming ? parseChatStream(response, request, target, stream) : parseChatResponse(response, target, request.pricing);
   }
-
-  return {
-    url: 'https://api.deepseek.com/chat/completions',
-    init: {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
-          { role: 'user', content: request.prompt },
-        ],
-        ...(request.responseMimeType === 'application/json' || request.responseSchema
-          ? { response_format: { type: 'json_object' } }
-          : {}),
-        max_tokens: maxOutputTokens,
-        ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-        stream: streaming,
-        ...(streaming ? { stream_options: { include_usage: true } } : {}),
-      }),
-    },
-  };
 }
 
 async function fetchAttempt(
   request: AiProviderRequest,
-  model: string,
+  target: ResolvedTarget,
   apiKey: string,
   maxOutputTokens: number,
   timeoutMs: number,
+  preflightCost: number | undefined,
 ): Promise<{ text: string; usage: AiProviderUsage }> {
   if (request.signal?.aborted) {
     throw new AiProviderRuntimeError('AI request was cancelled.', 'cancelled');
@@ -659,6 +1115,10 @@ async function fetchAttempt(
     controller.abort();
   }, timeoutMs);
   let emittedChunk = false;
+  // True once the provider accepted the request (2xx): from then on the vendor
+  // bills it, whatever happens to the reply.
+  let accepted = false;
+  const stream: StreamState = { usage: {} };
   const requestWithTrackedChunks: AiProviderRequest = request.onTextChunk
     ? {
         ...request,
@@ -669,37 +1129,34 @@ async function fetchAttempt(
       }
     : request;
   try {
-    const built = requestBody(requestWithTrackedChunks, model, maxOutputTokens);
-    const headers = new Headers(built.init.headers);
-    if (request.providerId === 'gemini-2.5-flash') {
-      built.url += `${built.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(apiKey)}`;
-    } else {
-      headers.set('Authorization', `Bearer ${apiKey}`);
-    }
-    const response = await fetch(built.url, { ...built.init, headers, signal: controller.signal });
-    if (!response.ok) throw responseError(request.providerId, response.status);
-    if (requestWithTrackedChunks.onTextChunk) {
-      return await (request.providerId === 'gemini-2.5-flash'
-        ? parseGeminiStream(response, requestWithTrackedChunks)
-        : parseDeepSeekStream(response, requestWithTrackedChunks));
-    }
-    return await (request.providerId === 'gemini-2.5-flash'
-      ? parseGeminiResponse(response, request.pricing)
-      : parseDeepSeekResponse(response, request.pricing));
+    const built = buildRequest(requestWithTrackedChunks, target, apiKey, maxOutputTokens);
+    const response = await fetch(built.url, { ...built.init, signal: controller.signal });
+    if (!response.ok) throw responseError(target.def, response.status);
+    accepted = true;
+    return await parseReply(response, requestWithTrackedChunks, target, stream);
   } catch (error) {
+    let normalized: AiProviderRuntimeError;
     if (timedOut) {
-      throw new AiProviderRuntimeError(
+      normalized = new AiProviderRuntimeError(
         `AI request timed out after ${Math.round(timeoutMs / 1000)}s. Try fewer items or check your connection.`,
         'timeout',
         true,
       );
+    } else if (request.signal?.aborted) {
+      normalized = new AiProviderRuntimeError('AI request was cancelled.', 'cancelled');
+    } else {
+      normalized = runtimeError(error);
+      if (emittedChunk && normalized.retriable) {
+        normalized = new AiProviderRuntimeError(normalized.message, normalized.code, false, normalized.status);
+      }
     }
-    if (request.signal?.aborted) {
-      throw new AiProviderRuntimeError('AI request was cancelled.', 'cancelled');
-    }
-    const normalized = runtimeError(error);
-    if (emittedChunk && normalized.retriable) {
-      throw new AiProviderRuntimeError(normalized.message, normalized.code, false, normalized.status);
+    if (accepted && !normalized.billedUsage) {
+      // The reply reached us and failed afterwards: billed. With the provider's
+      // own count where a stream reported one, the worst-case estimate otherwise.
+      const reported = error instanceof AiProviderRuntimeError ? error.billedUsage : undefined;
+      normalized.billedUsage = reported
+        ?? (Object.keys(stream.usage).length ? stream.usage : undefined)
+        ?? (preflightCost !== undefined ? { estimatedCostUsd: preflightCost } : {});
     }
     throw normalized;
   } finally {
@@ -726,29 +1183,35 @@ function wait(delayMs: number, signal?: AbortSignal): Promise<void> {
 
 export async function runCloudAiRequest(input: AiProviderRequest): Promise<AiProviderResult> {
   const startedAt = Date.now();
+  // First, before pricing, keys or anything else: an id this build does not
+  // know is refused, never mapped onto another vendor (audit R1).
+  const target = resolveTarget(input.providerId);
   const request = withResolvedPricing(input);
-  const model = providerModel(request.providerId);
-  const credentialBucket = providerKeyBucket(request.providerId);
+  const { model } = target;
+  const credentialBucket = target.def.keyBucket;
   const inputChars = request.prompt.length + (request.systemPrompt?.length ?? 0);
   if (request.maxInputChars !== undefined && inputChars > Math.max(0, request.maxInputChars)) {
     throw new AiProviderRuntimeError('AI request exceeds the configured input budget.', 'input-budget');
   }
-  // Refused, never silently dropped. This runtime is reachable from callers
-  // other than the Agent router, so the capability check lives here as well as
-  // there — sending a screenshot's worth of question to a text-only model and
-  // returning its confident answer is the failure mode being prevented.
+  // Refused, never silently dropped: sending a screenshot's worth of question to
+  // a text-only model and returning its confident answer is the failure mode.
   if ((request.images?.length ?? 0) > 0 && !providerAcceptsImageInput(request.providerId)) {
     throw new AiProviderRuntimeError(
-      `${providerModel(request.providerId)} does not accept image input.`,
+      `${target.def.label} does not accept image input.`,
       'vision-unsupported',
     );
   }
+  if (target.def.keyBucket === 'openai-compatible' && (!target.baseUrl || !target.model)) {
+    throw new AiProviderRuntimeError(
+      'The local AI server URL and model are not set. Set them in Settings > AI.',
+      'missing-credential',
+    );
+  }
   const maxOutputTokens = boundedInteger(request.maxOutputTokens, 2048, 1, 65_536);
-  const preflightCost = estimateAiProviderCostUsd(
-    estimatedTokens(inputChars),
-    maxOutputTokens,
-    request.pricing,
-  );
+  // A server on this computer bills nothing: no rates, no ledger, no ceiling.
+  const preflightCost = target.local
+    ? undefined
+    : estimateAiProviderCostUsd(estimatedTokens(inputChars), maxOutputTokens, request.pricing);
   if (
     request.maxEstimatedCostUsd !== undefined
     && preflightCost !== undefined
@@ -756,25 +1219,10 @@ export async function runCloudAiRequest(input: AiProviderRequest): Promise<AiPro
   ) {
     throw new AiProviderRuntimeError('AI request exceeds the configured cost budget.', 'cost-budget');
   }
-  // Second, and after the per-request cap on purpose: "this one request is too
-  // expensive" is the more specific complaint and names the control the user
-  // most likely just set. Both are preflight, and both estimate output at
-  // `maxOutputTokens` — the worst case — because a ceiling that can be crossed
-  // by a request it approved is not a ceiling. The cost is that a request which
-  // would in fact have fit can be refused near the boundary; the remedy for
-  // that is visible and reversible, whereas the alternative is a total that
-  // quietly ends the month above the number the user set.
-  if (spendGuard) {
-    const spend = spendGuard.verdict(preflightCost);
-    if (spend.kind === 'refuse') {
-      throw new AiProviderRuntimeError(
-        'AI request would exceed the monthly spending limit.',
-        'spend-budget',
-      );
-    }
+  const apiKey = credentialFor(target.def, request.apiKey);
+  if (!apiKey && !target.def.keyOptional) {
+    throw new AiProviderRuntimeError('AI provider credential is not configured.', 'missing-credential');
   }
-  const apiKey = credentialFor(request.providerId, request.apiKey);
-  if (!apiKey) throw new AiProviderRuntimeError('AI provider credential is not configured.', 'missing-credential');
 
   const cacheMode = request.cache ?? 'off';
   if (cacheMode === 'persistent') {
@@ -783,9 +1231,11 @@ export async function runCloudAiRequest(input: AiProviderRequest): Promise<AiPro
       'persistent-cache-unavailable',
     );
   }
-  const key = cacheKey(request, model, maxOutputTokens);
+  const key = cacheKey(request, target, maxOutputTokens);
   const cached = cacheMode === 'session' ? sessionCache.get(key) : undefined;
   if (cached) {
+    // A cache hit makes no request and costs nothing, so it neither needs the
+    // ceiling's permission nor adds to the ledger.
     emit(request, { type: 'cache-hit', providerId: request.providerId, model });
     emit(request, { type: 'complete', providerId: request.providerId, model, attempts: 0, cached: true });
     return {
@@ -803,57 +1253,89 @@ export async function runCloudAiRequest(input: AiProviderRequest): Promise<AiPro
     };
   }
 
+  // The ceiling, with every in-flight request's worst case already counted, and
+  // the reservation taken in the same synchronous turn as the check — the
+  // atomic "reserve, then settle" that stops parallel requests from crossing the
+  // ceiling together (audit R3). Worst case = output at `maxOutputTokens`,
+  // because a ceiling that can be crossed by a request it approved is not one.
+  const ledgered = Boolean(spendGuard) && !target.local;
+  let reservation = 0;
+  if (ledgered && spendGuard) {
+    let refused: boolean;
+    try {
+      const withReservations = preflightCost === undefined ? undefined : preflightCost + reservedUsd;
+      refused = spendGuard.verdict(withReservations).kind === 'refuse';
+    } catch {
+      // An unreadable ledger refuses: a ceiling that cannot be read is not a reason to spend.
+      refused = true;
+    }
+    if (refused) {
+      throw new AiProviderRuntimeError('AI request would exceed the monthly spending limit.', 'spend-budget');
+    }
+    reservation = preflightCost ?? 0;
+    reservedUsd += reservation;
+  }
+  const settle = (costUsd: number | undefined): void => {
+    if (!ledgered) return;
+    try {
+      spendGuard?.record(request.providerId, costUsd);
+    } catch {
+      // A ledger write failure must not turn a delivered answer into an error.
+    }
+  };
+
   const retryAttempts = boundedInteger(request.retryAttempts, 0, 0, 5);
   const retryBaseDelayMs = boundedInteger(request.retryBaseDelayMs, 500, 0, 30_000);
   const timeoutMs = boundedInteger(request.timeoutMs, AI_PROVIDER_TIMEOUT_MS, 1, 10 * 60_000);
   let attempts = 0;
-  for (;;) {
-    attempts += 1;
-    emit(request, { type: 'start', providerId: request.providerId, model, attempt: attempts });
-    try {
-      const result = await fetchAttempt(request, model, apiKey, maxOutputTokens, timeoutMs);
-      if (cacheMode === 'session') {
-        sessionCache.set(key, { text: result.text, usage: result.usage });
+  try {
+    for (;;) {
+      attempts += 1;
+      emit(request, { type: 'start', providerId: request.providerId, model, attempt: attempts });
+      try {
+        const result = await fetchAttempt(request, target, apiKey, maxOutputTokens, timeoutMs, preflightCost);
+        if (cacheMode === 'session') {
+          sessionCache.set(key, { text: result.text, usage: result.usage });
+        }
+        // The *actual* cost, not the worst-case figure the preflight reserved:
+        // the ledger records what was spent.
+        settle(result.usage.estimatedCostUsd);
+        emit(request, { type: 'complete', providerId: request.providerId, model, attempts, cached: false });
+        return {
+          text: result.text,
+          providerId: request.providerId,
+          model,
+          credentialBucket,
+          inputChars,
+          startedAt,
+          completedAt: Date.now(),
+          attempts,
+          cached: false,
+          delivery: request.onTextChunk ? 'streamed' : 'buffered',
+          usage: result.usage,
+        };
+      } catch (error) {
+        const normalized = runtimeError(error);
+        // Billed by the vendor even though it failed: counted, once per attempt
+        // that reached the provider. A refused attempt (401, 429, 5xx) is not.
+        if (normalized.billedUsage) settle(normalized.billedUsage.estimatedCostUsd);
+        if (!normalized.retriable || attempts > retryAttempts) {
+          emit(request, { type: 'error', providerId: request.providerId, model, attempts, code: normalized.code });
+          throw normalized;
+        }
+        const delayMs = retryBaseDelayMs * 2 ** (attempts - 1);
+        emit(request, {
+          type: 'retry',
+          providerId: request.providerId,
+          model,
+          attempt: attempts + 1,
+          delayMs,
+          reason: normalized.code,
+        });
+        await wait(delayMs, request.signal);
       }
-      // The *actual* cost, not the worst-case figure the preflight refused on:
-      // the ledger is a record of what was spent, and charging the user's month
-      // for output tokens the model did not produce would make the total wrong
-      // in the direction that refuses their next request.
-      //
-      // Only here, so a cache hit adds nothing — it made no request and there is
-      // no bill for it — and only on success, so a failed attempt that was
-      // retried is not counted once per attempt.
-      spendGuard?.record(request.providerId, result.usage.estimatedCostUsd);
-      emit(request, { type: 'complete', providerId: request.providerId, model, attempts, cached: false });
-      return {
-        text: result.text,
-        providerId: request.providerId,
-        model,
-        credentialBucket,
-        inputChars,
-        startedAt,
-        completedAt: Date.now(),
-        attempts,
-        cached: false,
-        delivery: request.onTextChunk ? 'streamed' : 'buffered',
-        usage: result.usage,
-      };
-    } catch (error) {
-      const normalized = runtimeError(error);
-      if (!normalized.retriable || attempts > retryAttempts) {
-        emit(request, { type: 'error', providerId: request.providerId, model, attempts, code: normalized.code });
-        throw normalized;
-      }
-      const delayMs = retryBaseDelayMs * 2 ** (attempts - 1);
-      emit(request, {
-        type: 'retry',
-        providerId: request.providerId,
-        model,
-        attempt: attempts + 1,
-        delayMs,
-        reason: normalized.code,
-      });
-      await wait(delayMs, request.signal);
     }
+  } finally {
+    reservedUsd = Math.max(0, reservedUsd - reservation);
   }
 }

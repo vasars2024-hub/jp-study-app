@@ -45,13 +45,13 @@ function draftOf(cards: CardSpec[]): AnkiDraft {
     ],
   };
   return buildAnkiDraft(raw, {
-    source: { kind: 'apkg', label: 'test.apkg', createdAtSec: CRT },
+    source: { kind: 'apkg', label: 'test.apkg', createdAtSec: CRT, fingerprint: 'test-fingerprint' },
     normalize: (v) => v,
   });
 }
 
 /** A graduated review card: it has an interval, an ease and a queue to leave. */
-function reviewCard(id: string, nid: string, over: Partial<RawAnkiCardRow> = {}): CardSpec {
+function reviewCard(id: string, nid: string, over: Partial<Omit<RawAnkiCardRow, 'id' | 'nid'>> = {}): CardSpec {
   return { id, nid, type: 2, queue: 2, due: 900, ivl: 30, factor: 2300, reps: 4, ...over };
 }
 

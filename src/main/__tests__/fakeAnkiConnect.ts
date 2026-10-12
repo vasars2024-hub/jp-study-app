@@ -96,23 +96,40 @@ export class FakeAnkiConnect {
     return this.calls.filter((call) => call.action === action).length;
   }
 
+  /** HTTP round trips (a `multi` batch is one request; its inner actions are each in `calls`). */
+  requests = 0;
+  /** Extra actions answered before `handle` (the mining fake's, or a test's); null = not handled. */
+  extraHandler: ((action: string, params: Record<string, unknown>) => { result: unknown } | null) | null = null;
+
   /** Install as the global `fetch`. Returns the stub for `vi.stubGlobal`. */
   fetch = async (_url: unknown, init?: { body?: unknown }): Promise<{ json: () => Promise<unknown> }> => {
     if (this.down) throw new TypeError('fetch failed');
+    this.requests += 1;
     const body = JSON.parse(String(init?.body ?? '{}')) as { action: string; params?: Record<string, unknown> };
-    const params = body.params ?? {};
-    this.calls.push({ action: body.action, params });
+    if (body.action === 'multi' && !this.unsupported.has('multi')) {
+      // AnkiConnect's `multi`: each inner action answered as `{ result, error }`.
+      const inner = ((body.params ?? {}).actions as Array<{ action: string; params?: Record<string, unknown> }>) ?? [];
+      const results = inner.map((call) => this.answer(call.action, call.params ?? {}));
+      return { json: async () => ({ result: results, error: null }) };
+    }
+    const out = this.answer(body.action, body.params ?? {});
+    return { json: async () => out };
+  };
+
+  private answer(action: string, params: Record<string, unknown>): { result: unknown; error: string | null } {
+    this.calls.push({ action, params });
     let result: unknown = null;
     let error: string | null = null;
     try {
       if (this.requireApiKey) throw new Error('valid api key must be provided');
-      if (this.unsupported.has(body.action)) throw new Error('unsupported action');
-      result = this.handle(body.action, params);
+      if (this.unsupported.has(action)) throw new Error('unsupported action');
+      const extra = this.extraHandler?.(action, params);
+      result = extra ? extra.result : this.handle(action, params);
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     }
-    return { json: async () => ({ result, error }) };
-  };
+    return { result, error };
+  }
 
   private handle(action: string, params: Record<string, unknown>): unknown {
     switch (action) {
@@ -120,6 +137,10 @@ export class FakeAnkiConnect {
         return this.apiVersion;
       case 'getActiveProfile':
         return this.profile;
+      case 'deckNames':
+        return [...new Set(['Default', ...[...this.cards.values()].map((c) => c.deckName)])];
+      case 'modelNames':
+        return Object.keys(this.models);
       case 'modelFieldNames': {
         const fields = this.models[String(params.modelName)];
         if (!fields) throw new Error(`model was not found: ${String(params.modelName)}`);
@@ -187,14 +208,21 @@ export class FakeAnkiConnect {
     const nid = /^nid:([\d,]+)$/.exec(query.trim());
     if (nid) return nid[1].split(',').map(Number).filter((id) => this.notes.has(id));
     const model = /"note:((?:[^"\\]|\\.)*)"/.exec(query)?.[1]?.replace(/\\(.)/g, '$1');
+    // `deck:X` matches X and its subdecks, case-insensitively, as Anki does.
+    const deck = /"deck:((?:[^"\\]|\\.)*)"/.exec(query)?.[1]?.replace(/\\(.)/g, '$1').toLowerCase();
     const terms: Array<{ field: string; value: string }> = [];
     for (const m of query.matchAll(/"((?:[^"\\:]|\\.)+):((?:[^"\\]|\\.)*)"/g)) {
       const field = m[1].replace(/\\(.)/g, '$1');
-      if (field === 'note') continue;
+      if (field === 'note' || field === 'deck') continue;
       terms.push({ field, value: m[2].replace(/\\(.)/g, '$1') });
     }
+    const inDeck = (note: FakeNote): boolean => !deck || note.cards.some((id) => {
+      const name = (this.cards.get(id)?.deckName ?? '').toLowerCase();
+      return name === deck || name.startsWith(`${deck}::`);
+    });
     return [...this.notes.values()]
       .filter((note) => !model || note.modelName === model)
+      .filter(inDeck)
       .filter((note) => !terms.length || terms.some((t) => (note.fields[t.field] ?? '') === t.value))
       .map((note) => note.noteId);
   }

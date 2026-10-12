@@ -33,7 +33,7 @@ function bridgeMethod<K extends keyof ReadingPassageHandoffBridge>(
   name: K,
 ): ReadingPassageHandoffBridge[K] | null {
   if (typeof window === 'undefined') return null;
-  const api = (window as { api?: Partial<ReadingPassageHandoffBridge> }).api;
+  const api = (window as unknown as { api?: Partial<ReadingPassageHandoffBridge> }).api;
   const method = api?.[name];
   return typeof method === 'function' ? (method.bind(api) as ReadingPassageHandoffBridge[K]) : null;
 }

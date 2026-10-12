@@ -12,12 +12,18 @@ import {
   type ArenaSessionState,
   type RoundOutcome,
 } from '../../renderer/games/engine';
-import type { ArenaMistake } from '../../renderer/games/types';
+import type { ArenaMistake, GameId } from '../../renderer/games/types';
+
+/** Every game these loops visit is a fast one; Mirror Writing has no rounds to build. */
+function fastId(id: GameId): Exclude<GameId, 'mirror-writing'> {
+  if (id === 'mirror-writing') throw new Error('mirror-writing builds no rounds');
+  return id;
+}
 
 describe('Game Arena engine', () => {
   it('builds a local first round for every fast game', () => {
     for (const game of GAME_DEFINITIONS.filter((g) => g.mode === 'fast')) {
-      const round = buildGameRound(game.id, 3, 'en', 0);
+      const round = buildGameRound(fastId(game.id), 3, 'en', 0);
       expect(round.gameId).toBe(game.id);
       expect(round.jp.length).toBeGreaterThan(0);
       // An audio round deliberately has no visible prompt — printing the
@@ -29,7 +35,7 @@ describe('Game Arena engine', () => {
 
   it('has no multiple-choice rounds left: every recall game is typed', () => {
     for (const game of GAME_DEFINITIONS.filter((g) => g.mode === 'fast')) {
-      const round = buildGameRound(game.id, 3, 'en', 0);
+      const round = buildGameRound(fastId(game.id), 3, 'en', 0);
       expect(['type', 'builder', 'match'], `${game.id}`).toContain(round.kind);
     }
   });
@@ -68,7 +74,7 @@ describe('Game Arena engine', () => {
     const answerable = GAME_DEFINITIONS.filter((g) => g.mode === 'fast');
     for (const game of answerable) {
       for (let seq = 0; seq < 6; seq++) {
-        const round = buildGameRound(game.id, 3, 'en', seq);
+        const round = buildGameRound(fastId(game.id), 3, 'en', seq);
         if (round.gameId === 'reverse-recall') continue; // prompt IS the Japanese, by design
         const answer =
           round.kind === 'builder'
@@ -99,6 +105,7 @@ describe('Game Arena engine', () => {
       word: `語${i}`,
       reading: `ご${i}`,
       meaning: `word ${i}`,
+      level: 3 as const,
     }));
     const withDeck = { vocab, cloze: [], sentences: [] };
     expect(gamePoolSize('kanji-reading', 3, withDeck)).toBe(30);
@@ -221,7 +228,7 @@ describe('every round declares the language its prompt is written in', () => {
     for (const source of ['en', 'ru', 'zh'] as const) {
       for (const game of fast) {
         for (let seed = 0; seed < 6; seed++) {
-          const round = buildGameRound(game.id, ((seed % 7) + 1) as 1, source, seed);
+          const round = buildGameRound(fastId(game.id), ((seed % 7) + 1) as 1, source, seed);
           // A displayed prompt is either the Japanese under study or the
           // player's own source language — never a third one. A keyed prompt
           // is the exception and is checked on its own terms below: its
@@ -240,7 +247,7 @@ describe('every round declares the language its prompt is written in', () => {
     for (const source of ['en', 'ru'] as const) {
       for (const game of fast) {
         for (let seed = 0; seed < 6; seed++) {
-          const round = buildGameRound(game.id, ((seed % 7) + 1) as 1, source, seed);
+          const round = buildGameRound(fastId(game.id), ((seed % 7) + 1) as 1, source, seed);
           // A keyed prompt is UI chrome; `prompt` stays English as the mining
           // payload, so its script says nothing about what the player reads.
           if (round.promptKey || round.promptLang === 'ja') continue;
@@ -260,7 +267,7 @@ describe('every round declares the language its prompt is written in', () => {
     for (const source of ['en', 'ru', 'zh'] as const) {
       for (const game of fast) {
         for (let seed = 0; seed < 6; seed++) {
-          const round = buildGameRound(game.id, ((seed % 7) + 1) as 1, source, seed);
+          const round = buildGameRound(fastId(game.id), ((seed % 7) + 1) as 1, source, seed);
           if (round.promptLang !== 'ja') continue;
           // An audio round deliberately shows nothing.
           if (!round.prompt) continue;

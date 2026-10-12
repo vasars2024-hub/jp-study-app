@@ -56,8 +56,21 @@ describe('the open route delivers the resolved subtitle to the player', () => {
     // evaluated on every render — a later `const` would throw before paint.
     const apply = player.indexOf('const applySubtitleFile = useCallback');
     expect(apply).toBeGreaterThan(-1);
-    expect(apply).toBeLessThan(player.indexOf('const loadOpened = useCallback'));
-    expect(loadOpened).toContain('}, [applySubtitleFile]);');
+    const loadOpenedAt = player.indexOf('const loadOpened = useCallback');
+    expect(apply).toBeLessThan(loadOpenedAt);
+    // The dependency array is read structurally rather than pinned as one exact
+    // string: moving the Whisper path to the queue added `detachGeneration` to it,
+    // and the property that matters is that applySubtitleFile is listed AND that
+    // every hook-local callback the array names is declared above loadOpened.
+    const deps = loadOpened.match(/\n {2}\}, \[([^\]]*)\]\);/);
+    expect(deps, 'loadOpened must end in a dependency array').not.toBeNull();
+    const names = (deps?.[1] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    expect(names).toContain('applySubtitleFile');
+    for (const name of names) {
+      const declared = player.search(new RegExp(`\\bconst ${name}\\s*=`));
+      if (declared === -1) continue; // destructured state/props, not a later const
+      expect(declared, `${name} must be declared before loadOpened`).toBeLessThan(loadOpenedAt);
+    }
   });
 
   it('has exactly one applySubtitleFile, so the study split cannot be bypassed', () => {

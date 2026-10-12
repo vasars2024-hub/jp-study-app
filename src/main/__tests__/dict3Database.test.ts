@@ -27,9 +27,11 @@ import { arrangeEntriesForExtension } from '../dictionary/wireArrange';
 import { resetDictDisplayPrefsCache, writeDictDisplayPrefs } from '../dictionary/displayPrefs';
 import {
   findLocalAudioFile,
+  MAX_LOCAL_AUDIO_BYTES,
   readAudioSourcesPrefs,
   resetAudioSourcesForTests,
   resolveAudioChain,
+  setAudioSourcesLogger,
   writeAudioSourcesPrefs,
 } from '../dictionary/audioSources';
 import type { LexiconAudioResult } from '../../shared/lexiconAudio';
@@ -197,5 +199,39 @@ describe('audio sources: local folders and the fallback chain', () => {
     const out = await resolveAudioChain({ lang: 'ja', term: '猫', reading: 'ねこ' }, disabled, remote);
     expect(out.status).toBe('none');
     expect(remote).toHaveBeenCalledTimes(1);
+  });
+
+  it('a disabled source never plays, even when the picker names it (risk4)', async () => {
+    const disabled = writeAudioSourcesPrefs({
+      sources: [{ id: 'local-1', kind: 'local', enabled: false, folder }, { id: 'jpod101', kind: 'jpod101', enabled: false }],
+    });
+    const local = await resolveAudioChain({ lang: 'ja', term: '猫', reading: 'ねこ', sourceId: 'local-1' }, disabled, remote);
+    expect(local.status).toBe('none');
+    expect(local.clip).toBeUndefined();
+    const cdn = await resolveAudioChain({ lang: 'ja', term: '猫', reading: 'ねこ', sourceId: 'jpod101' }, disabled, remote);
+    expect(cdn.status).toBe('none');
+    expect(remote).not.toHaveBeenCalled();
+  });
+
+  it('skips a local file over the size cap, with a log line, and reads nothing (risk4)', async () => {
+    const big = path.join(folder, 'jpod_files', 'さかな - 魚.mp3');
+    fs.writeFileSync(big, Buffer.alloc(0));
+    fs.truncateSync(big, MAX_LOCAL_AUDIO_BYTES + 1);
+    const logged: string[] = [];
+    setAudioSourcesLogger((m) => logged.push(m));
+    const readSpy = vi.spyOn(fs.promises, 'readFile');
+    try {
+      remote.mockResolvedValueOnce({ query: '魚', status: 'none' });
+      const out = await resolveAudioChain({ lang: 'ja', term: '魚', reading: 'さかな' }, prefs(), remote);
+      expect(out.status).toBe('none');
+      expect(readSpy.mock.calls.some(([file]) => String(file) === big)).toBe(false);
+      expect(logged.some((m) => m.includes('魚') && m.includes('cap'))).toBe(true);
+      // Under the cap still plays.
+      const ok = await resolveAudioChain({ lang: 'ja', term: '犬', reading: 'いぬ' }, prefs(), remote);
+      expect(ok.status).toBe('ready');
+    } finally {
+      readSpy.mockRestore();
+      setAudioSourcesLogger(null);
+    }
   });
 });

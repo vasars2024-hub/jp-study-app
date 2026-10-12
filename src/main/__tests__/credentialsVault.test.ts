@@ -210,7 +210,20 @@ describe('reading a secret that cannot be decrypted', () => {
     fs.writeFileSync(vaultFile(), 'not json at all', 'utf-8');
     expect(readSecret('jiten')).toBe('');
     expect(vaultStatuses()).toEqual(
-      ['gemini', 'deepseek', 'deepl', 'jimaku', 'opensubtitles', 'jiten', 'tmdb', 'mal'].map((id) => ({
+      [
+        'gemini',
+        'deepseek',
+        'anthropic',
+        'openai',
+        'openai-compatible',
+        'mirror-evaluator',
+        'deepl',
+        'jimaku',
+        'opensubtitles',
+        'jiten',
+        'tmdb',
+        'mal',
+      ].map((id) => ({
         id,
         configured: false,
         lastTestedAt: 0,
@@ -285,6 +298,14 @@ describe('the renderer-facing shape', () => {
     expect(vaultStatuses().map((entry) => entry.id)).toEqual([
       'gemini',
       'deepseek',
+      // Claude, OpenAI and a local OpenAI-compatible server's optional key were
+      // born in the vault (read by `main/credentials/ai.ts`), as was Mirror
+      // Writing's evaluator key (`main/mirrorEvaluatorProxy.ts`), which moved
+      // out of plain localStorage.
+      'anthropic',
+      'openai',
+      'openai-compatible',
+      'mirror-evaluator',
       // DeepL (the Translate workbench's optional MT engine) was born in the vault.
       'deepl',
       'jimaku',

@@ -50,6 +50,13 @@ import {
 } from './media';
 import { YtDownloadQueue, type YtQueueEntry, type YtQueueRunResult } from './ytDownloadQueue';
 import { registerYoutubeDiscoveryIpc } from './youtubeDiscovery';
+import { notifyNewYoutubeVideos, registerYoutubeStudy5Ipc } from './youtubeStudy5';
+import {
+  YT5_SWEEP_SPACING_MS,
+  yt5NewVideosAfterSync,
+  yt5PlanSweep,
+  type Yt5NewVideoGroup,
+} from '../shared/youtubeStudy5';
 import { logDiagnostic } from './errorLog';
 import { killProcessTree } from './processTree';
 import { readJsonDetailedSync, writeFileAtomicSync, writeJsonAtomicSync } from './atomicJson';
@@ -880,6 +887,12 @@ const AUTO_UPDATE_FIRST_TICK_MS = 5 * 60 * 1000;
 let autoUpdateTimer: ReturnType<typeof setInterval> | null = null;
 let autoUpdateFirstTimer: ReturnType<typeof setTimeout> | null = null;
 let autoUpdateRunning = false;
+let sweepSpacingMs = YT5_SWEEP_SPACING_MS;
+
+/** Test seam: the real pause between two listings is seconds long. */
+export function setYtSweepSpacingForTests(ms: number | null): void {
+  sweepSpacingMs = ms ?? YT5_SWEEP_SPACING_MS;
+}
 
 function isDue(lastCheckedAt: number | undefined, frequencyHours: number, now: number): boolean {
   if (!lastCheckedAt) return true;
@@ -902,22 +915,36 @@ export async function runAutoUpdateDue(): Promise<YtPlaylistsStore> {
   const due = store.playlists.filter(
     (p) => isImmersionPlaylist(p) && p.autoUpdate && isDue(p.lastCheckedAt, p.updateFrequencyHours, now),
   );
+  // Rate limit (7.5): oldest-checked first, at most YT5_MAX_CHECKS_PER_SWEEP per
+  // tick, spaced apart. The rest stay due and go on the next hourly tick, so a
+  // long subscription list is never one burst of yt-dlp listings.
+  const planned = yt5PlanSweep(due);
+  const news: Yt5NewVideoGroup[] = [];
   // Each playlist commits on its own. Holding one snapshot across the whole
   // sweep is what made this unattended timer revert the user's work: a sweep of
   // twenty playlists is minutes long, and everything they saved in that window
   // was overwritten by the state from before it started.
-  for (const pl of due) {
+  for (let i = 0; i < planned.length; i++) {
+    const pl = planned[i];
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, sweepSpacingMs));
     const fetched = await fetchPlaylist(pl.url);
     if ('error' in fetched) continue;
+    let beforeIds = new Set<string>();
+    let firstCheck = true;
     store = commitStore((fresh) => {
       const current = fresh.playlists.find((p) => p.id === pl.id);
       // Removed, or auto-update switched off, while this response was in
       // flight. Either way the user has spoken more recently than the sweep.
       if (!current || !current.autoUpdate) return null;
+      beforeIds = new Set(fresh.videos.filter((v) => v.playlistId === pl.id).map((v) => v.youtubeId));
+      firstCheck = !current.lastCheckedAt;
       const applied = applyPlaylistSync(fresh, fetched, pl.id);
       return applied ? applied.store : null;
     });
+    const added = yt5NewVideosAfterSync(beforeIds, store.videos, pl.id, firstCheck);
+    if (added.length) news.push({ playlistTitle: pl.title, titles: added.map((video) => video.title) });
   }
+  if (news.length) void notifyNewYoutubeVideos(news);
   return store;
 }
 
@@ -961,6 +988,7 @@ export function registerYtPlaylistsIpc(): void {
   // yt-dlp plumbing, so it is wired here rather than adding a second call site
   // in `main.ts` — which slice 70 owns this hour anyway.
   registerYoutubeDiscoveryIpc();
+  registerYoutubeStudy5Ipc();
 
   ipcMain.handle('yt:list', (): YtPlaylistsStore => readStore());
 

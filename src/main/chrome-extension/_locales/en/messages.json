@@ -2275,5 +2275,125 @@
   },
   "bg_recSaveInApp": {
     "message": "Part of this recording is already in Gum, so the browser no longer has the whole file. Open it in Gum instead."
+  },
+  "content_aiExplain": {
+    "message": "Explain in context"
+  },
+  "content_aiSuggestMeaning": {
+    "message": "Suggest a meaning (AI)"
+  },
+  "content_aiBadge": {
+    "message": "AI"
+  },
+  "content_aiBusy": {
+    "message": "Asking AI…"
+  },
+  "content_aiRetry": {
+    "message": "Try again"
+  },
+  "content_aiCancelled": {
+    "message": "Cancelled."
+  },
+  "content_aiSenseFits": {
+    "message": "Sense $1 fits here"
+  },
+  "content_aiNoSenseFits": {
+    "message": "None of the listed senses fits this sentence."
+  },
+  "content_aiConfHigh": {
+    "message": "High confidence"
+  },
+  "content_aiConfMedium": {
+    "message": "Medium confidence"
+  },
+  "content_aiConfLow": {
+    "message": "Low confidence"
+  },
+  "content_aiDisclaimer": {
+    "message": "AI can be wrong — check it against the dictionary."
+  },
+  "content_aiMeaningLabel": {
+    "message": "Suggested meaning"
+  },
+  "content_aiMeaningApply": {
+    "message": "Use for the card"
+  },
+  "content_aiMeaningDismiss": {
+    "message": "Dismiss"
+  },
+  "content_aiMeaningApplied": {
+    "message": "Saved with the card when you save this word, marked as AI."
+  },
+  "content_aiBreakdown": {
+    "message": "AI breakdown"
+  },
+  "content_aiSimplify": {
+    "message": "Simplify paragraph"
+  },
+  "content_aiSheetBreakdown": {
+    "message": "Sentence breakdown"
+  },
+  "content_aiSheetSimplify": {
+    "message": "Simplified paragraph"
+  },
+  "content_aiOriginal": {
+    "message": "Original"
+  },
+  "content_aiSimplifiedText": {
+    "message": "Simplified by AI"
+  },
+  "content_aiNotes": {
+    "message": "What changed"
+  },
+  "content_aiTranslation": {
+    "message": "Translation"
+  },
+  "content_aiWords": {
+    "message": "Word by word"
+  },
+  "content_aiEngineLocal": {
+    "message": "Offline model (nothing left this computer)"
+  },
+  "content_aiEngineCloud": {
+    "message": "Cloud AI"
+  },
+  "content_aiStateOff": {
+    "message": "AI is turned off. Turn it on in Gum: Settings > AI."
+  },
+  "content_aiStateNoKey": {
+    "message": "AI isn’t set up. Add a provider in Gum: Settings > AI, or install the offline model there."
+  },
+  "content_aiStateNoLocal": {
+    "message": "The offline AI model isn’t installed. Install it in Gum: Settings > AI."
+  },
+  "content_aiStateConsent": {
+    "message": "This feature isn’t allowed to send text to the cloud. Allow it in Gum: Settings > AI, or use the offline model."
+  },
+  "content_aiStateOffline": {
+    "message": "You’re offline, so the cloud AI can’t be reached. The offline model works without internet."
+  },
+  "content_aiStateAppClosed": {
+    "message": "Gum isn’t running. Open the app to use AI — the dictionary still works."
+  },
+  "content_aiStateOutdated": {
+    "message": "This version of Gum has no AI for the browser. Update Gum, then reload this extension."
+  },
+  "content_aiStateRateLimit": {
+    "message": "Too many AI requests at once. Wait a minute, then try again."
+  },
+  "content_aiStateTooLong": {
+    "message": "This text is too long for AI. Choose a shorter part."
+  },
+  "content_aiStateTimeout": {
+    "message": "The AI took too long to answer. Try again."
+  },
+  "content_aiStateSpend": {
+    "message": "The monthly AI spending limit is reached (Gum: Settings > AI)."
+  },
+  "content_aiStateNoAnswer": {
+    "message": "The AI had no answer for this."
+  },
+  "content_aiStateFailed": {
+    "message": "The AI couldn’t answer. Try again."
   }
 }

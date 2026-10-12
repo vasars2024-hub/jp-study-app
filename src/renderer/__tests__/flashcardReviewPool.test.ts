@@ -20,7 +20,7 @@ import {
   searchDeckCards,
   type DeckFlashcard,
 } from '../flashcardDeck';
-import type { LocalSrsState } from '../shared/localSrs';
+import type { LocalSrsState } from '../../shared/localSrs';
 
 const NOW = Date.UTC(2026, 8, 7, 12);
 

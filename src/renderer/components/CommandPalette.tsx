@@ -14,8 +14,10 @@ import {
   commandIsLive,
   effectiveKeys,
   formatKeysDisplay,
+  listCustomCommands,
   runCommand,
 } from '../keyboardShortcuts';
+import { loadPaletteRecents, rankWithRecency, recordPaletteUse, RECENT_SHOWN, type PaletteRecent } from '../paletteRecents';
 import { WIDGETS } from '../widgets/registry';
 import {
   mediaWorkspaceHostIsMounted,
@@ -34,8 +36,9 @@ import { loadThemeId } from '../theme/engine';
 import { hasDiscoveredAero } from '../aeroDiscovery';
 import { hasDiscoveredWired } from '../wiredDiscovery';
 import { useT } from '../i18n';
-import { commandCategory, commandLabel } from '../commandI18n';
+import { commandCategory, commandLabel, commandNote } from '../commandI18n';
 import { scoreLabelledItem } from '../fuzzySearch';
+import './kbd5.css';
 
 type PaletteMode = 'commands' | 'search' | 'toolbox';
 
@@ -60,6 +63,11 @@ interface Item {
    * the command catalog it is for — 160 settings cards would bury it.
    */
   typedOnly?: boolean;
+  /**
+   * kbd5: what the command does — its Settings > Shortcuts note — shown under
+   * the list for the highlighted row, so the list itself stays one line a row.
+   */
+  desc?: string;
   run: () => void;
 }
 
@@ -122,6 +130,20 @@ const SECTIONS: { id: string; labelKey: string; glyph: IconName; terms?: string;
   { id: 'city', labelKey: 'palette.section.city', glyph: 'city' },
   { id: 'files', labelKey: 'palette.section.files', glyph: 'folder' },
   { id: 'visualnovels', labelKey: 'palette.section.visualnovels', glyph: 'visual-novel', termsKey: 'vnApp.paletteTerms' },
+  {
+    id: 'snips',
+    labelKey: 'palette.section.snips',
+    glyph: 'scan',
+    terms: 'snip snipping win+shift+s screenshot ocr cards',
+    termsKey: 'snip.paletteTerms',
+  },
+  {
+    id: 'conversation',
+    labelKey: 'palette.section.conversation',
+    glyph: 'chat',
+    terms: 'conversation partner chat speaking talk practice roleplay',
+    termsKey: 'aiSpeak.paletteTerms',
+  },
 ];
 
 function openSection(id: string): void {
@@ -308,6 +330,7 @@ export default function CommandPalette() {
     for (const c of COMMAND_CATALOG) {
       if (mode === 'toolbox' && c.category !== 'Toolbox') continue;
       const category = commandCategory(c.category, t);
+      const desc = commandNote(c.id, c.note, t, c.category === 'Toolbox' ? c.scope : undefined);
       out.push({
         key: `cmd-${c.id}`,
         label: commandLabel(c.id, c.label, t),
@@ -315,8 +338,26 @@ export default function CommandPalette() {
         group: t('palette.group.commands'),
         glyph: 'command',
         keys: formatKeysDisplay(effectiveKeys(c.id)) || undefined,
+        ...(desc ? { desc, terms: desc } : {}),
         run: () => void runCommand(c.id),
       });
+    }
+    // kbd5: the user's own shortcuts are commands too (they were missing here,
+    // so a macro made in Settings could only be reached by its chord).
+    if (mode !== 'toolbox') {
+      const customCategory = commandCategory('Custom', t);
+      for (const c of listCustomCommands()) {
+        out.push({
+          key: `cmd-${c.id}`,
+          // The user's own name for it, never translated.
+          label: c.label,
+          sub: customCategory,
+          group: t('palette.group.commands'),
+          glyph: 'command',
+          keys: formatKeysDisplay(effectiveKeys(c.id)) || undefined,
+          run: () => void runCommand(c.id),
+        });
+      }
     }
     if (mode !== 'toolbox') {
       for (const s of SECTIONS) {
@@ -453,18 +494,32 @@ export default function CommandPalette() {
     // the comment above), `lang` is what actually needs to trigger a redo.
   }, [open, mode, grammarItems, settingsRows, lang]);
 
+  // Read once per opening: a pick closes the palette, so nothing changes while it is up.
+  const [recents, setRecents] = useState<PaletteRecent[]>([]);
+  useEffect(() => {
+    if (open) setRecents(loadPaletteRecents());
+  }, [open]);
+
   const results = useMemo(() => {
     const q = query.trim();
-    const scored: { item: Item; score: number }[] = [];
-    for (const item of items) {
-      if (!q && item.typedOnly) continue;
-      const s = q ? scoreLabelledItem(q, item) : 0;
-      if (s != null) scored.push({ item, score: s });
+    if (!q) {
+      // kbd5: the empty palette leads with what this user picked last.
+      const byKey = new Map(items.map((item) => [item.key, item]));
+      const recentGroup = t('kbd5.palette.recent');
+      const recent = recents
+        .map((r) => byKey.get(r.key))
+        .filter((item): item is Item => !!item)
+        .slice(0, RECENT_SHOWN)
+        .map((item) => ({ ...item, group: recentGroup }));
+      const shown = new Set(recent.map((item) => item.key));
+      const rest = items.filter((item) => !item.typedOnly && !shown.has(item.key));
+      return [...recent, ...rest].slice(0, 40);
     }
-    // Stable: equal scores keep catalog order (commands, pages, widgets, …).
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, 40).map((s) => s.item);
-  }, [items, query]);
+    // Fuzzy tiers first, then frecency inside and across them; stable for ties,
+    // so equal scores keep catalog order (commands, pages, widgets, …).
+    return rankWithRecency(items, (item) => scoreLabelledItem(q, item), recents).slice(0, 40);
+    // `t` is stable; `lang` is not needed here because `items` already carries it.
+  }, [items, query, recents]);
 
   useEffect(() => {
     setSel(0);
@@ -472,6 +527,7 @@ export default function CommandPalette() {
 
   const pick = useCallback(
     (item: Item) => {
+      recordPaletteUse(item.key);
       close();
       // Run after the overlay unmounts so focus lands where the action expects.
       window.setTimeout(() => item.run(), 0);
@@ -491,6 +547,17 @@ export default function CommandPalette() {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSel((s) => Math.max(0, s - 1));
+    } else if (e.key === 'PageDown') {
+      // kbd5: keyboard-only flow over a 40-row list without 39 presses.
+      e.preventDefault();
+      setSel((s) => Math.min(results.length - 1, s + 8));
+    } else if (e.key === 'PageUp') {
+      e.preventDefault();
+      setSel((s) => Math.max(0, s - 8));
+    } else if ((e.key === 'Home' || e.key === 'End') && e.ctrlKey) {
+      // Plain Home/End stay with the caret in the query; Ctrl jumps the list.
+      e.preventDefault();
+      setSel(e.key === 'Home' ? 0 : Math.max(0, results.length - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const item = results[sel];
@@ -567,8 +634,10 @@ export default function CommandPalette() {
               key={r.key}
               id={`${listId}-opt-${i}`}
               data-idx={i}
+              data-palette-key={r.key}
               role="option"
               aria-selected={i === sel}
+              aria-describedby={i === sel && r.desc ? `${listId}-desc` : undefined}
               className={`palette-row ${i === sel ? 'active' : ''}`}
               onMouseEnter={() => setSel(i)}
               onMouseDown={(e) => e.preventDefault()}
@@ -586,6 +655,15 @@ export default function CommandPalette() {
             </li>
           ))}
         </ul>
+        {/* kbd5: the highlighted command's description, then the keyboard route. */}
+        <div className="palette-foot muted">
+          {results[sel]?.desc ? (
+            <p id={`${listId}-desc`} className="palette-desc">
+              {results[sel]?.desc}
+            </p>
+          ) : null}
+          <p className="palette-keys-hint">{t('kbd5.palette.keysHint')}</p>
+        </div>
       </div>
     </>
   );

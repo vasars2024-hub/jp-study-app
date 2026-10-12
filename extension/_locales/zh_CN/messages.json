@@ -2221,5 +2221,125 @@
   },
   "bg_recSaveInApp": {
     "message": "此录制的一部分已上传到 Gum，浏览器中已没有完整文件。请在 Gum 中打开。"
+  },
+  "content_aiExplain": {
+    "message": "结合语境解释"
+  },
+  "content_aiSuggestMeaning": {
+    "message": "建议释义（AI）"
+  },
+  "content_aiBadge": {
+    "message": "AI 生成"
+  },
+  "content_aiBusy": {
+    "message": "正在询问 AI…"
+  },
+  "content_aiRetry": {
+    "message": "重试"
+  },
+  "content_aiCancelled": {
+    "message": "已取消。"
+  },
+  "content_aiSenseFits": {
+    "message": "此处适用义项 $1"
+  },
+  "content_aiNoSenseFits": {
+    "message": "列出的义项都不适合这个句子。"
+  },
+  "content_aiConfHigh": {
+    "message": "把握：高"
+  },
+  "content_aiConfMedium": {
+    "message": "把握：中"
+  },
+  "content_aiConfLow": {
+    "message": "把握：低"
+  },
+  "content_aiDisclaimer": {
+    "message": "AI 可能出错，请对照词典核实。"
+  },
+  "content_aiMeaningLabel": {
+    "message": "建议的释义"
+  },
+  "content_aiMeaningApply": {
+    "message": "用于卡片"
+  },
+  "content_aiMeaningDismiss": {
+    "message": "忽略"
+  },
+  "content_aiMeaningApplied": {
+    "message": "保存这个词时会随卡片一起保存，并标注为 AI。"
+  },
+  "content_aiBreakdown": {
+    "message": "AI 拆解句子"
+  },
+  "content_aiSimplify": {
+    "message": "简化段落"
+  },
+  "content_aiSheetBreakdown": {
+    "message": "句子拆解"
+  },
+  "content_aiSheetSimplify": {
+    "message": "简化后的段落"
+  },
+  "content_aiOriginal": {
+    "message": "原文"
+  },
+  "content_aiSimplifiedText": {
+    "message": "AI 简化版"
+  },
+  "content_aiNotes": {
+    "message": "改动说明"
+  },
+  "content_aiTranslation": {
+    "message": "翻译"
+  },
+  "content_aiWords": {
+    "message": "逐词"
+  },
+  "content_aiEngineLocal": {
+    "message": "离线模型（数据未离开本机）"
+  },
+  "content_aiEngineCloud": {
+    "message": "云端 AI"
+  },
+  "content_aiStateOff": {
+    "message": "AI 已关闭。请在 Gum 的“设置 > AI”中开启。"
+  },
+  "content_aiStateNoKey": {
+    "message": "AI 尚未设置。请在 Gum 的“设置 > AI”中添加服务商，或安装离线模型。"
+  },
+  "content_aiStateNoLocal": {
+    "message": "尚未安装离线 AI 模型。请在 Gum 的“设置 > AI”中安装。"
+  },
+  "content_aiStateConsent": {
+    "message": "此功能未获准将文本发送到云端。请在 Gum 的“设置 > AI”中允许，或改用离线模型。"
+  },
+  "content_aiStateOffline": {
+    "message": "当前离线，无法连接云端 AI。离线模型无需联网即可使用。"
+  },
+  "content_aiStateAppClosed": {
+    "message": "Gum 未运行。打开应用即可使用 AI——词典照常可用。"
+  },
+  "content_aiStateOutdated": {
+    "message": "此版本的 Gum 不支持浏览器 AI。请更新 Gum，然后重新加载此扩展。"
+  },
+  "content_aiStateRateLimit": {
+    "message": "AI 请求过多。请稍等一分钟再试。"
+  },
+  "content_aiStateTooLong": {
+    "message": "文本太长，AI 无法处理。请选择较短的部分。"
+  },
+  "content_aiStateTimeout": {
+    "message": "AI 响应超时。请重试。"
+  },
+  "content_aiStateSpend": {
+    "message": "已达到本月 AI 花费上限（Gum：“设置 > AI”）。"
+  },
+  "content_aiStateNoAnswer": {
+    "message": "AI 对此没有答案。"
+  },
+  "content_aiStateFailed": {
+    "message": "AI 无法回答。请重试。"
   }
 }

@@ -4,7 +4,7 @@
  * Dictionary page: 食べる → entries with a pitch contour, frequency chips, POS tooltips,
  * the kanji breakdown, i+1 examples, and the "in deck" marker after adding the word.
  */
-const { installHelpers, poll } = require('./_lib.cjs');
+const { installHelpers, poll, ensureDictionaryReady } = require('./_lib.cjs');
 const fixtures = require('../fixtures.cjs');
 
 module.exports = {
@@ -35,6 +35,10 @@ module.exports = {
     const job = start?.ok ? await idle() : start;
     result.check('KANJIDIC2 excerpt imports (job committed)', start?.ok === true && job?.jobId === start.snapshot?.jobId && job?.status === 'committed', { start, job });
 
+    // A fresh profile (first boot of a new snapshot) may still be loading the built-in
+    // dictionary: the search below must not race it (seen once in a full run: no entries).
+    const dict = await ensureDictionaryReady(ctx, { word: '食べる' });
+    result.check('the built-in dictionary answers a lookup', dict.ready, dict);
     await ev(`__e2e.open('dictionary')`);
     const input = await poll(ctx, `!!document.querySelector('form.dict-search input')`, 20000);
     result.check('dictionary app opens with a search box', input);

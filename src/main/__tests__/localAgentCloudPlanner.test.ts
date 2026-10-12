@@ -187,4 +187,23 @@ describe('Agent planning without a local model', () => {
     expect(result).toMatchObject({ ok: false, code: 'ai-off' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('refuses the cloud planner, with a code, while the Agent cloud opt-in is off', async () => {
+    gate.setAiCloudFeatureReader((feature) => feature !== 'agentChat');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const result = await plan({ target: 'gemini-2.5-flash' });
+      expect(result).toMatchObject({ ok: false, code: 'cloud-disabled' });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      gate.setAiCloudFeatureReader(null);
+    }
+  });
+
+  it('accepts a plan the model wrapped in prose (audit A3)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(geminiReply(`Here is the plan:\n${PLAN}\nHope that helps.`)));
+    const result = await plan({ cloudProviderId: 'gemini-2.5-flash' });
+    expect(result).toMatchObject({ ok: true, planner: 'cloud', summary: 'List your decks.' });
+  });
 });

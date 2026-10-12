@@ -1,0 +1,182 @@
+[
+  {
+    "id": "horizontal-plain",
+    "file": "horizontal-plain.png",
+    "category": "horizontal",
+    "orientation": "horizontal",
+    "text": "今日は雨が降っているので、家で本を読みます。",
+    "width": 760,
+    "height": 90
+  },
+  {
+    "id": "horizontal-two-lines",
+    "file": "horizontal-two-lines.png",
+    "category": "horizontal",
+    "orientation": "horizontal",
+    "text": "駅の前に新しい喫茶店ができました。\nコーヒーがとても美味しいそうです。",
+    "width": 640,
+    "height": 150
+  },
+  {
+    "id": "small-14px",
+    "file": "small-14px.png",
+    "category": "small",
+    "orientation": "horizontal",
+    "text": "明日の会議は午後三時から始まります。",
+    "width": 290,
+    "height": 30
+  },
+  {
+    "id": "small-12px-two-lines",
+    "file": "small-12px-two-lines.png",
+    "category": "small",
+    "orientation": "horizontal",
+    "text": "保存する前に内容を確認してください。\n変更は自動的に記録されます。",
+    "width": 250,
+    "height": 50
+  },
+  {
+    "id": "vertical-two-columns",
+    "file": "vertical-two-columns.png",
+    "category": "vertical",
+    "orientation": "vertical",
+    "text": "春になると桜が咲きます。\nみんなで花見に行きましょう。",
+    "width": 150,
+    "height": 470
+  },
+  {
+    "id": "vertical-three-columns",
+    "file": "vertical-three-columns.png",
+    "category": "vertical",
+    "orientation": "vertical",
+    "text": "静かな夜だった。\n窓の外では雪が\n音もなく降っている。",
+    "width": 200,
+    "height": 360
+  },
+  {
+    "id": "furigana-horizontal",
+    "file": "furigana-horizontal.png",
+    "category": "furigana",
+    "orientation": "horizontal",
+    "text": "昨日、図書館で漢字を勉強した。",
+    "width": 560,
+    "height": 100
+  },
+  {
+    "id": "furigana-two-lines",
+    "file": "furigana-two-lines.png",
+    "category": "furigana",
+    "orientation": "horizontal",
+    "text": "先生は毎朝新聞を読む。\n電車の中で音楽を聴く。",
+    "width": 440,
+    "height": 170
+  },
+  {
+    "id": "manga-bubble-vertical",
+    "file": "manga-bubble-vertical.png",
+    "category": "manga",
+    "orientation": "vertical",
+    "text": "なんだって！？\nそんなはずはない",
+    "width": 220,
+    "height": 330
+  },
+  {
+    "id": "manga-shout-horizontal",
+    "file": "manga-shout-horizontal.png",
+    "category": "manga",
+    "orientation": "horizontal",
+    "text": "待ってくれ！行かないで！",
+    "width": 520,
+    "height": 110
+  },
+  {
+    "id": "low-contrast",
+    "file": "low-contrast.png",
+    "category": "lowContrast",
+    "orientation": "horizontal",
+    "text": "設定を保存しました。再起動は不要です。",
+    "width": 560,
+    "height": 70
+  },
+  {
+    "id": "low-contrast-light",
+    "file": "low-contrast-light.png",
+    "category": "lowContrast",
+    "orientation": "horizontal",
+    "text": "次の駅で降りてください。",
+    "width": 400,
+    "height": 70
+  },
+  {
+    "id": "dark-dialogue-box",
+    "file": "dark-dialogue-box.png",
+    "category": "darkBox",
+    "orientation": "horizontal",
+    "text": "「おはよう、ずっと待ってたよ。」\n少女はそう言って微笑んだ。",
+    "width": 620,
+    "height": 150
+  },
+  {
+    "id": "subtitle-outline",
+    "file": "subtitle-outline.png",
+    "category": "subtitle",
+    "orientation": "horizontal",
+    "text": "それじゃあ、また明日ね。",
+    "width": 520,
+    "height": 100
+  },
+  {
+    "id": "small-10px",
+    "file": "small-10px.png",
+    "category": "small",
+    "orientation": "horizontal",
+    "text": "音量を調整するには右のつまみを回します。",
+    "width": 220,
+    "height": 22
+  },
+  {
+    "id": "furigana-vertical",
+    "file": "furigana-vertical.png",
+    "category": "furigana",
+    "orientation": "vertical",
+    "text": "毎日日本語を練習する。\n辞書を引いて覚える。",
+    "width": 190,
+    "height": 400
+  },
+  {
+    "id": "video-jpeg",
+    "file": "video-jpeg.png",
+    "category": "subtitle",
+    "orientation": "horizontal",
+    "text": "本当にありがとうございました。",
+    "width": 560,
+    "height": 90
+  },
+  {
+    "id": "dark-low-contrast",
+    "file": "dark-low-contrast.png",
+    "category": "lowContrast",
+    "orientation": "horizontal",
+    "text": "通信が切断されました。",
+    "width": 380,
+    "height": 70
+  },
+  {
+    "id": "mixed-latin",
+    "file": "mixed-latin.png",
+    "category": "horizontal",
+    "orientation": "horizontal",
+    "text": "Wi-Fiの設定を確認してください。\nエラーコード: 404",
+    "width": 520,
+    "height": 120
+  },
+  {
+    "id": "noisy-paper",
+    "file": "noisy-paper.png",
+    "category": "noisy",
+    "orientation": "horizontal",
+    "text": "古い手紙には懐かしい名前が書いてあった。",
+    "width": 700,
+    "height": 80
+  }
+]

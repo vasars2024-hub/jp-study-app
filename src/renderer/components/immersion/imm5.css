@@ -1,0 +1,100 @@
+/* Immersion browser 7.5: reader tools, i+1 highlighting, reading list, per-site stats. */
+
+.imm5-reader-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.imm5-reader-bar button[aria-pressed='true'] { border-color: var(--accent); }
+/* Reader alone (Focus): pinned above the article while it scrolls. */
+.immersion-stage > .imm5-reader-bar { position: sticky; top: 0; z-index: 3; background: var(--panel-2); }
+/* Split view is a wrapping flex row sized to the stage: a flow item would push the
+   webview and the reader past the stage's height, so the bar floats over the reader instead. */
+.immersion-split > .imm5-reader-bar {
+  position: absolute;
+  top: 6px;
+  right: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel, var(--panel-2));
+}
+.imm5-reader-count { color: var(--text-muted); }
+
+/* Known-word coverage of the page, coloured by the extensive-reading band. */
+.imm5-reader-coverage {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--border);
+}
+.imm5-reader-coverage.is-easy { border-color: color-mix(in srgb, #10b981 60%, transparent); }
+.imm5-reader-coverage.is-comfortable { border-color: color-mix(in srgb, #84cc16 60%, transparent); }
+.imm5-reader-coverage.is-stretch { border-color: color-mix(in srgb, #f59e0b 60%, transparent); }
+.imm5-reader-coverage.is-hard { border-color: color-mix(in srgb, #ef4444 60%, transparent); }
+
+/* 縦書き: the article set vertically, read right to left, scrolled sideways. */
+.immersion-reader.imm5-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  max-width: none;
+  height: calc(100vh - 190px);
+  min-height: 280px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 24px 28px;
+  line-height: 1.9;
+}
+.immersion-reader.immersion-split-reader.imm5-vertical { height: 100%; min-height: 0; }
+.immersion-reader.imm5-vertical p { margin: 0 0 0 0.9em; }
+.immersion-reader.imm5-vertical h1 { margin: 0 0 0 1rem; }
+.immersion-reader.imm5-vertical .reader-meta { margin: 0 0 0 1.25rem; }
+.immersion-reader.imm5-vertical img,
+.immersion-reader.imm5-vertical figure { max-height: 100%; max-width: none; }
+.immersion-reader.imm5-vertical blockquote { border-left: 0; border-top: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); padding: 1rem 0.5rem 0; }
+
+/* Furigana off: same effect as the EPUB reader's hideFurigana. */
+.imm5-hide-furigana rt,
+.imm5-hide-furigana rp { display: none; }
+
+/* i+1: the sentence via the Custom Highlight API, the one unknown word via a class. */
+::highlight(imm5-iplus1) { background-color: color-mix(in srgb, #34d399 22%, transparent); }
+.imm5-iplus1-word { outline: 1px solid color-mix(in srgb, #10b981 70%, transparent); border-radius: 2px; }
+
+.imm5-reading-list ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.imm5-reading-list li { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+.imm5-reading-list li.is-read { opacity: 0.7; }
+.imm5-reading-open {
+  display: grid;
+  gap: 2px;
+  min-height: var(--lq-hit-target, 32px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  min-width: 0;
+}
+.imm5-reading-open strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imm5-reading-excerpt { color: var(--text-muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imm5-reading-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.imm5-reading-transfer { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+
+.imm5-site-stats { display: grid; gap: 6px; margin-top: 8px; font-size: 0.82rem; }
+.imm5-site-stats-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.imm5-site-stats-head [role='group'] { display: inline-flex; gap: 2px; }
+.imm5-site-stats-head button[aria-pressed='true'] { border-color: var(--accent); }
+.imm5-site-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.imm5-site-table th,
+.imm5-site-table td { padding: 2px 4px; text-align: end; border-bottom: 1px solid var(--border); }
+.imm5-site-table th[scope='row'],
+.imm5-site-table thead th:first-child { text-align: start; max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: normal; }
+.imm5-day-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; padding: 0; list-style: none; }
+.imm5-day-strip li { display: grid; justify-items: center; padding: 2px 0; border-radius: 4px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.imm5-day-label { color: var(--text-muted); font-size: 0.72rem; }
+.imm5-day-value { font-variant-numeric: tabular-nums; }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type JSX } from 'react';
 import type { EpubFilterPipelineBreakdown, EpubFilterPipelineStep } from '../../shared/mining';
 import { useT } from '../i18n';
 import type { TVars } from '../../shared/i18n/core';

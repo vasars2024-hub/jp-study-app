@@ -286,6 +286,129 @@ export function parseStudyFilterRecipe(text: string): StudyFilterRecipeParse {
   };
 }
 
+// ---- the command box: free text to one typed operation ------------------------
+
+/**
+ * The arguments `study.filter-vocabulary` accepts (`studyAgentHandlers.filterPatch`),
+ * and nothing else: a command can only ever become one of the workspace's own
+ * typed, reversible operations.
+ */
+export interface StudyCommandFilterArgs {
+  excludedJlptLevels?: string[];
+  minimumOccurrences?: number;
+  excludeKnown?: boolean;
+  excludeInternalDuplicates?: boolean;
+  excludeAnkiDuplicates?: boolean;
+  excludeProperNouns?: boolean;
+  maximumCards?: number;
+}
+
+export type StudyCommandIntent =
+  | { op: 'filter'; args: StudyCommandFilterArgs }
+  | { op: 'undo-filter' }
+  | { op: 'preview-anki' }
+  | { op: 'preview-cards' };
+
+export const STUDY_COMMAND_OPS = ['filter', 'undo-filter', 'preview-anki', 'preview-cards'] as const;
+
+const JLPT_LEVEL = /^N[1-5]$/;
+
+/**
+ * The deterministic parser the command box always tries first. It keeps every
+ * phrase the box understood before ("Remove N5 and N4 words", "Undo filter",
+ * "Preview Anki", "Show cards"), and reads any JLPT levels named, not only N5+N4.
+ * `null` means "not understood" — only then may the optional AI fallback run.
+ */
+export function parseStudyCommand(text: string): StudyCommandIntent | null {
+  const lower = text.trim().toLocaleLowerCase();
+  if (!lower) return null;
+  const levels = [...new Set([...lower.matchAll(/\bn\s?([1-5])\b/g)].map((m) => `N${m[1]}`))].sort();
+  if (/remove|exclude|drop|hide/.test(lower) && levels.length) {
+    return { op: 'filter', args: { excludedJlptLevels: levels } };
+  }
+  if (lower.includes('undo')) return { op: 'undo-filter' };
+  if (lower.includes('anki') && /preview|show|check/.test(lower)) return { op: 'preview-anki' };
+  if (/preview|show|check/.test(lower) && lower.includes('card')) return { op: 'preview-cards' };
+  return null;
+}
+
+const wholeInRange = (value: unknown, min: number, max: number): number | undefined =>
+  (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : undefined);
+
+/**
+ * Re-derives an intent from untrusted data (the AI fallback's reply). Anything
+ * outside the typed operations, or a filter that would change nothing, is `null`.
+ */
+export function normalizeStudyCommandIntent(value: unknown): StudyCommandIntent | null {
+  if (!isRecord(value)) return null;
+  const op = value.op;
+  if (op === 'undo-filter' || op === 'preview-anki' || op === 'preview-cards') return { op };
+  if (op !== 'filter') return null;
+  const raw = isRecord(value.args) ? value.args : value;
+  const args: StudyCommandFilterArgs = {};
+  if (Array.isArray(raw.excludedJlptLevels)) {
+    const levels = [...new Set(raw.excludedJlptLevels
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim().toUpperCase())
+      .filter((entry) => JLPT_LEVEL.test(entry)))].sort();
+    if (levels.length) args.excludedJlptLevels = levels;
+  }
+  const minimum = wholeInRange(raw.minimumOccurrences, 1, 50);
+  if (minimum !== undefined) args.minimumOccurrences = minimum;
+  const maximum = wholeInRange(raw.maximumCards, 1, 500);
+  if (maximum !== undefined) args.maximumCards = maximum;
+  for (const flag of ['excludeKnown', 'excludeInternalDuplicates', 'excludeAnkiDuplicates', 'excludeProperNouns'] as const) {
+    if (typeof raw[flag] === 'boolean') args[flag] = raw[flag] as boolean;
+  }
+  return Object.keys(args).length ? { op: 'filter', args } : null;
+}
+
+/** The typed operation an intent runs, and its arguments, for the agent handlers. */
+export function studyCommandOperation(
+  intent: StudyCommandIntent,
+  workspaceId: string,
+): {
+  operation: 'study.filter-vocabulary' | 'study.undo-filter' | 'study.preview-anki' | 'study.preview-cards';
+  arguments: Record<string, unknown>;
+} {
+  switch (intent.op) {
+    case 'filter':
+      return { operation: 'study.filter-vocabulary', arguments: { workspaceId, ...intent.args } };
+    case 'undo-filter':
+      return { operation: 'study.undo-filter', arguments: { workspaceId } };
+    case 'preview-anki':
+      return { operation: 'study.preview-anki', arguments: { workspaceId } };
+    default:
+      return { operation: 'study.preview-cards', arguments: { workspaceId } };
+  }
+}
+
+/** One catalog key + vars per part of the intent, so the confirmation reads in the UI language. */
+export function describeStudyCommandIntent(
+  intent: StudyCommandIntent,
+): Array<{ key: string; vars?: Record<string, string | number> }> {
+  if (intent.op !== 'filter') return [{ key: `study.command.intent.${intent.op}` }];
+  const parts: Array<{ key: string; vars?: Record<string, string | number> }> = [];
+  const { args } = intent;
+  if (args.excludedJlptLevels?.length) {
+    parts.push({ key: 'study.command.intent.levels', vars: { levels: args.excludedJlptLevels.join(', ') } });
+  }
+  if (args.minimumOccurrences !== undefined) {
+    parts.push({ key: 'study.command.intent.minimum', vars: { count: args.minimumOccurrences } });
+  }
+  if (args.maximumCards !== undefined) {
+    parts.push({ key: 'study.command.intent.maximum', vars: { count: args.maximumCards } });
+  }
+  const flag = (name: keyof StudyCommandFilterArgs, on: string, off: string): void => {
+    if (typeof args[name] === 'boolean') parts.push({ key: args[name] ? on : off });
+  };
+  flag('excludeKnown', 'study.command.intent.excludeKnown', 'study.command.intent.includeKnown');
+  flag('excludeInternalDuplicates', 'study.command.intent.excludeDuplicates', 'study.command.intent.includeDuplicates');
+  flag('excludeAnkiDuplicates', 'study.command.intent.excludeAnki', 'study.command.intent.includeAnki');
+  flag('excludeProperNouns', 'study.command.intent.excludeNames', 'study.command.intent.includeNames');
+  return parts;
+}
+
 const valueKey = (value: StudyFilterRecipeValue): string =>
   (Array.isArray(value) ? [...value].sort().join('\0') : String(value));
 

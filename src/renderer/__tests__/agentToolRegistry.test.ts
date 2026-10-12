@@ -101,6 +101,105 @@ describe('central Agent tool registry', () => {
     expect(session).toMatchObject({ reminder: 'none' });
   });
 
+  it('holds calendar writes to the Calendar form rules instead of storing broken events', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    const schedule = handlers['calendar.schedule-session']!;
+    // Shaped like a date and not one; an unreadable time; an end before the start.
+    expect(() => schedule({ title: 'x', date: '2026-02-31' })).toThrow('blanc.agent.error.calendarDate');
+    expect(() => schedule({ title: 'x', date: '2026-10-09', startTime: '7pm' })).toThrow('planner.agent.error.time');
+    expect(() => schedule({ title: 'x', date: '2026-10-09', startTime: '19:00', endTime: '18:00' }))
+      .toThrow('planner.agent.error.endBeforeStart');
+    expect(() => schedule({ title: 'x', date: '2026-10-09', recurrence: 'weekly', recurrenceEndDate: '2026-10-01' }))
+      .toThrow('planner.agent.error.repeatEnd');
+    // A loose `9:00` is padded so the agenda sorts it before `10:00`.
+    const padded = await schedule({ title: 'Read', date: '2026-10-09', startTime: '9:00', endTime: '9:45' });
+    expect(padded).toMatchObject({ startTime: '09:00', endTime: '09:45', allDay: false });
+    // No start time means an all-day entry, as the argument hint promises.
+    const allDay = await handlers['calendar.create-reminder']!({ title: 'JLPT fee', date: '2026-10-09' });
+    expect(allDay).toMatchObject({ allDay: true, category: 'reminder' });
+    // Repeats are planned, not dropped.
+    const weekly = await schedule({
+      title: 'Grammar', date: '2026-10-05', startTime: '19:00', recurrence: 'custom', recurrenceInterval: 3, category: 'exam',
+    });
+    expect(weekly).toMatchObject({ recurrence: 'custom', recurrenceInterval: 3, category: 'exam' });
+  });
+
+  it('lists occurrences in a window, recurring events expanded, and says when it cut the list', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    await handlers['calendar.schedule-session']!({ title: 'Daily', date: '2026-10-01', startTime: '07:00', recurrence: 'daily' });
+    const listed = await handlers['calendar.list']!({ from: '2026-10-01', to: '2026-10-07' }) as {
+      occurrences: Array<{ date: string }>;
+      truncated?: number;
+    };
+    expect(listed.occurrences.map((o) => o.date)).toEqual([
+      '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07',
+    ]);
+    expect(listed.truncated).toBeUndefined();
+    // A daily event over a year: 365 occurrences, listed up to the cap and the rest counted.
+    const long = await handlers['calendar.list']!({ from: '2026-10-01', to: '2027-09-30' }) as {
+      occurrences: unknown[];
+      truncated?: number;
+    };
+    expect(long.occurrences.length + (long.truncated ?? 0)).toBe(365);
+    expect(long.truncated).toBeGreaterThan(0);
+    expect(() => handlers['calendar.list']!({ from: '2026-10-07', to: '2026-10-01' })).toThrow();
+  });
+
+  it('moves events, and refuses to delete or modify what does not exist', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    const created = await handlers['calendar.schedule-session']!({
+      title: 'Review', date: '2026-10-09', startTime: '19:00', endTime: '19:30',
+    }) as { id: string };
+    const moved = await handlers['calendar.reschedule-event']!({ id: created.id, date: '2026-10-11', startTime: '20:00', endTime: '20:30' });
+    expect(moved).toMatchObject({ event: { date: '2026-10-11', startTime: '20:00', endTime: '20:30' } });
+    expect(() => handlers['calendar.reschedule-event']!({ id: created.id, date: '2026-10-11', endTime: '19:00' }))
+      .toThrow('planner.agent.error.endBeforeStart');
+    expect(() => handlers['calendar.reschedule-event']!({ id: 'nope', date: '2026-10-11' }))
+      .toThrow('planner.agent.error.eventNotFound');
+    expect(() => handlers['calendar.delete-event']!({ id: 'nope' })).toThrow('planner.agent.error.eventNotFound');
+    expect(await handlers['calendar.delete-event']!({ id: created.id })).toMatchObject({ removed: created.id });
+
+    // One date of a repeating session moves on its own; the series keeps the rest.
+    const series = await handlers['calendar.schedule-session']!({
+      title: 'Daily', date: '2026-10-05', startTime: '07:00', recurrence: 'daily', recurrenceEndDate: '2026-10-09',
+    }) as { id: string };
+    const single = await handlers['calendar.reschedule-event']!({
+      id: series.id, occurrenceDate: '2026-10-07', date: '2026-10-11', onlyThisOccurrence: true,
+    }) as { id: string; seriesId: string };
+    expect(single.seriesId).toBe(series.id);
+    const listed = await handlers['calendar.list']!({ from: '2026-10-05', to: '2026-10-11' }) as { occurrences: Array<{ id: string; date: string }> };
+    expect(listed.occurrences.filter((o) => o.id === series.id).map((o) => o.date))
+      .toEqual(['2026-10-05', '2026-10-06', '2026-10-08', '2026-10-09']);
+    expect(listed.occurrences.find((o) => o.id === single.id)?.date).toBe('2026-10-11');
+
+    const [card] = addDeckCardsTracked([{ word: '猫', reading: 'ねこ', meaning: 'cat', source: 'import' }]);
+    expect(() => handlers['flashcard.modify-cards']!({ id: 'missing', patch: { meaning: 'x' } }))
+      .toThrow('blanc.agent.error.cardNotFound');
+    expect(() => handlers['flashcard.modify-cards']!({ id: card.id, patch: { nothing: 1 } }))
+      .toThrow('planner.agent.error.emptyPatch');
+    expect(await handlers['flashcard.modify-cards']!({ id: card.id, patch: { meaning: 'a cat' } }))
+      .toMatchObject({ modified: card.id, fields: ['meaning'] });
+    expect(loadDeck().find((c) => c.id === card.id)?.meaning).toBe('a cat');
+  });
+
+  it('looks words up in the study language and says plainly when there is no entry', async () => {
+    const lookupTerm = vi.fn(async (query: string) => (
+      query === '猫' ? { query, entries: [{ term: '猫', reading: 'ねこ', senses: [] }] } : { query, entries: [] }
+    ));
+    const previous = (window as unknown as { api?: unknown }).api;
+    (window as unknown as { api: unknown }).api = { ...(previous as object), lookupTerm };
+    localStorage.setItem('jp-study-lang', 'ja');
+    try {
+      const handlers = createCentralAgentToolRegistry(t);
+      expect(await handlers['dictionary.lookup']!({ term: '猫', limit: 50 })).toMatchObject({ term: '猫', found: true });
+      expect(lookupTerm).toHaveBeenLastCalledWith('猫', 10, expect.stringMatching(/^(ja|zh|ru)$/));
+      expect(await handlers['dictionary.lookup']!({ term: 'zzz' })).toMatchObject({ found: false });
+      expect(lookupTerm).toHaveBeenLastCalledWith('zzz', 5, expect.any(String));
+    } finally {
+      (window as unknown as { api?: unknown }).api = previous;
+    }
+  });
+
   it('answers read-only stats and known-word questions', async () => {
     const handlers = createCentralAgentToolRegistry(t);
     const summary = await handlers['study.stats-summary']?.({});

@@ -23,6 +23,8 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import Icon from '../Icons';
 import { useT } from '../../i18n';
 import { parseSubtitles } from '../../subtitles';
+import { getStudyLang } from '../../studyEnvironment';
+import YoutubePreStudyPanel from './YoutubePreStudyPanel';
 import {
   CONSISTENT_CHANNEL_SHARE,
   deriveStudySignals,
@@ -711,6 +713,8 @@ export function YoutubeDiscoveryInspector({ state }: { state: YoutubeDiscoverySt
     () => (selected ? [...selected.reasons].sort((a, b) => b.points - a.points) : []),
     [selected],
   );
+  /** The candidate whose pre-study list (7.5: track picker, unknown words, i+1) is open. */
+  const [preStudyId, setPreStudyId] = useState<string | null>(null);
 
   if (!selected) {
     return (
@@ -856,7 +860,25 @@ export function YoutubeDiscoveryInspector({ state }: { state: YoutubeDiscoverySt
           <Icon name="external" size={12} />
           {t('ytDiscovery.action.openOnYoutube')}
         </button>
+        <button
+          type="button"
+          className="disc-btn"
+          data-yt5-action="prestudy"
+          aria-pressed={preStudyId === candidate.videoId}
+          onClick={() => setPreStudyId((current) => (current === candidate.videoId ? null : candidate.videoId))}
+        >
+          <Icon name="sparkle" size={12} />
+          {t('yt5.action.prestudy')}
+        </button>
       </div>
+      {preStudyId === candidate.videoId ? (
+        <YoutubePreStudyPanel
+          videoId={candidate.videoId}
+          title={candidate.title}
+          studyLang={getStudyLang() === 'zh' ? 'zh' : getStudyLang() === 'ru' ? 'ru' : 'ja'}
+          onClose={() => setPreStudyId(null)}
+        />
+      ) : null}
     </aside>
   );
 }

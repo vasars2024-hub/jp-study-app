@@ -23,9 +23,9 @@ vi.mock('../i18n', () => ({
   useT: () => ({ t: (key: string) => key, lang: 'en' }),
 }));
 
-const confirmDialog = vi.fn<() => Promise<boolean>>();
+const confirmDialog = vi.fn<(...args: unknown[]) => Promise<boolean>>();
 vi.mock('../components/ui/dialogService', () => ({
-  confirmDialog: (...args: unknown[]) => confirmDialog(...(args as [])),
+  confirmDialog: (...args: unknown[]) => confirmDialog(...args),
 }));
 
 import { EventModal, useCalendar, type CalendarState } from '../components/calendar/CalendarContent';

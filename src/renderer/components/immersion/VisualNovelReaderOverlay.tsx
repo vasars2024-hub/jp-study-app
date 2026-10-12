@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useT } from '../../i18n';
 import {
   capturesForVisualNovel,
@@ -11,11 +11,19 @@ import { isLookupClick, lookupWordFromMouseUp, noteLookupPointerDown } from '../
 import { mineVisualNovelLine } from '../../visualNovelMining';
 import DictionaryPopup from '../DictionaryPopup';
 import SentenceTranslatePopup from '../SentenceTranslatePopup';
-import { useVisualNovelCapture } from './VisualNovelCaptureControls';
+import { useVisualNovelCapture, Vn5SessionStatsLine } from './VisualNovelCaptureControls';
+import { useVn5LineStudy, Vn5LineStudyBar } from './VisualNovelLineStudy';
+import { useVn5StudyPrefs } from '../../visualNovelStudy5Prefs';
+import { VN5_HOTKEYS, vn5HotkeyAction, type Vn5HotkeyAction } from '../../../shared/visualNovelStudy5';
+import { useAiReadiness } from '../../aiSetupClient';
+import { isVnAiExplainKey, VN_AI_EXPLAIN_KEY, vnLineForMining } from '../../vnAiTranslate';
 import './visualNovelReader.css';
 
 /** The type-size glyph on the two font buttons; a symbol, not a word. */
 const FONT_GLYPH = 'A';
+
+/** The optional AI explain / translate-with-context panel: its own chunk. */
+const VisualNovelAiAssist = lazy(() => import('./VisualNovelAiAssist'));
 
 /** How many recent lines the reader keeps on screen. */
 export const READER_LINE_COUNT = 6;
@@ -38,6 +46,12 @@ export default function VisualNovelReaderOverlay() {
   const [flash, setFlash] = useState<{ id: string; key: string } | null>(null);
   const capture = useVisualNovelCapture();
   const listRef = useRef<HTMLDivElement>(null);
+  const ai = useAiReadiness();
+  const aiOn = ai.loaded && ai.enabled;
+  const aiOnRef = useRef(aiOn);
+  aiOnRef.current = aiOn;
+  /** The line the AI explain panel is about; `signal` bumps on every E / Explain press. */
+  const [aiLine, setAiLine] = useState<{ id: string; signal: number } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -67,10 +81,14 @@ export default function VisualNovelReaderOverlay() {
   const entry = database.entries.find((candidate) => candidate.id === targetId)
     ?? database.entries[0]
     ?? null;
-  const lines = useMemo(
-    () => (entry ? capturesForVisualNovel(database, entry.id).slice(-READER_LINE_COUNT) : []),
+  const allLines = useMemo(
+    () => (entry ? capturesForVisualNovel(database, entry.id) : []),
     [database, entry],
   );
+  const [studyPrefs, setStudyPrefs] = useVn5StudyPrefs();
+  // Line study holds the reader on the current line while new ones queue.
+  const lineStudy = useVn5LineStudy(allLines, studyPrefs);
+  const lines = useMemo(() => lineStudy.visible.slice(-READER_LINE_COUNT), [lineStudy.visible]);
   const newestId = lines[lines.length - 1]?.id ?? '';
 
   useEffect(() => {
@@ -78,13 +96,70 @@ export default function VisualNovelReaderOverlay() {
     if (list) list.scrollTop = list.scrollHeight;
   }, [newestId]);
 
+  // Reader hotkeys (M mine, T translate, R replay, N / Enter / → next, C copy):
+  // the whole loop without reaching for the mouse while the game has the other hand.
+  const explainLine = (line: VisualNovelTextCapture): void => {
+    setAiLine((current) => ({ id: line.id, signal: (current?.signal ?? 0) + 1 }));
+  };
+  const explainRef = useRef<() => void>(() => undefined);
+  explainRef.current = () => {
+    const line = lineStudy.current;
+    if (line) explainLine(line);
+  };
+
+  const hotkeyRef = useRef<(action: Vn5HotkeyAction) => void>(() => undefined);
+  hotkeyRef.current = (action) => {
+    const line = lineStudy.current;
+    if (!line) return;
+    if (action === 'mine') mine(line);
+    else if (action === 'translate') setTranslating(line.japanese);
+    else if (action === 'replay') lineStudy.replay();
+    else if (action === 'next') lineStudy.next();
+    else if (action === 'copy') {
+      void navigator.clipboard?.writeText(line.japanese).then(
+        () => setFlash({ id: line.id, key: 'vn5.hotkey.copied' }),
+        () => undefined,
+      );
+    }
+  };
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return;
-      if (popup || translating) {
-        setPopup(null);
-        setTranslating('');
+      if (event.key === 'Escape') {
+        if (popup || translating) {
+          setPopup(null);
+          setTranslating('');
+        }
+        return;
       }
+      if (popup || translating || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      const editable = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+      // Enter on a focused button presses the button; only a bare page takes it as "next".
+      const onControl = !!target && /^(BUTTON|A)$/.test(target.tagName) && (event.key === 'Enter' || event.key === ' ');
+      if (aiOnRef.current && isVnAiExplainKey({
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey,
+        repeat: event.repeat,
+        editable,
+      })) {
+        event.preventDefault();
+        explainRef.current();
+        return;
+      }
+      const action = vn5HotkeyAction({
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey,
+        repeat: event.repeat,
+        editable: editable || onControl,
+      });
+      if (!action) return;
+      event.preventDefault();
+      hotkeyRef.current(action);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -101,7 +176,10 @@ export default function VisualNovelReaderOverlay() {
 
   const mine = (line: VisualNovelTextCapture): void => {
     if (!entry) return;
-    void mineVisualNovelLine(entry, line).then((added) => {
+    // Unchanged unless the learner turned on automatic AI translation for lines with none.
+    void vnLineForMining(line, allLines).then((ready) => (
+      mineVisualNovelLine(entry, ready, { captures: allLines, prefs: studyPrefs })
+    )).then((added) => {
       setFlash({ id: line.id, key: added ? 'vnReader.mined' : 'vnReader.minedExists' });
       window.setTimeout(() => setFlash((current) => (current?.id === line.id ? null : current)), 1800);
     });
@@ -145,6 +223,24 @@ export default function VisualNovelReaderOverlay() {
           </button>
         </div>
       </header>
+      {entry && allLines.length > 0 && (
+        <Vn5LineStudyBar study={lineStudy} prefs={studyPrefs} onPrefs={setStudyPrefs} compact />
+      )}
+      {capturing && <Vn5SessionStatsLine captures={allLines} state={capture} />}
+      {entry && lines.length > 0 && (
+        <small className="vn-reader-keys muted" data-vn5-hotkeys="">
+          {t('vn5.hotkey.legend', {
+            mine: VN5_HOTKEYS.mine,
+            translate: VN5_HOTKEYS.translate,
+            replay: VN5_HOTKEYS.replay,
+            next: VN5_HOTKEYS.next,
+            copy: VN5_HOTKEYS.copy,
+          })}
+          {aiOn && (
+            <span data-ai-entry>{' '}{t('aiImmerse.vn.keyLegend', { key: VN_AI_EXPLAIN_KEY })}</span>
+          )}
+        </small>
+      )}
       {!entry && <p className="vn-reader-empty">{t('vnReader.noNovel')}</p>}
       {entry && !lines.length && <p className="vn-reader-empty">{t('vnReader.empty')}</p>}
       {entry && lines.length > 0 && (
@@ -164,13 +260,49 @@ export default function VisualNovelReaderOverlay() {
               {line.translation && <p className="vn-reader-translation">{line.translation}</p>}
               <div className="vn-reader-actions" onMouseUp={(event) => event.stopPropagation()}>
                 {flash?.id === line.id && <small role="status">{t(flash.key)}</small>}
-                <button type="button" onClick={() => setTranslating(line.japanese)}>{t('vnReader.translate')}</button>
-                <button type="button" className="primary" onClick={() => mine(line)}>{t('vnReader.mine')}</button>
+                <button
+                  type="button"
+                  title={line.id === lineStudy.current?.id ? t('vn5.hotkey.hint', { key: VN5_HOTKEYS.translate }) : undefined}
+                  aria-keyshortcuts={line.id === lineStudy.current?.id ? VN5_HOTKEYS.translate : undefined}
+                  onClick={() => setTranslating(line.japanese)}
+                >
+                  {t('vnReader.translate')}
+                </button>
+                <button
+                  type="button"
+                  className="primary"
+                  title={line.id === lineStudy.current?.id ? t('vn5.hotkey.hint', { key: VN5_HOTKEYS.mine }) : undefined}
+                  aria-keyshortcuts={line.id === lineStudy.current?.id ? VN5_HOTKEYS.mine : undefined}
+                  onClick={() => mine(line)}
+                >
+                  {t('vnReader.mine')}
+                </button>
+                {aiOn && (
+                  <button
+                    type="button"
+                    data-ai-entry
+                    data-vn-ai-action="explain-line"
+                    title={line.id === lineStudy.current?.id ? t('vn5.hotkey.hint', { key: VN_AI_EXPLAIN_KEY }) : undefined}
+                    aria-keyshortcuts={line.id === lineStudy.current?.id ? VN_AI_EXPLAIN_KEY : undefined}
+                    aria-expanded={aiLine?.id === line.id}
+                    onClick={() => explainLine(line)}
+                  >
+                    {t('aiImmerse.vn.explain')}
+                  </button>
+                )}
               </div>
             </article>
           ))}
         </div>
       )}
+      {aiOn && aiLine && (() => {
+        const line = allLines.find((candidate) => candidate.id === aiLine.id);
+        return line ? (
+          <Suspense fallback={null}>
+            <VisualNovelAiAssist line={line} captures={allLines} explainSignal={aiLine.signal} compact />
+          </Suspense>
+        ) : null;
+      })()}
       {popup && <DictionaryPopup {...popup} onClose={() => setPopup(null)} />}
       {translating && <SentenceTranslatePopup text={translating} onClose={() => setTranslating('')} />}
     </div>

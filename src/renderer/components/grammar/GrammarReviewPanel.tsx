@@ -15,7 +15,8 @@
  * can be typed and checked before rating. Below the card: progress per JLPT/HSK
  * level, with a way to start the next few new points of a level.
  */
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import type { GrammarSuggestedRating } from '../../../shared/aiGrammarTutor';
 import { GRAMMAR, type NormalizedGrammarPoint } from '../../data/grammar';
 import { explanationCopiesMeaning, structureCopiesTitle } from '../../data/grammar/hollow';
 import { previewSchedule } from '../../../shared/flashcardScheduling';
@@ -60,6 +61,20 @@ const RATINGS: Array<{ rating: LocalSrsRating; key: string; grade: AnswerGrade }
 /** New points a "learn next" click puts into the schedule. */
 const LEARN_BATCH = 5;
 
+/**
+ * Optional production practice (`GrammarAiTools.tsx`): write a sentence with the
+ * pattern; the AI (or, without it, the offline matcher) suggests a rating that is
+ * applied only when the learner presses it. Loaded on first use.
+ */
+const GrammarProductionAi = lazy(() => import('./GrammarAiTools').then((m) => ({ default: m.GrammarProductionAi })));
+
+/** A suggested self-grade as this card's scheduler rating (the same mapping as RATINGS). */
+const SUGGESTED_TO_RATING: Record<GrammarSuggestedRating, (typeof RATINGS)[number]> = {
+  hard: RATINGS[0],
+  okay: RATINGS[1],
+  good: RATINGS[2],
+};
+
 /** The example with its pattern blanked (front) or marked (back). */
 function ClozeSentence({ cloze, revealed, lang }: { cloze: GrammarCloze; revealed: boolean; lang: string }) {
   return (
@@ -90,6 +105,7 @@ export default function GrammarReviewPanel() {
   const [checked, setChecked] = useState<boolean | null>(null);
   const [reviewedCount, setReviewedCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const [practiceOpen, setPracticeOpen] = useState(false);
 
   const byId = useMemo(() => new Map<string, NormalizedGrammarPoint>(GRAMMAR.map((p) => [p.id, p])), []);
   const known = useMemo(() => new Set(byId.keys()), [byId]);
@@ -179,6 +195,7 @@ export default function GrammarReviewPanel() {
       setRevealed(false);
       setTyped('');
       setChecked(null);
+      setPracticeOpen(false);
       setNow(at);
     },
     [current],
@@ -325,6 +342,21 @@ export default function GrammarReviewPanel() {
                   </Button>
                 ))}
               </div>
+              {/* Optional: write your own sentence with the pattern. The suggested
+                  rating is one more button, pressed by the learner — never applied for them. */}
+              {practiceOpen ? (
+                <Suspense fallback={null}>
+                  <GrammarProductionAi
+                    point={current}
+                    ratingLabel={(suggested) => t(SUGGESTED_TO_RATING[suggested].key)}
+                    onUseRating={(suggested) => rate(SUGGESTED_TO_RATING[suggested].rating, SUGGESTED_TO_RATING[suggested].grade)}
+                  />
+                </Suspense>
+              ) : (
+                <button type="button" className="gx-review-undo-reveal" onClick={() => setPracticeOpen(true)}>
+                  {t('aiTutor.production.open')}
+                </button>
+              )}
               <button type="button" className="gx-review-undo-reveal muted" onClick={resetAnswer}>
                 {t('gram2.prompt.hideAgain')}
               </button>

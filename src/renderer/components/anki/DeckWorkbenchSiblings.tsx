@@ -17,7 +17,7 @@
  * not exist yet. Every outcome offered is a Browser query, which the search box
  * already reverses.
  */
-import { useMemo } from 'react';
+import { useMemo, type JSX } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   SIBLING_VERDICTS,

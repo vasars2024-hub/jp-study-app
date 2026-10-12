@@ -238,6 +238,13 @@ export const EXTENSION_BRIDGE_ROUTES = [
   '/v1/sentence-analysis/snapshot',
   '/v1/sentence-analysis/mine',
   '/v1/examples',
+  // Optional AI, on demand from the popup (src/main/extensionAiRoutes.ts):
+  // availability, explain-in-context, sentence breakdown, simplify, a word's meaning.
+  '/v1/ai/status',
+  '/v1/ai/explain-context',
+  '/v1/ai/breakdown',
+  '/v1/ai/simplify',
+  '/v1/ai/word-meaning',
   '/v1/playlists/status',
   '/v1/playlist',
   '/v1/video',

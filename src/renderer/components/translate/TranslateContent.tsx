@@ -108,6 +108,15 @@ export interface TranslateController {
   clipboardWatch: boolean;
   setClipboardWatch: (on: boolean) => void;
   /**
+   * risk4: whether a clipboard-triggered translation may use the pair's cloud
+   * engine. Off by default: every copy the learner makes anywhere would
+   * otherwise be sent to a cloud provider. Off means the offline engine.
+   */
+  clipboardAllowCloud?: boolean;
+  setClipboardAllowCloud?: (on: boolean) => void;
+  /** Stop the translation in progress (risk4). Nothing is retried elsewhere. */
+  cancel?: () => void;
+  /**
    * Which engine produced the result on screen, whether the offline model stood
    * in for a cloud provider, and which glossary terms it honours. Null until a
    * translation finishes (and for history rows opened without re-running).
@@ -115,11 +124,26 @@ export interface TranslateController {
   meta?: TranslateResultMeta | null;
   /** Sentences finished so far while a translation is still running (progressive display). */
   liveSegments?: TranslateSegment[];
+  /**
+   * Each aligned sentence's translation, translated back into the source
+   * language — the learner's check that the meaning survived. By row index.
+   */
+  backTranslations?: Record<number, BackTranslation>;
+  backTranslate?: (row: number) => void;
+  backTranslateAll?: () => void;
+}
+
+export interface BackTranslation {
+  status: 'busy' | 'done' | 'error';
+  text?: string;
+  error?: string;
 }
 
 /** Remembered Translate preferences. Read raw; written through the guarded writer. */
 const STYLE_KEY = 'jp-translate-style-v1';
 const CLIPBOARD_WATCH_KEY = 'jp-translate-clipboard-watch-v1';
+/** risk4: clipboard-triggered translations stay offline unless this is '1'. */
+const CLIPBOARD_CLOUD_KEY = 'jp-translate-clipboard-cloud-v1';
 /** How often the clipboard watcher asks main for the clipboard while it is on. */
 export const CLIPBOARD_WATCH_INTERVAL_MS = 1200;
 
@@ -154,15 +178,20 @@ export function useTranslate(): TranslateController {
   const [reported, setReported] = useState<TranslateSegment[] | null>(null);
   const [style, setStyleState] = useState<TranslateStyle>(() => (readPref(STYLE_KEY) === 'literal' ? 'literal' : 'natural'));
   const [clipboardWatch, setClipboardWatchState] = useState(() => readPref(CLIPBOARD_WATCH_KEY) === '1');
+  const [clipboardAllowCloud, setClipboardAllowCloudState] = useState(() => readPref(CLIPBOARD_CLOUD_KEY) === '1');
   const [meta, setMeta] = useState<TranslateResultMeta | null>(null);
   const [liveSegments, setLiveSegments] = useState<TranslateSegment[]>([]);
   const styleRef = useRef(style);
   const startedRef = useRef(false);
   const requestRef = useRef(0);
   const offModelRef = useRef<(() => void) | null>(null);
+  /** The running translation's cancel (risk4). */
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => {
     requestRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
     offModelRef.current?.();
     offModelRef.current = null;
   }, []);
@@ -226,10 +255,19 @@ export function useTranslate(): TranslateController {
    * text; a history re-run and the clipboard watcher pass theirs explicitly, so
    * they never race a state update that has not rendered yet.
    */
-  const translateText = useCallback(async (raw: string, from: TransLang, to: TransLang) => {
+  const translateText = useCallback(async (
+    raw: string,
+    from: TransLang,
+    to: TransLang,
+    how: { engine?: 'pair' | 'offline'; fresh?: boolean } = {},
+  ) => {
     const text = raw.trim();
     if (!text) return;
     const request = ++requestRef.current;
+    // A new translation replaces the running one: stop that one in main too.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setError('');
     setOutput('');
     setTranslatedInput('');
@@ -266,9 +304,14 @@ export function useTranslate(): TranslateController {
       }, undefined, {
         style: styleRef.current,
         onSegments: (s) => { segments = s; },
-        // The engine the learner chose for this pair (main resolves and enforces consent).
-        provider: TRANSLATE_PAIR_CHOICE,
+        // The engine the learner chose for this pair (main resolves and enforces
+        // consent) — or, for the clipboard watcher without its cloud opt-in, no
+        // engine at all, which main runs offline (risk4).
+        ...(how.engine === 'offline' ? {} : { provider: TRANSLATE_PAIR_CHOICE }),
         ...(glossary.length ? { glossary } : {}),
+        // "Re-run" means a new translation, not the cached one.
+        ...(how.fresh ? { fresh: true } : {}),
+        signal: controller.signal,
         onSegment: (index, segment, total) => {
           if (request !== requestRef.current) return;
           live[index] = segment;
@@ -311,14 +354,39 @@ export function useTranslate(): TranslateController {
       // Sentences shown while it ran are not a translation once it failed.
       setOutput('');
       setLiveSegments([]);
+      // `TranslationCancelledError` (translator.ts) is an AbortError.
+      if (controller.signal.aborted || (e instanceof Error && e.name === 'AbortError')) {
+        // Cancelled by the learner: not an error, and nothing ran elsewhere.
+        setError('');
+        setState('idle');
+        setMsg(t('risk4.translate.cancelled'));
+        return;
+      }
       setError(e instanceof Error ? e.message : String(e));
       setState('error');
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       if (request === requestRef.current) {
         offModelRef.current?.();
         offModelRef.current = null;
       }
     }
+  }, [t]);
+
+  /** Stop the running translation (risk4): main aborts the engine; the pane goes idle. */
+  const cancel = useCallback(() => {
+    const controller = abortRef.current;
+    if (!controller) return;
+    controller.abort();
+    abortRef.current = null;
+    requestRef.current += 1;
+    offModelRef.current?.();
+    offModelRef.current = null;
+    setOutput('');
+    setLiveSegments([]);
+    setError('');
+    setState('idle');
+    setMsg(t('risk4.translate.cancelled'));
   }, [t]);
 
   const run = useCallback(() => translateText(input, source, target), [translateText, input, source, target]);
@@ -340,7 +408,7 @@ export function useTranslate(): TranslateController {
     setTarget(e.targetLang as TransLang);
     setInput(e.sourceText);
     setTab('translate');
-    void translateText(e.sourceText, e.sourceLang as TransLang, e.targetLang as TransLang);
+    void translateText(e.sourceText, e.sourceLang as TransLang, e.targetLang as TransLang, { fresh: true });
   }
 
   function togglePin(e: TranslationHistoryEntry) {
@@ -407,8 +475,15 @@ export function useTranslate(): TranslateController {
     writeLocalStorage(CLIPBOARD_WATCH_KEY, on ? '1' : '0');
   }
 
+  function setClipboardAllowCloud(on: boolean) {
+    setClipboardAllowCloudState(on);
+    writeLocalStorage(CLIPBOARD_CLOUD_KEY, on ? '1' : '0');
+  }
+
   function clear() {
     requestRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
     offModelRef.current?.();
     offModelRef.current = null;
     setInput('');
@@ -427,14 +502,75 @@ export function useTranslate(): TranslateController {
     [state, translatedInput, output, reported],
   );
 
+  // ---- Back-translation (the learner's meaning check) ----
+  //
+  // Each sentence's translation, translated back into the source language with
+  // the engine chosen for the REVERSE pair (offline unless the learner picked
+  // otherwise for that direction — consent is per pair, so this never sends
+  // text somewhere the learner did not choose for it). Nothing is saved to the
+  // history: it is a check, not a translation the learner asked for.
+  const [backTranslations, setBackTranslations] = useState<Record<number, BackTranslation>>({});
+  const backControllers = useRef(new Set<AbortController>());
+  const backContext = useRef({ segments, source, target });
+  backContext.current = { segments, source, target };
+  useEffect(() => {
+    // A new passage (or a cleared one) makes every earlier check stale.
+    for (const controller of backControllers.current) controller.abort();
+    backControllers.current.clear();
+    setBackTranslations({});
+  }, [segments]);
+  useEffect(() => () => {
+    for (const controller of backControllers.current) controller.abort();
+  }, []);
+
+  const runBackTranslation = useCallback(async (rows: number[]) => {
+    const { segments: list, source: from, target: to } = backContext.current;
+    const controller = new AbortController();
+    backControllers.current.add(controller);
+    try {
+      for (const row of rows) {
+        const segment = list[row];
+        if (!segment?.target.trim() || controller.signal.aborted) continue;
+        setBackTranslations((prev) => ({ ...prev, [row]: { status: 'busy' } }));
+        try {
+          const text = await translateTo(segment.target, to, from, undefined, undefined, {
+            provider: TRANSLATE_PAIR_CHOICE,
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted) return;
+          setBackTranslations((prev) => ({ ...prev, [row]: { status: 'done', text } }));
+        } catch (e) {
+          if (controller.signal.aborted || (e instanceof Error && e.name === 'AbortError')) return;
+          setBackTranslations((prev) => ({
+            ...prev,
+            [row]: { status: 'error', error: e instanceof Error ? e.message : String(e) },
+          }));
+        }
+      }
+    } finally {
+      backControllers.current.delete(controller);
+    }
+  }, []);
+
+  const backTranslate = useCallback((row: number) => {
+    void runBackTranslation([row]);
+  }, [runBackTranslation]);
+
+  const backTranslateAll = useCallback(() => {
+    const rows = backContext.current.segments
+      .map((segment, row) => (segment.target.trim() && !backTranslations[row] ? row : -1))
+      .filter((row) => row >= 0);
+    if (rows.length) void runBackTranslation(rows);
+  }, [runBackTranslation, backTranslations]);
+
   // The clipboard watcher (Migaku / Yomitan's clipboard monitor). Asks main for
   // the clipboard on an interval while it is on — the IPC read works whether or
   // not this window has focus, which is the whole point: the learner copies a
   // line in their browser and the translation is waiting when they look back.
   // The first read only seeds `last`, so turning it on never translates
   // whatever happened to be on the clipboard already.
-  const watchRef = useRef({ input, output, source, translateText });
-  watchRef.current = { input, output, source, translateText };
+  const watchRef = useRef({ input, output, source, translateText, clipboardAllowCloud });
+  watchRef.current = { input, output, source, translateText, clipboardAllowCloud };
   useEffect(() => {
     if (!clipboardWatch) return;
     const read = window.api?.clipboardReadText;
@@ -464,7 +600,11 @@ export function useTranslate(): TranslateController {
       if (!accepted) return;
       setTab('translate');
       setInput(accepted);
-      void cur.translateText(accepted, cur.source, target);
+      // risk4: a copy made anywhere on the machine is not a request to send it to
+      // a cloud provider. Offline unless the learner opted in for the watcher.
+      void cur.translateText(accepted, cur.source, target, {
+        engine: cur.clipboardAllowCloud ? 'pair' : 'offline',
+      });
     };
     void tick();
     const timer = window.setInterval(() => void tick(), CLIPBOARD_WATCH_INTERVAL_MS);
@@ -505,16 +645,24 @@ export function useTranslate(): TranslateController {
     copyResult,
     clipboardWatch,
     setClipboardWatch,
+    clipboardAllowCloud,
+    setClipboardAllowCloud,
+    cancel,
     meta,
     liveSegments,
+    backTranslations,
+    backTranslate,
+    backTranslateAll,
   };
 }
 
 /**
  * The workbench's own keys, handled on the surface's root so they work from
  * the source pane, the result and the aligned list alike: Alt+M mines the
- * finished translation, Alt+C copies it. (Ctrl+Enter stays on the textarea,
- * where it has always been.) IME composition is left alone.
+ * finished translation, Alt+C copies it, Alt+B back-translates every sentence,
+ * and Escape stops a translation that is running. (Ctrl+Enter stays on the
+ * textarea, where it has always been.) IME composition is left alone — an
+ * Escape that cancels a composition must never also cancel the translation.
  */
 export function handleTranslateHotkey(
   e: {
@@ -527,17 +675,28 @@ export function handleTranslateHotkey(
     nativeEvent?: { isComposing?: boolean; keyCode?: number };
     preventDefault: () => void;
   },
-  state: Pick<TranslateController, 'mineResult' | 'copyResult'>,
+  state: Pick<TranslateController, 'mineResult' | 'copyResult'>
+    & Partial<Pick<TranslateController, 'busy' | 'cancel' | 'backTranslateAll'>>,
 ): boolean {
   if (e.nativeEvent?.isComposing || e.nativeEvent?.keyCode === 229) return false;
+  if (e.key === 'Escape' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    if (!state.busy || !state.cancel) return false;
+    e.preventDefault();
+    state.cancel();
+    return true;
+  }
   if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
-  const key = e.code === 'KeyM' || e.key.toLowerCase() === 'm'
+  const lower = e.key.toLowerCase();
+  const key = e.code === 'KeyM' || lower === 'm'
     ? 'm'
-    : e.code === 'KeyC' || e.key.toLowerCase() === 'c' ? 'c' : '';
+    : e.code === 'KeyC' || lower === 'c'
+      ? 'c'
+      : (e.code === 'KeyB' || lower === 'b') && state.backTranslateAll ? 'b' : '';
   if (!key) return false;
   e.preventDefault();
   if (key === 'm') state.mineResult();
-  else state.copyResult();
+  else if (key === 'c') state.copyResult();
+  else state.backTranslateAll?.();
   return true;
 }
 

@@ -78,6 +78,7 @@ import {
   consumePendingAeroBoot,
   consumePendingWiredBoot,
   markLockscreenUnlocked,
+  refreshLockscreenMirror,
   syncLockscreenToMain,
   AERO_ENTRY_LOCKED_EVENT,
 } from './lockscreenSettings';
@@ -236,7 +237,17 @@ export default function App() {
   const handleLockscreenUnlocked = useCallback(() => {
     applyUnlockedLocally();
     // Ensure the main window is visible if a prior floating lock widget hid it.
-    void window.api.lockscreenUnlock();
+    // lock3: main answers `ok: false` while it still holds the lock (a stale
+    // mirror, a forged session flag); then this window goes back to its PIN pad
+    // instead of showing a desktop whose every request is being held.
+    void Promise.resolve(window.api.lockscreenUnlock())
+      .then((res) => {
+        if (res && res.ok === false) {
+          lockedRef.current = true;
+          setLocked(true);
+        }
+      })
+      .catch(() => undefined);
   }, [applyUnlockedLocally]);
 
   useEffect(() => onFocusModeChanged(setFocusModeState), []);
@@ -318,6 +329,8 @@ export default function App() {
       return;
     }
     syncLockscreenToMain(undefined, shouldShowLockscreen());
+    // lock3: main is the only writer of the PIN; refresh this window's mirror.
+    void refreshLockscreenMirror();
     let alive = true;
     void window.api.lockscreenIsLocked?.()
       .then((mainLocked) => {
@@ -364,6 +377,19 @@ export default function App() {
   // this window was closed or loading. Mini View and "Companion shortcuts…"
   // from the tray land here too.
   useEffect(() => installCompanionMining(), []);
+  // Snip to cards (main/snipToCards.ts): a Win+Shift+S snip is read and its unknown
+  // words mined here, where the deck lives; main re-sends what arrived while loading.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    let dead = false;
+    void import('./snipToCards').then(({ installSnipToCards }) => {
+      if (!dead) off = installSnipToCards();
+    });
+    return () => {
+      dead = true;
+      off?.();
+    };
+  }, []);
   useEffect(() => {
     const offRun = window.api.onCompanionRunInRenderer?.((command) => {
       if (command === 'miniView.toggle') setMiniModeEnabled(!isMiniMode());
@@ -472,12 +498,14 @@ export default function App() {
             void window.api.lockscreenUnlock();
           }}
         />
-        <ToastHost />
+        <ToastHost locked />
       </>
     );
   }
 
   if (isBlancWindow()) {
+    // lock3: while locked, only the PIN pad — no popup dictionary (it reads the
+    // clipboard on its hotkey) and no media workspace behind it.
     return (
       <>
         <Suspense fallback={<LiquidLoading layout="reading" />}>
@@ -490,25 +518,24 @@ export default function App() {
             />
           )}
         </Suspense>
-        <GlobalDictionaryOverlay />
-        <ToastHost />
-        <MediaWorkspaceHost />
+        {!locked && <GlobalDictionaryOverlay />}
+        <ToastHost locked={locked} />
+        {!locked && <MediaWorkspaceHost />}
       </>
     );
   }
 
-  // PIN gate — full-screen lock UI over a pre-mounted desktop so the unlock
-  // fade never reveals an empty black canvas behind it.
+  // PIN gate — full-screen lock UI. lock3: nothing of the desktop is mounted
+  // behind it any more. It used to pre-mount the whole DesktopShell (inert) so
+  // the unlock fade had something to reveal, which meant every widget, the
+  // clipboard monitor and the reminders ran — and drew study content into the
+  // DOM — behind the PIN pad. The empty root keeps the wallpaper layer.
   if (locked && !popout && !secondary) {
     return (
       <>
-        <div className="desktop-root desktop-root--lock-prewarm" inert aria-hidden="true">
-          <AeroViewport>
-            <DesktopShell onOpenBook={setReading} />
-          </AeroViewport>
-        </div>
+        <div className="desktop-root desktop-root--lock-prewarm" aria-hidden="true" />
         <Lockscreen onUnlocked={handleLockscreenUnlocked} />
-        <ToastHost />
+        <ToastHost locked />
       </>
     );
   }

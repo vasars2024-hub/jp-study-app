@@ -52,10 +52,12 @@ import {
 import { DICT_LOOKUP_LIMIT, clampLookupLimit } from '../shared/dictionaryLookup';
 import { interlinearFallbackLang, legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
 import { cedictInterlinearLookup, lookupCedictIndex, type CedictIndex } from './dictionary/chineseLookup';
+import { resetCedictMissingReport } from './dictionary/cedictMissingNotice';
 import { buildScanPrefixes, pickLongestScanHit, SCAN_DEFAULT_MAX_LEN } from '../shared/dictScan';
 import { cleanReadingAidWords, type ReadingAidResult } from '../shared/readingAid';
 import { TATOEBA_LANG } from '../shared/studyLang';
 import {
+  chineseDictionaryAvailable,
   lookupChineseInDictionary,
   loadCedictIndex,
   readingAidFor,
@@ -1225,9 +1227,14 @@ export function registerDictionaryIpc(): void {
   // mounted (which is where the renderer-side reset lived).
   void import('./downloads').then(({ onAssetInstalled }) => {
     onAssetInstalled((id) => {
-      if (id === 'cc-cedict') resetChineseDictionaryCache();
+      if (id === 'cc-cedict') {
+        resetChineseDictionaryCache();
+        resetCedictMissingReport();
+      }
     });
   }).catch(() => { /* downloads unavailable (tests) */ });
+  // risk4: whether any Chinese dictionary can answer, for the startup prompt.
+  ipcMain.handle('dict:chineseAvailable', (): Promise<boolean> => chineseDictionaryAvailable());
   ipcMain.handle('dict:listSources', (_e, pair?: unknown) =>
     listDictionarySources(undefined, readPair(pair)));
   ipcMain.handle('dict:listPairs', () => listDictionaryPairs());

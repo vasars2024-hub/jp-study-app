@@ -86,7 +86,7 @@ function draftOf(
     revlog: [],
   };
   return buildAnkiDraft(raw, {
-    source: { kind: 'apkg', label: 'test.apkg' },
+    source: { kind: 'apkg', label: 'test.apkg', fingerprint: 'test-fingerprint' },
     normalize: NORMALIZE,
   });
 }

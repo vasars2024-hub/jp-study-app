@@ -116,7 +116,7 @@ export const BLANC_UI_RU: Catalog = {
   'blanc.shell.hide': 'Скрыть',
   'blanc.shell.exit': 'Выйти из Blanc',
   'blanc.shell.back': 'Назад',
-  'blanc.shell.searchTitle': 'Поиск в Blanc (Ctrl+F)',
+  'blanc.shell.searchTitle': 'Поиск в Blanc',
   'blanc.shell.search': 'Поиск в Blanc',
   'blanc.shell.contextTools': 'Инструменты контекста',
   'blanc.shell.exitFullscreenWorkspace': 'Выйти из полноэкранной области',

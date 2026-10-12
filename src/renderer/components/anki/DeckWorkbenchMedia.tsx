@@ -13,7 +13,7 @@
  * from a package is not a change the tray can undo, so there is no button for
  * it here and no tray kind behind one.
  */
-import { useMemo } from 'react';
+import { useMemo, type JSX } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   MEDIA_HEALTHS,

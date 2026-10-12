@@ -159,7 +159,16 @@ export interface SentenceAnalyzeRequest {
    * so a caller can never quietly opt out of them.
    */
   prefs?: SentenceAnalysisPrefs;
+  /** Skip the cache (the answer still refreshes it): what "Re-analyze" asks for. */
+  refresh?: boolean;
 }
+
+/**
+ * Bumped whenever the prompt or the parse changes, so an analysis cached under
+ * an older prompt is asked for again rather than served forever. Part of the
+ * cache key in `main/sentenceAnalysis.ts`.
+ */
+export const SENTENCE_ANALYSIS_PROMPT_VERSION = 2;
 
 /** Where the analysis was triggered from. */
 export type SentenceAnalysisSource = 'lens' | 'extension-ocr' | 'extension-selection' | 'app';
@@ -420,6 +429,14 @@ function translationInstruction(lang: string, targets: readonly TranslationLang[
     .join(' ');
 }
 
+/** Register labels a teacher of this language would actually use (no です・ます for Chinese). */
+function formalityExamples(lang: string): string {
+  const base = String(lang || '').toLowerCase().split('-')[0];
+  if (base === 'zh') return '"Colloquial (口语)", "Neutral", "Polite (您 / 请)" or "Formal / written (书面语)"';
+  if (base === 'ru') return '"Informal (ты)", "Neutral", "Polite (Вы)" or "Formal / written"';
+  return '"Casual (plain form)", "Polite (です・ます)", "Formal / written" or "Humble"';
+}
+
 export function buildSentenceAnalysisPrompt(
   req: SentenceAnalyzeRequest,
   prefs: SentenceAnalysisPrefs = DEFAULT_ANALYSIS_PREFS,
@@ -466,8 +483,8 @@ export function buildSentenceAnalysisPrompt(
   }
   if (hasSection(prefs, 'formality')) {
     parts.push(
-      '"formality": {"level", "note"}. "level" is a short label such as "Casual (plain form)", ' +
-        '"Polite (です・ます)", "Formal / written" or "Humble". "note" says who would say this ' +
+      `"formality": {"level", "note"}. "level" is a short label such as ${formalityExamples(req.lang)}. ` +
+        '"note" says who would say this ' +
         'to whom, in what setting, and what would change if the register moved up or down.',
     );
   }
@@ -682,7 +699,8 @@ export function parseSentenceAnalysis(raw: string, sentence: string): SentenceAn
   try {
     parsed = JSON.parse(stripJsonFence(cleanLlmOutput(raw)));
   } catch {
-    throw new Error('The AI returned malformed JSON. Try again.');
+    // Coded, so the surface says it in the UI language (`aiErrorCodeOf` reads `code`).
+    throw Object.assign(new Error('The AI returned malformed JSON. Try again.'), { code: 'invalid' });
   }
   const obj = (parsed && typeof parsed === 'object' ? parsed : {}) as Record<string, unknown>;
   const normalized = normalizeAnalysisText(sentence);
@@ -700,7 +718,7 @@ export function parseSentenceAnalysis(raw: string, sentence: string): SentenceAn
   };
   const hasTranslation = !!(translations.en || translations.ja || translations.zh);
   if (!hasTranslation && !result.annotations.length) {
-    throw new Error('The AI returned an empty analysis. Try again.');
+    throw Object.assign(new Error('The AI returned an empty analysis. Try again.'), { code: 'invalid' });
   }
   return result;
 }

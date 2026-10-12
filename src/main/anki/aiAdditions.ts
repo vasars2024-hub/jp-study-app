@@ -42,7 +42,9 @@ import {
   type TranslateRequestNote,
 } from '../../shared/ankiTranslate';
 import { providerKeyBucket } from '../../shared/aiProviders';
+import { aiErrorCodeOf } from '../../shared/aiErrorCodes';
 import { callAiProvider } from '../aiProviderClient';
+import { aiFeaturesEnabled } from '../aiFeatureGate';
 import { getConfiguredAiEngine, getConfiguredAiProvider } from '../mining';
 
 export interface AiAdditionsRunDeps {
@@ -88,8 +90,9 @@ async function runChunked<N extends { noteId: string }>(
           : { noteId: answer.noteId, ok: false as const, error: 'no-answer' }
       ));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      batch = group.map((note) => ({ noteId: note.noteId, ok: false as const, error: message }));
+      // A code, not the provider's English prose: the panel says it in the UI language.
+      const code = aiErrorCodeOf(error);
+      batch = group.map((note) => ({ noteId: note.noteId, ok: false as const, error: code }));
     }
     results.push(...batch);
     deps.onChunk?.(batch);
@@ -166,6 +169,9 @@ export function registerAnkiAiAdditionsIpc(): void {
     });
     if (!batchId) return empty('no-batch-id');
     if (!request) return empty('no-request');
+    // The "Use AI features" switch, said once for the whole run instead of as a
+    // failure on every chunk.
+    if (!aiFeaturesEnabled()) return empty('ai-off');
     // The local Qwen backend has no path through `callAiProvider`. Refusing is
     // the honest answer; silently billing the cloud provider the user did not
     // select is not.
@@ -181,7 +187,7 @@ export function registerAnkiAiAdditionsIpc(): void {
           apiKey,
           prompt,
           AI_ADDITIONS_SCHEMA,
-          { itemCount },
+          { itemCount, feature: 'ankiAdditions' },
         ),
         isCancelled: () => cancelled.has(batchId),
         onChunk: (batch) => progress(sender, { batchId, results: batch }),
@@ -218,6 +224,7 @@ export function registerAnkiAiAdditionsIpc(): void {
     });
     if (!batchId) return empty('no-batch-id');
     if (!request) return empty('no-request');
+    if (!aiFeaturesEnabled()) return empty('ai-off');
     if (getConfiguredAiEngine() !== 'cloud') return empty('local-engine-unsupported');
     const { providerId, apiKey } = getConfiguredAiProvider();
     if (!apiKey) return empty('no-api-key', '', providerId);
@@ -230,7 +237,7 @@ export function registerAnkiAiAdditionsIpc(): void {
           apiKey,
           prompt,
           TRANSLATE_SCHEMA,
-          { itemCount },
+          { itemCount, feature: 'ankiAdditions' },
         ),
         isCancelled: () => cancelled.has(batchId),
         onChunk: (batch) => progress(sender, { batchId, results: batch }),

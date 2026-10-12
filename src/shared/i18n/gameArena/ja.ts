@@ -223,7 +223,7 @@ export const GAME_ARENA_CHROME_JA: Catalog = {
   'games.settings.apiUrl': 'APIエンドポイント',
   'games.settings.apiKey': 'APIキー',
   'games.settings.privacy':
-    'ミラーライティングが下書きを端末外に送信するのは、APIバックエンドを選んで設定した場合だけです。ローカルバックエンドはオフラインのまま動作します。',
+    'クイックチェックはこのパソコンの外に出ません。アプリの AI は「設定 → AI」に従います（オフラインモデル、またはミラーライティングに許可したクラウドプロバイダー）。API エンドポイントに下書きを送るのは、それを選んだときだけです。',
   'games.mirror.backend.local': 'クイックチェック（すぐ採点・ダウンロード不要）',
   'games.mirror.backend.api': 'APIエンドポイント',
   'games.mirror.draft': 'あなたの文章',
@@ -277,7 +277,7 @@ export const GAME_ARENA_CHROME_JA: Catalog = {
   'games.mirror.summary.strong': 'しっかり書けています。少し磨けば課題の内容を十分に表現できています。',
   'games.mirror.summary.solid': 'まずまずの下書きです。模範解答と比べる前に、抜けた内容と文の流れを整えましょう。',
   'games.mirror.summary.early': 'まだ下書きの段階です。すべての内容を分かりやすい日本語の文で書くことに集中しましょう。',
-  'games.mirror.error.apiMissing': 'ゲームアリーナの設定で API エンドポイントとキーを設定してください。',
+  'games.mirror.error.apiMissing': 'ゲームアリーナの設定で API エンドポイントを設定してください。',
   'games.mirror.error.network': '評価リクエストが失敗しました（{status}）。',
   'games.mirror.error.schemaInvalid': '評価の応答がスコアのスキーマと一致しませんでした。',
   'games.mirror.error.requestFailed': '評価リクエストが失敗しました。',

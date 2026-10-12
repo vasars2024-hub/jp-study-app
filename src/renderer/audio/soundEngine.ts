@@ -22,6 +22,7 @@ import {
   type SoundPackManifest,
 } from './soundPack';
 import { isAeroSafeModeApplied, onAeroSafeModeChanged } from '../aeroSafeMode';
+import { isAppLockedInRenderer, onAppLockChanged } from '../appLockState';
 
 const LS_ENABLED = 'jp-os-sound-enabled';
 const LS_VOLUME = 'jp-os-sound-volume';
@@ -87,6 +88,12 @@ class SoundEngine {
 
   private enabled = true;
   private muted = false;
+  /**
+   * Gum is locked (risk4): no new cue starts, and anything already playing (an
+   * ambient bed) is silenced through the master gain until the unlock restores it.
+   * Held, not queued — a cue is about a moment that has passed by the unlock.
+   */
+  private lockSilenced = false;
   private volume = 0.7;
   private categoryVolume = new Map<SoundCategory, number>(
     SOUND_CATEGORIES.map((category) => [category, DEFAULT_CATEGORY_VOLUME[category]]),
@@ -158,9 +165,17 @@ class SoundEngine {
   isMuted(): boolean {
     return this.muted;
   }
+  /** Silence everything while the app is locked; restore the user's level after. */
+  setLockSilenced(on: boolean): void {
+    this.lockSilenced = on;
+    if (this.master && this.ctx) this.master.gain.value = on || this.muted ? 0 : this.volume;
+  }
+  isLockSilenced(): boolean {
+    return this.lockSilenced || isAppLockedInRenderer();
+  }
   setMuted(m: boolean): void {
     this.muted = m;
-    if (this.master && this.ctx) this.master.gain.value = m ? 0 : this.volume;
+    if (this.master && this.ctx) this.master.gain.value = m || this.lockSilenced ? 0 : this.volume;
     try {
       localStorage.setItem(LS_MUTED, m ? '1' : '0');
     } catch {
@@ -172,7 +187,7 @@ class SoundEngine {
   }
   setVolume(v: number): void {
     this.volume = Math.min(1, Math.max(0, v));
-    if (this.master && this.ctx && !this.muted) this.master.gain.value = this.volume;
+    if (this.master && this.ctx && !this.muted && !this.lockSilenced) this.master.gain.value = this.volume;
     try {
       localStorage.setItem(LS_VOLUME, String(this.volume));
     } catch {
@@ -203,7 +218,7 @@ class SoundEngine {
     if (!AC) return null;
     const ctx = new AC();
     const master = ctx.createGain();
-    master.gain.value = this.muted ? 0 : this.volume;
+    master.gain.value = this.muted || this.lockSilenced ? 0 : this.volume;
     master.connect(ctx.destination);
     for (const c of SOUND_CATEGORIES) {
       const g = ctx.createGain();
@@ -252,7 +267,7 @@ class SoundEngine {
     category: SoundCategory,
     opts: { freq?: number; durationMs?: number; volume?: number; type?: OscillatorType } = {},
   ): void {
-    if (!this.enabled || this.muted) return;
+    if (!this.enabled || this.muted || this.isLockSilenced()) return;
     if (!this.perfAllows(category)) return;
     const ctx = this.ensureCtx();
     if (!ctx) return;
@@ -311,7 +326,7 @@ class SoundEngine {
 
   /** Play a one-shot sound. No-op if disabled/muted/missing (e.g. silent pack). */
   async play(category: SoundCategory, name: string, opts?: PlayOptions): Promise<void> {
-    if (!this.enabled || this.muted) return;
+    if (!this.enabled || this.muted || this.isLockSilenced()) return;
     if (!this.perfAllows(category)) return;
     const url = this.packs.get(this.activePackId)?.sounds?.[category]?.[name];
     if (!url) return;
@@ -323,7 +338,8 @@ class SoundEngine {
       } catch {
         /* ignore */
       }
-      if (ctx.state !== 'running') return;
+      // `resume()` moves `state`; TS still holds the narrowing from the check above.
+      if ((ctx.state as AudioContextState) !== 'running') return;
     }
     const buf = await this.load(url);
     if (!buf) return;
@@ -370,7 +386,7 @@ class SoundEngine {
       setVolume: () => undefined,
       fadeTo: () => undefined,
     };
-    if (!this.enabled || this.muted) return silent;
+    if (!this.enabled || this.muted || this.isLockSilenced()) return silent;
     if (!this.perfAllows(category)) return silent;
     const url = this.packs.get(this.activePackId)?.sounds?.[category]?.[name];
     if (!url) return silent;
@@ -433,6 +449,9 @@ export const soundEngine = new SoundEngine();
 onAeroSafeModeChanged((state) => {
   if (state.enabled && isAeroSafeModeApplied()) soundEngine.stopAll();
 });
+
+// Locked: silent until the unlock (risk4). Lock state comes from main (appLockState.ts).
+onAppLockChanged((locked) => soundEngine.setLockSilenced(locked));
 
 /** Convenience: play a sound from anywhere. */
 export function playSound(category: SoundCategory, name: string, opts?: PlayOptions): Promise<void> {

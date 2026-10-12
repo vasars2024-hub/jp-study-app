@@ -11,7 +11,7 @@
  * Opened imperatively (`openNoteViewer`), the way `dialogService` opens its
  * dialogs, so no window or shell has to mount a host for it.
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState, type JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import { findNotebookEntry, updateNotebookEntry, type NotebookTimelineEntry } from '../../notebookTimeline';
 import { formatDate } from '../filesapp/format';
@@ -19,6 +19,10 @@ import { useT } from '../../i18n';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
 import NoteBody from './NoteBody';
+import { getStudyLang } from '../../studyEnvironment';
+
+// Writing help (docs/AI_AUDIT.md N19): loaded only when a note is being edited.
+const WritingCorrection = lazy(() => import('../speak/WritingCorrection'));
 
 export function NoteViewer({
   entry,
@@ -32,6 +36,7 @@ export function NoteViewer({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(entry.title);
   const [body, setBody] = useState(entry.detail ?? '');
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
 
   const save = (): void => {
     const next = updateNotebookEntry(current.id, { title: title.trim() || current.title, detail: body });
@@ -79,8 +84,13 @@ export function NoteViewer({
               rows={10}
               value={body}
               onChange={(e) => setBody(e.target.value)}
+              onSelect={(e) => setSelection({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd })}
             />
           </label>
+          {/* Applied corrections land in the editor only; Save still writes the note. */}
+          <Suspense fallback={null}>
+            <WritingCorrection text={body} selection={selection} studyLang={getStudyLang()} onApply={setBody} />
+          </Suspense>
         </div>
       ) : current.detail ? (
         <NoteBody text={current.detail} />

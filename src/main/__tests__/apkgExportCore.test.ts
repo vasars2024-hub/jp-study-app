@@ -124,7 +124,7 @@ describe('applyExportChanges', () => {
     const db = fixtureDb();
     const result = applyExportChanges(
       db,
-      { notes: [{ noteId: '1001', fields: ['<b>食べた</b>', 'たべた'] }], cardMoves: [] },
+      { notes: [{ noteId: '1001', fields: ['<b>食べた</b>', 'たべた'] }], cardMoves: [], deckRenames: [] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
     expect(result).toEqual({ notesUpdated: 1, cardsUpdated: 0, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
@@ -150,7 +150,7 @@ describe('applyExportChanges', () => {
     const db = fixtureDb();
     applyExportChanges(
       db,
-      { notes: [{ noteId: '1001', tags: ['core', 'verbs'] }], cardMoves: [] },
+      { notes: [{ noteId: '1001', tags: ['core', 'verbs'] }], cardMoves: [], deckRenames: [] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
     const tags = db.exec('SELECT tags, flds FROM notes WHERE id = 1001')[0]!.values[0]!;
@@ -163,7 +163,7 @@ describe('applyExportChanges', () => {
     const db = fixtureDb();
     const result = applyExportChanges(
       db,
-      { notes: [], cardMoves: [{ cardId: '5001', noteId: '1001', due: 3 }] },
+      { notes: [], cardMoves: [{ cardId: '5001', noteId: '1001', due: 3 }], deckRenames: [] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
     expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
@@ -182,6 +182,7 @@ describe('applyExportChanges', () => {
             { noteId: '9999', fields: ['x', 'y'] },
           ],
           cardMoves: [],
+          deckRenames: [],
         },
         { nowMs: NOW_MS, normalize: stripFieldHtml },
       ),
@@ -196,7 +197,7 @@ describe('applyExportChanges', () => {
     try {
       applyExportChanges(
         db,
-        { notes: [{ noteId: '1001', fields: ['only-one'] }], cardMoves: [] },
+        { notes: [{ noteId: '1001', fields: ['only-one'] }], cardMoves: [], deckRenames: [] },
         { nowMs: NOW_MS, normalize: stripFieldHtml },
       );
       expect.unreachable('should have refused');
@@ -211,7 +212,7 @@ describe('applyExportChanges', () => {
     try {
       applyExportChanges(
         db,
-        { notes: [], cardMoves: [{ cardId: '4444', noteId: '1001', due: 1 }] },
+        { notes: [], cardMoves: [{ cardId: '4444', noteId: '1001', due: 1 }], deckRenames: [] },
         { nowMs: NOW_MS, normalize: stripFieldHtml },
       );
       expect.unreachable('should have refused');
@@ -761,9 +762,10 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
 describe('verifyExportChanges', () => {
   it('confirms applied changes and catches a tampered one', () => {
     const db = fixtureDb();
-    const changes = {
+    const changes: ApkgExportChangeSet = {
       notes: [{ noteId: '1001', fields: ['食べた', 'たべた'], tags: ['core'] }],
       cardMoves: [{ cardId: '5001', noteId: '1001', due: 7 }],
+      deckRenames: [],
     };
     applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
     expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
@@ -1248,7 +1250,7 @@ describe('gate 5 end to end: tray action → change set → package → re-read'
 
   const draftOf = (db: Database): AnkiDraft =>
     buildAnkiDraft(readRawCollection(db), {
-      source: { kind: 'apkg', label: 'fixture.apkg', createdAtSec: 1_500_000_000 },
+      source: { kind: 'apkg', label: 'fixture.apkg', createdAtSec: 1_500_000_000, fingerprint: 'test-fingerprint' },
       normalize: stripFieldHtml,
     });
 

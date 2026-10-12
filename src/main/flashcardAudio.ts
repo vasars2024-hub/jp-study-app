@@ -31,6 +31,9 @@ import {
 import { writeLocalDeckApkgOffMain } from './anki/localDeckApkgHost';
 import type { LocalDeckApkgRequest } from '../shared/localDeckApkg';
 import { isLocalSrsState } from '../shared/localSrs';
+import { pickCardAiExtras } from '../shared/cardAiExtras';
+import { cardAiExtrasLabels } from '../shared/cardAiExtrasHtml';
+import { mt } from './i18n';
 import {
   MINED_MEDIA_EXTENSIONS,
   MINED_MEDIA_MAX_BYTES,
@@ -292,6 +295,7 @@ export async function exportDeckWithAudio(
   media: ReadonlyArray<{ fileName: string; sourcePath?: string; dataUrl?: string }>,
   rows?: string[][],
   schedules?: LocalDeckApkgRequest['schedules'],
+  notes?: LocalDeckApkgRequest['notes'],
 ): Promise<DeckExportResult> {
   const safeName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '') || 'deck.csv';
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -345,6 +349,7 @@ export async function exportDeckWithAudio(
         media: packagedMedia,
         nowMs: Date.now(),
         ...(schedules ? { schedules } : {}),
+        ...(notes ? { notes, notesLabels: cardAiExtrasLabels((key) => mt(key)) } : {}),
       });
       packageVerified = true;
       scheduled = packaged.scheduled ?? 0;
@@ -896,6 +901,7 @@ export function registerFlashcardAudioIpc(): void {
       media?: unknown;
       rows?: unknown;
       schedules?: unknown;
+      notes?: unknown;
     };
     return exportDeckWithAudio(
       typeof request.text === 'string' ? request.text : '',
@@ -910,6 +916,7 @@ export function registerFlashcardAudioIpc(): void {
         ? request.rows.filter((row): row is string[] => Array.isArray(row) && row.every((field) => typeof field === 'string'))
         : undefined,
       sanitizeExportSchedules(request.schedules),
+      Array.isArray(request.notes) ? request.notes.map((entry) => pickCardAiExtras(entry) ?? null) : undefined,
     );
   });
   ipcMain.handle('flashcards:revealExport', (_event, directory?: unknown) => {

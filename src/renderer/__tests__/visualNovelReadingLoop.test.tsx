@@ -10,7 +10,7 @@
  * `visualNovelRemoveReports.test.tsx`: this import graph touches `window.api`
  * at module-eval time.
  */
-import { act } from 'react';
+import { act, type JSX } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { normalizeVisualNovelDatabase, type VisualNovelDatabase } from '../../shared/visualNovel';

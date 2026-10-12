@@ -16,6 +16,7 @@ import { summarizeAnkiDeckLinks, type AnkiSyncErrorKind } from '../../../shared/
 import { ANKI_OWNS_SCHEDULING_EVENT, ankiOwnsScheduling } from '../../ankiSchedulingOwner';
 import {
   ankiPushReviewsEnabled,
+  clearAnkiFailedAnswers,
   onAnkiSyncStateChanged,
   readAnkiSyncState,
   setAnkiPushReviewsEnabled,
@@ -24,11 +25,13 @@ import {
 import {
   ankiMirrorCounts,
   clearAnkiReviewOutbox,
+  linkExistingAnkiNotesNow,
   readAnkiReviewOutbox,
   rebindAnkiSyncProfile,
   syncAnkiNow,
   type AnkiSyncRunReport,
 } from '../../ankiReviewSync';
+import type { AnkiLinkPassReport } from '../../ankiNoteLinking';
 import { loadDeck, onDeckChanged } from '../../flashcardDeck';
 import { getProfiles } from '../../profileState';
 import { onAnkiMineQueueChanged, pendingAnkiCards } from '../../studyMining';
@@ -78,6 +81,7 @@ export default function AnkiSyncStatus() {
   const [live, refresh] = useLiveSyncState();
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<AnkiSyncRunReport | null>(null);
+  const [linkReport, setLinkReport] = useState<AnkiLinkPassReport | null>(null);
   const [pushOn, setPushOn] = useState(ankiPushReviewsEnabled);
   const [ankiOwns, setAnkiOwns] = useState(ankiOwnsScheduling);
   const [deckTick, setDeckTick] = useState(0);
@@ -158,6 +162,31 @@ export default function AnkiSyncStatus() {
     if (!on) void clearAnkiReviewOutbox().then(refresh);
   };
 
+  const linkNow = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      setLinkReport(await linkExistingAnkiNotesNow());
+    } finally {
+      setBusy(false);
+      refresh();
+    }
+  };
+
+  const linkText = useMemo(() => {
+    if (!linkReport) return '';
+    if (linkReport.errorKind) {
+      const [bound = '', current = ''] = (linkReport.error ?? '').split(' -> ');
+      return t(ERROR_KEYS[linkReport.errorKind] ?? ERROR_KEYS.api, {
+        bound,
+        current,
+        detail: translateAnkiReason(linkReport.error, t) ?? '',
+      });
+    }
+    return linkReport.linkedIds.length
+      ? t('anki4.sync.link.result', { count: linkReport.linkedIds.length, looked: linkReport.looked })
+      : t('anki4.sync.link.none', { looked: linkReport.looked });
+  }, [linkReport, t, lang]);
+
   const rebind = async (): Promise<void> => {
     setBusy(true);
     try {
@@ -205,6 +234,11 @@ export default function AnkiSyncStatus() {
       {errorText && (
         <div className="status-banner warn anki-sync-error" role="alert">
           <span>{errorText}</span>
+          {state?.paused ? (
+            <span>{t('anki4.sync.paused', { count: live.outbox })}</span>
+          ) : state?.retry ? (
+            <span>{t('anki4.sync.retryAt', { count: live.outbox, time: formatWhen(state.retry.nextAt) })}</span>
+          ) : null}
           {error?.kind === 'profile-mismatch' && currentProfile && (
             <button type="button" className="btn small" disabled={busy} onClick={() => void rebind()}>
               {t('anki3.sync.rebind', { profile: currentProfile })}
@@ -230,6 +264,14 @@ export default function AnkiSyncStatus() {
         </button>
         <span className="muted" role="status" aria-live="polite">{resultText}</span>
       </div>
+
+      <div className="actions">
+        <button type="button" className="btn" disabled={busy} onClick={() => void linkNow()}>
+          {t('anki4.sync.link.now')}
+        </button>
+        <span className="muted" role="status" aria-live="polite">{linkText}</span>
+      </div>
+      <p className="muted">{pushOn || ankiOwns ? t('anki4.sync.link.hintOn') : t('anki4.sync.link.hintOff')}</p>
 
       <table className="anki-sync-decks">
         <caption>{t('anki3.sync.decks.title')}</caption>
@@ -270,6 +312,17 @@ export default function AnkiSyncStatus() {
         <>
           <h3 className="anki-sync-subhead">{t('anki3.sync.unlinked.title')}</h3>
           <p className="muted">{state.unlinked.map((card) => card.word).join(', ')}</p>
+        </>
+      )}
+
+      {state && state.failedAnswers.length > 0 && (
+        <>
+          <h3 className="anki-sync-subhead">{t('anki4.sync.failed.title')}</h3>
+          <p className="muted">{t('anki4.sync.failed.hint')}</p>
+          <p>{state.failedAnswers.map((answer) => answer.word || answer.cardId).join(', ')}</p>
+          <button type="button" className="btn small" disabled={busy} onClick={() => void clearAnkiFailedAnswers().then(refresh)}>
+            {t('anki4.sync.failed.clear')}
+          </button>
         </>
       )}
     </div>

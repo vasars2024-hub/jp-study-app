@@ -134,8 +134,10 @@ export interface SubtitleDiscoverySettings {
    */
   autoTranslate: boolean;
   /**
-   * `auto`: a configured cloud key (Gemini / DeepSeek), else the offline model.
-   * `cloud` / `local`: only that engine.
+   * `local` (the default): the offline model only — nothing leaves the computer.
+   * `auto`: the app's AI provider when the user allowed subtitle translation to
+   * use the cloud (Settings > AI, or Translate consent for that provider), else
+   * the offline model. `cloud`: only that, under the same opt-in.
    */
   translationEngine: SubtitleTranslationEnginePreference;
   /**
@@ -172,7 +174,10 @@ export const DEFAULT_SUBTITLE_DISCOVERY_SETTINGS: SubtitleDiscoverySettings = {
   autoTranscribe: false,
   helperLanguage: 'en',
   autoTranslate: true,
-  translationEngine: 'auto',
+  // Offline by default (audit F1): background translation of whole episodes is
+  // the one AI path the user never pressed a button for, so it must not reach
+  // the cloud until they opt in.
+  translationEngine: 'local',
   autoStudyTrack: true,
   dismissedNotices: [],
   style: 'full',

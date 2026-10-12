@@ -18,7 +18,7 @@ import { summarizeReadingLensConfidence } from '../../shared/readingLensConfiden
 import type { LensDockPreference } from '../../shared/readingLensRegion';
 
 const CONFIDENCE = summarizeReadingLensConfidence([
-  { text: '猫', box: [0, 0, 10, 10], vertical: false, confidence: 0.9 },
+  { confidence: 0.9 },
 ]);
 
 let root: Root | null = null;
@@ -58,6 +58,7 @@ async function renderChrome(props: {
         onAskAgent={() => undefined}
         visualNovelSaveState="idle"
         onSaveToVisualNovel={() => undefined}
+        onOpenRead={() => undefined}
         {...props}
       />,
     );

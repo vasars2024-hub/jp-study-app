@@ -4,7 +4,7 @@
  * the text under the row's properties. Only for rows the Notebook timeline
  * owns (`source: 'notebook'`) — everything else in Files keeps its own panel.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import type { FilesItem } from '../../../shared/filesApp/catalog';
 import { findNotebookEntry, onNotebookTimelineChanged } from '../../notebookTimeline';
 import { useT } from '../../i18n';

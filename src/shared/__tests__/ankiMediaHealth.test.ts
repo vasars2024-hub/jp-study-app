@@ -204,7 +204,7 @@ function rawWith(
 
 function draftOf(raw: RawAnkiCollection): AnkiDraft {
   return buildAnkiDraft(raw, {
-    source: { kind: 'apkg', label: 'test.apkg' },
+    source: { kind: 'apkg', label: 'test.apkg', fingerprint: 'test-fingerprint' },
     normalize: (v) => v.replace(/<[^>]*>/g, '').trim(),
   });
 }

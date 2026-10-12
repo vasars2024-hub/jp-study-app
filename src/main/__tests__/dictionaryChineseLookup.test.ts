@@ -212,6 +212,29 @@ describe('lookupChineseTerm — database first, CC-CEDICT second', () => {
     expect(result.missingSourceLangs).toEqual(['zh']);
   });
 
+  it('a missing Chinese dictionary is reported to main\'s prompt hook (risk4); a plain miss is not', async () => {
+    const onMissing = vi.fn();
+    const missing = await lookupChineseTerm('传统', deps({
+      loadCedictText: async () => { throw new CedictNotInstalledError(); },
+      onMissing,
+    }));
+    expect(missing.missingSourceLangs).toEqual(['zh']);
+    expect(onMissing).toHaveBeenCalledTimes(1);
+    importCedict(db, CEDICT_TEXT, { dictId: 'cc-cedict' });
+    await lookupChineseTerm('不存在的词', deps({
+      loadCedictText: async () => { throw new CedictNotInstalledError(); },
+      onMissing,
+    }));
+    expect(onMissing).toHaveBeenCalledTimes(1);
+    // A throwing hook never changes the answer.
+    const still = await lookupChineseTerm('传统', deps({
+      db: () => null,
+      loadCedictText: async () => { throw new CedictNotInstalledError(); },
+      onMissing: () => { throw new Error('no windows'); },
+    }));
+    expect(still.missingSourceLangs).toEqual(['zh']);
+  });
+
   it('is a plain miss, not a missing dictionary, when the database has a Chinese one', async () => {
     importCedict(db, CEDICT_TEXT, { dictId: 'cc-cedict' });
     const notInstalled = deps({ loadCedictText: async () => { throw new CedictNotInstalledError(); } });

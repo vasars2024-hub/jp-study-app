@@ -145,6 +145,7 @@ import {
   type UserWallpaper,
 } from '../wallpaperLibrary';
 import { t as translate, useT } from '../i18n';
+import { withShortcut } from '../shortcutHints';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import {
   isReadingWorkspaceOpenDetail,
@@ -158,7 +159,9 @@ type WinSection =
   | 'player' | 'video' | 'music' | 'anki' | 'flashcards' | 'stats' | 'resources' | 'settings' | 'note'
   | 'games' | 'visualizer' | 'musicwidget' | 'city' | 'immersion' | 'calendar' | 'reading' | 'youtube'
   | 'scraper'
-  | 'visualnovels';
+  | 'visualnovels'
+  | 'snips'
+  | 'conversation';
 
 interface Win {
   id: string;
@@ -252,6 +255,10 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'files', labelKey: 'palette.section.files', glyph: 'folder' },
   { id: 'anki', labelKey: 'palette.section.anki', glyph: 'anki' },
   { id: 'flashcards', labelKey: 'palette.section.flashcards', glyph: 'flashcards' },
+  // Snip to cards: Win+Shift+S snips, read and turned into cards.
+  { id: 'snips', labelKey: 'palette.section.snips', glyph: 'scan' },
+  // The conversation partner (docs/AI_AUDIT.md N20).
+  { id: 'conversation', labelKey: 'palette.section.conversation', glyph: 'chat' },
   { id: 'games', labelKey: 'palette.section.games', glyph: 'dice' },
   { id: 'stats', labelKey: 'palette.section.stats', glyph: 'stats' },
   { id: 'calendar', labelKey: 'palette.section.calendar', glyph: 'calendar' },
@@ -4270,7 +4277,7 @@ function TrayOverflow({
     { id: 'widgets', label: t('desktop.widgets'), icon: <Icon name="app" size={18} />, popup: true, expanded: galleryOpen, run: onWidgets },
     {
       id: 'clipboard',
-      label: t('desktop.clipboardHistory'),
+      label: withShortcut(t('desktop.clipboardHistory'), 'clipboard.open'),
       icon: <Icon name="clipboard" size={18} />,
       popup: true,
       run: () => window.dispatchEvent(new CustomEvent('clipboard:open')),
@@ -4359,7 +4366,7 @@ const FloatingWindow = memo(function FloatingWindow({
   animPhase: WinAnimPhase | null;
   focused: boolean;
   hidden: boolean;
-  deskRef: React.RefObject<HTMLDivElement>;
+  deskRef: React.RefObject<HTMLDivElement | null>;
   noteColor?: string;
   onNoteColor?: (color: string) => void;
   /** shell2: right-click on the title bar opens the same menu as the taskbar entry. */

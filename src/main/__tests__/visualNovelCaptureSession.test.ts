@@ -236,3 +236,45 @@ describe('Test capture', () => {
     expect(h.session.state().lastLine?.speaker).toBe('ダル');
   });
 });
+
+describe('line cleanup and filters in the session', () => {
+  it('cleans hooker garbage, applies the user rules, and counts what it threw away', () => {
+    const h = harness();
+    h.session.start('vn-1', {
+      clipboard: false,
+      websocket: false,
+      lineFilters: {
+        collapseRepeats: true,
+        stripRuby: true,
+        dedupeRecent: false,
+        rules: [
+          { pattern: '^\\[\\d+\\]', mode: 'remove', enabled: true },
+          { pattern: 'セーブ', mode: 'drop', enabled: true },
+        ],
+      },
+    });
+    h.session.receive('ここんんににちちはは​', 'websocket');
+    h.advance(1_000);
+    h.session.receive('[12]｜吾輩《わがはい》は猫である。', 'websocket');
+    h.advance(1_000);
+    h.session.receive('セーブしました。', 'websocket');
+    expect(h.saved.map((s) => s.lines[0].japanese)).toEqual(['こんにちは', '吾輩は猫である。']);
+    expect(h.session.state().filtered).toBe(1);
+  });
+
+  it('drops a line repeated within the recent window only when asked to', () => {
+    const h = harness();
+    const base = { collapseRepeats: true, stripRuby: true, rules: [] };
+    h.session.start('vn-1', { clipboard: false, websocket: false, lineFilters: { ...base, dedupeRecent: true } });
+    for (const text of ['一行目。', '二行目。', '一行目。']) {
+      h.session.receive(text, 'websocket');
+      h.advance(1_000);
+    }
+    expect(h.saved.map((s) => s.lines[0].japanese)).toEqual(['一行目。', '二行目。']);
+    expect(h.session.state().filtered).toBe(1);
+    // Settings change mid-session: the duplicate filter goes away at once.
+    h.session.setLineFilters({ ...base, dedupeRecent: false });
+    h.session.receive('二行目。', 'websocket');
+    expect(h.saved).toHaveLength(3);
+  });
+});

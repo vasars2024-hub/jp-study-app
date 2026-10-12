@@ -107,6 +107,7 @@ import { installSettingsLinkRelay } from './settingsDeepLink';
 const VisualNovelReaderOverlay = React.lazy(() => import('./components/immersion/VisualNovelReaderOverlay'));
 const CaptionsOverlay = React.lazy(() => import('./captions/CaptionsOverlay'));
 const CompanionOverlay = React.lazy(() => import('./components/companion/CompanionOverlay'));
+const SnipToastWindow = React.lazy(() => import('./components/snip/SnipToastWindow'));
 const RegionSelectOverlay = React.lazy(() => import('./recorder/RegionSelectOverlay'));
 const RecorderPanel = React.lazy(() => import('./recorder/RecorderPanel'));
 const RecorderFrame = React.lazy(() => import('./recorder/RecorderFrame'));
@@ -198,6 +199,12 @@ const companionKind =
 const isCompanionSurface = companionKind === 'wheel' || companionKind === 'preview' || companionKind === 'notice';
 if (isCompanionSurface) {
   document.documentElement.classList.add('companion-window');
+}
+// Snip to cards' toast over other apps (main/snipToCards.ts). Same rule as the overlays above.
+const isSnipToast =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('snipToast') === '1';
+if (isSnipToast) {
+  document.documentElement.classList.add('snip-toast-window');
 }
 
 // The Region Recorder's windows (main/regionRecorder.ts): the region picker, the hidden
@@ -339,7 +346,7 @@ runWhenIdle(() => {
   installShellSounds();
 }, 3000);
 
-if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !isCaptionsOverlay && !isAudioCapture && !isCompanionSurface && !isRegionRecorder) {
+if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !isCaptionsOverlay && !isAudioCapture && !isCompanionSurface && !isRegionRecorder && !isSnipToast) {
   bootCustomCss();
   // Theme Studio's active theme was painted only while Settings > Appearance was
   // open, so a restart dropped it until then. Paint it at boot like the sandbox.
@@ -373,6 +380,10 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !i
     void import('./soundscape/focusSoundscape')
       .then(({ installFocusSoundscape }) => installFocusSoundscape())
       .catch((err) => console.warn('[soundscape:focus-link]', err));
+    // snd5: scene presets that follow reading / review / listening (off by default).
+    void import('./soundscape/studyModeSoundscape')
+      .then(({ installStudyModeSoundscape }) => installStudyModeSoundscape())
+      .catch((err) => console.warn('[soundscape:study-modes]', err));
   }, 4000);
   runWhenIdle(() => {
     // Move legacy localStorage data into IndexedDB after the shell can respond.
@@ -444,6 +455,17 @@ if (container) {
           <AppErrorBoundary>
             <React.Suspense fallback={null}>
               <CompanionOverlay kind={companionKind ?? ''} />
+            </React.Suspense>
+          </AppErrorBoundary>,
+        ),
+      );
+    } else if (isSnipToast) {
+      // Undo / Open go through main to the main window; nothing else boots.
+      createRoot(container).render(
+        withStrictMode(
+          <AppErrorBoundary>
+            <React.Suspense fallback={null}>
+              <SnipToastWindow />
             </React.Suspense>
           </AppErrorBoundary>,
         ),

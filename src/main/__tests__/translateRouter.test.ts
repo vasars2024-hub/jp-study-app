@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  TranslateCancelledError,
   TranslateRouteError,
   registerTranslateProviderIpc,
   resetTranslateProviderSettingsCache,
@@ -242,6 +243,129 @@ describe('DeepL', () => {
   });
 });
 
+describe('DeepL spending is recorded (risk4)', () => {
+  it('a Pro key adds the character-priced cost to the ledger once DeepL accepts the request', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ translations: [{ text: 'I like cats.' }] }));
+    const recordSpend = vi.fn();
+    const spendAllows = vi.fn((cost: number | undefined) => typeof cost === 'number');
+    await routeTranslation(
+      { text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' },
+      {
+        local: fakeLocal(), fetchImpl: fetchImpl as unknown as typeof fetch, readDeeplKey: () => 'pro-key',
+        spendAllows, recordSpend, settings: () => settingsWith(['deepl']), unpaced: true,
+      },
+    );
+    const estimated = spendAllows.mock.calls[0][0] as number;
+    expect(estimated).toBeCloseTo(5 * 25 / 1_000_000);
+    expect(recordSpend).toHaveBeenCalledTimes(1);
+    expect(recordSpend).toHaveBeenCalledWith('deepl', estimated);
+  });
+
+  it('a Free (:fx) key is recorded as a request costing nothing', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ translations: [{ text: 'I like cats.' }] }));
+    const recordSpend = vi.fn();
+    await routeTranslation(
+      { text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' },
+      {
+        local: fakeLocal(), fetchImpl: fetchImpl as unknown as typeof fetch, readDeeplKey: () => 'k:fx',
+        spendAllows: () => true, recordSpend, settings: () => settingsWith(['deepl']), unpaced: true,
+      },
+    );
+    expect(recordSpend).toHaveBeenCalledWith('deepl', 0);
+  });
+
+  it('nothing is recorded for a refused or failed request', async () => {
+    const recordSpend = vi.fn();
+    const base = {
+      local: fakeLocal(), readDeeplKey: () => 'pro-key', recordSpend,
+      settings: () => settingsWith(['deepl']), unpaced: true, localAvailable: () => true,
+    };
+    await routeTranslation({ text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' }, {
+      ...base, fetchImpl: vi.fn() as unknown as typeof fetch, spendAllows: () => false,
+    });
+    await routeTranslation({ text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' }, {
+      ...base, fetchImpl: vi.fn(async () => new Response('', { status: 429 })) as unknown as typeof fetch, spendAllows: () => true,
+    });
+    expect(recordSpend).not.toHaveBeenCalled();
+  });
+
+  it('the ceiling sees what was recorded: a real spend guard refuses once the month is used up', async () => {
+    const { setAgentSpendGuard } = await import('../providerRuntime');
+    const { agentSpendVerdict, recordAgentSpend, agentSpendPeriod } = await import('../../shared/agentSpendLedger');
+    let ledger = { version: 1 as const, entries: [] as never[], budgetUsd: 0.0002 } as Parameters<typeof recordAgentSpend>[0];
+    setAgentSpendGuard({
+      verdict: (cost) => agentSpendVerdict(ledger, agentSpendPeriod(Date.now()), cost),
+      record: (id, cost) => { ledger = recordAgentSpend(ledger, id, cost, Date.now()); },
+    });
+    try {
+      const fetchImpl = vi.fn(async () => jsonResponse({ translations: [{ text: 'I like cats.' }] }));
+      const deps = {
+        local: fakeLocal(), fetchImpl: fetchImpl as unknown as typeof fetch, readDeeplKey: () => 'pro-key',
+        settings: () => settingsWith(['deepl']), unpaced: true, localAvailable: () => true,
+      };
+      const text = '猫'.repeat(5); // 5 chars = $0.000125
+      expect((await routeTranslation({ text, source: 'ja', target: 'en', provider: 'deepl' }, deps)).meta.provider).toBe('deepl');
+      expect(ledger.entries).toEqual([expect.objectContaining({ providerId: 'deepl', requests: 1 })]);
+      const second = await routeTranslation({ text, source: 'ja', target: 'en', provider: 'deepl' }, deps);
+      expect(second.meta).toMatchObject({ provider: 'local', fallbackCode: 'spend' });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    } finally {
+      setAgentSpendGuard(null);
+    }
+  });
+});
+
+describe('cancel (risk4)', () => {
+  it('aborts the DeepL request and never falls back to the offline model', async () => {
+    const controller = new AbortController();
+    const local = fakeLocal();
+    const fetchImpl = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    }));
+    const run = routeTranslation(
+      { text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl', signal: controller.signal },
+      {
+        local, fetchImpl: fetchImpl as unknown as typeof fetch, readDeeplKey: () => 'k:fx', spendAllows: () => true,
+        settings: () => settingsWith(['deepl']), unpaced: true, localAvailable: () => true,
+      },
+    );
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalled());
+    controller.abort();
+    await expect(run).rejects.toBeInstanceOf(TranslateCancelledError);
+    expect(local).not.toHaveBeenCalled();
+  });
+
+  it('hands the signal to the cloud runtime and to the local runner', async () => {
+    const controller = new AbortController();
+    const runCloud = vi.fn(async (req: { signal?: AbortSignal }) => {
+      expect(req.signal).toBe(controller.signal);
+      return { text: '[1] I like cats.' } as never;
+    });
+    await routeTranslation(
+      { text: '猫が好き。', source: 'ja', target: 'en', provider: 'gemini-2.5-flash', signal: controller.signal },
+      { local: fakeLocal(), runCloud: runCloud as never, cloudConfigured: () => true, settings: () => settingsWith(['gemini-2.5-flash']), unpaced: true },
+    );
+    expect(runCloud).toHaveBeenCalled();
+    const local = vi.fn(async (args: { signal?: AbortSignal; text: string }) => {
+      expect(args.signal).toBe(controller.signal);
+      return { text: 'x', segments: [] };
+    });
+    await routeTranslation({ text: '猫', source: 'ja', target: 'en', signal: controller.signal }, { local, unpaced: true, settings: () => settingsWith() });
+    expect(local).toHaveBeenCalled();
+  });
+
+  it('an already-cancelled request does nothing at all', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const local = fakeLocal();
+    await expect(routeTranslation(
+      { text: '猫', source: 'ja', target: 'en', signal: controller.signal },
+      { local, unpaced: true, settings: () => settingsWith() },
+    )).rejects.toBeInstanceOf(TranslateCancelledError);
+    expect(local).not.toHaveBeenCalled();
+  });
+});
+
 describe('cloud LLMs', () => {
   it('streams: each sentence is reported as its line arrives, before the request resolves', async () => {
     const order: string[] = [];
@@ -337,7 +461,12 @@ describe('the higher-quality local tier', () => {
       { local, largeModel: () => null, settings: () => settingsWith(), unpaced: true, localAvailable: () => true },
     );
     expect(local.mock.calls[0][0].modelFileName).toBeUndefined();
-    expect(result.meta).toEqual({ provider: 'local', fallbackFrom: 'local-large', fallbackCode: 'not-installed' });
+    expect(result.meta).toEqual({
+      provider: 'local',
+      fallbackFrom: 'local-large',
+      fallbackCode: 'not-installed',
+      attempts: [{ provider: 'local-large', code: 'not-installed' }],
+    });
   });
 
   it('only picks models the catalog names, preferring 8B', () => {
@@ -379,5 +508,136 @@ describe('IPC: choice and consent are main\'s to enforce', () => {
     ]);
     expect(snap.providers.find((p) => p.id === 'local')).toMatchObject({ ready: false, reason: 'not-installed' });
     expect(snap.providers.find((p) => p.id === 'deepl')).toMatchObject({ ready: false, reason: 'no-key' });
+  });
+});
+
+describe('offline, and the chain of engines tried', () => {
+  it('does not try a cloud engine while offline, and says so instead of timing out', async () => {
+    const fetchImpl = vi.fn();
+    const result = await routeTranslation(
+      { text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' },
+      {
+        local: fakeLocal(), fetchImpl, readDeeplKey: () => 'k', spendAllows: () => true,
+        settings: () => settingsWith(['deepl']), unpaced: true, localAvailable: () => true, isOnline: () => false,
+      },
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result.meta).toMatchObject({
+      provider: 'local', fallbackFrom: 'deepl', fallbackCode: 'offline', attempts: [{ provider: 'deepl', code: 'offline' }],
+    });
+  });
+
+  it('calls a dropped connection offline, not a server problem, when the network is gone', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    let online = true;
+    const deps = {
+      local: fakeLocal(), fetchImpl: fetchImpl as unknown as typeof fetch, readDeeplKey: () => 'k', spendAllows: () => true,
+      settings: () => settingsWith(['deepl']), unpaced: true, localAvailable: () => true, isOnline: () => online,
+    };
+    const a = await routeTranslation({ text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' }, deps);
+    expect(a.meta.fallbackCode).toBe('network');
+    online = false;
+    // Went offline mid-request: the check before sending passed, the fetch failed.
+    deps.isOnline = (() => {
+      let calls = 0;
+      return () => (calls++ === 0);
+    })();
+    const b = await routeTranslation({ text: '犬が好き。', source: 'ja', target: 'en', provider: 'deepl' }, deps);
+    expect(b.meta.fallbackCode).toBe('offline');
+  });
+
+  it('names both engines when the offline model cannot stand in either', async () => {
+    const local = vi.fn(async () => {
+      throw new Error('The translation model is not installed.');
+    });
+    const fetchImpl = vi.fn(async () => new Response('', { status: 456 }));
+    const error = await routeTranslation(
+      { text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' },
+      {
+        local, fetchImpl: fetchImpl as unknown as typeof fetch, readDeeplKey: () => 'k', spendAllows: () => true,
+        settings: () => settingsWith(['deepl']), unpaced: true, localAvailable: () => true,
+      },
+    ).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(TranslateRouteError);
+    expect(error).toMatchObject({
+      provider: 'deepl',
+      code: 'quota',
+      attempts: [{ provider: 'deepl', code: 'quota' }, { provider: 'local', code: 'not-installed' }],
+    });
+  });
+
+  it('lists the missing offline model in the chain when it was never there to try', async () => {
+    const fetchImpl = vi.fn(async () => new Response('', { status: 403 }));
+    const error = await routeTranslation(
+      { text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' },
+      {
+        local: fakeLocal(), fetchImpl: fetchImpl as unknown as typeof fetch, readDeeplKey: () => 'k', spendAllows: () => true,
+        settings: () => settingsWith(['deepl']), unpaced: true, localAvailable: () => false,
+      },
+    ).catch((err: unknown) => err);
+    expect(error).toMatchObject({
+      code: 'auth',
+      attempts: [{ provider: 'deepl', code: 'auth' }, { provider: 'local', code: 'not-installed' }],
+    });
+  });
+});
+
+describe('the workbench cache', () => {
+  async function cacheDeps() {
+    const { TranslateResultCache } = await import('../../shared/translateCache');
+    const fetchImpl = vi.fn(async () => jsonResponse({ translations: [{ text: 'I like cats.' }] }));
+    const local = fakeLocal();
+    return {
+      fetchImpl,
+      local,
+      deps: {
+        local, fetchImpl: fetchImpl as unknown as typeof fetch, readDeeplKey: () => 'k:fx', spendAllows: () => true,
+        settings: () => settingsWith(['deepl']), unpaced: true, localAvailable: () => true,
+        cache: new TranslateResultCache(),
+      },
+    };
+  }
+
+  it('answers a repeated passage from the cache without sending it again, streaming its sentences', async () => {
+    const { fetchImpl, deps } = await cacheDeps();
+    const first = await routeTranslation({ text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' }, deps);
+    const seen: string[] = [];
+    const second = await routeTranslation(
+      { text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl', onSegment: (_i, s) => seen.push(s.target) },
+      deps,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(first.meta.cached).toBeUndefined();
+    expect(second).toMatchObject({ text: 'I like cats.', meta: { provider: 'deepl', cached: true } });
+    expect(seen).toEqual(['I like cats.']);
+  });
+
+  it('keys on style, glossary and engine, and `fresh` bypasses the lookup', async () => {
+    const { fetchImpl, local, deps } = await cacheDeps();
+    const base = { text: '先輩は猫が好き。', source: 'ja', target: 'en' } as const;
+    await routeTranslation({ ...base, provider: 'deepl' }, deps);
+    await routeTranslation({ ...base, provider: 'deepl', style: 'literal' }, deps);
+    await routeTranslation({ ...base, provider: 'deepl', glossary: [{ source: '先輩', target: 'senpai' }] }, deps);
+    await routeTranslation({ ...base, provider: 'deepl', fresh: true }, deps);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    await routeTranslation({ ...base }, deps);
+    await routeTranslation({ ...base }, deps);
+    expect(local).toHaveBeenCalledTimes(1);
+  });
+
+  it('never stores a fallback under the engine that failed', async () => {
+    const { local, deps } = await cacheDeps();
+    deps.fetchImpl = vi.fn(async () => new Response('', { status: 429 })) as unknown as typeof fetch;
+    const a = await routeTranslation({ text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' }, deps);
+    expect(a.meta.fallbackFrom).toBe('deepl');
+    deps.fetchImpl = vi.fn(async () => jsonResponse({ translations: [{ text: 'I like cats.' }] })) as unknown as typeof fetch;
+    const b = await routeTranslation({ text: '猫が好き。', source: 'ja', target: 'en', provider: 'deepl' }, deps);
+    expect(b.meta).toEqual({ provider: 'deepl' });
+    // …but the offline stand-in is a real offline translation, reused offline.
+    const c = await routeTranslation({ text: '猫が好き。', source: 'ja', target: 'en' }, deps);
+    expect(c.meta).toMatchObject({ provider: 'local', cached: true });
+    expect(local).toHaveBeenCalledTimes(1);
   });
 });

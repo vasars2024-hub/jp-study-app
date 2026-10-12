@@ -24,10 +24,10 @@ const REPO = resolve(__dirname, '../../..');
 const TOOL = join(REPO, 'tools', 'i18n-shadow-check.cjs');
 const VICTIM = join(REPO, 'src', 'renderer', 'components', 'MiniShell.tsx');
 
-/** `--file` mode, which never touches the baseline, so this is read-only. */
-function runOnFile(rel: string): string {
+/** `--file` mode (relative to src/, or absolute), which never touches the baseline, so this is read-only. */
+function runOnFile(file: string): string {
   try {
-    return execFileSync('node', [TOOL, '--file', rel], {
+    return execFileSync('node', [TOOL, '--file', file], {
       cwd: REPO,
       encoding: 'utf8',
       timeout: 120_000,
@@ -45,13 +45,37 @@ describe('the gate is clean on a file that was just fixed', () => {
   });
 });
 
+/**
+ * The plant goes into a COPY of MiniShell in a temp dir — never the real file.
+ *
+ * It used to be written over `src/renderer/components/MiniShell.tsx` and
+ * restored in `afterEach`. Vitest runs files in parallel workers, so for the
+ * length of each tool subprocess the real component carried a planted English
+ * label, and any worker that imported MiniShell in that window rendered it:
+ * `miniShellLocale.test.tsx` failed in a full run with "App slots" missing and
+ * `Exit to full desktop` — this file's plant — on `.mini-craft` in its place
+ * (and with `Size` in the drawer, from the third plant). A crashed run would
+ * also have left the plant in the tree for the next build to ship.
+ */
 describe('the gate fires on a planted shadow', () => {
-  let restore: string | null = null;
+  let dir: string | null = null;
 
   afterEach(() => {
-    if (restore !== null) writeFileSync(VICTIM, restore, 'utf8');
-    restore = null;
+    if (dir !== null) rmSync(dir, { recursive: true, force: true });
+    dir = null;
   });
+
+  function plant(from: string, to: string): string {
+    const original = readFileSync(VICTIM, 'utf8');
+    const planted = original.replace(from, to);
+    expect(planted, 'the plant did not apply — has MiniShell drifted?').not.toBe(original);
+    dir = mkdtempSync(join(tmpdir(), 'shadow-plant-'));
+    const copy = join(dir, 'MiniShell.tsx');
+    writeFileSync(copy, planted, 'utf8');
+    const out = runOnFile(copy);
+    expect(readFileSync(VICTIM, 'utf8'), 'the real MiniShell.tsx was modified').toBe(original);
+    return out;
+  }
 
   /**
    * Plant a literal whose exact text IS a translated catalog value, in a
@@ -60,15 +84,7 @@ describe('the gate fires on a planted shadow', () => {
    * a finding actionable rather than a lead.
    */
   it('names the literal AND the key that already carries it', () => {
-    restore = readFileSync(VICTIM, 'utf8');
-    const planted = restore.replace(
-      "aria-label={t('miniShell.a11y.appSlots')}",
-      'aria-label="Exit to full desktop"',
-    );
-    expect(planted, 'the plant did not apply — has MiniShell drifted?').not.toBe(restore);
-    writeFileSync(VICTIM, planted, 'utf8');
-
-    const out = runOnFile('renderer/components/MiniShell.tsx');
+    const out = plant("aria-label={t('miniShell.a11y.appSlots')}", 'aria-label="Exit to full desktop"');
     expect(out, 'the planted shadow was not caught').toContain('Exit to full desktop');
     expect(out, 'the tool did not name the existing key').toContain('settings.mini.exitDesktop');
   });
@@ -80,15 +96,10 @@ describe('the gate fires on a planted shadow', () => {
    * raw text would have missed it.
    */
   it('matches across the ellipsis and dash spellings', () => {
-    restore = readFileSync(VICTIM, 'utf8');
-    const planted = restore.replace(
+    const out = plant(
       "aria-label={t('miniShell.a11y.appSlots')}",
       'aria-label="Backdrop behind the craft window. Match your Study desktop wallpaper, use app-icon mosaic, or a custom image."',
     );
-    expect(planted).not.toBe(restore);
-    writeFileSync(VICTIM, planted, 'utf8');
-
-    const out = runOnFile('renderer/components/MiniShell.tsx');
     expect(out).toContain('settings.mini.wall.desc');
   });
 
@@ -99,12 +110,7 @@ describe('the gate fires on a planted shadow', () => {
    * it needs a control of its own or nobody will know when it is removed.
    */
   it('does NOT fire on a short common word that merely collides', () => {
-    restore = readFileSync(VICTIM, 'utf8');
-    const planted = restore.replace("{t('miniShell.size')}", 'Size');
-    expect(planted).not.toBe(restore);
-    writeFileSync(VICTIM, planted, 'utf8');
-
-    const out = runOnFile('renderer/components/MiniShell.tsx');
+    const out = plant("{t('miniShell.size')}", 'Size');
     expect(out, '"Size" was reported — distinctive() is not filtering').toContain(
       'no literal shadows an existing catalog value',
     );

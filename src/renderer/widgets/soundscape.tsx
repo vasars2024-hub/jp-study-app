@@ -5,14 +5,25 @@ import { Input, Select, Slider, Toggle } from '../components/ui';
 import { useT } from '../i18n';
 import {
   BUILT_IN_SCENES,
+  FADE_SCHEDULES,
   MAX_SAVED_MIXES,
+  MODE_PRESET_KEEP,
+  MODE_PRESET_PAUSE,
   MUSIC_STYLES,
   SLEEP_TIMER_MINUTES,
   SOUND_LAYERS,
   SOUND_LAYER_GROUPS,
+  STUDY_MODES,
   isMusicStyleId,
   isMixSilent,
+  type FadeScheduleId,
+  type StudyModePresets,
 } from '../soundscape/soundscapeModel';
+import {
+  loadStudyModePresets,
+  onStudyModePresetsChanged,
+  saveStudyModePresets,
+} from '../soundscape/studyModePresets';
 import {
   applySoundscapeScene,
   clearSoundscape,
@@ -21,6 +32,7 @@ import {
   saveSoundscapeMix,
   setSoundLayerLevel,
   setSoundscapeDuck,
+  setSoundscapeFade,
   setSoundscapeMaster,
   setSoundscapeMusic,
   setSoundscapeMusicVolume,
@@ -55,6 +67,8 @@ export function SoundscapeWidget() {
   useEffect(() => subscribeSoundscape(setSnap), []);
   const [focus, setFocus] = useState<FocusSoundscapeSettings>(() => loadFocusSoundscape());
   useEffect(() => onFocusSoundscapeChanged(setFocus), []);
+  const [modes, setModes] = useState<StudyModePresets>(() => loadStudyModePresets());
+  useEffect(() => onStudyModePresetsChanged(setModes), []);
   // Re-read on every mixer change and once a minute: the tally moves while sound plays.
   const [focusMinutes, setFocusMinutes] = useState(() => Math.floor(focusSoundSecondsOn() / 60));
   useEffect(() => {
@@ -300,6 +314,64 @@ export function SoundscapeWidget() {
             <div className="wgt-sound-duck" role="status">
               {t('snd2.focus.today', { minutes: focusMinutes })}
             </div>
+          )}
+        </div>
+
+        {/* snd5: a scene per study mode (studyModeSoundscape.ts), off by default. */}
+        <div className="wgt-sound-group wgt-sound-modes" role="group" aria-label={t('snd5.modes.heading')}>
+          <div className="wgt-sound-heading">{t('snd5.modes.heading')}</div>
+          <Toggle
+            checked={modes.enabled}
+            onChange={(event) => saveStudyModePresets({ enabled: event.target.checked })}
+            label={t('snd5.modes.enable')}
+          />
+          {modes.enabled &&
+            STUDY_MODES.map((mode) => (
+              <label key={mode.id} className="wgt-sound-mode">
+                <span>{t(mode.labelKey)}</span>
+                <Select
+                  value={modes[mode.id]}
+                  onChange={(event) => saveStudyModePresets({ [mode.id]: event.target.value })}
+                >
+                  <option value={MODE_PRESET_KEEP}>{t('snd5.modes.keep')}</option>
+                  <option value={MODE_PRESET_PAUSE}>{t('snd5.modes.pause')}</option>
+                  <optgroup label={t('soundscape.scene.builtIn')}>
+                    {BUILT_IN_SCENES.map((scene) => (
+                      <option key={scene.id} value={scene.id}>
+                        {t(scene.labelKey)}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {state.saved.length > 0 && (
+                    <optgroup label={t('soundscape.scene.saved')}>
+                      {state.saved.map((mix) => (
+                        <option key={mix.id} value={mix.id}>
+                          {mix.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </Select>
+              </label>
+            ))}
+        </div>
+
+        {/* snd5: how sound arrives and leaves; the sleep timer and focus breaks follow it. */}
+        <div className="wgt-sound-group" role="group" aria-label={t('snd5.fade.label')}>
+          <div className="wgt-sound-heading">{t('snd5.fade.label')}</div>
+          <Select
+            aria-label={t('snd5.fade.label')}
+            value={state.fade}
+            onChange={(event) => setSoundscapeFade(event.target.value as FadeScheduleId)}
+          >
+            {FADE_SCHEDULES.map((schedule) => (
+              <option key={schedule.id} value={schedule.id}>
+                {t(schedule.labelKey)}
+              </option>
+            ))}
+          </Select>
+          {sceneId !== null && state.sceneVolumes[sceneId] !== undefined && (
+            <div className="wgt-sound-duck">{t('snd5.sceneVolume.remembered')}</div>
           )}
         </div>
       </div>

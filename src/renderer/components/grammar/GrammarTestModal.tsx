@@ -15,7 +15,7 @@
  * modal early is the most likely way to hit it.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NormalizedGrammarPoint } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
 import { createDeckFolder } from '../../flashcardDeck';
@@ -61,6 +61,13 @@ import {
 } from '../../grammarSessionHistory';
 
 type Phase = 'setup' | 'play' | 'done';
+
+/**
+ * Optional production practice on the self-graded production question (cloze):
+ * write your own sentence with the pattern and get a suggested grade, applied
+ * only by pressing it. Loaded on first use (`GrammarAiTools.tsx`).
+ */
+const GrammarProductionAi = lazy(() => import('./GrammarAiTools').then((m) => ({ default: m.GrammarProductionAi })));
 
 /** Shown left-to-right, hardest first, so the safe default is not the nearest. */
 const GRADES: Array<{ grade: AnswerGrade; key: string }> = [
@@ -115,6 +122,7 @@ export default function GrammarTestModal({
   const [correctCount, setCorrectCount] = useState(0);
   const [familiarity, setFamiliarity] = useState<FamiliarityState>(() => loadFamiliarity());
   const [history, setHistory] = useState(() => loadSessionHistory());
+  const [practiceOpen, setPracticeOpen] = useState(false);
 
   const maxAvailable = pool.length;
   const question: SessionQuestion | null = plan?.questions[index] ?? null;
@@ -207,6 +215,7 @@ export default function GrammarTestModal({
       setIndex((i) => i + 1);
       setRevealed(false);
       setPicked(null);
+      setPracticeOpen(false);
     },
     [question, plan, pool, familiarity, correctCount, missed, index, finish],
   );
@@ -486,6 +495,24 @@ export default function GrammarTestModal({
                 ))}
               </div>
             )}
+
+            {question.type === 'cloze' && revealed && (() => {
+              const point = pool.find((p) => p.id === question.id);
+              if (!point) return null;
+              return practiceOpen ? (
+                <Suspense fallback={null}>
+                  <GrammarProductionAi
+                    point={point}
+                    ratingLabel={(grade) => t(GRADES.find((g) => g.grade === grade)?.key ?? 'grammar.test.okay')}
+                    onUseRating={(grade) => answer(grade)}
+                  />
+                </Suspense>
+              ) : (
+                <button type="button" className="btn small" onClick={() => setPracticeOpen(true)}>
+                  {t('aiTutor.production.open')}
+                </button>
+              );
+            })()}
           </div>
         )}
 

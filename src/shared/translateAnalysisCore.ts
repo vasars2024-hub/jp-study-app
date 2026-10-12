@@ -3,6 +3,7 @@
 // Chinese measure words / aspect particles). No Electron or Node dependencies —
 // mirrors translateCore.ts so everything here is unit-testable.
 
+import type { AiErrorCode } from './aiErrorCodes';
 import { langLabel } from './langs';
 import { cleanLlmOutput } from './translateCore';
 
@@ -79,15 +80,61 @@ export interface TranslateAnalyzeRequest {
   target: string;
   /** Ordered particle surface forms, computed offline by the renderer. */
   jaParticleTokens?: string[];
+  /** The UI language the notes are written in. English when absent. */
+  explainIn?: string;
+  /** Skip the cache (the answer still refreshes it): "analyze this again". */
+  refresh?: boolean;
 }
 
+/**
+ * Bumped whenever the prompt or the parse changes, so an analysis cached under
+ * an older prompt is asked for again instead of served forever. Part of the
+ * cache key in `main/translateAnalysis.ts`.
+ */
+export const TRANSLATE_ANALYSIS_PROMPT_VERSION = 2;
+
+/** What the panel can show, in the user's language, for a failed analysis. */
+export type TranslateAnalyzeResponse = {
+  ok: boolean;
+  result?: TranslateAnalysisResult;
+  /** English, for logs. The panel shows `code` instead. */
+  error?: string;
+  code?: AiErrorCode;
+  aiOff?: boolean;
+  needsKey?: boolean;
+  /** The configured provider has not been allowed to receive translate text. */
+  needsConsent?: boolean;
+  /** Answered from the disk cache. */
+  cached?: boolean;
+  /** Some requested sections are missing; shown, but not cached. */
+  partial?: boolean;
+};
+
+function langBase(lang: string): string {
+  return String(lang || '').toLowerCase().split('-')[0];
+}
+
+/**
+ * Which sections apply. Keyed to the language on EITHER side: a Chinese learner
+ * translating 中文 → English needs the measure words and aspect particles of
+ * the Chinese SOURCE, which a target-only check (the old rule) never asked for.
+ */
 export function computeAnalysisFlags(source: string, target: string): AnalysisFlags {
+  const s = langBase(source);
+  const t = langBase(target);
   return {
     formality: true,
-    particlesJa: source === 'ja' || target === 'ja',
-    declensionRu: target === 'ru',
-    measureWordZh: target === 'zh',
+    particlesJa: s === 'ja' || t === 'ja',
+    declensionRu: s === 'ru' || t === 'ru',
+    measureWordZh: s === 'zh' || t === 'zh',
   };
+}
+
+/** The side of the pair written in `lang`, or '' when neither is. */
+function sideIn(req: TranslateAnalyzeRequest, lang: string): string {
+  if (langBase(req.source) === lang) return req.sourceText;
+  if (langBase(req.target) === lang) return req.translatedText;
+  return '';
 }
 
 // ----- schema -------------------------------------------------------------
@@ -192,7 +239,10 @@ export function buildAnalysisSchema(flags: AnalysisFlags): unknown {
 export function buildAnalysisPrompt(req: TranslateAnalyzeRequest, flags: AnalysisFlags): string {
   const source = langLabel(req.source);
   const target = langLabel(req.target);
-  const jaText = req.source === 'ja' ? req.sourceText : req.translatedText;
+  const explain = langLabel(req.explainIn || 'en');
+  const jaText = sideIn(req, 'ja');
+  const ruText = sideIn(req, 'ru');
+  const zhText = sideIn(req, 'zh');
   const parts: string[] = [
     `You are a linguistics tutor. A ${source} sentence was translated into ${target}.`,
     `${source} sentence: ${req.sourceText}`,
@@ -213,7 +263,7 @@ export function buildAnalysisPrompt(req: TranslateAnalyzeRequest, flags: Analysi
         `"particleNotes": the Japanese sentence (${jaText}) contains these grammatical particles in order: ` +
           tokens.map((t, i) => `${i + 1}. ${t}`).join(' ') +
           `. Return an array of exactly ${tokens.length} strings, one per particle in the same order, ` +
-          'each briefly explaining (in English) what that particle does in THIS sentence — ' +
+          `each briefly explaining (in ${explain}) what that particle does in THIS sentence — ` +
           'e.g. topic vs. subject emphasis, direction, means, contrast.',
       );
     } else {
@@ -222,7 +272,7 @@ export function buildAnalysisPrompt(req: TranslateAnalyzeRequest, flags: Analysi
   }
   if (flags.declensionRu) {
     parts.push(
-      '"declension": for each declinable word in the Russian translation (nouns, adjectives, pronouns, numerals) ' +
+      `"declension": for each declinable word in the Russian text (${ruText}) (nouns, adjectives, pronouns, numerals) ` +
         'and each verb, return an object with "word" (form used in the sentence), "dictionaryForm", "pos". ' +
         'For declinables add "gender", "caseUsed", and full "singular"/"plural" case tables ' +
         '(nominative, genitive, dative, accusative, instrumental, prepositional). ' +
@@ -232,10 +282,11 @@ export function buildAnalysisPrompt(req: TranslateAnalyzeRequest, flags: Analysi
   }
   if (flags.measureWordZh) {
     parts.push(
-      '"measureWords": for each countable noun in the Chinese translation, return {"noun", "classifier", "pinyin", "reason"} ' +
-        'giving the correct measure word (e.g. 只 vs 条) with the classifier\'s pinyin and a one-line reason for the choice.',
-      '"aspectNotes": for each aspect particle 了/着/过 present (or clearly needed) in the Chinese translation, ' +
-        'return {"particle", "afterWord", "reason"} explaining the aspectual meaning. Empty array if none apply.',
+      `"measureWords": for each countable noun in the Chinese text (${zhText}), return {"noun", "classifier", "pinyin", "reason"} ` +
+        'giving the correct measure word (e.g. 只 vs 条) with the classifier\'s pinyin and a one-line reason ' +
+        `(in ${explain}) for the choice.`,
+      `"aspectNotes": for each aspect particle 了/着/过 present (or clearly needed) in the Chinese text (${zhText}), ` +
+        `return {"particle", "afterWord", "reason"} explaining (in ${explain}) the aspectual meaning. Empty array if none apply.`,
     );
   }
   return parts.join('\n\n');
@@ -350,18 +401,36 @@ function parseAspectNotes(v: unknown): AspectNoteItem[] | undefined {
   return items.length ? items : undefined;
 }
 
+/** The reply was not a JSON object at all. Never cached; the panel says "invalid". */
+export class TranslateAnalysisParseError extends Error {
+  readonly code = 'invalid';
+
+  constructor() {
+    super('The AI returned malformed JSON for the analysis.');
+    this.name = 'TranslateAnalysisParseError';
+  }
+}
+
+function stripFence(text: string): string {
+  const fenced = /^\s*```(?:json)?\s*([\s\S]*?)\s*```\s*$/i.exec(text);
+  return fenced ? fenced[1] : text;
+}
+
 /**
- * Tolerant parse: malformed JSON yields {}, and each field is validated
- * independently — a bad field is omitted, never thrown on.
+ * Field-tolerant, reply-strict parse. A reply that is not a JSON object THROWS
+ * (`TranslateAnalysisParseError`): it used to come back as `{}`, which the
+ * caller then cached to disk as a successful analysis of that sentence —
+ * forever. Inside a valid object each field is still validated on its own, and a
+ * bad field is omitted rather than thrown on.
  */
 export function parseAnalysisResponse(raw: string, flags: AnalysisFlags): TranslateAnalysisResult {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(cleanLlmOutput(raw));
+    parsed = JSON.parse(stripFence(cleanLlmOutput(raw)));
   } catch {
-    return {};
+    throw new TranslateAnalysisParseError();
   }
-  if (!parsed || typeof parsed !== 'object') return {};
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new TranslateAnalysisParseError();
   const obj = parsed as Record<string, unknown>;
   const result: TranslateAnalysisResult = {};
   if (flags.formality) {
@@ -383,4 +452,26 @@ export function parseAnalysisResponse(raw: string, flags: AnalysisFlags): Transl
     if (aspectNotes) result.aspectNotes = aspectNotes;
   }
   return result;
+}
+
+/**
+ * How much of what was asked for came back.
+ *
+ * `empty` — nothing usable: shown as a failure, never cached.
+ * `partial` — some sections: shown, not cached, so the next view asks again.
+ * `complete` — every section the flags asked for that the model must answer
+ *   (formality always; one particle note per detected particle). Only this is
+ *   cached. Declension, measure words and aspect notes may legitimately be
+ *   empty (a sentence with no declinable word), so their absence is not a gap.
+ */
+export function analysisCompleteness(
+  result: TranslateAnalysisResult,
+  flags: AnalysisFlags,
+  req: Pick<TranslateAnalyzeRequest, 'jaParticleTokens'>,
+): 'empty' | 'partial' | 'complete' {
+  if (!Object.keys(result).length) return 'empty';
+  if (flags.formality && !result.formality) return 'partial';
+  const tokens = req.jaParticleTokens ?? [];
+  if (flags.particlesJa && tokens.length && result.particleNotes?.length !== tokens.length) return 'partial';
+  return 'complete';
 }

@@ -38,6 +38,7 @@ const FORBIDDEN: Array<[RegExp, string]> = [
   [/\/components\/FocusShell\.tsx$/, 'Focus Mode (lazy in App.tsx)'],
   [/\/views\/AnkiView\.tsx$/, 'the Anki view'],
   [/\/components\/lens\/ReadingLensOverlay\.tsx$/, 'the Reading Lens overlay (its own window only)'],
+  [/\/i18n\/aiPack\//, 'the lazy AI strings pack (i18n/catalogs.ts loads it on first use)'],
 ];
 
 /**
@@ -47,6 +48,10 @@ const FORBIDDEN: Array<[RegExp, string]> = [
  * new eager edge to a big subsystem is exactly what this exists to catch.
  */
 const STUDY_OS_SOURCE_CEILING = 8_600_000;
+// Briefly raised to 4_220_000 on 2026-10-11 when the AI helpers' strings pushed
+// Blanc over; put back the same day by making those strings a lazy i18n pack
+// (`shared/i18n/catalogs.ts`, "Lazily merged packs"). The English catalog is
+// static in every window, so a string in it is boot cost everywhere.
 const BLANC_SOURCE_CEILING = 4_200_000;
 
 describe('Study OS startup import graph', () => {
@@ -80,6 +85,27 @@ describe('Study OS startup import graph', () => {
 
   it('stays under its source-byte ceiling', () => {
     expect(graphSourceBytes(graph)).toBeLessThan(STUDY_OS_SOURCE_CEILING);
+  });
+
+  it('names no lazy-pack string that a boot module would render before the pack loads', async () => {
+    // A key under a lazy pack's prefix (`aiStudy.`, `aiProv.` …) that a boot
+    // module names literally is a string shown at startup — the palette, a Blanc
+    // tool label, a settings row. It must be eager, or it renders as a
+    // placeholder until some AI surface loads the pack.
+    const { i18nPackForKey } = await import('../../shared/i18n/catalogs');
+    const { AI_PACK_EN } = await import('../../shared/i18n/aiPack/en');
+    const misses = new Set<string>();
+    for (const entry of [ENTRY, BLANC_ENTRY]) {
+      for (const file of walkImportGraph(entry).files.keys()) {
+        if (!/\.(t|j)sx?$/.test(file) || /[\\/]i18n[\\/]/.test(file)) continue;
+        const code = stripComments(readFileSync(file, 'utf8'));
+        for (const m of code.matchAll(/['"]([a-zA-Z]+\.[\w.-]+)['"]/g)) {
+          // In the pack means NOT eager: the pack and the eager catalogs share no key.
+          if (i18nPackForKey(m[1]) && AI_PACK_EN[m[1]] !== undefined) misses.add(`${rel(file)}: ${m[1]}`);
+        }
+      }
+    }
+    expect([...misses]).toEqual([]);
   });
 
   it('keeps Blanc under its source-byte ceiling too', () => {

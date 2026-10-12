@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SentenceAnalysisResult } from '../shared/sentenceAnalysisCore';
 import { localSentenceAnalysis } from '../renderer/localGrammarAnalysis';
+import { isAiErrorCode, type AiErrorCode } from '../shared/aiErrorCodes';
 
 /**
  * Whole-sentence AI annotation for the subtitle line the player is on.
@@ -84,6 +85,8 @@ interface Options {
   offline?: boolean;
   /** Localized fallback for a provider error with no message of its own. */
   errorLabel: string;
+  /** Says main's error code in the UI language. Without it, errorLabel stands in. */
+  describeError?: (code: AiErrorCode) => string;
 }
 
 export interface CueAnalysis {
@@ -92,6 +95,8 @@ export interface CueAnalysis {
   analyzeNow: () => void;
   /** Re-run after a failure, bypassing nothing — errors are never cached. */
   retry: () => void;
+  /** Ask again for a line that already has an AI analysis, bypassing both caches. */
+  reanalyze: () => void;
 }
 
 export function useCueAnalysis({
@@ -101,16 +106,23 @@ export function useCueAnalysis({
   auto,
   offline: offlineWanted = true,
   errorLabel,
+  describeError,
 }: Options): CueAnalysis {
   const [state, setState] = useState<CueAnalysisState>({ kind: 'idle' });
   // Demand is bound to the text it was made for, so asking for one line does
   // not silently authorize a call on whatever line comes next.
-  const [demand, setDemand] = useState<{ text: string; nonce: number } | null>(null);
+  const [demand, setDemand] = useState<{ text: string; nonce: number; refresh?: boolean } | null>(null);
   const reqRef = useRef(0);
+  const refreshUsed = useRef(0);
 
   const trimmed = text.trim();
   const demanded = demand?.text === trimmed;
   const demandNonce = demanded ? demand.nonce : 0;
+  // A re-analysis skips the renderer cache AND main's disk cache.
+  const demandRefresh = demanded && demand.refresh === true;
+  const say = (code: unknown, fallback: string | undefined): string => (
+    isAiErrorCode(code) && describeError ? describeError(code) : errorLabel || fallback || ''
+  );
 
   useEffect(() => {
     // Bumped before every early return as well: a request still in flight for
@@ -123,7 +135,11 @@ export function useCueAnalysis({
       return;
     }
     const key = cacheKey(trimmed, lang, uiLang);
-    const cached = readCache(key);
+    // Consumed once: a later re-run of this effect (pause, resume) must not
+    // send the line again just because the last demand was a re-analysis.
+    const refresh = demandRefresh && refreshUsed.current !== demandNonce;
+    if (refresh) refreshUsed.current = demandNonce;
+    const cached = refresh ? undefined : readCache(key);
     if (cached) {
       setState({ kind: 'ready', result: cached });
       return;
@@ -140,7 +156,12 @@ export function useCueAnalysis({
     let alive = true;
     void (async () => {
       try {
-        const res = await window.api.sentenceAnalyze({ text: trimmed, lang, explainIn: uiLang });
+        const res = await window.api.sentenceAnalyze({
+          text: trimmed,
+          lang,
+          explainIn: uiLang,
+          ...(refresh ? { refresh: true } : {}),
+        });
         if (!alive || id !== reqRef.current) return;
         if (res.ok && res.result) {
           writeCache(key, res.result);
@@ -151,19 +172,19 @@ export function useCueAnalysis({
             res.needsKey ? { ai: 'needsKey' }
               : res.needsLocalModel ? { ai: 'needsLocalModel' }
                 : res.aiOff ? { ai: 'off' }
-                  : { ai: 'error', message: res.error || errorLabel },
+                  : { ai: 'error', message: say(res.code, res.error) },
           ));
         } else {
           setState({
             kind: 'error',
-            message: res.error || errorLabel,
+            message: say(res.code, res.error),
             needsKey: !!res.needsKey,
             needsLocalModel: !!res.needsLocalModel,
           });
         }
       } catch (err) {
         if (!alive || id !== reqRef.current) return;
-        const message = err instanceof Error ? err.message : errorLabel;
+        const message = say('ipc-failed', err instanceof Error ? err.message : undefined);
         if (local) {
           setState(offline({ ai: 'error', message }));
           return;
@@ -182,7 +203,7 @@ export function useCueAnalysis({
     // `errorLabel` is deliberately absent: it is only read inside the failure
     // path, and depending on it would re-run the whole analysis on a UI-language
     // switch purely to restate an error string.
-  }, [trimmed, lang, uiLang, auto, offlineWanted, demanded, demandNonce]);
+  }, [trimmed, lang, uiLang, auto, offlineWanted, demanded, demandNonce, demandRefresh]);
 
   const analyzeNow = useCallback(() => {
     setDemand((current) => ({
@@ -191,5 +212,15 @@ export function useCueAnalysis({
     }));
   }, [text]);
 
-  return { state, analyzeNow, retry: analyzeNow };
+  const reanalyze = useCallback(() => {
+    const trimmedNow = text.trim();
+    cache.delete(cacheKey(trimmedNow, lang, uiLang));
+    setDemand((current) => ({
+      text: trimmedNow,
+      nonce: (current?.nonce ?? 0) + 1,
+      refresh: true,
+    }));
+  }, [text, lang, uiLang]);
+
+  return { state, analyzeNow, retry: analyzeNow, reanalyze };
 }

@@ -45,11 +45,13 @@ import { kvGet, kvSet } from './storage/db';
 import { showToast } from './components/ui/Toast';
 import { translateAnkiReason } from '../shared/anki';
 import { t } from './i18n';
+import { pickCardAiExtras } from '../shared/cardAiExtras';
 import { writeLocalStorage } from './localStorageWrite';
 import { getStudyLang } from './studyEnvironment';
 import { normalizeStudyLang, studyLangFromTag, studyLangOfText, type StudyLang } from '../shared/studyLang';
 import { noteStudyOsJobInstalled } from './studyOsJobsReady';
 import { linkCardsToExistingAnkiNotes } from './ankiNoteLinking';
+import { yt5EnrichMineInput, yt5MayEnrichMine } from './youtubeStudy5Mining';
 
 export interface MineMediaPayload {
   base64: string;
@@ -83,6 +85,10 @@ export interface MineToStudyInput {
   characterName?: string;
   /** Where in the work the line was (chapter, scene); context, never the meaning. */
   sceneReference?: string;
+  /** The line or two said right before the mined one (a visual novel's context); never the meaning. */
+  contextBefore?: string;
+  /** The line or two said right after it, when already captured. */
+  contextAfter?: string;
   audioPath?: string;
   imagePath?: string;
   audioDataUrl?: string;
@@ -339,7 +345,18 @@ export function requestFromCard(card: DeckFlashcard): MineNoteRequest {
     ...(card.reading?.trim() && card.reading !== card.word ? { reading: card.reading.trim() } : {}),
     ...(card.meaning?.trim() ? { meaning: card.meaning.trim() } : {}),
     ...(sentence ? { sentence } : {}),
+    ...withCardExtras(card),
   };
+}
+
+/**
+ * The card's saved extras (memory aid, notes, kept examples, accepted answers)
+ * for a request, as they are NOW: a queued request was stored when the word was
+ * mined, before any of them existed, so the drain re-reads them from the card.
+ */
+function withCardExtras(card: DeckFlashcard): Pick<MineNoteRequest, 'cardExtras'> {
+  const cardExtras = pickCardAiExtras(card);
+  return cardExtras ? { cardExtras } : {};
 }
 
 // ---------------------------------------------------------------------------
@@ -566,7 +583,10 @@ export function mineToStudy(input: MineToStudyInput): Promise<MineToStudyResult>
   return work;
 }
 
-async function runMine(key: string, input: MineToStudyInput): Promise<MineToStudyResult> {
+async function runMine(key: string, raw: MineToStudyInput): Promise<MineToStudyResult> {
+  // A YouTube scene gets the same title, `m:ss` and `&t=` link from every
+  // surface. Gated synchronously, so every other mine keeps its timing.
+  const input = yt5MayEnrichMine(raw) ? await yt5EnrichMineInput(raw) : raw;
   const word = input.word.trim();
   let card = findMinedCard(key, input);
   let created = false;
@@ -607,6 +627,8 @@ async function runMine(key: string, input: MineToStudyInput): Promise<MineToStud
       if (lang !== 'ja') draft.studyLang = lang;
       if (input.characterName?.trim()) draft.characterName = input.characterName.trim().slice(0, 200);
       if (input.sceneReference?.trim()) draft.sceneReference = input.sceneReference.trim().slice(0, 400);
+      if (input.contextBefore?.trim()) draft.contextBefore = input.contextBefore.trim().slice(0, 1000);
+      if (input.contextAfter?.trim()) draft.contextAfter = input.contextAfter.trim().slice(0, 1000);
       const audio = input.audioPath || audioPath;
       const image = input.imagePath || imagePath;
       const clip = input.clipPath || clipPath;
@@ -853,6 +875,8 @@ async function drain(): Promise<AnkiQueueReport> {
   return withDrainLock(async (renew) => {
     // A waiting card whose note already exists in Anki (mined on another machine
     // and synced in through AnkiWeb) is linked to it, never added a second time.
+    // Only while sync with Anki is on: linking is part of sync (ankiNoteLinking.ts);
+    // with it off, Anki's own duplicate check answers for the target deck.
     const links = await linkCardsToExistingAnkiNotes(pendingAnkiCards());
     if (links.linkedIds.length) {
       await withQueue((q) => {
@@ -867,7 +891,8 @@ async function drain(): Promise<AnkiQueueReport> {
     for (let i = 0; i < pending.length; i += 1) {
       renew();
       const card = pending[i];
-      const request = queue[card.id]?.request ?? requestFromCard(card);
+      const stored = queue[card.id]?.request;
+      const request = stored ? { ...stored, ...withCardExtras(card) } : requestFromCard(card);
       let result: MineNoteResult;
       try {
         result = await window.api.ankiMineNote(request);

@@ -70,6 +70,8 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   visualizer: 'blanc.tool.visualizer',
   'local-agent': 'blanc.tool.localAgent',
   'visual-novels': 'blanc.tool.visualNovels',
+  snips: 'blanc.tool.snips',
+  conversation: 'blanc.tool.conversation',
 };
 
 /** The catalog key for a tool's name, or undefined for an id this table does not know. */

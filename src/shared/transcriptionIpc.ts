@@ -45,6 +45,12 @@ export interface TranscriptionProgress {
    * an errored run never writes a track to read at all.
    */
   modelSubstitution?: { requested: string; used: string };
+  /**
+   * Set while the Whisper model is being fetched or loaded for this job (a
+   * first run downloads it inside the first chunk). `percent` is null when the
+   * download does not report sizes. Absent once the model is ready.
+   */
+  modelDownload?: { percent: number | null };
 }
 
 export interface TranscriptionCardOptions {
@@ -194,6 +200,28 @@ export interface TranscriptionChunkResult {
    * knows which graph it actually loaded.
    */
   modelSubstitution?: { requested: string; used: string };
+}
+
+/**
+ * An interim message about one chunk, sent on the same `transcription:chunk-reply`
+ * channel before its result: the worker is fetching or loading the model.
+ *
+ * The chunk timeout used to start when the chunk was sent, so a first run —
+ * which downloads the model inside the first chunk — timed out at 120 s, was
+ * retried, and stacked workers. Main now holds the transcription timeout until
+ * `model-ready`; while the model loads, each `model-loading` resets a stall
+ * timer instead, so a slow download that is moving never times out.
+ */
+export interface TranscriptionChunkStatus {
+  stage: 'model-loading' | 'model-ready';
+  /** 0..100 across the model's files, when the download reports sizes. */
+  progress?: number;
+}
+
+/** A `transcription:chunk-reply` payload that is a status, not the result. */
+export function isTranscriptionChunkStatus(payload: unknown): payload is TranscriptionChunkStatus {
+  const stage = (payload as { stage?: unknown } | null)?.stage;
+  return stage === 'model-loading' || stage === 'model-ready';
 }
 
 /**

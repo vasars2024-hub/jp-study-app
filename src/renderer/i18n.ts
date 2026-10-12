@@ -1,5 +1,13 @@
 import { useCallback, useSyncExternalStore } from 'react';
-import { catalogFor, en, ensureCatalog } from '../shared/i18n/catalogs';
+import {
+  catalogFor,
+  en,
+  ensureCatalog,
+  ensureI18nPack,
+  onI18nPacksChanged,
+  pendingI18nPack,
+  type I18nPackId,
+} from '../shared/i18n/catalogs';
 import {
   DEFAULT_LANG,
   LANG_TAGS,
@@ -35,6 +43,34 @@ function readStored(): UiLang {
 
 let current: UiLang = readStored();
 const listeners = new Set<() => void>();
+/**
+ * Bumped whenever what `t()` returns can change without the language changing:
+ * a lazy pack (the AI strings) was merged in. `useT` subscribes to it so a
+ * surface that rendered placeholders re-renders with the real text.
+ */
+let revision = 0;
+
+onI18nPacksChanged(() => {
+  revision += 1;
+  for (const listener of listeners) listener();
+});
+
+/**
+ * What `t()` shows for a key whose lazy pack is still loading: neutral, never
+ * the raw dotted key. It is on screen for one chunk fetch at most — the AI
+ * strings are also preloaded on idle once AI is known to be on
+ * (`aiSetupClient.ts`).
+ */
+export const I18N_PENDING_TEXT = '…';
+
+/**
+ * Load a lazy pack for the current language (and English). AI surfaces do not
+ * need to call this — `t()` asks on first use — but a caller that is about to
+ * use pack strings outside React (an export, a toast) awaits it first.
+ */
+export function ensureUiPack(pack: I18nPackId): Promise<void> {
+  return ensureI18nPack(pack, current);
+}
 
 /** Stamped on <html> so CSS font stacks and glyph selection follow the UI language. */
 export function applyLangAttribute(lang: UiLang = current): void {
@@ -86,12 +122,23 @@ export function setUiLang(lang: UiLang): void {
   });
 }
 
+function getI18nRevision(): number {
+  return revision;
+}
+
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
 export function t(key: string, vars?: TVars): string {
+  // A key of a lazy pack that has not arrived yet: start the load (idempotent)
+  // and show a placeholder; the merge notifies `useT` subscribers to re-render.
+  const pending = catalogFor(current)[key] === undefined ? pendingI18nPack(key) : null;
+  if (pending) {
+    void ensureI18nPack(pending, current);
+    return I18N_PENDING_TEXT;
+  }
   return translate(key, vars, {
     lang: current,
     // Synchronous by design: catalogs are resolved before render (initI18n) and
@@ -111,6 +158,9 @@ export function t(key: string, vars?: TVars): string {
  */
 export function useT(): { t: (key: string, vars?: TVars) => string; lang: UiLang } {
   const lang = useSyncExternalStore(subscribe, getUiLang, () => DEFAULT_LANG);
+  // Re-render when a lazy pack lands. `t` itself stays one stable function
+  // (CLAUDE.md i18n rule 6), so effects that list it do not re-run.
+  useSyncExternalStore(subscribe, getI18nRevision, () => 0);
   const translateFn = useCallback((key: string, vars?: TVars) => t(key, vars), []);
   return { t: translateFn, lang };
 }

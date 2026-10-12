@@ -36,6 +36,20 @@ export const TRANSLATE_ENGINES_UI_EN: Catalog = {
   'xlate2.result.by': 'Translated by {provider}',
   'xlate2.result.fellBack': '{provider} could not translate this ({reason}), so the offline model did.',
   'xlate2.error.cloud': '{provider} could not translate this: {reason}.',
+  'xlate2.error.chain': 'No engine could translate this. {details}.',
+  'xlate2.error.attempt': '{provider}: {reason}',
+  'xlate2.result.cached': 'Instant (translated earlier)',
+  'xlate2.result.cachedHint': 'The same text was translated a moment ago with the same engine and settings, so that translation was reused and nothing was sent.',
+  'xlate2.result.partial': 'Incomplete: {missing} of {total} sentences came back untranslated (sentence {sentences}), even after asking again. This result was not saved; translate again to retry.',
+
+  // ---- Study: back-translation and keys ----
+  'xlate2.back.action': 'Back-translate',
+  'xlate2.back.actionAll': 'Back-translate all',
+  'xlate2.back.hint': 'Translate this back into {lang} to check that the meaning survived',
+  'xlate2.back.label': 'Back into {lang}:',
+  'xlate2.back.working': 'Translating back…',
+  'xlate2.back.failed': 'Could not translate back: {reason}',
+  'xlate2.keysHintMore': 'Esc stops · Alt+B back-translates every sentence',
 
   // ---- Why a cloud engine did not answer ----
   'xlate2.fallback.consent': 'you have not allowed it to receive text',
@@ -44,6 +58,7 @@ export const TRANSLATE_ENGINES_UI_EN: Catalog = {
   'xlate2.fallback.rateLimit': 'too many requests, try again shortly',
   'xlate2.fallback.quota': 'the account\'s quota is used up',
   'xlate2.fallback.spend': 'the monthly spending limit would be exceeded',
+  'xlate2.fallback.offline': 'this computer is offline, so nothing was sent',
   'xlate2.fallback.network': 'the service could not be reached',
   'xlate2.fallback.timeout': 'the request timed out',
   'xlate2.fallback.invalid': 'the reply was not a usable translation',
@@ -73,6 +88,8 @@ export const TRANSLATE_ENGINES_UI_EN: Catalog = {
     one: '{count} more term applies to other language pairs.',
     other: '{count} more terms apply to other language pairs.',
   },
+  'xlate2.glossary.namesTitle': 'Names in this passage ({count})',
+  'xlate2.glossary.namesHint': 'Keep a name spelled the same way in every translation. Check the spelling: it is read from the dictionary reading, not from the text.',
   'xlate2.glossary.report': 'Glossary terms followed: {count} of {total}.',
   'xlate2.glossary.missing': 'Not followed: {terms}.',
 

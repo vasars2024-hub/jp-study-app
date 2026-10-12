@@ -491,4 +491,131 @@ var GUM_POPUP_CSS = String.raw`
   margin-top: 4px;
   min-height: 24px;
 }
+/* Optional AI (content.js "optional AI"): on-demand controls, answers labelled AI. */
+#jp-study-popup .rp-ai {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--rp-border);
+}
+#jp-study-popup .rp-ai[hidden] { display: none; }
+#jp-study-popup .rp-ai-row { margin-top: 0; }
+#jp-study-popup .rp-ai-btn {
+  min-height: 24px;
+  min-width: 24px;
+}
+#jp-study-popup .rp-ai-btn:focus-visible,
+#jp-study-popup .rp-icon:focus-visible,
+#jp-study-popup .rp-mini:focus-visible {
+  outline: 2px solid #d98a97;
+  outline-offset: 1px;
+}
+#jp-study-popup .rp-ai-primary {
+  background: rgba(156, 43, 61, 0.2);
+  border-color: rgba(156, 43, 61, 0.5);
+  font-weight: 600;
+}
+#jp-study-popup .rp-ai-badge {
+  display: inline-block;
+  font-size: calc(var(--rp-font) - 4px);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  padding: 0 5px;
+  margin-right: 5px;
+  border-radius: 5px;
+  color: #b8c7ff;
+  background: rgba(110, 140, 255, 0.16);
+  border: 1px solid rgba(110, 140, 255, 0.4);
+  vertical-align: 1px;
+}
+#jp-study-popup .rp-ai-card {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--rp-bg2);
+  border: 1px solid rgba(110, 140, 255, 0.3);
+}
+#jp-study-popup .rp-ai-head { display: flex; align-items: center; gap: 2px; font-weight: 600; }
+#jp-study-popup .rp-ai-sense { margin-top: 4px; font-weight: 600; }
+#jp-study-popup .rp-ai-quote {
+  margin-top: 2px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(110, 140, 255, 0.5);
+  color: var(--rp-muted);
+}
+#jp-study-popup .rp-ai-text { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; }
+#jp-study-popup .rp-ai-foot { margin-top: 6px; color: var(--rp-muted); font-size: calc(var(--rp-font) - 3px); }
+#jp-study-popup .rp-ai-state {
+  margin-top: 8px;
+  color: var(--rp-muted);
+  font-size: calc(var(--rp-font) - 1px);
+}
+#jp-study-popup .rp-ai-busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--rp-muted);
+}
+#jp-study-popup .rp-spinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--rp-border);
+  border-top-color: var(--rp-text);
+  animation: rp-spin 0.8s linear infinite;
+}
+@keyframes rp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #jp-study-popup .rp-spinner { animation: none; border-top-color: var(--rp-muted); }
+}
+#jp-study-popup .rp-senses li.rp-ai-pick {
+  background: rgba(110, 140, 255, 0.14);
+  box-shadow: inset 2px 0 0 rgba(110, 140, 255, 0.8);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+/* The AI sheet: the popup's look, wider, centred, for side-by-side text. */
+#jp-study-popup.rp-sheet {
+  position: fixed;
+  width: min(760px, calc(100vw - 24px));
+  max-height: calc(100vh - 96px);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(110, 140, 255, 0.35);
+}
+#jp-study-popup.rp-sheet .rp-sheet-title { font-size: calc(var(--rp-font) + 2px); }
+#jp-study-popup.rp-sheet .rp-sheet-body { padding: 4px 14px 14px; outline: none; }
+#jp-study-popup .rp-ai-sbs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 560px) {
+  #jp-study-popup .rp-ai-sbs { grid-template-columns: 1fr; }
+}
+#jp-study-popup .rp-ai-col {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--rp-bg2);
+  border: 1px solid var(--rp-border);
+}
+#jp-study-popup .rp-ai-col-ai { border-color: rgba(110, 140, 255, 0.4); }
+#jp-study-popup .rp-ai-col-title {
+  margin: 8px 0 4px;
+  font-size: calc(var(--rp-font) - 2px);
+  font-weight: 650;
+  color: var(--rp-muted);
+}
+#jp-study-popup .rp-ai-col .rp-ai-col-title { margin-top: 0; }
+#jp-study-popup .rp-ai-col-text { margin: 0; line-height: 1.9; white-space: pre-wrap; word-break: break-word; }
+#jp-study-popup .rp-ai-notes { margin: 0; padding-left: 20px; }
+#jp-study-popup .rp-ai-words { width: 100%; border-collapse: collapse; font-size: calc(var(--rp-font) - 1px); }
+#jp-study-popup .rp-ai-words td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--rp-border);
+  vertical-align: top;
+}
+#jp-study-popup .rp-ai-word { font-weight: 600; white-space: nowrap; }
+#jp-study-popup .rp-ai-reading { color: var(--rp-muted); white-space: nowrap; }
+#jp-study-popup[data-theme="light"] .rp-ai-badge { color: #2c3f9e; background: rgba(60, 90, 220, 0.1); }
 `;

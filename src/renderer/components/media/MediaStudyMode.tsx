@@ -509,6 +509,7 @@ export default function MediaStudyMode({
             mediaId={item.id}
             mediaTitle={item.title}
             sentence={activeCue?.text ?? analysis.sentences[0]?.text ?? ''}
+            lineId={activeCue ? `cue:${activeCue.start}-${activeCue.end}` : 'sentence:0'}
             jlptLevel={analysis.level?.label ?? null}
           />
         </div>

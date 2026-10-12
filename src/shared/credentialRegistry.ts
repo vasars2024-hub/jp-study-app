@@ -165,6 +165,92 @@ export const CREDENTIAL_REGISTRY: CredentialSpec[] = [
     refusesWhenUnencrypted: true,
   },
   {
+    // Anthropic Messages API (Claude Haiku / Sonnet / Opus 5.5). Read by
+    // `main/providerRuntime.ts` only, sent only in the `x-api-key` header.
+    id: 'anthropic',
+    label: 'Anthropic Claude',
+    descKey: 'aiProv.credential.anthropic.desc',
+    kind: 'apiKey',
+    category: 'ai',
+    fields: [
+      {
+        name: 'apiKey',
+        labelKey: 'credential.field.apiKey',
+        secret: true,
+        placeholderKey: 'credential.field.apiKey.placeholder',
+      },
+    ],
+    signupUrl: 'https://console.anthropic.com/settings/keys',
+    testable: false,
+    usedByKeys: ['credential.use.aiMining', 'credential.use.translateAnalysis'],
+    store: 'vault',
+    refusesWhenUnencrypted: true,
+  },
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    descKey: 'aiProv.credential.openai.desc',
+    kind: 'apiKey',
+    category: 'ai',
+    fields: [
+      {
+        name: 'apiKey',
+        labelKey: 'credential.field.apiKey',
+        secret: true,
+        placeholderKey: 'credential.field.apiKey.placeholder',
+      },
+    ],
+    signupUrl: 'https://platform.openai.com/api-keys',
+    testable: false,
+    usedByKeys: ['credential.use.aiMining', 'credential.use.translateAnalysis'],
+    store: 'vault',
+    refusesWhenUnencrypted: true,
+  },
+  {
+    // Optional: Ollama and LM Studio take no key. A server behind a proxy that
+    // wants one gets it here, never in the URL (the URL field refuses one).
+    id: 'openai-compatible',
+    label: 'Ollama / LM Studio (OpenAI-compatible)',
+    descKey: 'aiProv.credential.compat.desc',
+    kind: 'apiKey',
+    category: 'ai',
+    fields: [
+      {
+        name: 'apiKey',
+        labelKey: 'credential.field.apiKey',
+        secret: true,
+        placeholderKey: 'credential.field.apiKey.placeholder',
+      },
+    ],
+    signupUrl: 'https://ollama.com/download',
+    testable: false,
+    usedByKeys: ['credential.use.aiMining', 'credential.use.translateAnalysis'],
+    store: 'vault',
+    refusesWhenUnencrypted: true,
+  },
+  {
+    // Mirror Writing's custom evaluator endpoint. Read by
+    // `main/mirrorEvaluatorProxy.ts`; it used to sit in plain localStorage.
+    id: 'mirror-evaluator',
+    label: 'Mirror Writing · OpenAI-compatible endpoint',
+    descKey: 'aiProv.credential.mirror.desc',
+    kind: 'apiKey',
+    category: 'ai',
+    fields: [
+      {
+        name: 'apiKey',
+        labelKey: 'credential.field.apiKey',
+        secret: true,
+        placeholderKey: 'credential.field.apiKey.placeholder',
+      },
+    ],
+    signupUrl: 'https://platform.openai.com/api-keys',
+    testable: false,
+    usedByKeys: ['aiProv.credential.use.mirror'],
+    store: 'vault',
+    refusesWhenUnencrypted: true,
+  },
+  {
     // Read only by `main/translateRouter.ts`, and only after the user has
     // consented to DeepL in the Translate workbench. A Free key (`…:fx`) is sent
     // to api-free.deepl.com, any other to api.deepl.com.

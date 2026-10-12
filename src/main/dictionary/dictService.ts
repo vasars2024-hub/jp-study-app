@@ -568,7 +568,7 @@ export function collectInflectionReasons(
   for (const row of rows) {
     const existing = byHeadword.get(row.headword_id) ?? [];
     const reasons = [row.name, ...(row.tags?.split(',') ?? [])]
-      .filter((value): value is string => Boolean(value) && !value.startsWith(INFLECTION_WRITTEN_TAG));
+      .filter((value): value is string => typeof value === 'string' && value !== '' && !value.startsWith(INFLECTION_WRITTEN_TAG));
     byHeadword.set(row.headword_id, [...new Set([...existing, ...reasons])]);
   }
   return byHeadword;

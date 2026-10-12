@@ -19,7 +19,7 @@ import {
   type IntervalSnapshot,
 } from '../../shared/anki';
 import type { AnkiNoteInfo } from './client';
-import { invoke } from './client';
+import { invoke, invokeMulti } from './client';
 import { fnv1a, resolveTermFieldName } from './fieldMapper';
 
 const CHUNK_SIZE = 500; // notes/cards per AnkiConnect bulk call (A-4)
@@ -659,15 +659,24 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
     }
   };
 
-  const queries = dedupe(cfg.getQueries());
-  lastQueriesKey = queries.join('\x1f');
+  const allQueries = dedupe(cfg.getQueries());
+  lastQueriesKey = allQueries.join('\x1f');
+  // `deck:*` matches every note, so the union of it with anything is itself:
+  // the 28 default profiles' queries were 28 searches for one answer.
+  const queries = allQueries.some((q) => q.trim() === 'deck:*') ? ['deck:*'] : allQueries;
 
   // 1-2. note id union across every profile's sync query.
+  // Several profiles' queries go out as ONE `multi` request.
   const noteIdSet = new Set<number>();
-  for (const query of queries) {
-    checkEpoch();
-    const ids = (await invoke('findNotes', { query }, { signal })) ?? [];
-    for (const id of ids) noteIdSet.add(id);
+  checkEpoch();
+  if (queries.length === 1) {
+    for (const id of (await invoke('findNotes', { query: queries[0] }, { signal })) ?? []) noteIdSet.add(id);
+  } else if (queries.length > 1) {
+    const outcomes = await invokeMulti(queries.map((query) => ({ action: 'findNotes' as const, params: { query } })), { signal });
+    for (const outcome of outcomes) {
+      if (!outcome.ok) throw outcome.error;
+      for (const id of (outcome.result as number[] | null) ?? []) noteIdSet.add(id);
+    }
   }
   const noteIds = Array.from(noteIdSet);
 

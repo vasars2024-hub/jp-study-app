@@ -70,3 +70,38 @@ export function defaultWhisperTier(lang: 'ja' | 'zh' | 'ru'): WhisperModelTier {
 export function isWhisperModelTier(v: unknown): v is WhisperModelTier {
   return WHISPER_MODEL_SPECS.some((s) => s.id === v);
 }
+
+/**
+ * The chunk error a transcription reports when the audio's language needs a
+ * multilingual model and none is installed. Main stops the job on it (every
+ * slice would fail the same way) instead of writing an empty transcript.
+ */
+export const WHISPER_MULTILINGUAL_REQUIRED = 'multilingual-model-required';
+
+/** Whether `tier`'s model can transcribe `lang` at all. */
+export function whisperTierSupports(tier: WhisperModelTier, lang: 'ja' | 'zh' | 'ru'): boolean {
+  const spec = whisperSpec(tier);
+  return spec.langs.includes('any') || spec.langs.includes(lang);
+}
+
+/**
+ * The tier to actually run for `lang`.
+ *
+ * The model choice in Settings is global, so a learner who picked
+ * kotoba-whisper (trained on Japanese only) and then transcribed Chinese audio
+ * had it fed to a model that cannot produce Chinese. A tier that cannot do the
+ * language is swapped for a multilingual one — one that is already downloaded
+ * first, so the swap does not start a 500 MB download inside a 30 s chunk.
+ */
+export function whisperTierForLang(
+  tier: WhisperModelTier,
+  lang: 'ja' | 'zh' | 'ru',
+  isDownloaded: (candidate: WhisperModelTier) => boolean = () => false,
+): WhisperModelTier {
+  if (whisperTierSupports(tier, lang)) return tier;
+  const candidates = [defaultWhisperTier(lang), 'whisper-small', 'whisper-large-v3-turbo', 'whisper-base']
+    .filter((id, index, all): id is WhisperModelTier => (
+      isWhisperModelTier(id) && all.indexOf(id) === index && whisperTierSupports(id, lang)
+    ));
+  return candidates.find(isDownloaded) ?? candidates[0] ?? tier;
+}

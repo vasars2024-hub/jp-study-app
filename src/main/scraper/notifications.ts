@@ -24,8 +24,9 @@
 // without Electron: `notifyScraper` decides, and hands a finished notice to
 // whichever channels the profile asked for.
 
-import { Notification } from 'electron';
 import type { ScraperNotificationSettings } from '../../shared/scraperOutputSettings';
+import { showNativeNotification } from '../lockedNotifications';
+import { appLocked, deferWhileLocked } from '../lockGuard';
 import {
   describeDigest,
   describeNotice,
@@ -105,6 +106,20 @@ export function setScraperNoticeSink(next: ScraperNoticeSink | null): void {
   sink = next;
 }
 
+/** In-app toasts raised while locked, newest kept (risk4). */
+const MAX_HELD_TOASTS = 5;
+const heldToasts: ScraperNotice[] = [];
+
+function flushHeldToasts(): void {
+  if (appLocked()) {
+    deferWhileLocked('scraper-toasts', flushHeldToasts);
+    return;
+  }
+  for (const notice of heldToasts.splice(0, heldToasts.length)) {
+    if (sink) sink(notice);
+  }
+}
+
 interface PendingDigest {
   items: { kind: ScraperNoticeKind; facts: ScraperNoticeFacts }[];
   timer: NodeJS.Timeout | null;
@@ -140,20 +155,25 @@ function deliver(raw: ScraperNotice, settings: ScraperNotificationSettings): voi
   const wantsSystem = settings.channel === 'system' || settings.channel === 'both';
 
   if (wantsToast) {
-    if (sink) sink(notice);
+    // Locked (risk4): the in-app toast waits for the unlock, like the banner.
+    if (appLocked()) {
+      heldToasts.push(notice);
+      while (heldToasts.length > MAX_HELD_TOASTS) heldToasts.shift();
+      deferWhileLocked('scraper-toasts', flushHeldToasts);
+    } else if (sink) sink(notice);
     else scraperLog('debug', 'notify', `No window to show "${notice.title}" in.`);
   }
 
   if (wantsSystem) {
     try {
-      if (Notification.isSupported()) {
-        new Notification({
-          title: notice.title,
-          body: notice.body,
-          // `soundEnabled` off must be quiet, not merely quieter.
-          silent: !notice.sound,
-        }).show();
-      } else {
+      // Held while locked and shown on unlock (lockedNotifications.ts).
+      const outcome = showNativeNotification({
+        title: notice.title,
+        body: notice.body,
+        // `soundEnabled` off must be quiet, not merely quieter.
+        silent: !notice.sound,
+      });
+      if (outcome === 'unsupported') {
         scraperLog('debug', 'notify', 'This platform has no system notifications.');
       }
     } catch (error) {
@@ -257,6 +277,7 @@ export function resetScraperNotifications(): void {
   if (digest?.timer) clearTimeout(digest.timer);
   digest = null;
   sink = null;
+  heldToasts.length = 0;
   sequence = 0;
   recentNotices.clear();
 }

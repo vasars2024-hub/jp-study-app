@@ -3,16 +3,28 @@
  * Headless end-to-end harness for the REAL Gum app.
  *
  *   npm run e2e                       all flows, in order
- *   npm run e2e -- --flows=setup,dictionary
+ *   npm run e2e -- --flows=setup,dictionary   only these flows (ids, see --list)
+ *   npm run e2e -- --skip=extension,recorder  every flow but these
+ *   npm run e2e -- --list             print the flow ids and titles, run nothing
  *   npm run e2e -- --keep             keep the temp profile + media for inspection
- *   npm run e2e -- --reuse-build      skip rebuilding the snapshot
+ *   npm run e2e -- --reuse-build      skip rebuilding the snapshot (use the newest complete one)
+ *   npm run e2e -- --world-ai         start the fake AI server and preset the profile to it
+ *                                     (automatic when a selected flow declares `world: { ai: true }`)
  *   npm run e2e -- --dev              drive `electron-forge start` instead (live dev server)
+ *   npm run e2e -- --bridge-port=N --extension-port=N --vite-port=N
+ *                                     fixed ports instead of free ephemeral ones (also
+ *                                     GUM_E2E_BRIDGE_PORT / _EXTENSION_PORT / _VITE_PORT)
+ *
+ * Runs are isolated from each other (tools/e2e/isolation.cjs), so several agents can run
+ * the harness at once: free ephemeral ports per run, output in tools/e2e/out/<run-id>/,
+ * and each snapshot build in its own directory under tools/e2e/out/builds/, serialized by
+ * a lock — a rebuild never replaces a snapshot another run is executing.
  *
  * What it runs: a PRODUCTION snapshot of the tree (tools/e2e/build.cjs — forge's own Vite
- * config, written to tools/e2e/out/app, so the shared .vite/ is untouched), launched with
- * the repo's electron.exe. Not the dev server by default: other agents edit this tree while
- * a run is in flight, and Vite's HMR reloaded the page under a flow three times in seven
- * seconds. Environment:
+ * config, written to tools/e2e/out/builds/<build-id>/app, so the shared .vite/ is untouched),
+ * launched with the repo's electron.exe. Not the dev server by default: other agents edit
+ * this tree while a run is in flight, and Vite's HMR reloaded the page under a flow three
+ * times in seven seconds. Environment:
  *
  *   GUM_E2E_HEADLESS=1      src/main/e2eHeadless.ts: every window hidden for life (still
  *                           rendered), no tray, OS dialogs / toasts / shell calls / native
@@ -20,9 +32,15 @@
  *                           global shortcuts stubbed, DevTools never opened. Plus `--e2e`.
  *   JP_USER_DATA_DIR        a fresh temp profile per run
  *   JP_DEBUG_DIR/PORT       the debug bridge's bridge.json + port, private to this run
- *   JP_EXTENSION_PORT, PORT a private extension-server port (and Vite port for --dev)
+ *   JP_EXTENSION_PORT, PORT the run's extension-server port (and Vite port for --dev)
  *   SEANIME_EXE/_DATADIR    the media sidecar (default: the installed copy under
  *                           %USERPROFILE%\Apps\jp-study-app-win32-x64), datadir in the profile
+ *
+ * The world around it is the harness's (tools/e2e/world.cjs): AnkiConnect, qBittorrent, a
+ * web site, a texthooker and the subtitle/metadata providers are fakes on ephemeral
+ * loopback ports, and headless mode remaps the owner's well-known service ports onto them
+ * or refuses them (GUM_E2E_LOOPBACK / GUM_E2E_REMOTE), so a run never reaches the owner's
+ * Anki, torrent client, clipboard, screen or files.
  *
  * and drives it through the debug bridge (src/main/debugBridge.ts): `/eval` runs page JS in
  * the main window (`window: 'main'`), `/screenshot` is `webContents.capturePage()`, `/e2e`
@@ -34,7 +52,9 @@
  * the processes this script started (creation-time-checked descendants plus anything naming
  * the run's temp dir), one PID at a time.
  *
- * Output: tools/e2e/out/report.json + report.md, app stdout in out/app.log, screenshots in
+ * Output: tools/e2e/out/<run-id>/ — report.json + report.md, run.log, app.log, build.log,
+ * screens/. The newest finished run's report is copied to tools/e2e/out/report.{md,json}
+ * and named in tools/e2e/out/latest.json. Screenshots are also copied to
  * `%USERPROFILE%\Videos\Gum Showcase\screens\e2e-*.png`.
  */
 'use strict';
@@ -46,13 +66,17 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 
+const isolation = require('./isolation.cjs');
+
 const REPO = path.resolve(__dirname, '..', '..');
-const OUT = path.join(__dirname, 'out');
+/** Shared root: per-run folders, builds/, and the latest report copy. */
+const OUT_ROOT = path.join(__dirname, 'out');
+/** This run's id and its own output folder. */
+const RUN_ID = isolation.makeRunId();
+const OUT = path.join(OUT_ROOT, RUN_ID);
 const SCREENS = path.join(os.homedir(), 'Videos', 'Gum Showcase', 'screens');
 const FORGE_CLI = path.join(REPO, 'node_modules', '@electron-forge', 'cli', 'dist', 'electron-forge.js');
 const DEFAULT_SEANIME = path.join(os.homedir(), 'Apps', 'jp-study-app-win32-x64', 'resources', 'seanime', 'seanime.exe');
-
-const PORTS = { bridge: 39391, vite: 5191, extension: 18791 };
 
 const args = process.argv.slice(2);
 const argValue = (name) => {
@@ -62,14 +86,13 @@ const argValue = (name) => {
 const KEEP = args.includes('--keep');
 /** `--dev`: drive `electron-forge start` (live dev server) instead of the production snapshot. */
 const DEV = args.includes('--dev');
-/** `--reuse-build`: skip rebuilding the snapshot when tools/e2e/out/app already has one. */
+/** `--reuse-build`: skip rebuilding the snapshot when a complete one exists (out/builds/latest.json). */
 const REUSE_BUILD = args.includes('--reuse-build');
-const BUILD_APP = path.join(OUT, 'app');
 const ELECTRON = path.join(REPO, 'node_modules', 'electron', 'dist', 'electron.exe');
 const ONLY = (argValue('flows') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+const SKIP = (argValue('skip') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const stamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 
 function log(...parts) {
   const line = `[e2e ${new Date().toISOString().slice(11, 19)}] ${parts.join(' ')}`;
@@ -157,8 +180,12 @@ Get-Process -Id $ids -ErrorAction SilentlyContinue | Where-Object { $_.MainWindo
 
 class Harness {
   constructor() {
-    this.runId = stamp();
+    this.runId = RUN_ID;
     this.runDir = path.join(os.tmpdir(), `gum-e2e-${this.runId}`);
+    /** This run's ports (isolation.resolvePorts), set by start(). */
+    this.ports = null;
+    /** The snapshot this run executes (isolation.prepareBuild). */
+    this.appDir = null;
     this.profile = path.join(this.runDir, 'profile');
     this.debugDir = path.join(this.runDir, 'debug');
     this.mediaDir = path.join(this.runDir, 'media');
@@ -167,6 +194,8 @@ class Harness {
     this.desktopLeaks = [];
     this.screens = [];
     this.appLog = null;
+    /** The fakes (tools/e2e/world.cjs), started before the app. */
+    this.world = null;
   }
 
   env() {
@@ -175,10 +204,11 @@ class Harness {
       GUM_E2E_HEADLESS: '1',
       JP_USER_DATA_DIR: this.profile,
       JP_DEBUG_DIR: this.debugDir,
-      JP_DEBUG_PORT: String(PORTS.bridge),
-      JP_EXTENSION_PORT: String(PORTS.extension),
-      PORT: String(PORTS.vite),
+      JP_DEBUG_PORT: String(this.ports.bridge),
+      JP_EXTENSION_PORT: String(this.ports.extension),
+      PORT: String(this.ports.vite),
       SEANIME_DATADIR: path.join(this.profile, 'seanime-e2e'),
+      ...(this.world ? this.world.env() : {}),
     };
     const seanime = process.env.SEANIME_EXE || DEFAULT_SEANIME;
     if (fs.existsSync(seanime)) env.SEANIME_EXE = seanime;
@@ -186,34 +216,52 @@ class Harness {
     return env;
   }
 
-  /** Build the production snapshot (tools/e2e/build.cjs) unless --reuse-build finds one. */
+  /**
+   * The production snapshot this run executes (tools/e2e/build.cjs): the newest complete
+   * one with --reuse-build, otherwise a fresh build in its own directory. Concurrent runs
+   * are safe: builds are serialized by a lock, and no build replaces a snapshot in use
+   * (tools/e2e/isolation.cjs).
+   */
   async ensureBuild() {
-    const info = path.join(BUILD_APP, 'build-info.json');
-    if (REUSE_BUILD && fs.existsSync(info) && fs.existsSync(path.join(BUILD_APP, '.vite', 'build', 'main.js'))) {
-      log(`reusing build from ${JSON.parse(fs.readFileSync(info, 'utf8')).builtAt}`);
-      return;
-    }
-    log('building the production snapshot (tools/e2e/build.cjs)…');
-    const t0 = Date.now();
-    const code = await new Promise((resolve) => {
-      const p = spawn(process.execPath, ['--max-old-space-size=8192', path.join(__dirname, 'build.cjs')], {
-        cwd: REPO,
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, NODE_ENV: 'production' },
-      });
-      const buildLog = fs.createWriteStream(path.join(OUT, 'build.log'), { flags: 'w' });
-      p.stdout.pipe(buildLog);
-      p.stderr.pipe(buildLog);
-      p.on('exit', resolve);
+    const requestedAt = Date.now();
+    const build = await isolation.prepareBuild({
+      outRoot: OUT_ROOT,
+      reuse: REUSE_BUILD,
+      requestedAt,
+      log,
+      runBuild: async (appDir, id) => {
+        log(`building the production snapshot ${id} (tools/e2e/build.cjs)…`);
+        const t0 = Date.now();
+        const buildLogFile = path.join(OUT, 'build.log');
+        const code = await new Promise((resolve) => {
+          const p = spawn(process.execPath, ['--max-old-space-size=8192', path.join(__dirname, 'build.cjs'), `--out=${appDir}`], {
+            cwd: REPO,
+            windowsHide: true,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, NODE_ENV: 'production' },
+          });
+          const buildLog = fs.createWriteStream(buildLogFile, { flags: 'w' });
+          p.stdout.pipe(buildLog);
+          p.stderr.pipe(buildLog);
+          p.on('exit', resolve);
+        });
+        if (code !== 0) throw new Error(`build failed (exit ${code}); see ${path.relative(REPO, buildLogFile)}`);
+        log(`build done in ${Math.round((Date.now() - t0) / 1000)} s`);
+      },
     });
-    if (code !== 0) throw new Error(`build failed (exit ${code}); see tools/e2e/out/build.log`);
-    log(`build done in ${Math.round((Date.now() - t0) / 1000)} s`);
+    this.appDir = build.appDir;
+    this.buildId = build.id;
   }
 
-  async start() {
-    for (const dir of [this.profile, this.debugDir, this.mediaDir, OUT, SCREENS]) fs.mkdirSync(dir, { recursive: true });
-    log(`run dir ${this.runDir}`);
+  /** `worldOptions`: what the selected flows need of the world (`worldOptionsFor`). */
+  async start(worldOptions = {}) {
+    for (const dir of [this.profile, this.debugDir, this.mediaDir, OUT, path.join(OUT, 'screens'), SCREENS]) fs.mkdirSync(dir, { recursive: true });
+    this.ports = await isolation.resolvePorts(args);
+    log(`run ${this.runId}: dir ${this.runDir}, output ${path.relative(REPO, OUT)}, ports ${JSON.stringify(this.ports)}`);
+    const t0 = Date.now();
+    this.world = await require('./world.cjs').startWorld(this.mediaDir, { outDir: OUT, ...worldOptions });
+    this.world.seedProfile(this.profile);
+    log(`world up in ${Date.now() - t0} ms: ${JSON.stringify(this.world.ports())}`);
     const appArgs = ['--e2e', `--e2e-run=${this.runDir}`];
     if (DEV) {
       // The live dev server: convenient while writing a flow, but another agent's save
@@ -227,10 +275,12 @@ class Harness {
       });
     } else {
       await this.ensureBuild();
-      require('./build.cjs').linkResources();
+      // Registered as a user of the snapshot: its junctions stay until the last run using
+      // it has finished, whichever run that is.
+      await isolation.acquireSnapshot(this.appDir, this.runId, require('./build.cjs').linkResources);
       this.linked = true;
       this.appLog = fs.createWriteStream(path.join(OUT, 'app.log'), { flags: 'w' });
-      this.child = spawn(ELECTRON, [BUILD_APP, ...appArgs], {
+      this.child = spawn(ELECTRON, [this.appDir, ...appArgs], {
         cwd: REPO,
         env: this.env(),
         windowsHide: true,
@@ -275,7 +325,7 @@ class Harness {
    */
   async secondInstance(extraArgs = []) {
     if (DEV) return { skipped: 'second instance needs the production snapshot' };
-    const p = spawn(ELECTRON, [BUILD_APP, '--e2e', `--e2e-run=${this.runDir}`, ...extraArgs], {
+    const p = spawn(ELECTRON, [this.appDir, '--e2e', `--e2e-run=${this.runDir}`, ...extraArgs], {
       cwd: REPO,
       env: this.env(),
       windowsHide: true,
@@ -369,8 +419,15 @@ class Harness {
   async screenshot(name, { window = 'main' } = {}) {
     const r = await this.request('/screenshot', { window });
     if (!r.ok) throw new Error(`screenshot failed: ${r.error}`);
-    const target = path.join(SCREENS, `e2e-${name}.png`);
+    // The run's own copy is the record; the showcase folder gets one too, as before.
+    const target = path.join(OUT, 'screens', `e2e-${name}.png`);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(r.path, target);
+    try {
+      fs.copyFileSync(r.path, path.join(SCREENS, `e2e-${name}.png`));
+    } catch {
+      /* the showcase copy is a convenience */
+    }
     this.screens.push(target);
     return target;
   }
@@ -430,14 +487,21 @@ class Harness {
       left = await recheck();
     }
     this.appLog?.end();
-    // The app is gone: take the junctions out of tools/e2e/out/app again (build.cjs).
+    // The app is gone: release the snapshot. Its junctions are removed only when no other
+    // live run still uses it (build.cjs, isolation.cjs).
     if (this.linked) {
       try {
-        require('./build.cjs').unlinkResources();
+        const unlinked = await isolation.releaseSnapshot(this.appDir, this.runId, require('./build.cjs').unlinkResources);
+        if (!unlinked) log(`left the snapshot's junctions for another run still using ${this.buildId}`);
       } catch (err) {
-        log(`could not remove the out/app junctions: ${err}`);
+        log(`could not release the snapshot's junctions: ${err}`);
       }
       this.linked = false;
+    }
+    try {
+      await this.world?.close();
+    } catch (err) {
+      log(`could not close the fakes: ${err}`);
     }
     return { started: before.length, leftAfterKill: left.length, left: left.map((p) => p.ProcessId) };
   }
@@ -497,7 +561,46 @@ function loadFlowsAll() {
 }
 
 function loadFlows() {
-  return loadFlowsAll().filter((flow) => !ONLY.length || ONLY.includes(flow.id));
+  const all = loadFlowsAll();
+  const unknown = [...ONLY, ...SKIP].filter((id) => !all.some((f) => f.id === id));
+  if (unknown.length) throw new Error(`unknown flow id(s): ${unknown.join(', ')} (see --list)`);
+  // `boot` always runs: it is what proves headless mode and the isolation are in place.
+  return all.filter((flow) => flow.id === 'boot' || ((!ONLY.length || ONLY.includes(flow.id)) && !SKIP.includes(flow.id)));
+}
+
+/**
+ * The opt-in parts of the world the selected flows ask for (a flow's `world` field), plus
+ * `--world-ai` for `--serve`. `ai`: the fake AI server and the profile preset pointing at
+ * it (tools/e2e/world.cjs) — only when a flow that needs it runs.
+ */
+function worldOptionsFor(flows) {
+  return { ai: args.includes('--world-ai') || flows.some((flow) => Boolean(flow.world && flow.world.ai)) };
+}
+
+/** Loopback port -> who listens there (the harness's fakes and the app's own servers). */
+function ownerLabels(h) {
+  return {
+    ...(h.world ? h.world.ports() : {}),
+    ...(h.ports ? { [h.ports.bridge]: 'app debug bridge', [h.ports.extension]: 'app extension server' } : {}),
+  };
+}
+
+/**
+ * The isolation verdict for one flow: every loopback connection the app made while it
+ * ran, named by owner. A protected port (the owner's Anki, torrent client, texthooker …)
+ * contacted without being remapped to a fake or refused is a leak and fails the flow.
+ */
+function isolationVerdict(status, sinceTs, owners) {
+  const iso = status?.isolation ?? {};
+  const conns = (iso.loopback?.connections ?? []).filter((c) => c.ts >= sinceTs);
+  const protect = iso.loopback?.config?.protect ?? {};
+  const leaked = conns.filter((c) => protect[c.port] && c.verdict === 'allowed');
+  const byPort = {};
+  for (const c of conns) {
+    const key = `${c.port} ${owners[c.port] ?? protect[c.port] ?? 'app-owned'} (${c.verdict}${c.to ? ` -> ${c.to}` : ''})`;
+    byPort[key] = (byPort[key] ?? 0) + 1;
+  }
+  return { leaked, refused: conns.filter((c) => c.verdict === 'refused'), byPort, missing: iso.missing ?? [] };
 }
 
 /** What a flow gets: the harness, its result sheet, and short names for the bridge calls. */
@@ -517,7 +620,11 @@ function makeCtx(h, flow, result) {
     e2e: (a, x) => h.e2e(a, x),
     request: (r, b, t) => h.request(r, b, t),
     secondInstance: (args) => h.secondInstance(args),
-    extensionPort: PORTS.extension,
+    /** The run's own extension-server port (ephemeral unless overridden). */
+    extensionPort: h.ports?.extension,
+    /** The run's output folder (tools/e2e/out/<run-id>/). */
+    outDir: OUT,
+    world: h.world,
     shot: async (name, opts) => {
       if (opts && opts.window) {
         const file = await h.screenshot(`${flow.id}-${name}`, opts);
@@ -539,20 +646,38 @@ function writeReport(results, meta) {
     '',
     `Run ${meta.runId} — ${meta.startedAt} → ${meta.finishedAt}`,
     '',
-    `Desktop leaks: ${meta.desktopLeaks.length ? `**${meta.desktopLeaks.length}**` : 'none'}; processes left after teardown: ${meta.teardown?.leftAfterKill ?? '?'}`,
+    `Output tools/e2e/out/${meta.runId}/; snapshot ${meta.buildId ?? '(dev server)'}; ports ${JSON.stringify(meta.ports ?? {})}`,
     '',
-    '| Flow | Result | Checks | Notes |',
-    '| --- | --- | --- | --- |',
+    `Desktop leaks: ${meta.desktopLeaks.length ? `**${meta.desktopLeaks.length}**` : 'none'}; owner-service leaks: ${meta.isolation ? (meta.isolation.leaked ? `**${meta.isolation.leaked}**` : 'none') : '?'}; processes left after teardown: ${meta.teardown?.leftAfterKill ?? '?'}`,
+    '',
+    `Total ${Math.round((Date.parse(meta.finishedAt) - Date.parse(meta.startedAt)) / 1000)} s; ${results.filter((r) => r.status === 'PASS').length} PASS, ${results.filter((r) => r.status === 'FAIL').length} FAIL, ${results.filter((r) => r.status === 'SKIP').length} SKIP`,
+    '',
+    '| Flow | Id | Result | Checks | Time | Notes |',
+    '| --- | --- | --- | --- | --- | --- |',
   ];
   for (const r of results) {
     const passed = r.checks.filter((c) => c.ok).length;
-    lines.push(`| ${r.title} | ${r.status} | ${passed}/${r.checks.length} | ${(r.skipReason ?? r.notes.join('; ')).replace(/\|/g, '/')} |`);
+    const secs = r.durationMs != null ? `${Math.round(r.durationMs / 1000)} s` : '';
+    lines.push(`| ${r.title} | ${r.id} | ${r.status} | ${passed}/${r.checks.length} | ${secs} | ${(r.skipReason ?? r.notes.join('; ')).replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 300)} |`);
+  }
+  if (meta.isolation) {
+    const iso = meta.isolation;
+    lines.push('', '## Isolation', '');
+    lines.push(`Stubs: ${(iso.stubs ?? []).map((s) => `${s.installed ? '' : '**MISSING** '}${s.name}`).join('; ')}`, '');
+    lines.push('| Loopback port contacted | Connections |', '| --- | --- |');
+    for (const [k, n] of Object.entries(iso.loopbackByPort ?? {})) lines.push(`| ${k} | ${n} |`);
+    lines.push('', `Clipboard (in-memory): ${JSON.stringify(iso.clipboard ?? {})}`);
+    lines.push(`Screen capture (synthetic): ${JSON.stringify(iso.capture ?? {})}`);
+    if ((iso.shimNotes ?? []).length) lines.push(`Page shim notes: ${iso.shimNotes.join(' / ').slice(0, 600)}`);
+    lines.push(`Off-machine hosts requested (witnessed, not faked): ${(iso.offMachineHosts ?? []).join(', ') || 'none'}`);
+    if (meta.world) lines.push('', `Fakes: \`${JSON.stringify(meta.world).slice(0, 1500)}\``);
   }
   for (const r of results) {
     lines.push('', `## ${r.title} — ${r.status}`, '');
     if (r.skipReason) lines.push(`Skipped: ${r.skipReason}`, '');
     for (const c of r.checks) lines.push(`- ${c.ok ? 'PASS' : '**FAIL**'} ${c.name}${c.detail ? ` — ${c.detail.slice(0, 400)}` : ''}`);
     for (const n of r.notes) lines.push(`- note: ${n}`);
+    if (r.isolation && Object.keys(r.isolation).length) lines.push(`- loopback: ${Object.entries(r.isolation).map(([k, n]) => `${k} ×${n}`).join('; ')}`);
     for (const s of r.screens) lines.push(`- screenshot: ${s}`);
   }
   fs.writeFileSync(path.join(OUT, 'report.md'), `${lines.join('\n')}\n`);
@@ -561,6 +686,7 @@ function writeReport(results, meta) {
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, 'run.log'), '');
+  isolation.writeJsonAtomic(path.join(OUT, 'run.json'), { runId: RUN_ID, pid: process.pid, startedAt: new Date().toISOString(), args });
   const flows = loadFlows();
   if (!flows.length) throw new Error(`no flows match ${ONLY.join(',')}`);
   const h = new Harness();
@@ -568,12 +694,14 @@ async function main() {
   const results = [];
   let fatal = null;
   try {
-    await h.start();
+    await h.start(worldOptionsFor(flows));
     for (const flow of flows) {
       const result = new FlowResult(flow);
       log(`flow ${flow.id}: ${flow.title}`);
       const ctx = makeCtx(h, flow, result);
       const t0 = Date.now();
+      // Loopback connections are judged per flow, from this instant (bridge clock = ours).
+      const isoSince = t0 - 50;
       try {
         // Every flow starts on the desktop, whatever the previous one left open.
         if (flow.id !== 'boot' && flow.id !== 'setup') await require('./flows/_lib.cjs').toDesktop(ctx);
@@ -588,6 +716,15 @@ async function main() {
       }
       const desk = await h.checkDesktop(flow.id);
       result.check('nothing reached the desktop', desk.visible.length === 0 && desk.violations.length === 0, desk.visible.length || desk.violations.length ? desk : '');
+      try {
+        const iso = isolationVerdict(await h.e2e('status'), isoSince, ownerLabels(h));
+        result.isolation = iso.byPort;
+        result.check("nothing touched the owner's services (loopback guard)", iso.leaked.length === 0 && iso.missing.length === 0,
+          iso.leaked.length || iso.missing.length ? { leaked: iso.leaked, missingStubs: iso.missing } : '');
+        if (iso.refused.length) result.note(`refused (owner ports, no fake): ${[...new Set(iso.refused.map((c) => `${c.port} ${c.service}`))].join(', ')}`);
+      } catch (err) {
+        result.check("nothing touched the owner's services (loopback guard)", false, `status unreadable: ${err}`);
+      }
       result.durationMs = Date.now() - t0;
       results.push(result);
       if (h.child.exitCode !== null) {
@@ -600,8 +737,27 @@ async function main() {
       meta.stubbedCalls = status.calls?.length ?? 0;
       meta.stubbedApis = [...new Set((status.calls ?? []).map((c) => c.api))];
       meta.patchFailures = status.patchFailures;
+      // Per-flow verdicts are the record (a flow may `clear` the app's log mid-run), so the
+      // run's totals are their sum.
+      const byPort = {};
+      for (const r of results) for (const [k, n] of Object.entries(r.isolation ?? {})) byPort[k] = (byPort[k] ?? 0) + n;
+      const leaked = results.reduce((n, r) => n + (r.checks.some((c) => c.name.startsWith("nothing touched the owner's services") && !c.ok) ? 1 : 0), 0);
+      meta.isolation = {
+        stubs: status.isolation?.stubs ?? [],
+        loopbackByPort: byPort,
+        leaked,
+        clipboard: status.isolation?.clipboard,
+        capture: status.isolation?.capture,
+        shimNotes: (status.isolation?.shimNotes ?? []).slice(-20),
+        offMachineHosts: [...new Set((status.network ?? []).map((n) => { try { return new URL(n.detail).host; } catch { return n.detail; } }))],
+      };
     } catch {
       /* bridge gone */
+    }
+    try {
+      meta.world = h.world?.summary();
+    } catch {
+      /* fakes gone */
     }
   } catch (err) {
     fatal = String(err && err.stack ? err.stack : err);
@@ -613,8 +769,20 @@ async function main() {
     meta.desktopLeaks = h.desktopLeaks;
     meta.screens = h.screens;
     meta.fatal = fatal;
+    meta.ports = h.ports;
+    meta.buildId = h.buildId;
     writeReport(results.map((r) => ({ ...r })), meta);
     h.cleanup();
+    // This run's report becomes "the latest"; old run folders and snapshots are pruned
+    // (never one a live run is using).
+    try {
+      isolation.publishLatest(OUT_ROOT, OUT, RUN_ID);
+      isolation.writeJsonAtomic(path.join(OUT, 'run.json'), { runId: RUN_ID, pid: process.pid, startedAt: meta.startedAt, finishedAt: meta.finishedAt, args });
+      isolation.pruneRunDirs(OUT_ROOT, { exceptRunId: RUN_ID });
+      await isolation.pruneBuilds(OUT_ROOT, { unlink: require('./build.cjs').unlinkResources, log });
+    } catch (err) {
+      log(`could not publish/prune: ${err}`);
+    }
   }
   const failed = results.filter((r) => r.status === 'FAIL').length;
   log(`done: ${results.map((r) => `${r.id}=${r.status}`).join(' ')}${fatal ? ` FATAL: ${fatal.split('\n')[0]}` : ''}`);
@@ -630,26 +798,75 @@ async function main() {
  */
 async function serve() {
   fs.mkdirSync(OUT, { recursive: true });
+  isolation.writeJsonAtomic(path.join(OUT, 'run.json'), { runId: RUN_ID, pid: process.pid, startedAt: new Date().toISOString(), args, serve: true });
   const stopFile = path.join(OUT, 'stop');
   fs.rmSync(stopFile, { force: true });
   const h = new Harness();
   try {
-    await h.start();
-    fs.writeFileSync(path.join(OUT, 'session.json'), JSON.stringify({ bridge: h.bridge, runDir: h.runDir, launcher: h.child.pid }, null, 2));
-    log('serving; create out/stop (or run --stop) to tear down');
-    while (!fs.existsSync(stopFile) && h.child.exitCode === null) await sleep(1000);
+    await h.start(worldOptionsFor([]));
+    const session ={ bridge: h.bridge, runDir: h.runDir, launcher: h.child.pid, outDir: OUT, ports: h.ports };
+    fs.writeFileSync(path.join(OUT, 'session.json'), JSON.stringify(session, null, 2));
+    // The pointer a client (`--eval`, `--run`, `--stop`) finds the newest served app by.
+    isolation.writeJsonAtomic(path.join(OUT_ROOT, 'session.json'), session);
+    log('serving; create out/stop (or run --stop) to tear down; `--run=<flow>` runs a flow in here');
+    const requestFile = path.join(OUT, 'run-request.json');
+    while (!fs.existsSync(stopFile) && h.child.exitCode === null) {
+      // A flow run requested by a client (`--run=<id>`): executed in THIS process, which
+      // owns the fakes (ctx.world), and answered in out/run-result-<nonce>.json.
+      if (fs.existsSync(requestFile)) {
+        let req = null;
+        try {
+          req = JSON.parse(fs.readFileSync(requestFile, 'utf8'));
+        } catch {
+          /* half-written */
+        }
+        if (req) {
+          fs.rmSync(requestFile, { force: true });
+          // Authoring: pick up edits to the flows and fixtures since the last request.
+          for (const key of Object.keys(require.cache)) {
+            if (key.startsWith(path.join(__dirname, 'flows')) || key === path.join(__dirname, 'fixtures.cjs')) delete require.cache[key];
+          }
+          const flow = loadFlowsAll().find((f) => f.id === req.flow);
+          const result = new FlowResult(flow ?? { id: req.flow, title: req.flow });
+          const t0 = Date.now();
+          try {
+            if (!flow) throw new Error(`no flow ${req.flow}`);
+            if (flow.id !== 'boot' && flow.id !== 'setup') await require('./flows/_lib.cjs').toDesktop(makeCtx(h, flow, result));
+            await flow.run(makeCtx(h, flow, result));
+          } catch (err) {
+            result.check('flow ran to completion', false, String(err && err.stack ? err.stack : err));
+          }
+          try {
+            const iso = isolationVerdict(await h.e2e('status'), t0 - 50, ownerLabels(h));
+            result.check("nothing touched the owner's services (loopback guard)", iso.leaked.length === 0 && iso.missing.length === 0, iso.leaked.length ? iso.leaked : '');
+            result.isolation = iso.byPort;
+          } catch {
+            /* bridge gone */
+          }
+          result.durationMs = Date.now() - t0;
+          fs.writeFileSync(path.join(OUT, `run-result-${req.nonce}.json`), JSON.stringify({ ...result, world: h.world?.summary() }, null, 2));
+        }
+      }
+      await sleep(500);
+    }
   } catch (err) {
     log(`serve failed: ${err && err.stack ? err.stack : err}`);
   } finally {
     log(`teardown ${JSON.stringify(await h.stop())}`);
     fs.rmSync(path.join(OUT, 'session.json'), { force: true });
+    // Only this serve's pointer; a newer serve may have replaced it.
+    if (isolation.readJson(path.join(OUT_ROOT, 'session.json'))?.outDir === OUT) fs.rmSync(path.join(OUT_ROOT, 'session.json'), { force: true });
     fs.rmSync(stopFile, { force: true });
     h.cleanup();
   }
 }
 
 async function client() {
-  const session = JSON.parse(fs.readFileSync(path.join(OUT, 'session.json'), 'utf8'));
+  // `--session=<run-id>` picks a served app; otherwise the newest one (out/session.json).
+  const sessionId = argValue('session');
+  const session = JSON.parse(fs.readFileSync(sessionId ? path.join(OUT_ROOT, sessionId, 'session.json') : path.join(OUT_ROOT, 'session.json'), 'utf8'));
+  // The served app's own output folder holds its control files.
+  const OUT = session.outDir;
   const h = new Harness();
   h.bridge = session.bridge;
   if (args.includes('--stop')) {
@@ -658,19 +875,18 @@ async function client() {
   }
   const runId = argValue('run');
   if (runId) {
-    // One flow against the served app, for authoring. Same ctx as a full run.
-    const flow = loadFlowsAll().find((f) => f.id === runId);
-    if (!flow) throw new Error(`no flow ${runId}`);
-    h.runDir = session.runDir;
-    h.profile = path.join(session.runDir, 'profile');
-    h.mediaDir = path.join(session.runDir, 'media');
-    const result = new FlowResult(flow);
-    try {
-      await flow.run(makeCtx(h, flow, result));
-    } catch (err) {
-      result.check('flow ran to completion', false, String(err && err.stack ? err.stack : err));
-    }
-    console.log(JSON.stringify({ status: result.status, checks: result.checks, notes: result.notes }, null, 2));
+    // One flow against the served app, for authoring. It runs inside the serving process
+    // (which owns the fakes), with the same ctx as a full run.
+    if (!loadFlowsAll().some((f) => f.id === runId)) throw new Error(`no flow ${runId}`);
+    const nonce = `${Date.now()}-${process.pid}`;
+    const answer = path.join(OUT, `run-result-${nonce}.json`);
+    fs.writeFileSync(path.join(OUT, 'run-request.json'), JSON.stringify({ flow: runId, nonce }));
+    const deadline = Date.now() + 15 * 60_000;
+    while (!fs.existsSync(answer) && Date.now() < deadline) await sleep(500);
+    if (!fs.existsSync(answer)) throw new Error('the served app never answered the run request');
+    const result = JSON.parse(fs.readFileSync(answer, 'utf8'));
+    fs.rmSync(answer, { force: true });
+    console.log(JSON.stringify({ status: result.status, durationMs: result.durationMs, checks: result.checks, notes: result.notes, isolation: result.isolation, world: result.world }, null, 2));
     return;
   }
   const shot = argValue('shot');
@@ -685,7 +901,9 @@ async function client() {
   console.log(JSON.stringify(r.ok ? r.result : r, null, 2));
 }
 
-if (require.main === module && args.includes('--serve')) {
+if (require.main === module && args.includes('--list')) {
+  for (const flow of loadFlowsAll()) console.log(`${flow.id.padEnd(14)} ${flow.title}`);
+} else if (require.main === module && args.includes('--serve')) {
   serve();
 } else if (require.main === module && (args.some((a) => a.startsWith('--eval')) || args.includes('--stop') || argValue('shot') || argValue('run'))) {
   client().catch((err) => {

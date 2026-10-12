@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AgentTaskQueue } from '../../../shared/localAgentTaskQueue';
-import type { AgentOperationDraft } from '../../../shared/agentOperationLog';
+import type { AgentOperationDraft, AgentOperationLog } from '../../../shared/agentOperationLog';
 import {
   agentExecutionTimelineProjection,
   agentOperationDraftFromExecution,
@@ -12,6 +12,9 @@ import { confirmDialog } from '../ui';
 import { studyAnswerOf } from '../../../shared/agentStudyCoach';
 import { AgentStudyAnswerView } from './AgentStudyAnswer';
 import { recoverAgentExecutionClaim } from '../../agentExecutionLeaseClient';
+import { localizeAgentStepError } from './agentExecutionTargets';
+import { agentOperationWasUndone, agentUndoActionForCall, type AgentUndoFailureCode } from '../../../shared/agentUndo';
+import { performAgentUndo } from '../../agentUndoClient';
 import {
   isAgentConversationPlanQuarantined,
   retryAgentConversationPlanSave,
@@ -43,11 +46,18 @@ export function AgentConversationPlanQueue({
   onFailure,
   onTimeline,
   onOperation,
+  operationLog,
 }: {
   conversationId: string;
   queue: AgentTaskQueue | null;
   disabled: boolean;
-  onFailure: (code: string | null) => void;
+  /**
+   * This session's operation log. With it, a completed step whose effect can honestly be
+   * taken back (a created event or card, a moved event) offers Undo right on the step.
+   */
+  operationLog?: AgentOperationLog;
+  /** A failure code; `detail` is an already-localized sentence naming the exact rule. */
+  onFailure: (code: string | null, detail?: string) => void;
   onTimeline?: (projection: AgentTimelineProjection) => void;
   onOperation?: (operation: AgentOperationDraft) => void;
 }) {
@@ -108,7 +118,7 @@ export function AgentConversationPlanQueue({
       }
       if (result.ok) onFailure(null);
       else {
-        onFailure(result.code);
+        onFailure(result.code, result.reason ? localizeAgentStepError(result.reason, t) : undefined);
       }
     } finally {
       setRunningTaskIds((current) => {
@@ -143,6 +153,54 @@ export function AgentConversationPlanQueue({
         return next;
       });
     }
+  };
+
+  /** Per step call id: an Undo in flight, done, or refused with its reason. */
+  const [undoState, setUndoState] = useState<Record<string, 'running' | 'undone' | AgentUndoFailureCode>>({});
+  const undoStep = async (callId: string, operationId: string, operation: string): Promise<void> => {
+    if (!operationLog || undoState[callId] === 'running') return;
+    const confirmed = await confirmDialog({
+      title: t('agent.card.undo.title'),
+      message: t('agent.plan.undo.confirm', { operation: t(`agent.capabilities.operation.${operation}`) }),
+      confirmLabel: t('agent.card.undo.confirm'),
+    });
+    if (!confirmed) return;
+    setUndoState((current) => ({ ...current, [callId]: 'running' }));
+    // The whole gate is re-resolved inside: live entities, profile and permission as they are now.
+    const result = await performAgentUndo(operationLog, operationId, t);
+    if (result.ok) onOperation?.(result.operation);
+    setUndoState((current) => ({ ...current, [callId]: result.ok ? 'undone' : result.code }));
+  };
+
+  const stepUndo = (step: AgentTaskQueue['items'][number]['task']['steps'][number]) => {
+    if (!operationLog || step.status !== 'completed') return null;
+    const callId = step.request.callId;
+    const state = undoState[callId];
+    if (state === 'undone' || agentOperationWasUndone(operationLog, callId)) {
+      return <span className="agent-plan-undo-status">{t('agent.card.undo.undone')}</span>;
+    }
+    const action = agentUndoActionForCall(operationLog, callId);
+    if (!action || action.effect.type !== 'undo') {
+      return state && state !== 'running'
+        ? <span className="agent-plan-error" role="alert">{t(`agent.undo.error.${state}`)}</span>
+        : null;
+    }
+    const operationId = action.effect.operationId;
+    return (
+      <span className="agent-plan-undo">
+        <button
+          type="button"
+          className="agent-action agent-plan-undo-button"
+          disabled={disabled || state === 'running'}
+          onClick={() => void undoStep(callId, operationId, step.request.operation)}
+        >
+          {state === 'running' ? t('agent.card.undo.running') : t('agent.plan.undo.button')}
+        </button>
+        {state && state !== 'running' ? (
+          <span className="agent-plan-error" role="alert">{t(`agent.undo.error.${state}`)}</span>
+        ) : null}
+      </span>
+    );
   };
 
   const recover = async (item: AgentTaskQueue['items'][number]): Promise<void> => {
@@ -208,8 +266,10 @@ export function AgentConversationPlanQueue({
                     return (
                       <li key={step.id} className="agent-plan-step">
                         <span className="agent-plan-step-label">{step.label}</span>
-                        <span className="agent-plan-step-meta">
-                          {step.request.operation} · {t(`agent.plan.stepStatus.${step.status}`)}
+                        {/* What the step does, in the UI language; the raw operation id stays
+                            on hover for anyone matching it against the activity log. */}
+                        <span className="agent-plan-step-meta" title={step.request.operation}>
+                          {t(`agent.capabilities.operation.${step.request.operation}`)} · {t(`agent.plan.stepStatus.${step.status}`)}
                         </span>
                         {argumentsPreview ? (
                           <code>{t('agent.plan.arguments', { value: argumentsPreview })}</code>
@@ -218,7 +278,8 @@ export function AgentConversationPlanQueue({
                         {resultPreview ? (
                           <code>{t('agent.plan.result', { value: resultPreview })}</code>
                         ) : null}
-                        {step.error ? <span className="agent-plan-error">{step.error}</span> : null}
+                        {step.error ? <span className="agent-plan-error">{localizeAgentStepError(step.error, t)}</span> : null}
+                        {stepUndo(step)}
                       </li>
                     );
                   })}

@@ -64,4 +64,23 @@ export const LOCK_UPDATE_UI_EN: Catalog = {
   'upd2.notes.open': 'Open on GitHub',
   'upd2.privacy':
     'Privacy: an installed copy checks github.com in the background, which sees your IP address. Release notes and the version check above are fetched from GitHub only when you press the button. Gum sends no account, deck or study data.',
+
+  // Channel, skip-this-version, why a check failed, restart warning.
+  'upd2.channel.beta': 'Beta (pre-releases included)',
+  'upd2.channel.betaNote': 'Beta gets pre-releases as soon as they are published. They can have rough edges; switch back to Stable at any time.',
+  'upd2.state.skipped': 'Gum {version} is available. You chose to skip this version.',
+  'upd2.skip': 'Skip {version}',
+  'upd2.skippedNote': 'Skipping {version}: Gum will not offer or download it.',
+  'upd2.unskip': 'Stop skipping',
+  'upd2.unavailable.offline': 'Could not reach GitHub. Check your connection and try again.',
+  'upd2.unavailable.rateLimited': 'GitHub is limiting requests from your network right now. Try again after {time}.',
+  'upd2.unavailable.rateLimitedNoTime': 'GitHub is limiting requests from your network right now. Try again in an hour.',
+  'upd2.unavailable.http': 'GitHub answered with an error. Try again later.',
+  'upd2.unavailable.invalid': 'GitHub’s answer did not describe a release. Try again later.',
+  'upd2.unavailable.disabled': 'Update checks are switched off in this test run.',
+  'upd2.restart.unsaved': 'Restarting now would cut short {list}.',
+  'upd2.restart.anyway': 'Restart anyway',
+  'upd2.restart.notNow': 'Not now',
+  'upd2.unsaved.recording': 'the screen recording in progress',
+  'upd2.unsaved.recording-finalize': 'a recording that is still being saved',
 };

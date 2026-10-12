@@ -1,0 +1,45 @@
+/* YouTube 7.5: the pre-study panel and the per-video comprehension chip. */
+
+.yt5-prestudy {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, transparent);
+  min-width: 0;
+}
+.yt5-prestudy-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.yt5-prestudy-title { flex: 1 1 12em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+.yt5-prestudy-tracks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.yt5-prestudy-tracks label { display: inline-flex; align-items: center; gap: 6px; min-height: var(--lq-hit-target, 32px); }
+.yt5-prestudy h4 { margin: 4px 0 0; font-size: 0.85rem; }
+
+.yt5-comprehension { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; align-items: baseline; }
+.yt5-comprehension.is-easy strong,
+.yt5-comprehension.is-comfortable strong { color: var(--success, var(--accent)); }
+.yt5-comprehension.is-hard strong { color: var(--danger, var(--accent)); }
+
+.yt5-vocab,
+.yt5-iplus1 { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; max-height: 280px; overflow: auto; }
+.yt5-vocab li {
+  display: grid;
+  grid-template-columns: minmax(0, 7em) minmax(0, 7em) 4em auto auto auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.86rem;
+}
+.yt5-vocab-reading,
+.yt5-vocab-count { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yt5-iplus1 li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 0.86rem; }
+.yt5-iplus1 mark { padding: 0 3px; border-radius: 3px; }
+
+.yt-chip.status.yt5-known { font-variant-numeric: tabular-nums; }
+
+/* 7.6: a playlist's study progress, above its videos. */
+.yt5-progress { display: grid; gap: 6px; margin: 6px 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.82rem; min-width: 0; }
+.yt5-progress-meter { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.yt5-progress-meter > span { display: block; height: 100%; background: var(--accent); }
+.yt5-progress-facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; color: var(--text-muted); }
+.yt5-progress-facts strong { color: var(--text); }
+.yt5-progress-next { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

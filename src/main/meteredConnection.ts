@@ -14,6 +14,7 @@
  * its data limit.
  */
 import { execFile } from 'node:child_process';
+import path from 'node:path';
 
 export type ConnectionCost = 'unrestricted' | 'metered' | 'unknown';
 
@@ -49,14 +50,28 @@ const defaultRunner: ProbeRunner = (file, args, timeoutMs) =>
     );
   });
 
+/**
+ * The in-box Windows PowerShell 5.1, by absolute path (risk4). A bare
+ * `powershell.exe` is resolved through the current directory and PATH, so a
+ * planted `powershell.exe` earlier on PATH (or beside a launched shortcut) would
+ * run instead. `%SystemRoot%` is read from the environment, falling back to the
+ * default install location, and must itself be an absolute drive path.
+ */
+export function systemPowerShellPath(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = String(env.SystemRoot || env.SYSTEMROOT || env.windir || '').trim();
+  const root = /^[A-Za-z]:\\[^"<>|?*]*$/.test(raw) ? raw.replace(/\\+$/, '') : 'C:\\Windows';
+  return path.win32.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+}
+
 export async function probeConnectionCost(
   run: ProbeRunner = defaultRunner,
   platform: string = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<ConnectionCost> {
   if (platform !== 'win32') return 'unknown';
   try {
     const out = await run(
-      'powershell.exe',
+      systemPowerShellPath(env),
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', PROBE_SCRIPT],
       METERED_PROBE_TIMEOUT_MS,
     );

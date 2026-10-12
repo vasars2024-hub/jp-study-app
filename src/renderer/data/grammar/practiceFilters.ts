@@ -282,7 +282,7 @@ export function matchesFilters(point: FilterablePoint, filters: PracticeFilters)
 
   // Narrows within the categories above rather than acting as its own axis.
   if (filters.functions.length) {
-    if (!filters.functions.some((f) => point.functions.includes(f))) return false;
+    if (!filters.functions.some((f) => (point.functions as readonly string[]).includes(f))) return false;
   }
 
   if (filters.registers.length) {
@@ -337,7 +337,7 @@ function completenessScore(p: NormalizedGrammarPoint): number {
 }
 
 /** Deterministic shuffle so a 'random' sort is stable within a session. */
-function seededSort(list: NormalizedGrammarPoint[], seed: number): NormalizedGrammarPoint[] {
+function seededSort<T extends NormalizedGrammarPoint>(list: T[], seed: number): T[] {
   return [...list].sort((a, b) => {
     const ha = (a.id.length * 2654435761 + seed) % 1000;
     const hb = (b.id.length * 2654435761 + seed) % 1000;

@@ -24,10 +24,12 @@ import { forceCollect } from './debugGc';
 import {
   clearE2eRecords,
   clickE2eTrayItem,
+  e2eClipboard,
   e2eHeadlessStatus,
   fireE2eShortcut,
   isE2eHeadless,
   queueE2eDialogResult,
+  setE2eScreenImage,
 } from './e2eHeadless';
 import {
   EMPTY_WITNESS,
@@ -415,6 +417,24 @@ export function summarizeCpuProfile(
       ? Math.round(((profile.endTime - profile.startTime) / 1000) * 10) / 10
       : Math.round((totalUs / 1000) * 10) / 10;
   return { durationMs, totalSamples: samples.length, frames };
+}
+
+/**
+ * The clipboard command a key chord would run natively (Ctrl/Cmd+C, +X, +V, Ctrl+Insert,
+ * Shift+Insert, Shift+Delete), or null. Exported for its test.
+ */
+export function headlessClipboardChord(key: string, modifiers: readonly string[]): 'copy' | 'cut' | 'paste' | null {
+  const mods = new Set(modifiers.map((m) => m.toLowerCase()));
+  const ctrl = mods.has('ctrl') || mods.has('control') || mods.has('meta') || mods.has('cmd') || mods.has('command');
+  const shift = mods.has('shift');
+  const k = key.toLowerCase();
+  if (ctrl && !shift && k === 'c') return 'copy';
+  if (ctrl && !shift && k === 'x') return 'cut';
+  if (ctrl && (k === 'v')) return 'paste';
+  if (ctrl && k === 'insert') return 'copy';
+  if (shift && k === 'insert') return 'paste';
+  if (shift && k === 'delete') return 'cut';
+  return null;
 }
 
 async function handle(
@@ -1061,6 +1081,18 @@ async function handle(
       const key = String(body.key ?? '');
       if (!key) return { code: 400, body: { ok: false, error: 'missing key' } };
       const modifiers = Array.isArray(body.modifiers) ? (body.modifiers as string[]) : [];
+      // Under the harness a clipboard chord must not reach Chromium's native copy / paste,
+      // which reads and writes the OWNER's clipboard: it runs the page's execCommand, which
+      // the headless page shim routes to the in-memory clipboard.
+      const clipboardCommand = headlessClipboardChord(key, modifiers);
+      if (isE2eHeadless() && clipboardCommand) {
+        try {
+          const done = await win.webContents.executeJavaScript(`document.execCommand(${JSON.stringify(clipboardCommand)})`, true);
+          return { code: 200, body: { ok: true, delivered: true, transport: 'headless-clipboard-shim', command: clipboardCommand, result: done, key, modifiers } };
+        } catch (err) {
+          return { code: 200, body: { ok: false, error: String(err), key, modifiers } };
+        }
+      }
       const before = await readInputWitness(win);
       const cdp = cdpSender(win);
       if (cdp) {
@@ -1192,8 +1224,8 @@ async function handle(
      * slipped onto the desktop anyway, and the OS-dialog answers it queues. Refused unless
      * headless mode is on, so nothing here can change a developer's normal instance.
      *
-     * Body: `{ action: 'status' | 'clear' | 'queueDialog' | 'fireShortcut' | 'clickTray',
-     * kind?, result?, accelerator?, label? }`.
+     * Body: `{ action: 'status' | 'clear' | 'queueDialog' | 'fireShortcut' | 'clickTray' |
+     * 'clipboard' | 'setScreenImage', kind?, result?, accelerator?, label?, set?, path? }`.
      */
     case '/e2e': {
       if (!isE2eHeadless()) return { code: 409, body: { ok: false, error: 'e2e headless mode is off' } };
@@ -1213,6 +1245,14 @@ async function handle(
         // A row of the tray menu (headless: the stand-in keeps the app's own menu).
         const clicked = clickE2eTrayItem(String(body.label ?? ''));
         if (!clicked) return { code: 404, body: { ok: false, error: `no tray row ${String(body.label)}` } };
+      } else if (action === 'clipboard') {
+        // The in-memory clipboard headless mode substitutes for the OS one: read it, or
+        // put text / a picture on it the way a user copying elsewhere would.
+        const set = body.set && typeof body.set === 'object' ? (body.set as { text?: string; imagePath?: string; clear?: boolean }) : undefined;
+        return { code: 200, body: { ok: true, clipboard: e2eClipboard(set) } };
+      } else if (action === 'setScreenImage') {
+        // What every synthetic screen shows from now on (a PNG path; '' = plain grey).
+        if (!setE2eScreenImage(String(body.path ?? ''))) return { code: 400, body: { ok: false, error: `unreadable image ${String(body.path)}` } };
       } else if (action !== 'status') {
         return { code: 400, body: { ok: false, error: `unknown action ${action}` } };
       }
