@@ -531,6 +531,23 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+/* =============================================================================
+   media/playerFrame.css — 2 rules. The opening-frame pill and the failure card
+   float over a video still, so they take the same OPAQUE TINT treatment.
+   ============================================================================= */
+
+:root[data-lq-flat] .player-frame__pill {
+  background: rgb(10, 10, 14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .player-frame__failure {
+  background: rgb(14, 14, 20);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* The three study toasts share one blur rule but declare their tints
    separately, so the alpha-1 form is written per class. */
 :root[data-lq-flat] .study-global-status,

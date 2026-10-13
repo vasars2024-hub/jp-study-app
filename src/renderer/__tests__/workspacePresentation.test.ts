@@ -128,7 +128,7 @@ describe('the workspace host is wired to the sheet', () => {
   it('the overlay renders the opt-in class and data-presentation', () => {
     const source = src('src/media/MediaWorkspaceHost.tsx');
     expect(source).toMatch(/presentation\.liquid \? ' workspace-liquid' : ''/);
-    expect(source).toMatch(/data-presentation=\{presentation\.dataPresentation\}/);
+    expect(source).toMatch(/data-presentation=\{(?:open \? )?presentation\.dataPresentation(?: : undefined)?\}/);
     expect(source).toMatch(/useWorkspacePresentation\(\)/);
   });
 
