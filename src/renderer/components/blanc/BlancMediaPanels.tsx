@@ -10,7 +10,7 @@
  * lazy chunk carries only its own stack. The Study OS class-name stylesheet the
  * media blocks rely on is loaded by the shell's lazy loader before first render.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
 import { getStudyLang } from '../../studyEnvironment';
 import {
@@ -35,6 +35,13 @@ import {
 } from '../media/TranscriptionCardOptions';
 import BlancStudyPlayer from './BlancStudyPlayer';
 
+function warmSeanimeAfterPaint(): () => void {
+  const timer = window.setTimeout(() => {
+    void window.api?.seanimeWarm?.(0).catch(() => undefined);
+  }, 800);
+  return () => window.clearTimeout(timer);
+}
+
 /**
  * Pillar 0 fix for the `player` / `video` tab bail-out, which mounted
  * `MediaView` (and therefore `AppChrome`) inside `BlancViewHost`.
@@ -52,6 +59,10 @@ export function BlancMediaPanel() {
   const { items, current, cues, src, subName, genState, generating } = state;
   const [cardOptions, setCardOptions] = useTranscriptionCardOptions();
   const [queueNote, setQueueNote] = useState('');
+  // Blanc never warms the media server at launch (lowest memory). The Media tab is where a
+  // video is picked, so it is warmed here — after this panel's own first paint — and the
+  // player below opens without a server start in front of it.
+  useEffect(() => warmSeanimeAfterPaint(), []);
 
   const queueTranscription = async (): Promise<void> => {
     if (!current) return;

@@ -1,0 +1,145 @@
+/*
+  The player's opening frame (media/PlayerFrame.tsx): the video's own picture with one small
+  "Opening …" pill, or — only on a real failure — what failed and a Retry. Colours come from
+  the shell tokens, so every theme (Study OS, Aero, Wired, Blanc) paints it in its own ink;
+  the picture area itself is always dark, like the player it stands in for.
+*/
+.player-frame {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  overflow: hidden;
+  background: #000;
+  color: #f2f2f5;
+  isolation: isolate;
+}
+.player-frame--overlay {
+  position: absolute;
+  inset: 0;
+  /* Above the mounted player (`.study-player-slice` is z-index 80 under the host bar's 100). */
+  z-index: 90;
+}
+.player-frame--compact {
+  min-height: 120px;
+  border-radius: 6px;
+}
+.player-frame__image {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Dimmed a little: it is a promise of the video, not the video. */
+  opacity: .82;
+  animation: player-frame-in 140ms ease-out;
+}
+@keyframes player-frame-in {
+  from { opacity: 0; }
+  to { opacity: .82; }
+}
+.player-frame__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(90%, 52ch);
+  margin-bottom: clamp(16px, 6vh, 56px);
+  padding: 7px 14px 7px 10px;
+  border-radius: 999px;
+  background: rgba(10, 10, 14, .62);
+  backdrop-filter: blur(8px);
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.3;
+  /* It only appears if the open takes a moment: a warm open never shows it at all. */
+  animation: player-frame-pill-in 240ms ease-out 180ms both;
+}
+@keyframes player-frame-pill-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.player-frame--compact .player-frame__pill {
+  margin-bottom: 10px;
+  font-size: var(--font-size-xs, 12px);
+}
+.player-frame__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-frame__spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(255, 255, 255, .28);
+  border-top-color: var(--accent, #8ab4ff);
+  border-radius: 50%;
+  animation: player-frame-spin 800ms linear infinite;
+}
+@keyframes player-frame-spin {
+  to { transform: rotate(360deg); }
+}
+.player-frame__failure {
+  align-self: center;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  max-width: min(92%, 60ch);
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 10px;
+  background: rgba(14, 14, 20, .86);
+  backdrop-filter: blur(10px);
+}
+.player-frame__failure p { margin: 0; }
+.player-frame__failure-title {
+  font-weight: 700;
+  font-size: var(--font-size-md, 15px);
+}
+.player-frame__failure-text {
+  color: rgba(242, 242, 245, .86);
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.45;
+}
+.player-frame__details {
+  max-width: 100%;
+  color: rgba(242, 242, 245, .6);
+  font-size: var(--font-size-xs, 12px);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.player-frame__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.player-frame__btn {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.player-frame__btn--primary {
+  border-color: var(--accent, #8ab4ff);
+  background: var(--accent, #8ab4ff);
+  color: var(--accent-ink, #0b0b10);
+  font-weight: 600;
+}
+.player-frame__btn:disabled {
+  opacity: .6;
+  cursor: default;
+}
+.player-frame__btn:focus-visible {
+  outline: 2px solid var(--accent, #8ab4ff);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .player-frame__image,
+  .player-frame__pill { animation: none; }
+  .player-frame__spinner { animation-duration: 2400ms; }
+}

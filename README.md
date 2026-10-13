@@ -84,8 +84,24 @@ the shortcuts and the file-type entries, and leaves your data under
 
 Both use the same data folder, so you can switch between them.
 
-Windows SmartScreen may warn that the app is unrecognised, because the builds
-are not code-signed yet. Choose **More info → Run anyway**.
+### "Windows protected your PC"
+
+Gum v1 is not code-signed yet, so the first time you run `Setup.exe` (or
+`jp-study-app.exe` from the zip) Windows SmartScreen may show a blue
+**Windows protected your PC** box. That is Windows saying it has not seen this
+file often, not that something is wrong with it. To continue:
+
+1. Click **More info** (the small link under the message).
+2. Check that the app is `Gum-<version> Setup.exe` (or `jp-study-app.exe`), then
+   click **Run anyway**.
+
+You only need to do this once per download. If you prefer, check the file first:
+the release page lists each file's SHA-256, and the source is all in this
+repository.
+
+<!-- Screenshot placeholder: docs/images/smartscreen-more-info.png and
+     docs/images/smartscreen-run-anyway.png (the two SmartScreen steps on
+     Windows 11), to be captured on a clean machine and added here. -->
 
 The Japanese tokenizer, OCR engine and Chinese dictionary ship inside the app.
 The Japanese–English dictionary, pitch accent, example sentences and the larger
@@ -211,3 +227,7 @@ style.
 [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) (EDRDG), pitch accent from
 [Kanjium](https://github.com/mifunetoshiro/kanjium) and example sentences from
 [Tatoeba](https://tatoeba.org/); each keeps its own licence.
+Every bundled and downloaded third-party component, with its licence and
+required attribution, is listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md);
+what Gum sends where is in [`PRIVACY.md`](PRIVACY.md). Both are also in the app
+under **Settings → Help → About**.

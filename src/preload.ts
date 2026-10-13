@@ -369,6 +369,9 @@ const api = {
   launchTarget: (target: string): Promise<string | null> =>
     ipcRenderer.invoke('desktop:launch', target),
   mediaFileUrl: (p: string): Promise<string | null> => ipcRenderer.invoke('media:fileUrl', p),
+  /** How to open a local video: URL, library row, cached poster, direct-play probe (shared/playbackPlan.ts). */
+  mediaPlaybackPlan: (p: string): Promise<import('./shared/playbackPlan').PlaybackPlan | null> =>
+    ipcRenderer.invoke('media:playbackPlan', p),
   pickWallpaperVideo: (): Promise<{
     id: string;
     path: string;
@@ -4646,6 +4649,8 @@ const api = {
   seanimeStatus: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.status),
   seanimeStart: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.start),
   seanimeStop: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.stop),
+  /** Start the media server soon, without waiting for it (see main/seanime/lifecycle.ts). */
+  seanimeWarm: (delayMs?: number): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.warm, delayMs),
   seanimeProbe: (): Promise<
     { ok: true; result: SeanimeProbeResult } | { ok: false; error: string }
   > => ipcRenderer.invoke(SEANIME_CHANNELS.probe),

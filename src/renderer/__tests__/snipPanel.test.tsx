@@ -55,13 +55,16 @@ const MISSING: SnipEntry = {
   translation: undefined,
 };
 
+/** Most tests run on a profile where the learner turned watching on (off by default since v1). */
+let enabledInMain = true;
+
 function installApi(): void {
   const record = (name: string, value: unknown = undefined) => async (...args: unknown[]) => {
     calls.push({ name, args });
     return value;
   };
   (window as unknown as { api: Record<string, unknown> }).api = {
-    snipGetStatus: async () => ({ ...SNIP_SETTINGS_DEFAULTS, watching: true, historyCount: entries.length, historyBytes: 4096 }),
+    snipGetStatus: async () => ({ ...SNIP_SETTINGS_DEFAULTS, enabled: enabledInMain, watching: enabledInMain, historyCount: entries.length, historyBytes: 4096 }),
     onSnipSettingsChanged: () => () => undefined,
     onSnipHistoryChanged: () => () => undefined,
     snipHistoryList: async () => entries,
@@ -195,7 +198,19 @@ const REVIEW: SnipEntry = {
   ankiNoteIds: [],
 };
 
-describe('first-run notice (Snip to cards is on by default)', () => {
+describe('first-run notice (shown once the learner has turned Snip to cards on)', () => {
+  it('off by default: a profile that never turned it on sees no notice', async () => {
+    enabledInMain = false;
+    try {
+      const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+      await act(async () => root!.render(<SnipPanel />));
+      await settle();
+      expect(host.querySelector('.snip-notice')).toBeNull();
+    } finally {
+      enabledInMain = true;
+    }
+  });
+
   it('the Snips app says it is on and offers Turn off / Keep until answered', async () => {
     const SnipPanel = (await import('../components/snip/SnipPanel')).default;
     await act(async () => root!.render(<SnipPanel />));

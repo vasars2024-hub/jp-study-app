@@ -31,10 +31,12 @@ import {
 import {
   getSeanimeStatus,
   onSeanimeStatus,
+  primeSeanimeStatus,
   seanimeAuthToken,
   seanimeBaseUrl,
   startSeanime,
   stopSeanime,
+  warmSeanime,
 } from './supervisor';
 import { extractAudioPcm } from '../media';
 import { readSeanimeStudyLibrary } from './studyLibrary';
@@ -104,8 +106,13 @@ export async function probeSeanime(): Promise<SeanimeProbeResult> {
 export function registerSeanimeIpc(): void {
   // Handlers are registered unconditionally so the renderer can render an honest
   // "disabled" state; the supervisor itself refuses to spawn without the flag.
+  // A missing binary is known before anything is spawned (and before the first play).
+  if (SEANIME_SIDECAR_ENABLED) primeSeanimeStatus();
   ipcMain.handle(SEANIME_CHANNELS.status, (): SeanimeStatus => getSeanimeStatus());
   ipcMain.handle(SEANIME_CHANNELS.start, () => startSeanime());
+  // Fire-and-forget: answers the current status at once; the start (if any) runs on.
+  ipcMain.handle(SEANIME_CHANNELS.warm, (_event, delayMs?: unknown): SeanimeStatus =>
+    warmSeanime(typeof delayMs === 'number' && Number.isFinite(delayMs) ? Math.min(Math.max(delayMs, 0), 60_000) : 0, 'surface'));
   ipcMain.handle(SEANIME_CHANNELS.stop, () => {
     stopSeanime();
     return getSeanimeStatus();
@@ -153,4 +160,4 @@ export function registerSeanimeIpc(): void {
   }
 }
 
-export { stopSeanime };
+export { stopSeanime, warmSeanime };

@@ -7,7 +7,11 @@
  * bare "open the media workspace") now land here instead. The Media Center may not be
  * mounted when the request is made, so the intent is parked until it mounts and takes it.
  */
-import type { StudyReviewFocusRequest } from '../shared/mediaWorkspace';
+import {
+  MEDIA_WORKSPACE_OPEN_EVENT,
+  mediaWorkspaceHostExists,
+  type StudyReviewFocusRequest,
+} from '../shared/mediaWorkspace';
 import type { MediaItem } from '../shared/types';
 
 export type MediaCenterIntent =
@@ -54,8 +58,33 @@ export function onMediaCenterIntent(listener: () => void): () => void {
 const PLAY_EVENT = 'media-center:play';
 let pendingPlay: MediaItem | null = null;
 
-/** Park a file to play and bring the Media Center forward; a Media Center mounting later still plays it. */
+/**
+ * Can this window's player take the file right now? A mounted host whose server is not
+ * known to be unusable (opted out, binary missing): the player holds the request while the
+ * server warms, so nothing needs to be checked or awaited first.
+ */
+function playerTakesItNow(): boolean {
+  if (typeof document === 'undefined' || !mediaWorkspaceHostExists()) return false;
+  if (document.querySelector('.seanime-host')) return true;
+  const marker = document.querySelector('.seanime-host-present');
+  if (!marker) return false;
+  return marker.getAttribute('data-sidecar') !== 'disabled'
+    && marker.getAttribute('data-sidecar-error') !== 'missing-exe';
+}
+
+/**
+ * Play a file. With a player in this window it opens there at once (seamless playback,
+ * 2026-10-13: the YouTube "Next" and a dropped video used to bring the Media Center up
+ * first and play from it — measured ~400 ms of a heavy view mounting under the opening
+ * frame). Without one — a window with no host, a disabled server, a missing binary — the
+ * file is parked and the Media Center brought forward; a Media Center mounting later
+ * still plays it, and says what is wrong when it cannot.
+ */
 export function requestMediaCenterPlay(item: MediaItem): void {
+  if (item.path && playerTakesItNow()) {
+    window.dispatchEvent(new CustomEvent(MEDIA_WORKSPACE_OPEN_EVENT, { detail: { localFilePath: item.path } }));
+    return;
+  }
   pendingPlay = item;
   window.dispatchEvent(new CustomEvent(PLAY_EVENT));
   window.dispatchEvent(new CustomEvent('os:open', { detail: 'player' }));

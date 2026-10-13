@@ -18,19 +18,25 @@
  *     there" (empty `baseUrl`) and say different things about them.
  *
  * `enabled` exists so a surface that is mounted but not showing anything — the host's
- * launcher button, Blanc's Media tab with no video loaded — does not hold the sidecar up.
- * The sidecar's own watchdog exits shortly after its last client disconnects, and the
- * point of not connecting eagerly is that the process stays down until something needs it.
+ * launcher button, Blanc's Media tab with no video loaded — does not hold a connection.
+ * Whether the PROCESS runs is main's business since the seamless-playback pass
+ * (`main/seanime/lifecycle.ts`: warmed after boot, restarted after a crash); this hook only
+ * nudges it (`seanimeWarm`) when a surface needs it and finds it stopped.
+ *
+ * It never starts a sidecar that has `failed`: that is a stated failure the surface shows
+ * with a Retry, and restarting it from here would loop on a binary that cannot start.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SeanimeConnection, SeanimeStatus } from '../shared/seanime';
 import { bootstrapSeanimeConnection } from './seanimeBootstrap';
 
 export type SeanimeConnectionState = {
   /** `null` until the first status arrives from main. */
   status: SeanimeStatus | null;
-  /** `null` while disconnected; `baseUrl: ''` means the bootstrap failed. */
+  /** `null` while disconnected; `baseUrl: ''` means the bootstrap failed (after a retry). */
   conn: SeanimeConnection | null;
+  /** Try the connection bootstrap again (the surface's Retry for a failed connect). */
+  retryConnection: () => void;
 };
 
 export function useSeanimeStatus(): SeanimeStatus | null {
@@ -48,9 +54,36 @@ export function useSeanimeStatus(): SeanimeStatus | null {
   return status;
 }
 
-export function useSeanimeConnection(enabled: boolean): SeanimeConnectionState {
+/**
+ * Ask main to start the media server soon, without waiting. Falls back to the blocking
+ * start for a preload that predates `seanimeWarm` (a renderer reloaded against an older
+ * main under HMR).
+ */
+export function warmSeanimeServer(delayMs = 0): void {
+  const api = typeof window !== 'undefined' ? window.api : undefined;
+  if (!api) return;
+  if (typeof api.seanimeWarm === 'function') {
+    void api.seanimeWarm(delayMs).catch(() => undefined);
+  } else if (delayMs <= 0 && typeof api.seanimeStart === 'function') {
+    void api.seanimeStart().catch(() => undefined);
+  }
+}
+
+/** How long a failed connection bootstrap waits before its one automatic second try. */
+const BOOTSTRAP_RETRY_MS = 400;
+
+export function useSeanimeConnection(
+  enabled: boolean,
+  /**
+   * Whether this surface may nudge a stopped server. A surface that is only being kept warm
+   * (the host's hidden player) must not: an explicit stop would be undone by a player
+   * nobody is looking at. Defaults to `enabled`.
+   */
+  nudge: boolean = enabled,
+): SeanimeConnectionState {
   const status = useSeanimeStatus();
   const [conn, setConn] = useState<SeanimeConnection | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -61,30 +94,55 @@ export function useSeanimeConnection(enabled: boolean): SeanimeConnectionState {
     }
 
     let cancelled = false;
-    void bootstrapSeanimeConnection()
-      .then((next) => {
-        if (!cancelled) setConn(next);
-      })
-      .catch(() => {
-        if (!cancelled) setConn({ baseUrl: '', token: '' });
-      });
+    let timer = 0;
+    const run = (tries: number): void => {
+      void bootstrapSeanimeConnection()
+        .then((next) => {
+          if (cancelled) return;
+          if (!next.baseUrl && tries > 0) {
+            timer = window.setTimeout(() => run(tries - 1), BOOTSTRAP_RETRY_MS);
+            return;
+          }
+          setConn(next);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (tries > 0) {
+            timer = window.setTimeout(() => run(tries - 1), BOOTSTRAP_RETRY_MS);
+            return;
+          }
+          setConn({ baseUrl: '', token: '' });
+        });
+    };
+    run(1);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [enabled, status?.kind, status?.pid, status?.port]);
+  }, [enabled, status?.kind, status?.pid, status?.port, attempt]);
 
+  // A surface that needs the server and finds it stopped (or down without a recovery under
+  // way) nudges main once per state; `failed` is left to the surface's Retry.
+  const nudgedRef = useRef<string | null>(null);
+  const kind = status?.kind ?? null;
+  const recovering = status?.recovering === true;
   useEffect(() => {
-    if (
-      !enabled
-      || !status
-      || status.kind === 'ready'
-      || status.kind === 'starting'
-      || status.kind === 'disabled'
-    ) {
+    if (!enabled || !nudge || !kind) return;
+    const needsNudge = kind === 'stopped' || (kind === 'offline' && !recovering);
+    if (!needsNudge) {
+      nudgedRef.current = null;
       return;
     }
-    void window.api.seanimeStart().catch(() => undefined);
-  }, [enabled, status]);
+    const stateKey = `${kind}:${recovering}`;
+    if (nudgedRef.current === stateKey) return;
+    nudgedRef.current = stateKey;
+    warmSeanimeServer(0);
+  }, [enabled, nudge, kind, recovering]);
 
-  return { status, conn };
+  const retryConnection = useCallback(() => {
+    setConn(null);
+    setAttempt((n) => n + 1);
+  }, []);
+
+  return { status, conn, retryConnection };
 }

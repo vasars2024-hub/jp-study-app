@@ -2,6 +2,7 @@
  * YouTube immersion playlist manager — metadata sync, selective download, open in Video.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type InputHTMLAttributes } from 'react';
+import { warmMediaPlayerWhenIdle } from '../mediaWorkspaceBridge';
 import Icon from '../components/Icons';
 import VirtualList from '../components/VirtualList';
 import { AppChrome, StatusBarField, StatusBarSpacer, confirmDialog, type MenuBarMenu } from '../components/ui';
@@ -175,6 +176,8 @@ function readResumePositions(): VideoCoreResumePosition[] {
 
 export default function YouTubePlaylistsView() {
   const { t, lang } = useT();
+  // A downloaded video is one click away here: have the player warm before it.
+  useEffect(() => warmMediaPlayerWhenIdle(), []);
   const [store, setStore] = useState<YtPlaylistsStore>(() => emptyYtStore());
   const [side, setSide] = useState<SideSelection | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>('news');

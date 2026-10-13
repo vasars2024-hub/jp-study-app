@@ -14,11 +14,33 @@
  * The adopted surface is loaded with React.lazy so none of the 46 adopted packages are
  * in the boot path — with the flag off, the app's startup bundle is unchanged.
  *
+ * ## Seamless playback (2026-10-13)
+ *
+ * "Make the video playing seamless — minimize loading screens or weird 'server not started'
+ * BS" (owner). What changed here, and the measured reason for each:
+ *
+ *  - **An opening frame, not a loader.** From the click to the first decoded frame the
+ *    body shows `PlayerFrame`: the last frame the viewer left this file on (or its still /
+ *    thumbnail) and one small "Opening …" pill. It used to step through "Media server
+ *    stopped", "Media server starting", a spinner, "Connecting to the media server…",
+ *    "Provisioning the media connection…" and "Opening local file".
+ *  - **The server is never the viewer's problem unless it failed.** The bar no longer
+ *    narrates the sidecar's state. Main warms it after boot and restarts it after a crash
+ *    (`main/seanime/lifecycle.ts`); the request is simply held (queued) here until it is
+ *    ready and then plays. Only a stated failure — the lifecycle gave up, the binary is
+ *    missing, the connection could not be made, the player could not open the file —
+ *    shows words, translated, with a Retry that re-runs the very same open.
+ *  - **A warm player.** After the first video the adopted surface stays mounted while the
+ *    player is closed (hidden, holding its connection and websocket identity), so a re-open
+ *    or a resume skips the chunk, the status read, the socket handshake and the React
+ *    mount. It is released after `WARM_KEEP_MS` closed. A media view coming into sight can
+ *    ask for the same warm-up before the first video (`PLAYER_WARM_EVENT`).
+ *
  * The host chrome uses Study OS's shared EN/JA/ZH/RU catalog. ADR-003's
  * temporary Phases 2–3 exemption was removed at the Phase-4 exit gate.
  */
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { seanimeFailureKey, type SeanimeStatus } from '../shared/seanime';
+import { type SeanimeStatus } from '../shared/seanime';
 import {
   MEDIA_WORKSPACE_CLOSE_EVENT,
   MEDIA_WORKSPACE_OPEN_EVENT,
@@ -30,24 +52,41 @@ import {
   type MediaWorkspacePlaybackRequest,
   type StudyReviewFocusRequest,
 } from '../shared/mediaWorkspace';
-import { SIDECAR_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
+import { PLAYER_WARM_EVENT } from '../shared/playerWarm';
+import type { PlaybackPlan } from '../shared/playbackPlan';
 import { useT } from '../renderer/i18n';
 import { ContextualSurface } from '../renderer/components/liquid/LiquidSurface';
-import { LiquidLoading } from '../renderer/components/liquid/LiquidLoading';
 import { useWorkspacePresentation } from '../renderer/workspacePresentation';
 import { requestMediaCenter } from '../renderer/mediaCenterIntent';
 import { useSeanimeConnection } from './useSeanimeConnection';
+import PlayerFrame, { type PlayerFrameFailure } from './PlayerFrame';
+import { forgetPlaybackPlan, getPlaybackPlan, playbackTitle } from './playbackPlanClient';
+import { lastFrameFor, rememberLastFrame } from './lastFrameCache';
 
 const MediaWorkspace = React.lazy(() => import('./MediaWorkspace'));
 
-/** How long a stopped sidecar may be "auto-start is on its way" before it is explained. */
-const STOPPED_GRACE_MS = 4000;
+/** A closed warm player is released after this long, so an idle app gives the memory back. */
+const WARM_KEEP_MS = 10 * 60_000;
+/** A sidecar still `stopped` this long after an open was nudged did not start: say so. */
+const STOPPED_TOO_LONG_MS = 10_000;
+/**
+ * A media element that errored and has not drawn a frame this long after: the player's own
+ * fallbacks (the transcoder switch takes ~3.4 s cold) did not rescue it.
+ */
+const MEDIA_ERROR_GRACE_MS = 9_000;
 
-function sidecarStatusLabel(
-  kind: SeanimeStatus['kind'],
-  t: ReturnType<typeof useT>['t'],
-): string {
-  return t(SIDECAR_STATUS_KEY[kind]);
+/** The failure sentence for a sidecar that could not be brought up. */
+function serverFailureKey(status: SeanimeStatus): string {
+  switch (status.errorCode) {
+    case 'missing-exe':
+    case 'spawn-failed':
+    case 'unhealthy':
+    case 'port':
+    case 'disabled':
+      return `playback.failed.${status.errorCode}`;
+    default:
+      return 'playback.failed.crashed';
+  }
 }
 
 export default function MediaWorkspaceHost(): React.ReactElement | null {
@@ -55,12 +94,16 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
   const [open, setOpen] = useState(false);
   const [playbackRequest, setPlaybackRequest] =
     useState<MediaWorkspacePlaybackRequest | null>(null);
+  /**
+   * Keep the adopted surface mounted while closed (see "A warm player" above). Set by the
+   * first open that reaches the player, or by a media view asking ahead of time.
+   */
+  const [warmHeld, setWarmHeld] = useState(false);
   // Status tracking, the connection bootstrap and the auto-start live in
-  // `useSeanimeConnection` — Blanc's toolbox player needs exactly the same three rules
-  // (slice 15). `open` is the gate: a closed host must not hold the sidecar up. The
-  // bootstrap still resolves BEFORE React.lazy pulls the adopted bundle, which is the
-  // ordering `seanimeBootstrap.ts` exists to guarantee.
-  const { status, conn } = useSeanimeConnection(open);
+  // `useSeanimeConnection` — Blanc's toolbox player needs exactly the same rules
+  // (slice 15). The bootstrap still resolves BEFORE React.lazy pulls the adopted bundle,
+  // which is the ordering `seanimeBootstrap.ts` exists to guarantee.
+  const { status, conn, retryConnection } = useSeanimeConnection(open || warmHeld, open);
   // L3.2 — the fourth presentation host (`renderer/workspacePresentation.ts`): the Liquid
   // toggle in the bar, and the material the bar takes under `.workspace-liquid`.
   const presentation = useWorkspacePresentation();
@@ -79,6 +122,11 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
         requestMediaCenter({ tab: 'library' });
         return;
       }
+      // The server is wanted NOW: nudge it in the same tick as the click, before React
+      // has even rendered the frame. A no-op when it is already up. (No blocking-start
+      // fallback here: `useSeanimeConnection` nudges a stopped server once it renders.)
+      void window.api?.seanimeWarm?.(0).catch(() => undefined);
+      if (request.kind === 'local') void getPlaybackPlan(request.localFilePath);
       setPlaybackRequest(request);
       setOpen(true);
     };
@@ -89,6 +137,11 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
       if (!detail?.pathKey) return;
       requestMediaCenter({ tab: 'review', focus: detail });
     };
+    // A media view came into sight: a video is likely next. Warm the server and the player.
+    const onWarm = (): void => {
+      void window.api?.seanimeWarm?.(0).catch(() => undefined);
+      setWarmHeld(true);
+    };
     window.addEventListener(MEDIA_WORKSPACE_OPEN_EVENT, onWorkspaceOpen);
     const onWorkspaceClose = (): void => {
       setOpen(false);
@@ -96,11 +149,13 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     };
     window.addEventListener(MEDIA_WORKSPACE_CLOSE_EVENT, onWorkspaceClose);
     window.addEventListener(STUDY_REVIEW_FOCUS_EVENT, onReviewFocus);
+    window.addEventListener(PLAYER_WARM_EVENT, onWarm);
     return () => {
       releaseHost();
       window.removeEventListener(MEDIA_WORKSPACE_OPEN_EVENT, onWorkspaceOpen);
       window.removeEventListener(MEDIA_WORKSPACE_CLOSE_EVENT, onWorkspaceClose);
       window.removeEventListener(STUDY_REVIEW_FOCUS_EVENT, onReviewFocus);
+      window.removeEventListener(PLAYER_WARM_EVENT, onWarm);
     };
   }, []);
 
@@ -111,36 +166,47 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     return () => setMediaWorkspaceOpen(false);
   }, [open]);
 
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const localPath = playbackRequest?.kind === 'local' ? playbackRequest.localFilePath : null;
+  const workspaceReady = status?.kind === 'ready' && conn !== null && conn.baseUrl !== '';
+
   // Closing drops the video too: kept, a later open remounted the player and it replayed the
-  // last file (or its error screen) on its own (transition audit 2026-09-23).
+  // last file (or its error screen) on its own (transition audit 2026-09-23). The frame on
+  // screen is kept first, as the opening picture for this file's next open.
   const close = useCallback(() => {
+    const video = hostRef.current?.querySelector('video');
+    rememberLastFrame(localPath, video);
     setOpen(false);
     setPlaybackRequest(null);
-  }, []);
+  }, [localPath]);
 
   /*
    * Is a video on screen (or opening)? Read from the slice's own published state
    * (`data-study-player`), watched with a MutationObserver because the slice is lazy. When a
    * player that WAS up goes idle — VideoCore's own Close Player on an error screen — the host
-   * closes with it: there is nothing else here to look at.
+   * closes with it: there is nothing else here to look at. The slice also publishes the
+   * error it is showing (`data-study-error`), which the opening frame turns into a stated,
+   * retryable failure.
    */
-  const hostRef = useRef<HTMLDivElement | null>(null);
   const hadPlayerRef = useRef(false);
   const [playerActive, setPlayerActive] = useState(false);
+  const [sliceError, setSliceError] = useState<string | null>(null);
   useEffect(() => {
     const root = hostRef.current;
     hadPlayerRef.current = false;
+    setSliceError(null);
     if (!open || !root) {
       setPlayerActive(false);
       return undefined;
     }
     const read = (): void => {
-      const up = root.querySelector(
-        '.study-player-slice:is([data-study-player="active"], [data-study-player="loading"])',
-      ) != null;
+      const slice = root.querySelector<HTMLElement>('.study-player-slice');
+      const state = slice?.getAttribute('data-study-player');
+      const up = state === 'active' || state === 'loading';
       setPlayerActive(up);
+      setSliceError(slice?.getAttribute('data-study-error') || null);
       if (up) hadPlayerRef.current = true;
-      else if (hadPlayerRef.current && root.querySelector('.study-player-slice')) close();
+      else if (hadPlayerRef.current && slice) close();
     };
     read();
     const observer = new MutationObserver(read);
@@ -148,46 +214,120 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['data-study-player'],
+      attributeFilter: ['data-study-player', 'data-study-error'],
     });
     return () => observer.disconnect();
-  }, [close, open, status?.kind]);
+  }, [close, open, status?.kind, playbackRequest?.requestId]);
 
   /*
-   * What is playing, named the way the Media Center names it ("Midnight Kitchen · Episode 1",
-   * 第1話 in Japanese). The adopted player's own title strip named anime only — a drama had
-   * no title anywhere — and named them differently from the library. Falls back to the file
-   * name.
+   * The plan for this open (title, poster, and — for the slice — disk vs media server).
+   * One IPC shared with the slice (`playbackPlanClient.ts`); it used to be `listMedia`, the
+   * whole library, just to name the file in the bar.
    */
-  const [nowPlayingTitle, setNowPlayingTitle] = useState<string | null>(null);
+  const [plan, setPlan] = useState<PlaybackPlan | null>(null);
   useEffect(() => {
-    if (!playbackRequest || playbackRequest.kind !== 'local') {
-      setNowPlayingTitle(null);
-      return undefined;
-    }
-    const path = playbackRequest.localFilePath;
-    const norm = (value: string): string => value.replace(/\\/g, '/').toLowerCase();
-    const base = path.slice(Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')) + 1)
-      .replace(/\.[^.]+$/, '');
-    setNowPlayingTitle(base);
+    setPlan(null);
+    if (!localPath) return undefined;
     let cancelled = false;
-    // Guarded like the status calls: a window or harness without the library API keeps the
-    // file-name title rather than throwing out of an effect.
-    if (typeof window.api?.listMedia !== 'function') return undefined;
-    void window.api.listMedia().then((items) => {
-      if (cancelled) return;
-      const item = items.find((entry) => norm(entry.path ?? '') === norm(path));
-      if (!item) return;
-      const series = item.seriesTitle || item.title || base;
-      const episode = item.episode && item.episode > 0
-        ? t('mediaWorkspace.episode', { number: item.episode })
-        : '';
-      setNowPlayingTitle(episode ? `${series} · ${episode}` : series);
-    }).catch(() => undefined);
+    void getPlaybackPlan(localPath).then((next) => {
+      if (!cancelled) setPlan(next);
+    });
     return () => {
       cancelled = true;
     };
-  }, [playbackRequest, t]);
+  }, [localPath, playbackRequest?.requestId]);
+
+  /*
+   * What is playing, named the way the Media Center names it ("Midnight Kitchen · Episode 1",
+   * 第1話 in Japanese). Falls back to the file name.
+   */
+  const nowPlayingTitle = playbackRequest?.kind === 'local'
+    ? playbackTitle(playbackRequest.localFilePath, plan, (n) => t('mediaWorkspace.episode', { number: n }))
+    : playbackRequest?.kind === 'stream'
+      ? `${playbackRequest.stream.seriesTitle} · ${t('mediaWorkspace.episode', { number: playbackRequest.stream.episodeNumber })}`
+      : null;
+
+  // The opening frame stays up until the requested video draws its first frame — again
+  // after the player was rebuilt under it (a media server restart mid-video).
+  const [firstFrame, setFirstFrame] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState<string | null>(null);
+  /** Where the current request's video is, for a rebuild to continue from (see below). */
+  const lastTimeRef = useRef<{ requestId: number; t: number } | null>(null);
+  useEffect(() => {
+    setFirstFrame(false);
+    setMediaFailed(null);
+    const root = hostRef.current;
+    if (!open || !root || !playbackRequest) return undefined;
+    const requestId = playbackRequest.requestId;
+    let errorTimer = 0;
+    let lastSnapAt = 0;
+    const onTime = (event: Event): void => {
+      const media = event.target;
+      if (!(media instanceof HTMLVideoElement) || !Number.isFinite(media.currentTime)) return;
+      lastTimeRef.current = { requestId, t: media.currentTime };
+      // Keep the opening picture fresh for a rebuild under a playing video (cheap: a
+      // 180-px JPEG every few seconds).
+      const now = Date.now();
+      if (now - lastSnapAt > 5000 && !media.paused) {
+        lastSnapAt = now;
+        rememberLastFrame(localPath, media);
+      }
+    };
+    const onFrame = (event: Event): void => {
+      if (!(event.target instanceof HTMLMediaElement)) return;
+      window.clearTimeout(errorTimer);
+      errorTimer = 0;
+      setMediaFailed(null);
+      setFirstFrame(true);
+    };
+    const onError = (event: Event): void => {
+      const media = event.target;
+      if (!(media instanceof HTMLMediaElement) || !media.error) return;
+      const detail = media.error.message || `MediaError ${media.error.code}`;
+      window.clearTimeout(errorTimer);
+      errorTimer = window.setTimeout(() => setMediaFailed(detail), MEDIA_ERROR_GRACE_MS);
+    };
+    root.addEventListener('loadeddata', onFrame, true);
+    root.addEventListener('playing', onFrame, true);
+    root.addEventListener('error', onError, true);
+    root.addEventListener('timeupdate', onTime, true);
+    return () => {
+      window.clearTimeout(errorTimer);
+      root.removeEventListener('loadeddata', onFrame, true);
+      root.removeEventListener('playing', onFrame, true);
+      root.removeEventListener('error', onError, true);
+      root.removeEventListener('timeupdate', onTime, true);
+    };
+  }, [open, playbackRequest, workspaceReady, localPath]);
+
+  /*
+   * The media server went away under an open player (a crash; main is already restarting
+   * it). The adopted surface is rebuilt for the new server generation, and the request it
+   * gets continues from where the video was — not from the request's original start point —
+   * so the viewer sees the frame they were on, a moment of "Opening …", and the video again.
+   */
+  const wasReadyRef = useRef(workspaceReady);
+  useEffect(() => {
+    const was = wasReadyRef.current;
+    wasReadyRef.current = workspaceReady;
+    if (!open || !was || workspaceReady) return;
+    const last = lastTimeRef.current;
+    setPlaybackRequest((current) => (
+      current?.kind === 'local' && last && last.requestId === current.requestId && last.t > 0.5
+        ? { ...current, startAtSec: last.t }
+        : current
+    ));
+  }, [open, workspaceReady]);
+
+  // A closed warm player is released after a while (and never held across a restart).
+  useEffect(() => {
+    if (open && status?.kind === 'ready' && conn?.baseUrl) setWarmHeld(true);
+  }, [open, status?.kind, conn?.baseUrl]);
+  useEffect(() => {
+    if (open || !warmHeld) return undefined;
+    const timer = window.setTimeout(() => setWarmHeld(false), WARM_KEEP_MS);
+    return () => window.clearTimeout(timer);
+  }, [open, warmHeld]);
 
   // The bar's height, for the player that starts under it (`--seanime-host-bar-h`,
   // mediaWorkspace.css). `offsetHeight` is in CSS pixels, which is what the player's `top`
@@ -211,16 +351,15 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
   }, [open, status?.kind]);
 
   /*
-   * A stopped sidecar is normally a moment: opening the player auto-starts it, so for that
-   * moment it shows the loader, not "stopped" and a Start button. If it is STILL stopped
-   * after a few seconds the auto-start did not take, and the words and the button come
-   * back — a loader must never spin on a server nobody is starting.
+   * A stopped sidecar is normally a moment: the open nudged it, and main starts it. If it is
+   * STILL stopped long after, the start did not take, and that is a failure to state (with a
+   * Retry) rather than a frame that spins forever.
    */
   const [stoppedTooLong, setStoppedTooLong] = useState(false);
   useEffect(() => {
     setStoppedTooLong(false);
     if (!open || status?.kind !== 'stopped') return undefined;
-    const timer = window.setTimeout(() => setStoppedTooLong(true), STOPPED_GRACE_MS);
+    const timer = window.setTimeout(() => setStoppedTooLong(true), STOPPED_TOO_LONG_MS);
     return () => window.clearTimeout(timer);
   }, [open, status?.kind]);
 
@@ -273,6 +412,21 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     if (back?.isConnected) back.focus({ preventScroll: true });
   }, [open]);
 
+  /** Retry pressed: which failure it answers decides what is re-run. */
+  const [retrying, setRetrying] = useState(false);
+  useEffect(() => {
+    setRetrying(false);
+  }, [status?.kind, conn, playbackRequest?.requestId]);
+
+  /** The same open again, as a new request (the slice re-runs it from the top). */
+  const reissue = useCallback(() => {
+    setPlaybackRequest((current) => {
+      if (!current) return current;
+      if (current.kind === 'local') forgetPlaybackPlan(current.localFilePath);
+      return { ...current, requestId: Date.now() };
+    });
+  }, []);
+
   if (!status || status.kind === 'disabled') return null;
 
   /*
@@ -285,134 +439,144 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     <span className="seanime-font-warm" lang="ja" aria-hidden="true">あ漢字カナ</span>
   ) : null;
 
-  const statusLabel = sidecarStatusLabel(status.kind, t);
-  // The other three hosts' own strings, reused verbatim so one enable flow reads
-  // the same wherever it is met.
-  const liquidLabel = presentation.liquid
-    ? t('desktop.returnToStandard')
-    : t('desktop.makeLiquid');
-
-  if (!open) {
-    // Nothing on screen while closed. This invisible marker keeps "a host is mounted and its
-    // sidecar is not disabled" answerable from the DOM (`mediaWorkspaceHostIsMounted`).
+  const mountWorkspace = workspaceReady && (open || warmHeld);
+  // Nothing on screen while closed and cold. This invisible marker keeps "a host is mounted
+  // and its sidecar is not disabled" answerable from the DOM (`mediaWorkspaceHostIsMounted`).
+  const marker = !open ? (
+    <span
+      className="seanime-host-present"
+      data-sidecar={status.kind}
+      data-sidecar-error={status.errorCode ?? undefined}
+      hidden
+    />
+  ) : null;
+  if (!open && !mountWorkspace) {
     return (
       <>
-        <span className="seanime-host-present" data-sidecar={status.kind} hidden />
+        {marker}
+        {null}
         {fontWarm}
       </>
     );
   }
 
-  const retryable = status.kind === 'failed' || status.kind === 'offline'
-    || status.kind === 'stopped';
-  const loading = (status.kind === 'stopped' && !stoppedTooLong)
-    || status.kind === 'starting'
-    || (status.kind === 'ready' && !conn);
+  // The one failure the frame may state, in priority order.
+  let failure: PlayerFrameFailure | null = null;
+  if (open) {
+    if (status.kind === 'failed' || stoppedTooLong) {
+      failure = {
+        message: t(stoppedTooLong ? 'playback.failed.unhealthy' : serverFailureKey(status)),
+        details: status.error,
+        retrying,
+        onRetry: status.errorCode === 'disabled'
+          ? undefined
+          : () => {
+            setRetrying(true);
+            void window.api.seanimeStart().catch(() => setRetrying(false));
+          },
+      };
+    } else if (status.kind === 'ready' && conn && !conn.baseUrl) {
+      failure = {
+        message: t('playback.failed.connect'),
+        retrying,
+        onRetry: () => {
+          setRetrying(true);
+          retryConnection();
+        },
+      };
+    } else if (sliceError || mediaFailed) {
+      failure = {
+        message: sliceError ?? t('playback.failed.player'),
+        details: sliceError ? null : mediaFailed,
+        onRetry: reissue,
+      };
+    }
+  }
+  const frameUp = open && playbackRequest !== null
+    && (failure !== null || !workspaceReady || !firstFrame);
+
+  const liquidLabel = presentation.liquid
+    ? t('desktop.returnToStandard')
+    : t('desktop.makeLiquid');
 
   return (
-    <div
-      ref={hostRef}
-      className={`seanime-host${presentation.liquid ? ' workspace-liquid' : ''}`}
-      data-now-playing={playerActive && nowPlayingTitle ? 'true' : undefined}
-      role="dialog"
-      aria-modal="true"
-      aria-label={nowPlayingTitle ?? t('mediaWorkspace.launcher')}
-      data-presentation={presentation.dataPresentation}
-    >
-      {/* The bar is navigation and transport by §2.3, so it is the region that takes the
-          material (`theme/liquid-window.css` paints it only under `.workspace-liquid`). */}
-      <ContextualSurface as="header" className="seanime-host-bar">
-        <span className="seanime-host-lead">
-          <button
-            ref={backRef}
-            type="button"
-            className="seanime-host-btn seanime-host-back"
-            onClick={close}
-            title={t('mediaWorkspace.backHint')}
-          >
-            <span aria-hidden="true">←</span> {t('common.back')}
-          </button>
-        </span>
-        {/* Silent when all is well; a server that is starting, stopped or failed says so. */}
-        <span
-          className="seanime-host-status"
-          data-sidecar={status.kind}
-          role="status"
-          aria-live="polite"
-        >
-          {status.kind === 'ready' ? null : (
-            <>
-              <span className="seanime-host-dot" aria-hidden="true" />
-              {t('mediaWorkspace.status', { status: statusLabel })}
-            </>
-          )}
-        </span>
-        {/* The flexible middle of the bar, so it appearing and going moves nothing else. */}
-        <span className="seanime-host-now" title={nowPlayingTitle ?? undefined}>
-          {nowPlayingTitle}
-        </span>
-        <span className="seanime-host-trail">
-          {presentation.presentable ? (
-            <button
-              type="button"
-              className={`seanime-host-btn seanime-host-liquid${
-                presentation.liquid ? ' is-liquid' : ''
-              }`}
-              title={liquidLabel}
-              aria-label={liquidLabel}
-              aria-pressed={presentation.liquid}
-              onClick={presentation.toggle}
-            >
-              {presentation.liquid ? '◆' : '◇'}
-            </button>
-          ) : null}
-        </span>
-      </ContextualSurface>
-      <div className="seanime-host-body">
-        {/* One loader from "server stopped" to "video drawn"; real failures get words and a
-            retry. */}
-        {loading ? (
-          <LiquidLoading layout="study" />
-        ) : status.kind !== 'ready' ? (
-          <div className="seanime-host-state" role="status">
-            <p>{t('mediaWorkspace.serverState', { status: statusLabel })}</p>
-            {/* The failure in the UI language, with its recovery; the raw
-                diagnostic (paths, exit codes) only behind a details line. */}
-            {seanimeFailureKey(status.errorCode) ? (
-              <p className="seanime-host-state-detail">{t(seanimeFailureKey(status.errorCode) as string)}</p>
-            ) : null}
-            {status.error ? (
-              <details className="seanime-host-state-detail">
-                <summary>{t('mediaWorkspace.failure.details')}</summary>
-                {status.error}
-              </details>
-            ) : null}
-            {retryable ? (
+    <>
+      {marker}
+      <div
+        ref={hostRef}
+        className={open
+          ? `seanime-host${presentation.liquid ? ' workspace-liquid' : ''}`
+          : 'seanime-host-warm'}
+        // Closed and warm: mounted, never painted, out of the accessibility tree.
+        style={open ? undefined : { display: 'none' }}
+        aria-hidden={open ? undefined : true}
+        data-now-playing={open && playerActive && nowPlayingTitle ? 'true' : undefined}
+        role={open ? 'dialog' : undefined}
+        aria-modal={open ? true : undefined}
+        aria-label={open ? nowPlayingTitle ?? t('mediaWorkspace.launcher') : undefined}
+        data-presentation={open ? presentation.dataPresentation : undefined}
+      >
+        {open ? (
+          /* The bar is navigation and transport by §2.3, so it is the region that takes the
+             material (`theme/liquid-window.css` paints it only under `.workspace-liquid`).
+             It no longer narrates the media server: that is the frame's job, and only when
+             there is something the viewer can act on. */
+          <ContextualSurface as="header" className="seanime-host-bar">
+            <span className="seanime-host-lead">
               <button
+                ref={backRef}
                 type="button"
-                className="seanime-host-btn"
-                onClick={() => void window.api.seanimeStart().catch(() => undefined)}
+                className="seanime-host-btn seanime-host-back"
+                onClick={close}
+                title={t('mediaWorkspace.backHint')}
               >
-                {t('mediaWorkspace.startServer')}
+                <span aria-hidden="true">←</span> {t('common.back')}
               </button>
-            ) : null}
-          </div>
-        ) : !conn ? null : !conn.baseUrl ? (
-          <div className="seanime-host-state" role="status">
-            <p>{t('mediaWorkspace.notRunning')}</p>
-          </div>
-        ) : (
-          <Suspense fallback={<LiquidLoading layout="study" />}>
-            <MediaWorkspace
-              key={`seanime-${status.pid ?? 'none'}-${status.port}`}
-              conn={conn}
-              playbackRequest={playbackRequest}
+            </span>
+            {/* The flexible middle of the bar, so it appearing and going moves nothing else. */}
+            <span className="seanime-host-now" title={nowPlayingTitle ?? undefined}>
+              {nowPlayingTitle}
+            </span>
+            <span className="seanime-host-trail">
+              {presentation.presentable ? (
+                <button
+                  type="button"
+                  className={`seanime-host-btn seanime-host-liquid${
+                    presentation.liquid ? ' is-liquid' : ''
+                  }`}
+                  title={liquidLabel}
+                  aria-label={liquidLabel}
+                  aria-pressed={presentation.liquid}
+                  onClick={presentation.toggle}
+                >
+                  {presentation.liquid ? '◆' : '◇'}
+                </button>
+              ) : null}
+            </span>
+          </ContextualSurface>
+        ) : null}
+        <div className="seanime-host-body">
+          {mountWorkspace && conn ? (
+            <Suspense fallback={null}>
+              <MediaWorkspace
+                key={`seanime-${status.pid ?? 'none'}-${status.port}`}
+                conn={conn}
+                playbackRequest={open ? playbackRequest : null}
+              />
+            </Suspense>
+          ) : null}
+          {frameUp ? (
+            <PlayerFrame
+              overlay
+              title={nowPlayingTitle}
+              imageUrl={lastFrameFor(localPath) ?? plan?.posterUrl ?? null}
+              failure={failure}
+              onBack={failure ? close : undefined}
             />
-          </Suspense>
-        )}
+          ) : null}
+        </div>
       </div>
       {fontWarm}
-    </div>
+    </>
   );
 }
-

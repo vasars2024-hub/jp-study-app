@@ -3,6 +3,7 @@ import {
   classifySnipTokens,
   clipboardHasImageFormat,
   groupJapaneseTokens,
+  migrateSnipSettings,
   normalizeSnipSettings,
   normalizeSnipWord,
   pruneSnipHistory,
@@ -34,9 +35,9 @@ const SENTENCE: SnipToken[] = [
 ];
 
 describe('settings', () => {
-  it('defaults: on, auto-add, Anki when set up, Snips deck, 12 words', () => {
+  it('defaults: off (v1), auto-add once on, Anki when set up, Snips deck, 12 words', () => {
     expect(normalizeSnipSettings(undefined)).toEqual(SNIP_SETTINGS_DEFAULTS);
-    expect(SNIP_SETTINGS_DEFAULTS).toMatchObject({ enabled: true, autoAdd: true, sendToAnki: 'auto', deck: 'Snips', maxWords: 12 });
+    expect(SNIP_SETTINGS_DEFAULTS).toMatchObject({ enabled: false, autoAdd: true, sendToAnki: 'auto', deck: 'Snips', maxWords: 12 });
   });
 
   it('repairs each field on its own and clamps the word limit', () => {
@@ -44,6 +45,27 @@ describe('settings', () => {
     expect(s).toMatchObject({ enabled: false, sendToAnki: 'auto', deck: 'Snips', maxWords: 50, ankiDeck: 'Mine::Snips' });
     expect(normalizeSnipSettings({ maxWords: 0 }).maxWords).toBe(1);
     expect(normalizeSnipSettings({ maxWords: 'x' }).maxWords).toBe(12);
+  });
+
+  it('migration: an old profile keeps watching only if it was used, and a turned-off choice is kept', () => {
+    const none0 = { historyCount: 0 };
+    const used = { historyCount: 3 };
+    // Never written (new profile, or old profile that never touched it).
+    expect(migrateSnipSettings(undefined, none0)).toEqual({ settings: SNIP_SETTINGS_DEFAULTS, migrated: true });
+    expect(migrateSnipSettings({}, used).settings.enabled).toBe(true);
+    // Old file, on (the old default) but never used → off; other fields kept.
+    expect(migrateSnipSettings({ enabled: true, deck: 'Mine', maxWords: 5 }, none0)).toEqual({
+      settings: { ...SNIP_SETTINGS_DEFAULTS, enabled: false, deck: 'Mine', maxWords: 5 },
+      migrated: true,
+    });
+    expect(migrateSnipSettings({ enabled: true }, used).settings.enabled).toBe(true);
+    expect(migrateSnipSettings({ enabled: true, notice: 'answered' }, none0).settings.enabled).toBe(true);
+    expect(migrateSnipSettings({ enabled: true, notice: 'shown' }, none0).settings.enabled).toBe(true);
+    // Turned off stays off whatever the history says.
+    expect(migrateSnipSettings({ enabled: false, notice: 'answered' }, used).settings.enabled).toBe(false);
+    // Already on the new schema: only repaired, never re-decided.
+    expect(migrateSnipSettings({ schema: 2, enabled: true }, none0)).toEqual({ settings: { ...SNIP_SETTINGS_DEFAULTS, enabled: true }, migrated: false });
+    expect(migrateSnipSettings({ schema: 2, enabled: false }, used)).toMatchObject({ settings: { enabled: false }, migrated: false });
   });
 
   it('off keeps cards in Gum only', () => {

@@ -23,6 +23,7 @@ import type {
   Anime_LocalFile,
   VideoCore_VideoPlaybackInfo,
 } from '../../vendor/seanime/generated/types';
+import { STUDY_MEDIA_KEY, type StudyMediaIdentity } from './studyMediaIdentity';
 
 /**
  * Did the sidecar refuse this open because of what it knows about the FILE (not matched, not
@@ -44,9 +45,20 @@ export function directLocalPlaybackInfo(input: {
   localFilePath: string;
   streamUrl: string;
   startAtSec?: number;
+  /**
+   * The library's identity for an anime episode played from disk (see
+   * `studyMediaIdentity.ts`): the study surfaces read it where the server's `media` /
+   * `episode` would be, VideoCore never sees it.
+   */
+  studyMedia?: StudyMediaIdentity | null;
 }): VideoCore_VideoPlaybackInfo {
   const name = fileNameOf(input.localFilePath);
+  const media = input.studyMedia
+    && (input.studyMedia.mediaId || input.studyMedia.title || input.studyMedia.episodeNumber)
+    ? { [STUDY_MEDIA_KEY]: input.studyMedia }
+    : {};
   return {
+    ...media,
     id: `direct-${input.requestId}`,
     playbackType: 'localfile',
     streamUrl: input.streamUrl,

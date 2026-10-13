@@ -30,16 +30,28 @@ export function mediaServerReachFor(status: StatusLike | null | undefined): Medi
 export interface MediaServerProbeApi {
   seanimeStatus(): Promise<StatusLike | null>;
   seanimeStart(): Promise<StatusLike | null>;
+  /** Start without waiting (main/seanime/lifecycle.ts). Absent on an older preload. */
+  seanimeWarm?(delayMs?: number): Promise<StatusLike | null>;
 }
 
 /**
- * Where an opened video can go. A sidecar nobody has started has not looked for its
- * binary yet, so it is started here (the workspace would start it on open anyway). A
- * missing binary answers at once; a start still running after `waitMs` therefore has
- * a binary, and the workspace — which shows "starting" — is the right place for it.
+ * Where an opened video can go.
+ *
+ * Main now answers "is there a binary?" before anything is spawned
+ * (`primeSeanimeStatus`), so a `stopped` sidecar HAS one: it is warmed here without
+ * waiting and the workspace — which holds the request and plays it the moment the server
+ * is up — is the right place at once. This used to start it and wait up to `waitMs`
+ * (1.5 s) on every open of a file while the server was down.
+ *
+ * Without `seanimeWarm` (an older preload) the old rule stands: start it, and a start
+ * still running after `waitMs` has a binary.
  */
 export async function probeMediaServer(api: MediaServerProbeApi, waitMs = 1500): Promise<MediaServerReach> {
   let status = await api.seanimeStatus().catch(() => null);
+  if (status?.kind === 'stopped' && typeof api.seanimeWarm === 'function') {
+    void api.seanimeWarm(0).catch(() => null);
+    return mediaServerReachFor(status);
+  }
   if (status?.kind === 'stopped') {
     const started = await Promise.race([
       api.seanimeStart().catch(() => null),

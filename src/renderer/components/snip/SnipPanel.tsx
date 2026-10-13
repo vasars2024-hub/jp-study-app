@@ -582,8 +582,9 @@ function SnipDetail({ entry, folder, defaultDeck, maxWords }: { entry: SnipEntry
 }
 
 /**
- * The first-run notice, kept until it is answered: Snip to cards is on by
- * default, so the learner is told plainly and can turn it off in one click.
+ * The first-run notice, kept (while watching) until it is answered: the learner
+ * turned Snip to cards on (it is off by default), so once it is making cards
+ * they are told plainly what it does and can turn it off in one click.
  */
 function SnipNotice({ onAnswer }: { onAnswer: (keep: boolean) => void }) {
   const { t } = useT();

@@ -59,9 +59,11 @@ import { MEDIA5_ZH } from '../media5/zh';
 import { PLANNER_UI_ZH } from '../plannerUi/zh';
 import { SNIP_UI_ZH } from '../snipUi/zh';
 import { SNIP2_UI_ZH } from '../snip2Ui/zh';
+import { ABOUT_UI_ZH } from '../aboutUi/zh';
 import { NOTES_UI_ZH } from '../notesUi/zh';
 import { LIBRARY_MANAGE_UI_ZH } from '../libraryManageUi/zh';
 import { VIDEO_STUDY2_UI_ZH } from '../videoStudy2Ui/zh';
+import { PLAYBACK_UI_ZH } from '../playbackUi/zh';
 
 export const zh: Catalog = {
   'common.download': '下载',
@@ -802,9 +804,11 @@ export const zh: Catalog = {
   ...PLANNER_UI_ZH,
   ...SNIP_UI_ZH,
   ...SNIP2_UI_ZH,
+  ...ABOUT_UI_ZH,
   ...NOTES_UI_ZH,
   ...LIBRARY_MANAGE_UI_ZH,
   ...VIDEO_STUDY2_UI_ZH,
+  ...PLAYBACK_UI_ZH,
 
   'settings.appTitle': '设置',
   'settings.group.personalization': '个性化',
@@ -9910,7 +9914,6 @@ export const zh: Catalog = {
   'mediaWorkspace.openFile.systemPlayerFailed': 'Windows 无法用系统播放器打开此文件。',
   'mediaWorkspace.resumeLast.nothing': '还没有观看记录，请先打开一个视频。',
   'mediaWorkspace.resumeLast.noWorkspaceHere': '此窗口没有媒体播放器，请在主窗口中继续播放。',
-  'mediaWorkspace.status': '媒体服务器：{status}',
   'mediaWorkspace.sidecar.disabled': '已禁用',
   'mediaWorkspace.sidecar.stopped': '已停止',
   'mediaWorkspace.sidecar.starting': '正在启动',
@@ -9936,8 +9939,6 @@ export const zh: Catalog = {
   'mediaWorkspace.notRunning': '媒体服务器未运行。',
   'mediaWorkspace.playerNeedsServer': '视频播放需要媒体服务器，但此版本中已禁用。',
   'mediaWorkspace.connectingServer': '正在连接媒体服务器…',
-  'mediaWorkspace.serverOffline': '媒体服务器离线',
-  'mediaWorkspace.provisioning': '正在配置媒体连接…',
   'mediaWorkspace.openingLocal': '正在打开本地文件',
   'mediaWorkspace.openStalled': '媒体服务器已接受该文件，但随后停止了准备。请重新打开。',
   'mediaWorkspace.fileMissing': '此视频已不在原来的位置：{path}。它可能已被移动或删除，或其所在的驱动器未连接。',

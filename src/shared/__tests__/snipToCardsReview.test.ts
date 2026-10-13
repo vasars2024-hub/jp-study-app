@@ -17,9 +17,9 @@ import {
   SNIP_SETTINGS_DEFAULTS,
 } from '../snipToCards';
 
-describe('settings: the default stays on, and the first run says so', () => {
-  it('watching and auto-add are still on by default (owner decision pending); the notice starts pending', () => {
-    expect(SNIP_SETTINGS_DEFAULTS).toMatchObject({ enabled: true, autoAdd: true, notice: 'pending', mergeExisting: true });
+describe('settings: off by default (v1, owner decision), and the first snip after turning it on says so', () => {
+  it('watching is off by default; auto-add is ready for when it is turned on; the notice starts pending', () => {
+    expect(SNIP_SETTINGS_DEFAULTS).toMatchObject({ enabled: false, autoAdd: true, notice: 'pending', mergeExisting: true });
     expect(snipNoticeOpen(normalizeSnipSettings(undefined))).toBe(true);
   });
 

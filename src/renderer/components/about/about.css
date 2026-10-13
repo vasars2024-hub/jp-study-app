@@ -1,0 +1,196 @@
+/*
+ * About Gum (Settings → Help, and Blanc Settings). Theme-neutral on purpose:
+ * only the shared tokens every look defines (Study OS, Aero, WIRED, Blanc),
+ * each with a fallback, so the panel reads as part of whichever shell hosts it.
+ */
+.about-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.about-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+}
+
+.about-tab {
+  min-height: 28px;
+  padding: 4px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.about-tab:hover,
+.about-tab:focus-visible {
+  opacity: 1;
+}
+
+.about-tab.is-active {
+  border-bottom-color: var(--accent, currentColor);
+  color: var(--accent-text, inherit);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.about-body {
+  min-width: 0;
+}
+
+.about-body p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.about-name {
+  font-size: 15px;
+}
+
+.about-version {
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.about-link {
+  color: var(--accent-text, inherit);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.about-url {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.about-note {
+  font-size: 12px;
+}
+
+.about-h {
+  margin: 14px 0 6px;
+  font-size: 13px;
+}
+
+.about-md,
+.about-pre {
+  padding: 8px 10px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 6px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.06));
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.about-md ul,
+.about-md ol {
+  padding-inline-start: 18px;
+}
+
+.about-md li {
+  overflow-wrap: anywhere;
+}
+
+.about-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 11.5px;
+}
+
+.about-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.about-search {
+  width: min(100%, 360px);
+  min-height: 28px;
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.45));
+  border-radius: 4px;
+  background: var(--input-bg, transparent);
+  color: inherit;
+  font: inherit;
+}
+
+.about-pkg-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.about-pkg {
+  min-height: 26px;
+  padding: 2px 8px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.about-pkg.is-active {
+  border-color: var(--accent, currentColor);
+}
+
+.about-pkg-name {
+  font-weight: 600;
+}
+
+.about-credit-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.about-credit {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+}
+
+.about-credit:last-child {
+  border-bottom: 0;
+}
+
+.about-credit p {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.about-credit-text {
+  font-size: 12.5px;
+}
+
+.about-consent {
+  min-height: 24px;
+}

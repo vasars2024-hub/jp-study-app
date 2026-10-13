@@ -94,7 +94,7 @@ import {
 } from '../components/music/MusicContent';
 import { MusicQueuePanel } from '../components/music/MusicQueue';
 import { useT } from '../i18n';
-import { openMediaWorkspace } from '../mediaWorkspaceBridge';
+import { openMediaWorkspace, warmMediaPlayerWhenIdle } from '../mediaWorkspaceBridge';
 import {
   subtitleChoiceDestination,
   useMediaWorkspaceAvailability,
@@ -1597,6 +1597,8 @@ function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () =
 
 export default function MediaCenterView({ initialTab = 'home' }: MediaCenterViewProps) {
   const { t, lang } = useT();
+  // The library is where a video is picked: have the player warm before the click.
+  useEffect(() => warmMediaPlayerWhenIdle(), []);
   const wired = useWiredMaterials();
   const media = useMedia('full', wired);
   const music = useMusic();

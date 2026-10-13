@@ -169,6 +169,8 @@ const BatchConverterPanel = retryableLazy(() => readyPanels().then((m) => ({ def
 const BlancModelsPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.BlancModelsPanel })));
 const BlancYoutubePanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.BlancYoutubePanel })));
 const RecorderLauncherPanel = retryableLazy(() => import('../../recorder/RecorderLauncherPanel'));
+// v1: About Gum (version, licences, credits, privacy), fetched only when opened.
+const AboutPanel = retryableLazy(() => import('../about/AboutPanel'));
 const DifficultyAnalyzerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.DifficultyAnalyzerPanel })));
 const FrequencyExplorerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.FrequencyExplorerPanel })));
 const ImmersionTrackerPanel = retryableLazy(() => readyPanels().then((m) => ({ default: m.ImmersionTrackerPanel })));
@@ -4256,7 +4258,31 @@ function BlancSettingsPanel({
           </button>
         </div>
       </fieldset>
+
+      <BlancAboutSettings />
     </div>
+  );
+}
+
+/** Settings → About Gum: the shared About panel, loaded on first open (Blanc's boot stays lean). */
+function BlancAboutSettings() {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <fieldset data-blanc-setting="about" tabIndex={-1}>
+      <legend>{t('about.title')}</legend>
+      <p className="blanc-note">{t('about.desc')}</p>
+      <div className="blanc-row-actions">
+        <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          {open ? t('about.close') : t('about.open')}
+        </button>
+      </div>
+      {open && (
+        <Suspense fallback={<div className="blanc-loading">{t('blanc.shell.loading')}</div>}>
+          <AboutPanel />
+        </Suspense>
+      )}
+    </fieldset>
   );
 }
 

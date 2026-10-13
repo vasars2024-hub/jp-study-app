@@ -69,6 +69,13 @@ import {
 } from '../shared/directstreamOpenChannel';
 import { installSeanimeMediaAuth } from './seanimeMediaAuth';
 import { directLocalPlaybackInfo, sidecarCannotServeFile } from './directLocalPlayback';
+import { getPlaybackPlan } from './playbackPlanClient';
+import { routeLocalPlayback, type PlaybackPlan } from '../shared/playbackPlan';
+import {
+  studyEpisodeNumber,
+  studyMediaTitle,
+  type StudyMediaIdentity,
+} from './studyMediaIdentity';
 import {
   ensureTranscodeEnabled,
   isTranscodableMediaError,
@@ -254,6 +261,21 @@ function requestedStartSec(
   return requestedKey && requestedKey === resumeKeyForPlayback(nativeInfo)
     ? startAtSec
     : null;
+}
+
+/**
+ * The library's identity for an anime episode played from disk — what the server's
+ * `media` / `episode` would have said (`studyMediaIdentity.ts`). Non-anime rows carry none:
+ * their cards are named exactly as they were before disk playback was routed this way.
+ */
+function studyMediaFromPlan(plan: PlaybackPlan): StudyMediaIdentity | null {
+  const item = plan.item;
+  if (!item || (!item.anilistId && !item.malId && item.category !== 'anime')) return null;
+  return {
+    ...(item.anilistId ? { mediaId: item.anilistId } : {}),
+    ...(item.seriesTitle || item.title ? { title: item.seriesTitle || item.title } : {}),
+    ...(typeof item.episode === 'number' && item.episode > 0 ? { episodeNumber: item.episode } : {}),
+  };
 }
 
 function loadResumePosition(
@@ -597,9 +619,8 @@ function StudyOverlay({
  * last resort because it is always better than an empty row.
  */
 function ledgerTitleForPlayback(playbackInfo: VideoCore_VideoPlaybackInfo): string {
-  const media = playbackInfo.media?.title;
-  const mediaTitle = media?.userPreferred || media?.romaji || media?.english || media?.native;
-  const episode = playbackInfo.episode?.episodeNumber;
+  const mediaTitle = studyMediaTitle(playbackInfo);
+  const episode = studyEpisodeNumber(playbackInfo);
   if (mediaTitle) {
     return episode != null ? `${mediaTitle} — ${episode}` : mediaTitle;
   }
@@ -875,19 +896,34 @@ function StudyPlayerSession({
     setState(initialState);
   }, [playbackRequest, proofConfig, setState]);
 
-  /** See `./directLocalPlayback.ts`: the file plays from disk when the sidecar will not. */
+  /**
+   * See `./directLocalPlayback.ts`: the file plays from disk — because the plan said it can
+   * (`shared/playbackPlan.ts`, `known` carries its URL), or because the sidecar would not.
+   */
   const openDirect = React.useCallback(
-    async (request: Extract<MediaWorkspacePlaybackRequest, { kind: 'local' }>, stated: string) => {
+    async (
+      request: Extract<MediaWorkspacePlaybackRequest, { kind: 'local' }>,
+      stated: string,
+      known?: { url: string; studyMedia?: StudyMediaIdentity | null },
+    ) => {
       // The sidecar refuses one open TWICE (socket `abort-open` and the POST's 500), sometimes
       // again seconds later. Only the first may hand off: a second would reset a video that is
       // already playing, and the POST's refusal would paint an error screen over it.
-      if (directRequestRef.current === request.requestId) return;
+      // A launch the plan routed here may run again for the same request (its effect was torn
+      // down mid-way by a client id the server renamed): that one must still land, unless the
+      // video is already up.
+      if (
+        directRequestRef.current === request.requestId
+        && (!known || stateRef.current.playbackInfo)
+      ) return;
       directRequestRef.current = request.requestId;
-      let streamUrl: string | null = null;
-      try {
-        streamUrl = await window.api.mediaFileUrl(request.localFilePath);
-      } catch {
-        streamUrl = null;
+      let streamUrl: string | null = known?.url ?? null;
+      if (!streamUrl) {
+        try {
+          streamUrl = await window.api.mediaFileUrl(request.localFilePath);
+        } catch {
+          streamUrl = null;
+        }
       }
       if (latestRequestRef.current?.requestId !== request.requestId) return;
       if (!streamUrl) {
@@ -907,6 +943,7 @@ function StudyPlayerSession({
         requestId: request.requestId,
         localFilePath: request.localFilePath,
         streamUrl,
+        studyMedia: known?.studyMedia,
       });
       const startAtSec = request.startAtSec ?? loadResumePosition(info);
       setState({
@@ -916,6 +953,7 @@ function StudyPlayerSession({
           localFilePath: request.localFilePath,
           streamUrl,
           startAtSec,
+          studyMedia: known?.studyMedia,
         }),
         playbackError: null,
         loadingState: null,
@@ -963,6 +1001,16 @@ function StudyPlayerSession({
       return;
     }
     launchedRequestRef.current = playbackRequest.requestId;
+    // Already playing this request from disk: a re-run of this effect (the server renamed
+    // this window's client id; a new server generation's socket came up) has nothing to do.
+    // Re-launching it would tear down a video the viewer is watching — the disk stream never
+    // needed the socket in the first place.
+    if (
+      directRequestRef.current === playbackRequest.requestId
+      && stateRef.current.playbackInfo
+    ) {
+      return;
+    }
     const controller = new AbortController();
 
     if (playbackRequest.kind === 'stream') {
@@ -1051,10 +1099,36 @@ function StudyPlayerSession({
       loadingState: translateUi('mediaWorkspace.openingLocal'),
     });
     void (async () => {
+    /*
+      One IPC decides the route (`shared/playbackPlan.ts`): is the file on disk, which
+      library row is it, and can Chromium play it as it is? The host asked for the same plan
+      the moment the request landed, so this is usually already answered. It replaced two
+      calls — `mediaFileUrl`, then `listMedia` (the WHOLE library) — and, for anything that
+      might be anime, a library scan inside the sidecar before the same disk playback.
+    */
+    const plan = await getPlaybackPlan(localRequest.localFilePath);
+    if (controller.signal.aborted) return;
+    if (plan) {
+      const route = routeLocalPlayback(plan);
+      if (route === 'direct' && plan.url) {
+        void openDirect(localRequest, '', { url: plan.url, studyMedia: studyMediaFromPlan(plan) });
+        return;
+      }
+      if (route === 'missing') {
+        setState({
+          active: true,
+          playbackInfo: null,
+          playbackError: translateUi('mediaWorkspace.fileMissing', { path: localRequest.localFilePath }),
+          loadingState: null,
+        });
+        return;
+      }
+    }
     // A file that is not on disk is known in one call; without this it waited out the whole
     // library scan below (11.4 s measured) before saying so (transition audit 2026-09-23).
     // `mediaFileUrl` answers null for a missing path — the same test `openDirect` relies on.
-    const onDisk = await window.api.mediaFileUrl(localRequest.localFilePath).catch(() => null);
+    // (Only reached without a plan: a preload that predates `mediaPlaybackPlan`.)
+    const onDisk = plan?.url ?? await window.api.mediaFileUrl(localRequest.localFilePath).catch(() => null);
     if (controller.signal.aborted) return;
     if (!onDisk) {
       setState({
@@ -1072,7 +1146,9 @@ function StudyPlayerSession({
       from disk anyway. The app's own library already says what the file is, so a file it
       knows as non-anime, with no AniList/MAL id, goes straight to disk playback.
     */
-    const libraryItem = typeof window.api?.listMedia === 'function'
+    const libraryItem = plan
+      ? null
+      : typeof window.api?.listMedia === 'function'
       ? await window.api.listMedia()
         .then((items) => {
           const wanted = normalizeLibraryPath(localRequest.localFilePath);
@@ -1709,6 +1785,8 @@ function StudyPlayerSession({
         // stream is prepared. Hidden then, the viewer got no feedback at all for an open, and
         // the library flashed between two videos.
         data-study-player={state.active ? 'active' : state.loadingState ? 'loading' : 'idle'}
+        // The error on screen, for the host's opening frame to state with a Retry.
+        data-study-error={state.playbackError || undefined}
         data-cue-proof-phase={proofWindow().__SEANIME_CUE_PROOF__?.phase ?? 'idle'}
       >
         <VideoCore

@@ -7,7 +7,7 @@
  * one-shot: dismissed once, never seen again, on a profile that has no other way
  * to ask for it.
  */
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { loadOnboarding, onTourStarted, replayTour } from '../../../onboardingStore';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
@@ -20,6 +20,11 @@ import { DiagnosticsCard } from './DiagnosticsCard';
 import UpdatePanel from './UpdatePanel';
 import HelpShortcutsCard from './HelpShortcutsCard';
 import { FirstRunCard, HelpSearchCard } from './HelpSearchCard';
+import { retryableLazy } from '../../../retryableLazy';
+
+// v1: About (version, licence, open source licences, credits, privacy) is its
+// own chunk, fetched when Help opens; its big texts load per tab on top of that.
+const AboutPanel = retryableLazy(() => import('../../about/AboutPanel'));
 
 /**
  * `idle` before the button is used; `started` only when an overlay actually
@@ -109,6 +114,11 @@ export default function HelpPage() {
       <HelpShortcutsCard />
       <UpdatePanel />
       <DiagnosticsCard />
+      <SettingsCard id="about" title={t('about.title')} description={t('about.desc')}>
+        <Suspense fallback={<p className="muted">{t('about.loading')}</p>}>
+          <AboutPanel />
+        </Suspense>
+      </SettingsCard>
     </>
   );
 }

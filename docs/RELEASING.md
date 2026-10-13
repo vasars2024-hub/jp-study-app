@@ -56,6 +56,25 @@ app exe (packager, `@electron/windows-sign`) and `Setup.exe` / `Update.exe`
 Unsigned builds work, but SmartScreen warns on `Setup.exe` until the file earns
 reputation, and some antivirus products quarantine `Update.exe` updates.
 
+### Unsigned v1: what users see, and what to tell them
+
+v1 ships unsigned. Every release note and the README carry the same short,
+friendly instructions, so nobody thinks the warning means malware:
+
+> **"Windows protected your PC"?** Gum isn't code-signed yet, so Windows
+> SmartScreen doesn't recognise the download. Click **More info**, check that the
+> app is `Gum-<version> Setup.exe`, then click **Run anyway**. You only need to do
+> this once.
+
+- Paste that block into the GitHub release body (step 4) together with the
+  SHA-256 of each uploaded file (`Get-FileHash -Algorithm SHA256 <file>`).
+- Screenshot placeholder: `docs/images/smartscreen-more-info.png` and
+  `docs/images/smartscreen-run-anyway.png` — capture both SmartScreen steps on a
+  clean Windows 11 VM before the first public announcement, and link them from
+  the README's "Windows protected your PC" section.
+- Updates installed by Gum itself (Squirrel) do not show SmartScreen; only the
+  first download does.
+
 ## 2. Delta packages
 
 `forge.config.ts` gives MakerSquirrel `remoteReleases =

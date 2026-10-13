@@ -73,6 +73,13 @@ export default function StudyWebsocketProvider({
     // inline, so a `conn` dependency would re-run this on every render of the parent and
     // close a healthy socket each time. The pool is keyed on exactly these two values, so
     // rebuilding the object here cannot desync from the key.
+    //
+    // The confirmation is per CONNECTION, but the atom is per window: left `true` from a
+    // previous server generation (a crash and restart), it let a local open through before
+    // the new socket had been told its id, under the old id — and the rename that followed
+    // tore that open down half-way (seamless playback pass, measured in the e2e crash test).
+    // Joining starts unconfirmed; the pool replays `true` at once if this connection already is.
+    setIdentityConfirmed(false);
     return joinSeanimeSocket({ baseUrl: conn.baseUrl, token: conn.token }, {
       onSocket: setSocket,
       onConnected: setConnected,

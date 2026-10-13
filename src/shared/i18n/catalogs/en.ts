@@ -59,9 +59,11 @@ import { MEDIA5_EN } from '../media5/en';
 import { PLANNER_UI_EN } from '../plannerUi/en';
 import { SNIP_UI_EN } from '../snipUi/en';
 import { SNIP2_UI_EN } from '../snip2Ui/en';
+import { ABOUT_UI_EN } from '../aboutUi/en';
 import { NOTES_UI_EN } from '../notesUi/en';
 import { LIBRARY_MANAGE_UI_EN } from '../libraryManageUi/en';
 import { VIDEO_STUDY2_UI_EN } from '../videoStudy2Ui/en';
+import { PLAYBACK_UI_EN } from '../playbackUi/en';
 
 export const en: Catalog = {
   // Common actions
@@ -907,9 +909,11 @@ export const en: Catalog = {
   ...PLANNER_UI_EN,
   ...SNIP_UI_EN,
   ...SNIP2_UI_EN,
+  ...ABOUT_UI_EN,
   ...NOTES_UI_EN,
   ...LIBRARY_MANAGE_UI_EN,
   ...VIDEO_STUDY2_UI_EN,
+  ...PLAYBACK_UI_EN,
   // The Updates panel's upd3 strings are a lazy pack too (../updateUi3); Study OS
   // loads it before first paint, Blanc never shows them.
 
@@ -10574,7 +10578,6 @@ export const en: Catalog = {
   'mediaWorkspace.openFile.systemPlayerFailed': 'Windows could not open the file in a system player.',
   'mediaWorkspace.resumeLast.nothing': 'Nothing watched yet — open a video first.',
   'mediaWorkspace.resumeLast.noWorkspaceHere': 'This window has no media player — resume from the main window.',
-  'mediaWorkspace.status': 'Media server {status}',
   'mediaWorkspace.sidecar.disabled': 'disabled',
   'mediaWorkspace.sidecar.stopped': 'stopped',
   'mediaWorkspace.sidecar.starting': 'starting',
@@ -10600,8 +10603,6 @@ export const en: Catalog = {
   'mediaWorkspace.notRunning': 'The media server is not running.',
   'mediaWorkspace.playerNeedsServer': 'Video playback needs the media server, which is disabled in this build.',
   'mediaWorkspace.connectingServer': 'Connecting to the media server…',
-  'mediaWorkspace.serverOffline': 'Media server offline',
-  'mediaWorkspace.provisioning': 'Provisioning the media connection…',
   'mediaWorkspace.openingLocal': 'Opening local file',
   'mediaWorkspace.openStalled': 'The media server accepted this file and then stopped preparing it. Try opening it again.',
   'mediaWorkspace.fileMissing': 'This video isn’t where it used to be: {path}. It may have been moved or deleted, or its drive may be unplugged.',

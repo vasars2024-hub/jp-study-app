@@ -310,6 +310,16 @@ function fileHasBytes(file: string): boolean {
   return fileSize(file) > 0;
 }
 
+/**
+ * This item's artwork if it has ALREADY been generated, else null — never starts ffmpeg.
+ * For the player's opening frame, which must not compete with the video it is opening.
+ */
+export function cachedMediaArtwork(id: string): string | null {
+  if (!id) return null;
+  const out = artworkPath(id);
+  return fileHasBytes(out) ? out : null;
+}
+
 export interface MediaArtworkRequest {
   id: string;
   file: string;

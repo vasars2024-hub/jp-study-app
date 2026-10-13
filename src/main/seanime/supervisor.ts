@@ -43,6 +43,7 @@ import {
   createSeanimeKeepalive,
   type SeanimeKeepaliveIo,
 } from './keepalive';
+import { createSeanimeLifecycle, isPermanentFailure } from './lifecycle';
 
 /**
  * Where the binary comes from. Resolved per start rather than at module load, so
@@ -121,10 +122,15 @@ const keepaliveIo: SeanimeKeepaliveIo = {
 const keepalive = createSeanimeKeepalive(keepaliveIo);
 
 const HEALTH_TIMEOUT_MS = 90_000;
-const HEALTH_INTERVAL_MS = 500;
+/** First polls are tight: a warm datadir answers in ~0.7 s, and every poll gap is latency. */
+const HEALTH_INTERVAL_MS = 100;
+/** One lifecycle ping (`lifecycle.ts`) may take this long before it counts as missed. */
+const PING_TIMEOUT_MS = 4_000;
 const LOG_TAIL_MAX = 40;
 
 let child: ChildProcess | null = null;
+/** Children this file killed on purpose: their exit is not a crash. */
+const expectedExits = new WeakSet<ChildProcess>();
 // `disabled` is what the renderer keys off to hide the dev panel entirely, so the
 // initial state must reflect the flag: armed-but-not-started is `stopped`.
 let status: SeanimeStatus = emptyStatus(SEANIME_SIDECAR_ENABLED ? 'stopped' : 'disabled');
@@ -198,9 +204,10 @@ function pushLog(chunk: Buffer | string): void {
   if (logTail.length > LOG_TAIL_MAX * 4) logTail = logTail.slice(-LOG_TAIL_MAX);
 }
 
-async function pollHealth(port: number, deadline: number): Promise<SeanimeStatus['kind']> {
+async function pollHealth(port: number, deadline: number, owner: ChildProcess): Promise<SeanimeStatus['kind']> {
+  let interval = HEALTH_INTERVAL_MS;
   while (Date.now() < deadline) {
-    if (!child || child.exitCode !== null) return 'failed';
+    if (child !== owner || owner.exitCode !== null) return 'failed';
     try {
       const res = await fetch(`http://127.0.0.1:${port}/api/v1/status`, {
         headers: { 'X-Seanime-Token': token },
@@ -218,9 +225,30 @@ async function pollHealth(port: number, deadline: number): Promise<SeanimeStatus
     } catch {
       /* not listening yet — keep polling until the deadline */
     }
-    await new Promise((r) => setTimeout(r, HEALTH_INTERVAL_MS));
+    await new Promise((r) => setTimeout(r, interval));
+    // A first-run datadir (migrations, several seconds) should not cost a request per 100 ms.
+    interval = Math.min(500, Math.round(interval * 1.25));
   }
   return 'failed';
+}
+
+/** One health request for the lifecycle's keep-warm loop. Never throws. */
+async function pingSeanime(): Promise<boolean> {
+  const port = status.port;
+  if (!port || !child) return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/v1/status`, {
+      headers: { 'X-Seanime-Token': token },
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -254,7 +282,11 @@ function installExitHook(): void {
   app.on('will-quit', () => stopSeanime());
 }
 
-export async function startSeanime(): Promise<SeanimeStatus> {
+/**
+ * Spawn ONE generation and resolve once it is ready or has failed. When to call it — and
+ * what to do after a failure or a crash — is `lifecycle.ts`'s business, not this function's.
+ */
+async function spawnGeneration(): Promise<SeanimeStatus> {
   if (!SEANIME_SIDECAR_ENABLED) {
     // The flag is on by default now, so the only way to be here is an explicit opt-out.
     setStatus({ ...emptyStatus('disabled'), error: 'SEANIME_SIDECAR=0 disables the sidecar', errorCode: 'disabled' });
@@ -302,9 +334,11 @@ export async function startSeanime(): Promise<SeanimeStatus> {
     ...emptyStatus('starting'),
     port,
     dataDir,
+    // A restart in progress stays a recovery to the UI until it is ready (or gives up).
+    recovering: status.recovering === true,
   });
 
-  child = spawn(
+  const proc = spawn(
     exe.exePath,
     [
       `--datadir=${dataDir}`,
@@ -315,41 +349,65 @@ export async function startSeanime(): Promise<SeanimeStatus> {
     ],
     { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
   );
+  child = proc;
 
-  child.stdout?.on('data', pushLog);
-  child.stderr?.on('data', pushLog);
+  proc.stdout?.on('data', pushLog);
+  proc.stderr?.on('data', pushLog);
   // Without this, a spawn failure (exe deleted, blocked by antivirus, EACCES)
   // is an unhandled 'error' event — an uncaught exception in main.
-  child.on('error', (err) => {
+  proc.on('error', (err) => {
+    if (child !== proc) return;
     child = null;
     keepalive.stop();
     pushLog(`spawn error: ${err.message}`);
     setStatus({ kind: 'failed', pid: null, error: `could not start the sidecar: ${err.message}`, errorCode: 'spawn-failed' });
   });
-  child.on('exit', (code) => {
-    child = null;
+  proc.on('exit', (code) => {
+    const expected = expectedExits.has(proc);
+    if (child === proc) child = null;
+    if (expected) return;
     // Release the client before anything else: a keepalive left running would retry
     // against a port with nothing behind it until the next start replaced it.
     keepalive.stop();
-    // A crash while we believed we were up is the "offline" state, not a silent stop.
-    if (status.kind === 'ready' || status.kind === 'starting') {
-      setStatus({
-        kind: 'offline',
-        pid: null,
-        error: `sidecar exited with code ${code ?? 'null'}`,
-        errorCode: 'crashed',
-      });
+    const said = `sidecar exited with code ${code ?? 'null'}`;
+    pushLog(said);
+    if (status.kind === 'starting') {
+      // A crash during the start: `pollHealth` sees it and the start reports the failure.
+      setStatus({ error: said, errorCode: 'crashed' });
+      return;
+    }
+    if (status.kind !== 'ready') return;
+    // Not a silent stop and not an error screen: the lifecycle brings it back (`recovering`
+    // keeps the player's loading frame up meanwhile) and only a run of failures is shown.
+    // The status is held at `ready` for this one synchronous step so the next one the UI
+    // sees is the recovery, never a flash of "offline".
+    lifecycle.onUnexpectedExit(said);
+    if (!lifecycle.snapshot().restartPending) {
+      setStatus({ kind: 'offline', pid: null, port: 0, error: said, errorCode: 'crashed', recovering: false });
     }
   });
 
-  setStatus({ pid: child.pid ?? null });
+  setStatus({ pid: proc.pid ?? null });
 
-  const kind = await pollHealth(port, Date.now() + HEALTH_TIMEOUT_MS);
+  const kind = await pollHealth(port, Date.now() + HEALTH_TIMEOUT_MS, proc);
+  if (child !== proc) {
+    // Killed (stop) or crashed while starting; whatever ended it has said so.
+    if (status.kind === 'starting') {
+      setStatus({
+        kind: 'failed',
+        pid: null,
+        port: 0,
+        errorCode: status.errorCode ?? 'crashed',
+        error: status.error ?? 'the sidecar exited while starting',
+      });
+    }
+    return status;
+  }
   if (kind === 'ready') {
     // Before the status goes out, so the log line it writes rides the same update and
     // the dev panel shows the client being held rather than reporting it a poll later.
     keepalive.start({ baseUrl: `http://127.0.0.1:${port}`, token });
-    setStatus({ kind: 'ready', error: null, errorCode: null });
+    setStatus({ kind: 'ready', error: null, errorCode: null, recovering: false });
   } else if (status.kind === 'starting') {
     // Only a start still in progress timed out; a spawn error or an early exit
     // has already said what happened and must not be reworded as "unhealthy".
@@ -358,22 +416,121 @@ export async function startSeanime(): Promise<SeanimeStatus> {
       error: `sidecar did not become healthy within ${HEALTH_TIMEOUT_MS / 1000}s`,
       errorCode: 'unhealthy',
     });
-    stopSeanime();
+    killChild();
   } else {
-    stopSeanime();
+    killChild();
   }
   return status;
 }
 
-/** Synchronous so it is safe from `will-quit` and `process.on('exit')`. */
-export function stopSeanime(): void {
+/** Kill the running generation on purpose (its exit is not reported as a crash). */
+function killChild(): void {
   // First, and synchronously: while this client is held the dead-man switch will never
   // fire, so a stop that killed the child without releasing it would leave the one thing
   // that could still finish the job holding a socket to a dead port.
   keepalive.stop();
-  const pid = child?.pid;
+  const proc = child;
   child = null;
-  if (pid) killTree(pid);
+  if (!proc) return;
+  expectedExits.add(proc);
+  if (proc.pid) killTree(proc.pid);
+}
+
+const lifecycle = createSeanimeLifecycle({
+  spawn: spawnGeneration,
+  kill: () => {
+    killChild();
+    if (status.kind === 'ready' || status.kind === 'starting') {
+      setStatus({ pid: null, port: 0 });
+    }
+  },
+  isRunning: () => child !== null && child.exitCode === null,
+  status: () => status,
+  ping: pingSeanime,
+  report: (event) => {
+    if (event.kind === 'recovering') {
+      // The player keeps its frame and its queued request; nothing to explain yet.
+      setStatus({
+        kind: 'starting',
+        pid: null,
+        port: 0,
+        recovering: true,
+        error: `restarting (attempt ${event.attempt}) — ${event.reason}`,
+        errorCode: null,
+      });
+      return;
+    }
+    setStatus({
+      kind: 'failed',
+      pid: null,
+      port: 0,
+      recovering: false,
+      error: event.reason,
+      errorCode: status.errorCode ?? 'crashed',
+    });
+  },
+  setTimer: (fn, ms) => {
+    const handle = setTimeout(fn, ms);
+    // A pending warm or restart must never hold the process open at quit.
+    (handle as { unref?: () => void }).unref?.();
+    return handle;
+  },
+  clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  log: (line) => pushLog(line),
+});
+
+/**
+ * Start the sidecar (or join the start in flight) and resolve once it is ready or has
+ * failed. This is the user's Start / Retry: it also restarts the failure count, so a
+ * sidecar that gave up gets its full run of attempts again.
+ */
+export function startSeanime(): Promise<SeanimeStatus> {
+  if (isPermanentFailure(status) && status.errorCode === 'missing-exe') {
+    // Look again: a reinstall (or a harness setting SEANIME_EXE) may have fixed it.
+    setStatus({ ...emptyStatus('stopped') });
+  }
+  return lifecycle.ensure({ manual: true, reason: 'start requested' });
+}
+
+/**
+ * "Something will want the media server soon": start it without waiting, now or after
+ * `delayMs`. A player opening calls this with 0, the app a few seconds after its first
+ * paint, a media surface when it comes into view. A no-op when it is already up, already
+ * starting, or cannot start (missing binary, opted out).
+ */
+export function warmSeanime(delayMs = 0, reason = 'warm'): SeanimeStatus {
+  // A sidecar that gave up (or can never start) waits for the user's Retry: a warm must not
+  // quietly restart the loop that just failed five times.
+  if (status.kind === 'disabled' || status.kind === 'failed') return status;
+  if (delayMs <= 0) {
+    void lifecycle.ensure({ reason }).catch(() => undefined);
+  } else {
+    lifecycle.warm(delayMs, reason);
+  }
+  return status;
+}
+
+/**
+ * Answer "is there a binary?" before anything is spawned, so a missing install is a stated
+ * failure from the first status read instead of something discovered on the first play.
+ */
+export function primeSeanimeStatus(): SeanimeStatus {
+  if (status.kind !== 'stopped' || child) return status;
+  const exe = currentExe();
+  if (!exe.exists) {
+    setStatus({ ...emptyStatus('failed'), error: seanimeExeMissingMessage(exe), errorCode: 'missing-exe' });
+  }
+  return status;
+}
+
+/** For tests and the dev panel: the lifecycle's own view. */
+export function seanimeLifecycleSnapshot(): ReturnType<typeof lifecycle.snapshot> {
+  return lifecycle.snapshot();
+}
+
+/** Synchronous so it is safe from `will-quit` and `process.on('exit')`. */
+export function stopSeanime(): void {
+  lifecycle.stop();
   // The datadir deliberately survives: it holds the sidecar's settings, library and any
   // installed provider extension. Phase 1 deleted it here, which is exactly what made a
   // normal run start empty every time.
@@ -382,6 +539,6 @@ export function stopSeanime(): void {
   if (status.kind !== 'offline' && status.kind !== 'failed') {
     setStatus({ ...emptyStatus('stopped'), logTail: status.logTail });
   } else {
-    setStatus({ pid: null, port: 0 });
+    setStatus({ pid: null, port: 0, recovering: false });
   }
 }

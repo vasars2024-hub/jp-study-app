@@ -11,6 +11,7 @@
  * VideoCore's own CC menu — can record a choice without importing the overlay component.
  */
 import type { VideoCore_VideoPlaybackInfo } from '@/app/(main)/_features/video-core/video-core.atoms';
+import { studyEpisodeNumber, studyMediaId } from './studyMediaIdentity';
 import {
   normalizeVideoCoreSubtitleDelays,
   normalizeVideoCoreTrackChoices,
@@ -53,10 +54,10 @@ export function studySubtitleSource(
   const source: VideoCoreResumeSource = {};
   const local = localFilePath || playbackInfo?.localFile?.path;
   if (local) source.localFilePath = local;
-  if (playbackInfo?.media?.id != null) source.mediaId = playbackInfo.media.id;
-  if (playbackInfo?.episode?.episodeNumber != null) {
-    source.episodeNumber = playbackInfo.episode.episodeNumber;
-  }
+  const mediaId = studyMediaId(playbackInfo);
+  if (mediaId != null) source.mediaId = mediaId;
+  const episodeNumber = studyEpisodeNumber(playbackInfo);
+  if (episodeNumber != null) source.episodeNumber = episodeNumber;
   if (playbackInfo?.streamPath) source.streamPath = playbackInfo.streamPath;
   if (playbackInfo?.id) source.playbackId = playbackInfo.id;
   return source;

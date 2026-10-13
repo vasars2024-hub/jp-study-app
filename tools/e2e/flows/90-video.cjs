@@ -12,7 +12,7 @@
  * witness in main/videoClip.ts), and "Condensed audio" saves a `(condensed).mp3` download.
  */
 const fs = require('node:fs');
-const { installHelpers, poll } = require('./_lib.cjs');
+const { installHelpers, poll, pollAsync } = require('./_lib.cjs');
 const fixtures = require('../fixtures.cjs');
 
 /** The lead-in the flow sets: not the 250 ms default, and inside the 0.5 s gap between lines. */
@@ -35,7 +35,95 @@ const setPadBefore = (ms) => `(() => {
 
 const DECK = `(() => { const d = JSON.parse(localStorage.getItem('jp-flashcard-deck') || '{"cards":[]}'); return d.cards || d; })()`;
 
+/**
+ * Click-to-first-frame, measured in the page: `__e2eOpenTimer.start(label)` stamps t0 and
+ * records, against it, the first `loadeddata` (a frame is decoded) and `playing` of any
+ * <video>, every distinct loading/state text the player host shows on the way, and any text
+ * that reads as a server failure ("not running", "Start the media server", "offline"...).
+ * The caller then performs the open (an event, a click) right after `start`.
+ */
+const OPEN_TIMER = `(() => {
+  if (window.__e2eOpenTimer) return true;
+  const BAD = /not running|not started|isn.t running|server (is )?(stopped|offline|failed)|media server (offline|is (stopped|offline|failed))|start the media server|sidecar|Video error|Unrecoverable/i;
+  const textOf = (el) => (el ? String(el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim() : '');
+  const api = {
+    rec: null,
+    start(label) {
+      const rec = { label, t0: performance.now(), firstFrame: null, playing: null, states: [], bad: [] };
+      api.rec = rec;
+      const at = () => Math.round(performance.now() - rec.t0);
+      const onMedia = (e) => {
+        if (api.rec !== rec || !(e.target instanceof HTMLVideoElement)) return;
+        if (e.type === 'loadeddata' && rec.firstFrame == null) rec.firstFrame = at();
+        if (e.type === 'playing' && rec.playing == null) rec.playing = at();
+      };
+      document.addEventListener('loadeddata', onMedia, true);
+      document.addEventListener('playing', onMedia, true);
+      let last = '';
+      const snap = () => {
+        if (api.rec !== rec) return;
+        const host = document.querySelector('.seanime-host') || document.querySelector('.blanc-study-player')?.closest('fieldset') || null;
+        const parts = [];
+        if (host) {
+          const status = textOf(host.querySelector('.seanime-host-status'));
+          if (status) parts.push('bar: ' + status);
+          for (const el of host.querySelectorAll('.lq-loading, .seanime-host-state, [data-player-frame], .seanime-host-body > p, #media-workspace > p, #media-workspace > div > p, [data-study-player="loading"]')) {
+            const t = textOf(el).slice(0, 140);
+            if (t) parts.push(t);
+          }
+          const frame = host.querySelector('[data-player-frame]');
+          if (frame) parts.push('frame:' + (frame.getAttribute('data-player-frame') || ''));
+        }
+        const now = parts.join(' | ');
+        if (now !== last) { last = now; rec.states.push([at(), now]); }
+        const scan = [textOf(host), ...[...document.querySelectorAll('[data-sonner-toaster], .toast, [class*="toast"]')].map(textOf)].join(' \\n ');
+        const m = BAD.exec(scan);
+        if (m && !rec.bad.some((b) => b[1] === m[0])) rec.bad.push([at(), m[0], scan.slice(Math.max(0, m.index - 60), m.index + 80)]);
+      };
+      const mo = new MutationObserver(snap);
+      mo.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-player-frame', 'data-study-player', 'data-sidecar'] });
+      rec.stop = () => { mo.disconnect(); document.removeEventListener('loadeddata', onMedia, true); document.removeEventListener('playing', onMedia, true); };
+      snap();
+      return true;
+    },
+    read() {
+      const r = api.rec;
+      if (!r) return null;
+      return { label: r.label, firstFrame: r.firstFrame, playing: r.playing, states: r.states.slice(0, 40), bad: r.bad.slice(0, 10) };
+    },
+    stop() { const out = api.read(); api.rec?.stop?.(); api.rec = null; return out; },
+  };
+  window.__e2eOpenTimer = api;
+  return true;
+})()`;
+
+const openEvent = (detail) => `(window.dispatchEvent(new CustomEvent('seanime:media-workspace-open', { detail: ${JSON.stringify(detail)} })), true)`;
+const closePlayer = `(document.querySelectorAll('video').forEach((x) => x.pause()), window.dispatchEvent(new CustomEvent('seanime:media-workspace-close')), true)`;
+
+/**
+ * Time one open: install the timer, run `open` (page JS), wait for the first decoded frame
+ * (and `playing`), and return `{ label, firstFrame, playing, states, bad }` (ms from t0).
+ */
+async function timeOpen(ctx, label, open, { timeout = 60000, window = 'main' } = {}) {
+  const run = (js) => ctx.eval(js, { window });
+  await run(OPEN_TIMER);
+  await run(`window.__e2eOpenTimer.start(${JSON.stringify(label)})`);
+  await run(open);
+  const deadline = Date.now() + timeout;
+  let rec = null;
+  while (Date.now() < deadline) {
+    rec = await run(`window.__e2eOpenTimer.read()`).catch(() => null);
+    if (rec && rec.firstFrame != null && rec.playing != null) break;
+    await ctx.sleep(50);
+  }
+  // A paused open (resume lands paused on some paths) has a frame but never `playing`.
+  await ctx.sleep(400);
+  return (await run(`window.__e2eOpenTimer.stop()`).catch(() => null)) ?? rec;
+}
+
 module.exports = {
+  /** Shared with 91-youtube.cjs: the in-page click-to-first-frame timer. */
+  timing: { OPEN_TIMER, timeOpen },
   id: 'video',
   title: 'Video study (Seanime sidecar): U/R/L/C, ? keyboard help, clip lead-in, condensed audio',
   async run(ctx) {
@@ -43,8 +131,115 @@ module.exports = {
     await installHelpers(ctx);
     const v = await fixtures.video(ctx.mediaDir);
 
+    // ---- Click-to-first-frame, every way in that reaches the player ------------------------
+    // Seamless playback (2026-10-13): every open is timed from the request to the <video>'s
+    // first decoded frame, against a budget, and no loading state may ever read as a server
+    // problem ("Media server stopped", "not running", "offline", "Start the media server").
+    const timings = [];
+    const timed = async (label, open, { budgetMs, keepOpen = false, ...opts } = {}) => {
+      const rec = await timeOpen(ctx, label, open, opts);
+      timings.push({ ...rec, budgetMs });
+      result.note(`timing ${label}: firstFrame=${rec?.firstFrame ?? 'none'} ms, playing=${rec?.playing ?? 'none'} ms; states=${JSON.stringify(rec?.states ?? [])}; bad=${JSON.stringify(rec?.bad ?? [])}`);
+      if (budgetMs) result.check(`${label}: first frame within ${budgetMs} ms`, rec?.firstFrame != null && rec.firstFrame <= budgetMs, { firstFrame: rec?.firstFrame, playing: rec?.playing, states: rec?.states });
+      result.check(`${label}: no "server not started" / error text on the way`, (rec?.bad ?? []).length === 0, rec?.bad);
+      if (!keepOpen) {
+        await ev(closePlayer);
+        await ctx.sleep(600);
+      }
+      return rec;
+    };
+    const sidecar = () => ev(`window.api.seanimeStatus()`, { await: true });
+    const waitSidecar = (want, timeout = 20000) => pollAsync(ctx, `window.api.seanimeStatus().then((s) => (${JSON.stringify(want)}.includes(s.kind) ? s : null))`, timeout, 100);
+    const statusBefore = await sidecar();
+    result.note(`sidecar before the first open: ${statusBefore?.kind}`);
+    if (statusBefore?.errorCode === 'missing-exe') {
+      result.check('a missing media server is known before any play (stated, not discovered on play)', statusBefore.kind === 'failed', statusBefore);
+    } else {
+      const libCopy = v.mp4.replace(/\.mp4$/, '-library.mp4');
+      fs.copyFileSync(v.mp4, libCopy);
+      fs.copyFileSync(v.srt, libCopy.replace(/\.mp4$/, '.ja.srt'));
+      await ev(`window.api.addMediaPaths(${JSON.stringify([libCopy])})`, { await: true });
+
+      // Cold: the media server is down when the video is picked (idle app, or a first open
+      // right after boot) — the open itself has to bring it up.
+      await ev(`window.api.seanimeStop()`, { await: true });
+      await waitSidecar(['stopped'], 5000);
+      // A file the library has never seen (Files app, drag-and-drop, "Open with Gum").
+      await timed('cold: unknown file, media server stopped', openEvent({ localFilePath: v.mp4 }), { budgetMs: 4000 });
+      await timed('warm: same file again (re-open / resume)', openEvent({ localFilePath: v.mp4 }), { budgetMs: 1500 });
+      // A library item (Media Center play, Continue Watching, YouTube "Next").
+      await timed('warm: library item', openEvent({ localFilePath: libCopy }), { budgetMs: 1500 });
+      await timed('warm: Continue Watching (startAtSec 6)', openEvent({ localFilePath: libCopy, startAtSec: 6 }), { budgetMs: 1500 });
+      await ev(`window.api.seanimeStop()`, { await: true });
+      await waitSidecar(['stopped'], 5000);
+      await timed('cold: library item, media server stopped', openEvent({ localFilePath: libCopy }), { budgetMs: 4000 });
+
+      // A killed media server comes back by itself — never "offline" with a Start button.
+      const up = await waitSidecar(['ready'], 15000);
+      if (up?.pid) {
+        await ev(`(() => { window.__e2eSidecarKinds = []; window.__e2eSidecarOff?.(); window.__e2eSidecarOff = window.api.onSeanimeStatus((s) => window.__e2eSidecarKinds.push(s.kind + (s.recovering ? ':recovering' : ''))); return true; })()`);
+        try { process.kill(up.pid); } catch { /* already gone */ }
+        const back = await pollAsync(ctx, `window.api.seanimeStatus().then((s) => (s.kind === 'ready' && s.pid && s.pid !== ${up.pid} ? s : null))`, 20000, 100);
+        const kinds = await ev(`(window.__e2eSidecarOff?.(), window.__e2eSidecarKinds)`);
+        result.check('a killed media server restarts by itself (new pid, ready)', Boolean(back), { before: up.pid, after: back?.pid, kinds });
+        result.check('…and never reports itself offline or failed on the way', Array.isArray(kinds) && !kinds.some((k) => /^(offline|failed)/.test(k)), kinds);
+        await timed('after a media-server crash: library item', openEvent({ localFilePath: libCopy }), { budgetMs: 1500 });
+
+        // Killed WHILE a video plays: the player is rebuilt under the opening frame and the
+        // video plays again from where it was, with no error and no button to press.
+        await timed('crash mid-video: open', openEvent({ localFilePath: libCopy, startAtSec: 2 }), { budgetMs: 1500, keepOpen: true });
+        await ctx.sleep(1200);
+        const before = await ev(`(() => { const x = [...document.querySelectorAll('video')].find((v) => v.readyState >= 2); return x ? Math.round(x.currentTime * 10) / 10 : null; })()`);
+        const mid = await sidecar();
+        await ev(OPEN_TIMER);
+        await ev(`window.__e2eOpenTimer.start('crash mid-video: recovery')`);
+        try { process.kill(mid.pid); } catch { /* already gone */ }
+        let recovered = null;
+        for (let i = 0; i < 200 && !recovered; i++) {
+          const rec = await ev(`window.__e2eOpenTimer.read()`).catch(() => null);
+          if (rec && rec.playing != null) recovered = rec;
+          else await ctx.sleep(100);
+        }
+        const recRead = (await ev(`window.__e2eOpenTimer.stop()`).catch(() => null)) ?? recovered;
+        await ctx.sleep(500);
+        const playingNow = await ev(`(() => { const x = [...document.querySelectorAll('video')].find((v) => v.readyState >= 2); return x ? { t: Math.round(x.currentTime * 10) / 10, paused: x.paused } : null; })()`);
+        result.note(`timing crash mid-video: recovery: playing again after ${recRead?.playing ?? 'never'} ms; states=${JSON.stringify(recRead?.states ?? [])}; bad=${JSON.stringify(recRead?.bad ?? [])}`);
+        result.check('a media server killed mid-video: playback resumes by itself within 8 s', Boolean(recovered) && recRead.playing <= 8000 && Boolean(playingNow), { playingAfterMs: recRead?.playing, now: playingNow });
+        result.check('…with no error or server text on screen', (recRead?.bad ?? []).length === 0, recRead?.bad);
+        result.check('…continuing from where it was, not from the open request start point', before != null && playingNow != null && playingNow.t >= before - 0.6, { before, now: playingNow });
+        timings.push({ label: 'crash mid-video: back to playing', firstFrame: recRead?.firstFrame, playing: recRead?.playing, bad: recRead?.bad, budgetMs: 8000 });
+        await ev(closePlayer);
+        await ctx.sleep(600);
+      } else {
+        result.check('the media server is up for the crash test', false, up);
+      }
+      // Blanc's toolbox player: the Media tab, a library item clicked. Blanc never warms the
+      // server at launch (lowest memory) — its Media tab does, the moment it is shown.
+      await ctx.e2e('clickTray', { label: 'Open Blanc' });
+      let blanc = null;
+      for (let i = 0; i < 60 && !blanc; i++) {
+        const wins = (await ctx.e2e('status')).windows ?? [];
+        blanc = wins.find((w) => /blanc/i.test(w.url ?? '')) ?? null;
+        if (!blanc) await ctx.sleep(250);
+      }
+      const bev = (js) => ctx.request('/eval', { window: blanc.id, js }).then((r) => (r.ok ? r.result : null));
+      let blancTab = null;
+      for (let i = 0; blanc && i < 60 && !blancTab; i++) {
+        blancTab = await bev(`(() => { if (document.readyState !== 'complete') return null; window.dispatchEvent(new CustomEvent('os:open', { detail: 'media' })); return [...document.querySelectorAll('.media-card')].some((c) => c.innerText.includes('asa-no-kaiwa-e2e-library')) || null; })()`).catch(() => null);
+        if (!blancTab) await ctx.sleep(500);
+      }
+      result.check('Blanc opens, and its Media tab lists the library item', Boolean(blancTab), { blanc, blancTab });
+      if (blancTab) {
+        await ctx.sleep(1500);
+        await timed('Blanc: library item in the toolbox player', `(() => { const c = [...document.querySelectorAll('.media-card')].find((x) => x.innerText.includes('asa-no-kaiwa-e2e-library')); c?.click(); return Boolean(c); })()`, { budgetMs: 1500, window: blanc.id, keepOpen: true });
+        await bev(`(document.querySelectorAll('video').forEach((x) => x.pause()), true)`);
+      }
+
+      result.note(`timings: ${JSON.stringify(timings.map((t) => ({ label: t?.label, firstFrame: t?.firstFrame, playing: t?.playing, budgetMs: t?.budgetMs, bad: (t?.bad ?? []).length })))}`);
+    }
+
     let status = await ev(`window.api.seanimeStatus()`, { await: true });
-    if (status?.kind === 'stopped') status = await ev(`window.api.seanimeStart()`, { await: true });
+    if (status?.kind !== 'ready' && status?.errorCode !== 'missing-exe') status = await ev(`window.api.seanimeStart()`, { await: true });
     if (status?.kind !== 'ready') {
       if (status?.errorCode === 'missing-exe') {
         result.skip(`no Seanime sidecar binary (SEANIME_EXE): ${status.error}`);

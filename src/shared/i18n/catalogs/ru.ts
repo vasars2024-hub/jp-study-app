@@ -59,9 +59,11 @@ import { MEDIA5_RU } from '../media5/ru';
 import { PLANNER_UI_RU } from '../plannerUi/ru';
 import { SNIP_UI_RU } from '../snipUi/ru';
 import { SNIP2_UI_RU } from '../snip2Ui/ru';
+import { ABOUT_UI_RU } from '../aboutUi/ru';
 import { NOTES_UI_RU } from '../notesUi/ru';
 import { LIBRARY_MANAGE_UI_RU } from '../libraryManageUi/ru';
 import { VIDEO_STUDY2_UI_RU } from '../videoStudy2Ui/ru';
+import { PLAYBACK_UI_RU } from '../playbackUi/ru';
 
 export const ru: Catalog = {
   'common.download': 'Скачать',
@@ -933,9 +935,11 @@ export const ru: Catalog = {
   ...PLANNER_UI_RU,
   ...SNIP_UI_RU,
   ...SNIP2_UI_RU,
+  ...ABOUT_UI_RU,
   ...NOTES_UI_RU,
   ...LIBRARY_MANAGE_UI_RU,
   ...VIDEO_STUDY2_UI_RU,
+  ...PLAYBACK_UI_RU,
 
   'settings.appTitle': 'Настройки',
   'settings.group.personalization': 'Персонализация',
@@ -10896,7 +10900,6 @@ export const ru: Catalog = {
   'mediaWorkspace.openFile.systemPlayerFailed': 'Windows не смогла открыть файл в системном плеере.',
   'mediaWorkspace.resumeLast.nothing': 'Вы ещё ничего не смотрели — сначала откройте видео.',
   'mediaWorkspace.resumeLast.noWorkspaceHere': 'В этом окне нет медиаплеера — продолжите в главном окне.',
-  'mediaWorkspace.status': 'Медиасервер: {status}',
   'mediaWorkspace.sidecar.disabled': 'отключён',
   'mediaWorkspace.sidecar.stopped': 'остановлен',
   'mediaWorkspace.sidecar.starting': 'запускается',
@@ -10922,8 +10925,6 @@ export const ru: Catalog = {
   'mediaWorkspace.notRunning': 'Медиасервер не запущен.',
   'mediaWorkspace.playerNeedsServer': 'Для воспроизведения видео нужен медиасервер, но в этой сборке он отключён.',
   'mediaWorkspace.connectingServer': 'Подключение к медиасерверу…',
-  'mediaWorkspace.serverOffline': 'Медиасервер не в сети',
-  'mediaWorkspace.provisioning': 'Подготовка медиаподключения…',
   'mediaWorkspace.openingLocal': 'Открытие локального файла',
   'mediaWorkspace.openStalled': 'Медиасервер принял этот файл, но затем прекратил его подготовку. Попробуйте открыть его ещё раз.',
   'mediaWorkspace.fileMissing': 'Видео больше нет на прежнем месте: {path}. Возможно, его переместили или удалили, либо диск не подключён.',

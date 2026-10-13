@@ -41,6 +41,7 @@ import type { Status } from '../../vendor/seanime/generated/types';
 import type { SeanimeConnection } from '../shared/seanime';
 import { useT } from '../renderer/i18n';
 import SeanimeToastHost from './SeanimeToastHost';
+import PlayerFrame from './PlayerFrame';
 import StudyWebsocketProvider from './StudyWebsocketProvider';
 import './mediaWorkspace.css';
 // After the base sheet, deliberately: the workspace layer overrides the grammar
@@ -58,49 +59,73 @@ function createQueryClient(): QueryClient {
   });
 }
 
-/** Seeds `serverStatusAtom` before any adopted query is allowed to mount. */
+/** Attempts at the first `/api/v1/status` read before the gate says it failed. */
+const STATUS_ATTEMPTS = 3;
+const STATUS_RETRY_MS = [150, 600];
+
+/**
+ * Seeds `serverStatusAtom` before any adopted query is allowed to mount.
+ *
+ * While it reads, it renders NOTHING: the host (or Blanc) already shows the player's
+ * opening frame (`PlayerFrame`), and a "Connecting to the media server…" line under it
+ * was one of the loading screens the seamless-playback pass removed. A read that fails is
+ * tried again twice (a sidecar that has just reported ready can still refuse its first
+ * request), and only then becomes a stated failure — translated, with a Retry that reads
+ * again — never a raw "Media server offline".
+ */
 function StatusGate({
   conn,
   children,
 }: {
   conn: SeanimeConnection;
   children: React.ReactNode;
-}): React.ReactElement {
+}): React.ReactElement | null {
   const { t } = useT();
   const setServerStatus = useSetServerStatus();
   const [state, setState] = React.useState<'loading' | 'ready' | string>('loading');
+  const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {
     let cancelled = false;
     void (async () => {
-      try {
-        const res = await fetch(`${conn.baseUrl}/api/v1/status`, {
-          headers: { 'X-Seanime-Token': conn.token },
-        });
-        if (!res.ok) throw new Error(`status -> HTTP ${res.status}`);
-        const body = (await res.json()) as { data?: Status };
-        if (cancelled) return;
-        setServerStatus(body.data);
-        setState('ready');
-      } catch (err) {
-        if (!cancelled) setState(err instanceof Error ? err.message : String(err));
+      let lastError = '';
+      for (let i = 0; i < STATUS_ATTEMPTS && !cancelled; i++) {
+        try {
+          const res = await fetch(`${conn.baseUrl}/api/v1/status`, {
+            headers: { 'X-Seanime-Token': conn.token },
+          });
+          if (!res.ok) throw new Error(`status -> HTTP ${res.status}`);
+          const body = (await res.json()) as { data?: Status };
+          if (cancelled) return;
+          setServerStatus(body.data);
+          setState('ready');
+          return;
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : String(err);
+          const wait = STATUS_RETRY_MS[i];
+          if (wait !== undefined) await new Promise((r) => setTimeout(r, wait));
+        }
       }
+      if (!cancelled) setState(lastError || 'status read failed');
     })();
     return () => {
       cancelled = true;
     };
-  }, [conn, setServerStatus]);
+  }, [conn, setServerStatus, attempt]);
 
-  if (state === 'loading') {
-    return <p className="p-6 text-gray-400">{t('mediaWorkspace.connectingServer')}</p>;
-  }
+  if (state === 'loading') return null;
   if (state !== 'ready') {
-    // Explicit terminal state, never a spinner — the Phase-1 lifecycle rule.
     return (
-      <div className="p-6 space-y-2">
-        <p className="font-semibold text-gray-200">{t('mediaWorkspace.serverOffline')}</p>
-        <p className="text-sm text-gray-400">{state}</p>
-      </div>
+      <PlayerFrame
+        failure={{
+          message: t('playback.failed.connect'),
+          details: state,
+          onRetry: () => {
+            setState('loading');
+            setAttempt((n) => n + 1);
+          },
+        }}
+      />
     );
   }
   return <>{children}</>;
@@ -121,7 +146,6 @@ export default function MediaSurfaceShell({
   className?: string;
   children: React.ReactNode;
 }): React.ReactElement {
-  const { t } = useT();
   // Set during render, not in an effect: the axios client reads the origin at call time,
   // and child queries mount before any effect of this component runs.
   setSeanimeBaseUrl(conn.baseUrl);
@@ -139,9 +163,9 @@ export default function MediaSurfaceShell({
     }
   }, [activeToken, conn.baseUrl, conn.token, setActiveToken]);
 
-  if (activeToken !== conn.token) {
-    return <p className="p-6 text-gray-400">{t('mediaWorkspace.provisioning')}</p>;
-  }
+  // One render, while the layout effect above hands the new token to the live atom. Blank
+  // on purpose: the surface's opening frame is already on screen.
+  if (activeToken !== conn.token) return <></>;
 
   return (
     // `id` powers Tailwind's `important` scoping and `dark` powers its class-based dark

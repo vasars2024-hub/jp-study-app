@@ -5,7 +5,7 @@
 import type { Catalog } from '../core';
 
 export const SNIP2_UI_EN: Catalog = {
-  // ---- First-run notice (the default is on) ----
+  // ---- First-run notice (shown once, after the learner turns it on; the default is off) ----
   'snip2.notice.title': 'Snip to cards is on',
   'snip2.notice.body': 'Every picture you snip with Win+Shift+S is read, and its new words become cards. Keep it, or turn it off (the tray and the Snips app can turn it back on).',
   'snip2.notice.turnOff': 'Turn off',

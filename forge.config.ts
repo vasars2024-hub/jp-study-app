@@ -62,6 +62,9 @@ const SIDECAR_SOURCE_CHECKOUT = 'seanime-upstream';
 /** Opt out of a sidecar-bearing package, loudly, rather than shipping a broken one. */
 const SIDECAR_SKIP_ENV = 'SEANIME_SKIP_SIDECAR_PACKAGING';
 
+/** Licence, third-party notices and privacy statement, shipped in `resources/` (see `extraResource`). */
+const SHIPPED_DOCUMENTS = ['LICENSE', 'THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_LICENSES.json', 'PRIVACY.md'] as const;
+
 /**
  * Stages `seanime.exe` into the resource slot before packaging, and **fails the build**
  * when it cannot. A silently absent binary is exactly the failure this exists to prevent:
@@ -281,7 +284,18 @@ const config: ForgeConfig = {
     // `private-assets/` is the owner's git-ignored third-party art (see .gitignore). It is
     // shipped only when the folder exists, so a public clone packages exactly as before;
     // main.ts serves its `public/` after ours (`<resourcesPath>/private-assets/public`).
-    extraResource: ['public', SIDECAR_STAGING_DIR, ...(fs.existsSync('private-assets') ? ['private-assets'] : [])],
+    //
+    // v1: the licence, the third-party notices (human and machine-readable) and the
+    // privacy statement ship as plain files in `<resourcesPath>/`, next to Electron's
+    // own LICENSE / LICENSES.chromium.html. The About screen renders the same files
+    // from its own chunk, so it works offline even if these are moved;
+    // `thirdPartyNotices.test.ts` fails if one drops out of this list.
+    extraResource: [
+      'public',
+      SIDECAR_STAGING_DIR,
+      ...SHIPPED_DOCUMENTS,
+      ...(fs.existsSync('private-assets') ? ['private-assets'] : []),
+    ],
     // Optional assets the app downloads on demand, and engine builds it never
     // loads, leave the packaged copy of `public/` (see ON_DEMAND_PUBLIC_PATHS).
     afterCopyExtraResources: [

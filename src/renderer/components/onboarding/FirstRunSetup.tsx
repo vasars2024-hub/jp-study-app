@@ -6,7 +6,8 @@
  *   3. Dictionary, plus optional OCR and Whisper downloads with live progress
  *   4. Optional Anki connection check
  *   5. Look: Study OS, Aero, WIRED or Blanc
- *   6. Summary, then the guided tour or straight to studying
+ *   6. Summary (with Snip to cards offered, off by default), then the guided
+ *      tour or straight to studying
  *
  * Lazy-loaded by `App.tsx` only when `firstRunSetupPending()` says so, so the
  * Study OS boot graph never carries it. Every step persists, so a restart (or
@@ -56,6 +57,7 @@ import {
 } from './firstRunDownloads';
 import HelpLink from './HelpLink';
 import PlacementQuiz, { FirstRunAiRow } from './FirstRunAi';
+import FirstRunSnip from './FirstRunSnip';
 import Icon, { type IconName } from '../Icons';
 import './firstRun.css';
 
@@ -792,6 +794,8 @@ function FinishStep({ studyLang, level, theme }: { studyLang: StudyLang; level: 
       </ul>
       <p className="frs-note">{t('onb2.finish.note')}</p>
       {theme === 'blanc' && <p className="frs-note">{t('onb3.finish.blancTour')}</p>}
+      {/* v1: Snip to cards is off by default; one click turns it on here. */}
+      <FirstRunSnip />
     </>
   );
 }

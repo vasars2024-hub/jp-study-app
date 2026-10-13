@@ -21,16 +21,23 @@ import type { StudyLang } from './studyLang';
 export type SnipAnkiMode = 'auto' | 'on' | 'off';
 
 /**
- * The one-time "Snip to cards is on" notice. Watching and adding are on by
- * default (the owner asked for it), so the first snip that makes cards says so
- * and offers Turn off / Keep. `pending` → nothing shown yet; `shown` → the toast
- * carried it once (the Snips view keeps its banner until it is answered);
- * `answered` → the learner chose, never shown again.
+ * The one-time "Snip to cards is on" notice. Watching is off by default (v1:
+ * the learner turns it on in first-run setup, Settings, the tray or the Snips
+ * view), and once it is on the first snip that makes cards says so and offers
+ * Turn off / Keep. While watching is off nothing is read, so the notice never
+ * appears for a learner who did not turn the feature on. `pending` → nothing
+ * shown yet; `shown` → the toast carried it once (the Snips view keeps its
+ * banner, while watching, until it is answered); `answered` → the learner
+ * chose, never shown again.
  */
 export type SnipNoticeState = 'pending' | 'shown' | 'answered';
 
 export interface SnipSettings {
-  /** Watch the clipboard for snips. On by default: the owner asked for it. */
+  /**
+   * Watch the clipboard for snips. Off by default (v1, the owner's decision):
+   * reading every picture copied to the clipboard is opt-in. Profiles from
+   * before v1 are moved over by `migrateSnipSettings`.
+   */
   enabled: boolean;
   /** Add every unknown word as a card without asking. */
   autoAdd: boolean;
@@ -59,7 +66,7 @@ export const SNIP_MAX_WORDS_LIMIT = 50;
 export const SNIP_DECK_DEFAULT = 'Snips';
 
 export const SNIP_SETTINGS_DEFAULTS: Readonly<SnipSettings> = Object.freeze({
-  enabled: true,
+  enabled: false,
   autoAdd: true,
   sendToAnki: 'auto',
   deck: SNIP_DECK_DEFAULT,
@@ -114,6 +121,45 @@ export function normalizeSnipSettings(raw: unknown): SnipSettings {
       ? r.notice
       : SNIP_SETTINGS_DEFAULTS.notice,
   };
+}
+
+/**
+ * The settings file's schema. Version 2 (v1.0 release) is the first one written
+ * with watching off by default; a file without `schema` (or no file at all) was
+ * written, or never written, while the default was on.
+ */
+export const SNIP_SETTINGS_SCHEMA = 2;
+
+/** What the profile shows about past use, for the one-time move to the off default. */
+export interface SnipUseEvidence {
+  /** Snips in the history (entries in `snips/index.json`, or pictures in `snips/`). */
+  historyCount: number;
+}
+
+/**
+ * The stored settings, moved to the current schema.
+ *
+ * The rule for a profile from before the default changed (no `schema`):
+ *  - Turned off (`enabled: false` stored) → stays off. That was a choice.
+ *  - Otherwise watching stays on only when the profile shows it was used: a snip
+ *    in the history, or the one-time notice already shown or answered (Keep).
+ *    A profile that was simply on by default and never snipped anything (no
+ *    file, or a file written by an unrelated settings change) is turned off,
+ *    like a new profile. Someone who already relies on it keeps it.
+ *  - Every other field is kept as stored.
+ * A file that already has `schema >= 2` is the learner's own choice under the
+ * off default and is only repaired, never re-decided. `migrated` says the file
+ * should be written back (with the schema) so the decision is made once.
+ */
+export function migrateSnipSettings(
+  raw: unknown,
+  evidence: SnipUseEvidence,
+): { settings: SnipSettings; migrated: boolean } {
+  const r = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const settings = normalizeSnipSettings(r);
+  if (Number(r.schema) >= SNIP_SETTINGS_SCHEMA) return { settings, migrated: false };
+  const used = (Number(evidence.historyCount) || 0) > 0 || r.notice === 'shown' || r.notice === 'answered';
+  return { settings: { ...settings, enabled: r.enabled !== false && used }, migrated: true };
 }
 
 /** Whether the first-run notice still needs an answer (the Snips view shows its banner). */

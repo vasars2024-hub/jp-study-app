@@ -44,8 +44,10 @@ import {
   cleanSnipDeckName,
   clipboardHasImageFormat,
   normalizeSnipAction,
+  migrateSnipSettings,
   normalizeSnipSettings,
   normalizeSnipToastPayload,
+  SNIP_SETTINGS_SCHEMA,
   normalizeSnipWord,
   pruneSnipHistory,
   snipImageRejection,
@@ -96,17 +98,32 @@ function settingsPath(): string {
 
 function ensureSettings(): SnipSettings {
   if (!settingsLoaded) {
-    // No file is a new or an existing profile from before this feature: both
-    // get the defaults, which have watching on.
-    settings = normalizeSnipSettings(readJsonSync<unknown>(settingsPath(), {}));
+    // Watching is off by default since v1. A file from before that (or no file)
+    // is moved over once by `migrateSnipSettings`: on only where it was used.
+    const { settings: loaded, migrated } = migrateSnipSettings(readJsonSync<unknown>(settingsPath(), {}), {
+      historyCount: snipUseCount(),
+    });
+    settings = loaded;
     settingsLoaded = true;
+    if (migrated) saveSettings();
   }
   return settings;
 }
 
+/** Snips this profile already has: history entries, or stored pictures if the index is unreadable. */
+function snipUseCount(): number {
+  const entries = loadHistory().length;
+  if (entries > 0) return entries;
+  try {
+    return fs.readdirSync(historyDir()).filter((f) => /^snip-[a-z0-9-]+\.png$/i.test(f)).length;
+  } catch {
+    return 0;
+  }
+}
+
 function saveSettings(): void {
   try {
-    writeJsonAtomicSync(settingsPath(), settings);
+    writeJsonAtomicSync(settingsPath(), { ...settings, schema: SNIP_SETTINGS_SCHEMA });
   } catch (err) {
     console.error('[snipToCards] settings save failed', err);
   }
@@ -591,9 +608,9 @@ function toastBounds(payload: SnipToastPayload): Electron.Rectangle {
 }
 
 /**
- * The first snip that makes cards carries the one-time notice: watching and
- * adding are on by default, so the learner is told, once, and asked whether to
- * keep it. Marked as shown here (main owns the setting), so two windows never
+ * The first snip that makes cards carries the one-time notice: the learner
+ * turned watching on (it is off by default), so the first time it actually
+ * makes cards they are told, once, what it did and asked whether to keep it. Marked as shown here (main owns the setting), so two windows never
  * both show it.
  */
 function withNotice(payload: SnipToastPayload): SnipToastPayload {

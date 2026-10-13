@@ -8,7 +8,7 @@
  * is this project's GitHub page before `shell.openExternal`; the renderer never
  * navigates. Other addresses were already turned into text by the parser.
  */
-import { Fragment, useMemo, type JSX, type MouseEvent, type ReactNode } from 'react';
+import { Fragment, useMemo, type CSSProperties, type JSX, type MouseEvent, type ReactNode } from 'react';
 import { useT } from '../../../i18n';
 import { parseReleaseMarkdown, type MdBlock, type MdInline, type MdList } from '../../../../shared/releaseMarkdown';
 
@@ -93,14 +93,26 @@ function Block({ block, linkLabel }: { block: MdBlock; linkLabel: (label: string
   }
 }
 
-export default function ReleaseNotesMarkdown({ source, emptyText }: { source: string; emptyText: string }) {
+export default function ReleaseNotesMarkdown({
+  source,
+  emptyText,
+  className,
+  style,
+}: {
+  source: string;
+  emptyText: string;
+  /** Extra class on the scroll box (About uses its own, taller box). */
+  className?: string;
+  /** Replaces the release-notes box style (260 px tall). */
+  style?: CSSProperties;
+}) {
   const { t, lang } = useT();
   const blocks = useMemo(() => parseReleaseMarkdown(source), [source]);
   // `lang`, not `t`: t's identity is stable across a language switch. (No eslint-disable:
   // react-hooks/exhaustive-deps is not a configured rule in this repo.)
   const linkLabel = useMemo(() => (label: string) => t('upd3.notes.linkLabel', { label }), [lang]);
   return (
-    <div className="upd2-notes-body upd3-notes-md" style={NOTES_STYLE}>
+    <div className={`upd2-notes-body upd3-notes-md${className ? ` ${className}` : ''}`} style={style ?? NOTES_STYLE}>
       {blocks.length ? blocks.map((block, i) => <Fragment key={i}>{Block({ block, linkLabel })}</Fragment>) : <p>{emptyText}</p>}
     </div>
   );

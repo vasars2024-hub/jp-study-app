@@ -16,6 +16,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { installHelpers, poll, pollAsync, DECK } = require('./_lib.cjs');
 const fixtures = require('../fixtures.cjs');
+/** The in-page click-to-first-frame timer (seamless playback): shared with the video flow. */
+const { timeOpen } = require('./90-video.cjs').timing;
 
 const AUTO_ID = 'E2Eyt0002bb';
 const AUTO_TITLE = '自動字幕 E2E';
@@ -104,8 +106,14 @@ module.exports = {
     }
 
     // "Next" on the progress strip is the way in; the row's own button is the fallback.
-    const viaNext = await ev(`__e2e.click('[data-yt5-action="continue"]')`);
-    const opened = viaNext ? 'next' : await ev(openRow(yt.title));
+    // Timed from the click to the first decoded frame, with the warm budget (the YouTube app
+    // warmed the player when it opened), and nothing on the way may read as a server problem.
+    await ev(`window.__e2eYtOpened = null`);
+    const nextTiming = await timeOpen(ctx, 'YouTube "Next"', `(() => { window.__e2eYtOpened = __e2e.click('[data-yt5-action="continue"]') ? 'next' : (${openRow(yt.title)}); return true; })()`);
+    const opened = await ev(`window.__e2eYtOpened`);
+    result.note(`timing YouTube "Next": firstFrame=${nextTiming?.firstFrame ?? 'none'} ms, playing=${nextTiming?.playing ?? 'none'} ms; states=${JSON.stringify(nextTiming?.states ?? [])}; bad=${JSON.stringify(nextTiming?.bad ?? [])}`);
+    result.check('YouTube "Next": first frame within 1500 ms', nextTiming?.firstFrame != null && nextTiming.firstFrame <= 1500, nextTiming);
+    result.check('YouTube "Next": no "server not started" / error text on the way', (nextTiming?.bad ?? []).length === 0, nextTiming?.bad);
     const playing = await poll(ctx, `(() => { const x = document.querySelector('video'); return x && x.readyState >= 2 && x.duration > 19 ? Math.round(x.duration) : null; })()`, 60000, 500);
     result.check('"Next" on the playlist progress opens the downloaded file in the study player', Boolean(opened) && playing === 20, { opened, playing });
     if (playing !== 20) return;
@@ -146,7 +154,10 @@ module.exports = {
     if (!autoItem) return;
     // The first video's element can outlive its workspace for a moment: tell the new one apart.
     await ev(`(document.querySelectorAll('video').forEach((x) => { x.dataset.e2eOld = x.currentSrc || x.src || '-'; }), true)`);
-    const autoOpened = await poll(ctx, openRow(AUTO_TITLE), 10000);
+    const autoTiming = await timeOpen(ctx, 'YouTube row (auto-captions)', `(window.__e2eAutoOpened = ${openRow(AUTO_TITLE)}, true)`, { timeout: 20000 });
+    const autoOpened = await ev(`window.__e2eAutoOpened`);
+    result.note(`timing YouTube row: firstFrame=${autoTiming?.firstFrame ?? 'none'} ms; states=${JSON.stringify(autoTiming?.states ?? [])}; bad=${JSON.stringify(autoTiming?.bad ?? [])}`);
+    result.check('YouTube row open: first frame within 1500 ms, no server text', autoTiming?.firstFrame != null && autoTiming.firstFrame <= 1500 && (autoTiming?.bad ?? []).length === 0, autoTiming);
     // The warning is a toast: read it while it is up, before waiting on the player.
     const warned = await poll(ctx, `(() => { const hit = [...document.querySelectorAll('body *')].find((x) => x.children.length === 0 && /speech recognition/.test(x.textContent || '')); return hit ? hit.textContent.trim().slice(0, 120) : null; })()`, 8000, 150);
     result.check('opening it warns that the captions are YouTube speech recognition', Boolean(warned), warned);

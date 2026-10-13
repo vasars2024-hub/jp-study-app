@@ -2,10 +2,10 @@
 /* eslint-disable @typescript-eslint/no-var-requires -- CommonJS tooling, run by node directly */
 /**
  * First-run setup on a fresh profile: consent (declined), study language, level, the
- * downloads step showing the built-in dictionary as ready, a theme pick, finish → the
- * first-steps checklist on the desktop.
+ * downloads step showing the built-in dictionary as ready, a theme pick, finish (with the
+ * Snip to cards offer, off by default) → the first-steps checklist on the desktop.
  */
-const { installHelpers, poll } = require('./_lib.cjs');
+const { installHelpers, poll, pollAsync } = require('./_lib.cjs');
 
 module.exports = {
   id: 'setup',
@@ -73,6 +73,20 @@ module.exports = {
     result.check('finish step', await step('finish'));
     const summary = await ev(`__e2e.text('.frs-summary')`);
     result.check('finish summary names Japanese and the Study OS look', /日本語|Japanese/.test(summary) && /Study OS/i.test(summary), summary);
+    // v1: Snip to cards is off by default and offered here with one switch.
+    const snipOffer = await ev(`(() => { const o = document.querySelector('[data-first-run-optin="snip"]'); const i = o && o.querySelector('input[role="switch"]'); return o ? { text: o.textContent, checked: i ? i.checked : null, disabled: i ? i.disabled : null } : null; })()`);
+    result.check('finish: Snip to cards offered, off by default, with the privacy note',
+      Boolean(snipOffer) && snipOffer.checked === false && /Snip to cards/.test(snipOffer.text) && /this computer only/.test(snipOffer.text), snipOffer);
+    const snipBefore = await ev(`window.api.snipGetStatus()`, { await: true });
+    result.check('main agrees: clipboard watching is off in a fresh profile', snipBefore?.enabled === false && snipBefore?.watching === false, snipBefore);
+    // One click turns it on in main, a second turns it off again (the snip-cards flow
+    // proves the off default and enables it itself).
+    await ev(`__e2e.click(document.querySelector('[data-first-run-optin="snip"] input[role="switch"]'))`);
+    const snipOn = await pollAsync(ctx, `window.api.snipGetStatus().then((s) => s && s.enabled ? s : null)`, 5000, 200);
+    result.check('finish: one click enables Snip to cards (main starts watching)', Boolean(snipOn) && snipOn.watching === true, snipOn);
+    await ev(`__e2e.click(document.querySelector('[data-first-run-optin="snip"] input[role="switch"]'))`);
+    const snipOff = await pollAsync(ctx, `window.api.snipGetStatus().then((s) => s && !s.enabled ? s : null)`, 5000, 200);
+    result.check('finish: a second click turns it off again', Boolean(snipOff), snipOff);
     await ctx.shot('finish');
     await ev(`__e2e.click(document.querySelector('.frs-foot-right .btn.primary'))`);
 

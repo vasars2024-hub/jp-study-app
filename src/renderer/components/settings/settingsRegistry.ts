@@ -1412,6 +1412,15 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     pageId: 'help',
     group: 'System',
   },
+  // v1: About — version, licence and source, open source licences, credits, privacy.
+  {
+    id: 'about',
+    titleKey: 'about.title',
+    descKey: 'about.desc',
+    keywords: ['about', 'version', 'licence', 'license', 'gpl', 'open source', 'third party', 'notices', 'credits', 'attribution', 'jmdict', 'edrdg', 'privacy', 'telemetry', 'source code'],
+    pageId: 'help',
+    group: 'System',
+  },
   // set2: two Help cards existed only for someone already on the Help page.
   {
     id: 'help-shortcuts',

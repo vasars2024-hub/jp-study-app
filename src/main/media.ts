@@ -43,7 +43,9 @@ import {
 import { YOUTUBE_MEDIA_SUBTITLE_DIRECTORY } from '../shared/youtubeStorage';
 import { classifyMediaKind } from '../shared/mediaKind';
 import { ingestPathKey } from '../shared/mediaIngest';
-import { clearMediaArtwork, ensureMediaArtwork } from './mediaArtwork';
+import { cachedMediaArtwork, clearMediaArtwork, ensureMediaArtwork } from './mediaArtwork';
+import { probeDirectPlayFile } from './directPlayProbe';
+import type { PlaybackPlan } from '../shared/playbackPlan';
 import { resolveSubtitleFallbackFont } from './subtitleFallbackFont';
 import { registerMediaMetadataIpc, runMediaMetadata } from './mediaMetadata';
 import { registerMediaDiscoveryIpc } from './mediaDiscovery';
@@ -1546,6 +1548,60 @@ export function registerMediaIpc(): void {
     if (typeof p !== 'string' || !fs.existsSync(p)) return null;
     if (!MEDIA_EXT.has(path.extname(p).toLowerCase())) return null;
     return `playfile://${tokenFor(p)}`;
+  });
+
+  /**
+   * The player's whole "how do I open this file?" in one answer (`shared/playbackPlan.ts`):
+   * URL, the one library row, a poster that already exists, and the direct-play probe.
+   * Replaces `mediaFileUrl` + `listMedia` (the entire library) on every open.
+   */
+  ipcMain.handle('media:playbackPlan', (_e, p: unknown): PlaybackPlan | null => {
+    if (typeof p !== 'string' || !path.isAbsolute(p)) return null;
+    const unknownDirect: PlaybackPlan['direct'] = { verdict: 'unknown', reason: 'not probed', container: 'unknown', subtitles: 0 };
+    if (!fs.existsSync(p) || !MEDIA_EXT.has(path.extname(p).toLowerCase())) {
+      return { url: null, item: null, posterUrl: null, direct: unknownDirect };
+    }
+    const keyOf = (value: string): string => value.trim().split('\\').join('/').toLowerCase();
+    const wanted = keyOf(p);
+    const row = readDb().items.find((i) => keyOf(i.path ?? '') === wanted) ?? null;
+    let posterUrl: string | null = null;
+    if (row) {
+      const userData = app.getPath('userData');
+      for (const stored of [row.stillPath, row.backdropPath, row.bannerPath, row.posterPath]) {
+        if (!stored) continue;
+        const file = path.join(userData, stored);
+        if (fs.existsSync(file)) {
+          posterUrl = `playfile://${tokenFor(file)}`;
+          break;
+        }
+      }
+      if (!posterUrl) {
+        const generated = cachedMediaArtwork(row.id);
+        if (generated) posterUrl = `playfile://${tokenFor(generated)}`;
+      }
+    }
+    const probed = probeDirectPlayFile(p);
+    return {
+      url: `playfile://${tokenFor(p)}`,
+      item: row
+        ? {
+            id: row.id,
+            title: row.title,
+            ...(row.seriesTitle ? { seriesTitle: row.seriesTitle } : {}),
+            ...(typeof row.episode === 'number' ? { episode: row.episode } : {}),
+            ...(row.anilistId ? { anilistId: row.anilistId } : {}),
+            ...(row.malId ? { malId: row.malId } : {}),
+            ...(row.category ? { category: row.category } : {}),
+          }
+        : null,
+      posterUrl,
+      direct: {
+        verdict: probed.decision.verdict,
+        reason: probed.decision.reason,
+        container: probed.probe.container,
+        subtitles: probed.probe.subtitles,
+      },
+    };
   });
 
   // Pick a looping video to use as the desktop wallpaper.

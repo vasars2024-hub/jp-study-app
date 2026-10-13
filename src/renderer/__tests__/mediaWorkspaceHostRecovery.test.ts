@@ -226,4 +226,59 @@ describe('MediaWorkspaceHost — recovery from a sidecar crash', () => {
     await emit(status({ kind: 'ready', port: 65047, pid: 8844 }));
     expect(workspace(el)?.dataset.instance).toBe('2');
   });
+
+  // ---- Seamless playback (2026-10-13): the request waits for the server, never the viewer ----
+
+  async function openWhile(initial: SeanimeStatus): Promise<HTMLDivElement> {
+    stubApi(initial);
+    const { default: MediaWorkspaceHost } = await import('../../media/MediaWorkspaceHost');
+    host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => { root.render(createElement(MediaWorkspaceHost, {})); });
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('seanime:media-workspace-open', {
+        detail: { localFilePath: 'c:/media/ep1.mkv' },
+      }));
+    });
+    await flush();
+    return host;
+  }
+
+  it('queues an open made while the server is starting, and plays it the moment it is ready', async () => {
+    const el = await openWhile(STARTING);
+    expect(workspace(el)).toBeNull();
+    expect(el.querySelector('[data-player-frame]')?.getAttribute('data-player-frame')).toBe('opening');
+    // The opening frame names the video, never the server.
+    expect(el.textContent).toContain('ep1');
+    expect(el.textContent).not.toMatch(/media server|starting|stopped|offline/i);
+    await emit(GEN_2);
+    expect(workspace(el)).not.toBeNull();
+    expect(startCalls).toBe(0);
+  });
+
+  it('a crash main is already recovering shows the opening frame, not "offline", and asks for no start', async () => {
+    const el = await openOnReady();
+    await emit(status({ kind: 'starting', recovering: true, error: 'restarting (attempt 1)' }));
+    expect(workspace(el)).toBeNull();
+    expect(el.querySelector('[data-player-frame]')?.getAttribute('data-player-frame')).toBe('opening');
+    expect(el.textContent).not.toMatch(/media server|offline|Start the/i);
+    expect(startCalls).toBe(0);
+    await emit(GEN_2);
+    expect(workspace(el)?.dataset.instance).toBe('2');
+  });
+
+  it('a server that gave up is a stated failure with a Retry that starts it again', async () => {
+    const el = await openOnReady();
+    await emit(status({ kind: 'failed', errorCode: 'crashed', error: 'sidecar exited with code 1' }));
+    expect(el.querySelector('[data-player-frame]')?.getAttribute('data-player-frame')).toBe('failed');
+    expect(el.textContent).toContain('sidecar exited with code 1');
+    const retry = el.querySelector<HTMLButtonElement>('[data-player-retry]');
+    expect(retry).not.toBeNull();
+    await act(async () => { retry?.click(); });
+    expect(startCalls).toBe(1);
+    await emit(GEN_2);
+    expect(workspace(el)).not.toBeNull();
+    expect(el.querySelector('[data-player-frame="failed"]')).toBeNull();
+  });
 });

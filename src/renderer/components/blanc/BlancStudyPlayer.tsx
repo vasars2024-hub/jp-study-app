@@ -34,11 +34,12 @@
  * `theme/blanc-media.css` gives the surface a bounded, scrolling frame the same way
  * `.blanc-flashcards-embed` does for the flashcard modes.
  */
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { useMediaWorkspaceAvailability } from '../../mediaWorkspaceAvailability';
 import { useSeanimeConnection } from '../../../media/useSeanimeConnection';
-import { SIDECAR_STATUS_KEY } from '../../../shared/mediaWorkspaceLabels';
+import PlayerFrame from '../../../media/PlayerFrame';
+import { lastFrameFor } from '../../../media/lastFrameCache';
 import { normalizeMediaWorkspaceOpenRequest } from '../../../shared/mediaWorkspace';
 import type { MediaItem } from '../../../shared/types';
 
@@ -54,7 +55,7 @@ export default function BlancStudyPlayer({ item }: { item: MediaItem }) {
   // A loaded source is the signal that this surface is really in use, so the sidecar is
   // started for it. Blanc's Media tab with nothing loaded never renders this component at
   // all, which is what keeps the media server down until something needs it.
-  const { status, conn } = useSeanimeConnection(availability === 'available');
+  const { status, conn, retryConnection } = useSeanimeConnection(availability === 'available');
 
   const playbackRequest = useMemo(
     // `requestId` is derived from the item rather than from a clock: a re-render must not
@@ -67,6 +68,26 @@ export default function BlancStudyPlayer({ item }: { item: MediaItem }) {
     [item.id, item.path, item.positionSec],
   );
 
+  // The item's own artwork for the opening frame — only what is already on disk (a still
+  // or a thumbnail made earlier); the frame never waits for one to be generated.
+  const [poster, setPoster] = useState<string | null>(null);
+  useEffect(() => {
+    setPoster(null);
+    let cancelled = false;
+    const ask = window.api?.mediaPlaybackPlan;
+    if (typeof ask !== 'function') return undefined;
+    void ask(item.path).then((plan) => {
+      if (!cancelled) setPoster(plan?.posterUrl ?? null);
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [item.path]);
+  const [retrying, setRetrying] = useState(false);
+  useEffect(() => {
+    setRetrying(false);
+  }, [status?.kind, conn]);
+
   // `pending` shows nothing: with the status still in flight there is nothing true to say.
   if (availability === 'pending') return null;
 
@@ -77,28 +98,64 @@ export default function BlancStudyPlayer({ item }: { item: MediaItem }) {
     return <p className="blanc-status-row">{t('mediaWorkspace.playerNeedsServer')}</p>;
   }
 
-  // Explicit terminal states, never a spinner — the Phase-1 lifecycle rule.
-  if (!status || status.kind === 'starting') {
-    return <p className="blanc-status-row">{t('mediaWorkspace.connecting')}</p>;
-  }
-  if (status.kind !== 'ready') {
+  // From here the toolbox shows the player's opening frame (`media/PlayerFrame.tsx`): the
+  // item's picture and "Opening …" while the media server starts, restarts or connects —
+  // never the server's own state — and a stated failure with a Retry only when it failed.
+  const imageUrl = lastFrameFor(item.path) ?? poster;
+  const title = item.seriesTitle || item.title;
+  if (status?.kind === 'failed') {
     return (
-      <div className="blanc-status-row">
-        <span>{t('mediaWorkspace.serverState', { status: t(SIDECAR_STATUS_KEY[status.kind]) })}</span>
-        <button
-          type="button"
-          onClick={() => void window.api.seanimeStart().catch(() => undefined)}
-        >
-          {t('mediaWorkspace.startServer')}
-        </button>
+      <div className="blanc-study-player">
+        <PlayerFrame
+          compact
+          title={title}
+          imageUrl={imageUrl}
+          failure={{
+            message: t(
+              status.errorCode === 'missing-exe' || status.errorCode === 'spawn-failed'
+                || status.errorCode === 'unhealthy' || status.errorCode === 'port'
+                ? `playback.failed.${status.errorCode}`
+                : 'playback.failed.crashed',
+            ),
+            details: status.error,
+            retrying,
+            onRetry: () => {
+              setRetrying(true);
+              void window.api.seanimeStart().catch(() => setRetrying(false));
+            },
+          }}
+        />
       </div>
     );
   }
-  if (!conn) return <p className="blanc-status-row">{t('mediaWorkspace.connecting')}</p>;
-  if (!conn.baseUrl) return <p className="blanc-status-row">{t('mediaWorkspace.notRunning')}</p>;
+  if (status?.kind === 'ready' && conn && !conn.baseUrl) {
+    return (
+      <div className="blanc-study-player">
+        <PlayerFrame
+          compact
+          title={title}
+          imageUrl={imageUrl}
+          failure={{
+            message: t('playback.failed.connect'),
+            retrying,
+            onRetry: () => {
+              setRetrying(true);
+              retryConnection();
+            },
+          }}
+        />
+      </div>
+    );
+  }
+  const opening = (
+    <div className="blanc-study-player">
+      <PlayerFrame compact title={title} imageUrl={imageUrl} />
+    </div>
+  );
+  if (!status || status.kind !== 'ready' || !conn) return opening;
 
   return (
-    <Suspense fallback={<p className="blanc-status-row">{t('common.loading')}</p>}>
+    <Suspense fallback={opening}>
       <MediaPlayerSurface
         conn={conn}
         playbackRequest={playbackRequest}

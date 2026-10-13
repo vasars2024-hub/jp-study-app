@@ -7,8 +7,10 @@
  * is in memory (src/main/e2eHeadless.ts), so the flow puts a rendered picture of Japanese
  * text there — exactly what the Snipping Tool leaves — and asserts that the running app:
  *
- *  - notices it (Snip to cards is ON by default) and reads it — in a fresh profile with the
- *    bundled offline recognizer, since no OCR model is installed (none is downloaded);
+ *  - leaves it alone while Snip to cards is OFF (the v1 default: clipboard watching is opt-in);
+ *  - once it is turned on (the same `snip:setSettings` the first-run switch, Settings and the
+ *    tray use), notices a new snip and reads it — in a fresh profile with the bundled offline
+ *    recognizer, since no OCR model is installed (none is downloaded);
  *  - adds the unknown words as cards in the deck ("Snips" folder) and as notes in the fake
  *    AnkiConnect;
  *  - records a history entry, and renders the Snips analysis view (breakdown, cards);
@@ -58,9 +60,10 @@ module.exports = {
     const dict = await ensureDictionaryReady(ctx);
     result.check('the built-in dictionary is ready for lookups', dict.ready, dict);
 
-    // --- On by default, nothing read yet ----------------------------------------------------
+    // --- Off by default (v1): nothing is read until the learner turns it on ------------------
     const status = await ev(`window.api.snipGetStatus()`, { await: true });
-    result.check('Snip to cards is on by default in a fresh profile', status?.enabled === true && status?.autoAdd === true && status?.maxWords === 12, status);
+    result.check('Snip to cards is OFF by default in a fresh profile (auto-add and the 12-word limit ready for when it is on)',
+      status?.enabled === false && status?.watching === false && status?.autoAdd === true && status?.maxWords === 12, status);
     const engines = await ev(`window.api.lensOcrEngineStatus()`, { await: true });
     result.note(`OCR engines: ${JSON.stringify(engines)} (none installed means the bundled offline recognizer reads the snip)`);
     const historyBefore = (await ev(`window.api.snipHistoryList({})`, { await: true })) ?? [];
@@ -78,9 +81,23 @@ module.exports = {
     }
     const notesBefore = new Set(fake.notes.keys());
 
+    // --- While off, a snip on the clipboard is not read ---------------------------------------
+    const offClip = await ctx.e2e('clipboard', { set: { imagePath: image } });
+    result.check('the snip picture is on the (in-memory) clipboard', offClip?.clipboard?.hasImage === true, offClip?.clipboard);
+    await ctx.sleep(2500);
+    const historyWhileOff = (await ev(`window.api.snipHistoryList({})`, { await: true })) ?? [];
+    result.check('while Snip to cards is off, the snip is not read (no history entry)', historyWhileOff.length === historyBefore.length, { before: historyBefore.length, after: historyWhileOff.length });
+
+    // --- Turn it on (what the first-run switch does) -----------------------------------------
+    const on = await ev(`window.api.snipSetSettings({ enabled: true })`, { await: true });
+    result.check('turning it on starts watching, with the one-time notice still pending', on?.enabled === true && on?.watching === true && on?.notice === status?.notice, on);
+
     // --- The snip lands on the clipboard ----------------------------------------------------
+    // Turning watching on never reads the picture already there, so the snip is taken again.
+    await ctx.e2e('clipboard', { set: { text: 'x' } });
+    await ctx.sleep(1200);
     const clip = await ctx.e2e('clipboard', { set: { imagePath: image } });
-    result.check('the snip picture is on the (in-memory) clipboard', clip?.clipboard?.hasImage === true, clip?.clipboard);
+    result.check('the snip is taken again with watching on', clip?.clipboard?.hasImage === true, clip?.clipboard);
 
     const entry = await pollAsync(ctx, `window.api.snipHistoryList({}).then((list) => {
       const fresh = (list || []).filter((e) => !${JSON.stringify(historyBefore.map((e) => e.id))}.includes(e.id));
@@ -141,7 +158,7 @@ module.exports = {
     // --- The toast, and Undo -----------------------------------------------------------------
     const toast = await poll({ ...ctx, eval: (js) => ctx.eval(js, { window: TOAST }) }, `(() => { const m = document.querySelector('.snip-toast-message'); return m ? { text: m.textContent, undo: Boolean(document.querySelector('.snip-toast-undo')), notice: Boolean(document.querySelector('.snip-toast-notice')), meta: [...document.querySelectorAll('.snip-toast-meta')].map((x) => x.textContent) } : null; })()`, 10000);
     result.note(toast ? `toast: ${toast.text} | ${(toast.meta || []).join(' | ')}` : 'no background toast (the in-app toast was used)');
-    // Watching and adding are on by default, so the first snip that makes cards says so, once.
+    // The learner turned it on just now, so the first snip that makes cards says what it did, once.
     if (status?.notice === 'pending') {
       result.check('the first snip that made cards showed the one-time "Snip to cards is on" notice, with the Undo window spelled out',
         Boolean(toast?.notice) && (toast?.meta || []).some((m) => /Undo stays in Snips/.test(m)), toast);
@@ -223,6 +240,9 @@ module.exports = {
       }
     }
     await ev(`window.api.snipSetSettings({ autoAdd: true })`, { await: true });
+    // Back to the default (off) for the flows after this one.
+    const off = await ev(`window.api.snipSetSettings({ enabled: false })`, { await: true });
+    result.check('turning it off again stops watching', off?.enabled === false && off?.watching === false, off);
 
     // Leave the clipboard without a picture for the flows after this one.
     await ctx.e2e('clipboard', { set: { text: '' } });

@@ -4,6 +4,33 @@ import {
   type MediaWorkspaceOpenRequest,
 } from '../shared/mediaWorkspace';
 import { mediaWorkspaceIsAvailable } from './mediaWorkspaceAvailability';
+import { PLAYER_WARM_EVENT } from '../shared/playerWarm';
+
+/**
+ * A video is likely next (a media view came into sight, a row is under the pointer): warm
+ * the media server and the window's player now, so the open itself is instant. Cheap and
+ * idempotent; throttled so a hover storm is one event.
+ */
+let lastWarmAt = 0;
+export function warmMediaPlayer(): void {
+  const now = Date.now();
+  if (now - lastWarmAt < 5000) return;
+  lastWarmAt = now;
+  window.dispatchEvent(new CustomEvent(PLAYER_WARM_EVENT));
+}
+
+/**
+ * `warmMediaPlayer` once the view that asks has painted and the window is idle, so the
+ * warm-up never competes with the view's own first frame. Returns a cancel for an effect.
+ */
+export function warmMediaPlayerWhenIdle(): () => void {
+  if (typeof window.requestIdleCallback === 'function') {
+    const id = window.requestIdleCallback(() => warmMediaPlayer(), { timeout: 2000 });
+    return () => window.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(() => warmMediaPlayer(), 600);
+  return () => window.clearTimeout(id);
+}
 
 /** Bring the adopted workspace forward and optionally start a local file. */
 export function openMediaWorkspace(detail: MediaWorkspaceOpenRequest = {}): void {

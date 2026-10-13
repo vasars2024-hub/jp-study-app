@@ -297,8 +297,11 @@ describe('the supervisor wiring', () => {
   it('releases the client on stop and on an unexpected child exit', () => {
     // Either omission leaves a socket holding a dead port, and the stop case leaves the
     // switch unable to finish a kill the supervisor started.
-    expect(supervisor).toMatch(/export function stopSeanime[\s\S]{0,400}keepalive\.stop\(\)/);
-    expect(supervisor).toMatch(/child\.on\('exit'[\s\S]{0,400}keepalive\.stop\(\)/);
+    // stop -> lifecycle.stop() -> io.kill -> killChild(), which releases the client first.
+    expect(supervisor).toMatch(/export function stopSeanime[\s\S]{0,200}lifecycle\.stop\(\)/);
+    expect(supervisor).toMatch(/kill: \(\) => \{\s*killChild\(\)/);
+    expect(supervisor).toMatch(/function killChild\(\)[\s\S]{0,400}keepalive\.stop\(\)[\s\S]{0,200}killTree/);
+    expect(supervisor).toMatch(/proc\.on\('exit'[\s\S]{0,500}keepalive\.stop\(\)/);
   });
 
   it('holds the client only once the sidecar is actually healthy', () => {

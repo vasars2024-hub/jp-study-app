@@ -192,6 +192,9 @@ const history = () => mod.__snipToCardsTestables.loadHistory();
 
 beforeEach(async () => {
   h.userData = fs.mkdtempSync(path.join(os.tmpdir(), 'gum-snip-'));
+  // Watching is off by default since v1: these tests run on a profile where the
+  // learner turned it on (the migration has its own describe block below).
+  fs.writeFileSync(path.join(h.userData, 'snip-to-cards.json'), JSON.stringify({ schema: 2, enabled: true }));
   mod = await load();
 });
 
@@ -415,7 +418,7 @@ describe('the poll does not decode a picture that sits on the clipboard (scoreca
   });
 });
 
-describe('the first-run notice (Snip to cards is on by default)', () => {
+describe('the first-run notice (shown once the learner has turned Snip to cards on)', () => {
   it('the first toast that reports cards carries the notice once, and main records it', async () => {
     expect((await h.handlers.get('snip:getStatus')!({})) as { notice: string }).toMatchObject({ enabled: true, autoAdd: true, notice: 'pending' });
     // A toast that added nothing does not use it up.
@@ -480,5 +483,62 @@ describe('actions and patches are checked in main', () => {
     expect(next).toMatchObject({ status: 'done', text: '未来', ocrText: '末来', review: 'manual', deck: 'Manga' });
     expect(next).not.toHaveProperty('error');
     expect(next.id).toBe(entry.id);
+  });
+});
+
+describe('v1 default: watching is off, older profiles are moved over once', () => {
+  async function fresh(files: { settings?: unknown; index?: unknown; pictures?: string[] }): Promise<{ enabled: boolean; notice: string }> {
+    fs.rmSync(h.userData, { recursive: true, force: true });
+    fs.mkdirSync(h.userData, { recursive: true });
+    if (files.settings !== undefined) fs.writeFileSync(path.join(h.userData, 'snip-to-cards.json'), JSON.stringify(files.settings));
+    if (files.index !== undefined || files.pictures) {
+      fs.mkdirSync(path.join(h.userData, 'snips'), { recursive: true });
+      if (files.index !== undefined) fs.writeFileSync(path.join(h.userData, 'snips', 'index.json'), JSON.stringify(files.index));
+      for (const name of files.pictures ?? []) fs.writeFileSync(path.join(h.userData, 'snips', name), 'png');
+    }
+    mod.stopSnipToCards();
+    mod = await load();
+    return (await h.handlers.get('snip:getStatus')!({})) as { enabled: boolean; notice: string };
+  }
+  const stored = () => JSON.parse(fs.readFileSync(path.join(h.userData, 'snip-to-cards.json'), 'utf8'));
+  const oldEntry = { id: 'snip-old-1', createdAt: 1, lang: 'ja', status: 'done', width: 600, height: 120, bytes: 10, hash: 'h', text: '猫', words: [], cardIds: [], ankiNoteIds: [] };
+
+  it('a new profile is off, nothing is read, and the decision is written once with the schema', async () => {
+    expect(await fresh({})).toMatchObject({ enabled: false, notice: 'pending' });
+    expect(stored()).toMatchObject({ schema: 2, enabled: false });
+    await snip('猫');
+    expect(history()).toHaveLength(0);
+  });
+
+  it('an old profile on by default that never snipped is turned off', async () => {
+    expect(await fresh({ settings: { enabled: true, notice: 'pending', deck: 'Mine' } })).toMatchObject({ enabled: false });
+    expect(stored()).toMatchObject({ schema: 2, enabled: false, deck: 'Mine' });
+  });
+
+  it('an old profile with snip history keeps watching (file or no file)', async () => {
+    expect(await fresh({ index: { version: 1, entries: [oldEntry] } })).toMatchObject({ enabled: true });
+    expect(await fresh({ settings: { enabled: true }, index: { version: 1, entries: [oldEntry] } })).toMatchObject({ enabled: true });
+    // The index is unreadable but the pictures are there: still used.
+    expect(await fresh({ index: 'garbage', pictures: ['snip-abc-1.png'] })).toMatchObject({ enabled: true });
+  });
+
+  it('an old profile that answered or saw the notice keeps watching; one that turned it off stays off', async () => {
+    expect(await fresh({ settings: { enabled: true, notice: 'answered' } })).toMatchObject({ enabled: true, notice: 'answered' });
+    expect(await fresh({ settings: { enabled: true, notice: 'shown' } })).toMatchObject({ enabled: true });
+    expect(await fresh({ settings: { enabled: false, notice: 'answered' }, index: { version: 1, entries: [oldEntry] } })).toMatchObject({ enabled: false });
+  });
+
+  it('a choice made under the new default is never re-decided', async () => {
+    expect(await fresh({ settings: { schema: 2, enabled: true } })).toMatchObject({ enabled: true });
+    expect(await fresh({ settings: { schema: 2, enabled: false }, index: { version: 1, entries: [oldEntry] } })).toMatchObject({ enabled: false });
+  });
+
+  it('turning it on (first-run setup, Settings, tray) starts watching and the first cards carry the notice', async () => {
+    await fresh({});
+    const on = (await h.handlers.get('snip:setSettings')!({}, { enabled: true })) as { enabled: boolean; notice: string; watching: boolean };
+    expect(on).toMatchObject({ enabled: true, notice: 'pending', watching: true });
+    expect(stored()).toMatchObject({ schema: 2, enabled: true });
+    await h.handlers.get('snip:toast:show')!({}, { id: 'snip-x', kind: 'added', words: ['猫'], count: 1 });
+    expect(await h.handlers.get('snip:toast:get')!({})).toMatchObject({ notice: true });
   });
 });

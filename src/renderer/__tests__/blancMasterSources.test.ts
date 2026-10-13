@@ -91,6 +91,8 @@ describe('Blanc Master Search source adapters', () => {
       'mode',
       // Blanc mechanics: warm tools, RAM budget, Flow and Capture inbox.
       'mechanics',
+      // v1: About Gum (version, licences, credits, privacy).
+      'about',
     ]);
   });
 

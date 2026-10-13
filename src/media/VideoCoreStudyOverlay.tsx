@@ -13,6 +13,7 @@ import {
   vc_videoElement,
 } from '@/app/(main)/_features/video-core/video-core-atoms';
 import type { VideoCore_VideoPlaybackInfo } from '@/app/(main)/_features/video-core/video-core.atoms';
+import { studyEpisodeNumber, studyMediaId, studyMediaTitle } from './studyMediaIdentity';
 import type {
   NormalizedTrackInfo,
   SubtitleManagerCueChangeEvent,
@@ -382,22 +383,21 @@ function miningSourceFromPlayback(
   const localPath = playbackInfo.localFile?.path || requestedLocalPath || '';
   // A YouTube download has no media metadata, so its cards used to carry no source title
   // at all; the title yt-dlp wrote into the file name is the video's own.
-  const mediaTitle = playbackInfo.media?.title?.userPreferred
-    || playbackInfo.media?.title?.romaji
-    || playbackInfo.media?.title?.english
-    || playbackInfo.media?.title?.native
+  // `studyMedia*` read the server's AniList entry first and, for an episode played straight
+  // from disk, the library's identity for it (`studyMediaIdentity.ts`).
+  const mediaTitle = studyMediaTitle(playbackInfo)
     || youtubeIdentityFromPath(playbackInfo.localFile?.path)?.title;
+  const mediaId = studyMediaId(playbackInfo);
+  const episodeNumber = studyEpisodeNumber(playbackInfo);
   return {
     playbackId: playbackInfo.id,
     playbackType: String(playbackInfo.playbackType),
     streamType: playbackInfo.streamType,
     ...(playbackInfo.streamPath ? { streamPath: playbackInfo.streamPath } : {}),
     ...(localPath ? { localFilePath: localPath } : {}),
-    ...(playbackInfo.media?.id != null ? { mediaId: playbackInfo.media.id } : {}),
+    ...(mediaId != null ? { mediaId } : {}),
     ...(mediaTitle ? { mediaTitle } : {}),
-    ...(playbackInfo.episode?.episodeNumber != null
-      ? { episodeNumber: playbackInfo.episode.episodeNumber }
-      : {}),
+    ...(episodeNumber != null ? { episodeNumber } : {}),
     ...(playbackInfo.episode?.displayTitle || playbackInfo.episode?.episodeTitle
       ? { episodeTitle: playbackInfo.episode.displayTitle || playbackInfo.episode.episodeTitle }
       : {}),
@@ -3255,7 +3255,7 @@ export default function VideoCoreStudyOverlay({
 
   const detachFrame: StudyDetachFrame = {
     mediaName,
-    episode: playbackInfo?.episode?.episodeNumber ?? null,
+    episode: studyEpisodeNumber(playbackInfo) ?? null,
     streamType: String(playbackInfo?.streamType ?? ''),
     playbackRate: preferences.playbackRate,
     activeIndex: studyCue?.index ?? null,
@@ -3703,7 +3703,7 @@ export default function VideoCoreStudyOverlay({
     mediaInfo: (
       <MediaInfoBlock
         name={mediaName}
-        episodeNumber={playbackInfo?.episode?.episodeNumber ?? null}
+        episodeNumber={studyEpisodeNumber(playbackInfo) ?? null}
         streamType={String(playbackInfo?.streamType ?? '')}
         durationSec={durationSec}
         trackCount={tracks.length}

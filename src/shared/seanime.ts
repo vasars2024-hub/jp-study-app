@@ -20,9 +20,10 @@
  * **Set `SEANIME_SIDECAR=0` to opt out.** That is the rollback for this flip, and `=1`
  * still works so every existing harness and recipe keeps its meaning.
  *
- * Turning this on does **not** spawn anything at boot: nothing calls `startSeanime()`
- * eagerly, so the only effect is that the initial status is `stopped` rather than
- * `disabled` and the media surface becomes reachable.
+ * Turning this on does not spawn anything during boot itself: the sidecar is warmed a few
+ * seconds AFTER the main window's first paint (`warmSeanime`, main.ts), or when a media
+ * surface comes into view, so a first video does not wait for it and boot does not pay
+ * for it. See `main/seanime/lifecycle.ts`.
  *
  * **Only the main process reads this.** The renderer gates on the reported
  * `SeanimeStatus.kind !== 'disabled'` (`media/MediaWorkspaceHost.tsx:177`), which main
@@ -95,6 +96,12 @@ export interface SeanimeStatus {
   errorCode?: SeanimeFailureCode | null;
   /** Last few lines of server stderr/stdout, for diagnosing a failed start. */
   logTail: string[];
+  /**
+   * True while the supervisor is bringing a crashed or hung sidecar back by itself
+   * (`main/seanime/lifecycle.ts`). The kind is `starting` meanwhile; a surface keeps its
+   * loading frame and its queued request, and says nothing about a server.
+   */
+  recovering?: boolean;
 }
 
 /** One poster tile in the Phase-1 dev grid. */
@@ -178,6 +185,8 @@ export const SEANIME_CHANNELS = {
   status: 'seanime:status',
   start: 'seanime:start',
   stop: 'seanime:stop',
+  /** Start soon without waiting (a media surface came into view, a player is opening). */
+  warm: 'seanime:warm',
   probe: 'seanime:probe',
   connection: 'seanime:connection',
   extractAudio: 'seanime:extractAudio',

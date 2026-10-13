@@ -103,11 +103,13 @@ export const BLANC_MASTER_SETTINGS: BlancMasterSearchContent[] = [
   { kind: 'setting', id: 'shortcuts', title: 'Keyboard shortcuts', detail: 'Toolbox command bindings and conflicts', category: 'Settings' },
   { kind: 'setting', id: 'mode', title: 'Blanc mode', detail: 'Start in Blanc only, open Study OS, or exit Blanc', category: 'Settings' },
   { kind: 'setting', id: 'mechanics', title: 'Speed & memory', detail: 'Warm tools, RAM budget, Flow sprint and Capture inbox', category: 'Settings' },
+  { kind: 'setting', id: 'about', title: 'About Gum', detail: 'Version, licences, credits and privacy', category: 'Settings' },
 ];
 
 /** Settings whose labels live outside `blanc.refine.setting.*`. */
 const SETTING_KEY_OVERRIDES: Record<string, string> = {
   mechanics: 'blanc.mech.setting',
+  about: 'about.blanc.setting',
 };
 
 /** The settings index in the UI language; the English source stays a search keyword. */

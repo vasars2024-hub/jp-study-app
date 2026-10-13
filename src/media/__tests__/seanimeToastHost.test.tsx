@@ -230,7 +230,11 @@ describe('SeanimeToastHost', () => {
         createElement(Shell, { conn, surface: 'player', children: 'player' }),
       ));
     });
+    // The status gate tries the read three times before it states the failure (seamless
+    // playback pass), and the raw error rides along behind its details line.
+    await act(async () => { await new Promise((r) => setTimeout(r, 1000)); });
     expect(host.textContent).toContain('offline test');
+    expect(host.querySelector('[data-player-frame="failed"]')).not.toBeNull();
     expect(toasterCount()).toBe(1);
     const { toast } = await import('sonner');
     await act(async () => { toast.error('server mutation failed'); });

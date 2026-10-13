@@ -274,6 +274,8 @@ declare global {
       pickShortcut(): Promise<{ target: string; name: string; icon: string } | null>;
       launchTarget(target: string): Promise<string | null>;
       mediaFileUrl(p: string): Promise<string | null>;
+      /** How to open a local video in one answer (shared/playbackPlan.ts). */
+      mediaPlaybackPlan?(p: string): Promise<import('../shared/playbackPlan').PlaybackPlan | null>;
       pickWallpaperVideo(): Promise<{
         id: string;
         path: string;
@@ -2774,6 +2776,8 @@ declare global {
       seanimeStatus(): Promise<import('../shared/seanime').SeanimeStatus>;
       seanimeStart(): Promise<import('../shared/seanime').SeanimeStatus>;
       seanimeStop(): Promise<import('../shared/seanime').SeanimeStatus>;
+      /** Start the media server soon without waiting; answers the current status. */
+      seanimeWarm?(delayMs?: number): Promise<import('../shared/seanime').SeanimeStatus>;
       seanimeProbe(): Promise<
         | { ok: true; result: import('../shared/seanime').SeanimeProbeResult }
         | { ok: false; error: string }

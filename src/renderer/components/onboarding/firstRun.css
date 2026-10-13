@@ -528,3 +528,25 @@
   padding: 0 12px 10px;
   font-size: 12px;
 }
+
+/* Finish step: optional features offered with one click (Snip to cards, off by default). */
+.frs-optin {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+}
+
+.frs-optin .frs-legend {
+  margin-bottom: 4px;
+}
+
+.frs-optin .frs-optin-what,
+.frs-optin .frs-optin-privacy {
+  margin-top: 0;
+  margin-bottom: 6px;
+}
+
+.frs-optin .frs-optin-toggle {
+  min-height: 24px;
+}

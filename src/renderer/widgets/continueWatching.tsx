@@ -37,6 +37,7 @@ import {
   STUDY_REVIEW_FOCUS_EVENT,
 } from '../../shared/mediaWorkspace';
 import type { SeanimeStatus } from '../../shared/seanime';
+import { PLAYER_WARM_EVENT } from '../../shared/playerWarm';
 import {
   continueWatchingResumeSec,
   formatContinueWatchingPosition,
@@ -47,6 +48,15 @@ import { readContinueWatching } from '../continueWatchingStore';
 import { useT } from '../i18n';
 import Icon from '../components/Icons';
 import type { WidgetProps } from './types';
+
+/** See `shared/playerWarm.ts`. Throttled: a pointer sweeping the list is one warm-up. */
+let lastWarmAt = 0;
+function warmPlayer(): void {
+  const now = Date.now();
+  if (now - lastWarmAt < 5000) return;
+  lastWarmAt = now;
+  window.dispatchEvent(new CustomEvent(PLAYER_WARM_EVENT));
+}
 
 /** Matches the other live widgets' cadence (`useStatsSummary` in `study.tsx`). */
 const REFRESH_MS = 30_000;
@@ -207,6 +217,9 @@ function Row({
           time: position,
         })}
         onClick={() => onResume(entry)}
+        // Pointer or focus on a row is the moment before a click: warm the player then.
+        onPointerEnter={warmPlayer}
+        onFocus={warmPlayer}
       >
         <span className="wgt-cw-play" aria-hidden="true">
           <Icon name="player" size={11} />

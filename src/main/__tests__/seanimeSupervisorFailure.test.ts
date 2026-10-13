@@ -45,7 +45,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 h.root = fs.mkdtempSync(path.join(os.tmpdir(), 'seanime-sup-'));
 process.env.SEANIME_DATADIR = path.join(h.root, 'datadir');
 
-const { startSeanime, stopSeanime, getSeanimeStatus } = await import('../seanime/supervisor');
+const { startSeanime, stopSeanime, getSeanimeStatus, onSeanimeStatus, primeSeanimeStatus, warmSeanime } = await import('../seanime/supervisor');
 const { seanimeFailureKey } = await import('../../shared/seanime');
 
 const fetchMock = vi.fn();
@@ -81,15 +81,56 @@ describe('sidecar failures are typed', () => {
     expect(status).toMatchObject({ kind: 'failed', errorCode: 'spawn-failed' });
   });
 
-  it('a crash after it was ready is crashed', async () => {
+  it('a crash after it was ready is recovered by itself (no "offline" in between)', async () => {
     const exe = path.join(h.root, 'seanime.exe');
     fs.writeFileSync(exe, 'MZ');
     process.env.SEANIME_EXE = exe;
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: { version: '3.0.0' } }) });
     const ready = await startSeanime();
     expect(ready).toMatchObject({ kind: 'ready', errorCode: null });
+    const seen: string[] = [];
+    const off = onSeanimeStatus((s) => seen.push(s.kind));
     h.children[0].exitCode = 1;
     h.children[0].emit('exit', 1);
-    expect(getSeanimeStatus()).toMatchObject({ kind: 'offline', errorCode: 'crashed' });
+    expect(getSeanimeStatus()).toMatchObject({ kind: 'starting', recovering: true, errorCode: null });
+    await vi.waitFor(() => expect(getSeanimeStatus()).toMatchObject({ kind: 'ready', recovering: false }), { timeout: 3000 });
+    off();
+    expect(h.children).toHaveLength(2);
+    expect(seen).not.toContain('offline');
+    expect(seen).not.toContain('failed');
+  });
+
+  it('a stopped sidecar that exits is not restarted', async () => {
+    const exe = path.join(h.root, 'seanime.exe');
+    fs.writeFileSync(exe, 'MZ');
+    process.env.SEANIME_EXE = exe;
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: { version: '3.0.0' } }) });
+    await startSeanime();
+    stopSeanime();
+    h.children[0].exitCode = 1;
+    h.children[0].emit('exit', 1);
+    await new Promise((r) => setTimeout(r, 400));
+    expect(h.children).toHaveLength(1);
+    expect(getSeanimeStatus().kind).toBe('stopped');
+  });
+
+  it('concurrent starts spawn one server', async () => {
+    const exe = path.join(h.root, 'seanime.exe');
+    fs.writeFileSync(exe, 'MZ');
+    process.env.SEANIME_EXE = exe;
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: { version: '3.0.0' } }) });
+    const [a, b] = await Promise.all([startSeanime(), startSeanime()]);
+    expect(a.kind).toBe('ready');
+    expect(b.kind).toBe('ready');
+    expect(h.children).toHaveLength(1);
+  });
+
+  it('a missing binary is known before any start (primeSeanimeStatus)', () => {
+    process.env.SEANIME_EXE = path.join(h.root, 'absent', 'seanime.exe');
+    stopSeanime();
+    expect(primeSeanimeStatus()).toMatchObject({ kind: 'failed', errorCode: 'missing-exe' });
+    // warm() does not try to start a binary that is not there.
+    expect(warmSeanime(0)).toMatchObject({ kind: 'failed', errorCode: 'missing-exe' });
+    expect(h.children).toHaveLength(0);
   });
 });

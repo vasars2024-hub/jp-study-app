@@ -59,9 +59,11 @@ import { MEDIA5_JA } from '../media5/ja';
 import { PLANNER_UI_JA } from '../plannerUi/ja';
 import { SNIP_UI_JA } from '../snipUi/ja';
 import { SNIP2_UI_JA } from '../snip2Ui/ja';
+import { ABOUT_UI_JA } from '../aboutUi/ja';
 import { NOTES_UI_JA } from '../notesUi/ja';
 import { LIBRARY_MANAGE_UI_JA } from '../libraryManageUi/ja';
 import { VIDEO_STUDY2_UI_JA } from '../videoStudy2Ui/ja';
+import { PLAYBACK_UI_JA } from '../playbackUi/ja';
 
 export const ja: Catalog = {
   'common.download': 'ダウンロード',
@@ -804,9 +806,11 @@ export const ja: Catalog = {
   ...PLANNER_UI_JA,
   ...SNIP_UI_JA,
   ...SNIP2_UI_JA,
+  ...ABOUT_UI_JA,
   ...NOTES_UI_JA,
   ...LIBRARY_MANAGE_UI_JA,
   ...VIDEO_STUDY2_UI_JA,
+  ...PLAYBACK_UI_JA,
 
   'settings.appTitle': '設定',
   'settings.group.personalization': '個人設定',
@@ -9959,7 +9963,6 @@ export const ja: Catalog = {
   'mediaWorkspace.openFile.systemPlayerFailed': 'Windowsでこのファイルをシステムのプレーヤーで開けませんでした。',
   'mediaWorkspace.resumeLast.nothing': 'まだ視聴履歴がありません。先に動画を開いてください。',
   'mediaWorkspace.resumeLast.noWorkspaceHere': 'このウィンドウにはプレーヤーがありません。メインウィンドウで再開してください。',
-  'mediaWorkspace.status': 'メディアサーバー：{status}',
   'mediaWorkspace.sidecar.disabled': '無効',
   'mediaWorkspace.sidecar.stopped': '停止中',
   'mediaWorkspace.sidecar.starting': '起動中',
@@ -9985,8 +9988,6 @@ export const ja: Catalog = {
   'mediaWorkspace.notRunning': 'メディアサーバーが起動していません。',
   'mediaWorkspace.playerNeedsServer': '動画の再生にはメディアサーバーが必要ですが、このビルドでは無効になっています。',
   'mediaWorkspace.connectingServer': 'メディアサーバーに接続中…',
-  'mediaWorkspace.serverOffline': 'メディアサーバーはオフラインです',
-  'mediaWorkspace.provisioning': 'メディア接続を準備中…',
   'mediaWorkspace.openingLocal': 'ローカルファイルを開いています',
   'mediaWorkspace.openStalled': 'メディアサーバーはこのファイルを受け付けましたが、準備を中断しました。もう一度開いてみてください。',
   'mediaWorkspace.fileMissing': 'この動画が元の場所にありません：{path}。移動・削除されたか、ドライブが接続されていない可能性があります。',

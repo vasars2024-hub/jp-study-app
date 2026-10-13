@@ -8,6 +8,7 @@
  */
 import React from 'react';
 import type { VideoCore_VideoPlaybackInfo } from '@/app/(main)/_features/video-core/video-core.atoms';
+import { studyMediaTitle } from './studyMediaIdentity';
 import type { VideoCoreActiveCue } from '@/app/(main)/_features/video-core/video-core-subtitles';
 import {
   normalizeVideoCoreMiningHistory,
@@ -144,8 +145,7 @@ export function StudyHudBlock({
  * detached copy of this block gets a name over IPC and must derive it identically.
  */
 export function mediaDisplayName(playbackInfo: VideoCore_VideoPlaybackInfo | null): string {
-  const title = playbackInfo?.media?.title;
-  return title?.userPreferred || title?.romaji || title?.english || title?.native
+  return studyMediaTitle(playbackInfo)
     || playbackInfo?.localFile?.path?.split(/[\\/]/).pop()
     || playbackInfo?.streamPath
     || '—';

@@ -95,9 +95,13 @@ export function installRecorderMainBridge(): () => void {
         reach = await reachMediaWorkspace();
         if (reach === 'ready') {
           let status = await window.api.seanimeStatus().catch(() => null);
-          // A sidecar nobody has started yet has not looked for its binary; the workspace
-          // would start it on open anyway, and a missing binary answers at once.
-          if (status?.kind === 'stopped') status = await window.api.seanimeStart().catch(() => status);
+          // Main reports a missing binary before anything is spawned, so a `stopped` server
+          // has one: warm it and open at once — the player holds the recording until the
+          // server is up. (An older preload without `seanimeWarm` still starts and waits.)
+          if (status?.kind === 'stopped') {
+            if (typeof window.api.seanimeWarm === 'function') void window.api.seanimeWarm(0).catch(() => null);
+            else status = await window.api.seanimeStart().catch(() => status);
+          }
           reach = recordingPlayerReach(reach, status);
         }
         if (reach === 'ready') openMediaWorkspace({ localFilePath: path });

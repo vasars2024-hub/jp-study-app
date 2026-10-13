@@ -75,7 +75,7 @@ import { configureVisualNovelReader } from './main/immersion/visualNovelReaderWi
 import { registerSystemMetricsIpc } from './main/systemMetrics';
 import { registerScraperIpc } from './main/scraper';
 import { registerReadingIpc } from './main/reading';
-import { registerSeanimeIpc, stopSeanime } from './main/seanime';
+import { registerSeanimeIpc, stopSeanime, warmSeanime } from './main/seanime';
 import { registerMalSyncIpc } from './main/malSync';
 import { registerMalLibraryIpc } from './main/malLibrary';
 import { registerWatchLibraryIpc } from './main/watchLibrary';
@@ -388,9 +388,27 @@ function notifyLockBlocked(notice: LockBlockNotice): void {
 let fileOpenRouter: FileOpenRouter | null = null;
 const earlyOpenPaths: string[] = [];
 function openFilesFromShell(paths: string[]): void {
+  warmMediaServerFor(paths);
   if (fileOpenRouter) fileOpenRouter.open(paths);
   else earlyOpenPaths.push(...paths);
 }
+
+/** A video opened from the shell will want the media server: start it now, not on play. */
+const SHELL_VIDEO_RE = /\.(mp4|m4v|mkv|webm|mov|avi|wmv|flv|ts|m2ts|ogv)$/i;
+function warmMediaServerFor(paths: readonly string[]): void {
+  if (!paths.some((p) => SHELL_VIDEO_RE.test(p))) return;
+  // A running app starts it now; a launch that is still booting lets its first paint go
+  // first (the player nudges it again the moment the file is opened anyway).
+  warmSeanime(app.isReady() && mainWindow ? 0 : 2_000, 'opened from the shell');
+}
+
+/**
+ * How long after the main window's first paint the media server is warmed. Late enough
+ * that boot's own deferred work (dictionary metadata, extension server) has gone first,
+ * early enough that a user heading for a video finds it ready. `GUM_SEANIME_PREWARM=0`
+ * turns the boot warm off (a surface still warms it when it comes into view).
+ */
+const SEANIME_BOOT_WARM_DELAY_MS = 6_000;
 
 app.on('second-instance', (_event, argv, workingDirectory) => {
   const openedFiles = filePathsFromArgv(argv, { cwd: workingDirectory });
@@ -2357,7 +2375,11 @@ app.whenReady().then(async () => {
     else createPopoutWindow(coldOpen);
   }
   // Cold-start "Open with Gum": the Study OS renderer drains these once mounted.
-  fileOpenRouter.open([...earlyOpenPaths.splice(0), ...filePathsFromArgv(process.argv)]);
+  {
+    const shellPaths = [...earlyOpenPaths.splice(0), ...filePathsFromArgv(process.argv)];
+    warmMediaServerFor(shellPaths);
+    fileOpenRouter.open(shellPaths);
+  }
   afterFirstPaint(() => {
     // Assignments are seeded from `screen`, which is only live now. Run once the
     // main window exists, so its own display is excluded from the secondaries.
@@ -2387,6 +2409,15 @@ app.whenReady().then(async () => {
     // The Files app's watched folders, resumed from main's own copy of the list
     // so they keep importing without the Files window being opened first.
     startFilesWatchFromDisk();
+    // The media server, warm before the first video instead of started by it. Only for a
+    // Study OS launch someone is looking at: a Blanc-only launch (lowest memory) or a
+    // hidden tray start warms it when a media surface comes into view instead.
+    if (
+      mainWindow && !mainWindow.isDestroyed() && !launchedToTray()
+      && !/^(0|false|off)$/i.test(process.env.GUM_SEANIME_PREWARM ?? '')
+    ) {
+      warmSeanime(SEANIME_BOOT_WARM_DELAY_MS, 'after boot');
+    }
   });
 
   app.on('activate', () => {

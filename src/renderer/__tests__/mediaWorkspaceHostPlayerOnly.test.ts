@@ -150,6 +150,37 @@ describe('MediaWorkspaceHost — player only', () => {
     expect(el.querySelector('.seanime-host')).toBeNull();
   });
 
+  it('keeps the player warm after close: hidden, and the SAME instance on re-open', async () => {
+    stubApi(READY);
+    const el = await mount();
+    await dispatch('seanime:media-workspace-open', FILE);
+    const first = el.querySelector('[data-stub-workspace]');
+    expect(first).not.toBeNull();
+
+    await act(async () => { el.querySelector<HTMLButtonElement>('.seanime-host-back')?.click(); });
+    await flush();
+    expect(el.querySelector('.seanime-host')).toBeNull();
+    const warm = el.querySelector<HTMLElement>('.seanime-host-warm');
+    expect(warm).not.toBeNull();
+    expect(warm?.style.display).toBe('none');
+    expect(warm?.getAttribute('aria-hidden')).toBe('true');
+    expect(warm?.querySelector('[data-stub-workspace]')).toBe(first);
+
+    await dispatch('seanime:media-workspace-open', FILE);
+    expect(el.querySelector('.seanime-host [data-stub-workspace]')).toBe(first);
+  });
+
+  it('a media view asking ahead (gum:player-warm) mounts the player hidden before the first open', async () => {
+    stubApi(READY);
+    const el = await mount();
+    expect(el.querySelector('[data-stub-workspace]')).toBeNull();
+    await dispatch('gum:player-warm');
+    const warm = el.querySelector('.seanime-host-warm [data-stub-workspace]');
+    expect(warm).not.toBeNull();
+    await dispatch('seanime:media-workspace-open', FILE);
+    expect(el.querySelector('.seanime-host [data-stub-workspace]')).toBe(warm);
+  });
+
   it('closes on Escape, but not while the user is typing', async () => {
     stubApi(READY);
     const el = await mount();
@@ -169,20 +200,40 @@ describe('MediaWorkspaceHost — player only', () => {
     expect(el.querySelector('.seanime-host')).toBeNull();
   });
 
-  it('shows one loader while a stopped sidecar is auto-started, then explains it', async () => {
-    // For the first few seconds a stopped sidecar is one that auto-start is bringing up,
-    // so it shows the single loader rather than "stopped" and a Start button for a frame.
+  it('shows the opening frame (never server words) while a stopped sidecar comes up, and a Retry only if it never does', async () => {
+    // Seamless playback (2026-10-13): a stopped server is one main is bringing up, so the
+    // player shows the video's opening frame with "Opening …" — no "Media server stopped",
+    // no Start button. Only a server that is STILL stopped long after is a failure, stated
+    // in words the viewer can act on, with a Retry that really starts it.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       stubApi(STOPPED);
+      let starts = 0;
+      (window as unknown as { api: Record<string, unknown> }).api.seanimeStart = async () => {
+        starts += 1;
+        return undefined;
+      };
       const el = await mount();
       await dispatch('seanime:media-workspace-open', FILE);
-      expect(el.querySelector('.lq-loading')).not.toBeNull();
+      const frame = el.querySelector('[data-player-frame]');
+      expect(frame?.getAttribute('data-player-frame')).toBe('opening');
+      expect(el.textContent).not.toMatch(/media server|stopped|starting|Start the/i);
       expect(el.querySelector('.seanime-host-state')).toBeNull();
+      expect(el.querySelector('.seanime-host-status')).toBeNull();
 
       await act(async () => { vi.advanceTimersByTime(4100); });
       await flush();
-      expect(el.querySelector('.seanime-host-state')?.textContent).toContain('media server is');
+      // Still just the frame a few seconds in (a first start can take that long).
+      expect(el.querySelector('[data-player-frame]')?.getAttribute('data-player-frame')).toBe('opening');
+
+      await act(async () => { vi.advanceTimersByTime(6100); });
+      await flush();
+      expect(el.querySelector('[data-player-frame]')?.getAttribute('data-player-frame')).toBe('failed');
+      const retry = el.querySelector<HTMLButtonElement>('[data-player-retry]');
+      expect(retry).not.toBeNull();
+      const before = starts;
+      await act(async () => { retry?.click(); });
+      expect(starts).toBe(before + 1);
     } finally {
       vi.useRealTimers();
     }

@@ -644,3 +644,75 @@ describe('the look picked in setup and the tour (onb3)', () => {
     }
   });
 });
+
+describe('finish step: Snip to cards offered with one click (off by default, v1)', () => {
+  async function mountFinish(enabled: boolean): Promise<ReturnType<typeof vi.fn>> {
+    const setSettings = vi.fn(async (patch: { enabled?: boolean }) => ({ enabled: patch.enabled === true }));
+    Object.assign(window.api as unknown as Record<string, unknown>, {
+      snipGetStatus: vi.fn(async () => ({ enabled })),
+      snipSetSettings: setSettings,
+      onSnipSettingsChanged: vi.fn(() => () => undefined),
+    });
+    patchFirstRun({ step: 'finish' });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<FirstRunSetup onClose={vi.fn()} />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    return setSettings;
+  }
+  const offer = (): HTMLElement | null => host.querySelector('[data-first-run-optin="snip"]');
+  const toggle = (): HTMLInputElement | null => host.querySelector('[data-first-run-optin="snip"] input[role="switch"]');
+
+  it('says what it does and that pictures stay on this computer; the switch starts off', async () => {
+    await mountFinish(false);
+    expect(offer()?.textContent).toContain(en('onb4.snip.title'));
+    expect(offer()?.textContent).toContain(en('onb4.snip.what'));
+    expect(offer()?.textContent).toContain(en('onb4.snip.privacy'));
+    expect(en('onb4.snip.privacy')).toMatch(/this computer only/);
+    expect(toggle()?.checked).toBe(false);
+    expect(toggle()?.closest('label')?.textContent).toContain(en('onb4.snip.enable'));
+  });
+
+  it('one click turns it on in main (the same setting Settings and the tray use)', async () => {
+    const setSettings = await mountFinish(false);
+    await act(async () => {
+      toggle()?.click();
+    });
+    expect(setSettings).toHaveBeenCalledWith({ enabled: true });
+    expect(toggle()?.checked).toBe(true);
+    expect(offer()?.textContent).toContain(en('onb4.snip.on'));
+    await act(async () => {
+      toggle()?.click();
+    });
+    expect(setSettings).toHaveBeenLastCalledWith({ enabled: false });
+    expect(toggle()?.checked).toBe(false);
+  });
+
+  it('shows the choice already made (setup re-run from Help)', async () => {
+    await mountFinish(true);
+    expect(toggle()?.checked).toBe(true);
+  });
+
+  it('a stale bridge without the snip API leaves the switch off, not broken', async () => {
+    const api = window.api as unknown as Record<string, unknown>;
+    patchFirstRun({ step: 'finish' });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    delete api.snipGetStatus;
+    delete api.onSnipSettingsChanged;
+    await act(async () => {
+      root?.render(<FirstRunSetup onClose={vi.fn()} />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(toggle()?.checked).toBe(false);
+    expect(toggle()?.disabled).toBe(false);
+  });
+});
