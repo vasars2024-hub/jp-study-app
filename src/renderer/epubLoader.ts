@@ -176,7 +176,7 @@ export async function loadEpub(buffer: ArrayBuffer): Promise<LoadedEpub> {
       await collectStyles(doc, absPath);
       const body = doc.body ?? doc.querySelector('body');
       if (body) {
-        sanitize(body);
+        sanitizeChapterBody(body);
         const heading = body.querySelector('h1, h2, h3, h4, h5, h6');
         label = (heading?.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
         // Swap every image reference for a blob URL from the archive.
@@ -380,18 +380,73 @@ function anchorOf(href: string): string {
   return i === -1 ? '' : href.slice(i + 1);
 }
 
-/** Remove scripts, external styles and inline handlers before we inject the HTML. */
-function sanitize(root: Element): void {
-  const kill = root.querySelectorAll('script, link, style, meta, base, title');
-  kill.forEach((el) => el.remove());
-  // Strip on* event handlers and javascript: hrefs.
+/**
+ * Elements a chapter never keeps. The chapter is injected straight into the
+ * app's own DOM, so anything that embeds another browsing context or plugin
+ * (iframe/frame/object/embed/applet/portal), submits or captures input (form
+ * controls), or rewrites attributes after sanitising (SVG `set`/`animate*`) is
+ * dropped with its subtree. CSP is still the outer guard; this is the inner one.
+ */
+const STRIPPED_ELEMENTS = [
+  'script', 'link', 'style', 'meta', 'base', 'title',
+  'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'portal',
+  'form', 'input', 'button', 'select', 'textarea', 'option', 'datalist',
+  'set', 'animate', 'animateMotion', 'animateTransform', 'handler', 'listener',
+].join(', ');
+
+/** Attributes that are never kept on any element. */
+const STRIPPED_ATTRIBUTES = new Set(['srcdoc', 'srcset', 'formaction', 'action', 'ping', 'background', 'poster', 'data', 'codebase', 'manifest']);
+
+/** Attributes whose value is a URL the browser may load or navigate to. */
+function isUrlAttribute(name: string): boolean {
+  return name === 'href' || name === 'src' || name.endsWith(':href');
+}
+
+/**
+ * Whether a URL attribute may stay. Relative paths, in-book fragments, blob:
+ * (our rewritten images), data:image/* and http(s)/mailto links are kept;
+ * javascript:, vbscript:, data:text/html and every other scheme are not.
+ * A protocol-relative `//host` reference is treated as remote http.
+ */
+export function isSafeEpubUrl(value: string): boolean {
+  // Browsers ignore ASCII whitespace and control characters inside a scheme
+  // (java + TAB + script:), so the check has to as well.
+  let v = '';
+  for (const ch of value) if (ch.charCodeAt(0) > 0x20 && ch.charCodeAt(0) !== 0x7f) v += ch.toLowerCase();
+  if (!v) return true;
+  const scheme = /^([a-z][a-z0-9+.-]*):/.exec(v);
+  if (!scheme) return true; // relative path, fragment, or //host
+  switch (scheme[1]) {
+    case 'blob':
+    case 'http':
+    case 'https':
+    case 'mailto':
+      return true;
+    case 'data':
+      return v.startsWith('data:image/');
+    default:
+      return false;
+  }
+}
+
+/**
+ * Remove scripts, embeds, form controls, external styles, inline handlers and
+ * unsafe URLs before we inject the HTML (scorecard: the old block-list left
+ * iframe/object/embed/form and SVG `xlink:href`).
+ */
+export function sanitizeChapterBody(root: Element): void {
+  root.querySelectorAll(STRIPPED_ELEMENTS).forEach((el) => el.remove());
   const all = root.querySelectorAll('*');
   all.forEach((el) => {
     for (const attr of Array.from(el.attributes)) {
       const name = attr.name.toLowerCase();
-      if (name.startsWith('on')) el.removeAttribute(attr.name);
-      if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(attr.value)) {
+      if (name.startsWith('on') || STRIPPED_ATTRIBUTES.has(name)) {
         el.removeAttribute(attr.name);
+        continue;
+      }
+      if (isUrlAttribute(name) && !isSafeEpubUrl(attr.value)) {
+        el.removeAttribute(attr.name);
+        continue;
       }
       // An inline style goes through the same allow-list as the book's
       // stylesheets: it used to be kept verbatim, so `position: fixed` or a

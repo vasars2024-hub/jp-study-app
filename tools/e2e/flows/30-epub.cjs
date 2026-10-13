@@ -89,5 +89,95 @@ module.exports = {
     await ctx.shot('reopened');
     await ev(`__e2e.clickText('button', 'Library')`);
     await poll(ctx, `!document.querySelector('.novel-content')`, 10000);
+
+    // Reopen from the shelf: the book lands where it was left, and still does after
+    // the font size changed between sessions (the position is a character offset,
+    // not a page fraction — novelTextAnchor.ts).
+    const SETTINGS_KEY = 'jp-reader-settings';
+    const visible = `(() => {
+      const sc = document.querySelector('.novel-scroller');
+      if (!sc) return null;
+      const v = sc.getBoundingClientRect();
+      const ids = [...document.querySelectorAll('.novel-content p[id]')]
+        .filter((p) => [...p.getClientRects()].some((r) => r.width > 0 && r.right > v.left + 4 && r.left < v.right - 4))
+        .map((p) => p.id);
+      return { ids, pages: Number(sc.getAttribute('data-paged-pages') || 0), paged: sc.getAttribute('data-paged') === 'true' };
+    })()`;
+    const openFromShelf = async () => {
+      await ev(`__e2e.open('library')`);
+      await poll(ctx, `!!document.querySelector('.card[aria-label=${JSON.stringify(TITLE)}]')`, 15000);
+      await ev(`__e2e.click(document.querySelector('.card[aria-label=${JSON.stringify(TITLE)}]'))`);
+      const ok = await poll(ctx, `!!document.querySelector('.novel-content #q1')`, 20000);
+      await ctx.sleep(1200);
+      return Boolean(ok);
+    };
+    const closeBook = async () => {
+      await ev(`__e2e.clickText('button', 'Library')`);
+      await poll(ctx, `!document.querySelector('.novel-content')`, 10000);
+      await ctx.sleep(400);
+    };
+    const savedFont = await ev(`(() => { try { return JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) || '{}').fontSize ?? null; } catch { return null; } })()`);
+    const savedFlow = await ev(`(() => { try { return JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) || '{}').flow ?? null; } catch { return null; } })()`);
+    try {
+      result.check('the book reopens from the shelf', await openFromShelf());
+      const start = await ev(visible);
+      result.check('the fixture book spans more than one page', Boolean(start && start.paged && start.pages >= 2), start);
+      const flips = Math.max(1, Math.min(2, (start?.pages ?? 2) - 1));
+      for (let i = 0; i < flips; i++) {
+        await ev(`(document.querySelector('[data-paged-control="next"]')?.click(), true)`);
+        await ctx.sleep(300);
+      }
+      // A page turn scrolls smoothly; wait for it to land before reading the page.
+      await poll(ctx, `(() => { const v = ${visible}; return v && v.ids.length && !v.ids.includes('p1') ? true : null; })()`, 8000);
+      const before = await ev(visible);
+      const anchor = before?.ids?.[0] ?? null;
+      result.check('turning pages moves past the first page', Boolean(anchor) && !before.ids.includes('p1'), before);
+      await closeBook();
+
+      result.check('the book reopens again', await openFromShelf());
+      const same = await ev(visible);
+      result.check('reopened at the same place (same font)', Boolean(anchor) && Boolean(same?.ids?.includes(anchor)) && !same.ids.includes('p1'), { anchor, same });
+      await ctx.shot('reopen-same');
+      await closeBook();
+
+      await ev(`(() => { const k = ${JSON.stringify(SETTINGS_KEY)}; let s = {}; try { s = JSON.parse(localStorage.getItem(k) || '{}'); } catch {} s.fontSize = Math.round((s.fontSize || 100) * 1.4); localStorage.setItem(k, JSON.stringify(s)); return s.fontSize; })()`);
+      result.check('the book reopens with a larger font', await openFromShelf());
+      const larger = await ev(visible);
+      result.check('reopened at the same text after a font-size change', Boolean(anchor) && Boolean(larger?.ids?.includes(anchor)), { anchor, larger });
+      await ctx.shot('reopen-larger-font');
+      await closeBook();
+
+      // The same in Scroll flow: scroll part-way, close, change the font, reopen.
+      const setSettings = (patch) => ev(`(() => { const k = ${JSON.stringify(SETTINGS_KEY)}; let s = {}; try { s = JSON.parse(localStorage.getItem(k) || '{}'); } catch {} Object.assign(s, ${JSON.stringify(patch)}); localStorage.setItem(k, JSON.stringify(s)); return true; })()`);
+      await setSettings({ flow: 'scrolled', fontSize: savedFont ?? 100 });
+      result.check('the book opens in Scroll flow', await openFromShelf());
+      const scrolled = await ev(`(() => {
+        const sc = document.querySelector('.novel-scroller');
+        if (!sc || sc.getAttribute('data-paged') === 'true') return null;
+        const max = sc.scrollWidth - sc.clientWidth;
+        if (max < 50) return { max };
+        // vertical-rl: forward is a negative scrollLeft in Chromium.
+        sc.scrollLeft = -Math.round(max * 0.6);
+        sc.dispatchEvent(new Event('scroll'));
+        return { max, at: sc.scrollLeft };
+      })()`);
+      result.check('Scroll flow scrolls part-way through the book', Boolean(scrolled && scrolled.max >= 50), scrolled);
+      await ctx.sleep(1500); // the scroll-end save
+      const storedLoc = () => ev(`window.api.listLibrary().then((l) => (l.find((i) => i.title === ${JSON.stringify(TITLE)})?.progress?.location ?? null))`, { await: true });
+      const scrollAt = `(() => { const sc = document.querySelector('.novel-scroller'); return sc ? { at: Math.round(sc.scrollLeft), max: sc.scrollWidth - sc.clientWidth } : null; })()`;
+      const sBefore = { ...(await ev(visible)), stored: await storedLoc(), scroll: await ev(scrollAt) };
+      const sAnchor = sBefore?.ids?.[0] ?? null;
+      result.check('Scroll flow: past the first paragraphs', Boolean(sAnchor) && !sBefore.ids.includes('p1'), sBefore);
+      await closeBook();
+      await setSettings({ fontSize: Math.round((savedFont ?? 100) * 1.4) });
+      result.check('the book reopens in Scroll flow with a larger font', await openFromShelf());
+      const sAfter = { ...(await ev(visible)), scroll: await ev(scrollAt) };
+      result.check('Scroll flow: reopened at the same text after a font-size change', Boolean(sAnchor) && Boolean(sAfter?.ids?.includes(sAnchor)) && !sAfter.ids.includes('p1'), { sAnchor, sAfter });
+      await ctx.shot('reopen-scrolled-larger-font');
+      await closeBook();
+    } finally {
+      // Leave the reader settings as later flows expect them.
+      await ev(`(() => { const k = ${JSON.stringify(SETTINGS_KEY)}; let s = {}; try { s = JSON.parse(localStorage.getItem(k) || '{}'); } catch {} if (${JSON.stringify(savedFlow)} === null) delete s.flow; else s.flow = ${JSON.stringify(savedFlow)}; if (${JSON.stringify(savedFont)} === null) delete s.fontSize; else s.fontSize = ${JSON.stringify(savedFont)}; localStorage.setItem(k, JSON.stringify(s)); return true; })()`);
+    }
   },
 };

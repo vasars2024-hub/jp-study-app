@@ -65,6 +65,12 @@ function epub(dir) {
 body { font-family: serif; line-height: 1.8; }
 .tcy { text-combine-upright: all; -webkit-text-combine: horizontal; -epub-text-combine: horizontal; }
 rt { font-size: 0.5em; }`;
+  // Enough plain text (no ruby, so the ruby check stays exact) for several
+  // pages, so the epub flow can check that a reopened book lands where it was
+  // left. 24 paragraphs keeps the chapter one reader part (30 elements).
+  const filler = Array.from({ length: 24 }, (_, i) =>
+    `<p id="q${i + 1}">第${i + 1}段落。${'窓の外では春の風が静かに吹いていて、猫はその音を聞きながら長い夢を見ていた。'.repeat(5)}</p>`,
+  ).join('');
   const chapter = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja" lang="ja">
@@ -74,6 +80,7 @@ rt { font-size: 0.5em; }`;
 <p id="p1">春の朝、<ruby>小町<rt>こまち</rt></ruby>という<ruby>猫<rt>ねこ</rt></ruby>は<ruby>窓辺<rt>まどべ</rt></ruby>で<span class="tcy">12</span>時まで眠っていた。</p>
 <p id="p2">目を覚ますと、猫は台所へ行ってパンを食べる。</p>
 <p id="p3">それから<span class="tcy">3</span>匹の雀を眺めて、また静かに目を閉じた。</p>
+${filler}
 </body></html>`;
   const nav = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>

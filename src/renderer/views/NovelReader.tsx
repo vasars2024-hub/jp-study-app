@@ -54,6 +54,15 @@ import { activeReadingSeconds, creditReadingProgress, READING_IDLE_MS } from '..
 import { chapterCharsRemaining, estimateReadingMinutes } from '../../shared/readingTime';
 import { isReaderInteraction } from '../readerActivity';
 import { BOOK_OPEN_AT_EVENT, bookLocation, takeBookOpenAt, type BookPosition } from '../bookRoundTrip';
+import {
+  ANCHOR_SLACK_PX,
+  charFractionAt,
+  distanceOfCharFraction,
+  liveCharDistance,
+  pageOfDistance,
+  readingStartPadPx,
+  type CharDistance,
+} from '../novelTextAnchor';
 import ReaderSpeedReadout from '../components/reading/ReaderSpeedReadout';
 import { readerNotesMarkdown } from '../../shared/readerNotesExport';
 import { scrollIntoViewReliably } from '../utils/reliableScroll';
@@ -419,8 +428,20 @@ export default function NovelReader({ item, onClose }: Props) {
   const stepRef = useRef(0);
   /** Paged mode: where to land (0..1) after the next part/layout pass. */
   const pendingPosRef = useRef<number | null>(null);
-  /** Scroll modes: part + fraction to land on after the next window pass. */
-  const pendingTargetRef = useRef<{ pi: number; lf: number } | null>(null);
+  /**
+   * Scroll modes: part + fraction to land on after the next window pass.
+   * `char` marks a stored (character) fraction rather than a geometric one.
+   */
+  const pendingTargetRef = useRef<{ pi: number; lf: number; char?: boolean } | null>(null);
+  /** Paged mode: a stored character fraction to land on after the next layout pass. */
+  const pendingCharRef = useRef<{ pi: number; frac: number } | null>(null);
+  /**
+   * The last position written: its part, the geometric fraction it was taken
+   * at, and the character fraction stored. While the reader is still there
+   * (`lf` unchanged) a reflow lands on that character instead of the stale
+   * geometric fraction (novelTextAnchor.ts).
+   */
+  const lastSaveRef = useRef<{ pi: number; lf: number; frac: number } | null>(null);
   /** Scroll modes: keep this part visually fixed across a window mutation. */
   const anchorRef = useRef<{ pi: number; old: number } | null>(null);
   /** Cached part geometry so the scroll handler avoids layout reads every frame. */
@@ -791,8 +812,74 @@ export default function NovelReader({ item, onClose }: Props) {
     pendingCharsRef.current += creditReadingProgress(maxGlobalRef, g, totalCharsRef.current, jump);
   }, []);
 
+  // ----- character anchors (novelTextAnchor.ts) -----
+  /** Live character distances over the current layout, or null while unmounted. */
+  const liveDistance = useCallback((): CharDistance | null => {
+    const el = scrollerRef.current;
+    if (!el || !el.isConnected) return null;
+    const L = layoutRef.current;
+    const off = L.axis === 'y' ? el.scrollTop : Math.abs(el.scrollLeft);
+    return liveCharDistance(
+      el,
+      L.vertical ? 'vertical' : L.paged ? 'horizontal-paged' : 'horizontal-scroll',
+      off,
+    );
+  }, []);
+
+  /** The element holding part `pi`'s text: the page itself when paged. */
+  const anchorRoot = useCallback((pi: number): HTMLElement | null => {
+    const content = contentRef.current;
+    if (!content || !content.isConnected) return null;
+    return layoutRef.current.paged
+      ? content
+      : content.querySelector<HTMLElement>(`[data-pi="${pi}"]`);
+  }, []);
+
+  /** Character fraction of the first character at the reading start of the view, or null. */
+  const textFracNow = useCallback((): number | null => {
+    const el = scrollerRef.current;
+    const root = anchorRoot(partRef.current);
+    const distance = liveDistance();
+    if (!el || !root || !distance) return null;
+    const L = layoutRef.current;
+    const start = L.paged
+      ? pageRef.current * stepRef.current
+      : L.axis === 'y'
+        ? el.scrollTop
+        : Math.abs(el.scrollLeft);
+    return charFractionAt(root, distance, start - ANCHOR_SLACK_PX);
+  }, [anchorRoot, liveDistance]);
+
+  /** Scroll-space distance of the character a stored fraction names in part `pi`, or null. */
+  const distanceOfTextFrac = useCallback(
+    (pi: number, frac: number): number | null => {
+      const root = anchorRoot(pi);
+      const distance = liveDistance();
+      return root && distance ? distanceOfCharFraction(root, distance, frac) : null;
+    },
+    [anchorRoot, liveDistance],
+  );
+
+  /** Scroll modes: the offset that puts a character at the reading start, with room for its ruby. */
+  const scrollOffsetForDistance = useCallback((d: number): number => {
+    const el = scrollerRef.current;
+    const content = contentRef.current;
+    if (!el) return 0;
+    const fontPx = content ? parseFloat(getComputedStyle(content).fontSize) : NaN;
+    const max =
+      layoutRef.current.axis === 'y'
+        ? el.scrollHeight - el.clientHeight
+        : el.scrollWidth - el.clientWidth;
+    return Math.min(Math.max(d - readingStartPadPx(fontPx), 0), Math.max(0, max));
+  }, []);
+
   const saveNow = useCallback(
     (g: number, lf: number) => {
+      // The stored fraction is a CHARACTER fraction (novelTextAnchor.ts), so a
+      // font, margin or window change cannot move it. The geometric `lf` is
+      // only the fallback when the page has no measurable text.
+      const stored = Math.min(1, Math.max(0, textFracNow() ?? lf));
+      lastSaveRef.current = { pi: partRef.current, lf, frac: stored };
       // Through the canonical reading model (Phase 5). The projection emits the
       // exact `p:<part>:<frac>` string this reader has always written, so no
       // stored position changes shape; what it adds is a format check on the
@@ -802,12 +889,12 @@ export default function NovelReader({ item, onClose }: Props) {
         item.id,
         progressFromReadingLocator(
           item,
-          { kind: 'part', part: partRef.current, fraction: Math.min(1, Math.max(0, lf)) },
+          { kind: 'part', part: partRef.current, fraction: stored },
           g,
         ),
       );
     },
-    [item],
+    [item, textFracNow],
   );
 
   // ----- offset helpers (abstract over axis + RTL sign) -----
@@ -982,8 +1069,12 @@ export default function NovelReader({ item, onClose }: Props) {
         localFracRef.current = lf;
         partRef.current = pi;
         positionRestoredRef.current = true;
-        pendingPosRef.current = lf; // consumed by paged layout
-        pendingTargetRef.current = { pi, lf }; // consumed by scroll layout
+        // The stored fraction is a character fraction (an old geometric save,
+        // or the legacy mapping above, is close enough to read as one).
+        pendingPosRef.current = lf; // consumed by paged layout (fallback)
+        pendingCharRef.current = { pi, frac: lf }; // consumed by paged layout
+        pendingTargetRef.current = { pi, lf, char: true }; // consumed by scroll layout
+        lastSaveRef.current = null;
         setPart(pi);
         setLoaded(handle);
         setLoading(false);
@@ -1004,6 +1095,14 @@ export default function NovelReader({ item, onClose }: Props) {
       // replace a real `p:<part>:<frac>` with `p:0:0.0000` while `percent`
       // survives (it is seeded from item.progress). See positionRestoredRef.
       if (!positionRestoredRef.current) return;
+      // The page is usually unmounted by now, so the character fraction of the
+      // last save is reused while the reader has not moved since; a live
+      // measurement is tried next, and the geometric fraction is the last resort.
+      const last = lastSaveRef.current;
+      const closeFrac =
+        last && last.pi === partRef.current && last.lf === localFracRef.current
+          ? last.frac
+          : (textFracNow() ?? localFracRef.current);
       window.api.setProgress(
         item.id,
         progressFromReadingLocator(
@@ -1011,7 +1110,7 @@ export default function NovelReader({ item, onClose }: Props) {
           {
             kind: 'part',
             part: partRef.current,
-            fraction: Math.min(1, Math.max(0, localFracRef.current)),
+            fraction: Math.min(1, Math.max(0, closeFrac)),
           },
           curGlobalRef.current,
         ),
@@ -1131,7 +1230,14 @@ export default function NovelReader({ item, onClose }: Props) {
     const last = loaded.chapters.length - 1;
     const cp = Math.min(Math.max(partRef.current, 0), last);
     if (!pendingTargetRef.current) {
-      pendingTargetRef.current = { pi: cp, lf: localFracRef.current };
+      // Land on the character of the last save while the reader is still
+      // there (a restore that was just landed, or a switch from paged), not on
+      // the geometric fraction, which means something else in this layout.
+      const lastSave = lastSaveRef.current;
+      pendingTargetRef.current =
+        lastSave && lastSave.pi === cp && lastSave.lf === localFracRef.current
+          ? { pi: cp, lf: lastSave.frac, char: true }
+          : { pi: cp, lf: localFracRef.current };
     }
     anchorRef.current = null;
     partGeomRef.current = null;
@@ -1191,14 +1297,39 @@ export default function NovelReader({ item, onClose }: Props) {
     el.setAttribute('data-paged-pages', String(pages));
     el.setAttribute('data-paged-step', String(Math.round(step)));
 
+    // A character to land on: the restored position, or — when only the
+    // layout changed (font, margins, window) and the reader has not moved since
+    // the last save — the character that save stored. Either way the page is
+    // the one that now holds that character, not the old page fraction.
+    const pendingChar = pendingCharRef.current;
+    pendingCharRef.current = null;
+    const last = lastSaveRef.current;
+    let charFrac: number | null = null;
+    if (pendingChar && pendingChar.pi === partRef.current) charFrac = pendingChar.frac;
+    else if (
+      pendingPosRef.current === null &&
+      last &&
+      last.pi === partRef.current &&
+      last.lf === localFracRef.current
+    ) {
+      charFrac = last.frac;
+    }
+    const charDist = charFrac === null ? null : distanceOfTextFrac(partRef.current, charFrac);
     const target = pendingPosRef.current ?? localFracRef.current;
     pendingPosRef.current = null;
     const frac = Number.isFinite(target) ? Math.min(1, Math.max(0, target)) : 0;
-    const p = Math.min(pages - 1, Math.max(0, Math.round(frac * (pages - 1))));
+    const p =
+      charDist !== null
+        ? pageOfDistance(charDist, step, pages)
+        : Math.min(pages - 1, Math.max(0, Math.round(frac * (pages - 1))));
     pageRef.current = p;
     setPage(p);
     setOffsetPx(p * step, false);
     localFracRef.current = pages > 1 ? p / (pages - 1) : 0;
+    // Same character, new page fraction: a further reflow keeps the anchor.
+    if (charDist !== null && charFrac !== null) {
+      lastSaveRef.current = { pi: partRef.current, lf: localFracRef.current, frac: charFrac };
+    }
     const g2 = globalFor(partRef.current, localFracRef.current);
     updateGlobal(g2);
     setProgress(g2);
@@ -1228,9 +1359,15 @@ export default function NovelReader({ item, onClose }: Props) {
     const t = pendingTargetRef.current;
     if (t) {
       pendingTargetRef.current = null;
+      // The paged twin of this target is moot once scroll mode has landed it.
+      pendingCharRef.current = null;
       const pe = partEl(t.pi);
       if (pe) {
-        const off = Math.min(Math.max(startOffset(pe) + t.lf * extentOf(pe), 0), axisMax());
+        const charDist = t.char ? distanceOfTextFrac(t.pi, t.lf) : null;
+        const off =
+          charDist !== null
+            ? scrollOffsetForDistance(charDist)
+            : Math.min(Math.max(startOffset(pe) + t.lf * extentOf(pe), 0), axisMax());
         setOffsetPx(off);
         partRef.current = t.pi;
         localFracRef.current = t.lf;
@@ -1251,7 +1388,18 @@ export default function NovelReader({ item, onClose }: Props) {
     const typoKey = `${settings.fontSize}|${settings.lineHeight}|${settings.sideMargin}|${settings.contentWidth}|${settings.fontWeight}`;
     const typoReflow = typoKeyRef.current !== typoKey;
     typoKeyRef.current = typoKey;
-    if (typoReflow) {
+    const lastSave = lastSaveRef.current;
+    const anchorDist =
+      typoReflow &&
+      lastSave &&
+      lastSave.pi === partRef.current &&
+      lastSave.lf === localFracRef.current
+        ? distanceOfTextFrac(lastSave.pi, lastSave.frac)
+        : null;
+    if (anchorDist !== null) {
+      // Land on the character the last save stored, not the stale extent fraction.
+      setOffsetPx(scrollOffsetForDistance(anchorDist));
+    } else if (typoReflow) {
       const pe = partEl(partRef.current);
       if (pe) {
         const off = Math.min(
@@ -1479,6 +1627,11 @@ export default function NovelReader({ item, onClose }: Props) {
       window.clearTimeout(scrollEndTimerRef.current);
       scrollEndTimerRef.current = window.setTimeout(() => {
         scrollingRef.current = false;
+        // Save where the scroll settled: the throttled save above can be up to
+        // a second behind, and a reflow anchors on the last save.
+        if (positionRestoredRef.current && !pendingTargetRef.current) {
+          saveNow(curGlobalRef.current, localFracRef.current);
+        }
         setHlTick((t) => t + 1);
         flushPendingWin();
         measureWin();
@@ -2146,7 +2299,7 @@ export default function NovelReader({ item, onClose }: Props) {
         sentence: sentence || undefined,
         ...(linkViewRef.current
           ? {}
-          : { position: bookLocation(partRef.current, localFracRef.current), percent: curGlobalRef.current }),
+          : { position: bookLocation(partRef.current, textFracNow() ?? localFracRef.current), percent: curGlobalRef.current }),
       });
       setCollectionOpen(true);
     },
@@ -2570,7 +2723,7 @@ export default function NovelReader({ item, onClose }: Props) {
       lookup: current.kind === 'dict',
       ...(linkViewRef.current
         ? {}
-        : { position: bookLocation(partRef.current, localFracRef.current), percent: curGlobalRef.current }),
+        : { position: bookLocation(partRef.current, textFracNow() ?? localFracRef.current), percent: curGlobalRef.current }),
     });
     setCollectionOpen(true);
   }, []);
