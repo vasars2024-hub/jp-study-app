@@ -3,9 +3,25 @@
 // Both read/write the same localStorage cache (lyrics.ts), so whichever one
 // mounts first pays the network lookup and the other gets it for free.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MediaItem } from '../shared/types';
 import { parseSubtitles, type Cue } from './subtitles';
+import {
+  attachLrcWords,
+  lyricCompanions,
+  lyricPositionAt,
+  lyricWordAt,
+  shiftWords,
+  type LyricWord,
+} from '../shared/lrcKaraoke';
+import { shiftCues } from '../shared/subtitleSync';
+import {
+  LYRICS_OFFSET_STEP_MS,
+  loadLyricsOffset,
+  nudgeLyricsOffset,
+  onLyricsOffsetChanged,
+  saveLyricsOffset,
+} from './lyricsOffset';
 import { markWiredDiscovered } from './wiredDiscovery';
 import {
   cachedLyrics,
@@ -24,19 +40,41 @@ import { loadLyricsSettings, onLyricsSettingsChanged } from './lyricsSettings';
  * .lrc the user picked; `sidecar` and `embedded` travel with the audio file itself
  * (see `shared/musicLocalLyrics.ts`).
  */
-export type LyricsSource = 'lrclib' | 'file' | 'sidecar' | 'embedded';
+export type LyricsSource = 'lrclib' | 'file' | 'sidecar' | 'embedded' | 'folder';
 
 export type LyricsState =
   | { kind: 'none' }
   | { kind: 'loading' }
   | { kind: 'missing'; error?: string }
-  | { kind: 'synced'; cues: Cue[]; source?: LyricsSource }
+  | {
+    kind: 'synced';
+    cues: Cue[];
+    /** Enhanced-LRC word times per cue (null where a line has none); absent when no line has any. */
+    words?: Array<LyricWord[] | null>;
+    source?: LyricsSource;
+  }
   | { kind: 'plain'; lines: string[]; source?: LyricsSource };
 
 export interface LiveLyrics {
+  /** The sheet, with this song's timing nudge already applied to every time. */
   lyrics: LyricsState;
-  /** Index of the currently-live cue when lyrics.kind === 'synced', else -1. */
+  /**
+   * The ANCHOR line: the last one that has started (synced only, else -1). It stays
+   * on the line just sung through an instrumental break, so a view scrolled to it
+   * holds still, and Replay / Mine act on what was just heard.
+   */
   activeIndex: number;
+  /** The line being sung right now (`start <= t < end`); -1 in a break. This is the one to light. */
+  sungIndex: number;
+  /** The word being sung in `sungIndex`, when that line has enhanced-LRC word times; else -1. */
+  wordIndex: number;
+  /** Per cue: the index of the line it translates (same time tag), or -1. */
+  companions: number[];
+  /** This song's saved timing nudge in ms (positive: lyrics later). */
+  offsetMs: number;
+  /** Nudge this song's lyrics by `deltaMs` (±100 ms per press), saved per song. */
+  nudgeOffset: (deltaMs: number) => void;
+  resetOffset: () => void;
   /** Force a fresh network lookup, bypassing the cache ("Search again"). */
   reload: () => void;
   /** Adopt lyrics text picked from a local .lrc file. */
@@ -47,7 +85,10 @@ export function toLyricsState(res: { lrc?: string; plain?: string; source?: Lyri
   const source = res.source;
   if (res.lrc) {
     const cues = parseSubtitles(res.lrc);
-    if (cues.length) return { kind: 'synced', cues, source };
+    if (cues.length) {
+      const words = attachLrcWords(cues, res.lrc);
+      return words.some(Boolean) ? { kind: 'synced', cues, words, source } : { kind: 'synced', cues, source };
+    }
   }
   const plain = res.plain ?? res.lrc ?? '';
   // Stray LRC header tags ([ar:…], [ti:…]) are metadata, not lyrics lines.
@@ -73,23 +114,73 @@ export async function readLocalLyrics(id: string): Promise<LyricsState | null> {
   }
 }
 
+/**
+ * In-flight network lookups, one per song and search mode, shared by every
+ * mounted consumer: the Music app, the mini-player and both finding overlays
+ * all run this hook for the same song, and each used to send its own request.
+ */
+const lookups = new Map<string, Promise<LyricsResult | null>>();
+
+/**
+ * Look a song up on the network (or join the lookup already running for it) and
+ * write the outcome to the shared cache. A .lrc the user picked while the lookup
+ * was out wins: the network answer neither overwrites it nor is shown.
+ */
+function lookUpLyrics(item: MediaItem, useAlbumInSearch: boolean, durationSec: number): Promise<LyricsResult | null> {
+  const key = `${item.id}|${useAlbumInSearch ? 'album' : 'plain'}`;
+  const running = lookups.get(key);
+  if (running) return running;
+  const lookup = fetchLyrics(guessSongMeta(item, useAlbumInSearch), durationSec)
+    .then((res) => {
+      const picked = cachedLyrics(item.id);
+      if (picked?.source === 'file') return picked;
+      if (res) {
+        saveLyrics(item.id, res);
+        markWiredDiscovered();
+      } else {
+        markNoLyrics(item.id);
+      }
+      return res;
+    })
+    .finally(() => {
+      lookups.delete(key);
+    });
+  lookups.set(key, lookup);
+  return lookup;
+}
+
+/** Test seam: forget lookups still in flight. */
+export function resetLyricsLookupsForTests(): void {
+  lookups.clear();
+}
+
+const NO_COMPANIONS: number[] = [];
+
 export function useLiveLyrics(current: MediaItem | null, duration: number, time: number): LiveLyrics {
-  const [lyrics, setLyrics] = useState<LyricsState>({ kind: 'none' });
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [sheet, setLyrics] = useState<LyricsState>({ kind: 'none' });
   const [useAlbumInSearch, setUseAlbumInSearch] = useState(() => loadLyricsSettings().useAlbumInSearch);
   const lyricsForRef = useRef<string | null>(null);
+  /**
+   * Bug 22: bumped by every load, every song change and every picked file. A load
+   * re-checks it after each await and drops its answer once it no longer
+   * matches, so skipping during a lookup can never show the previous song's
+   * lyrics (nor a slow lookup overwrite a file the user just picked).
+   */
+  const requestRef = useRef(0);
 
   const albumSettingInit = useRef(false);
   useEffect(() => onLyricsSettingsChanged((s) => setUseAlbumInSearch(s.useAlbumInSearch)), []);
 
   const load = useCallback(async (item: MediaItem, durationSec: number, force: boolean) => {
+    const request = ++requestRef.current;
+    const stale = (): boolean => request !== requestRef.current;
     if (force) clearLyrics(item.id);
     const cached = cachedLyrics(item.id);
     // A .lrc the user picked by hand is their correction and outranks everything.
     // Otherwise lyrics that ship with the file beat a guess from the network.
     if (cached?.source !== 'file') {
       const local = await readLocalLyrics(item.id);
-      if (lyricsForRef.current !== null && lyricsForRef.current !== item.id) return;
+      if (stale()) return;
       if (local) {
         setLyrics(local);
         return;
@@ -106,16 +197,11 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
     }
     setLyrics({ kind: 'loading' });
     try {
-      const res = await fetchLyrics(guessSongMeta(item, useAlbumInSearch), durationSec);
-      if (res) {
-        saveLyrics(item.id, res);
-        markWiredDiscovered();
-        setLyrics(toLyricsState(res));
-      } else {
-        markNoLyrics(item.id);
-        setLyrics({ kind: 'missing' });
-      }
+      const res = await lookUpLyrics(item, useAlbumInSearch, durationSec);
+      if (stale()) return;
+      setLyrics(res ? toLyricsState(res) : { kind: 'missing' });
     } catch (err) {
+      if (stale()) return;
       setLyrics({ kind: 'missing', error: err instanceof Error ? err.message : String(err) });
     }
   }, [useAlbumInSearch]);
@@ -127,34 +213,75 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
       return;
     }
     if (!current || duration <= 0) return;
-    lyricsForRef.current = null;
-    setActiveIndex(-1);
+    // Marked as this song's load, so the effect below does not start a second one.
+    lyricsForRef.current = current.id;
     void load(current, duration, true);
   }, [useAlbumInSearch]);
+
+  // A different song (or none): whatever is loading belongs to the old one.
+  const currentId = current?.id ?? null;
+  useEffect(() => {
+    if (lyricsForRef.current === currentId) return;
+    requestRef.current += 1;
+    lyricsForRef.current = null;
+    // Until the new song's duration is known its lookup cannot start; the old
+    // song's lines must not stay up (and karaoke along) in the meantime.
+    setLyrics(currentId ? { kind: 'loading' } : { kind: 'none' });
+  }, [currentId]);
 
   // Load lyrics when the current song (and its duration) becomes known.
   useEffect(() => {
     if (!current || duration <= 0) return;
     if (lyricsForRef.current === current.id) return;
     lyricsForRef.current = current.id;
-    setActiveIndex(-1);
     void load(current, duration, false);
   }, [current, current?.id, duration, load]);
 
-  // Karaoke: which line is live?
+  // This song's timing nudge, shared live with every other consumer of the hook.
+  const [offset, setOffset] = useState(() => ({ id: currentId, ms: loadLyricsOffset(currentId) }));
+  const offsetMs = offset.id === currentId ? offset.ms : loadLyricsOffset(currentId);
   useEffect(() => {
-    if (lyrics.kind !== 'synced') {
-      setActiveIndex(-1);
-      return;
-    }
-    const cues = lyrics.cues;
-    let idx = -1;
-    for (let i = 0; i < cues.length; i++) {
-      if (cues[i].start <= time) idx = i;
-      else break;
-    }
-    setActiveIndex(idx);
-  }, [time, lyrics]);
+    setOffset({ id: currentId, ms: loadLyricsOffset(currentId) });
+    return onLyricsOffsetChanged((id, ms) => {
+      if (id === currentId) setOffset({ id, ms });
+    });
+  }, [currentId]);
+  const nudgeOffset = useCallback((deltaMs: number) => {
+    if (!currentId || !deltaMs) return;
+    // One press is one step; a caller cannot jump the sheet by seconds at once.
+    nudgeLyricsOffset(currentId, Math.sign(deltaMs) * Math.min(Math.abs(deltaMs), LYRICS_OFFSET_STEP_MS));
+  }, [currentId]);
+  const resetOffset = useCallback(() => {
+    if (currentId) saveLyricsOffset(currentId, 0);
+  }, [currentId]);
+
+  // The nudge moves the sheet itself, so a seek, a loop, a replay and a mined clip
+  // all land on the corrected times, not just the highlight.
+  const lyrics = useMemo<LyricsState>(() => {
+    if (sheet.kind !== 'synced' || !offsetMs) return sheet;
+    const sec = offsetMs / 1000;
+    return {
+      ...sheet,
+      cues: shiftCues(sheet.cues, sec),
+      ...(sheet.words ? { words: shiftWords(sheet.words, sec) } : {}),
+    };
+  }, [sheet, offsetMs]);
+
+  const companions = useMemo(
+    () => (lyrics.kind === 'synced' ? lyricCompanions(lyrics.cues) : NO_COMPANIONS),
+    [lyrics],
+  );
+
+  // Karaoke: a line is lit from its start to its END (a blank stamp, its closing
+  // word time or the next tag), so an instrumental break lights nothing. It used to
+  // be `start <= time` alone, which kept the last sung line lit through every break.
+  // The anchor (the line just finished) is what views scroll to, so they hold still.
+  const position = lyrics.kind === 'synced'
+    ? lyricPositionAt(lyrics.cues, time, companions)
+    : { sung: -1, anchor: -1 };
+  const wordIndex = lyrics.kind === 'synced' && position.sung >= 0
+    ? lyricWordAt(lyrics.words?.[position.sung], time)
+    : -1;
 
   const reload = useCallback(() => {
     if (current) void load(current, duration, true);
@@ -163,6 +290,8 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
   const loadFromFile = useCallback(
     (text: string) => {
       if (!current) return;
+      // The user's pick wins over a lookup still out for this song.
+      requestRef.current += 1;
       const res: LyricsResult = { lrc: text, source: 'file' };
       saveLyrics(current.id, res);
       markWiredDiscovered();
@@ -171,5 +300,16 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
     [current],
   );
 
-  return { lyrics, activeIndex, reload, loadFromFile };
+  return {
+    lyrics,
+    activeIndex: position.anchor,
+    sungIndex: position.sung,
+    wordIndex,
+    companions,
+    offsetMs,
+    nudgeOffset,
+    resetOffset,
+    reload,
+    loadFromFile,
+  };
 }

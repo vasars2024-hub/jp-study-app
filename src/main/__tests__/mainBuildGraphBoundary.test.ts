@@ -159,6 +159,7 @@ describe('main/preload build graph boundary', () => {
     // Named in forge.config.ts's `build` list alongside src/main.ts, and each is bundled
     // with the same alias-less vite.main.config.ts, so each needs the same property.
     const entries = [
+      'src/squirrelEntry.ts',
       'src/main/dictionary/importWorker.ts',
       'src/main/anki/apkgReadWorker.ts',
       'src/main/llamaHostWorker.ts',

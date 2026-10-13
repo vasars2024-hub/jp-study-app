@@ -22,6 +22,11 @@ const LINES = [
   { send: 'ここんんばばんんはは', japanese: 'こんばんは', speaker: '' },
   { send: '｜窓辺《まどべ》に\u200B立つ。', japanese: '窓辺に立つ。', speaker: '' },
   { send: '[SYS]セーブしました', japanese: null },
+  // The game saying the same short line twice is two lines, not an echo.
+  { send: 'はい。', japanese: 'はい。', speaker: '' },
+  { send: 'はい。', japanese: 'はい。', speaker: '' },
+  // A hooker that sends BINARY frames (UTF-8 bytes) is captured too.
+  { send: 'バイナリで届いた行です。', binary: true, japanese: 'バイナリで届いた行です。', speaker: '' },
 ];
 const MINE = '今日は雨ですね。';
 const DECK = `(() => { const d = JSON.parse(localStorage.getItem('jp-flashcard-deck') || '{"cards":[]}'); return d.cards || d; })()`;
@@ -61,8 +66,18 @@ module.exports = {
     const state = await pollAsync(ctx, `window.api.visualNovelCaptureState().then((s) => s && s.websocket === 'connected' ? s : null)`, 10000);
     result.check('"Start capture" connects to the texthooker fixture', connected && Boolean(state), { via: startBtn ? 'button' : 'api', handshakes: hook.handshakes, state });
 
+    // "Test capture" while a real capture runs would replace it; it is off, and main refuses it.
+    const testBtn = await ev(`(() => { const b = document.querySelector('.vn-capture-bar [data-vn-capture-test]'); return b ? { disabled: b.disabled, title: b.title } : null; })()`);
+    const testRefused = await ev(`window.api.visualNovelCaptureStart(${JSON.stringify(entry.id)}, { test: true })`, { await: true });
+    const stillLive = await ev(`window.api.visualNovelCaptureState()`, { await: true });
+    result.check('"Test capture" is disabled with a reason while capturing, and main refuses a test without ending the capture',
+      Boolean(testBtn?.disabled && testBtn.title) && testRefused?.ok === false && testRefused?.errorCode === 'capture-running'
+        && stillLive?.active === true && stillLive?.test === false && stillLive?.websocket === 'connected',
+      { testBtn, testRefused, stillLive: stillLive && { active: stillLive.active, test: stillLive.test, websocket: stillLive.websocket } });
+
     for (const line of LINES) {
-      hook.send(line.send);
+      if (line.binary && typeof hook.sendBinary === 'function') hook.sendBinary(line.send);
+      else hook.send(line.send);
       await ctx.sleep(500);
     }
     const want = LINES.filter((l) => l.japanese).map((l) => l.japanese);
@@ -72,6 +87,8 @@ module.exports = {
     const captures = (db?.captures ?? db?.database?.captures ?? []).filter((c) => c.visualNovelId === entry.id);
     result.check('saved as hooked lines (source "hook"), the speaker parsed off 【小町】', want.every((w) => captures.some((c) => c.japanese === w && c.source === 'hook')) && captures.some((c) => c.speaker === '小町' && c.japanese === LINES[0].japanese), captures.map((c) => ({ japanese: c.japanese, speaker: c.speaker, source: c.source })));
     result.check('a URL from the hook is not captured as a line', !captures.some((c) => /example\.invalid/.test(c.japanese)), captures.length);
+    result.check('a line the game says twice (はい。 / はい。) is kept twice', captures.filter((c) => c.japanese === 'はい。').length === 2, captures.map((c) => c.japanese));
+    result.check('a binary WebSocket frame is captured as a line', captures.some((c) => c.japanese === 'バイナリで届いた行です。'), captures.map((c) => c.japanese));
     result.check('cleanup fixed the hook garbage: repeated characters collapsed, furigana markup and zero-width marks gone',
       captures.some((c) => c.japanese === 'こんばんは') && captures.some((c) => c.japanese === '窓辺に立つ。')
         && !captures.some((c) => /ここんん|《|\u200B/.test(c.japanese)),

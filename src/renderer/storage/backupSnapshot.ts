@@ -143,6 +143,20 @@ async function dumpDatabase(name: string): Promise<SnapshotDatabase | null> {
   }
 }
 
+
+/**
+ * Notes save to IndexedDB on the next tick after each change; land any still
+ * queued so the snapshot holds the last keystroke. A note IndexedDB refused is
+ * in the localStorage journal, which the snapshot carries too.
+ */
+async function landPendingNotes(): Promise<void> {
+  try {
+    const { flushUserNotes } = await import('../userNotesStore');
+    await flushUserNotes();
+  } catch {
+    /* the journal in localStorage is in the snapshot regardless */
+  }
+}
 /** Everything the renderer holds, as JSON-safe data. */
 export async function collectRendererSnapshot(options: { mirrorReading?: boolean } = {}): Promise<RendererSnapshot> {
   // Highlights and bookmarks live per book in localStorage and are mirrored
@@ -159,6 +173,7 @@ export async function collectRendererSnapshot(options: { mirrorReading?: boolean
       /* the localStorage copies are in the snapshot regardless */
     }
   }
+  await landPendingNotes();
   const indexedDb: Record<string, SnapshotDatabase> = {};
   for (const name of await databaseNames()) {
     const dump = await dumpDatabase(name);
@@ -252,6 +267,7 @@ export async function collectRendererSnapshotText(options: { mirrorReading?: boo
       /* the localStorage copies are in the snapshot regardless */
     }
   }
+  await landPendingNotes();
   const pause = makeYielder();
   const databases: string[] = [];
   const dbTexts: string[] = [];

@@ -37,8 +37,7 @@ import {
 } from '../../knownWordsBulk';
 import { levelListWordKeys, loadLevelLists, onLevelListsChanged } from '../../levelLists';
 import { getStudyLang, onStudyLangChanged, studyContentLang } from '../../studyEnvironment';
-import { gradeKeyFor } from '../../studyTokens';
-import { tokenizeSync, tokenizerReady } from '../../tokenizer';
+import { wordKnowledgeKeys } from '../../studyTokens';
 import { MAX_FREQUENCY_BATCH } from '../../../shared/lexiconFrequency';
 import type { StudyLang } from '../../../shared/studyLang';
 import { KNOWLEDGE_LEVEL_KEYS } from '../lexicon/WordKnowledge';
@@ -48,22 +47,17 @@ import './knownWordsManager.css';
 const PAGE = 200;
 
 /**
- * The store key an imported word is filed under — the key the reader looks it up
- * by. Japanese: the dictionary form when kuromoji reads the entry as ONE word
- * (食べた → 食べる); a compound or an unbuilt tokenizer keeps the entry as written.
- * Russian: the graded form or shared stem (`gradeKeyFor`). Chinese: as written.
+ * The store keys an imported word is filed under — the keys the reader looks it
+ * up by, from the one rule every writer uses (`shared/knowledgeKey`): 食べた →
+ * 食べる, 勉強する → 勉強, a noun compound → each part, a set phrase whole;
+ * Chinese by ICU word; Russian by the graded form or shared stem.
  */
-function importKeyFor(word: string, lang: StudyLang): string {
-  if (lang === 'ru') return gradeKeyFor(word, 'ru');
-  if (lang !== 'ja' || !tokenizerReady()) return word;
+function importKeysFor(word: string, lang: StudyLang): string[] {
   try {
-    const tokens = tokenizeSync(word).filter((token) => token.surface.trim());
-    const content = tokens.filter((token) => token.content);
-    if (content.length === 1 && tokens.length <= 2 && content[0].lemma) return content[0].lemma;
+    return wordKnowledgeKeys(word, lang);
   } catch {
-    /* keep the word as written */
+    return [word];
   }
-  return word;
 }
 
 function saveTextFile(fileName: string, text: string, type: string): void {
@@ -194,7 +188,7 @@ export default function KnownWordsManager() {
   };
 
   const runImport = (raw: string): void => {
-    const words = parseKnownWordsImport(raw).map((word) => importKeyFor(word, studyLang));
+    const words = parseKnownWordsImport(raw).flatMap((word) => importKeysFor(word, studyLang));
     if (!words.length) {
       setMessage(t('kw2.import.empty'));
       return;

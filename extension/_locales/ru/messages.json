@@ -605,6 +605,39 @@
   "content_reason_teoku": {
     "message": "заготовка (–ておく)"
   },
+  "content_reason_teAru": {
+    "message": "результат (–てある)"
+  },
+  "content_reason_teMiru": {
+    "message": "попытка (–てみる)"
+  },
+  "content_reason_teKuru": {
+    "message": "движение к говорящему (–てくる)"
+  },
+  "content_reason_teIku": {
+    "message": "движение от говорящего (–ていく)"
+  },
+  "content_reason_conditionalNara": {
+    "message": "условие (–なら)"
+  },
+  "content_reason_tagaru": {
+    "message": "желание третьего лица (–たがる)"
+  },
+  "content_reason_sou": {
+    "message": "видимость (–そう)"
+  },
+  "content_reason_nagara": {
+    "message": "одновременность (–ながら)"
+  },
+  "content_reason_zu": {
+    "message": "отрицание (–ず)"
+  },
+  "content_reason_sa": {
+    "message": "существительное (–さ)"
+  },
+  "content_reason_nasai": {
+    "message": "вежливый приказ (–なさい)"
+  },
   "content_rpNoSentence": {
     "message": "Не удалось найти предложение вокруг этого слова."
   },

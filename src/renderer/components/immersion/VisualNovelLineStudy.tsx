@@ -15,6 +15,7 @@ import {
   type Vn5LineStudyState,
   type Vn5StudyPrefs,
 } from '../../../shared/visualNovelStudy5';
+import { trackForegroundMedia } from '../../foregroundAudio';
 import './vn5.css';
 
 /** Pause between two plays of the same line. */
@@ -45,6 +46,8 @@ async function playLine(line: VisualNovelTextCapture, signal: { cancelled: boole
           audio.onended = () => resolve();
           audio.onerror = () => resolve();
           void audio.play().catch(() => resolve());
+          // snd6: a voiced line is study audio; the Soundscape ducks under it.
+          trackForegroundMedia(audio);
         });
         return;
       }

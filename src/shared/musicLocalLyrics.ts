@@ -15,7 +15,8 @@
  * `main/musicLyricsFile.ts`.
  */
 
-export type LocalLyricsSource = 'sidecar' | 'embedded';
+/** `folder`: a .lrc matched by name or [ti:] tag in a Lyrics folder or the user's lyrics folder. */
+export type LocalLyricsSource = 'sidecar' | 'embedded' | 'folder';
 
 export interface LocalLyrics {
   text: string;
@@ -98,4 +99,101 @@ export function pickLyricsTag(tags: Record<string, string>): string | null {
   if (values.length === 0) return null;
   const synced = values.find((v) => /\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]/.test(v));
   return (synced ?? values[0]).slice(0, LOCAL_LYRICS_MAX_CHARS);
+}
+
+// ----- offline .lrc folder matching ------------------------------------------
+
+/**
+ * A comparable key for a song or .lrc name: NFKC (full-width → half-width), lower
+ * case, without the extension, bracketed tags (`(Official Video)`, `[abc123]`,
+ * `【MV】`), a leading track number (`01 - `, `01. `, `1-03 `) and every space and
+ * punctuation mark. Japanese text survives intact.
+ */
+export function lyricMatchKey(name: string): string {
+  return name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\.(lrc|txt|mp3|m4a|aac|flac|wav|ogg|opus|wma|alac)$/i, '')
+    .replace(/[[(（【〔][^\])）】〕]*[\])）】〕]/g, ' ')
+    .replace(/^\s*(?:\d{1,2}[-.])?\d{1,3}(?:\s*[-._)]\s*|\s+)/, '')
+    .replace(/[\s\p{P}\p{S}]+/gu, '');
+}
+
+/** The `[ti:]` and `[ar:]` tags at the top of an LRC file, when present. */
+export function readLrcHeader(text: string): { title?: string; artist?: string } {
+  const out: { title?: string; artist?: string } = {};
+  const head = text.slice(0, 4096);
+  const ti = /^\s*\[ti:\s*([^\]\n]*?)\s*\]\s*$/im.exec(head);
+  const ar = /^\s*\[ar:\s*([^\]\n]*?)\s*\]\s*$/im.exec(head);
+  if (ti?.[1]) out.title = ti[1];
+  if (ar?.[1]) out.artist = ar[1];
+  return out;
+}
+
+export interface LrcCandidate {
+  /** A path or name the caller can open again; returned as-is on a match. */
+  file: string;
+  /** The file's base name, with or without `.lrc`. */
+  name: string;
+  /** From the file's `[ti:]` / `[ar:]` tags. */
+  title?: string;
+  artist?: string;
+}
+
+export interface LyricSongHint {
+  /** The audio file's name, e.g. `03 - 夜に駆ける.flac`. */
+  fileName: string;
+  title?: string;
+  artist?: string;
+}
+
+/** `Artist - Title` → [`Artist`, `Title`]; a name with no separator is all title. */
+function splitArtistTitle(name: string): { artist: string; title: string } {
+  const base = name.replace(/\.[a-z0-9]{2,4}$/i, '');
+  const parts = base.split(/\s+[-–—]\s+/);
+  if (parts.length >= 2) return { artist: parts[0], title: parts[parts.length - 1] };
+  // `アーティスト「曲名」` — the usual Japanese layout of a release name.
+  const jp = /^(.+?)\s*[「『]([^」』]+)[」』]/.exec(base);
+  if (jp) return { artist: jp[1], title: jp[2] };
+  return { artist: '', title: base };
+}
+
+/**
+ * Which .lrc in a folder belongs to a song, or null. In order:
+ *  1. the same name, compared by `lyricMatchKey` (`01 - Song.flac` ↔ `Song.lrc`);
+ *  2. artist AND title agree (from the names or the `[ti:]`/`[ar:]` tags);
+ *  3. the title alone, but only when exactly one file has it — two songs called
+ *     "Intro" must not share lyrics, so an ambiguous title matches nothing.
+ */
+export function pickLrcCandidate(song: LyricSongHint, candidates: readonly LrcCandidate[]): LrcCandidate | null {
+  if (candidates.length === 0) return null;
+  const nameKey = lyricMatchKey(song.fileName);
+  if (nameKey) {
+    const same = candidates.find((c) => lyricMatchKey(c.name) === nameKey);
+    if (same) return same;
+  }
+  const fromName = splitArtistTitle(song.fileName);
+  const titleKeys = new Set([lyricMatchKey(fromName.title), lyricMatchKey(song.title ?? '')].filter(Boolean));
+  // A tag title like "Artist - Title" (MediaItem.title for such files) contributes its title half too.
+  if (song.title) titleKeys.add(lyricMatchKey(splitArtistTitle(song.title).title));
+  titleKeys.delete('');
+  const artistKeys = new Set([lyricMatchKey(fromName.artist), lyricMatchKey(song.artist ?? '')].filter(Boolean));
+  if (titleKeys.size === 0) return null;
+
+  const described = candidates.map((c) => {
+    const parts = splitArtistTitle(c.name);
+    const titles = new Set([lyricMatchKey(parts.title), lyricMatchKey(c.title ?? '')].filter(Boolean));
+    const artists = new Set([lyricMatchKey(parts.artist), lyricMatchKey(c.artist ?? '')].filter(Boolean));
+    return { c, titles, artists };
+  });
+  const titleHit = (d: (typeof described)[number]) => [...d.titles].some((k) => titleKeys.has(k));
+  const artistHit = (d: (typeof described)[number]) => [...d.artists].some((k) => artistKeys.has(k));
+
+  const both = described.filter((d) => titleHit(d) && artistHit(d));
+  if (both.length >= 1) return both[0].c;
+  const titleOnly = described.filter(titleHit);
+  // A file naming a DIFFERENT artist is someone else's song with the same title.
+  const compatible = titleOnly.filter((d) => d.artists.size === 0 || artistKeys.size === 0);
+  if (compatible.length === 1) return compatible[0].c;
+  return null;
 }

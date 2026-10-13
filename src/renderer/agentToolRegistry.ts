@@ -29,10 +29,13 @@ import {
   deleteEvent,
   detachOccurrence,
   expandOccurrences,
+  daysBetweenKeys,
+  eventSpanDays,
   isCalendarDateKey,
   loadEvents,
   normalizeClockTime,
-  normalizeRecurrenceInterval,
+  normalizeEventFields,
+  nthOfDateKey,
   parseDateKey,
   REMINDER_OFFSETS,
   rescheduleEventPatch,
@@ -145,14 +148,133 @@ function optionalClock(
 }
 
 const AGENT_EVENT_CATEGORIES: readonly EventCategory[] = ['study', 'exam', 'assignment', 'reminder', 'personal'];
-const AGENT_RECURRENCES: readonly RecurrenceFreq[] = ['none', 'daily', 'weekly', 'monthly', 'custom'];
+const AGENT_RECURRENCES: readonly RecurrenceFreq[] = ['none', 'daily', 'weekly', 'monthly', 'yearly', 'custom'];
+/** `custom` counts days; `weekly` / `monthly` / `yearly` count weeks, months or years. */
+const AGENT_CUSTOM_INTERVAL_MAX = 365;
+const AGENT_EVERY_INTERVAL_MAX = 99;
+/** The longest multi-day event the agent may make: a term, not an open-ended block. */
+const AGENT_EVENT_SPAN_MAX_DAYS = 366;
+const WEEKDAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+/** Absent, null and '' all mean "not given", which is what a model sends for an unused field. */
+const notGiven = (value: unknown): boolean => value === undefined || value === null || value === '';
+
+/** A whole number, or a string that is one (`"3"`), else NaN. */
+function wholeNumber(value: unknown): number {
+  const n = typeof value === 'string' && value.trim() ? Number(value) : value;
+  return typeof n === 'number' && Number.isInteger(n) ? n : Number.NaN;
+}
+
+/** One weekday: 0 (Sunday) … 6 (Saturday), or its English name ('tue', 'Tuesday'); -1 otherwise. */
+function weekdayNumber(value: unknown): number {
+  if (typeof value === 'string' && /^[a-z]{3,9}$/i.test(value.trim())) {
+    const name = value.trim().toLowerCase();
+    const index = WEEKDAY_NAMES.indexOf(name.slice(0, 3) as typeof WEEKDAY_NAMES[number]);
+    const full = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return index >= 0 && (name.length === 3 || full[index] === name) ? index : -1;
+  }
+  const n = wholeNumber(value);
+  return n >= 0 && n <= 6 ? n : -1;
+}
+
+/**
+ * The repeat rule an agent asked for, checked against what the Calendar can store: every
+ * repeat the Calendar's own editor offers (yearly, every N weeks/months/years, several
+ * weekdays, the Nth weekday of the month) and nothing it would silently reinterpret. A
+ * present-but-wrong field is an error the model reads, never a rule quietly dropped: the old
+ * `'none'` fallback for an unknown `recurrence` turned "yearly" into a one-off event that the
+ * model then reported as a yearly one.
+ */
+function agentRepeatRule(
+  t: AgentToolRegistryTranslate,
+  arguments_: Readonly<Record<string, unknown>>,
+  date: string,
+): Pick<CalendarEvent, 'recurrence' | 'recurrenceInterval' | 'recurrenceWeekdays' | 'recurrenceNth' | 'recurrenceEndDate'> {
+  const raw = arguments_.recurrence;
+  if (!notGiven(raw) && !AGENT_RECURRENCES.includes(raw as RecurrenceFreq)) {
+    throw new Error(t('planner.agent.error.repeat'));
+  }
+  const recurrence = notGiven(raw) ? 'none' : raw as RecurrenceFreq;
+  const counted = recurrence === 'custom' || recurrence === 'weekly' || recurrence === 'monthly' || recurrence === 'yearly';
+
+  let recurrenceInterval: number | undefined;
+  if (!notGiven(arguments_.recurrenceInterval)) {
+    const every = wholeNumber(arguments_.recurrenceInterval);
+    const max = recurrence === 'custom' ? AGENT_CUSTOM_INTERVAL_MAX : AGENT_EVERY_INTERVAL_MAX;
+    // `1` is harmless on any repeat (it is the default); anything else must mean something.
+    if (!(every >= 1 && every <= max) || (!counted && every !== 1)) {
+      throw new Error(t('planner.agent.error.repeatInterval'));
+    }
+    if (counted) recurrenceInterval = every;
+  } else if (recurrence === 'custom') {
+    recurrenceInterval = 1;
+  }
+
+  let recurrenceWeekdays: number[] | undefined;
+  if (!notGiven(arguments_.recurrenceWeekdays)) {
+    const list = arguments_.recurrenceWeekdays;
+    const days = Array.isArray(list) ? list.map(weekdayNumber) : [];
+    // The first date is the first occurrence, so it must be one of the days. The Calendar
+    // would otherwise add its weekday silently, and the series would gain a day nobody asked for.
+    if (
+      recurrence !== 'weekly' || !days.length || days.length > 7 || days.some((day) => day < 0)
+      || !days.includes(parseDateKey(date).getDay())
+    ) {
+      throw new Error(t('planner.agent.error.repeatWeekdays'));
+    }
+    recurrenceWeekdays = [...new Set(days)].sort((a, b) => a - b);
+  }
+
+  let recurrenceNth: number | undefined;
+  if (!notGiven(arguments_.recurrenceNth)) {
+    const nth = wholeNumber(arguments_.recurrenceNth);
+    const position = nthOfDateKey(date);
+    // The weekday is the date's own, so the date must BE that weekday of its month.
+    const matches = nth === -1 ? position.last : nth >= 1 && nth <= 5 && position.nth === nth;
+    if ((recurrence !== 'monthly' && recurrence !== 'yearly') || !matches) {
+      throw new Error(t('planner.agent.error.repeatNth'));
+    }
+    recurrenceNth = nth;
+  }
+
+  let recurrenceEndDate: string | undefined;
+  if (recurrence !== 'none' && !notGiven(arguments_.recurrenceEndDate)) {
+    if (!isCalendarDateKey(arguments_.recurrenceEndDate) || arguments_.recurrenceEndDate < date) {
+      throw new Error(t('planner.agent.error.repeatEnd'));
+    }
+    recurrenceEndDate = arguments_.recurrenceEndDate;
+  }
+
+  return {
+    recurrence,
+    ...(recurrenceInterval !== undefined ? { recurrenceInterval } : {}),
+    ...(recurrenceWeekdays ? { recurrenceWeekdays } : {}),
+    ...(recurrenceNth !== undefined ? { recurrenceNth } : {}),
+    ...(recurrenceEndDate ? { recurrenceEndDate } : {}),
+  };
+}
+
+/** The last day of a multi-day event, or undefined for one that is over the same day. */
+function agentEndDate(
+  t: AgentToolRegistryTranslate,
+  arguments_: Readonly<Record<string, unknown>>,
+  date: string,
+): string | undefined {
+  const value = arguments_.endDate;
+  if (notGiven(value) || value === date) return undefined;
+  if (!isCalendarDateKey(value) || value < date || daysBetweenKeys(date, value) > AGENT_EVENT_SPAN_MAX_DAYS) {
+    throw new Error(t('planner.agent.error.endDate'));
+  }
+  return value;
+}
 
 /**
  * What an agent asked to put on the calendar, held to the same rules as the Calendar's own
  * form: a real date (`2026-02-31` is refused, not stored), zero-padded times so the agenda
  * sorts, an end that is not before its start, and a repeat that does not end before it
  * begins. A bad argument is an error the model sees, never an event that silently vanishes
- * from every view.
+ * from every view. Stored through `normalizeEventFields`, the shape the Calendar's own editor
+ * and importer write.
  */
 function safeCalendarEntry(
   t: AgentToolRegistryTranslate,
@@ -166,28 +288,22 @@ function safeCalendarEntry(
   const startTime = optionalClock(t, arguments_, 'startTime');
   const endTime = optionalClock(t, arguments_, 'endTime');
   const allDay = arguments_.allDay === true || !startTime;
-  if (!allDay && startTime && endTime && endTime < startTime) {
+  const endDate = agentEndDate(t, arguments_, date);
+  // Over several days the end falls on a later day, so an earlier clock time is fine there.
+  if (!endDate && !allDay && startTime && endTime && endTime < startTime) {
     throw new Error(t('planner.agent.error.endBeforeStart'));
   }
   const category = AGENT_EVENT_CATEGORIES.includes(arguments_.category as EventCategory)
     ? arguments_.category as EventCategory
     : 'study';
-  const recurrence = AGENT_RECURRENCES.includes(arguments_.recurrence as RecurrenceFreq)
-    ? arguments_.recurrence as RecurrenceFreq
-    : 'none';
-  let recurrenceEndDate: string | undefined;
-  if (recurrence !== 'none' && arguments_.recurrenceEndDate !== undefined && arguments_.recurrenceEndDate !== '') {
-    if (!isCalendarDateKey(arguments_.recurrenceEndDate) || arguments_.recurrenceEndDate < date) {
-      throw new Error(t('planner.agent.error.repeatEnd'));
-    }
-    recurrenceEndDate = arguments_.recurrenceEndDate;
-  }
-  return {
+  const repeat = agentRepeatRule(t, arguments_, date);
+  return normalizeEventFields({
     title: textArgument(t, arguments_, 'title'),
     description: typeof arguments_.description === 'string'
       ? arguments_.description.slice(0, 500)
       : undefined,
     date,
+    ...(endDate ? { endDate } : {}),
     startTime: allDay ? undefined : startTime,
     endTime: allDay ? undefined : endTime,
     allDay,
@@ -196,12 +312,8 @@ function safeCalendarEntry(
       : CATEGORY_COLORS[category],
     category,
     reminder: agentReminderOffset(arguments_.reminder, defaultReminder),
-    recurrence,
-    ...(recurrence === 'custom'
-      ? { recurrenceInterval: normalizeRecurrenceInterval(Number(arguments_.recurrenceInterval ?? 1)) }
-      : {}),
-    ...(recurrenceEndDate ? { recurrenceEndDate } : {}),
-  };
+    ...repeat,
+  });
 }
 
 /** The calendar's occurrences in a window (recurring events expanded), for `calendar.list`. */
@@ -227,9 +339,14 @@ function agentCalendarList(
       id: o.id,
       title: o.title,
       date: o.occurrenceDate,
+      ...(o.endDate ? { endDate: shiftDateKey(o.occurrenceDate, eventSpanDays(o)) } : {}),
       ...(o.allDay ? { allDay: true } : { startTime: o.startTime, endTime: o.endTime }),
       category: o.category,
       recurrence: o.recurrence,
+      // The rest of the rule, so the model can describe a series it did not make.
+      ...(o.recurrenceInterval && o.recurrenceInterval > 1 ? { recurrenceInterval: o.recurrenceInterval } : {}),
+      ...(o.recurrenceWeekdays?.length ? { recurrenceWeekdays: o.recurrenceWeekdays } : {}),
+      ...(o.recurrenceNth ? { recurrenceNth: o.recurrenceNth } : {}),
       reminder: o.reminder,
     })),
     // Said, not silently cut: the model must know the list is partial.
@@ -247,6 +364,14 @@ interface CalendarPlacement {
   startTime?: string;
   endTime?: string;
   recurrenceEndDate?: string;
+  /**
+   * A move shifts these too (`rescheduleEventPatch`): a multi-day event keeps its length, "every
+   * Tue and Thu" moved a day is every Wed and Fri, "the 2nd Tuesday" follows the date. An Undo
+   * that put back only the date left the span, the weekdays and the week of the month moved.
+   */
+  endDate?: string;
+  recurrenceWeekdays?: number[];
+  recurrenceNth?: number;
 }
 
 function placementOf(event: CalendarEvent): CalendarPlacement {
@@ -256,6 +381,9 @@ function placementOf(event: CalendarEvent): CalendarPlacement {
     ...(event.startTime ? { startTime: event.startTime } : {}),
     ...(event.endTime ? { endTime: event.endTime } : {}),
     ...(event.recurrenceEndDate ? { recurrenceEndDate: event.recurrenceEndDate } : {}),
+    ...(event.endDate ? { endDate: event.endDate } : {}),
+    ...(event.recurrenceWeekdays?.length ? { recurrenceWeekdays: [...event.recurrenceWeekdays] } : {}),
+    ...(event.recurrenceNth ? { recurrenceNth: event.recurrenceNth } : {}),
   };
 }
 
@@ -266,19 +394,67 @@ function readPlacement(value: unknown): CalendarPlacement | null {
   const clockOrAbsent = (v: unknown) => v === undefined || normalizeClockTime(v) === v;
   if (!clockOrAbsent(raw.startTime) || !clockOrAbsent(raw.endTime)) return null;
   if (raw.recurrenceEndDate !== undefined && !isCalendarDateKey(raw.recurrenceEndDate)) return null;
+  if (raw.endDate !== undefined && !isCalendarDateKey(raw.endDate)) return null;
+  const weekdays = raw.recurrenceWeekdays;
+  if (weekdays !== undefined && !(Array.isArray(weekdays) && weekdays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6))) return null;
+  const nth = raw.recurrenceNth;
+  if (nth !== undefined && !(nth === -1 || (Number.isInteger(nth) && (nth as number) >= 1 && (nth as number) <= 5))) return null;
   return {
     date: raw.date,
     allDay: raw.allDay,
     ...(typeof raw.startTime === 'string' ? { startTime: raw.startTime } : {}),
     ...(typeof raw.endTime === 'string' ? { endTime: raw.endTime } : {}),
     ...(typeof raw.recurrenceEndDate === 'string' ? { recurrenceEndDate: raw.recurrenceEndDate } : {}),
+    ...(typeof raw.endDate === 'string' ? { endDate: raw.endDate } : {}),
+    ...(Array.isArray(weekdays) && weekdays.length ? { recurrenceWeekdays: [...weekdays] as number[] } : {}),
+    ...(typeof nth === 'number' ? { recurrenceNth: nth } : {}),
   };
 }
 
 const samePlacement = (a: CalendarPlacement, b: CalendarPlacement): boolean => (
   a.date === b.date && a.allDay === b.allDay && a.startTime === b.startTime
   && a.endTime === b.endTime && a.recurrenceEndDate === b.recurrenceEndDate
+  && a.endDate === b.endDate && a.recurrenceNth === b.recurrenceNth
+  && (a.recurrenceWeekdays ?? []).join(',') === (b.recurrenceWeekdays ?? []).join(',')
 );
+
+/** The `code` an Undo refusal carries, so the client can say "changed since" rather than "failed". */
+export const AGENT_UNDO_CHANGED_SINCE = 'changed-since';
+
+/** An Undo that would overwrite (or delete) a change made since. Nothing was changed. */
+function changedSince(t: AgentToolRegistryTranslate, key: string): Error {
+  return Object.assign(new Error(t(key)), { code: AGENT_UNDO_CHANGED_SINCE });
+}
+
+/** A stored value with its object keys sorted, so the same event always serializes the same way. */
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(record).sort()
+      .filter((key) => record[key] !== undefined)
+      .map((key) => [key, canonical(record[key])]));
+  }
+  return value;
+}
+
+/**
+ * A short digest of an event exactly as stored: any edit (title, notes, time, reminder,
+ * repeat) changes it. Taken when the Agent creates an event and checked again before an Undo
+ * deletes it, so Undo never deletes an event the user has edited since. A digest and not a
+ * copy: nothing in it can restore, or leak, what the event said (FNV-1a, two seeds).
+ */
+export function agentCalendarEventFingerprint(event: CalendarEvent): string {
+  const text = JSON.stringify(canonical(event));
+  let a = 0x811c9dc5;
+  let b = (0x01000193 ^ text.length) >>> 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193) >>> 0;
+    b = Math.imul(b ^ c, 0x5bd1e995) >>> 0;
+  }
+  return `${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
+}
 
 /**
  * The inverse of a move (Undo), carried in the same gated operation: `undo.restore` puts the
@@ -294,7 +470,7 @@ function agentUndoReschedule(
   const event = loadEvents().find((candidate) => candidate.id === id);
   if (!event) throw new Error(t('planner.agent.error.eventNotFound'));
   const expect = readPlacement(undo.expect);
-  if (!expect || !samePlacement(placementOf(event), expect)) throw new Error(t('planner.agent.error.movedSince'));
+  if (!expect || !samePlacement(placementOf(event), expect)) throw changedSince(t, 'planner.agent.error.movedSince');
   if (undo.kind === 'rejoin') {
     const seriesId = typeof undo.seriesId === 'string' ? undo.seriesId : '';
     const series = loadEvents().find((candidate) => candidate.id === seriesId);
@@ -313,6 +489,10 @@ function agentUndoReschedule(
     startTime: restore.startTime,
     endTime: restore.endTime,
     recurrenceEndDate: restore.recurrenceEndDate,
+    endDate: restore.endDate,
+    // Only on a series that has the field at all: a one-off never gains a repeat rule.
+    ...(event.recurrence === 'weekly' ? { recurrenceWeekdays: restore.recurrenceWeekdays } : {}),
+    ...(event.recurrence === 'monthly' || event.recurrence === 'yearly' ? { recurrenceNth: restore.recurrenceNth } : {}),
   });
   return { id, restored: restore };
 }
@@ -336,7 +516,8 @@ function agentRescheduleEvent(
   const endTime = optionalClock(t, arguments_, 'endTime');
   const nextStart = startTime ?? event.startTime;
   const nextEnd = endTime ?? event.endTime;
-  if (!event.allDay && nextStart && nextEnd && nextEnd < nextStart) {
+  // A multi-day event ends on a later day, where an earlier clock time is fine.
+  if (!event.allDay && !eventSpanDays(event) && nextStart && nextEnd && nextEnd < nextStart) {
     throw new Error(t('planner.agent.error.endBeforeStart'));
   }
   const times: Partial<CalendarEvent> = {
@@ -534,8 +715,14 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
     // false success the model then reported to the user.
     'calendar.delete-event': (arguments_) => {
       const id = textArgument(t, arguments_, 'id');
-      if (!loadEvents().some((event) => event.id === id)) {
+      const event = loadEvents().find((candidate) => candidate.id === id);
+      if (!event) {
         throw new Error(t('planner.agent.error.eventNotFound'));
+      }
+      // Undo of an event the Agent made passes the digest taken when it was made: an event
+      // the user has edited since is theirs now, and is not deleted.
+      if (arguments_.expect !== undefined && arguments_.expect !== agentCalendarEventFingerprint(event)) {
+        throw changedSince(t, 'planner.agent.error.editedSince');
       }
       return { removed: id, events: deleteEvent(id).length };
     },

@@ -59,7 +59,8 @@ describe('day queries', () => {
     // A date query is not a substring search: nothing matches the literal text.
     expect(searchDeckCards(deck, 'added:2026-10-08')).toEqual([]);
     expect(deckCardMatchesDate(card('x'), 'reviewed', '2026-10-01')).toBe(false);
-    expect(endOfLocalDay('2026-10-31')).toBe(new Date(2026, 10, 1).getTime());
+    // A study day ends at the next day's start hour (4 am), across the DST change too.
+    expect(endOfLocalDay('2026-10-31')).toBe(new Date(2026, 10, 1, 4).getTime());
   });
 
   it('studies ahead on scheduled cards only, soonest first, never on new cards', () => {

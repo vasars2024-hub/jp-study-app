@@ -9,7 +9,10 @@
  * Sources:
  *  - named flags set by producers (`setForegroundAudio('tts', true)`);
  *  - media elements handed to `trackForegroundMedia` (a detached `new Audio()`
- *    fires its events on itself only, so it has to be handed over);
+ *    fires its events on itself only, so it has to be handed over), counted
+ *    from the moment `play()` un-pauses them until they pause, end, fail or
+ *    change source, and forgotten after that (a stopped clip used to stay in
+ *    the set for the life of the window);
  *  - every `<video>` in this document, watched with capture-phase listeners
  *    (media events do not bubble, but they do pass the capture phase), counted
  *    only while it is playing and audible;
@@ -21,7 +24,10 @@
  */
 
 const flags = new Set<string>();
-const tracked = new Set<HTMLMediaElement>();
+/** Handed-over elements that are sounding right now; only these are held. */
+const sounding = new Set<HTMLMediaElement>();
+/** Every element ever handed over, so its listeners are attached once. */
+let watched = new WeakSet<HTMLMediaElement>();
 const listeners = new Set<(active: boolean) => void>();
 let remote = false;
 let videoActive = false;
@@ -34,7 +40,7 @@ function audible(el: HTMLMediaElement): boolean {
 }
 
 function recompute(): void {
-  const next = flags.size > 0 || remote || videoActive || [...tracked].some(audible);
+  const next = flags.size > 0 || remote || videoActive || sounding.size > 0;
   if (next === announced) return;
   announced = next;
   for (const listener of [...listeners]) listener(next);
@@ -71,14 +77,14 @@ function watchDocument(): void {
 export function isForegroundAudioActive(): boolean {
   watchDocument();
   scanVideos();
-  return flags.size > 0 || remote || videoActive || [...tracked].some(audible);
+  return flags.size > 0 || remote || videoActive || sounding.size > 0;
 }
 
 /** True while it is audible in THIS window (what a pop-out reports to the main window). */
 export function isLocalForegroundAudioActive(): boolean {
   watchDocument();
   scanVideos();
-  return flags.size > 0 || videoActive || [...tracked].some(audible);
+  return flags.size > 0 || videoActive || sounding.size > 0;
 }
 
 export function onForegroundAudioChanged(cb: (active: boolean) => void): () => void {
@@ -103,17 +109,37 @@ export function setRemoteForegroundAudio(active: boolean): void {
   recompute();
 }
 
-/** Count a detached media element (a card clip) while it plays. */
+/** Every event that can change whether a handed-over element is sounding. */
+const CLIP_EVENTS = [...MEDIA_EVENTS, 'error', 'abort'] as const;
+
+function settle(el: HTMLMediaElement): void {
+  if (audible(el) && !el.error) sounding.add(el);
+  else sounding.delete(el);
+}
+
+function onClipEvent(event: Event): void {
+  settle(event.currentTarget as HTMLMediaElement);
+  recompute();
+}
+
+/**
+ * Count a detached media element (a card clip, a word, the learner's own
+ * recording) while it sounds.
+ *
+ * Call it again right after `play()` or `pause()` on that element: it re-reads
+ * the element at once instead of waiting for the queued `play`/`pause` event, so
+ * the Soundscape ducks the moment a clip starts and lets go the moment it is
+ * stopped. `ended` and `error` are only known from their events.
+ */
 export function trackForegroundMedia(el: HTMLMediaElement): void {
-  if (tracked.has(el)) return;
-  tracked.add(el);
-  const update = (): void => {
-    // A finished clip is forgotten, so the set never grows past what is playing.
-    if (el.ended || el.error) tracked.delete(el);
-    recompute();
-  };
-  for (const type of MEDIA_EVENTS) el.addEventListener(type, update);
-  el.addEventListener('error', update);
+  // A test's stand-in element (no event target) is simply not tracked.
+  if (typeof el?.addEventListener !== 'function') return;
+  if (!watched.has(el)) {
+    watched.add(el);
+    for (const type of CLIP_EVENTS) el.addEventListener(type, onClipEvent);
+  }
+  settle(el);
+  recompute();
 }
 
 /**
@@ -147,7 +173,8 @@ export function noteSpeechStopped(): void {
 /** Test seam: forget everything. */
 export function resetForegroundAudioForTests(): void {
   flags.clear();
-  tracked.clear();
+  sounding.clear();
+  watched = new WeakSet();
   listeners.clear();
   remote = false;
   videoActive = false;

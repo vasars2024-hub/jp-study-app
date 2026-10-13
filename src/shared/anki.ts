@@ -319,6 +319,14 @@ export interface IntervalEntry {
   /** Anki currently has at least one matching card in the suspended queue. */
   suspended?: boolean;
   /**
+   * Set beside `suspended`: true when EVERY card of every matching note is
+   * suspended, false when some card is still in rotation. Only an all-suspended
+   * word is out of rotation for knowledge (`ankiEntryIsOutOfRotation`); one
+   * suspended sibling card or duplicate note is not. Absent on a snapshot
+   * written before this field existed, where `suspended` alone is read as all.
+   */
+  allSuspended?: boolean;
+  /**
    * Epoch ms when a poll last observed this expression's interval change.
    * This is bounded evidence inside the existing snapshot, not a review log.
    */
@@ -400,9 +408,32 @@ export function ankiTagsContainLeech(tags: readonly string[] | null | undefined)
 }
 
 /**
+ * Whether every card behind an entry is suspended. A snapshot written before
+ * `allSuspended` existed only knew "some card is", and is read the old way.
+ */
+export function ankiEntryIsOutOfRotation(entry: Pick<IntervalEntry, 'suspended' | 'allSuspended'>): boolean {
+  return entry.suspended === true && entry.allSuspended !== false;
+}
+
+/**
+ * The suspension flags of one note from how many of its cards there are and
+ * how many are suspended: `suspended` when any is, `allSuspended` saying
+ * whether that is every one of them.
+ */
+export function ankiSuspensionFlags(
+  cardCount: number,
+  suspendedCount: number,
+): Pick<IntervalEntry, 'suspended' | 'allSuspended'> {
+  if (suspendedCount <= 0) return {};
+  return { suspended: true, allSuspended: cardCount > 0 && suspendedCount >= cardCount };
+}
+
+/**
  * Fold another note with the same cleaned expression into the bounded entry.
  * The strongest interval keeps today's knowledge behavior, while current Anki
  * problem-state flags are unioned so a sibling note/card cannot be hidden.
+ * The word is out of rotation only when BOTH sides are (`allSuspended`): a
+ * suspended duplicate note no longer hides a live one.
  */
 export function mergeIntervalEntries(
   previous: IntervalEntry | undefined,
@@ -412,10 +443,11 @@ export function mergeIntervalEntries(
   const strongest = candidate.ivlDays > previous.ivlDays ? candidate : previous;
   const leech = previous.leech === true || candidate.leech === true;
   const suspended = previous.suspended === true || candidate.suspended === true;
+  const allSuspended = ankiEntryIsOutOfRotation(previous) && ankiEntryIsOutOfRotation(candidate);
   return {
     ...strongest,
     ...(leech ? { leech: true } : {}),
-    ...(suspended ? { suspended: true } : {}),
+    ...(suspended ? { suspended: true, allSuspended } : {}),
   };
 }
 
@@ -477,14 +509,17 @@ export function levelForIntervalDays(
 /**
  * Knowledge level an Anki card is evidence for, or 0 when it is evidence of
  * nothing: a card never reviewed (interval 0 — new, or still in its first
- * learning steps) says the word was added, not learned, and a suspended card
- * is out of rotation. Neither may lift a word to Learning or above.
+ * learning steps) says the word was added, not learned, and a word whose EVERY
+ * card is suspended is out of rotation. Neither may lift a word to Learning or
+ * above. One suspended card beside a live one (a suspended reverse card, a
+ * suspended duplicate note) does not take the word out — that used to drop a
+ * live 180-day word to level 0.
  */
 export function ankiEntryKnowledgeLevel(
-  entry: Pick<IntervalEntry, 'ivlDays' | 'suspended'>,
+  entry: Pick<IntervalEntry, 'ivlDays' | 'suspended' | 'allSuspended'>,
   thresholds: { familiar: number; known: number },
 ): 0 | 1 | 2 | 3 {
-  if (entry.suspended === true) return 0;
+  if (ankiEntryIsOutOfRotation(entry)) return 0;
   if (!Number.isFinite(entry.ivlDays) || entry.ivlDays <= 0) return 0;
   return levelForIntervalDays(entry.ivlDays, thresholds);
 }
@@ -492,6 +527,46 @@ export function ankiEntryKnowledgeLevel(
 /** Rollup rule: WkLevel >= 3 -> 'known'; WkLevel 0..2 -> 'new'. */
 export function knownCategoryForLevel(wkLevel: number): KnownCategory {
   return wkLevel >= 3 ? 'known' : 'new';
+}
+
+/**
+ * Fold interval entries into knowledge levels by WORD KEY rather than by
+ * expression: `keysOf` names the knowledge keys an expression speaks for
+ * (勉強 and 勉強する are one word). A key's level comes from the longest
+ * interval among its entries; it is out of rotation only when every entry
+ * behind it is, so a suspended duplicate never hides a live note of the same
+ * word. Keys with no evidence (all unseen, or all suspended) are left out
+ * rather than set to 0: a sync never erases a level the built-in SRS inferred.
+ */
+export function foldIntervalEntriesByKey(
+  entries: readonly IntervalEntry[],
+  keysOf: (expression: string) => readonly string[],
+  thresholds: { familiar: number; known: number },
+): Record<string, 1 | 2 | 3> {
+  const byKey = new Map<string, { ivlDays: number; live: boolean }>();
+  for (const entry of entries) {
+    const live = !ankiEntryIsOutOfRotation(entry);
+    for (const key of keysOf(entry.expression)) {
+      if (!key) continue;
+      const seen = byKey.get(key);
+      // Every interval counts once the word is live, exactly as a suspended
+      // sibling card's interval counts inside one note (`ivlDays` is the max
+      // over all of a note's cards) and a suspended duplicate's inside one
+      // expression (`mergeIntervalEntries`).
+      if (!seen) byKey.set(key, { ivlDays: entry.ivlDays, live });
+      else {
+        seen.ivlDays = Math.max(seen.ivlDays, entry.ivlDays);
+        seen.live = seen.live || live;
+      }
+    }
+  }
+  const out: Record<string, 1 | 2 | 3> = {};
+  for (const [key, { ivlDays, live }] of byKey) {
+    if (!live) continue;
+    const level = ankiEntryKnowledgeLevel({ ivlDays }, thresholds);
+    if (level !== 0) out[key] = level;
+  }
+  return out;
 }
 
 // ----- Jidoujisho-style field templates ------------------------------------

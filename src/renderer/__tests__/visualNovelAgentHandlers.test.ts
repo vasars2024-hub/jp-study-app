@@ -263,6 +263,16 @@ describe('visual-novel.add', () => {
     expect(result.createdId).toBe('vn-3');
     expect(database.entries.map((row) => row.title)).toContain('New Story');
   });
+
+  it('fails with a catalog sentence, never main\'s English error (onb3)', async () => {
+    const api = (window as unknown as { api: Record<string, unknown> }).api;
+    api.visualNovelAdd = async () => ({ ok: false, error: 'This game is already in the library.', errorCode: 'duplicate' });
+    await expect(handlers()['visual-novel.add']?.({ title: 'Dup' })).rejects.toThrow('vnError.duplicate');
+    api.visualNovelAdd = async () => ({ ok: false, error: 'EIO: i/o error, write' });
+    await expect(handlers()['visual-novel.add']?.({ title: 'Broken' })).rejects.toThrow('onb3.vn.agent.addFailed');
+    api.visualNovelUpdateRoutes = async () => ({ ok: false, error: 'The visual novel does not exist.', errorCode: 'not-found' });
+    await expect(handlers()['visual-novel.track-route']?.({ id: 'vn-1', name: 'Yukine' })).rejects.toThrow('vnError.notFound');
+  });
 });
 
 describe('visual-novel.track-route', () => {

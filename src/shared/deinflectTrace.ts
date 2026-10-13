@@ -48,6 +48,17 @@ const STEPS: Readonly<Record<string, DeinflectStepInfo>> = {
   'completion (–てしまう)': { labelKey: 'deinflect.reason.shimau', grammarId: 'n4-te-shimau' },
   'completion (–ちゃう)': { labelKey: 'deinflect.reason.chau', grammarId: 'n4-te-shimau' },
   '–ておく': { labelKey: 'deinflect.reason.teoku', grammarId: 'n4-te-oku' },
+  '–てある': { labelKey: 'deinflect.reason.teAru', grammarId: 'n4-te-aru' },
+  '–てみる': { labelKey: 'deinflect.reason.teMiru', grammarId: 'n4-te-miru' },
+  '–てくる': { labelKey: 'deinflect.reason.teKuru', grammarId: 'n4-te-iku-kuru' },
+  '–ていく': { labelKey: 'deinflect.reason.teIku', grammarId: 'n4-te-iku-kuru' },
+  'conditional (–なら)': { labelKey: 'deinflect.reason.conditionalNara', grammarId: 'n4-nara' },
+  '–たがる': { labelKey: 'deinflect.reason.tagaru', grammarId: 'n4-tagaru' },
+  '–そう': { labelKey: 'deinflect.reason.sou', grammarId: 'n4-sou-appearance' },
+  '–ながら': { labelKey: 'deinflect.reason.nagara', grammarId: 'n5-nagara' },
+  '–ず': { labelKey: 'deinflect.reason.zu', grammarId: 'n3-zu-ni' },
+  'noun (–さ)': { labelKey: 'deinflect.reason.sa', grammarId: null },
+  '–なさい': { labelKey: 'deinflect.reason.nasai', grammarId: 'n4-nasai' },
 };
 
 /** What the trace knows about one reason. Unknown reasons (an importer's own names) keep their text. */

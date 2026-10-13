@@ -10,7 +10,7 @@ export const AI_EAGER_UI_RU: Catalog = {
   'study.command.intent.preview-cards': 'Предпросмотр карточек',
   'study.command.intent.levels': 'Убрать слова уровней {levels}',
   'study.command.intent.minimum': 'Оставить только слова, встречающиеся не менее {count} раз',
-  'study.command.intent.maximum': 'Оставить не более {count} карточек',
+  'study.command.intent.maximum': { one: 'Оставить не более {count} карточки', few: 'Оставить не более {count} карточек', many: 'Оставить не более {count} карточек', other: 'Оставить не более {count} карточек' },
   'study.command.intent.excludeKnown': 'Исключить уже известные слова',
   'study.command.intent.includeKnown': 'Включить уже известные слова',
   'study.command.intent.excludeDuplicates': 'Исключить повторяющиеся слова',

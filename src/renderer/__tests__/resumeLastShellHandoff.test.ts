@@ -44,8 +44,14 @@ function onToast(event: Event): void {
   toasts.push(String((event as CustomEvent).detail?.message ?? ''));
 }
 
-/** Drains the two microtask hops in `resumeLastEpisode` (the IPC, then the `.then`). */
+/**
+ * Drains `resumeLastEpisode`: the IPC, its `.then`, and the on-use import of the
+ * continue-watching store (kept out of Blanc's boot bundle). The import is
+ * awaited here once so the command's own `import()` finds it cached.
+ */
 async function settle(): Promise<void> {
+  await import('../continueWatchingStore');
+  await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 

@@ -940,12 +940,14 @@ export function sxs(key: ScraperTextKey, value: string): string {
  * older stored reports) keeps main's own `message`.
  */
 export function sxQbitMessage(report: CodedMessage): string {
-  return sxCodedMessage('scraperFix.qbit.', report);
+  // The key is spelled as a template here (not a prefix argument) so the
+  // i18n gates can see that every `scraperFix.qbit.<code>` key has this reader.
+  return sxCodedMessage(report.messageCode ? `scraperFix.qbit.${report.messageCode}` : null, report);
 }
 
 /** Same for a Seanime acquisition action result (`scraperFix.acq.<code>`). */
 export function sxAcquisitionMessage(result: CodedMessage): string {
-  return sxCodedMessage('scraperFix.acq.', result);
+  return sxCodedMessage(result.messageCode ? `scraperFix.acq.${result.messageCode}` : null, result);
 }
 
 interface CodedMessage {
@@ -954,10 +956,8 @@ interface CodedMessage {
   messageVars?: Record<string, string | number>;
 }
 
-function sxCodedMessage(prefix: string, report: CodedMessage): string {
-  if (!report.messageCode) return report.message;
-  const key = prefix + report.messageCode;
-  if (SHARED_EN[key] === undefined) return report.message;
+function sxCodedMessage(key: string | null, report: CodedMessage): string {
+  if (!key || SHARED_EN[key] === undefined) return report.message;
   const lang = getUiLang();
   return translate(key, report.messageVars, { lang, catalog: catalogFor(lang), fallback: SHARED_EN });
 }

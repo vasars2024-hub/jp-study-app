@@ -587,6 +587,39 @@
   "content_reason_teoku": {
     "message": "准备（〜ておく）"
   },
+  "content_reason_teAru": {
+    "message": "结果状态（〜てある）"
+  },
+  "content_reason_teMiru": {
+    "message": "尝试（〜てみる）"
+  },
+  "content_reason_teKuru": {
+    "message": "趋向（〜てくる）"
+  },
+  "content_reason_teIku": {
+    "message": "趋向（〜ていく）"
+  },
+  "content_reason_conditionalNara": {
+    "message": "条件（〜なら）"
+  },
+  "content_reason_tagaru": {
+    "message": "第三人称愿望（〜たがる）"
+  },
+  "content_reason_sou": {
+    "message": "样态（〜そう）"
+  },
+  "content_reason_nagara": {
+    "message": "同时（〜ながら）"
+  },
+  "content_reason_zu": {
+    "message": "否定（〜ず）"
+  },
+  "content_reason_sa": {
+    "message": "名词化（〜さ）"
+  },
+  "content_reason_nasai": {
+    "message": "命令（〜なさい）"
+  },
   "content_rpNoSentence": {
     "message": "未检测到这个词所在的句子。"
   },

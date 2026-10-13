@@ -12,6 +12,7 @@ import type {
 } from '../shared/visualNovel';
 import { loadDeck } from './flashcardDeck';
 import { getTokenizer, tokenizeSync } from './tokenizer';
+import { visualNovelErrorKey } from '../shared/visualNovelCapture';
 
 export type VisualNovelAgentTranslate = (key: string, vars?: TVars) => string;
 
@@ -208,7 +209,7 @@ export function createVisualNovelAgentHandlers(t: VisualNovelAgentTranslate): Ag
         ...(optionalText(arguments_, 'language', 20) ? { language: optionalText(arguments_, 'language', 20) } : {}),
       });
       if (!response.ok || !response.database) {
-        throw new Error(response.error ?? t('blanc.agent.error.visualNovelNotFound'));
+        throw new Error(t(visualNovelErrorKey(response, 'onb3.vn.agent.addFailed')));
       }
       const created = response.database.entries.find((entry) => !known.has(entry.id));
       return {
@@ -250,7 +251,7 @@ export function createVisualNovelAgentHandlers(t: VisualNovelAgentTranslate): Ag
 
       const response = await window.api.visualNovelUpdateRoutes(entry.id, routes);
       if (!response.ok || !response.database) {
-        throw new Error(response.error ?? t('blanc.agent.error.visualNovelNotFound'));
+        throw new Error(t(visualNovelErrorKey(response, 'onb3.vn.agent.routesFailed')));
       }
       const saved = response.database.entries.find((candidate) => candidate.id === entry.id);
       return {
@@ -294,7 +295,7 @@ export function createVisualNovelAgentHandlers(t: VisualNovelAgentTranslate): Ag
         source: 'clipboard',
       });
       if (!response.ok || !response.database) {
-        throw new Error(response.error ?? t('blanc.agent.error.clipboardNoJapanese'));
+        throw new Error(t(visualNovelErrorKey(response, 'onb3.vn.agent.captureFailed')));
       }
       const stored = newestCapture(response.database.captures, entry.id);
       return {

@@ -62,8 +62,10 @@ function info(id: string, title: string, priority: number, glossLangs: string[])
   };
 }
 
-function sense(definition: string) {
-  return { partsOfSpeech: ['n'], definitions: [definition], tags: [] };
+// Real JMdict part-of-speech codes: the lookup checks a de-inflected candidate
+// against them (Yomitan's rule), so 食べた only lands on an ichidan 食べる.
+function sense(definition: string, partsOfSpeech: string[] = ['n']) {
+  return { partsOfSpeech, definitions: [definition], tags: [] };
 }
 
 const EN: LegacyDictIndex = {
@@ -71,10 +73,10 @@ const EN: LegacyDictIndex = {
   info: info('fixture-jmdict-en', 'JMdict EN', 0, ['en']),
   terms: {
     猫: [{ word: '猫', reading: 'ねこ', score: 5, senses: [sense('cat')] }],
-    食べる: [{ word: '食べる', reading: 'たべる', score: 5, senses: [sense('to eat')] }],
+    食べる: [{ word: '食べる', reading: 'たべる', score: 5, senses: [sense('to eat', ['v1', 'vt'])] }],
     行く: [
-      { word: '行く', reading: 'いく', score: 9, senses: [sense('to go')] },
-      { word: '行く', reading: 'ゆく', score: 1, senses: [sense('to go (literary)')] },
+      { word: '行く', reading: 'いく', score: 9, senses: [sense('to go', ['v5k-s', 'vi'])] },
+      { word: '行く', reading: 'ゆく', score: 1, senses: [sense('to go (literary)', ['v5k-s', 'vi'])] },
     ],
   },
 };

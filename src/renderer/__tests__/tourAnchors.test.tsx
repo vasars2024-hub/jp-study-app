@@ -133,6 +133,12 @@ beforeAll(async () => {
   localStorage.clear();
   localStorage.setItem(TELEMETRY_CONSENT_KEY, 'no');
 
+  // Settings is a lazy window, and the overlay routes it to a step's page by an
+  // event it repeats only for its anchor wait (ANCHOR_WAIT_MS). On a cold run the
+  // first transform of SettingsApp's module graph here could outlast that window,
+  // the route was lost and the step's anchor never rendered — the flake. Load the
+  // module up front so `lazy()` resolves at once, as the packaged chunk does.
+  await import('../components/settings/SettingsApp');
   const DesktopShell = (await import('../components/DesktopShell')).default as (props: {
     onOpenBook: () => void;
   }) => ReactNode;

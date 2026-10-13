@@ -4,6 +4,7 @@ import { useSettings } from '../SettingsContext';
 import type { IconSizeId, IconTextColorId, SnapGridId, StartColumnsId, TaskbarSizeId } from '../../../desktopPrefs';
 import { useT } from '../../../i18n';
 import { Toggle } from '../../ui';
+import ResetSectionButton from '../ResetSectionButton';
 
 export default function DesktopLayoutPage() {
   const { t } = useT();
@@ -237,10 +238,38 @@ export default function DesktopLayoutPage() {
         <p className="muted os-set-hint">{t('settings.desktop.sessionHint')}</p>
       </SettingsCard>
 
-      <SettingsCard id="desktop-reset" title={t('settings.desktop.reset.title')} description={t('settings.desktop.reset.desc')}>
-        <button type="button" className="btn" onClick={onReset}>
-          {t('settings.desktop.reset.button')}
-        </button>
+      <SettingsCard
+        id="desktop-reset"
+        title={t('settings.desktop.reset.title')}
+        description={t('set8.desktopReset.desc')}
+        highlight={focusSettingId === 'desktop-reset'}
+      >
+        {onReset ? (
+          <ResetSectionButton
+            settingId="desktop-reset"
+            section={t('settings.desktop.reset.title')}
+            label={t('settings.desktop.reset.button')}
+            dialogTitle={t('set8.desktopReset.dialogTitle')}
+            dialogMessage={t('set8.desktopReset.dialogMessage')}
+            onReset={onReset}
+          />
+        ) : (
+          <>
+            {/* The pop-out Settings window: no desktop here to reset (see SettingsWallProps.onReset). */}
+            <button
+              type="button"
+              className="btn"
+              data-reset-section="desktop-reset"
+              disabled
+              aria-describedby="desktop-reset-unavailable"
+            >
+              {t('settings.desktop.reset.button')}
+            </button>
+            <p id="desktop-reset-unavailable" className="muted os-set-hint" data-desktop-reset-unavailable="">
+              {t('set8.desktopReset.popoutHint')}
+            </p>
+          </>
+        )}
       </SettingsCard>
     </>
   );

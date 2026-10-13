@@ -67,7 +67,9 @@ export default function AppSection({
           onWallImage={() => undefined}
           onWallVideo={() => undefined}
           onWallClear={() => undefined}
-          onReset={() => undefined}
+          // No `onReset`: this window has no desktop, and the desktop's reset hands back an
+          // Undo that only the desktop window can run. Desktop layout disables the button
+          // here and says where the reset lives instead of confirming a no-op.
           onOpenVisualizer={() => void window.api.popOut('music')}
           onOpenMusicWidget={() => void window.api.popOut('musicwidget')}
         />

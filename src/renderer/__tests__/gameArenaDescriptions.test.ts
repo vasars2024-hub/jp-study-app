@@ -14,6 +14,11 @@ import { UI_LANGS, type UiLang } from '../../shared/i18n/core';
 import type { StudyLang } from '../../shared/levelScale';
 import { buildGameRound, GAME_DEFINITIONS } from '../games/engine';
 import type { GameId } from '../games/types';
+import { loadGamePack } from '../data/gamePacks/registry';
+
+// The Chinese and Russian packs load on demand (the Arena awaits them); the
+// rounds below are built at collection time, so load them first.
+await Promise.all([loadGamePack('zh'), loadGamePack('ru')]);
 
 const PER_LANGUAGE = new Set<GameId>(['kana-sprint', 'kanji-reading', 'particle-panic', 'counter-quiz']);
 const STUDY: StudyLang[] = ['ja', 'zh', 'ru'];

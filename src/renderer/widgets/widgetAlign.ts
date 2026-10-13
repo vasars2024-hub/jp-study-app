@@ -146,3 +146,24 @@ export function alignResize(
     guides: [...(snappedW ? edgeGuides('x', tx) : []), ...(snappedH ? edgeGuides('y', ty) : [])],
   };
 }
+
+/**
+ * wid7: keep a resize inside the desk. The frame grows from its bottom-right
+ * corner, so its far edges may not pass the desk's right and bottom edges —
+ * dragging the grip past them used to leave the widget's lower half under the
+ * taskbar or off-screen, where its own grip could no longer be reached. The
+ * minimum size still wins over the desk (a widget placed near the edge keeps
+ * its minimum rather than collapsing below it).
+ */
+export function clampResizeToDesk(
+  rect: AlignRect,
+  desk: { width: number; height: number },
+  min: { w: number; h: number },
+): { w: number; h: number } {
+  const maxW = Math.max(min.w, desk.width - rect.x);
+  const maxH = Math.max(min.h, desk.height - rect.y);
+  return {
+    w: Math.min(Math.max(rect.w, min.w), maxW),
+    h: Math.min(Math.max(rect.h, min.h), maxH),
+  };
+}

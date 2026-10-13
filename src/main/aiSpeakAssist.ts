@@ -14,9 +14,10 @@
  * cancellable through `aiStudy:cancel`, then zod for the shape and the feature's
  * own checks for the content.
  *
- * The conversation partner's known-word sample is study data: on the cloud
- * engine it is removed from the request unless the learner allowed study data
- * to leave the device (`agentCloudStudyDataGate.ts`). Audio never reaches main.
+ * The conversation partner's known-word sample and its earlier-session words
+ * are study data: on the cloud engine they are removed from the request unless
+ * the learner allowed study data to leave the device
+ * (`agentCloudStudyDataGate.ts`). Audio never reaches main.
  */
 import { ipcMain } from 'electron';
 import { z } from 'zod';
@@ -180,7 +181,8 @@ export function explainShadowing(input: unknown, deps: AiStudyDeps = {}): Promis
 }
 
 /**
- * The known-word sample stays on the device unless the engine is the offline
+ * The known-word sample and the words recalled from earlier conversations
+ * (both study data) stay on the device unless the engine is the offline
  * model or the learner allowed study data to go to the cloud. Stripped here,
  * before the runner sees the request, so the cache key and the prompt agree on
  * what was sent and the reply says whether a sample went with it.
@@ -189,7 +191,7 @@ export function withholdKnownWordsForCloud(input: unknown, engine: 'cloud' | 'lo
   if (engine === 'local-qwen' || !input || typeof input !== 'object') return input;
   const raw = input as Record<string, unknown>;
   if (cloudMayReceiveStudyData(raw.shareStudyData)) return input;
-  return { ...raw, knownWords: [] };
+  return { ...raw, knownWords: [], recallWords: [] };
 }
 
 export function replyAsConversationPartner(input: unknown, deps: AiStudyDeps = {}): Promise<AiStudyResponse<ConversationReplyResult>> {

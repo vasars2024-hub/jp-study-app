@@ -40,7 +40,6 @@ export type FlashcardTextProvenance =
   | 'book-text';
 
 import {
-  filterLocalReviewsDue,
   isLocalSrsState,
   limitNewCards,
   type LocalSrsAlgorithm,
@@ -58,6 +57,14 @@ import {
   type ScheduleOptions,
 } from '../shared/flashcardScheduling';
 import { loadSchedulingConfig } from './flashcardScheduling';
+import {
+  applyFsrsReplayEntry,
+  planFsrsReplay,
+  type FsrsReplayPlan,
+  type ReplayLogRow,
+} from '../shared/fsrsMemoryReplay';
+import { isQueueDue } from '../shared/reviewSessionQueue';
+import { endOfStudyDayKey, startOfStudyDay, studyDayIndex, studyDayKey } from '../shared/studyDay';
 
 export interface DeckFlashcard {
   id: string;
@@ -205,7 +212,9 @@ import { logBlanc } from './blancConsole';
 import { levelForIntervalDays } from '../shared/anki';
 import { getLevel, isManualLevel, setInferredLevel, type WkLevel } from './knownWords';
 import { getStudyLang } from './studyEnvironment';
+import type { StudyLang } from '../shared/studyLang';
 import { getTokenizer, tokenizeSync, tokenizerReady } from './tokenizer';
+import { wordKnowledgeKey, wordKnowledgeKeys } from './studyTokens';
 import { ankiOwnsScheduling, hasAnkiTwin, withoutAnkiOwned } from './ankiSchedulingOwner';
 import { getActiveProfile } from './profileState';
 import { appendReviewLog, removeReviewLogEntry } from './reviewLog';
@@ -1701,6 +1710,30 @@ export function dueDeckCardNow(id: string, now = Date.now()): boolean {
 export function reviewKnowledgeWord(
   card: Pick<DeckFlashcard, 'word' | 'sentence' | 'studyKind'> & Partial<Pick<DeckFlashcard, 'studyLang'>>,
 ): string | null {
+  const word = reviewKnowledgeSubject(card);
+  if (word === null) return null;
+  return knowledgeLemma(word, getStudyLang());
+}
+
+/**
+ * Every known-word key a review speaks for: one for a word, each part for a
+ * noun compound the reader shows as separate words (携帯電話 → 携帯, 電話), the
+ * whole for a set phrase (気をつける). The rule is `shared/knowledgeKey`, the
+ * one the reader, the Anki sync and the import use. Empty when the card is not
+ * evidence about a word (see `reviewKnowledgeWord`).
+ */
+export function reviewKnowledgeWords(
+  card: Pick<DeckFlashcard, 'word' | 'sentence' | 'studyKind'> & Partial<Pick<DeckFlashcard, 'studyLang'>>,
+): string[] {
+  const word = reviewKnowledgeSubject(card);
+  if (word === null) return [];
+  return knowledgeLemmas(word, getStudyLang());
+}
+
+/** The card's word when the card is evidence about one word, else null. */
+function reviewKnowledgeSubject(
+  card: Pick<DeckFlashcard, 'word' | 'sentence' | 'studyKind'> & Partial<Pick<DeckFlashcard, 'studyLang'>>,
+): string | null {
   if (card.studyKind && card.studyKind !== 'vocabulary') return null;
   // The knowledge store is per study language: a Chinese card reviewed while
   // studying Japanese must not land in the Japanese store (or vice versa).
@@ -1712,28 +1745,32 @@ export function reviewKnowledgeWord(
   // they carried `studyKind: 'grammar'` are still recognised by it.
   if (/[\s。．、，！？!?「」『』()（）〜～~]/.test(word)) return null;
   if (card.sentence && card.sentence.trim() === word && word.length > 6) return null;
-  return cardLang === 'ja' ? knowledgeLemma(word) : word;
+  return word;
 }
 
 /**
- * The lemma the knowledge store keys a Japanese word under, exactly as the
- * reader and the Anki sync do: "食べた" is graded as "食べる", so every
- * inflected form highlights. Only a word that is ONE content token (plus
- * inflection) is reduced — a compound such as 日本語 stays whole rather than
- * collapsing to its first part. Unchanged while the tokenizer is not built.
+ * The key the knowledge store files a word under, exactly as the reader and the
+ * Anki sync do (`shared/knowledgeKey`): "食べた" is graded as "食べる" and
+ * "勉強する" as "勉強", so every form highlights. A word the rule splits into
+ * several keys (a noun compound) is returned whole here — use
+ * `knowledgeLemmas` to write evidence about it. Unchanged spelling (NFKC)
+ * while the tokenizer is not built.
  */
-export function knowledgeLemma(word: string): string {
-  if (!tokenizerReady()) return word;
-  let tokens: ReturnType<typeof tokenizeSync>;
+export function knowledgeLemma(word: string, lang: StudyLang = getStudyLang()): string {
   try {
-    tokens = tokenizeSync(word);
+    return wordKnowledgeKey(word, lang);
   } catch {
     return word;
   }
-  if (!tokens.length || !tokens[0].content) return word;
-  if (tokens.filter((token) => token.content).length !== 1) return word;
-  const lemma = tokens[0].lemma;
-  return lemma && lemma !== '*' ? lemma : word;
+}
+
+/** Every key evidence about `word` is written under (`shared/knowledgeKey`). */
+export function knowledgeLemmas(word: string, lang: StudyLang = getStudyLang()): string[] {
+  try {
+    return wordKnowledgeKeys(word, lang);
+  } catch {
+    return word ? [word] : [];
+  }
 }
 
 /**
@@ -1763,7 +1800,7 @@ export function sentenceKnowledgeTarget(
   if (cardLang !== getStudyLang()) return null;
   // A target word needs a separate sentence; with no sentence the word IS the line.
   if (word && sentence && word !== sentence && word.length <= 16 && !/[\s。．、，！？!?「」『』()（）〜～~]/.test(word)) {
-    return { kind: 'word', word: cardLang === 'ja' ? knowledgeLemma(word) : word };
+    return { kind: 'word', word: knowledgeLemma(word, getStudyLang()) };
   }
   const text = sentence || word;
   // Content-word nudges need the Japanese tokenizer.
@@ -1813,9 +1850,12 @@ function applySentenceKnowledge(
   if (target.kind === 'word') {
     // Only ever raises: a sentence missed may have been missed for another word.
     const level = levelForIntervalDays(intervalDays, getActiveProfile().deckParams.thresholds);
-    if (level <= getLevel(target.word)) return;
-    const prior = setInferredLevel(target.word, level);
-    if (prior !== null) changes.push({ word: target.word, previous: prior });
+    const cardLang = getStudyLang();
+    for (const word of knowledgeLemmas(target.word, cardLang)) {
+      if (level <= getLevel(word)) continue;
+      const prior = setInferredLevel(word, level);
+      if (prior !== null) changes.push({ word, previous: prior });
+    }
     return;
   }
   const nudge = (): void => {
@@ -1842,8 +1882,8 @@ export interface DeckReviewUndo {
   /** The card exactly as it was before the review. */
   previous: DeckFlashcard;
   log: ReviewLogEntry;
-  /** Knowledge level before the review changed it, when it did. */
-  knowledge?: { word: string; previous: WkLevel };
+  /** Knowledge levels before the review changed them (one per key it moved). */
+  knowledge?: Array<{ word: string; previous: WkLevel }>;
   /** Levels a sentence-card review moved (may fill in after the tokenizer loads). */
   sentenceKnowledge?: Array<{ word: string; previous: WkLevel }>;
   /** Set when this review made the card a leech: what the leech action did. */
@@ -1866,9 +1906,8 @@ export const LEECH_TAG = 'leech';
  * when spreading is switched on, once per graded card.
  */
 function dueLoadFor(cards: readonly DeckFlashcard[], now: number): (dayOffset: number) => number {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const from = start.getTime();
+  // Offsets are STUDY days (`studyDay.ts`), the days an FSRS card falls due on.
+  const from = startOfStudyDay(now);
   // Built once per snapshot and day, then carried across each grade
   // (`carryDueLoad`): it was a full deck scan per graded card.
   if (!dueLoadMemo || dueLoadMemo.cards !== cards || dueLoadMemo.from !== from) {
@@ -1883,18 +1922,13 @@ function dueLoadFor(cards: readonly DeckFlashcard[], now: number): (dayOffset: n
   return (dayOffset) => perDay.get(dayOffset) ?? 0;
 }
 
-/** The day (from local midnight `from`) a card adds review load to, or null. */
+/** The study day (from the study day starting at `from`) a card adds review load to, or null. */
 function dueDayOffset(card: DeckFlashcard, from: number): number | null {
   const due = card.srs?.dueAt;
   if (card.suspended || typeof due !== 'number' || !Number.isFinite(due) || due < from) return null;
-  // Local calendar days, not 24-hour blocks: across a DST change a day is 23 or 25 hours,
-  // and dividing elapsed time put a card due just after midnight on the previous day.
-  const a = new Date(from);
-  const b = new Date(due);
-  return Math.round(
-    (Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()))
-      / (24 * 60 * 60 * 1000),
-  );
+  // Study days on the local calendar, not 24-hour blocks: across a DST change a day is
+  // 23 or 25 hours, and dividing elapsed time put a card on the wrong day.
+  return studyDayIndex(due) - studyDayIndex(from);
 }
 
 /**
@@ -2057,16 +2091,18 @@ export function reviewDeckCard(
   // same interval thresholds decide the level, and a level the user set by
   // hand is never overridden (setInferredLevel skips manual entries).
   let knowledge: DeckReviewUndo['knowledge'];
-  const word = reviewKnowledgeWord(next);
-  if (word) {
+  const words = reviewKnowledgeWords(next);
+  if (words.length) {
     const level: WkLevel = rating === 'again'
       ? 1
       : levelForIntervalDays(next.srs?.intervalDays ?? 0, getActiveProfile().deckParams.thresholds);
-    const prior = setInferredLevel(word, level);
-    if (prior !== null) knowledge = { word, previous: prior };
+    for (const word of words) {
+      const prior = setInferredLevel(word, level);
+      if (prior !== null) (knowledge ??= []).push({ word, previous: prior });
+    }
   }
   let sentenceKnowledge: DeckReviewUndo['sentenceKnowledge'];
-  if (!word && (rating === 'good' || rating === 'easy')) {
+  if (!words.length && (rating === 'good' || rating === 'easy')) {
     const target = sentenceKnowledgeTarget(next);
     if (target) {
       sentenceKnowledge = [];
@@ -2129,7 +2165,7 @@ export function undoLastReview(): { undo: DeckReviewUndo; cards: DeckFlashcard[]
     else writeStore(store);
   }
   removeReviewLogEntry(undo.log);
-  if (undo.knowledge) setInferredLevel(undo.knowledge.word, undo.knowledge.previous);
+  for (const change of [...(undo.knowledge ?? [])].reverse()) setInferredLevel(change.word, change.previous);
   // Newest first, so a word moved twice ends at its oldest level.
   for (const change of [...(undo.sentenceKnowledge ?? [])].reverse()) setInferredLevel(change.word, change.previous);
   return { undo, cards: store.cards };
@@ -2143,6 +2179,12 @@ export function resetReviewUndoForTests(): void {
 export interface SchedulingSweepReport {
   /** Cards whose stored schedule actually changed. */
   changed: number;
+  /**
+   * Switching to FSRS: of the changed cards, how many got their memory from
+   * the review log and how many from an SM-2 estimate (`fsrsMemoryReplay.ts`).
+   */
+  memoryFromLog?: number;
+  memoryFromSm2?: number;
   /** Cards with no schedule at all: already new, nothing to convert or forget. */
   unscheduled: number;
   /** Cards the sweep looked at — the folder's size, not the deck's, when scoped. */
@@ -2157,10 +2199,14 @@ export interface SchedulingSweepReport {
  * the algorithm are not rewritten, so running it twice reports zero the second
  * time rather than churning the store.
  */
-export function convertDeckSchedule(algorithm: LocalSrsAlgorithm): SchedulingSweepReport {
+export function convertDeckSchedule(
+  algorithm: LocalSrsAlgorithm,
+  options: { log?: readonly ReplayLogRow[]; now?: number } = {},
+): SchedulingSweepReport {
   const store = readStore();
   let changed = 0;
   let unscheduled = 0;
+  const switched: DeckFlashcard[] = [];
   store.cards = store.cards.map((card): DeckFlashcard => {
     const current = migrateSrsState(card.srs);
     if (!current) {
@@ -2170,11 +2216,77 @@ export function convertDeckSchedule(algorithm: LocalSrsAlgorithm): SchedulingSwe
     const adapted = adaptStateForAlgorithm(current, algorithm);
     if (adapted === card.srs) return card;
     changed += 1;
-    return { ...card, srs: adapted };
+    const next = { ...card, srs: adapted };
+    if (algorithm === 'fsrs' && (current.algorithm ?? 'sm2') !== 'fsrs') switched.push(next);
+    return next;
   });
-  const report = { changed, unscheduled, total: store.cards.length };
+  const report: SchedulingSweepReport = { changed, unscheduled, total: store.cards.length };
+  if (switched.length) {
+    // SM-2 -> FSRS: each card gets the memory its review history implies (or
+    // the SM-2 estimate Anki uses when there is none), never a restart as a
+    // new card. Due dates stay where they are: the queue does not move.
+    const config = loadSchedulingConfig();
+    const plan = planFsrsReplay(switched, options.log ?? [], {
+      weights: config.fsrsWeights,
+      desiredRetention: config.desiredRetention,
+      maximumIntervalDays: config.maximumIntervalDays,
+      dayStartHour: config.dayStartHour,
+    }, options.now ?? Date.now(), false);
+    const byId = new Map(plan.entries.map((entry) => [entry.id, entry]));
+    store.cards = store.cards.map((card) => {
+      const entry = byId.get(card.id);
+      const srs = entry ? applyFsrsReplayEntry(card.srs, entry) : null;
+      return srs ? { ...card, srs } : card;
+    });
+    report.memoryFromLog = plan.fromLog;
+    report.memoryFromSm2 = plan.fromSm2;
+  }
   if (changed > 0) writeStore(store);
   return report;
+}
+
+/**
+ * "Reschedule cards on change", previewed: what rebuilding every scheduled
+ * card's FSRS memory from `log` under the current parameters would do, and
+ * with `rescheduleDue` where their due dates would move. Nothing is written.
+ */
+export function previewFsrsReplay(
+  log: readonly ReplayLogRow[],
+  rescheduleDue: boolean,
+  now = Date.now(),
+): FsrsReplayPlan {
+  const config = loadSchedulingConfig();
+  return planFsrsReplay(loadDeck(), log, {
+    weights: config.fsrsWeights,
+    desiredRetention: config.desiredRetention,
+    maximumIntervalDays: config.maximumIntervalDays,
+    dayStartHour: config.dayStartHour,
+  }, now, rescheduleDue);
+}
+
+/**
+ * Apply a previewed replay. A card reviewed (or reset) since the preview is
+ * skipped rather than overwritten with a stale plan.
+ */
+export function applyFsrsReplay(plan: FsrsReplayPlan): { applied: number; skipped: number } {
+  const store = readStore();
+  const byId = new Map(plan.entries.map((entry) => [entry.id, entry]));
+  let applied = 0;
+  let skipped = 0;
+  store.cards = store.cards.map((card) => {
+    const entry = byId.get(card.id);
+    if (!entry) return card;
+    const srs = applyFsrsReplayEntry(migrateSrsState(card.srs), entry);
+    if (!srs) {
+      skipped += 1;
+      return card;
+    }
+    applied += 1;
+    return { ...card, srs };
+  });
+  // A deck-wide pass, like convert and reset: one whole-store write.
+  if (applied > 0) writeStore(store);
+  return { applied, skipped };
 }
 
 /**
@@ -2443,9 +2555,12 @@ export function dueDeckCards<T extends { srs?: unknown; ankiNoteId?: number; ank
   introducedToday: number = introducedTodayCount(now),
 ): T[] {
   // "Anki owns scheduling": a card with an Anki twin is reviewed there only.
-  // A suspended card (a leech the user chose to park) is due nowhere.
+  // A suspended card (a leech the user chose to park) is due nowhere. A card in
+  // its steps is due within the learn-ahead limit, as Anki counts "Learning".
+  const learnAhead = loadSchedulingConfig().learnAheadMinutes;
   const live = withoutAnkiOwned(cards).filter((card) => !card.suspended);
-  return limitNewCards(filterLocalReviewsDue(live, now), newPerDay, introducedToday);
+  const due = live.filter((card) => !isLocalSrsState(card.srs) || isQueueDue(card.srs, now, learnAhead));
+  return limitNewCards(due, newPerDay, introducedToday);
 }
 
 /** The deck's own review load per coming day, as the Flashcards queue will present it. */
@@ -2493,16 +2608,15 @@ export function deckDueForecast(
 let introducedMemo: { cards: readonly DeckFlashcard[]; from: number; stamps: number[] } | null = null;
 
 /**
- * Cards introduced today across the whole deck — the new-card budget already
+ * Cards introduced this STUDY day across the whole deck (the day starts at the
+ * configured hour, 4 am by default, as in Anki) — the new-card budget already
  * spent. Same answer as `countIntroducedToday(loadDeck(), now)`, but the scan is
  * done once per deck version and day: it was a default parameter, so every due
  * count parsed and scanned the whole deck again.
  */
 export function introducedTodayCount(now = Date.now()): number {
   const cards = loadDeck();
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const from = start.getTime();
+  const from = startOfStudyDay(now);
   if (!introducedMemo || introducedMemo.cards !== cards || introducedMemo.from !== from) {
     const stamps: number[] = [];
     for (const card of cards) {
@@ -2545,6 +2659,7 @@ export function reviewSessionCounts(
     ? Number.POSITIVE_INFINITY
     : Math.max(0, Math.floor(newPerDay) - Math.max(0, introducedTodayCount(now)));
   const ankiOwned = ankiOwnsScheduling();
+  const learnAhead = loadSchedulingConfig().learnAheadMinutes;
   const all = { count: 0, newTaken: 0 };
   const tallies = new Map<string, { count: number; newTaken: number }>();
   for (const card of pool) {
@@ -2564,7 +2679,7 @@ export function reviewSessionCounts(
     }
     if (card.suspended || (ankiOwned && hasAnkiTwin(card))) continue;
     const scheduled = isLocalSrsState(card.srs);
-    if (scheduled && (card.srs as LocalSrsState).dueAt > now) continue;
+    if (scheduled && !isQueueDue(card.srs as LocalSrsState, now, learnAhead)) continue;
     tallyDueCard(all, scheduled, audioOk, budget);
     tallyDueCard(tally, scheduled, audioOk, budget);
   }
@@ -2635,15 +2750,18 @@ export function setDeckCardsSuspended(ids: readonly string[], suspended: boolean
 export const DECK_DATE_QUERY = /^(added|reviewed|due):(\d{4}-\d{2}-\d{2})$/;
 export type DeckDateQueryKind = 'added' | 'reviewed' | 'due';
 
+/** The study day (`studyDay.ts`) a time falls on, as the Calendar and Statistics key it. */
 function localDateKeyOf(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return studyDayKey(ms);
 }
 
-/** The end (exclusive) of a local `YYYY-MM-DD`, in epoch ms. */
+/**
+ * The end (exclusive) of the study day `YYYY-MM-DD`, in epoch ms: the next
+ * day's start hour (4 am by default), so "due:" agrees with the queue, whose
+ * review cards fall due at the start of their study day.
+ */
 export function endOfLocalDay(dateKey: string): number {
-  const [y, m, d] = dateKey.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, (d || 1) + 1).getTime();
+  return endOfStudyDayKey(dateKey);
 }
 
 export function deckCardMatchesDate(

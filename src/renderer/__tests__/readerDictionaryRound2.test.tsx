@@ -18,7 +18,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../components/DictionaryResults', () => ({ default: () => <div className="dict-results-stub" /> }));
-vi.mock('../tokenizer', () => ({ lemmaOf: async (s: string) => s }));
+// The popup grades through `knowledgeTargets`, which reads the tokenizer's state
+// (`tokenizerReady`, `getTokenizer`); only the lemma is faked.
+vi.mock('../tokenizer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../tokenizer')>()),
+  lemmaOf: async (s: string) => s,
+  getTokenizer: () => Promise.reject(new Error('no kuromoji in this test')),
+}));
 vi.mock('../studyEnvironment', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../studyEnvironment')>()),
   getStudyLang: () => 'ja',

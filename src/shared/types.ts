@@ -542,6 +542,27 @@ export interface LibraryItem {
   /** Absolute path the item was imported from; used to de-duplicate auto-imports. */
   sourcePath?: string;
 
+  /**
+   * SHA-256 (hex) of the file the item was imported from — the duplicate check
+   * for the same book under another path or name. Absent on items imported
+   * before it existed; those are hashed lazily from their stored copy.
+   */
+  contentHash?: string;
+
+  /** Authors, " & "-joined (OPF `dc:creator`, or edited). */
+  author?: string;
+  /** Series name (OPF `calibre:series` / `belongs-to-collection`, or edited). */
+  series?: string;
+  /** Position within `series`; may be fractional (1.5). */
+  seriesIndex?: number;
+  /** User tags (OPF `dc:subject`, or edited). */
+  tags?: string[];
+  /**
+   * Set once the user edits the details: re-reading the file's metadata must
+   * never overwrite what they typed.
+   */
+  metaEditedAt?: number;
+
   /** Book only: relative path to the epub inside the item folder. */
   epubFile?: string;
 

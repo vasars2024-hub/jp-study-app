@@ -401,9 +401,12 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
             return;
           }
           // Stable can still ask Squirrel (its feed is a download redirect, not the
-          // rate-limited API); beta cannot know which tag to fetch.
+          // rate-limited API); beta cannot know which tag to fetch. Through
+          // squirrelDownloads(null), so the feed is reset to the stable redirect
+          // first: after an earlier hand-off it still names the staging folder,
+          // which the downloader may already have cleared.
           if (prefs.channel === 'stable') {
-            askSquirrel();
+            squirrelDownloads(null);
             return;
           }
           fail(answer.reason === 'offline' ? 'network: release feed unreachable' : `release feed: ${answer.reason}`);

@@ -577,7 +577,12 @@ export function exportKeymap(now: Date = new Date()): string {
   return JSON.stringify(doc, null, 2);
 }
 
-export type KeymapImportError = 'notJson' | 'notKeymap' | 'rejected';
+/**
+ * `invalidCustom`: a custom shortcut in the file is incomplete or damaged (`detail` is its
+ * name when it has one); `rejected`: it could not be applied and nothing changed. `detail`
+ * is never an English message — the Shortcuts page words every case (kbd7).
+ */
+export type KeymapImportError = 'notJson' | 'notKeymap' | 'invalidCustom' | 'rejected';
 
 /**
  * Import either a keymap document or a bare shortcuts export (the format the
@@ -599,7 +604,14 @@ export function importKeymap(json: string): { ok: true; player: number } | { ok:
     return { ok: false, error: 'notKeymap' };
   }
   const res = importShortcuts(JSON.stringify(shortcuts));
-  if (!res.ok) return { ok: false, error: 'rejected', detail: res.error };
+  if (!res.ok) {
+    if (res.error === 'invalidCustom') {
+      return res.label ? { ok: false, error: 'invalidCustom', detail: res.label } : { ok: false, error: 'invalidCustom' };
+    }
+    if (res.error === 'notShortcuts') return { ok: false, error: 'notKeymap' };
+    if (res.error === 'notJson') return { ok: false, error: 'notJson' };
+    return { ok: false, error: 'rejected' };
+  }
   let player = 0;
   if (isDoc && doc.player && typeof doc.player === 'object') {
     const clean: PlayerOverrides = {};

@@ -13,21 +13,26 @@
  *    AnkiConnect;
  *  - records a history entry, and renders the Snips analysis view (breakdown, cards);
  *  - shows the toast, whose Undo removes exactly those cards and notes;
- *  - never reads the same picture twice.
+ *  - carries the one-time "Snip to cards is on" notice on that first toast (Turn off / Keep);
+ *  - never reads the same picture twice;
+ *  - review mode: with automatic adding off, a second snip adds nothing, a reading corrected
+ *    before adding is what the card gets, and "Add selected" adds exactly the chosen words.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const { ensureDictionaryReady, installHelpers, poll, pollAsync, DECK } = require('./_lib.cjs');
 
 const SNIP_TEXT = '窓辺の猫は静かに眠っていた。';
+/** The review-mode snip: different words, so it is a new picture with new candidates. */
+const REVIEW_TEXT = '図書館で古い地図を見つけた。';
 const TOAST = 'snipToast=1';
 
 /** The snip: one line of Japanese on white, the size of a typical text snip. */
-async function renderSnip(dir) {
+async function renderSnip(dir, text = SNIP_TEXT, name = 'snip-cards') {
   const world = require('../world.cjs');
-  const file = path.join(dir, 'snip-cards.png');
-  const textFile = path.join(dir, 'snip-cards.txt');
-  fs.writeFileSync(textFile, SNIP_TEXT, 'utf8');
+  const file = path.join(dir, `${name}.png`);
+  const textFile = path.join(dir, `${name}.txt`);
+  fs.writeFileSync(textFile, text, 'utf8');
   await world.ffmpeg([
     '-f', 'lavfi', '-i', 'color=c=white:s=1240x200',
     '-frames:v', '1',
@@ -134,8 +139,20 @@ module.exports = {
     }
 
     // --- The toast, and Undo -----------------------------------------------------------------
-    const toast = await poll({ ...ctx, eval: (js) => ctx.eval(js, { window: TOAST }) }, `(() => { const m = document.querySelector('.snip-toast-message'); return m ? { text: m.textContent, undo: Boolean(document.querySelector('.snip-toast-undo')) } : null; })()`, 10000);
-    result.note(toast ? `toast: ${toast.text}` : 'no background toast (the in-app toast was used)');
+    const toast = await poll({ ...ctx, eval: (js) => ctx.eval(js, { window: TOAST }) }, `(() => { const m = document.querySelector('.snip-toast-message'); return m ? { text: m.textContent, undo: Boolean(document.querySelector('.snip-toast-undo')), notice: Boolean(document.querySelector('.snip-toast-notice')), meta: [...document.querySelectorAll('.snip-toast-meta')].map((x) => x.textContent) } : null; })()`, 10000);
+    result.note(toast ? `toast: ${toast.text} | ${(toast.meta || []).join(' | ')}` : 'no background toast (the in-app toast was used)');
+    // Watching and adding are on by default, so the first snip that makes cards says so, once.
+    if (status?.notice === 'pending') {
+      result.check('the first snip that made cards showed the one-time "Snip to cards is on" notice, with the Undo window spelled out',
+        Boolean(toast?.notice) && (toast?.meta || []).some((m) => /Undo stays in Snips/.test(m)), toast);
+      if (toast?.notice) {
+        await ctx.eval(`document.querySelector('.snip-toast-keep').click()`, { window: TOAST });
+        const answered = await pollAsync(ctx, `window.api.snipGetStatus().then((s) => s && s.notice === 'answered' && s.enabled ? s : null)`, 5000, 200);
+        result.check('Keep on answers the notice and leaves Snip to cards on', Boolean(answered), answered);
+      }
+    } else {
+      result.note(`notice already ${status?.notice} in this profile; not asserted`);
+    }
     let undoVia = '';
     if (toast?.undo) {
       try {
@@ -164,6 +181,48 @@ module.exports = {
     await ctx.sleep(2500);
     const historyAfter = (await ev(`window.api.snipHistoryList({})`, { await: true })) ?? [];
     result.check('the same picture put back on the clipboard is not read again', historyAfter.length === historyBefore.length + 1, { before: historyBefore.length, after: historyAfter.length });
+
+    // --- Review mode: nothing is added until the learner chooses ------------------------------
+    await ev(`window.api.snipSetSettings({ autoAdd: false })`, { await: true });
+    let reviewImage = null;
+    try {
+      reviewImage = await renderSnip(ctx.mediaDir, REVIEW_TEXT, 'snip-review');
+    } catch (err) {
+      result.note(`could not render the review snip (${err.message}); review mode not exercised`);
+    }
+    if (reviewImage) {
+      const known = historyAfter.map((e) => e.id);
+      const notesBeforeReview = fake.notes.size;
+      await ctx.e2e('clipboard', { set: { text: 'y' } });
+      await ctx.sleep(800);
+      await ctx.e2e('clipboard', { set: { imagePath: reviewImage } });
+      const pending = await pollAsync(ctx, `window.api.snipHistoryList({}).then((list) => (list || []).find((e) => !${JSON.stringify(known)}.includes(e.id) && e.status !== 'processing') || null)`, 240000, 500);
+      result.note(pending ? `review snip read by ${pending.engine}: ${JSON.stringify(pending.text)} - ${(pending.words || []).map((w) => `${w.surface}:${w.status}`).join(' ')}` : 'review snip not read');
+      const candidates = (pending?.words || []).map((w, i) => ({ w, i })).filter(({ w }) => w.status === 'candidate');
+      result.check('review mode: the snip was read, its new words listed, and nothing added',
+        Boolean(pending) && pending.status === 'done' && pending.review === 'manual' && candidates.length >= 1
+          && pending.cardIds.length === 0 && fake.notes.size === notesBeforeReview,
+        pending ? { status: pending.status, review: pending.review, candidates: candidates.length, cards: pending.cardIds.length } : null);
+      if (pending && candidates.length) {
+        const first = candidates[0];
+        await ev(`window.api.snipAction({ id: ${JSON.stringify(pending.id)}, action: 'editWord', index: ${first.i}, reading: 'てすとよみ' })`, { await: true });
+        const edited = await pollAsync(ctx, `window.api.snipHistoryGet(${JSON.stringify(pending.id)}).then((e) => e && e.words[${first.i}] && e.words[${first.i}].edited ? e.words[${first.i}] : null)`, 20000, 300);
+        result.check('a reading corrected before adding is kept on the word', edited?.reading === 'てすとよみ', edited);
+        await ev(`window.api.snipAction({ id: ${JSON.stringify(pending.id)}, action: 'addWords', indices: [${first.i}] })`, { await: true });
+        const added = await pollAsync(ctx, `window.api.snipHistoryGet(${JSON.stringify(pending.id)}).then((e) => e && e.cardIds.length ? e : null)`, 30000, 300);
+        const card = added ? await ev(`(() => { const ids = ${JSON.stringify(added.cardIds)}; return ${DECK}.filter((c) => ids.includes(c.id)).map((c) => ({ word: c.word, reading: c.reading, folder: c.folder })); })()`) : null;
+        result.check('"Add selected" added exactly the chosen word, with the corrected reading',
+          Boolean(added) && added.cardIds.length === 1 && Array.isArray(card) && card.length === 1 && card[0].reading === 'てすとよみ' && card[0].folder === 'Snips'
+            && added.words.filter((w) => w.status === 'candidate').length === candidates.length - 1,
+          { card, cardIds: added?.cardIds });
+        if (added) {
+          await ev(`window.api.snipAction({ id: ${JSON.stringify(pending.id)}, action: 'undo' })`, { await: true });
+          const undoneReview = await pollAsync(ctx, `window.api.snipHistoryGet(${JSON.stringify(pending.id)}).then((e) => e && e.undone ? e : null)`, 30000, 300);
+          result.check('Undo after review removes that card too', Boolean(undoneReview) && undoneReview.cardIds.length === 0, undoneReview ? { cardIds: undoneReview.cardIds } : null);
+        }
+      }
+    }
+    await ev(`window.api.snipSetSettings({ autoAdd: true })`, { await: true });
 
     // Leave the clipboard without a picture for the flows after this one.
     await ctx.e2e('clipboard', { set: { text: '' } });

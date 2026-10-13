@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
+import { visualNovelErrorKey } from '../../../shared/visualNovelCapture';
 import type {
   VisualNovelDatabase,
   VisualNovelEntry,
@@ -105,7 +106,7 @@ export default function VisualNovelSourcePanel({
     const response = await window.api.visualNovelUpdateMetadata(entry.id, patch);
     setBusy(false);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnSource.msg.applyFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnSource.msg.applyFailed')), true);
       return;
     }
     onApplied(response.database);

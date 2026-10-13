@@ -72,13 +72,18 @@ const INTERACTIVE_SEL =
 const POPUP_SEL = '.dict-popup, .sentence-translate-popup, .translate-popup';
 
 type Popup =
-  | { kind: 'dict'; query: string; x: number; y: number; context?: string }
+  /**
+   * `scan`: look for the longest dictionary word starting at `query` (10ten /
+   * Yomitan). True for a click, which resolved one tokenizer word; false for
+   * text the user selected or pasted, which is exactly what they asked for.
+   */
+  | { kind: 'dict'; query: string; x: number; y: number; context?: string; scan?: boolean }
   | { kind: 'translate'; query: string };
 
-function popupFromHit(hit: WordLookupHit): Popup {
+function popupFromHit(hit: WordLookupHit, scan: boolean): Popup {
   return hit.translate
     ? { kind: 'translate', query: hit.query }
-    : { kind: 'dict', query: hit.query, x: hit.x, y: hit.y, context: hit.context };
+    : { kind: 'dict', query: hit.query, x: hit.x, y: hit.y, context: hit.context, scan };
 }
 
 export default function GlobalDictionaryOverlay() {
@@ -143,6 +148,9 @@ export default function GlobalDictionaryOverlay() {
         close();
         return;
       }
+      // A drag that ended on a selection looks up what was selected, as typed;
+      // read before `lookupWordFromMouseUp`, which clears it on a plain click.
+      const selected = !modifier && !isLookupClick(e) && Boolean(window.getSelection()?.toString().trim());
       const hit = modifier
         ? // The modifier gesture suppressed selection, so go straight to the point.
           lookupWordAtPoint(e.clientX, e.clientY)
@@ -151,7 +159,7 @@ export default function GlobalDictionaryOverlay() {
         if (openRef.current) close();
         return;
       }
-      setPopup(popupFromHit(hit));
+      setPopup(popupFromHit(hit, !selected));
     };
 
     window.addEventListener('mousedown', onDown, true);
@@ -176,7 +184,7 @@ export default function GlobalDictionaryOverlay() {
       setPopup(
         long
           ? { kind: 'translate', query: text.slice(0, 240) }
-          : { kind: 'dict', query: text.slice(0, 40), x: rect.left, y: rect.bottom },
+          : { kind: 'dict', query: text.slice(0, 40), x: rect.left, y: rect.bottom, scan: false },
       );
     });
   }, []);
@@ -193,7 +201,7 @@ export default function GlobalDictionaryOverlay() {
           }
           const x = window.innerWidth / 2 - 170;
           const y = window.innerHeight / 3;
-          setPopup({ kind: 'dict', query: text.slice(0, 40), x, y });
+          setPopup({ kind: 'dict', query: text.slice(0, 40), x, y, scan: false });
         })
         .catch(() => toast('dictionary.clipboardFailed', 'warn'));
     });
@@ -227,7 +235,7 @@ export default function GlobalDictionaryOverlay() {
   // Any view can request a lookup without importing this module.
   useEffect(() => {
     const h = (e: Event) => {
-      const d = (e as CustomEvent<{ query?: string; x?: number; y?: number; context?: string }>).detail;
+      const d = (e as CustomEvent<{ query?: string; x?: number; y?: number; context?: string; scan?: boolean }>).detail;
       const query = d?.query?.trim();
       if (!query) return;
       setPopup({
@@ -236,6 +244,9 @@ export default function GlobalDictionaryOverlay() {
         x: d?.x ?? window.innerWidth / 2 - 170,
         y: d?.y ?? window.innerHeight / 3,
         context: d?.context,
+        // A view that asks for a word by name asked for that word, unless it says
+        // the word came from a click in running text (`scan: true`).
+        scan: d?.scan === true,
       });
     };
     window.addEventListener('dict:lookup', h);
@@ -257,6 +268,7 @@ export default function GlobalDictionaryOverlay() {
         x={popup.x}
         y={popup.y}
         context={popup.context}
+        scan={popup.scan}
         onClose={close}
       />
     </Suspense>

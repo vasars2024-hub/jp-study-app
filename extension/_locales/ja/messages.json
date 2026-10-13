@@ -587,6 +587,39 @@
   "content_reason_teoku": {
     "message": "準備（〜ておく）"
   },
+  "content_reason_teAru": {
+    "message": "結果の状態（〜てある）"
+  },
+  "content_reason_teMiru": {
+    "message": "試み（〜てみる）"
+  },
+  "content_reason_teKuru": {
+    "message": "方向・変化（〜てくる）"
+  },
+  "content_reason_teIku": {
+    "message": "方向・変化（〜ていく）"
+  },
+  "content_reason_conditionalNara": {
+    "message": "条件（〜なら）"
+  },
+  "content_reason_tagaru": {
+    "message": "第三者の希望（〜たがる）"
+  },
+  "content_reason_sou": {
+    "message": "様態（〜そう）"
+  },
+  "content_reason_nagara": {
+    "message": "同時（〜ながら）"
+  },
+  "content_reason_zu": {
+    "message": "否定（〜ず）"
+  },
+  "content_reason_sa": {
+    "message": "名詞化（〜さ）"
+  },
+  "content_reason_nasai": {
+    "message": "命令（〜なさい）"
+  },
   "content_rpNoSentence": {
     "message": "この単語を含む文が見つかりませんでした。"
   },

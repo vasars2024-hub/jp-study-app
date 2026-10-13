@@ -8,6 +8,7 @@ import { AI_AGENT_UI_ZH } from '../aiAgentUi/zh';
 import { AI_IMMERSE_UI_ZH } from '../aiImmerseUi/zh';
 import { AI_TUTOR_UI_ZH } from '../aiTutorUi/zh';
 import { AI_SPEAK_UI_ZH } from '../aiSpeakUi/zh';
+import { AI_SPEAK2_UI_ZH } from '../aiSpeak2Ui/zh';
 
 export const AI_PACK_ZH: Catalog = {
   ...AI_FIX_UI_ZH,
@@ -17,4 +18,5 @@ export const AI_PACK_ZH: Catalog = {
   ...AI_IMMERSE_UI_ZH,
   ...AI_TUTOR_UI_ZH,
   ...AI_SPEAK_UI_ZH,
+  ...AI_SPEAK2_UI_ZH,
 };

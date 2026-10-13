@@ -53,10 +53,6 @@ export const PLANNER_UI_EN: Catalog = {
     one: '{count} event repeats in a way this calendar cannot hold — only its first date is imported',
     other: '{count} events repeat in a way this calendar cannot hold — only their first date is imported',
   },
-  'planner.icsImport.warning.multi-day': {
-    one: '{count} event spans several days — it is imported on its first day',
-    other: '{count} events span several days — each is imported on its first day',
-  },
   'planner.icsImport.warning.timezone-unknown': {
     one: '{count} event names a time zone this computer does not know — its time is read as written',
     other: '{count} events name a time zone this computer does not know — their times are read as written',
@@ -106,4 +102,65 @@ export const PLANNER_UI_EN: Catalog = {
   },
   'agent.plan.undo.button': 'Undo',
   'agent.plan.undo.confirm': 'Undo this step ({operation})? It is checked again first: if what it changed has been changed since, nothing is undone.',
+  // Repeats: yearly, several weekdays, every N weeks/months/years, the Nth weekday, month ends
+  'calendar.modal.repeat.yearly': 'Yearly',
+  'planner.repeat.weekdays': 'Repeat on',
+  'planner.repeat.everyWeeks': 'Every N weeks',
+  'planner.repeat.everyMonths': 'Every N months',
+  'planner.repeat.everyYears': 'Every N years',
+  'planner.repeat.pattern': 'Which day',
+  'planner.repeat.monthDay': 'Day {day} of the month',
+  'planner.repeat.monthDayClamp': 'Day {day} — the last day in shorter months',
+  'planner.repeat.monthDaySkip': 'Day {day} — months without it are skipped (iCalendar’s rule)',
+  'planner.repeat.nthWeekday': 'The {ordinal} {weekday} of the month',
+  'planner.repeat.yearDay': 'Every {date}',
+  'planner.repeat.yearDayClamp': 'Every {date} — February 28 in common years',
+  'planner.repeat.yearDaySkip': 'Every {date} — leap years only (iCalendar’s rule)',
+  'planner.repeat.yearNth': 'The {ordinal} {weekday} of {month}',
+  'planner.repeat.ordinal.1': 'first',
+  'planner.repeat.ordinal.2': 'second',
+  'planner.repeat.ordinal.3': 'third',
+  'planner.repeat.ordinal.4': 'fourth',
+  'planner.repeat.ordinal.5': 'fifth',
+  'planner.repeat.ordinal.last': 'last',
+  // Events over several days
+  'planner.multiDay.endDate': 'Ends on',
+  'planner.multiDay.endBeforeStart': 'The event ends before it starts.',
+  'planner.multiDay.dayOf': 'day {index} of {count}',
+  // An exact reminder kept from an imported file
+  'planner.reminder.custom': 'Custom',
+  'planner.reminder.minutesBefore': { one: '{count} minute before', other: '{count} minutes before' },
+  'planner.reminder.hoursBefore': { one: '{count} hour before', other: '{count} hours before' },
+  'planner.reminder.daysBefore': { one: '{count} day before', other: '{count} days before' },
+  // Snoozing a reminder card
+  'planner.snooze.label': 'Snooze',
+  'planner.snooze.named': 'Snooze “{title}”',
+  'planner.snooze.5m': 'For 5 minutes',
+  'planner.snooze.15m': 'For 15 minutes',
+  'planner.snooze.1h': 'For 1 hour',
+  'planner.snooze.untilStart': 'Until it starts',
+  // .ics import: what the calendar keeps differently, said
+  'planner.icsImport.warning.repeat-zone': {
+    one: '{count} event repeats on days that move in this time zone in a way this calendar cannot repeat — only its first date is imported',
+    other: '{count} events repeat on days that move in this time zone in a way this calendar cannot repeat — only their first date is imported',
+  },
+  'planner.icsImport.warning.timezone-shift': {
+    one: '{count} repeating event comes from another time zone and keeps the local time of its first date — after a daylight-saving change it can be an hour off',
+    other: '{count} repeating events come from another time zone and keep the local time of their first date — after a daylight-saving change they can be an hour off',
+  },
+  'planner.icsImport.warning.month-end-skip': {
+    one: '{count} event repeats on the 29th–31st and skips months without that day, as its calendar meant (events made here use the month’s last day instead)',
+    other: '{count} events repeat on the 29th–31st and skip months without that day, as their calendar meant (events made here use the month’s last day instead)',
+  },
+  // Agent calendar tool: the Calendar's repeat rules, checked (the model reads these too)
+  'planner.agent.error.repeat': "recurrence must be 'none', 'daily', 'weekly', 'monthly', 'yearly' or 'custom'.",
+  'planner.agent.error.repeatInterval': "recurrenceInterval must be a whole number: days between repeats (1–365) for 'custom', or every N weeks, months or years (1–99) for 'weekly', 'monthly' or 'yearly'. 'none' and 'daily' take none.",
+  'planner.agent.error.repeatWeekdays': "recurrenceWeekdays is for a 'weekly' repeat: the weekdays it falls on (0 = Sunday … 6 = Saturday, or names like 'tue'), including the weekday of date.",
+  'planner.agent.error.repeatNth': "recurrenceNth is for a 'monthly' or 'yearly' repeat: 1–5, or -1 for the last, and date must be that weekday of its month (for the 2nd Tuesday, a date that is the 2nd Tuesday).",
+  'planner.agent.error.endDate': 'endDate must be a real date after date, at most a year later.',
+  // Agent: Undo of an event the Agent made, after the user edited it
+  'planner.agent.error.editedSince': 'This event was edited after the Agent made it, so Undo would delete that edit. Nothing was changed.',
+  // Agent: a reply the user stopped part-way
+  'agent.message.status.stopped': 'Stopped',
+  'agent.message.stoppedPartial': 'You stopped this reply. The text above is what had arrived, so it may end mid-sentence.',
 };

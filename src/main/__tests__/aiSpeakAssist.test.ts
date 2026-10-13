@@ -242,3 +242,38 @@ describe('cancel', () => {
     expect((await correctWriting(writeReq, cloudDeps(call))).cached).toBe(false);
   });
 });
+
+describe('round 2: the opening is fresh, earlier-session words are study data, pitch findings reach the prompt', () => {
+  const opening = { ...chatReq, history: [], message: '', correct: false };
+
+  it('an opening asked with `refresh` is a new call, not the cached line (bug 44: Start after Clear)', async () => {
+    const call = vi.fn(async (..._args: unknown[]) => JSON.stringify({ reply: 'いらっしゃいませ。', translation: 'Welcome.', correction: null }));
+    expect((await replyAsConversationPartner(opening, cloudDeps(call))).cached).toBe(false);
+    expect((await replyAsConversationPartner(opening, cloudDeps(call))).cached).toBe(true);
+    expect((await replyAsConversationPartner({ ...opening, refresh: true }, cloudDeps(call))).cached).toBe(false);
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+
+  it('recall words: stripped for the cloud unless sharing is allowed; sent to the offline model', async () => {
+    const call = vi.fn(async (..._args: unknown[]) => chatReply);
+    const req = { ...chatReq, recallWords: ['改札', '乗り換え'] };
+    const withheld = await replyAsConversationPartner(req, cloudDeps(call));
+    expect(String(call.mock.calls[0][2])).not.toContain('改札');
+    expect(withheld.result?.recallSent).toBe(false);
+    const allowed = await replyAsConversationPartner({ ...req, shareStudyData: 'allow' }, cloudDeps(call));
+    expect(String(call.mock.calls[1][2])).toContain('改札, 乗り換え');
+    expect(allowed.result?.recallSent).toBe(true);
+    const runLocal = vi.fn(async (..._args: unknown[]) => chatReply);
+    await replyAsConversationPartner(req, cloudDeps(call, { engine: () => 'local-qwen', localAvailable: () => true, runLocal }));
+    expect(String(runLocal.mock.calls[0][0])).toContain('改札, 乗り換え');
+    expect(withholdKnownWordsForCloud({ recallWords: ['a'], knownWords: ['b'] }, 'cloud')).toMatchObject({ recallWords: [], knownWords: [] });
+  });
+
+  it('the measured pitch accent and pauses are sent as text', async () => {
+    const call = vi.fn(async (..._args: unknown[]) => shadowReply);
+    await explainShadowing({ ...shadowReq, accent: ['箸: 1 → 2'], pauses: ['inside 図書館 0.4s'] }, cloudDeps(call));
+    const prompt = String(call.mock.calls[0][2]);
+    expect(prompt).toContain('箸: 1 → 2');
+    expect(prompt).toContain('inside 図書館 0.4s');
+  });
+});

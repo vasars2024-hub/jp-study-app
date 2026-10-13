@@ -3,7 +3,7 @@
  *
  * Nothing here restates the table. Each assertion re-derives its side from a
  * file the table does not own: the stream vocabulary from
- * `renderer/notebookTimeline.ts`, the enumerator ids from both registries, the
+ * `renderer/notebookActivity.ts`, the enumerator ids from both registries, the
  * section from `AppSection.tsx`'s switch, and every named symbol from the file
  * the row points at.
  *
@@ -57,14 +57,15 @@ function checkRow(row: NotebookStreamAbsorption, sources: Set<string>): string[]
 }
 
 describe('gate 7 — the Notebook streams were absorbed, not dropped', () => {
-  it('covers the stream vocabulary exactly, re-derived from notebookTimeline.ts', () => {
-    const declared = read('src/renderer/notebookTimeline.ts');
+  it('covers the stream vocabulary exactly, re-derived from notebookActivity.ts', () => {
+    // Declared in notebookActivity.ts (the boot half of notebookTimeline.ts, which re-exports it).
+    const declared = read('src/renderer/notebookActivity.ts');
     const union = declared.slice(
       declared.indexOf('export type NotebookStream'),
       declared.indexOf(';', declared.indexOf('export type NotebookStream')),
     );
     const vocabulary = [...union.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]).sort();
-    expect(vocabulary.length).toBe(15);
+    expect(vocabulary.length).toBe(16);
     expect(NOTEBOOK_STREAM_ABSORPTION.map((r) => r.stream).sort()).toEqual(vocabulary);
 
     // The union used to be WIDER than what the Notebook rendered: `media` was

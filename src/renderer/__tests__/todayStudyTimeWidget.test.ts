@@ -15,16 +15,14 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { statsKey } from '../stats';
+import { statsKey, todayDayKey } from '../stats';
 
 const store = new Map<string, string>();
 let host: HTMLDivElement | null = null;
 
+/** The stats store's today: a study day, which is yesterday's date between 00:00 and 04:00. */
 function todayKey(): string {
-  const d = new Date();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
+  return todayDayKey();
 }
 
 function seedToday(entry: { seconds?: number; chars?: number; watchSeconds?: number }): void {

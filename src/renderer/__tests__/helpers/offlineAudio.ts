@@ -67,6 +67,21 @@ export class FParam {
     this.events = this.events.filter((e) => e.t < t);
     return this;
   }
+  /**
+   * The spec's cancel-and-hold: drop what is scheduled from `t` on and stay at
+   * the value the automation had at `t` (mid ramp or mid setTarget).
+   */
+  cancelAndHoldAtTime(t: number): this {
+    const held = this.intrinsic(t, false);
+    this.events = this.events.filter((e) => e.t < t);
+    this.insert({ kind: 'set', t, v: held });
+    return this;
+  }
+
+  /** Test seam: how many automation events are still in the timeline. */
+  scheduledCount(): number {
+    return this.events.length;
+  }
 
   private insert(event: { kind: 'set' | 'linear' | 'exp' | 'target'; t: number; v: number; tc?: number }): void {
     let i = this.events.length;
@@ -78,7 +93,7 @@ export class FParam {
   private baseT = 0;
 
   /** The intrinsic (automation) value at time t. */
-  private intrinsic(t: number): number {
+  private intrinsic(t: number, fold = true): number {
     let value = this.base;
     let lastT = this.baseT;
     // Events before `foldable` are entirely in the past and not a running target.
@@ -88,6 +103,13 @@ export class FParam {
       if (e.kind === 'target') {
         if (e.t > t) break;
         const next = this.events[i + 1];
+        if (next && (next.kind === 'linear' || next.kind === 'exp')) {
+          // Spec: a ramp after a SetTarget replaces it, starting from the
+          // SetTarget's start time and the value just before it. This is what
+          // undid a slider glide issued over a still-running fade-in (bug 23).
+          lastT = e.t;
+          continue;
+        }
         const end = next && next.t <= t ? next.t : t;
         value = e.v + (value - e.v) * Math.exp(-(end - e.t) / Math.max(1e-6, e.tc ?? 0.1));
         lastT = end;
@@ -115,7 +137,7 @@ export class FParam {
     // Fold a settled prefix that ends on a plain value, so long renders stay
     // cheap. A target in the prefix is folded only when an event after it is
     // already past — then its contribution is fixed.
-    if (foldable > 0) {
+    if (fold && foldable > 0) {
       const last = this.events[foldable - 1];
       this.base = last.v;
       this.baseT = last.t;

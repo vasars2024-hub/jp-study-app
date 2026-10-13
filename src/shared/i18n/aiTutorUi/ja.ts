@@ -128,10 +128,7 @@ export const AI_TUTOR_UI_JA: Catalog = {
   'aiTutor.event.repeat.none': '1回のみ',
   'aiTutor.event.repeat.daily': '毎日',
   'aiTutor.event.repeat.weekly': '毎週 {days}',
-  'aiTutor.event.perWeekday': '曜日ごとに1件、計 {count} 件の毎週の予定を作成します。',
   'aiTutor.event.apply': 'この内容を使う',
-  'aiTutor.event.alsoCreates': '作成すると、{dates} から始まる同じ毎週の予定も追加されます。',
-  'aiTutor.event.dropExtra': 'これだけにする',
 
   // ---- 初回設定 ----
   'aiTutor.onboarding.label': 'AI（任意）',

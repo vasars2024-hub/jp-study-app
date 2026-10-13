@@ -518,6 +518,38 @@ const api = {
   clearWatchFolder: (): Promise<null> => ipcRenderer.invoke('config:clearWatchFolder'),
   syncLibrary: (): Promise<LibraryItem[]> => ipcRenderer.invoke('library:sync'),
 
+  // Library management: import job, trash, details, missing files
+  importBooksFolder: (): Promise<{ started: boolean; found: number; canceled?: boolean }> =>
+    ipcRenderer.invoke('library:importBooksFolder'),
+  libraryImportStatus: (): Promise<import('./shared/libraryManage').LibraryImportStatus> =>
+    ipcRenderer.invoke('library:importStatus'),
+  libraryImportCancel: (jobId?: string): Promise<boolean> => ipcRenderer.invoke('library:importCancel', jobId),
+  libraryImportResume: (): Promise<{ started: boolean; remaining: number }> =>
+    ipcRenderer.invoke('library:importResume'),
+  libraryImportDiscard: (): Promise<boolean> => ipcRenderer.invoke('library:importDiscard'),
+  onLibraryImportProgress: (
+    cb: (progress: import('./shared/libraryManage').LibraryImportProgress) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, progress: import('./shared/libraryManage').LibraryImportProgress): void =>
+      cb(progress);
+    ipcRenderer.on('library:importProgress', handler);
+    return () => ipcRenderer.removeListener('library:importProgress', handler);
+  },
+  restoreLibraryItem: (id: string): Promise<import('./shared/libraryManage').LibraryRestoreResult> =>
+    ipcRenderer.invoke('library:restore', id),
+  listLibraryTrash: (): Promise<import('./shared/libraryManage').LibraryTrashSummary[]> =>
+    ipcRenderer.invoke('library:listTrash'),
+  releaseLibraryTrash: (): Promise<{ released: number; remaining: number }> =>
+    ipcRenderer.invoke('library:releaseTrash'),
+  updateLibraryMeta: (
+    id: string,
+    patch: import('./shared/libraryMeta').LibraryMetaPatch,
+  ): Promise<import('./shared/libraryManage').LibraryMetaUpdateResult> =>
+    ipcRenderer.invoke('library:updateMeta', id, patch),
+  checkLibraryMissing: (): Promise<string[]> => ipcRenderer.invoke('library:checkMissing'),
+  relinkManga: (id: string): Promise<import('./shared/libraryManage').RelinkMangaResult> =>
+    ipcRenderer.invoke('library:relinkManga', id),
+
   // Dictionary + Anki
   lookupWord: (query: string): Promise<DictResult> => ipcRenderer.invoke('dict:lookup', query),
   /**
@@ -529,6 +561,9 @@ const api = {
    */
   lookupTerm: (query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult> =>
     ipcRenderer.invoke('dict:lookupTerm', query, limit, lang),
+  /** The longest dictionary word at the start of `text` (the popup's scan across the cursor); '' on a miss. */
+  dictScanLongest: (text: string, lang?: 'ja' | 'zh'): Promise<{ matched: string }> =>
+    ipcRenderer.invoke('dict:scanLongest', text, lang),
   /**
    * Chinese lookup — the dictionary database first, CC-CEDICT second. Replaces
    * `renderer/chineseDict.ts`, which parsed 9.4 MB of CC-CEDICT on the UI thread.
@@ -1662,6 +1697,9 @@ const api = {
   /** Lyrics stored with a library audio file: a sidecar .lrc, else embedded tags. */
   musicLocalLyrics: (id: string): Promise<import('./shared/musicLocalLyrics').LocalLyrics | null> =>
     ipcRenderer.invoke('music:localLyrics', id),
+  /** The offline lyrics folder: read it, pick it with a folder dialog, or forget it. */
+  musicLyricsFolder: (action: 'get' | 'pick' | 'clear'): Promise<string | null> =>
+    ipcRenderer.invoke('music:lyricsFolder', action),
 
   /** Open an http/https link in the system browser. */
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openExternal', url),

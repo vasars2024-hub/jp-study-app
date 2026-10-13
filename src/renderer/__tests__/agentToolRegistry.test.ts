@@ -6,6 +6,7 @@ vi.mock('../i18n', () => ({
 }));
 import { AGENT_TOOL_OPERATIONS } from '../../shared/localAgent';
 import {
+  agentCalendarEventFingerprint,
   agentToolCapabilityMatrix,
   availableAgentToolOperationIds,
   createCentralAgentToolRegistry,
@@ -228,5 +229,105 @@ describe('central Agent tool registry', () => {
     const createdIds = (cards as { createdIds: string[] }).createdIds;
     expect(createdIds).toHaveLength(1);
     expect(loadDeck().map((card) => card.id)).toContain(createdIds[0]);
+  });
+});
+
+describe('calendar tool: every repeat the Calendar offers, validated', () => {
+  const schedule = () => createCentralAgentToolRegistry(t)['calendar.schedule-session']!;
+  const stored = () => JSON.parse(localStorage.getItem('jp-calendar-events') ?? '[]') as Array<Record<string, unknown>>;
+
+  it('makes a yearly event, every N years, and the Nth weekday of the month', async () => {
+    expect(await schedule()({ title: 'Birthday', date: '2026-10-12', recurrence: 'yearly' }))
+      .toMatchObject({ recurrence: 'yearly' });
+    expect(await schedule()({ title: 'Olympics', date: '2028-07-14', recurrence: 'yearly', recurrenceInterval: 4 }))
+      .toMatchObject({ recurrence: 'yearly', recurrenceInterval: 4 });
+    // 2026-10-13 is the 2nd Tuesday of October; 2026-10-27 the last.
+    expect(await schedule()({ title: 'Club', date: '2026-10-13', recurrence: 'monthly', recurrenceNth: '2' }))
+      .toMatchObject({ recurrence: 'monthly', recurrenceNth: 2 });
+    expect(await schedule()({ title: 'Review', date: '2026-10-27', recurrence: 'monthly', recurrenceNth: -1 }))
+      .toMatchObject({ recurrenceNth: -1 });
+    expect(await schedule()({ title: 'Every other month', date: '2026-10-05', recurrence: 'monthly', recurrenceInterval: 2 }))
+      .toMatchObject({ recurrence: 'monthly', recurrenceInterval: 2 });
+  });
+
+  it('makes one weekly series on several weekdays, by number or by name', async () => {
+    // 2026-10-06 is a Tuesday.
+    expect(await schedule()({
+      title: 'Grammar', date: '2026-10-06', startTime: '19:00', recurrence: 'weekly', recurrenceWeekdays: [4, 2],
+    })).toMatchObject({ recurrence: 'weekly', recurrenceWeekdays: [2, 4] });
+    expect(await schedule()({
+      title: 'Kanji', date: '2026-10-06', recurrence: 'weekly', recurrenceWeekdays: ['tue', 'Friday'], recurrenceInterval: 2,
+    })).toMatchObject({ recurrenceWeekdays: [2, 5], recurrenceInterval: 2 });
+    // The series lands on the days asked, and only those.
+    const listed = await createCentralAgentToolRegistry(t)['calendar.list']!({ from: '2026-10-05', to: '2026-10-11' }) as {
+      occurrences: Array<{ title: string; date: string; recurrenceWeekdays?: number[] }>;
+    };
+    expect(listed.occurrences.filter((o) => o.title === 'Grammar').map((o) => o.date)).toEqual(['2026-10-06', '2026-10-08']);
+    expect(listed.occurrences.find((o) => o.title === 'Grammar')?.recurrenceWeekdays).toEqual([2, 4]);
+  });
+
+  it('makes a multi-day event, where a timed end earlier in the day is fine', async () => {
+    const camp = await schedule()({ title: 'Study camp', date: '2026-10-09', endDate: '2026-10-11', startTime: '18:00', endTime: '10:00' });
+    expect(camp).toMatchObject({ date: '2026-10-09', endDate: '2026-10-11', startTime: '18:00', endTime: '10:00' });
+    // Over several days without an end time: that day's end, as the Calendar's editor stores it.
+    expect(await schedule()({ title: 'Trip', date: '2026-10-09', endDate: '2026-10-10', startTime: '09:00' }))
+      .toMatchObject({ endTime: '23:59' });
+    // The same day is not multi-day.
+    expect(await schedule()({ title: 'Read', date: '2026-10-09', endDate: '2026-10-09' })).not.toHaveProperty('endDate');
+    const listed = await createCentralAgentToolRegistry(t)['calendar.list']!({ from: '2026-10-09', to: '2026-10-09' }) as {
+      occurrences: Array<{ title: string; endDate?: string }>;
+    };
+    expect(listed.occurrences.find((o) => o.title === 'Study camp')?.endDate).toBe('2026-10-11');
+  });
+
+  it('refuses a rule it cannot store instead of quietly making a one-off', () => {
+    const before = stored().length;
+    const refuse = (extra: Record<string, unknown>, key: string) => {
+      expect(() => schedule()({ title: 'x', date: '2026-10-06', ...extra })).toThrow(key);
+    };
+    refuse({ recurrence: 'fortnightly' }, 'planner.agent.error.repeat');
+    refuse({ recurrence: 'custom', recurrenceInterval: 0 }, 'planner.agent.error.repeatInterval');
+    refuse({ recurrence: 'custom', recurrenceInterval: 400 }, 'planner.agent.error.repeatInterval');
+    refuse({ recurrence: 'weekly', recurrenceInterval: 1.5 }, 'planner.agent.error.repeatInterval');
+    refuse({ recurrence: 'daily', recurrenceInterval: 3 }, 'planner.agent.error.repeatInterval');
+    // Weekdays: weekly only, real days, and the first date must be one of them (a Tuesday here).
+    refuse({ recurrence: 'monthly', recurrenceWeekdays: [2] }, 'planner.agent.error.repeatWeekdays');
+    refuse({ recurrence: 'weekly', recurrenceWeekdays: [1, 3] }, 'planner.agent.error.repeatWeekdays');
+    refuse({ recurrence: 'weekly', recurrenceWeekdays: [2, 7] }, 'planner.agent.error.repeatWeekdays');
+    refuse({ recurrence: 'weekly', recurrenceWeekdays: 'tue' }, 'planner.agent.error.repeatWeekdays');
+    refuse({ recurrence: 'weekly', recurrenceWeekdays: ['tuesdays'] }, 'planner.agent.error.repeatWeekdays');
+    // Nth: monthly or yearly only, and the date must be that weekday of its month (the 6th is the 1st Tuesday).
+    refuse({ recurrence: 'monthly', recurrenceNth: 2 }, 'planner.agent.error.repeatNth');
+    refuse({ recurrence: 'monthly', recurrenceNth: -1 }, 'planner.agent.error.repeatNth');
+    refuse({ recurrence: 'weekly', recurrenceNth: 1 }, 'planner.agent.error.repeatNth');
+    refuse({ recurrence: 'yearly', recurrenceNth: 6 }, 'planner.agent.error.repeatNth');
+    // Multi-day: a real later date, at most a year on.
+    refuse({ endDate: '2026-10-05' }, 'planner.agent.error.endDate');
+    refuse({ endDate: '2026-02-31' }, 'planner.agent.error.endDate');
+    refuse({ endDate: '2028-10-06' }, 'planner.agent.error.endDate');
+    expect(stored()).toHaveLength(before);
+  });
+
+  it('stores only what the rule uses, like the Calendar editor', async () => {
+    await schedule()({ title: 'Plain weekly', date: '2026-10-06', recurrence: 'weekly', recurrenceWeekdays: [2], recurrenceInterval: 1 });
+    const [event] = stored();
+    expect(event).toMatchObject({ recurrence: 'weekly' });
+    expect(event).not.toHaveProperty('recurrenceWeekdays');
+    expect(event).not.toHaveProperty('recurrenceInterval');
+  });
+
+  it('refuses to delete, through Undo, an event edited since the digest was taken', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    const made = await handlers['calendar.schedule-session']!({ title: 'Read', date: '2026-10-09' }) as { id: string };
+    const digest = agentCalendarEventFingerprint(stored()[0] as never);
+    localStorage.setItem('jp-calendar-events', JSON.stringify([{ ...stored()[0], description: 'bring the book' }]));
+
+    expect(() => handlers['calendar.delete-event']!({ id: made.id, expect: digest })).toThrow('planner.agent.error.editedSince');
+    expect(stored()).toHaveLength(1);
+    // The digest is of the event, not of one serialization of it: key order does not matter.
+    const reordered = Object.fromEntries(Object.entries(stored()[0]).reverse());
+    expect(agentCalendarEventFingerprint(reordered as never)).toBe(agentCalendarEventFingerprint(stored()[0] as never));
+    // Without `expect` (the model's own delete) nothing changes.
+    expect(await handlers['calendar.delete-event']!({ id: made.id })).toMatchObject({ removed: made.id });
   });
 });

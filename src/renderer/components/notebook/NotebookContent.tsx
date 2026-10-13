@@ -21,6 +21,8 @@ import {
   type NotebookSources,
 } from '../../notebook/aggregate';
 import { onNotebookTimelineChanged, type NotebookStream } from '../../notebookTimeline';
+import { getUserNote } from '../../userNotesStore';
+import { openNotesManager } from '../notes/openNotesManager';
 import {
   ALL_NOTEBOOK_STREAMS,
   NOTEBOOK_VIEWS,
@@ -304,10 +306,25 @@ export function NotebookFolders({ state }: { state: NotebookState }) {
 export function NotebookTimeline({
   state,
   onOpen,
+  onOpenNote,
 }: {
   state: NotebookState;
   onOpen: (href?: string) => void;
+  /**
+   * Opens one of the learner's notes. Without it a note row opens the Notes
+   * app (the dialog every non-Blanc shell uses); rows that are automatic
+   * events keep opening their `href`.
+   */
+  onOpenNote?: (id: string) => void;
 }) {
+  const openRow = (e: { id: string; href?: string }): void => {
+    if (getUserNote(e.id)) {
+      if (onOpenNote) onOpenNote(e.id);
+      else void openNotesManager({ noteId: e.id });
+      return;
+    }
+    onOpen(e.href);
+  };
   const { t, lang } = useT();
 
   if (state.visible.length === 0) {
@@ -325,7 +342,7 @@ export function NotebookTimeline({
         const chain = lineageForEntry(e, state.lineage);
         return (
           <li key={e.id} className="gx-notebook-item">
-            <button type="button" className="gx-notebook-item-btn" onClick={() => onOpen(e.href)}>
+            <button type="button" className="gx-notebook-item-btn" onClick={() => openRow(e)}>
               <div className="gx-notebook-item-top">
                 <span className="gx-notebook-item-title">{e.title}</span>
                 <span className="muted">{t(`notebook.stream.${e.stream}`)}</span>

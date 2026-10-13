@@ -14,13 +14,17 @@
  * been learned, production from the translation once it is mature — and a cloze
  * can be typed and checked before rating. Below the card: progress per JLPT/HSK
  * level, with a way to start the next few new points of a level.
+ *
+ * A rating can be taken back once (the Undo button, or Ctrl+Z while the panel
+ * has focus), as on Flashcards: the point's previous schedule, familiarity and
+ * review-log row are restored and it is asked again first.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { GrammarSuggestedRating } from '../../../shared/aiGrammarTutor';
 import { GRAMMAR, type NormalizedGrammarPoint } from '../../data/grammar';
 import { explanationCopiesMeaning, structureCopiesTitle } from '../../data/grammar/hollow';
-import { previewSchedule } from '../../../shared/flashcardScheduling';
-import type { LocalSrsRating } from '../../../shared/localSrs';
+import { previewScheduleDelays } from '../../../shared/flashcardScheduling';
+import type { LocalSrsRating, LocalSrsState } from '../../../shared/localSrs';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { loadSchedulingConfig } from '../../flashcardScheduling';
 import {
@@ -29,8 +33,10 @@ import {
   loadGrammarSrs,
   nextGrammarDueAt,
   onGrammarSrsChanged,
+  restoreGrammarPoint,
   reviewGrammarPoint,
   saveGrammarSrs,
+  schedulerPrior,
   seedMissed,
 } from '../../grammarSrs';
 import { loadCollections, onGrammarCollectionsChanged } from '../../grammarCollections';
@@ -41,10 +47,12 @@ import {
   onFamiliarityChanged,
   saveFamiliarity,
   type AnswerGrade,
+  type FamiliarityEntry,
 } from '../../grammarFamiliarity';
 import { grammarLevelProgress } from '../../grammarProgress';
-import { checkClozeAnswer, grammarReviewPrompt, type GrammarCloze } from '../../grammarReviewPrompt';
-import { appendReviewLog } from '../../reviewLog';
+import { checkCloze, grammarReviewPrompt, type GrammarCloze } from '../../grammarReviewPrompt';
+import { appendReviewLog, removeReviewLogEntry } from '../../reviewLog';
+import type { ReviewLogEntry } from '../../../shared/reviewLog';
 import { useT } from '../../i18n';
 import { contentLangOf, getStudyLang, onStudyLangChanged } from '../../studyEnvironment';
 import { Button } from '../ui';
@@ -74,6 +82,21 @@ const SUGGESTED_TO_RATING: Record<GrammarSuggestedRating, (typeof RATINGS)[numbe
   okay: RATINGS[1],
   good: RATINGS[2],
 };
+
+/** What one rating changed, so Undo can put it back. */
+interface RatingUndo {
+  id: string;
+  title: string;
+  /** The point's schedule before the rating; undefined when it had none. */
+  srs: LocalSrsState | undefined;
+  familiarity: FamiliarityEntry | undefined;
+  log: ReviewLogEntry;
+}
+
+/** Ctrl+Z (Cmd+Z on macOS), the chord Flashcards uses for the same thing. */
+function isUndoChord(e: KeyboardEvent<HTMLElement>): boolean {
+  return (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z';
+}
 
 /** The example with its pattern blanked (front) or marked (back). */
 function ClozeSentence({ cloze, revealed, lang }: { cloze: GrammarCloze; revealed: boolean; lang: string }) {
@@ -106,6 +129,12 @@ export default function GrammarReviewPanel() {
   const [reviewedCount, setReviewedCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [practiceOpen, setPracticeOpen] = useState(false);
+  const [undo, setUndo] = useState<RatingUndo | null>(null);
+  /** After an undo, the restored point is asked again first, whatever else is due. */
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  /** Bumped after a rating or an undo, to keep keyboard focus inside the panel. */
+  const [focusTick, setFocusTick] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const byId = useMemo(() => new Map<string, NormalizedGrammarPoint>(GRAMMAR.map((p) => [p.id, p])), []);
   const known = useMemo(() => new Set(byId.keys()), [byId]);
@@ -130,12 +159,15 @@ export default function GrammarReviewPanel() {
   }, []);
 
   const due = useMemo(() => dueGrammarIds(srs, now, known), [srs, now, known]);
-  const current = due.length ? byId.get(due[0]) ?? null : null;
+  const currentId = pinnedId && due.includes(pinnedId) ? pinnedId : due[0];
+  const current = currentId ? byId.get(currentId) ?? null : null;
   const currentState = current ? srs[current.id] : undefined;
   const scheduled = useMemo(() => Object.keys(srs).filter((id) => known.has(id)).length, [srs, known]);
   const nextAt = useMemo(() => nextGrammarDueAt(srs, now), [srs, now]);
   const previews = useMemo(
-    () => (current ? previewSchedule(currentState?.repetitions ? currentState : undefined, loadSchedulingConfig(), now) : null),
+    // The same prior the rating hands the scheduler: a point inside its steps is
+    // not new, and a step reads as minutes rather than as a zero-day interval.
+    () => (current ? previewScheduleDelays(schedulerPrior(currentState), loadSchedulingConfig(), now) : null),
     [current, currentState, now],
   );
   // Keyed on the point and its schedule, so the prompt is stable while it is on screen
@@ -182,36 +214,79 @@ export default function GrammarReviewPanel() {
     setChecked(null);
   };
 
+  // A rating or an undo unmounts the focused button; without this the panel
+  // loses focus and its keys (Space, 1-4, Ctrl+Z) stop reaching it.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!focusTick || !root || root.contains(document.activeElement)) return;
+    root.focus({ preventScroll: true });
+  }, [focusTick]);
+
   const rate = useCallback(
     (rating: LocalSrsRating, grade: AnswerGrade) => {
       if (!current) return;
       const at = Date.now();
-      const next = reviewGrammarPoint(loadGrammarSrs(), current.id, rating, loadSchedulingConfig(), at);
+      const before = loadGrammarSrs();
+      const familiarityBefore = loadFamiliarity();
+      const next = reviewGrammarPoint(before, current.id, rating, loadSchedulingConfig(), at);
       saveGrammarSrs(next);
       setSrs(next);
-      saveFamiliarity(applyGrade(loadFamiliarity(), current.id, grade, at));
-      appendReviewLog({ mode: 'grammar', grammarId: current.id, word: current.title, correct: rating !== 'again', at });
+      saveFamiliarity(applyGrade(familiarityBefore, current.id, grade, at));
+      const log = appendReviewLog({ mode: 'grammar', grammarId: current.id, word: current.title, correct: rating !== 'again', at });
+      setUndo({ id: current.id, title: current.title, srs: before[current.id], familiarity: familiarityBefore[current.id], log });
+      setPinnedId(null);
       setReviewedCount((n) => n + 1);
       setRevealed(false);
       setTyped('');
       setChecked(null);
       setPracticeOpen(false);
       setNow(at);
+      setFocusTick((n) => n + 1);
     },
     [current],
   );
 
+  /** One step back: the last rating's schedule, familiarity and log row, and its place in the queue. */
+  const undoRating = useCallback(() => {
+    if (!undo) return;
+    const restored = restoreGrammarPoint(loadGrammarSrs(), undo.id, undo.srs);
+    saveGrammarSrs(restored);
+    setSrs(restored);
+    const familiarityNow: Record<string, FamiliarityEntry> = { ...loadFamiliarity() };
+    if (undo.familiarity) familiarityNow[undo.id] = undo.familiarity;
+    else delete familiarityNow[undo.id];
+    saveFamiliarity(familiarityNow);
+    removeReviewLogEntry(undo.log);
+    setUndo(null);
+    setPinnedId(undo.id);
+    setReviewedCount((n) => Math.max(0, n - 1));
+    setRevealed(false);
+    setTyped('');
+    setChecked(null);
+    setPracticeOpen(false);
+    setNow(Date.now());
+    setFocusTick((n) => n + 1);
+  }, [undo]);
+
   const checkTyped = (e: FormEvent): void => {
     e.preventDefault();
     if (!prompt?.cloze || !typed.trim()) return;
-    setChecked(checkClozeAnswer(typed, prompt.cloze.answers));
+    setChecked(checkCloze(typed, prompt.cloze));
     setRevealed(true);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (!current) return;
-    // Typing an answer: digits and Space belong to the field, Enter submits its form.
+    // Typing an answer: digits and Space belong to the field, Enter submits its
+    // form, and Ctrl+Z is the field's own text undo.
     if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    if (undo && isUndoChord(e)) {
+      e.preventDefault();
+      // Handled here, before the window-level shortcut layer, whose Ctrl+Z is Flashcards'.
+      e.stopPropagation();
+      undoRating();
+      return;
+    }
+    if (!current) return;
     if (!revealed && (e.key === ' ' || e.key === 'Enter')) {
       e.preventDefault();
       setRevealed(true);
@@ -233,11 +308,24 @@ export default function GrammarReviewPanel() {
   const pointLang = current?.lang ?? 'ja';
 
   return (
-    <div className="gx-review" tabIndex={-1} onKeyDown={onKeyDown}>
+    <div className="gx-review" tabIndex={-1} onKeyDown={onKeyDown} ref={rootRef}>
       <div className="gx-review-summary muted" role="status">
         {t('grammar.review.summary', { due: due.length, scheduled })}
         {reviewedCount > 0 && <> · {t('grammar.review.done', { count: reviewedCount })}</>}
       </div>
+      {undo && (
+        <div className="gx-review-undo-row">
+          <button
+            type="button"
+            className="gx-review-undo-reveal gx-review-undo"
+            aria-keyshortcuts="Control+Z"
+            title={t('gram2.undo.hint', { title: undo.title })}
+            onClick={undoRating}
+          >
+            {t('gram2.undo.label')}
+          </button>
+        </div>
+      )}
 
       {current ? (
         <article className="gx-review-card" data-prompt={kind}>

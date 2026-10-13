@@ -19,6 +19,8 @@ export interface TexthookerServer {
   handshakes: string[];
   /** Send one hooked line to every connected client. Resolves with how many got it. */
   send(line: string): number;
+  /** Send one hooked line as a BINARY frame (UTF-8 bytes), as some hookers do. */
+  sendBinary(line: string): number;
   /** Resolves once at least `n` clients are connected (or rejects after `timeoutMs`). */
   waitForClient(n?: number, timeoutMs?: number): Promise<void>;
   close(): Promise<void>;
@@ -26,19 +28,20 @@ export interface TexthookerServer {
 
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
-function textFrame(text: string): Buffer {
+function textFrame(text: string, opcode = 0x1): Buffer {
   const payload = Buffer.from(text, 'utf8');
   const len = payload.length;
+  const first = 0x80 | opcode;
   let head: Buffer;
-  if (len < 126) head = Buffer.from([0x81, len]);
+  if (len < 126) head = Buffer.from([first, len]);
   else if (len < 65536) {
     head = Buffer.alloc(4);
-    head[0] = 0x81;
+    head[0] = first;
     head[1] = 126;
     head.writeUInt16BE(len, 2);
   } else {
     head = Buffer.alloc(10);
-    head[0] = 0x81;
+    head[0] = first;
     head[1] = 127;
     head.writeBigUInt64BE(BigInt(len), 2);
   }
@@ -90,6 +93,11 @@ export async function startTexthooker(): Promise<TexthookerServer> {
     handshakes,
     send(line: string) {
       const frame = textFrame(line);
+      for (const s of sockets) s.write(frame);
+      return sockets.size;
+    },
+    sendBinary(line: string) {
+      const frame = textFrame(line, 0x2);
       for (const s of sockets) s.write(frame);
       return sockets.size;
     },

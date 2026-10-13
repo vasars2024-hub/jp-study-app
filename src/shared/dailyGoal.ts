@@ -10,6 +10,7 @@
 // never disagree with Statistics about what was done today.
 
 import type { ReviewLogEntry } from './reviewLog';
+import { endOfStudyDay, startOfStudyDay } from './studyDay';
 
 export type DailyGoalMetric = 'reviews' | 'newCards' | 'minutes';
 
@@ -106,13 +107,15 @@ export function adjustDailyGoalTarget(
   return out;
 }
 
-/** [start, end) of the local calendar day containing `now`, epoch ms. */
+/**
+ * [start, end) of the STUDY day containing `now`, epoch ms (`studyDay.ts`: rolls over at
+ * the configured hour, 4 am by default). The goal's minutes come from the stats store's
+ * today, which is a study day, and its new cards are the new-card budget, also a study
+ * day: counting reviews from midnight reset the review and new-card bars at 00:00 while
+ * the minutes bar ran on to 04:00.
+ */
 export function localDayBounds(now = Date.now()): { start: number; end: number } {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { start: start.getTime(), end: end.getTime() };
+  return { start: startOfStudyDay(now), end: endOfStudyDay(now) };
 }
 
 /**

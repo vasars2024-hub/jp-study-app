@@ -29,13 +29,16 @@ import {
   deleteRepeatingScope,
   detachOccurrence,
   excludeOccurrence,
-  expandOccurrences,
   getOverdueReminders,
   getTodayOccurrences,
   getUpcomingOccurrences,
+  daysBetweenKeys,
+  expandDayOccurrences,
   loadEvents,
+  normalizeEventFields,
   normalizeRecurrenceInterval,
   onCalendarChanged,
+  parseDateKey,
   REMINDER_LABEL_KEYS,
   REMINDER_OFFSETS,
   rescheduleEventPatch,
@@ -46,6 +49,7 @@ import {
   startOfWeekOn,
   toDateKey,
   updateEvent,
+  weeklyWeekdays,
   type CalendarEvent,
   type RepeatEditScope,
   type EventCategory,
@@ -59,6 +63,7 @@ import { useT } from '../../i18n';
 import { formatDuration, getMediaActivityByDay, getStreakRestDates, getStudyDaysByKey, onStatsChanged } from '../../stats';
 import { deckDueForecast, loadDeck, onDeckChanged } from '../../flashcardDeck';
 import { calendarStudyDay, dueByDate, gameAnswersByDay } from '../../../shared/studyActivityHeatmap';
+import { studyDayKey } from '../../../shared/studyDay';
 import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
 import { exportCalendarIcsFile } from '../../calendarIcs';
 import { heatLevelsFor } from '../../../shared/calendarDayDetail';
@@ -71,6 +76,14 @@ import { CalendarYearGrid } from './CalendarYearGrid';
 import { CalendarIcsImportButton } from './CalendarIcsImport';
 import { CalendarWeekGrid } from './CalendarWeekGrid';
 import { CAL_DRAG_TYPE, KEYBOARD_MOVE_KEYS, keyboardMoveFor, readDraggedOccurrence } from './calendarKeyboardMove';
+import {
+  reminderLabel,
+  repeatPatternFields,
+  repeatPatternOf,
+  repeatPatternOptions,
+  weekdayName,
+  type RepeatPattern,
+} from './calendarRepeatText';
 
 export type ViewMode = 'month' | 'week' | 'day' | 'agenda' | 'year';
 
@@ -97,6 +110,17 @@ export function startOfWeek(d: Date, weekStart: WeekStartDay = 0): Date {
   return startOfWeekOn(d, weekStart);
 }
 
+/** The fields the editor decides; each is written (as undefined when the event has none). */
+const EDITOR_OWNED_UNSET: Partial<CalendarEvent> = {
+  endDate: undefined,
+  reminderMinutes: undefined,
+  recurrenceInterval: undefined,
+  recurrenceWeekdays: undefined,
+  recurrenceWeekStart: undefined,
+  recurrenceNth: undefined,
+  recurrenceMonthEnd: undefined,
+};
+
 const EMPTY_FORM = {
   id: '',
   title: '',
@@ -108,14 +132,56 @@ const EMPTY_FORM = {
   color: CATEGORY_COLORS.study,
   category: 'study' as EventCategory,
   reminder: 'none' as ReminderOffset,
+  /** The lead time of an exact (`custom`) reminder kept from an imported file. */
+  reminderMinutes: 0,
+  /** Days after `date` the event runs on: 0 = over the same day. Kept as a length so moving the date keeps it. */
+  spanDays: 0,
   recurrence: 'none' as RecurrenceFreq,
   recurrenceInterval: 1,
   recurrenceEndDate: '',
+  /** Weekly: the weekdays it falls on, besides the date's own (which is always one). */
+  recurrenceWeekdays: [] as number[],
+  recurrenceWeekStart: undefined as number | undefined,
+  /** Monthly / yearly: the same day number, the Nth weekday, or the last one. */
+  repeatPattern: 'day' as RepeatPattern,
   /** The occurrence the editor was opened from (a repeating event's chip). Never saved. */
   occurrenceDate: '',
 };
 
 export type EventForm = typeof EMPTY_FORM;
+
+/** The "every N …" field's label for each repeat that has one. */
+const INTERVAL_LABEL_KEYS: Partial<Record<RecurrenceFreq, string>> = {
+  custom: 'calendar.modal.everyNDays',
+  weekly: 'planner.repeat.everyWeeks',
+  monthly: 'planner.repeat.everyMonths',
+  yearly: 'planner.repeat.everyYears',
+};
+
+/** The editor's fields for an event (or one of its occurrences). */
+export function eventFormOf(ev: CalendarEvent & { occurrenceDate?: string }): Partial<EventForm> {
+  return {
+    id: ev.id,
+    title: ev.title,
+    description: ev.description ?? '',
+    date: ev.date,
+    startTime: ev.startTime ?? '09:00',
+    endTime: ev.endTime ?? '10:00',
+    allDay: !!ev.allDay,
+    color: ev.color,
+    category: ev.category,
+    reminder: ev.reminder,
+    reminderMinutes: ev.reminderMinutes ?? 0,
+    spanDays: ev.endDate && ev.endDate > ev.date ? daysBetweenKeys(ev.date, ev.endDate) : 0,
+    recurrence: ev.recurrence,
+    recurrenceInterval: ev.recurrenceInterval ?? 1,
+    recurrenceEndDate: ev.recurrenceEndDate ?? '',
+    recurrenceWeekdays: ev.recurrence === 'weekly' ? weeklyWeekdays(ev) : [],
+    recurrenceWeekStart: ev.recurrenceWeekStart,
+    repeatPattern: repeatPatternOf(ev),
+    occurrenceDate: ev.occurrenceDate ?? '',
+  };
+}
 
 /**
  * "Describe it": a sentence → the form's fields, shown for confirmation
@@ -148,11 +214,16 @@ export function EventModal({
   }));
   const isEditing = !!form.id;
   const [quickOpen, setQuickOpen] = useState(false);
-  /** Other weekdays of a described weekly event ("Tue/Thu"): one more weekly event each, on Create. */
-  const [extraDates, setExtraDates] = useState<string[]>([]);
+  /** A described "every Tue/Thu" is ONE weekly series on both days. */
   const applyDraft = (
-    draft: { title: string; date: string; startTime: string | null; endTime: string | null; recurrence: 'none' | 'daily' | 'weekly' },
-    extra: string[],
+    draft: {
+      title: string;
+      date: string;
+      startTime: string | null;
+      endTime: string | null;
+      recurrence: 'none' | 'daily' | 'weekly';
+      weekdays?: number[];
+    },
   ): void => {
     setForm((f) => ({
       ...f,
@@ -163,8 +234,8 @@ export function EventModal({
       endTime: draft.endTime ?? f.endTime,
       recurrence: draft.recurrence,
       recurrenceInterval: 1,
+      recurrenceWeekdays: draft.recurrence === 'weekly' ? (draft.weekdays ?? []) : [],
     }));
-    setExtraDates(draft.recurrence === 'weekly' ? extra : []);
     setQuickOpen(false);
   };
   const changeScope = (next: RepeatEditScope): void => {
@@ -196,40 +267,67 @@ export function EventModal({
 
   // `HH:MM` is zero-padded and fixed-width, so a plain string compare is a
   // correct time compare. All-day events carry no times, so they cannot be
-  // inverted (D162).
+  // inverted (D162). An event over several days ends on a later day, at any time.
   const endsBeforeStart =
-    !form.allDay && Boolean(form.startTime) && Boolean(form.endTime) && form.endTime < form.startTime;
+    !form.allDay && form.spanDays === 0 && Boolean(form.startTime) && Boolean(form.endTime) && form.endTime < form.startTime;
+  const endDateBeforeStart = form.spanDays < 0;
+  const endDateValue = form.date && form.spanDays > 0 ? shiftDateKey(form.date, form.spanDays) : form.date;
+  const monthOrYear = form.recurrence === 'monthly' || form.recurrence === 'yearly';
+  const patternOptions = monthOrYear && form.date
+    ? repeatPatternOptions(form.date, form.recurrence as 'monthly' | 'yearly', t, LANG_TAGS[lang])
+    : [];
+  // A pattern the date no longer allows ("the last Friday" after moving to the 3rd) falls back to the day.
+  const pattern: RepeatPattern = patternOptions.some((option) => option.value === form.repeatPattern) ? form.repeatPattern : 'day';
+  const dateWeekday = form.date ? parseDateKey(form.date).getDay() : -1;
+  let weekStartDay: WeekStartDay = 0;
+  try {
+    weekStartDay = resolveWeekStart(loadDesktopPrefs().weekStart, LANG_TAGS[lang]);
+  } catch {
+    /* the locale's default */
+  }
+  const toggleWeekday = (day: number): void => setForm((f) => ({
+    ...f,
+    recurrenceWeekdays: f.recurrenceWeekdays.includes(day)
+      ? f.recurrenceWeekdays.filter((d) => d !== day)
+      : [...f.recurrenceWeekdays, day].sort(),
+  }));
   const missingDate = !form.date;
   // ISO date keys compare correctly as strings. An end before the first
   // occurrence leaves zero occurrences, so the event would vanish from every view.
   const repeatEndsBeforeStart =
     scope !== 'this' && form.recurrence !== 'none' && Boolean(form.recurrenceEndDate) && Boolean(form.date) && form.recurrenceEndDate < form.date;
 
+  const invalid = !form.title.trim() || missingDate || endsBeforeStart || endDateBeforeStart || repeatEndsBeforeStart;
   const save = () => {
-    if (!form.title.trim() || missingDate || endsBeforeStart || repeatEndsBeforeStart) return;
-    const payload: Omit<CalendarEvent, 'id' | 'createdAt'> = {
+    if (invalid) return;
+    const raw: Omit<CalendarEvent, 'id' | 'createdAt'> = {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
       date: form.date,
+      endDate: form.spanDays > 0 ? shiftDateKey(form.date, form.spanDays) : undefined,
       allDay: form.allDay,
       startTime: form.allDay ? undefined : form.startTime,
       endTime: form.allDay ? undefined : form.endTime,
       color: form.color,
       category: form.category,
       reminder: form.reminder,
+      reminderMinutes: form.reminder === 'custom' ? form.reminderMinutes : undefined,
       recurrence: form.recurrence,
-      recurrenceInterval:
-        form.recurrence === 'custom' ? normalizeRecurrenceInterval(form.recurrenceInterval) : undefined,
+      recurrenceInterval: form.recurrence === 'daily' || form.recurrence === 'none'
+        ? undefined
+        : normalizeRecurrenceInterval(form.recurrenceInterval),
+      recurrenceWeekdays: form.recurrence === 'weekly' ? form.recurrenceWeekdays : undefined,
+      recurrenceWeekStart: form.recurrence === 'weekly' ? form.recurrenceWeekStart : undefined,
+      ...(monthOrYear ? repeatPatternFields(pattern, form.date) : {}),
       recurrenceEndDate: form.recurrenceEndDate || undefined,
     };
+    // Every field the editor owns is written, absent ones as undefined, so an edit that turns
+    // "the 2nd Tuesday" back into "day 12" clears the old rule rather than merging over it.
+    const payload = { ...EDITOR_OWNED_UNSET, ...normalizeEventFields(raw) };
     const series = openedFromOccurrence ? loadEvents().find((candidate) => candidate.id === form.id) : undefined;
     if (series && form.occurrenceDate) saveRepeatingEdit(series, form.occurrenceDate, scope, payload);
     else if (isEditing) updateEvent(form.id, payload);
-    else {
-      addEvent(payload);
-      // A described "every Tue/Thu" is one weekly event per weekday, listed above Create.
-      if (form.recurrence === 'weekly') for (const date of extraDates) addEvent({ ...payload, date });
-    }
+    else addEvent(payload);
     onClose();
   };
 
@@ -384,6 +482,26 @@ export function EventModal({
             <p id="cal-date-error" className="cal-field-error" role="alert">{t('calendar.modal.dateRequired')}</p>
           )}
 
+          {/* After the start date in the DOM: the first date field is the event's date. */}
+          <label className="cal-field cal-end-date">
+            <span>{t('planner.multiDay.endDate')}</span>
+            <input
+              type="date"
+              value={endDateValue}
+              min={form.date || undefined}
+              disabled={!form.date}
+              onChange={(e) => {
+                const value = e.target.value;
+                set('spanDays', value && form.date ? daysBetweenKeys(form.date, value) : 0);
+              }}
+              aria-invalid={endDateBeforeStart || undefined}
+              aria-describedby={endDateBeforeStart ? 'cal-end-date-error' : undefined}
+            />
+          </label>
+          {endDateBeforeStart && (
+            <p id="cal-end-date-error" className="cal-field-error" role="alert">{t('planner.multiDay.endBeforeStart')}</p>
+          )}
+
           {!form.allDay && (
             <div className="cal-field-row">
               <label className="cal-field">
@@ -435,6 +553,10 @@ export function EventModal({
               {REMINDER_OFFSETS.map((r) => (
                 <option key={r} value={r}>{t(REMINDER_LABEL_KEYS[r])}</option>
               ))}
+              {/* An exact lead time an imported event came with stays a choice, named by its minutes. */}
+              {initial.reminder === 'custom' && (
+                <option value="custom">{reminderLabel({ reminder: 'custom', reminderMinutes: form.reminderMinutes }, t)}</option>
+              )}
             </select>
           </label>
 
@@ -447,22 +569,64 @@ export function EventModal({
                 <option value="daily">{t('calendar.modal.repeat.daily')}</option>
                 <option value="weekly">{t('calendar.modal.repeat.weekly')}</option>
                 <option value="monthly">{t('calendar.modal.repeat.monthly')}</option>
+                <option value="yearly">{t('calendar.modal.repeat.yearly')}</option>
                 <option value="custom">{t('calendar.modal.repeat.custom')}</option>
               </select>
             </label>
-            {form.recurrence === 'custom' && (
+            {form.recurrence !== 'none' && form.recurrence !== 'daily' && (
               <label className="cal-field">
-                <span>{t('calendar.modal.everyNDays')}</span>
+                <span>{t(INTERVAL_LABEL_KEYS[form.recurrence] ?? 'calendar.modal.everyNDays')}</span>
                 <input
                   type="number"
+                  className="cal-interval"
                   min={1}
-                  max={365}
+                  max={form.recurrence === 'custom' ? 365 : 99}
                   value={form.recurrenceInterval}
                   onChange={(e) => set('recurrenceInterval', normalizeRecurrenceInterval(Number(e.target.value)))}
                 />
               </label>
             )}
           </div>
+          )}
+
+          {scope !== 'this' && form.recurrence === 'weekly' && (
+            <fieldset className="cal-weekdays">
+              <legend>{t('planner.repeat.weekdays')}</legend>
+              {Array.from({ length: 7 }, (_, i) => (i + weekStartDay) % 7).map((day) => {
+                const own = day === dateWeekday;
+                const on = own || form.recurrenceWeekdays.includes(day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    className={`cal-weekday-btn${on ? ' is-on' : ''}`}
+                    aria-pressed={on}
+                    // The date's own weekday is always one of them: the series starts there.
+                    disabled={own}
+                    aria-label={weekdayName(day, LANG_TAGS[lang], 'long')}
+                    title={weekdayName(day, LANG_TAGS[lang], 'long')}
+                    onClick={() => toggleWeekday(day)}
+                  >
+                    {weekdayName(day, LANG_TAGS[lang], 'short')}
+                  </button>
+                );
+              })}
+            </fieldset>
+          )}
+
+          {scope !== 'this' && monthOrYear && patternOptions.length > 1 && (
+            <label className="cal-field">
+              <span>{t('planner.repeat.pattern')}</span>
+              <select
+                className="cal-repeat-pattern"
+                value={pattern}
+                onChange={(e) => set('repeatPattern', e.target.value as RepeatPattern)}
+              >
+                {patternOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
           )}
 
           {form.recurrence !== 'none' && scope !== 'this' && (
@@ -480,21 +644,6 @@ export function EventModal({
           )}
           {repeatEndsBeforeStart && (
             <p id="cal-repeat-error" className="cal-field-error" role="alert">{t('calendar.modal.repeatEndBeforeStart')}</p>
-          )}
-
-          {!isEditing && form.recurrence === 'weekly' && extraDates.length > 0 && (
-            <div className="cal-field-row" role="note">
-              <p className="muted">
-                {t('aiTutor.event.alsoCreates', {
-                  dates: extraDates
-                    .map((date) => fromKey(date).toLocaleDateString(LANG_TAGS[lang], { weekday: 'short', month: 'short', day: 'numeric' }))
-                    .join(', '),
-                })}
-              </p>
-              <button type="button" className="btn small" onClick={() => setExtraDates([])}>
-                {t('aiTutor.event.dropExtra')}
-              </button>
-            </div>
           )}
 
           {canSkipOccurrence && (
@@ -524,7 +673,7 @@ export function EventModal({
           )}
           <div className="cal-modal-spacer" />
           <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="button" className="btn primary" onClick={save} disabled={!form.title.trim() || missingDate || endsBeforeStart || repeatEndsBeforeStart}>
+          <button type="button" className="btn primary" onClick={save} disabled={invalid}>
             {isEditing ? t('common.save') : t('calendar.modal.create')}
           </button>
         </div>
@@ -561,13 +710,20 @@ function useDayDropTarget(moveOccurrence: CalendarState['moveOccurrence'] | unde
 }
 
 export function EventChip({ ev, onClick, onMoveDays }: { ev: EventOccurrence; onClick: () => void; onMoveDays?: (days: number) => void }) {
+  const { t } = useT();
+  // An event over several days draws on each of them; its time shows on the first, and only
+  // the first is picked up by a drag (the move is the whole occurrence, from its start).
+  const part = ev.spanDays ? (ev.spanIndex ?? 0) : 0;
+  const continued = part > 0;
+  const dayOf = ev.spanDays ? t('planner.multiDay.dayOf', { index: part + 1, count: ev.spanDays }) : '';
   return (
     <button
       type="button"
-      className="cal-chip"
+      className={`cal-chip${ev.spanDays ? ' cal-chip--span' : ''}${continued ? ' cal-chip--cont' : ''}`}
       style={{ borderLeftColor: ev.color }}
       onClick={onClick}
       data-occurrence={`${ev.id}|${ev.occurrenceDate}`}
+      aria-label={dayOf ? `${ev.title}, ${dayOf}` : undefined}
       aria-keyshortcuts={onMoveDays ? KEYBOARD_MOVE_KEYS : undefined}
       onKeyDown={onMoveDays ? (e) => {
         const move = keyboardMoveFor(e, 'week');
@@ -576,13 +732,13 @@ export function EventChip({ ev, onClick, onMoveDays }: { ev: EventOccurrence; on
         e.stopPropagation();
         onMoveDays(move.days);
       } : undefined}
-      draggable
+      draggable={!continued}
       onDragStart={(e) => {
         e.dataTransfer.setData(CAL_DRAG_TYPE, JSON.stringify({ id: ev.id, from: ev.occurrenceDate }));
         e.dataTransfer.effectAllowed = 'move';
       }}
     >
-      {!ev.allDay && ev.startTime && <span className="cal-chip-time">{ev.startTime}</span>}
+      {!ev.allDay && ev.startTime && !continued && <span className="cal-chip-time">{ev.startTime}</span>}
       <span className="cal-chip-title">{ev.title}</span>
     </button>
   );
@@ -674,15 +830,17 @@ export function useCalendar() {
       start = cursor;
       end = cursor;
     }
-    return expandOccurrences(events, start, end);
+    // An event over several days is on every day it covers (`spanDay`).
+    return expandDayOccurrences(events, start, end);
   }, [events, mode, cursor, monthCells, weekStart]);
 
   const occsByDay = useMemo(() => {
     const map = new Map<string, EventOccurrence[]>();
     for (const o of rangeOccurrences) {
-      const list = map.get(o.occurrenceDate) ?? [];
+      const day = o.spanDay ?? o.occurrenceDate;
+      const list = map.get(day) ?? [];
       list.push(o);
-      map.set(o.occurrenceDate, list);
+      map.set(day, list);
     }
     return map;
   }, [rangeOccurrences]);
@@ -726,23 +884,7 @@ export function useCalendar() {
   });
   /** What the last keyboard move did, for the screen-reader status line. */
   const [moveNotice, setMoveNotice] = useState('');
-  const openEdit = (ev: EventOccurrence) =>
-    setModal({
-      id: ev.id,
-      title: ev.title,
-      description: ev.description ?? '',
-      date: ev.date,
-      startTime: ev.startTime ?? '09:00',
-      endTime: ev.endTime ?? '10:00',
-      allDay: !!ev.allDay,
-      color: ev.color,
-      category: ev.category,
-      reminder: ev.reminder,
-      recurrence: ev.recurrence,
-      recurrenceInterval: ev.recurrenceInterval ?? 1,
-      recurrenceEndDate: ev.recurrenceEndDate ?? '',
-      occurrenceDate: ev.occurrenceDate,
-    });
+  const openEdit = (ev: EventOccurrence) => setModal(eventFormOf(ev));
 
   /**
    * Drag-to-reschedule: move the occurrence picked up on `from` to `to`. A one-off event
@@ -985,11 +1127,13 @@ function MonthGrid({ state }: { state: CalendarState }) {
   const studyByDay = useMemo(() => getStudyDaysByKey(), [statsVersion]);
   const [deckVersion, setDeckVersion] = useState(0);
   useEffect(() => onDeckChanged(() => setDeckVersion((v) => v + 1)), []);
-  const todayKey = toKey(today);
+  // The STUDY day, not the calendar date: due counts are filed by study day, so they
+  // move at the day-start hour (4 am), not at midnight.
+  const studyTodayKey = studyDayKey(today.getTime());
   const dueByDay = useMemo(
     () => dueByDate(deckDueForecast(loadDeck(), CALENDAR_DUE_DAYS), new Date()),
-    // `deckVersion` and `todayKey` are the change signals.
-    [deckVersion, todayKey],
+    // `deckVersion` and `studyTodayKey` are the change signals.
+    [deckVersion, studyTodayKey],
   );
   // The cursor's own day when it is on screen, else the first cell: a grid whose
   // active descendant is a day from the month you navigated away from reads as
@@ -1243,7 +1387,9 @@ export function CalendarBody({ state }: { state: CalendarState }) {
         {dayList.length === 0 && <p className="muted">{t('calendar.noEventsToday')}</p>}
         {dayList.map((ev) => (
           <button type="button" key={`${ev.id}-${ev.occurrenceDate}`} className="cal-day-row" style={{ borderLeftColor: ev.color }} onClick={() => openEdit(ev)}>
-            <span className="cal-day-time">{ev.allDay ? t('calendar.allDay') : `${ev.startTime ?? ''}${ev.endTime ? `–${ev.endTime}` : ''}`}</span>
+            <span className="cal-day-time">{ev.spanDays
+              ? t('planner.multiDay.dayOf', { index: (ev.spanIndex ?? 0) + 1, count: ev.spanDays })
+              : ev.allDay ? t('calendar.allDay') : `${ev.startTime ?? ''}${ev.endTime ? `–${ev.endTime}` : ''}`}</span>
             <span className="cal-day-title">{ev.title}</span>
             <span className="cal-badge" style={{ background: ev.color }}>{t(CATEGORY_LABEL_KEYS[ev.category] ?? CATEGORY_LABEL_KEYS.personal)}</span>
           </button>

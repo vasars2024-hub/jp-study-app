@@ -49,12 +49,12 @@ import {
 } from '../../shared/libraryLevel';
 import { useCoverArt } from '../utils/coverArt';
 import {
-  DEFAULT_LIBRARY_LAYOUT,
   LIBRARY_LAYOUTS,
   compareRecentlyRead,
   drawerState,
   groupLibraryBySeries,
   libraryHostedActions,
+  matchesLibraryQuery,
   nextRowIndex,
   resolveSelection,
   type LibraryLayout,
@@ -71,6 +71,11 @@ import { readingWorkspaceEntryFromLibraryItem } from '../../shared/readingWorksp
 import { resolveReadingWorkspaceActions } from '../../shared/readingWorkspaceActions';
 import type { ReadingWorkspaceActionId } from '../../shared/readingWorkspaceActions';
 import { isLibrarySort, readLibrarySort, writeLibrarySort, type LibrarySort } from '../librarySortPref';
+import { readLibraryView, resolveStoredFolder, writeLibraryView } from '../libraryViewPref';
+import LibraryImportStatus from '../components/library/LibraryImportStatus';
+import LibraryRemovedBar, { type LibraryRemovedNotice } from '../components/library/LibraryRemovedBar';
+import LibraryMetaEditor from '../components/library/LibraryMetaEditor';
+import '../components/library/libraryManage.css';
 
 interface Props {
   onOpen: (item: LibraryItem) => void;
@@ -192,7 +197,9 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   const aero = useAeroMaterials();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
-  const [active, setActive] = useState<FolderFilter>('all');
+  // Remembered between visits (libraryViewPref): folder, grouping, layout, filters.
+  const [initialView] = useState(readLibraryView);
+  const [active, setActive] = useState<FolderFilter>(initialView.folder);
   // Remembered between visits (librarySortPref); both sort pickers write through `chooseSort`.
   const [sortBy, setSortBy] = useState<LibrarySort>(readLibrarySort);
   const chooseSort = useCallback((value: string) => {
@@ -200,10 +207,30 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     setSortBy(value);
     writeLibrarySort(value);
   }, []);
-  const [groupBy, setGroupBy] = useState<LibraryGroup>('none');
-  const [layout, setLayout] = useState<LibraryLayout>(DEFAULT_LIBRARY_LAYOUT);
-  const [langFilter, setLangFilter] = useState<InboxLangFilter>('all');
-  const [levelFilter, setLevelFilter] = useState<'all' | '1' | '2' | '3' | '4' | '5' | '6' | '7'>('all');
+  const [groupBy, setGroupBy] = useState<LibraryGroup>(initialView.group);
+  const [layout, setLayout] = useState<LibraryLayout>(initialView.layout);
+  const [langFilter, setLangFilter] = useState<InboxLangFilter>(initialView.lang);
+  const [levelFilter, setLevelFilter] = useState<'all' | '1' | '2' | '3' | '4' | '5' | '6' | '7'>(initialView.level);
+  /** The shelf search (title, authors, series, tags). Not remembered: a stale query hides books. */
+  const [query, setQuery] = useState('');
+  /** Whether main has answered with the folders, so a remembered folder is not judged early. */
+  const [foldersLoaded, setFoldersLoaded] = useState(false);
+  useEffect(() => {
+    // Written only once the folder list is known, so a remembered folder is
+    // validated before anything can overwrite it with 'all'.
+    if (!foldersLoaded) return;
+    writeLibraryView({ folder: String(active), group: groupBy, layout, lang: langFilter, level: levelFilter });
+  }, [foldersLoaded, active, groupBy, layout, langFilter, levelFilter]);
+  /** Item just removed, for the Undo bar. */
+  const [lastRemoved, setLastRemoved] = useState<LibraryRemovedNotice | null>(null);
+  const [trashKey, setTrashKey] = useState(0);
+  const [removeError, setRemoveError] = useState('');
+  /** Item whose details editor is open. */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  /** Items whose stored copy is gone (moved or deleted behind the app). */
+  const [missingIds, setMissingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [relinkNote, setRelinkNote] = useState<{ id: string; text: string } | null>(null);
+  const [importNote, setImportNote] = useState('');
   const [watchFolder, setWatchFolder] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** Item id whose "file into folder…" menu is open. */
@@ -292,7 +319,11 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     });
     window.api.getWatchFolder().then(setWatchFolder);
     window.api.getLibraryFolders().then((fs) => {
-      setFolders(fs.includes(INBOX_FOLDER) ? fs : [...fs, INBOX_FOLDER]);
+      const list = fs.includes(INBOX_FOLDER) ? fs : [...fs, INBOX_FOLDER];
+      setFolders(list);
+      // A remembered folder deleted since (here or in another window) opens All.
+      setActive((current) => resolveStoredFolder(String(current), list));
+      setFoldersLoaded(true);
     });
     // Deep-link from Chrome extension settings / capture UI.
     const focus = takeHandoff('libraryFocusFolder');
@@ -365,6 +396,69 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     });
   }, []);
 
+  const itemIdsKey = useMemo(() => items.map((it) => it.id).join('|'), [items]);
+  useEffect(() => {
+    if (!itemIdsKey || !window.api?.checkLibraryMissing) {
+      setMissingIds(new Set());
+      return;
+    }
+    let alive = true;
+    void window.api.checkLibraryMissing()
+      .then((ids) => {
+        if (alive) setMissingIds(new Set(Array.isArray(ids) ? ids : []));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [itemIdsKey]);
+
+  async function relinkMissing(item: LibraryItem) {
+    setRelinkNote(null);
+    try {
+      if (item.kind === 'manga') {
+        const res = await window.api?.relinkManga?.(item.id);
+        if (!res || (!res.ok && res.canceled)) return;
+        if (res.ok) {
+          setRelinkNote({ id: item.id, text: t('libManage.missing.relinked') });
+        } else {
+          setRelinkNote({
+            id: item.id,
+            text:
+              res.errorCode === 'no-pages'
+                ? t('libManage.missing.noPages')
+                : res.errorCode === 'storage-full'
+                  ? t('libManage.missing.diskFull')
+                  : t('libManage.missing.relinkFailed'),
+          });
+          return;
+        }
+      } else {
+        const res = await window.api?.relinkBook?.(item.id);
+        if (!res || (!res.ok && res.canceled)) return;
+        if (res.ok) {
+          setRelinkNote({ id: item.id, text: t('libManage.missing.relinked') });
+        } else {
+          setRelinkNote({
+            id: item.id,
+            text: res.errorCode === 'storage-full' ? t('libManage.missing.diskFull') : t('libManage.missing.relinkFailed'),
+          });
+          return;
+        }
+      }
+      const ids = await window.api?.checkLibraryMissing?.();
+      if (Array.isArray(ids)) setMissingIds(new Set(ids));
+    } catch {
+      setRelinkNote({ id: item.id, text: t('libManage.missing.relinkFailed') });
+    }
+  }
+
+  async function importBooksFolder() {
+    setImportNote('');
+    const res = await window.api?.importBooksFolder?.();
+    if (res && !res.canceled && res.found === 0) setImportNote(t('libManage.import.noneFound'));
+  }
+
   async function importFiles() {
     setBusy(true);
     try {
@@ -411,15 +505,59 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   async function removeItem(id: string) {
     const ok = await confirmDialog({
       title: t('library.remove.title'),
+      // Remove moves the item to the library trash (main/libraryTrash.ts): the
+      // copy is deleted only after 30 days, and Undo / Restore bring it back.
+      // One message says both, so it never promises a deletion it then retracts.
       message: t('library.remove.message'),
       confirmLabel: t('common.remove'),
       danger: true,
     });
-    if (ok) {
+    if (!ok) return;
+    const title = items.find((it) => it.id === id)?.title ?? '';
+    setRemoveError('');
+    try {
       setItems(await window.api.removeItem(id));
-      setSelectedId((current) => (current === id ? null : current));
+    } catch {
+      // A file in it is held open: nothing was removed, and the shelf says so.
+      setRemoveError(t('libManage.remove.failed'));
+      return;
     }
+    setSelectedId((current) => (current === id ? null : current));
+    setLastRemoved({ id, title });
+    setTrashKey((n) => n + 1);
   }
+
+  const onRestored = useCallback((next: LibraryItem[], item: LibraryItem) => {
+    setItems(next);
+    setSelectedId(item.id);
+    setTrashKey((n) => n + 1);
+  }, []);
+  const dismissLastRemoved = useCallback(() => setLastRemoved(null), []);
+
+  /** Import progress, the Undo bar and Recently removed — shown by both shells. */
+  const manageStrips = (
+    <>
+      <LibraryImportStatus t={t} />
+      {importNote && (
+        <div className="banner" role="status">
+          {importNote}
+        </div>
+      )}
+      {removeError && (
+        <div className="banner" role="alert">
+          {removeError}
+        </div>
+      )}
+      <LibraryRemovedBar
+        t={t}
+        lang={lang}
+        lastRemoved={lastRemoved}
+        onDismissLast={dismissLastRemoved}
+        onRestored={onRestored}
+        refreshKey={trashKey}
+      />
+    </>
+  );
 
   async function remove(e: MouseEvent, id: string) {
     e.stopPropagation();
@@ -652,8 +790,10 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   }, [items, folders, bookLevels, langFilter, levelFilter]);
 
   const visible = useMemo(() => {
-    const list = scoped.filter((it) =>
-      matchesLibraryFilters(it, bookLevels, { lang: langFilter, level: levelFilter }),
+    const list = scoped.filter(
+      (it) =>
+        matchesLibraryFilters(it, bookLevels, { lang: langFilter, level: levelFilter }) &&
+        matchesLibraryQuery(it, query),
     );
 
     const sorted = [...list];
@@ -687,7 +827,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       }
     });
     return sorted;
-  }, [scoped, sortBy, langFilter, levelFilter, bookLevels]);
+  }, [scoped, sortBy, langFilter, levelFilter, bookLevels, query]);
 
   /**
    * The scope holds books and the filter hid every one of them. Distinct from an empty folder,
@@ -698,6 +838,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   const clearFilters = useCallback(() => {
     setLangFilter('all');
     setLevelFilter('all');
+    setQuery('');
   }, []);
 
   const groupedVisible = useMemo(() => {
@@ -728,7 +869,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
    * folder or filter — but only on the unfiltered "All" view, where it cannot
    * be mistaken for a filter result.
    */
-  const showContinueShelf = active === 'all' && langFilter === 'all' && levelFilter === 'all';
+  const showContinueShelf = active === 'all' && langFilter === 'all' && levelFilter === 'all' && !query.trim();
 
   /** Arrow keys walk the list rows; Enter still opens, Space still selects. */
   const onListRowKeyDown = useCallback((e: KeyboardEvent<HTMLButtonElement>) => {
@@ -793,6 +934,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   // resolveSelection. A drawer that re-selects something the moment you close
   // it is a drawer that cannot be closed.
   const selectedItem = resolveSelection(visible, selectedId);
+  const editingItem = editingId ? (items.find((it) => it.id === editingId) ?? null) : null;
   const activeLabel =
     active === 'all'
       ? t('library.filter.allItems')
@@ -832,7 +974,51 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           <dt>{t('library.inspector.added')}</dt>
           <dd>{new Date(selectedItem.createdAt).toLocaleDateString(LANG_TAGS[lang])}</dd>
         </div>
+        {selectedItem.author && (
+          <div>
+            <dt>{t('libManage.meta.field.author')}</dt>
+            <dd>{selectedItem.author}</dd>
+          </div>
+        )}
+        {selectedItem.series && (
+          <div>
+            <dt>{t('libManage.meta.field.series')}</dt>
+            <dd>
+              {selectedItem.seriesIndex !== undefined
+                ? t('libManage.meta.seriesWithIndex', { series: selectedItem.series, index: selectedItem.seriesIndex })
+                : selectedItem.series}
+            </dd>
+          </div>
+        )}
+        {selectedItem.tags && selectedItem.tags.length > 0 && (
+          <div>
+            <dt>{t('libManage.meta.field.tags')}</dt>
+            <dd className="lib-meta-tags">
+              {selectedItem.tags.map((tag) => (
+                <span key={tag} className="lib-meta-tag">
+                  {tag}
+                </span>
+              ))}
+            </dd>
+          </div>
+        )}
       </dl>
+      {missingIds.has(selectedItem.id) && (
+        <div className="lib-missing" role="status" data-library-missing={selectedItem.id}>
+          <strong>{t('libManage.missing.badge')}</strong>
+          <span className="muted">{t('libManage.missing.explain')}</span>
+          <div>
+            <Button size="sm" onClick={() => void relinkMissing(selectedItem)}>
+              {t('libManage.missing.relink')}
+            </Button>
+          </div>
+        </div>
+      )}
+      {relinkNote?.id === selectedItem.id && (
+        <div className="muted" role="status">
+          {relinkNote.text}
+        </div>
+      )}
       <div className="aero-library-inspector-actions lib-drawer-actions">
         {/*
           The unified Reading action set, not a Library-specific button row.
@@ -864,6 +1050,9 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
             {t('library.card.setCoverTitle')}
           </Button>
         )}
+        <Button leftIcon={<Icon name="edit" size={14} />} onClick={() => setEditingId(selectedItem.id)}>
+          {t('libManage.meta.edit')}
+        </Button>
         <Button leftIcon={<Icon name="close" size={14} />} onClick={() => void removeItem(selectedItem.id)}>
           {t('common.remove')}
         </Button>
@@ -938,6 +1127,12 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       items: [
         { id: 'import-files', label: t('library.menu.importFiles'), disabled: busy, onSelect: importFiles },
         { id: 'import-folder', label: t('library.menu.importFolder'), disabled: busy, onSelect: importFolder },
+        {
+          id: 'import-books-folder',
+          label: t('libManage.menu.importBooksFolder'),
+          disabled: busy,
+          onSelect: () => void importBooksFolder(),
+        },
         { separator: true, label: '' },
         {
           id: 'import-web',
@@ -1077,6 +1272,10 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
               <button className="btn" disabled={busy} onClick={importFolder}>
                 <Icon name="folder" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
                 {t('library.btn.importFolder')}
+              </button>
+              <button className="btn" disabled={busy} onClick={() => void importBooksFolder()}>
+                <Icon name="folder-open" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
+                {t('libManage.btn.importBooksFolder')}
               </button>
               <button className="btn" disabled={busy} onClick={() => setImportOpen(true)}>
                 <Icon name="globe" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
@@ -1327,6 +1526,23 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 {t('library.toolbar.youtube')}
               </Button>
               <ToolbarSpacer />
+              <input
+                id="aero-lib-search"
+                type="search"
+                className="gram-search lib-search"
+                value={query}
+                placeholder={t('libManage.search.placeholder')}
+                aria-label={t('libManage.search.label')}
+                title={t('libManage.search.label')}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && query) {
+                    // Clears the search; the window keeps its Escape otherwise.
+                    e.stopPropagation();
+                    setQuery('');
+                  }
+                }}
+              />
               {layoutSwitch}
               <label className="muted" htmlFor="aero-lib-sort" style={{ fontSize: 11 }}>
                 {t('library.sort.label')}
@@ -1390,6 +1606,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
               </div>
             )}
             {busy && <div className="banner">{t('library.busy')}</div>}
+            {manageStrips}
             {items.length === 0 ? (
               <div className="aero-library-empty">
                 <Icon name="library" size={38} />
@@ -1675,6 +1892,23 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       </div>
 
       <div className="lib-sort-row lq-hit-scope" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <input
+                id="lib-search"
+                type="search"
+                className="gram-search lib-search"
+                value={query}
+                placeholder={t('libManage.search.placeholder')}
+                aria-label={t('libManage.search.label')}
+                title={t('libManage.search.label')}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && query) {
+                    // Clears the search; the window keeps its Escape otherwise.
+                    e.stopPropagation();
+                    setQuery('');
+                  }
+                }}
+              />
         <label className="muted" htmlFor="lib-sort" style={{ fontSize: 12 }}>
           {t('library.sort.label')}
         </label>
@@ -1770,6 +2004,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       )}
 
       {busy && <div className="banner">{t('library.busy')}</div>}
+      {manageStrips}
 
       {items.length === 0 ? (
         <div className="empty">
@@ -2070,6 +2305,14 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
         </ReadingCanvas>
       )}
         </>
+      )}
+      {editingItem && (
+        <LibraryMetaEditor
+          item={editingItem}
+          t={t}
+          onClose={() => setEditingId(null)}
+          onSaved={(next) => setItems(next)}
+        />
       )}
     </div>
     </AppChrome>

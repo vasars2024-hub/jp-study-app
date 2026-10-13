@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { appendNotebookEvent } from './notebookTimeline';
+import { appendNotebookEvent } from './notebookActivity';
 import { mineToStudy, requestStudyInput, type MineToStudyInput } from './studyMining';
 import type { MineNoteRequest } from '../shared/anki';
 import {

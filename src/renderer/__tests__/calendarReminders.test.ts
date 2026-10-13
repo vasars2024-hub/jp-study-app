@@ -13,7 +13,9 @@ import { LS_KEYS } from '../storage/storage';
 import {
   CALENDAR_REMINDER_STATE_KEY,
   CALENDAR_REMINDER_TICK_MS,
+  calendarSnoozeUntil,
   createCalendarReminderScheduler,
+  snoozeCalendarReminder,
   evaluateCalendarReminders,
   emptyCalendarReminderState,
   isPrimaryShellWindow,
@@ -180,6 +182,88 @@ describe('calendar reminders — the scheduler', () => {
     expect(isPrimaryShellWindow('?popout=calendar')).toBe(false);
     expect(isPrimaryShellWindow('?blanc=1')).toBe(false);
     expect(isPrimaryShellWindow('?desk=1&displayKey=x')).toBe(false);
+  });
+});
+
+describe('calendar reminders — package 8 fixes', () => {
+  it('an "at event time" reminder for an event with no end time is on time, not "missed"', () => {
+    // It ends the moment it starts, so the tick after the start used to call it over and missed.
+    vi.setSystemTime(new Date(2026, 8, 15, 9, 59, 50));
+    const delivered: CalendarReminder[][] = [];
+    const scheduler = launch([event({ id: 'call', endTime: undefined, reminder: 'at' })], delivered);
+    scheduler.start();
+    expect(delivered).toEqual([]);
+    vi.advanceTimersByTime(CALENDAR_REMINDER_TICK_MS);
+    expect(delivered.flat().map((r) => [r.eventId, r.missed])).toEqual([['call', false]]);
+    scheduler.stop();
+  });
+
+  it('an exact imported lead time fires that long before, even days ahead', () => {
+    const events = [event({ id: 'exam', date: '2026-09-18', reminder: 'custom', reminderMinutes: 3 * 1440 })];
+    const at = (d: number, h: number, m = 0) => new Date(2026, 8, d, h, m).getTime();
+    const early = evaluateCalendarReminders({ events, now: at(15, 9, 59), state: { fired: {}, lastRunAt: at(15, 9, 58) } });
+    expect(early.due).toEqual([]);
+    const due = evaluateCalendarReminders({ events, now: at(15, 10, 0), state: early.state });
+    expect(due.due.map((r) => [r.eventId, r.occurrenceDate, r.missed])).toEqual([['exam', '2026-09-18', false]]);
+  });
+
+  it('a multi-day event is not over until its last day', () => {
+    const at = (d: number, h: number) => new Date(2026, 8, d, h).getTime();
+    const events = [event({ id: 'trip', allDay: true, startTime: undefined, endTime: undefined, endDate: '2026-09-17', reminder: 'at' })];
+    // Due 09:00 on the 15th; the app was closed until noon on the 16th. Late, so marked missed,
+    // but delivered as an event still running (it ends on the 17th), not as history.
+    const result = evaluateCalendarReminders({ events, now: at(16, 12), state: { fired: {}, lastRunAt: at(15, 8) } });
+    expect(result.due.map((r) => [r.eventId, r.missed])).toEqual([['trip', true]]);
+    expect(result.due[0].occurrenceDate).toBe('2026-09-15');
+    // A first launch never dumps history; this one is still running, so it is said.
+    const fresh = evaluateCalendarReminders({ events, now: at(16, 12), state: { fired: {}, lastRunAt: null } });
+    expect(fresh.due.map((r) => r.eventId)).toEqual(['trip']);
+  });
+
+  it('snooze: the card comes back once when the snooze is up, across a restart, on time', () => {
+    vi.setSystemTime(new Date(2026, 8, 15, 9, 45));
+    const events = [event({ id: 'exam', reminder: '15m' })];
+    const first: CalendarReminder[][] = [];
+    const a = launch(events, first);
+    a.start();
+    const [reminder] = first.flat();
+    expect(reminder.eventId).toBe('exam');
+    const until = calendarSnoozeUntil(reminder, '5m', Date.now());
+    expect(until).toBe(new Date(2026, 8, 15, 9, 50).getTime());
+    snoozeCalendarReminder(reminder.key, until as number);
+    a.stop();
+
+    // Restarted before the snooze is up: nothing yet; then exactly once.
+    const second: CalendarReminder[][] = [];
+    const b = launch(events, second);
+    b.start();
+    expect(second).toEqual([]);
+    vi.advanceTimersByTime(5 * MIN);
+    expect(second.flat().map((r) => [r.key, r.missed])).toEqual([[reminder.key, false]]);
+    vi.advanceTimersByTime(10 * MIN);
+    expect(second.flat()).toHaveLength(1);
+    b.stop();
+    expect(JSON.parse(localStorage.getItem(CALENDAR_REMINDER_STATE_KEY) ?? '{}').snoozed).toEqual({});
+  });
+
+  it('"until it starts" is offered only while the start is ahead; a snooze for a deleted event is dropped', () => {
+    const startsAt = new Date(2026, 8, 15, 10, 0).getTime();
+    expect(calendarSnoozeUntil({ startsAt }, 'start', startsAt - MIN)).toBe(startsAt);
+    expect(calendarSnoozeUntil({ startsAt }, 'start', startsAt)).toBeNull();
+    const result = evaluateCalendarReminders({
+      events: [],
+      now: startsAt,
+      state: { fired: {}, lastRunAt: startsAt - 30_000, snoozed: { 'gone|2026-09-15|10:00|15m': startsAt - 1 } },
+    });
+    expect(result.due).toEqual([]);
+    expect(result.state.snoozed).toEqual({});
+  });
+
+  it('the key of a picker reminder is unchanged, so nothing already delivered fires again', async () => {
+    const { calendarReminderKey } = await import('../calendarReminders');
+    expect(calendarReminderKey({ ...event({ id: 'a' }), occurrenceDate: '2026-09-15' })).toBe('a|2026-09-15|10:00|15m');
+    expect(calendarReminderKey({ ...event({ id: 'a', reminder: 'custom', reminderMinutes: 10 }), occurrenceDate: '2026-09-15' }))
+      .toBe('a|2026-09-15|10:00|custom10');
   });
 });
 

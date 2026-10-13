@@ -19,9 +19,17 @@
  *   node tools/blanc-budget.cjs            # build, measure, compare to budget
  *   node tools/blanc-budget.cjs --update   # rewrite the budget from this build
  *   node tools/blanc-budget.cjs --json
+ *   node tools/blanc-budget.cjs --dist=<renderer out dir>   # measure an existing build
  *
  * Exit code 1 if a budget is exceeded or a forbidden subsystem appears in the
  * Blanc boot path.
+ *
+ * The Blanc half is a vitest gate: src/renderer/__tests__/blancBuiltBudget.test.ts
+ * runs this script with --json (one production renderer build, ~45 s) and fails
+ * when `blanc.bytes` passes the budget or a violation appears. That test exists
+ * because this gate went red unnoticed for a week (2,538,528 B against
+ * 2,411,724 B on 2026-10-12) while the SOURCE-graph tests stayed green: they
+ * measure which files are reachable, not how many bytes ship.
  */
 'use strict';
 
@@ -62,7 +70,9 @@ function build(outDir) {
   execFileSync(
     process.execPath,
     [viteBin, 'build', '--config', 'vite.renderer.config.ts', '--outDir', outDir],
-    { cwd: ROOT, stdio: 'pipe' },
+    // Vite's warnings for this tree run to hundreds of KB; the default 1 MB
+    // buffer is closer than it looks.
+    { cwd: ROOT, stdio: 'pipe', maxBuffer: 64 * 1024 * 1024 },
   );
 }
 
@@ -81,10 +91,17 @@ function main() {
   const asJson = process.argv.includes('--json');
   const update = process.argv.includes('--update');
 
-  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blanc-budget-'));
+  const distArg = process.argv.find((a) => a.startsWith('--dist='));
+  const given = distArg ? path.resolve(distArg.slice('--dist='.length)) : null;
+  if (given && !fs.existsSync(path.join(given, 'blanc.html'))) {
+    console.error(`--dist: no blanc.html in ${given} (expected a renderer build output).`);
+    process.exitCode = 2;
+    return;
+  }
+  const outDir = given ?? fs.mkdtempSync(path.join(os.tmpdir(), 'blanc-budget-'));
   let report;
   try {
-    build(outDir);
+    if (!given) build(outDir);
 
     const blancAssets = entryAssets(outDir, 'blanc.html');
     const mainAssets = entryAssets(outDir, 'index.html');
@@ -108,7 +125,7 @@ function main() {
       violations,
     };
   } finally {
-    fs.rmSync(outDir, { recursive: true, force: true });
+    if (!given) fs.rmSync(outDir, { recursive: true, force: true });
   }
 
   if (update) {

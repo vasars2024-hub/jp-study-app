@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { WidgetSnapshot } from '../../shared/desktop';
 import { WIDGETS, getWidgetDef } from '../widgets/registry';
 import { WIDGET_CATEGORIES, type WidgetCategory } from '../widgets/types';
@@ -14,6 +14,13 @@ import { writeLocalStorageJson } from '../localStorageWrite';
 
 // Persist favorites + recently-used across sessions (small UI state → localStorage).
 const GKEY = 'jp-widget-gallery';
+
+/**
+ * wid7: how long the pointer must rest on a card before the preview follows it.
+ * The preview mounts the real widget, so sweeping the pointer across a row of
+ * cards used to mount and unmount a dozen widgets on the way to the one wanted.
+ */
+export const PREVIEW_HOVER_MS = 150;
 interface GalleryPrefs {
   favorites: string[];
   recent: string[];
@@ -69,6 +76,24 @@ export default function WidgetGallery({
   const [prefs, setPrefs] = useState<GalleryPrefs>(loadPrefs);
   /** wid6: the card the preview pane shows — the last one pointed at or focused. */
   const [previewType, setPreviewType] = useState<string | null>(null);
+  const hoverTimer = useRef<number | null>(null);
+  const cancelHover = (): void => {
+    if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+  };
+  useEffect(() => cancelHover, []);
+  /** The pointer settles before the preview moves; focus moves it at once (a keyboard step is deliberate). */
+  const hoverPreview = (type: string): void => {
+    cancelHover();
+    hoverTimer.current = window.setTimeout(() => {
+      hoverTimer.current = null;
+      setPreviewType(type);
+    }, PREVIEW_HOVER_MS);
+  };
+  const focusPreview = (type: string): void => {
+    cancelHover();
+    setPreviewType(type);
+  };
   const [tab, setTab] = useState<Tab>('All');
   const [query, setQuery] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
@@ -163,8 +188,9 @@ export default function WidgetGallery({
         key={w.type}
         className={`widget-card${isInstalled ? ' installed' : ''}${previewDef?.type === w.type ? ' is-previewed' : ''}`}
         data-widget-card={w.type}
-        onPointerEnter={() => setPreviewType(w.type)}
-        onFocus={() => setPreviewType(w.type)}
+        onPointerEnter={() => hoverPreview(w.type)}
+        onPointerLeave={cancelHover}
+        onFocus={() => focusPreview(w.type)}
       >
         <div className="widget-card-head">
           <span className="widget-card-title">{titleOf(w)}</span>

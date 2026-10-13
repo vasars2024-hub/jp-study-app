@@ -6,6 +6,7 @@ import {
   type AudioSourceConfig,
 } from '../../../shared/audioSources';
 import { loadAudioSources, onAudioSourcesChanged } from '../../audioSourcesClient';
+import { cardAudio } from '../../cardAudioPlayback';
 import { useT } from '../../i18n';
 import './wordAudio.css';
 import './dict3.css';
@@ -113,9 +114,12 @@ export default function WordAudio({ word, reading, lang }: Props) {
    * hand and cached, and the only realistic cause is Chromium's user-activation
    * window having expired while the fetch was in flight. The state stays
    * `ready`, so the next click replays from the ref under a fresh gesture.
+   *
+   * Through the shared study-clip channel: a second click (or another word)
+   * cuts this one instead of stacking on it, and the Soundscape ducks under it.
    */
   const start = (src: string) => {
-    void new Audio(src).play().catch(() => undefined);
+    void cardAudio.play(src).catch(() => undefined);
   };
 
   const play = async () => {

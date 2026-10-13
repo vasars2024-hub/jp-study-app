@@ -5,7 +5,7 @@
  * imported, opened, checked through computed styles, a word is mined from the page with a
  * real (CDP) click, and the card it makes reopens the book ("Open in book").
  */
-const { installHelpers, poll, clickText } = require('./_lib.cjs');
+const { installHelpers, poll, clickText, ensureDictionaryReady } = require('./_lib.cjs');
 const fixtures = require('../fixtures.cjs');
 
 const TITLE = '窓辺の猫（E2E）';
@@ -50,7 +50,11 @@ module.exports = {
     result.check('ruby kept with its readings', styles.ruby.join(',') === 'こまち,ねこ,まどべ', styles.ruby);
     await ctx.shot('vertical');
 
-    // Mine a word with a real click on the page.
+    // Mine a word with a real click on the page. The pop-up needs the built-in dictionary,
+    // which a fresh profile may still be loading: this flow must not depend on the
+    // `dictionary` flow having run (and paid that wait) first.
+    const dict = await ensureDictionaryReady(ctx, { word: MINED });
+    result.check('the built-in dictionary is ready for lookups', dict.ready, dict);
     const click = await clickText(ctx, '.novel-content', MINED[0]);
     result.check('a real click lands on the page', click.ok === true && click.delivered >= 1, click);
     const popupWord = await poll(ctx, `document.querySelector('.dict-popup .dict-word')?.textContent`, 10000);

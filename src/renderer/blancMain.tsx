@@ -31,7 +31,7 @@ import { applyBlancCustomCss } from './blancCustomCssApply';
 import { loadToolboxSettings } from './toolboxSettings';
 import { bootTheme, onThemeChanged } from './theme';
 import { initProfileState } from './profileState';
-import { installKeyboardShortcuts } from './keyboardShortcuts';
+import { installKeyboardShortcutsSafely } from './keyboardShortcuts';
 import { startAiSetupSync } from './aiSetupClient';
 import { installBlancConsoleCapture } from './blancConsole';
 import { installNotificationCapture } from './notificationStore';
@@ -123,7 +123,8 @@ applyBlancCustomCss(bootToolbox.customCss);
 applyLangAttribute();
 installNotificationCapture();
 installBlancConsoleCapture();
-installKeyboardShortcuts();
+// kbd7: a damaged shortcut store is backed up and reset, never a window that will not render.
+installKeyboardShortcutsSafely();
 // BlancDeckPanel reads the active profile's Anki deck name.
 void initProfileState().catch((err) => console.error('[profileState] init failed:', err));
 // Earns its place by this file's own rule: `LocalAgentPanel` in

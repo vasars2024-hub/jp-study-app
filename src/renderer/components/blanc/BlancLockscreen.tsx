@@ -37,7 +37,20 @@ function useMinuteClock(): Date {
 export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
   const { t } = useT();
   useLockBlockedToasts();
-  const [digits, setDigits] = useState('');
+  const [digits, setDigitsState] = useState('');
+  /**
+   * The digits as typed so far, updated synchronously. The keydown path reads and
+   * writes this instead of computing the next value inside a state updater:
+   * StrictMode runs updaters twice, so a submit scheduled from one fired twice and
+   * one wrong PIN cost two of main's attempts (bug 37).
+   */
+  const digitsRef = useRef('');
+  const setDigits = (next: string): void => {
+    digitsRef.current = next;
+    setDigitsState(next);
+  };
+  /** A PIN is with main: a second submit waits for its answer. */
+  const verifyingRef = useRef(false);
   const [error, setError] = useState('');
   const now = useMinuteClock();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -96,25 +109,29 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
       if (pin.length > 0) setError(t('lock4.tooShort'));
       return;
     }
-    void Promise.resolve(verifyLockscreenPinDetailed(pin)).then((res) => {
-      if (!res.ok) {
-        setDigits('');
-        // Main's backoff holds entry: say how long, or the right PIN reads as wrong too.
-        setError(
-          res.retryAfterMs && res.retryAfterMs > 0
-            ? t('lockscreen.retryIn', { count: Math.max(1, Math.ceil(res.retryAfterMs / 1000)) })
-            : t('blanc.tb.wrongPin'),
-        );
-        return;
-      }
-      onUnlocked();
-    });
+    if (verifyingRef.current) return;
+    verifyingRef.current = true;
+    void Promise.resolve(verifyLockscreenPinDetailed(pin))
+      .then((res) => {
+        if (!res.ok) {
+          setDigits('');
+          // Main's backoff holds entry: say how long, or the right PIN reads as wrong too.
+          setError(
+            res.retryAfterMs && res.retryAfterMs > 0
+              ? t('lockscreen.retryIn', { count: Math.max(1, Math.ceil(res.retryAfterMs / 1000)) })
+              : t('blanc.tb.wrongPin'),
+          );
+          return;
+        }
+        onUnlocked();
+      })
+      .finally(() => {
+        verifyingRef.current = false;
+      });
   };
   // The keydown listener registers once; it reaches the latest `submit` here.
   const submitRef = useRef(submit);
   submitRef.current = submit;
-  const digitsRef = useRef(digits);
-  digitsRef.current = digits;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -141,15 +158,19 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
         return;
       }
       if (/^\d$/.test(event.key)) {
-        setDigits((prev) => {
-          if (prev.length >= maxDigitsRef.current) return prev;
+        // Outside any state updater (see digitsRef): the submit is scheduled once.
+        const prev = digitsRef.current;
+        if (prev.length < maxDigitsRef.current) {
           const next = prev + event.key;
+          digitsRef.current = next;
+          setDigitsState(next);
           if (kindRef.current === 'pin4' && next.length === 4) window.setTimeout(() => submitRef.current(next), 40);
-          return next;
-        });
+        }
         setError('');
       } else if (event.key === 'Backspace' || event.key === 'Delete') {
-        setDigits((prev) => prev.slice(0, -1));
+        const next = digitsRef.current.slice(0, -1);
+        digitsRef.current = next;
+        setDigitsState(next);
       }
     };
     // Focus that lands outside the lock (a toast's button, a click on the window

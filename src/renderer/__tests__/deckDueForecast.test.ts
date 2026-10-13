@@ -73,15 +73,17 @@ describe('deckDueForecast', () => {
 });
 
 describe('review load buckets across a DST change', () => {
-  it('puts a card due just after midnight on its own local day', () => {
+  it('puts a card on its own study day across the change (days start at 4 am)', () => {
     const previous = process.env.TZ;
     process.env.TZ = 'America/New_York';
     try {
       // US clocks spring forward on 2026-03-08: that local day is 23 hours long.
       const now = new Date(2026, 2, 7, 12, 0).getTime();
-      const due = new Date(2026, 2, 9, 0, 30).getTime();
-      const entries = dueLoadEntriesForTests([card({ srs: srs(due) })], now, true);
-      expect(entries).toEqual([[2, 1]]);
+      const due = new Date(2026, 2, 9, 4, 30).getTime();
+      expect(dueLoadEntriesForTests([card({ srs: srs(due) })], now, true)).toEqual([[2, 1]]);
+      // 00:30 on the 9th still belongs to the study day of the 8th.
+      const lateNight = new Date(2026, 2, 9, 0, 30).getTime();
+      expect(dueLoadEntriesForTests([card({ srs: srs(lateNight) })], now, true)).toEqual([[1, 1]]);
     } finally {
       process.env.TZ = previous;
     }

@@ -51,8 +51,11 @@ export type MusicMineOutcome =
 
 export interface MusicMining {
   outcome: MusicMineOutcome;
-  /** Resolves once the note has been attempted; never throws. */
-  mine: (line: MusicMiningLine, kind: MusicLyricsKind, positionSec: number) => Promise<void>;
+  /**
+   * Resolves once the note has been attempted; never throws. `translation` is the line's
+   * translation when the sheet carries one (a bilingual LRC), and becomes the card's.
+   */
+  mine: (line: MusicMiningLine, kind: MusicLyricsKind, positionSec: number, translation?: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -68,6 +71,7 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
     line: MusicMiningLine,
     kind: MusicLyricsKind,
     positionSec: number,
+    translation = '',
   ): Promise<void> => {
     if (!current) return;
     const cue = musicStudyCue(line, kind, positionSec);
@@ -76,7 +80,7 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
     if (!cue) return;
 
     let draft = createVideoCoreMiningDraft(
-      cue, cue.text, musicMiningSource(current, kind), Date.now(), '', studyLangOfText(cue.text, getStudyLang()),
+      cue, cue.text, musicMiningSource(current, kind), Date.now(), translation, studyLangOfText(cue.text, getStudyLang()),
     );
 
     // Attach the line's audio when there is a real range to record.

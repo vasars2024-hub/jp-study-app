@@ -74,6 +74,20 @@ function seedOneFile(): void {
 }
 
 /**
+ * Drains `resumeLastEpisode` after the command fires: the availability IPC, its `.then`,
+ * and the on-use import of the continue-watching store (kept out of Blanc's boot bundle
+ * since 5183c5f6). The import is awaited here once so the command's own `import()` finds
+ * it cached — the same drain `resumeLastShellHandoff.test.ts` uses. It adds no slack to
+ * the ordering this file pins: the reader closes and the host mounts in the commit the
+ * handler causes, before any of this runs.
+ */
+async function settle(): Promise<void> {
+  await import('../continueWatchingStore');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
  * `App.tsx` in miniature: a `reading` state, the hook, and the two branches — a reader
  * with a palette and no host, or a desktop with a host.
  */
@@ -111,6 +125,7 @@ describe('resuming from inside a book', () => {
     expect(document.querySelector('.reader-root')).not.toBeNull();
     await act(async () => {
       runCommand('video.resumeLast');
+      await settle();
     });
 
     expect(document.querySelector('.reader-root'), 'the book stayed open').toBeNull();
@@ -130,6 +145,7 @@ describe('resuming from inside a book', () => {
 
     await act(async () => {
       runCommand('video.resumeLast');
+      await settle();
     });
 
     expect(document.querySelector('.reader-root'), 'the book was closed for nothing')
@@ -148,6 +164,7 @@ describe('resuming from inside a book', () => {
 
     await act(async () => {
       runCommand('video.resumeLast');
+      await settle();
     });
 
     expect(opens).toEqual([]);
@@ -167,6 +184,7 @@ describe('resuming from inside a book', () => {
 
     await act(async () => {
       runCommand('video.resumeLast');
+      await settle();
     });
 
     expect(opens).toHaveLength(1);

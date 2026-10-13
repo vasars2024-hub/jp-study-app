@@ -143,8 +143,8 @@ function maskComments(text) {
 }
 
 /** A path under here declares keys; it never consumes them. */
-function isCatalogSource(file) {
-  return file.startsWith(I18N_DIR + path.sep);
+function isCatalogSource(file, i18nDir = I18N_DIR) {
+  return file.startsWith(i18nDir + path.sep);
 }
 
 function isTestFile(file) {
@@ -169,14 +169,14 @@ function walk(dir, out = []) {
  * TypeScript modules with a build step, and a text read cannot be defeated by a
  * lazy loader.
  */
-function collectEnglishKeys() {
+function collectEnglishKeys(i18nDir = I18N_DIR, root = ROOT) {
   const keys = new Map(); // key -> declaring file, relative
-  for (const file of walk(I18N_DIR)) {
+  for (const file of walk(i18nDir)) {
     if (path.basename(file) !== 'en.ts') continue;
     const text = fs.readFileSync(file, 'utf8');
     for (const line of text.split('\n')) {
       const m = /^\s+'([^']+)'\s*:/.exec(line);
-      if (m) keys.set(m[1], path.relative(ROOT, file).replace(/\\/g, '/'));
+      if (m) keys.set(m[1], path.relative(root, file).replace(/\\/g, '/'));
     }
   }
   return keys;
@@ -226,20 +226,27 @@ function namespaceOf(key) {
   return parts.length > 1 ? `${parts[0]}.${parts[1]}` : parts[0];
 }
 
-function main() {
-  const args = process.argv.slice(2);
-  const asJson = args.includes('--json');
-  const update = args.includes('--update-baseline');
-  const listAt = args.indexOf('--list');
-  const listPrefix = listAt >= 0 ? args[listAt + 1] : null;
+/**
+ * The whole check as data, so a test can run it in-process (the way
+ * `i18n-hardcoded-check.cjs` is run by `i18n.test.ts`) instead of trusting an exit code.
+ *
+ * `root` defaults to this repo; a test points it at a temp tree to plant an orphan and
+ * prove the gate fires. `baselinePath` defaults to `<root>/tools/i18n-orphan-key-baseline.json`.
+ */
+function scan(opts = {}) {
+  const root = opts.root ?? ROOT;
+  const src = path.join(root, 'src');
+  const i18nDir = path.join(src, 'shared', 'i18n');
+  const vendor = opts.root ? [path.join(root, 'vendor', 'seanime-web')] : VENDOR_CONSUMERS;
+  const baselinePath = opts.baselinePath ?? (opts.root ? path.join(root, 'tools', 'i18n-orphan-key-baseline.json') : BASELINE_PATH);
 
-  const declared = collectEnglishKeys();
+  const declared = collectEnglishKeys(i18nDir, root);
 
   // One pass over every consuming file: collect the literal text and the set of
   // interpolated prefixes. Concatenating the sources is deliberate — a key is
   // used if ANY file asks for it, and which file does not change the verdict.
-  const roots = [SRC, ...VENDOR_CONSUMERS.filter((dir) => fs.existsSync(dir))];
-  const consumers = roots.flatMap((dir) => walk(dir)).filter((f) => !isCatalogSource(f) && !isTestFile(f));
+  const roots = [src, ...vendor.filter((dir) => fs.existsSync(dir))];
+  const consumers = roots.flatMap((dir) => walk(dir)).filter((f) => !isCatalogSource(f, i18nDir) && !isTestFile(f));
   const dynamicPrefixes = new Set();
   const dynamicSuffixes = new Set();
   const haystack = [];
@@ -276,15 +283,8 @@ function main() {
   const byNamespace = new Map();
   for (const o of orphans) byNamespace.set(o.namespace, (byNamespace.get(o.namespace) ?? 0) + 1);
 
-  if (listPrefix) {
-    const hits = orphans.filter((o) => o.key.startsWith(listPrefix));
-    for (const o of hits) console.log(`${o.key}  (${o.declaredIn})`);
-    console.log(`\n${hits.length} orphan key(s) under "${listPrefix}".`);
-    return 0;
-  }
-
-  const baseline = fs.existsSync(BASELINE_PATH)
-    ? JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'))
+  const baseline = fs.existsSync(baselinePath)
+    ? JSON.parse(fs.readFileSync(baselinePath, 'utf8'))
     : { namespaces: {} };
 
   const regressions = [];
@@ -296,6 +296,25 @@ function main() {
   for (const [ns, allowed] of Object.entries(baseline.namespaces)) {
     const count = byNamespace.get(ns) ?? 0;
     if (count < allowed) improvements.push({ namespace: ns, count, allowed });
+  }
+
+  return { declared, orphans, byNamespace, baseline, regressions, improvements };
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const asJson = args.includes('--json');
+  const update = args.includes('--update-baseline');
+  const listAt = args.indexOf('--list');
+  const listPrefix = listAt >= 0 ? args[listAt + 1] : null;
+
+  const { declared, orphans, byNamespace, regressions, improvements } = scan();
+
+  if (listPrefix) {
+    const hits = orphans.filter((o) => o.key.startsWith(listPrefix));
+    for (const o of hits) console.log(`${o.key}  (${o.declaredIn})`);
+    console.log(`\n${hits.length} orphan key(s) under "${listPrefix}".`);
+    return 0;
   }
 
   if (update) {
@@ -334,4 +353,6 @@ function main() {
   return regressions.length ? 1 : 0;
 }
 
-process.exit(main());
+module.exports = { scan, maskComments, collectDynamicPrefixes, collectDynamicSuffixes, namespaceOf };
+
+if (require.main === module) process.exit(main());

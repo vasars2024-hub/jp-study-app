@@ -1,0 +1,132 @@
+/* Library management strips: import progress, Undo / Recently removed, details editor. */
+
+.lib-import-status,
+.lib-removed {
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--glass-border, rgba(127, 127, 127, 0.35));
+  border-radius: 6px;
+  background: var(--glass-tint, rgba(127, 127, 127, 0.08));
+  font-size: 12px;
+}
+
+.lib-import-status__line,
+.lib-removed__undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lib-import-status__line progress {
+  flex: 1 1 160px;
+  min-width: 120px;
+}
+
+.lib-import-status__spacer {
+  flex: 1 1 auto;
+}
+
+.lib-import-status__sub {
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lib-import-status__failures ul,
+.lib-removed__list ul {
+  margin: 6px 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.lib-removed__list summary,
+.lib-import-status__failures summary {
+  cursor: pointer;
+  min-height: 24px;
+  line-height: 24px;
+}
+
+.lib-removed__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.lib-removed__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lib-removed__error {
+  margin-top: 4px;
+  color: var(--danger, #c0392b);
+}
+
+.lib-removed__undo + .lib-removed__list {
+  margin-top: 6px;
+}
+
+.lib-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+  flex: 1 1 auto;
+}
+
+.lib-meta-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.lib-meta-row {
+  display: flex;
+  gap: 10px;
+}
+
+.lib-meta-row .lib-meta-field:last-child {
+  flex: 0 0 120px;
+}
+
+.lib-meta-hint {
+  font-size: 11px;
+}
+
+.lib-missing {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--warning, #c98a00);
+  font-size: 12px;
+}
+
+.lib-missing strong {
+  display: block;
+}
+
+.lib-meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.lib-meta-tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--surface-3, rgba(127, 127, 127, 0.16));
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.lib-search {
+  min-width: 140px;
+  max-width: 240px;
+  min-height: 24px;
+}

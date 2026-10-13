@@ -13,6 +13,18 @@ import {
   type RoundOutcome,
 } from '../../renderer/games/engine';
 import type { ArenaMistake, GameId } from '../../renderer/games/types';
+import { loadGamePack } from '../../renderer/data/gamePacks/registry';
+import type { GamePack } from '../../renderer/data/gamePacks/types';
+import type { VocabItem } from '../../renderer/games/contentSource';
+import type { StudyLang } from '../levelScale';
+
+// The Chinese and Russian packs load on demand (data/gamePacks/registry.ts); every
+// pack is loaded here so the rounds below can draw on all three.
+const GAME_PACKS: Record<StudyLang, GamePack> = {
+  ja: await loadGamePack('ja'),
+  zh: await loadGamePack('zh'),
+  ru: await loadGamePack('ru'),
+};
 
 /** Every game these loops visit is a fast one; Mirror Writing has no rounds to build. */
 function fastId(id: GameId): Exclude<GameId, 'mirror-writing'> {
@@ -283,5 +295,179 @@ describe('every round declares the language its prompt is written in', () => {
     const round = buildGameRound('word-match', 3, 'ru', 0);
     expect(round.kind).toBe('match');
     expect(round.promptKey).toBe('games.match.instruction');
+  });
+});
+
+/**
+ * Answer checking where the exact form is the skill. An audit found edit-distance
+ * tolerance (18% from five characters) on Kanji Reading, so a different word passed, no
+ * NFKC (half-width katakana failed), digits refused in Counter Quiz, and Reverse Recall
+ * taking one clause of a sentence as the whole translation.
+ */
+describe('Game Arena answer checking', () => {
+  const ownWord = (word: string, reading: string, meaning = 'x'): VocabItem => ({ word, reading, meaning, level: 3 });
+  const readingRound = (word: string, reading: string) =>
+    buildGameRound('kanji-reading', 3, 'en', 0, { vocab: [ownWord(word, reading)], cloze: [], sentences: [] });
+  const withPack = (studyLang: StudyLang, over: Partial<GamePack>) => ({
+    vocab: [],
+    cloze: [],
+    sentences: [],
+    studyLang,
+    pack: { ...GAME_PACKS[studyLang], ...over },
+  });
+  const answers = (round: ReturnType<typeof buildGameRound>, typed: string) => evaluateRound(round, typed).correct;
+
+  describe('Kanji Reading: no typo room on a reading', () => {
+    it('rejects びよういん (美容院) for びょういん (病院): small kana is not a typo', () => {
+      const round = readingRound('病院', 'びょういん');
+      expect(answers(round, 'びょういん')).toBe(true);
+      expect(answers(round, 'びよういん')).toBe(false);
+    });
+
+    it('rejects おばさん for おばあさん: a dropped mora is a different word', () => {
+      const round = readingRound('お祖母さん', 'おばあさん');
+      expect(answers(round, 'おばあさん')).toBe(true);
+      expect(answers(round, 'おばさん')).toBe(false);
+      // And the other way round: an added mora is wrong too.
+      expect(answers(readingRound('叔母さん', 'おばさん'), 'おばあさん')).toBe(false);
+    });
+
+    it('also holds on the bundled reading table', () => {
+      const pack = withPack('ja', {
+        reading: [{ id: 'r-hosp', level: 3, word: '病院', reading: 'びょういん', meaning: { en: 'hospital' } }],
+      });
+      const round = buildGameRound('kanji-reading', 3, 'en', 0, pack);
+      expect(answers(round, 'びょういん')).toBe(true);
+      expect(answers(round, 'びよういん')).toBe(false);
+    });
+
+    it('keeps the safe folds: katakana, half-width ｶﾀｶﾅ, full-width spaces', () => {
+      const round = readingRound('片仮名', 'かたかな');
+      expect(answers(round, 'カタカナ')).toBe(true);
+      expect(answers(round, 'ｶﾀｶﾅ')).toBe(true);
+      expect(answers(round, '　かたかな　')).toBe(true);
+      // Half-width voiced kana compose under NFKC: ｶﾞｯｺｳ is がっこう.
+      expect(answers(readingRound('学校', 'がっこう'), 'ｶﾞｯｺｳ')).toBe(true);
+      expect(answers(readingRound('学校', 'がっこう'), 'がこう')).toBe(false);
+    });
+
+    it('reads ー as the same vowel written out, and nothing looser', () => {
+      expect(answers(readingRound('お母さん', 'おかあさん'), 'おかーさん')).toBe(true);
+      expect(answers(readingRound('拉麺', 'らーめん'), 'ラーメン')).toBe(true);
+      expect(answers(readingRound('拉麺', 'らーめん'), 'らあめん')).toBe(true);
+      // せんせー is how 先生 sounds, not how its reading is spelled; and length still counts.
+      expect(answers(readingRound('先生', 'せんせい'), 'せんせー')).toBe(false);
+      expect(answers(readingRound('お母さん', 'おかあさん'), 'おかさん')).toBe(false);
+    });
+  });
+
+  describe('Particle Panic and Counter Quiz: exact forms', () => {
+    it('rejects a near-miss Russian case ending', () => {
+      const pack = withPack('ru', {
+        particles: [
+          { id: 'p-ok', level: 3, prompt: 'По ___ (окончание) университета он уехал.', answer: 'окончании', hint: { en: 'case' } },
+        ],
+      });
+      const round = buildGameRound('particle-panic', 3, 'en', 0, pack);
+      expect(answers(round, 'окончании')).toBe(true);
+      expect(answers(round, 'окончание')).toBe(false);
+    });
+
+    it('accepts 3冊 and full-width ３冊 for 三冊, and still the reading さんさつ', () => {
+      const pack = withPack('ja', { counters: GAME_PACKS.ja.counters.filter((c) => c.id === 'ctr-book') });
+      const round = buildGameRound('counter-quiz', 2, 'en', 0, pack);
+      expect(round.kind === 'type' && round.answer).toBe('三冊');
+      for (const typed of ['三冊', 'さんさつ', 'サンサツ', '3冊', '３冊']) expect(answers(round, typed), typed).toBe(true);
+      for (const typed of ['三本', '3本', '4冊', 'さんさく']) expect(answers(round, typed), typed).toBe(false);
+    });
+
+    it('takes digits for a multi-character numeral and for Chinese 两', () => {
+      const ageCounters = GAME_PACKS.ja.counters.filter((c) => c.id === 'ctr-age');
+      const age = buildGameRound('counter-quiz', 3, 'en', 0, withPack('ja', { counters: ageCounters }));
+      expect(answers(age, '20歳')).toBe(true);
+      expect(answers(age, '２０歳')).toBe(true);
+      expect(answers(age, 'はたち')).toBe(true);
+      const geCounters = GAME_PACKS.zh.counters.filter((c) => c.id === 'zh-m-ge');
+      const zh = buildGameRound('counter-quiz', 1, 'en', 0, withPack('zh', { counters: geCounters }));
+      expect(answers(zh, '两个')).toBe(true);
+      expect(answers(zh, '2个')).toBe(true);
+      expect(answers(zh, '２个')).toBe(true);
+      expect(answers(zh, '2只')).toBe(false);
+    });
+
+    it('rejects a Russian number with the wrong agreement, digits or words', () => {
+      const pack = withPack('ru', { counters: GAME_PACKS.ru.counters.filter((c) => c.id === 'ru-n-minuta') });
+      const round = buildGameRound('counter-quiz', 3, 'en', 0, pack);
+      expect(answers(round, 'двадцать одна минута')).toBe(true);
+      expect(answers(round, '21 минута')).toBe(true);
+      expect(answers(round, 'двадцать одна минуты')).toBe(false);
+      expect(answers(round, '21 минут')).toBe(false);
+    });
+  });
+
+  const bundledSentence = (id: string) => {
+    const sentence = GAME_PACKS.ja.sentences.find((s) => s.id === id);
+    if (!sentence) throw new Error(`no bundled sentence ${id}`);
+    return sentence;
+  };
+
+  describe('Reverse Recall on a sentence wants the whole translation', () => {
+    const rain = bundledSentence('ja-x2-rain');
+    const rainRound = (source: 'en' | 'ru' | 'zh' = 'en') =>
+      buildGameRound('reverse-recall', 2, source, 0, withPack('ja', { sentences: [rain] }));
+
+    it('rejects either half of 雨が降っているので、家にいます。', () => {
+      const round = rainRound();
+      expect(round.prompt).toBe('雨が降っているので、家にいます。');
+      expect(answers(round, "so I'm staying home.")).toBe(false);
+      expect(answers(round, "It's raining")).toBe(false);
+      expect(answers(rainRound('ru'), 'поэтому я дома')).toBe(false);
+      expect(answers(rainRound('zh'), '所以我在家')).toBe(false);
+    });
+
+    it('accepts the full sentence, loosely punctuated, with or without contractions', () => {
+      const round = rainRound();
+      expect(answers(round, "It's raining, so I'm staying home.")).toBe(true);
+      expect(answers(round, 'its raining so im staying home')).toBe(true);
+      expect(answers(round, 'It is raining, so I am staying home')).toBe(true);
+      expect(answers(round, 'It is raining so I am staying at home')).toBe(true);
+      expect(answers(round, "It's rainig, so I'm staying home.")).toBe(true);
+      expect(answers(rainRound('ru'), 'Идет дождь, поэтому я дома')).toBe(true);
+      expect(answers(rainRound('zh'), '因为在下雨，所以我在家。')).toBe(true);
+    });
+
+    it('rejects an answer that flips the negation', () => {
+      expect(answers(rainRound(), "It's raining, so I'm not staying home.")).toBe(false);
+      const forget = bundledSentence('ja-x4-forget');
+      const round = buildGameRound('reverse-recall', 4, 'en', 0, withPack('ja', { sentences: [forget] }));
+      expect(answers(round, "Please make sure you don't forget your homework.")).toBe(true);
+      expect(answers(round, 'Please make sure you forget your homework.')).toBe(false);
+    });
+
+    it('accepts every bundled sentence typed in full, and no lone clause of the English ones', () => {
+      let clauses = 0;
+      for (const lang of ['ja', 'zh', 'ru'] as const) {
+        for (const sentence of GAME_PACKS[lang].sentences) {
+          const round = buildGameRound('reverse-recall', sentence.level, 'en', 0, withPack(lang, { sentences: [sentence] }));
+          if (round.kind !== 'type') continue;
+          expect(answers(round, round.answer), `${sentence.id} whole`).toBe(true);
+          const parts = round.answer.split(/[,;]/).map((c) => c.trim()).filter(Boolean);
+          if (parts.length < 2) continue;
+          for (const part of parts) {
+            clauses += 1;
+            expect(answers(round, part), `${sentence.id}: ${part}`).toBe(false);
+          }
+        }
+      }
+      expect(clauses).toBeGreaterThan(20);
+    });
+
+    it("still takes any one sense of a word gloss from the learner's own deck", () => {
+      const content = { vocab: [ownWord('犬', 'いぬ', 'dog, hound')], cloze: [], sentences: [] };
+      const round = buildGameRound('reverse-recall', 3, 'en', 0, content);
+      expect(answers(round, 'dog')).toBe(true);
+      expect(answers(round, 'hound')).toBe(true);
+      expect(answers(round, 'cat')).toBe(false);
+    });
   });
 });

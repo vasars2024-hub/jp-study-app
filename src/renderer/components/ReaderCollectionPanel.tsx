@@ -26,6 +26,7 @@ import { cardContentLang, getStudyLang, studyContentLang } from '../studyEnviron
 import { glossFor } from '../companionMine';
 import { mineReaderCollectionCard } from '../studyMiningRoutes';
 import { cardBookPosition, openBookAt } from '../bookRoundTrip';
+import { cardAudio } from '../cardAudioPlayback';
 
 type SortMode = 'newest' | 'oldest' | 'word' | 'frequency';
 type TargetLang = 'en' | 'ru' | 'zh';
@@ -988,7 +989,7 @@ export default function ReaderCollectionPanel({
                       const result = await window.api.visualNovelReadCaptureAudio(c.audioPath);
                       if (result.ok) dataUrl = result.dataUrl;
                     }
-                    if (dataUrl) await new Audio(dataUrl).play().catch(() => undefined);
+                    if (dataUrl) await cardAudio.play(dataUrl).catch(() => undefined);
                   }}
                 >
                   <Icon name="player" size={12} />

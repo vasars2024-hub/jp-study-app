@@ -35,7 +35,7 @@ import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import Icon from '../components/Icons';
-import { ocrFailureKey, runOcr, tesseractReads, type OcrLang } from '../ocr';
+import { mangaOcrErrorKey, ocrFailureKey, runOcr, tesseractReads, type OcrLang } from '../ocr';
 import { STUDY_LANG_NAME_KEY, studyLangOfText } from '../../shared/studyLang';
 import {
   cropPageImage,
@@ -220,7 +220,8 @@ export default function MangaReader({ item, onClose }: Props) {
     phase: string;
     pageIndex: number;
     pageTotal: number;
-    message?: string;
+    /** Main's English reason, when the run failed; shown only through `mangaOcrErrorKey`. */
+    error?: string;
   } | null>(null);
   const [ocrText, setOcrText] = useState('');
   const [ocrError, setOcrError] = useState('');
@@ -410,7 +411,8 @@ export default function MangaReader({ item, onClose }: Props) {
         return page;
       } catch (err) {
         console.error(err);
-        setOcrError(err instanceof Error ? err.message : t('manga.ocr.failed'));
+        // Main's reason is English; say it in the UI language (ocr.ts).
+        setOcrError(t(mangaOcrErrorKey(err)));
         setOcrStatus('error');
         return null;
       }
@@ -545,7 +547,7 @@ export default function MangaReader({ item, onClose }: Props) {
         setOcrProgress(1);
       } else if (p.phase === 'error') {
         setOcrStatus('error');
-        setOcrError(p.error || t('manga.ocr.failed'));
+        setOcrError(t(mangaOcrErrorKey(p.error)));
       }
     });
   }, [item.id, t]);
@@ -611,7 +613,9 @@ export default function MangaReader({ item, onClose }: Props) {
         phase: p.phase,
         pageIndex: p.pageIndex,
         pageTotal: p.pageTotal,
-        message: p.message || p.error,
+        // Main's `message` ("OCR 3/40") and `error` are English; the line below is built
+        // from the catalog, and a failure is shown through mangaOcrErrorKey.
+        ...(p.phase === 'error' ? { error: p.error || p.message || 'failed' } : {}),
       });
       if (p.phase === 'done' || p.phase === 'error' || p.phase === 'cancelled') {
         setVolumeBusy(false);
@@ -850,7 +854,7 @@ export default function MangaReader({ item, onClose }: Props) {
           setTranslateFailure(res.failure ?? null);
           setVolumeNotice({
             kind: 'error',
-            text: res.failure ? failureText(res.failure) : res.error || t('manga.ocr.volumeFailed'),
+            text: res.failure ? failureText(res.failure) : t('manga.ocr.volumeFailed'),
           });
         }
         return;
@@ -881,7 +885,8 @@ export default function MangaReader({ item, onClose }: Props) {
         }
       }
     } catch (err) {
-      setVolumeNotice({ kind: 'error', text: err instanceof Error ? err.message : t('manga.ocr.volumeFailed') });
+      console.error(err);
+      setVolumeNotice({ kind: 'error', text: t('manga.ocr.volumeFailed') });
     } finally {
       setVolumeBusy(false);
     }
@@ -1037,7 +1042,7 @@ export default function MangaReader({ item, onClose }: Props) {
           if (res.cancelled) return false;
           setTranslateFailure(res.failure ?? null);
           setTranslateError(
-            res.failure ? failureText(res.failure) : res.error || t('manga.translate.failed'),
+            res.failure ? failureText(res.failure) : t('manga.translate.failed'),
           );
           return false;
         }
@@ -1087,7 +1092,7 @@ export default function MangaReader({ item, onClose }: Props) {
         return true;
       } catch (err) {
         console.error(err);
-        setTranslateError(err instanceof Error ? err.message : t('manga.translate.failed'));
+        setTranslateError(t('manga.translate.failed'));
         return false;
       } finally {
         setTranslating(false);
@@ -1143,7 +1148,7 @@ export default function MangaReader({ item, onClose }: Props) {
         if (ok) setDrawRegionMode(false);
       } catch (err) {
         console.error(err);
-        setOcrError(err instanceof Error ? err.message : t('manga.ocr.failed'));
+        setOcrError(t(mangaOcrErrorKey(err)));
       } finally {
         setRegionBusy(false);
       }
@@ -2133,19 +2138,21 @@ export default function MangaReader({ item, onClose }: Props) {
                 />
               </div>
               <span className="muted">
-                {volumeProgress.message ||
-                  t('manga.ocr.volumeProgress', {
-                    phase: volumeProgress.phase,
-                    current: Math.min(volumeProgress.pageIndex + 1, volumeProgress.pageTotal),
-                    total: volumeProgress.pageTotal,
-                  })}
+                {t('manga.ocr.volumeProgress', {
+                  phase:
+                    volumeProgress.phase === 'ocr' || volumeProgress.phase === 'translate'
+                      ? t(`onb3.manga.phase.${volumeProgress.phase}`)
+                      : volumeProgress.phase,
+                  current: Math.min(volumeProgress.pageIndex + 1, volumeProgress.pageTotal),
+                  total: volumeProgress.pageTotal,
+                })}
               </span>
             </div>
           )}
           {/* `muted` is presentation; `ocr-error` and `role` are what say this IS the error
               state. It read as ordinary dimmed prose to everything that looks for one. */}
-          {(ocrStatus === 'error' || (volumeProgress?.phase === 'error' && volumeProgress.message)) && (
-            <div className="ocr-msg muted ocr-error" role="alert">{ocrError || volumeProgress?.message}</div>
+          {(ocrStatus === 'error' || (volumeProgress?.phase === 'error' && volumeProgress.error)) && (
+            <div className="ocr-msg muted ocr-error" role="alert">{ocrError || t(mangaOcrErrorKey(volumeProgress?.error))}</div>
           )}
           {drawRegionMode && (
             <p className="ocr-hint muted">

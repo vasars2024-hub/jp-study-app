@@ -1267,10 +1267,10 @@ describe('Files app — bulk mine isolates every item (gate 20)', () => {
 
     const receipt = host?.querySelector('.fa-bulk-result');
     expect(receipt?.textContent).toContain('2 of 3 items added 2 cards; 1 failed.');
-    expect(receipt?.textContent).toContain('First transcript — 1 cards added.');
+    expect(receipt?.textContent).toContain('First transcript — 1 card added.');
     expect(receipt?.textContent).toContain('Broken transcript — The file could not be read.');
     expect(receipt?.textContent).toContain('fixture read failed');
-    expect(receipt?.textContent).toContain('Last subtitle — 1 cards added.');
+    expect(receipt?.textContent).toContain('Last subtitle — 1 card added.');
     expect(receipt?.querySelectorAll('li[data-outcome="done"]')).toHaveLength(2);
     expect(receipt?.querySelectorAll('li[data-outcome="refused"]')).toHaveLength(1);
 

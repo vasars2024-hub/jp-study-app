@@ -67,6 +67,11 @@ export const PRODUCT5_UI_ZH: Catalog = {
   'kbd5.io.error.notJson': '这不是有效的 JSON。',
   'kbd5.io.error.notKeymap': '这不是 Gum 的键位文件。',
   'kbd5.io.error.rejected': '键位被拒绝：{detail}',
+  // kbd7: import hardening and boot recovery (the import reasons fill {detail} above).
+  'kbd7.import.invalidCustom': '其中有自定义快捷键不完整或已损坏。未做任何更改。',
+  'kbd7.import.invalidCustomNamed': '自定义快捷键“{name}”不完整或已损坏。未做任何更改。',
+  'kbd7.import.saveFailed': '无法应用。你的快捷键保持不变。',
+  'kbd7.boot.storeReset': '无法载入已保存的快捷键，已恢复为默认设置。旧设置已另存一份副本。',
   'kbd5.custom.edit': '编辑',
   'kbd5.custom.editTitle': '编辑自定义快捷键',
   'kbd5.custom.save': '保存更改',

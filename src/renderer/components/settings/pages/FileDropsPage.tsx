@@ -130,7 +130,11 @@ export default function FileDropsPage() {
           settingId="filedrop-reset"
           section={t('settings.nav.fileDrops')}
           label={t('settings.fileDrops.reset.action')}
-          onReset={() => setPrefs(resetFileDropPrefs())}
+          onReset={() => {
+            const before = loadFileDropPrefs();
+            setPrefs(resetFileDropPrefs());
+            return () => setPrefs(saveFileDropPrefs(before));
+          }}
         />
       </SettingsCard>
     </>

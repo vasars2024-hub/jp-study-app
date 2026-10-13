@@ -15,6 +15,7 @@ vi.mock('../i18n', () => ({
 import GrammarDueChip, { GrammarDueDayLine } from '../components/grammar/GrammarDueChip';
 import { enrolGrammarPoints, saveGrammarSrs } from '../grammarSrs';
 import { openAppSection } from '../extensionBridgeUi';
+import { shiftStudyDayKey, studyDayKey } from '../../shared/studyDay';
 
 let root: Root | null = null;
 let host: HTMLDivElement;
@@ -40,10 +41,9 @@ async function render(node: ReactNode): Promise<void> {
   await act(async () => root?.render(node));
 }
 
+/** A study-day key (4 am rollover), as the Calendar's day panel hands the line: not the calendar date. */
 function todayKey(offsetDays = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return shiftStudyDayKey(studyDayKey(Date.now()), offsetDays);
 }
 
 describe('GrammarDueChip', () => {
@@ -85,7 +85,9 @@ describe('GrammarDueDayLine', () => {
     );
     const lines = [...host.querySelectorAll('.gram-due-day')];
     expect(lines).toHaveLength(2);
-    expect(lines[0].textContent).toContain('gram2.due.count:1');
+    // Today's line is labelled "due today" (Calendar convention); a later day's is a plain count.
+    expect(lines[0].textContent).toContain('gram2.due.today:1');
+    expect(lines[1].textContent).toContain('gram2.due.count:1');
     expect(lines[0].querySelector('button')).not.toBeNull();
     expect(lines[1].querySelector('button')).toBeNull();
   });

@@ -9,6 +9,7 @@
 
 import { isStudyLang, type StudyLang } from '../shared/studyLang';
 import { WHISPER_MULTILINGUAL_REQUIRED } from '../shared/whisperModels';
+import { repairCueEnds } from '../shared/whisperWindowing';
 
 export interface PcmTranscription {
   ok: boolean;
@@ -166,18 +167,12 @@ export async function transcribePcm(
       if (message.type === 'partial' && Array.isArray(message.cues)) {
         for (const cue of message.cues) {
           const text = cue?.text?.trim();
-          if (!text) continue;
-          chunks.push(text);
-          if (
-            typeof cue.start === 'number'
-            && Number.isFinite(cue.start)
-            && typeof cue.end === 'number'
-            && Number.isFinite(cue.end)
-            && cue.end > cue.start
-          ) {
-            cues.push({ start: cue.start, end: cue.end, text });
-          }
+          if (text) chunks.push(text);
         }
+        // A cue with a start and no usable end is closed at the next one's start rather
+        // than dropped: its text used to reach `text` but never the timed track, so the
+        // SRT lost the line (scorecard bug 30).
+        cues.push(...repairCueEnds(message.cues.filter((cue) => cue && typeof cue === 'object')));
       } else if (message.type === 'done') {
         finish({ ok: true, text: chunks.join(' ').trim(), cues });
       } else if (message.type === 'error') {

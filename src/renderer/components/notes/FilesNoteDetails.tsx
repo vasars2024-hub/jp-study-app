@@ -1,14 +1,17 @@
 /**
  * A saved note's body in the Files inspector. Files listed Notebook entries by
  * title only, so "Save as note" produced a row nobody could read; this shows
- * the text under the row's properties. Only for rows the Notebook timeline
- * owns (`source: 'notebook'`) — everything else in Files keeps its own panel.
+ * the text under the row's properties, with a way into the Notes app (search,
+ * tags, versions, trash, export). Only for rows the Notebook timeline owns
+ * (`source: 'notebook'`) — everything else in Files keeps its own panel.
  */
 import { useEffect, useState, type JSX } from 'react';
 import type { FilesItem } from '../../../shared/filesApp/catalog';
 import { findNotebookEntry, onNotebookTimelineChanged } from '../../notebookTimeline';
 import { useT } from '../../i18n';
 import NoteBody from './NoteBody';
+import { openNotesManager } from './openNotesManager';
+import { getUserNote } from '../../userNotesStore';
 
 export function notebookEntryIdOf(item: Pick<FilesItem, 'source' | 'location'>): string | null {
   if (item.source !== 'notebook' || item.location.store !== 'localStorage') return null;
@@ -28,6 +31,16 @@ export default function FilesNoteDetails({ item }: { item: FilesItem }): JSX.Ele
   return (
     <section className="fa-note-body" aria-label={t('notes.details.aria')}>
       {text ? <NoteBody text={text} /> : <p className="fa-details-note">{t('notes.viewer.empty')}</p>}
+      <div className="fa-note-actions">
+        {getUserNote(id) ? (
+          <button type="button" className="btn ghost" onClick={() => void openNotesManager({ noteId: id })}>
+            {t('notes.details.open')}
+          </button>
+        ) : null}
+        <button type="button" className="btn ghost" onClick={() => void openNotesManager({ newNote: true })}>
+          {t('notes.details.new')}
+        </button>
+      </div>
     </section>
   );
 }

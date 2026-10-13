@@ -43,19 +43,15 @@ module.exports = {
     await next();
 
     result.check('downloads step', await step('downloads'));
-    // The built-in JMdict pack is provisioned by main on first boot; the row turns "ready"
-    // once dictListYomitan reports it. Re-entering the step re-asks, so poll by toggling.
-    let ready = await poll(ctx, `document.querySelector('[data-download="dictionary-builtin"].is-ready') ? true : false`, 8000);
-    const deadline = Date.now() + 5 * 60_000;
-    while (!ready && Date.now() < deadline) {
-      await ev(`__e2e.clickText('.frs-foot-right .btn', 'Back')`);
-      await step('level');
-      await next();
-      await step('downloads');
-      ready = await poll(ctx, `document.querySelector('[data-download="dictionary-builtin"].is-ready') ? true : false`, 8000);
-    }
+    // The built-in JMdict pack is provisioned by main on first boot. While that import runs
+    // the row says it is being set up (never a download offer); it turns "ready" by itself
+    // once dictListYomitan reports the pack — the step re-asks on main's import stream.
+    const builtIn = `document.querySelector('[data-download="dictionary-builtin"]')`;
+    const dlRowsEarly = await ev(`[...document.querySelectorAll('.frs-dl-row')].map((r) => ({ id: r.dataset.download, cls: r.className, status: r.querySelector('.frs-dl-status')?.textContent }))`);
+    result.note(`downloads on entry: ${JSON.stringify(dlRowsEarly)}`);
+    const ready = await poll(ctx, `${builtIn}?.classList.contains('is-ready') ? true : false`, 5 * 60_000);
     const dlRows = await ev(`[...document.querySelectorAll('.frs-dl-row')].map((r) => ({ id: r.dataset.download, cls: r.className, status: r.querySelector('.frs-dl-status')?.textContent }))`);
-    result.check('downloads: built-in dictionary shown as ready', ready, dlRows);
+    result.check('downloads: built-in dictionary shown as ready without leaving the step', Boolean(ready), dlRows);
     await ctx.shot('downloads');
     await next();
 

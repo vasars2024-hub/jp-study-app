@@ -494,6 +494,10 @@ export function registerAgentExecutionIpc(
       });
       activeConversations.add(request.conversationId);
       const ids = agentExecutionMessageIds(request.requestId);
+      // Every chunk the user has already seen, in order. A cancel keeps it: the reply is
+      // stored as far as it got and marked stopped, rather than wiped back to an empty
+      // bubble that throws away text the user was reading (scorecard, Agent row).
+      let streamed = '';
 
       try {
         const result = await runProvider(request.policy, request.prompt, {
@@ -507,6 +511,7 @@ export function registerAgentExecutionIpc(
           feature: 'agentChat',
           onTextChunk: (text) => {
             if (!active.has(request.requestId) || !text) return;
+            streamed += text;
             try {
               if (!event.sender.isDestroyed()) {
                 event.sender.send('agentExecution:event', {
@@ -577,7 +582,10 @@ export function registerAgentExecutionIpc(
             now(),
             {
               status: code === 'cancelled' ? 'cancelled' : 'failed',
-              text: '',
+              // Only a cancel keeps the partial text. A failure mid-stream (timeout,
+              // upstream error) is not something the user chose to stop, and its half
+              // answer is not presented as one.
+              text: code === 'cancelled' ? streamed : '',
               error: code,
             },
           );

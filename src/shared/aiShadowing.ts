@@ -22,7 +22,7 @@ import {
 import type { UiLang } from './i18n/core';
 import type { ShadowHintKind, ShadowLang, ShadowPace } from './shadowingScore';
 
-export const SHADOWING_PROMPT_VERSION = 1;
+export const SHADOWING_PROMPT_VERSION = 2;
 
 const HINT_KINDS: readonly ShadowHintKind[] = [
   'long-vowel', 'sokuon', 'moraic-n', 'voicing', 'small-kana',
@@ -47,6 +47,13 @@ export interface ShadowingFeedbackRequest {
   extra: string[];
   hints: ShadowHintKind[];
   pace: ShadowPace | '';
+  /**
+   * Measured on the device from the recording (`shadowingProsody.ts`): words whose
+   * pitch accent did not match the dictionary, as "word: expected → heard"
+   * (downstep numbers), and pauses inside the line, as "inside 図書館 0.4s".
+   */
+  accent?: string[];
+  pauses?: string[];
   answerLang: UiLang;
   refresh?: boolean;
 }
@@ -83,6 +90,8 @@ export function normalizeShadowingFeedbackRequest(input: unknown): ShadowingFeed
     extra: clipList(raw.extra, 12, 24),
     hints,
     pace: raw.pace === 'slow' || raw.pace === 'fast' || raw.pace === 'ok' ? raw.pace : '',
+    ...(lang === 'ja' && clipList(raw.accent, 6, 40).length ? { accent: clipList(raw.accent, 6, 40) } : {}),
+    ...(clipList(raw.pauses, 4, 40).length ? { pauses: clipList(raw.pauses, 4, 40) } : {}),
     answerLang: normalizeAnswerLang(raw.answerLang),
     ...(raw.refresh === true ? { refresh: true } : {}),
   };
@@ -92,6 +101,7 @@ export function shadowingFeedbackKeyParts(request: ShadowingFeedbackRequest): st
   return [
     request.lang, request.expected, request.heard, String(request.score), request.missed.join('|'),
     request.extra.join('|'), request.hints.join('|'), request.pace, request.answerLang,
+    (request.accent ?? []).join('|'), (request.pauses ?? []).join('|'),
   ];
 }
 
@@ -110,6 +120,10 @@ export function buildShadowingFeedbackPrompt(request: ShadowingFeedbackRequest):
     request.extra.length ? `Words heard that the line does not have: ${request.extra.join(', ')}` : '',
     request.hints.length ? `Sound differences a rule-based check found: ${request.hints.join(', ')}` : '',
     request.pace === 'slow' ? 'They spoke much slower than the original.' : request.pace === 'fast' ? 'They spoke much faster than the original.' : '',
+    request.accent?.length
+      ? `Pitch accent measured from their recording did not match the dictionary for (word: expected downstep → heard; 0 = flat/heiban, n = drop after mora n): ${request.accent.join('; ')}`
+      : '',
+    request.pauses?.length ? `Pauses measured inside the line: ${request.pauses.join('; ')}` : '',
     '',
     `Explain the most likely pronunciation issues behind these differences, in ${answer}; quote ${study} exactly.`,
     `Consider especially ${focus}. The recognizer can mishear, so say "likely", never "you said".`,

@@ -5,6 +5,7 @@
 // used when available, falling back to WASM.
 import { pipeline, env } from '@huggingface/transformers';
 import { isStudyLang, WHISPER_LANGUAGE } from '../shared/studyLang';
+import { commitWhisperWindow, whisperChunkCues, WHISPER_WINDOW_SEC } from '../shared/whisperWindowing';
 import {
   WHISPER_CPU_PIPELINE_OPTIONS,
   WHISPER_GPU_PIPELINE_OPTIONS,
@@ -26,7 +27,8 @@ env.backends.onnx.wasm.wasmPaths = new URL('/ort/', self.location.href).href;
 const post = (m: unknown): void => (self as unknown as { postMessage: (m: unknown) => void }).postMessage(m);
 
 const SAMPLE_RATE = 16000;
-const WINDOW_SEC = 25; // seconds of audio transcribed per step
+/** Below this, a trailing scrap of audio is not worth a Whisper pass (it hallucinates on near-silence). */
+const MIN_TAIL_SEC = 0.5;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let transcriber: any = null;
@@ -120,11 +122,20 @@ self.onmessage = async (e: MessageEvent): Promise<void> => {
     const t = await load(model, prefer ?? 'auto');
     post({ type: 'status', status: 'transcribing', device, model: effectiveModel, requestedModel: model });
 
-    const windowLen = WINDOW_SEC * SAMPLE_RATE;
-    const windows = Math.max(1, Math.ceil(audio.length / windowLen));
-    for (let i = 0; i < windows; i++) {
-      const seg = audio.subarray(i * windowLen, Math.min((i + 1) * windowLen, audio.length));
-      const offset = i * WINDOW_SEC;
+    // Windows that overlap where it matters (`shared/whisperWindowing.ts`): a segment cut
+    // by a window's edge is held back and the next window starts just before it, so it is
+    // heard whole; a segment without an end time is closed at the next one's start rather
+    // than dropped. Each window advances by at least half its length.
+    const totalSec = audio.length / SAMPLE_RATE;
+    let startSec = 0;
+    let committedUntilSec = 0;
+    while (startSec < totalSec) {
+      if (startSec > 0 && totalSec - startSec < MIN_TAIL_SEC) break;
+      const from = Math.floor(startSec * SAMPLE_RATE);
+      const to = Math.min(audio.length, from + WHISPER_WINDOW_SEC * SAMPLE_RATE);
+      const seg = audio.subarray(from, to);
+      const windowStartSec = from / SAMPLE_RATE;
+      const windowSec = seg.length / SAMPLE_RATE;
       const out = await t(seg, {
         language: whisperLang,
         task: 'transcribe',
@@ -134,14 +145,18 @@ self.onmessage = async (e: MessageEvent): Promise<void> => {
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw: any[] = Array.isArray(out?.chunks) ? out.chunks : [];
-      const cues = raw
-        .map((c) => ({
-          start: (Array.isArray(c.timestamp) ? c.timestamp[0] ?? 0 : 0) + offset,
-          end: (Array.isArray(c.timestamp) ? c.timestamp[1] ?? 0 : 0) + offset,
-          text: String(c.text ?? '').trim(),
-        }))
-        .filter((c) => c.text);
-      post({ type: 'partial', cues, progress: (i + 1) / windows });
+      const step = commitWhisperWindow({
+        cues: whisperChunkCues(raw, windowSec),
+        windowStartSec,
+        windowSec,
+        audioEndSec: totalSec,
+        committedUntilSec,
+      });
+      committedUntilSec = step.committedUntilSec;
+      post({ type: 'partial', cues: step.kept, progress: totalSec > 0 ? Math.min(1, step.nextStartSec / totalSec) : 1 });
+      // Never stand still: a window that cannot advance ends the run instead of looping.
+      if (step.nextStartSec <= startSec) break;
+      startSec = step.nextStartSec;
     }
     post({ type: 'done' });
   } catch (err) {

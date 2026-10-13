@@ -17,13 +17,21 @@
 // and nothing is ever written over the stored history at all, so a failed read
 // or two windows answering at once cannot lose rows either. A stored v1 value
 // that is not a review log is never written over.
+//
+// Beyond `REVIEW_LOG_LIMIT` rows the oldest are ARCHIVED, not deleted: moved, in
+// the same IndexedDB transaction that removes them, into chunk records
+// (`review-log-archive:`). Statistics reads the live window; the FSRS optimiser
+// and the memory replay read everything (`loadFullReviewLog`).
 
 import { kvBatch, kvGet, kvScanPrefix, kvUpdate } from './storage/db';
 import { recordReviewActivity } from './stats';
 import {
+  isRecallReview,
   mergeNormalizedReviewLog,
   normalizeReviewLog,
+  normalizeReviewLogArchiveChunk,
   normalizeReviewLogEntry,
+  REVIEW_LOG_ARCHIVE_CHUNK,
   REVIEW_LOG_LIMIT,
   type ReviewLogEntry,
 } from '../shared/reviewLog';
@@ -32,6 +40,8 @@ import {
 export const REVIEW_LOG_IDB_KEY = 'review-log-v1';
 /** One record per row, appended. */
 export const REVIEW_LOG_ROW_PREFIX = 'review-log-row:';
+/** Archived rows, `REVIEW_LOG_ARCHIVE_CHUNK` per record, oldest first by key. */
+export const REVIEW_LOG_ARCHIVE_PREFIX = 'review-log-archive:';
 export const REVIEW_LOG_EVENT = 'jp-review-log-changed';
 
 let cache: ReviewLogEntry[] | null = null;
@@ -76,8 +86,8 @@ function isReviewLogValue(value: unknown): boolean {
   return typeof value === 'object' && Array.isArray((value as { entries?: unknown }).entries);
 }
 
-async function readStored(): Promise<ReviewLogEntry[]> {
-  const legacy = normalizeReviewLog(await kvGet<unknown>(REVIEW_LOG_IDB_KEY));
+async function readStored(limit = REVIEW_LOG_LIMIT): Promise<ReviewLogEntry[]> {
+  const legacy = normalizeReviewLog(await kvGet<unknown>(REVIEW_LOG_IDB_KEY), limit);
   legacyIds = new Set(legacy.map((entry) => entry.id));
   const rows: ReviewLogEntry[] = [];
   for (const [, value] of await kvScanPrefix(REVIEW_LOG_ROW_PREFIX)) {
@@ -85,7 +95,33 @@ async function readStored(): Promise<ReviewLogEntry[]> {
     if (entry) rows.push(entry);
   }
   // Both lists are normalised entries already: merge, do not re-validate.
-  return mergeNormalizedReviewLog([...legacy, ...rows]);
+  return mergeNormalizedReviewLog([...legacy, ...rows], limit);
+}
+
+async function readArchive(): Promise<ReviewLogEntry[]> {
+  const rows: ReviewLogEntry[] = [];
+  for (const [, value] of await kvScanPrefix(REVIEW_LOG_ARCHIVE_PREFIX)) {
+    for (const entry of normalizeReviewLogArchiveChunk(value)) rows.push(entry);
+  }
+  return rows;
+}
+
+/**
+ * The whole history: archived rows, every stored row and this window's own,
+ * uncapped. For the FSRS optimiser and the memory replay, which need each
+ * card's reviews back to its first; Statistics uses `loadReviewLog`.
+ */
+export async function loadFullReviewLog(): Promise<ReviewLogEntry[]> {
+  let stored: ReviewLogEntry[] = [];
+  let archived: ReviewLogEntry[] = [];
+  try {
+    [stored, archived] = await Promise.all([readStored(Number.POSITIVE_INFINITY), readArchive()]);
+  } catch {
+    return loadReviewLog();
+  }
+  const own = ownRows.map(normalizeReviewLogEntry).filter((entry): entry is ReviewLogEntry => entry !== null);
+  return mergeNormalizedReviewLog([...stored, ...own, ...archived], Number.POSITIVE_INFINITY)
+    .filter((entry) => !ownRemoved.has(entry.id));
 }
 
 export function loadReviewLog(): Promise<ReviewLogEntry[]> {
@@ -141,8 +177,11 @@ function persist(): void {
 }
 
 /**
- * Drop the oldest stored rows beyond `REVIEW_LOG_LIMIT` (the whole-log value
- * capped itself on every write). Run once in a while, not per answer.
+ * Move the oldest stored rows beyond `REVIEW_LOG_LIMIT` into archive chunks.
+ * (The whole-log value capped itself on every write, and this used to DELETE
+ * the excess, taking the oldest history out from under the optimiser.) The
+ * chunk puts and the row deletes are one transaction, so a row is never in
+ * neither. Run once in a while, not per answer. Returns the rows archived.
  */
 export async function pruneReviewLog(limit = REVIEW_LOG_LIMIT): Promise<number> {
   const rows = await kvScanPrefix(REVIEW_LOG_ROW_PREFIX);
@@ -150,10 +189,19 @@ export async function pruneReviewLog(limit = REVIEW_LOG_LIMIT): Promise<number> 
   const excess = rows.length + legacyCount - limit;
   if (excess <= 0) return 0;
   const oldest = rows
-    .map(([key, value]) => ({ key, at: normalizeReviewLogEntry(value)?.at ?? 0 }))
-    .sort((a, b) => a.at - b.at)
+    .map(([key, value]) => ({ key, entry: normalizeReviewLogEntry(value) }))
+    .sort((a, b) => (a.entry?.at ?? 0) - (b.entry?.at ?? 0))
     .slice(0, excess);
-  await kvBatch(oldest.map(({ key }) => ({ type: 'delete' as const, key })));
+  const kept = oldest.map(({ entry }) => entry).filter((entry): entry is ReviewLogEntry => entry !== null);
+  const puts: Array<{ type: 'put'; key: string; value: unknown }> = [];
+  for (let i = 0; i < kept.length; i += REVIEW_LOG_ARCHIVE_CHUNK) {
+    const chunk = kept.slice(i, i + REVIEW_LOG_ARCHIVE_CHUNK);
+    // Keyed by the chunk's first time (zero-padded, so key order is time
+    // order) and its first id, so two windows archiving at once never collide.
+    const first = String(Math.max(0, Math.floor(chunk[0].at))).padStart(15, '0');
+    puts.push({ type: 'put', key: `${REVIEW_LOG_ARCHIVE_PREFIX}${first}-${chunk[0].id}`, value: { version: 1, entries: chunk } });
+  }
+  await kvBatch([...puts, ...oldest.map(({ key }) => ({ type: 'delete' as const, key }))]);
   return oldest.length;
 }
 
@@ -180,7 +228,9 @@ export function resetReviewLogForTests(): void {
  */
 export function appendReviewLog(input: Omit<ReviewLogEntry, 'id' | 'at'> & { at?: number }): ReviewLogEntry {
   const entry: ReviewLogEntry = { ...input, id: newId(), at: input.at ?? Date.now() };
-  recordReviewActivity(entry.mode === 'review' ? 'review' : 'practice', entry.correct, entry.at);
+  // A due card graded from a game moved a schedule, but it is not a recall
+  // test: the day counts it as practice, so it never enters a review pass rate.
+  recordReviewActivity(isRecallReview(entry) ? 'review' : 'practice', entry.correct, entry.at);
   heldAppends.push(entry);
   ownRows.push(entry);
   if (cache) {
@@ -198,7 +248,7 @@ export function appendReviewLog(input: Omit<ReviewLogEntry, 'id' | 'at'> & { at?
 
 /** Take back one answer (review undo). */
 export function removeReviewLogEntry(entry: ReviewLogEntry): void {
-  recordReviewActivity(entry.mode === 'review' ? 'review' : 'practice', entry.correct, entry.at, true);
+  recordReviewActivity(isRecallReview(entry) ? 'review' : 'practice', entry.correct, entry.at, true);
   heldAppends = heldAppends.filter((row) => row.id !== entry.id);
   ownRows = ownRows.filter((row) => row.id !== entry.id);
   ownRemoved.add(entry.id);

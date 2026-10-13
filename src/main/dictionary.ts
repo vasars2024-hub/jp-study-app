@@ -53,7 +53,7 @@ import { DICT_LOOKUP_LIMIT, clampLookupLimit } from '../shared/dictionaryLookup'
 import { interlinearFallbackLang, legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
 import { cedictInterlinearLookup, lookupCedictIndex, type CedictIndex } from './dictionary/chineseLookup';
 import { resetCedictMissingReport } from './dictionary/cedictMissingNotice';
-import { buildScanPrefixes, pickLongestScanHit, SCAN_DEFAULT_MAX_LEN } from '../shared/dictScan';
+import { buildScanPrefixes, pickLongestScanHit, SCAN_DEFAULT_MAX_LEN, SCAN_MAX_LEN_CEILING } from '../shared/dictScan';
 import { cleanReadingAidWords, type ReadingAidResult } from '../shared/readingAid';
 import { TATOEBA_LANG } from '../shared/studyLang';
 import {
@@ -554,6 +554,27 @@ export async function scanOfflinePrefixes(
     ...(dbHit.via ? { via: dbHit.via } : {}),
     ...(lang ? { lang } : {}),
   };
+}
+
+/** How far past the clicked word the in-app popup scans, in code points (10ten's window). */
+export const POPUP_SCAN_MAX_LEN = 16;
+
+/**
+ * The longest dictionary word starting at the clicked word, for the in-app
+ * popup. Only the matched text crosses back: the popup then looks it up through
+ * `lookupTerm` like any other query. Never throws — a miss is `''`.
+ */
+export async function scanLongestForPopup(text: unknown, lang?: 'ja' | 'zh'): Promise<{ matched: string }> {
+  if (typeof text !== 'string' || !text.trim()) return { matched: '' };
+  try {
+    const found = await scanOfflinePrefixes(text.slice(0, SCAN_MAX_LEN_CEILING), lang, {
+      maxLen: POPUP_SCAN_MAX_LEN,
+      limit: 1,
+    });
+    return { matched: found.matched };
+  } catch {
+    return { matched: '' };
+  }
 }
 
 /** The in-memory fallbacks of `scanOfflinePrefixes`, longest prefix first. */
@@ -1211,6 +1232,10 @@ export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string, limit?: number, lang?: unknown) =>
     lookupTerm(query, limit, lang === 'ja' || lang === 'zh' || lang === 'ru' ? lang : undefined));
+  // The in-app popup's longest match across the cursor (10ten / Yomitan scan):
+  // the same one-batch prefix scan the browser extension's hover uses.
+  ipcMain.handle('dict:scanLongest', (_e, text: unknown, lang?: unknown) =>
+    scanLongestForPopup(text, lang === 'ja' || lang === 'zh' ? lang : undefined));
   // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.
   // `limit` is clamped here rather than trusted: it arrives from a renderer.
   ipcMain.handle('dict:lookupChinese', (_e, query: string, limit?: number) =>

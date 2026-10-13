@@ -262,7 +262,9 @@ class Harness {
     this.world = await require('./world.cjs').startWorld(this.mediaDir, { outDir: OUT, ...worldOptions });
     this.world.seedProfile(this.profile);
     log(`world up in ${Date.now() - t0} ms: ${JSON.stringify(this.world.ports())}`);
-    const appArgs = ['--e2e', `--e2e-run=${this.runDir}`];
+    // `--mute-audio` (a Chromium switch): flows play real media (the music flow's sine
+    // tones, card clips); hidden windows are not silent ones, so nothing may reach the speakers.
+    const appArgs = ['--e2e', `--e2e-run=${this.runDir}`, '--mute-audio'];
     if (DEV) {
       // The live dev server: convenient while writing a flow, but another agent's save
       // reloads the page under it (see build.cjs).

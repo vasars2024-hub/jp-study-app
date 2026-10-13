@@ -499,12 +499,7 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
           <p className="fa-panel-note">{t('settings.memory.storageUnavailable')}</p>
         )}
         <p className="fa-panel-note">
-          {t(
-            present.length === 1
-              ? 'settings.memory.catalogSummaryOne'
-              : 'settings.memory.catalogSummary',
-            { bytes: formatBytes(totalBytes), count: present.length },
-          )}
+          {t('settings.memory.catalogSummary', { bytes: formatBytes(totalBytes), count: present.length })}
         </p>
         {health ? (
           <div className={`fa-panel-health is-${health.status}`} data-storage-health={health.status}>

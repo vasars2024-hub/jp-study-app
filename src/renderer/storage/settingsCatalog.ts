@@ -305,6 +305,19 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     clearConfirm: 'Delete all personal reading highlights?',
   },
   {
+    // One IndexedDB record per note (`user-note:<id>`), the write-ahead journal,
+    // the automatic activity timeline, and the verbatim backups the notes
+    // migration keeps (`user-notes.*`). Not clearable here: notes are deleted
+    // one by one through the Notes trash, never in bulk from a storage panel.
+    id: 'notes',
+    label: 'Notes',
+    description: 'Your notes (Notes app, Quick Notes, saved translations and analyses) and the Notebook activity timeline.',
+    category: 'Study',
+    lsKeys: ['jp-grammarx-notebook-timeline-v1', 'jp-user-notes-journal-v1'],
+    idbPrefixes: ['user-note:', 'user-notes.'],
+    clearable: false,
+  },
+  {
     id: 'lookups',
     label: 'Lookup history',
     description: 'Recent dictionary lookups widget.',
@@ -817,4 +830,150 @@ export function removeKeysForDomain(def: SettingsDomainDef): number {
 
 export function domainById(id: string): SettingsDomainDef | undefined {
   return SETTINGS_DOMAINS.find((d) => d.id === id);
+}
+
+// ---------------------------------------------------------------------------
+// Settings-only transfer (WP3): which keys a settings file may carry.
+//
+// The key names live here, in the catalog, because this module is the one the
+// architecture audit accepts as naming every key (`STORAGE_REGISTRY_MODULES`).
+// `settingsTransfer.ts` refers to them only through `SETTINGS_TRANSFER_KEYS`, so
+// it never reads as a second writer of anyone's key.
+//
+// Two lists, and a key has to pass both:
+//
+// - the ALLOW list is the whole vocabulary. A key that is not named below is
+//   not exported and is refused on import, whatever group it claims;
+// - the DENY list is the backstop for the allow list. Secrets, user data and
+//   machine-specific state are named there explicitly, so a key added to a
+//   group by mistake still cannot leave the machine. A test asserts the two
+//   lists never meet.
+// ---------------------------------------------------------------------------
+
+/** Short name -> storage key, for every key a settings file may carry. */
+export const SETTINGS_TRANSFER_KEYS = {
+  environment: 'jp-os-environment-v1',
+  theme: 'jp-os-theme',
+  personalization: 'jp-os-personalization-v1',
+  customCss: 'jp-os-custom-css-v1',
+  displayPrefs: 'jp-os-display-prefs-v1',
+  desktopPrefs: 'jp-os-desktop-prefs-v1',
+  fileDropPrefs: 'jp-os-filedrop-prefs-v1',
+  shortcuts: 'jp-shortcuts-v1',
+  visualizer: 'jp-os-visualizer',
+  musicWidget: 'jp-os-music-widget',
+  lyricsSettings: 'jp-lyrics-settings',
+  readerSettings: 'jp-reader-settings',
+  exampleCount: 'jp-study-ex-display',
+  exampleLangs: 'jp-study-ex-langs',
+  translateSource: 'jp-study-translate-source',
+  translateTarget: 'jp-study-translate-target',
+  toolboxSettings: 'jp-study.toolbox.settings.v1',
+} as const;
+
+export type SettingsTransferKeyName = keyof typeof SETTINGS_TRANSFER_KEYS;
+
+/**
+ * Groups a settings file is organised by, keyed by the `SETTINGS_DOMAINS` id
+ * they belong to (so the Memory panel's translated domain names label them),
+ * in UI order. A domain missing here is not transferable at all.
+ */
+export const SETTINGS_TRANSFER_GROUPS: ReadonlyArray<{
+  id: string;
+  keys: readonly SettingsTransferKeyName[];
+}> = [
+  { id: 'appearance', keys: ['theme', 'personalization', 'customCss'] },
+  { id: 'environment', keys: ['environment'] },
+  { id: 'display', keys: ['displayPrefs'] },
+  { id: 'desktop-prefs', keys: ['desktopPrefs'] },
+  { id: 'file-drop-prefs', keys: ['fileDropPrefs'] },
+  { id: 'shortcuts', keys: ['shortcuts'] },
+  { id: 'visualizer', keys: ['visualizer'] },
+  { id: 'music', keys: ['musicWidget', 'lyricsSettings'] },
+  { id: 'reading', keys: ['readerSettings'] },
+  { id: 'dictionary', keys: ['exampleCount', 'exampleLangs', 'translateSource', 'translateTarget'] },
+  { id: 'blanc-toolbox', keys: ['toolboxSettings'] },
+];
+
+/**
+ * Never exported, never imported — each with the reason, because "why is my X
+ * not in the file" deserves an answer that is not a guess.
+ */
+export const SETTINGS_TRANSFER_DENY_KEYS: Readonly<Record<string, string>> = {
+  // The study language travels as file metadata. Changing it swaps dictionaries
+  // and decks, which is not something a settings import should do on the side.
+  'jp-study-dict-lang': 'study language (metadata only)',
+  // Mirrors another key; the owner rewrites them from the key they mirror.
+  'jp-os-accent': 'mirror of the personalization accent',
+  'jp-os-reduce-motion': 'mirror of the display animation level',
+  // Machine-specific.
+  'jp-app-zoom': 'depends on this screen',
+  'jp-study-whisper-device': 'depends on this PC (CPU/GPU)',
+  'jp-study-whisper-lang': 'retired key',
+  'jp-os-aero-safe-mode-v1': 'crash-recovery state of this install',
+  'jp-os-filedrop-backup-v1': 'undo backups of this PC',
+  'jp-os-wins': 'window layout of this PC',
+  'jp-os-icons': 'icon layout of this PC',
+  'jp-os-wall': 'wallpaper file of this PC',
+  'jp-music-player': 'player state of this PC',
+  // User data and progress.
+  'jp-desktop-notes': 'user data (sticky notes)',
+  'jp-os-achievements-v1': 'progress',
+  'jp-os-trinkets-v1': 'progress',
+  'jp-os-secret-history-v1': 'progress',
+  'jp-os-secret-leaf-v1': 'progress',
+  'jp-music-liked': 'user data (liked songs)',
+  'jp-music-playlists': 'user data (playlists)',
+  'jp-flashcard-deck': 'user data (deck)',
+  'jp-flashcard-deck-journal': 'user data (deck)',
+  'jp-word-knowledge': 'user data (known words)',
+  'jp-word-knowledge-ja': 'user data (known words)',
+  'jp-word-knowledge-zh': 'user data (known words)',
+  'jp-saved-words': 'user data (saved words)',
+  'jp-saved-words-ja': 'user data (saved words)',
+  'jp-saved-words-zh': 'user data (saved words)',
+  'jp-level-lists': 'user data (level lists)',
+  'jp-study-stats-v1': 'user data (review log and stats)',
+  'jp-study-stats-v1-ja': 'user data (review log and stats)',
+  'jp-study-stats-v1-zh': 'user data (review log and stats)',
+  'jp-media-study-database-v1': 'user data (media study history)',
+  'jp-grammarx-notebook-timeline-v1': 'user data (notes)',
+  'jp-user-notes-journal-v1': 'user data (notes)',
+  'jp-calendar-events': 'user data (calendar)',
+  'jp-clipboard-history': 'user data (clipboard)',
+  // Clipboard settings can switch clipboard monitoring on and a smaller history
+  // size trims history on save, which no Undo brings back.
+  'jp-clipboard-settings': 'can enable clipboard monitoring and trim history',
+  'jp-lookup-history': 'user data (lookups)',
+  'jp-study-csv-editor-v1': 'user data (CSV draft)',
+  'jp-novels-planned': 'user data (planned novels)',
+};
+
+/** Whole families of keys that are never transferable. */
+export const SETTINGS_TRANSFER_DENY_PREFIXES: readonly string[] = [
+  'jp-exttoken-', // browser-extension pairing tokens
+  'jp-bookmarks-',
+  'jp-annotations:',
+  'jp-lyrics-', // lyric cache; `jp-lyrics-settings` is allowed by name below
+  'jp-game-',
+  'jp-study.blanc.',
+  'jp-blanc-',
+  'jp-os-wins',
+  'jp-os-icons',
+];
+
+/** Anything that names a secret, wherever it lives. */
+const SETTINGS_TRANSFER_SECRET_PATTERN = /(api[-_.]?key|token|secret|passw|vault|credential|\bauth\b|cookie)/i;
+
+/**
+ * Whether a key is barred from a settings file. The deny list wins over any
+ * allow-list entry except an exact allow-listed name that a prefix rule happens
+ * to cover (`jp-lyrics-settings` under the `jp-lyrics-` cache prefix).
+ */
+export function settingsTransferKeyDenied(key: string): boolean {
+  if (Object.prototype.hasOwnProperty.call(SETTINGS_TRANSFER_DENY_KEYS, key)) return true;
+  if (SETTINGS_TRANSFER_SECRET_PATTERN.test(key)) return true;
+  const allowedByName = (Object.values(SETTINGS_TRANSFER_KEYS) as string[]).includes(key);
+  if (allowedByName) return false;
+  return SETTINGS_TRANSFER_DENY_PREFIXES.some((p) => key.startsWith(p));
 }

@@ -22,7 +22,28 @@ import {
   wordFrequencyCacheGeneration,
 } from '../../dictFrequencyCache';
 import { useT } from '../../i18n';
+import { cachedDictionaryOrder } from '../../dictDisplayPrefs';
+import { dictionaryRanker } from '../../../shared/dictDisplay';
 import './dictEntryExtras.css';
+
+/**
+ * Chips in the user's dictionary order (Settings → dictionaries), as Yomitan lays
+ * out its frequency tags: the same corpus sits in the same slot on every entry,
+ * so the eye can compare two words' "Novels" ranks without reading every label.
+ * Sorting by rank put whichever corpus happened to rank the word best first, so
+ * the slots reshuffled from word to word. A corpus the order does not name goes
+ * last, best rank first among those.
+ */
+export function orderFrequencyChips<R extends { corpusTitle: string; rank: number }>(
+  ranks: readonly R[],
+  orderedTitles: readonly string[] | undefined,
+): R[] {
+  const rankOf = dictionaryRanker(orderedTitles);
+  return ranks
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => rankOf(a.row.corpusTitle) - rankOf(b.row.corpusTitle) || a.row.rank - b.row.rank || a.index - b.index)
+    .map(({ row }) => row);
+}
 
 /** Chips shown before the rest fold into "+N". */
 const MAX_CHIPS = 4;
@@ -47,7 +68,7 @@ export default function EntryFrequencies({ entry, lang }: { entry: DictEntry; la
     };
   }, [entry.word, lang, generation]);
 
-  const ranks = reply?.entries ?? [];
+  const ranks = orderFrequencyChips(reply?.entries ?? [], cachedDictionaryOrder());
   if (!ranks.length) {
     // The merged metadata rank, as before: attributed when the merge knew its source.
     if (entry.frequency == null) return null;

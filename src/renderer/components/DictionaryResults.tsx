@@ -18,7 +18,15 @@ import AnkiSetup from './AnkiSetup';
 import Icon from './Icons';
 import { loadSaved, onSavedChanged, removeSaved, SAVED_WORDS_BOOK_ID, SAVED_WORDS_BOOK_TITLE, SAVED_WORDS_FOLDER } from '../savedWords';
 import { mineToStudy, notifyMined, type MineToStudyInput } from '../studyMining';
-import { cycleLevel, getLevel, onKnowledgeChanged, type WkLevel } from '../knownWords';
+import { getLevel, onKnowledgeChanged } from '../knownWords';
+import { getTokenizer, tokenizerReady } from '../tokenizer';
+import {
+  combinedLevel,
+  cycleKnowledgeTargets,
+  knowledgeParts,
+  knowledgeTargetsSync,
+  type KnowledgePart,
+} from './lexicon/knowledgeTargets';
 import { getStudyLang, onStudyLangChanged, studyContentLang } from '../studyEnvironment';
 import { getActiveProfile, getProfiles, onProfileChanged } from '../profileState';
 import { translateTo, type TransLang } from '../translator';
@@ -1138,13 +1146,40 @@ export default function DictionaryResults({
    * floating window on the desk disappeared — measured live against a refused
    * AnkiConnect port, one click on "+ Add to Anki".
    */
+  /**
+   * Each headword's knowledge keys by the one rule (`shared/knowledgeKey`): a noun
+   * compound such as 携帯電話 lives under its parts (携帯 + 電話), which is what the
+   * reader colours, so the row shows the parts' combined state — the least-known
+   * part — and grading it grades every part. Before kuromoji is built a Japanese
+   * word keeps its spelling; `tokenizerTick` re-reads once it is.
+   */
+  const [tokenizerTick, setTokenizerTick] = useState(0);
+  const needsTokenizer = gradable && lang === 'ja' && !tokenizerReady() && entries.some((entry) => /[㐀-鿿々]{2,}/.test(entry.word));
+  useEffect(() => {
+    if (!needsTokenizer) return undefined;
+    let alive = true;
+    void getTokenizer()
+      .then(() => {
+        if (alive) setTokenizerTick((n) => n + 1);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [needsTokenizer]);
   const knowledge = useMemo(() => {
-    const levels = new Map<string, WkLevel>();
-    if (gradable) for (const entry of entries) levels.set(entry.word, getLevel(entry.word));
+    const levels = new Map<string, { keys: string[]; level: ReturnType<typeof combinedLevel>; parts: KnowledgePart[] }>();
+    if (gradable) {
+      for (const entry of entries) {
+        if (levels.has(entry.word)) continue;
+        const keys = knowledgeTargetsSync(entry.word, lang);
+        levels.set(entry.word, { keys, level: combinedLevel(keys), parts: keys.length > 1 ? knowledgeParts(keys) : [] });
+      }
+    }
     return levels;
     // `knowledgeTick` is the subscription, not a value: it is what re-reads the
     // store after somebody else writes to it.
-  }, [entries, gradable, knowledgeTick]);
+  }, [entries, gradable, lang, knowledgeTick, tokenizerTick]);
 
   /**
    * "In deck / in Anki" for each headword on screen, before anything is added. Same
@@ -1397,8 +1432,12 @@ export default function DictionaryResults({
                 {gradable && (
                   <WordKnowledge
                     word={entry.word}
-                    level={knowledge.get(entry.word) ?? 0}
-                    onCycle={cycleLevel}
+                    level={knowledge.get(entry.word)?.level ?? 0}
+                    parts={knowledge.get(entry.word)?.parts}
+                    onCycle={() => {
+                      const keys = knowledge.get(entry.word)?.keys;
+                      cycleKnowledgeTargets(keys?.length ? keys : [entry.word]);
+                    }}
                   />
                 )}
               </div>
@@ -1434,12 +1473,16 @@ export default function DictionaryResults({
                   merged per the user's layout (`DictCardSections`). */}
               <DictCardSections card={card} prefs={displayPrefs} lang={lang} />
               <KanjiBreakdown word={entry.word} lang={lang} onLookup={onLookup} />
+              {/* Anki already holds this word (the "In Anki" badge above): the Add
+                  button says so before it is pressed, as Yomitan's duplicate icon
+                  does, rather than only after a second note was attempted. */}
               <button
-                className={`dict-add lq-hit ${addState[i] === 'added' || addState[i] === 'dup' || addState[i] === 'queued' || addState[i] === 'saved' ? 'done' : ''}`}
+                className={`dict-add lq-hit ${addState[i] === 'added' || addState[i] === 'dup' || addState[i] === 'queued' || addState[i] === 'saved' ? 'done' : ''}${here?.inAnki && !addState[i] ? ' is-dup-known' : ''}`}
                 disabled={addState[i] === 'adding' || addState[i] === 'translating'}
+                title={here?.inAnki && !addState[i] ? t('dict4.anki.addAgainTitle') : undefined}
                 onClick={() => addToAnki(entry, i)}
               >
-                {addLabel(i)}
+                {here?.inAnki && !addState[i] ? t('dict4.anki.addAgain') : addLabel(i)}
               </button>
               {addState[i] === 'error' && addErr[i] && (
                 <div className="dict-add-err">{addErr[i]}</div>

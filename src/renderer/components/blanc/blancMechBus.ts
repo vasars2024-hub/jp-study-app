@@ -38,6 +38,11 @@ export const BLANC_OPEN_FLOW_EVENT = 'blanc:open-flow';
 export const BLANC_OPEN_INBOX_EVENT = 'blanc:open-inbox';
 /** Quick Notes changed outside the panel (the `n` verb): a warm panel reloads. */
 export const BLANC_QUICK_NOTES_EVENT = 'blanc:quick-notes-changed';
+/**
+ * The old Quick Notes text box (one localStorage string). Only read now: its text
+ * is moved into the notes store as a note (`blancQuickNotes.ts`).
+ */
+export const BLANC_QUICK_NOTES_KEY = 'jp-study.blanc.quickNotes';
 
 export function requestBlancFlow(): void {
   window.dispatchEvent(new CustomEvent(BLANC_OPEN_FLOW_EVENT));

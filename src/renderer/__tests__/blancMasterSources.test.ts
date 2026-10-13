@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CollectedFolder, CollectedTool } from '../../shared/collectedTools';
 import { en } from '../../shared/i18n/catalogs/en';
 import { ja } from '../../shared/i18n/catalogs/ja';
+import { translate, type Catalog, type UiLang } from '../../shared/i18n/core';
 import {
   BLANC_MASTER_SETTINGS,
   appDrawerMasterContent,
@@ -15,18 +16,18 @@ import {
   savedWordMasterContent,
 } from '../components/blanc/blancMasterSources';
 
-function labelsFrom(catalog: object) {
-  return blancMasterSourceLabels((key, vars) => {
-    let value = String((catalog as Record<string, unknown>)[key] ?? key);
-    for (const [name, replacement] of Object.entries(vars ?? {})) {
-      value = value.replaceAll(`{${name}}`, String(replacement));
-    }
-    return value;
-  });
+/*
+  Resolve through the app's real `translate()` rather than a string-only stub:
+  catalog entries can be plural forms ({ one, other }) since the plural pass, and
+  a stub that stringifies them renders "[object Object]" where the app renders
+  "2 lookups".
+*/
+function labelsFrom(lang: UiLang, catalog: Catalog) {
+  return blancMasterSourceLabels((key, vars) => translate(key, vars, { lang, catalog, fallback: en }));
 }
 
-const EN_LABELS = labelsFrom(en);
-const JA_LABELS = labelsFrom(ja);
+const EN_LABELS = labelsFrom('en', en);
+const JA_LABELS = labelsFrom('ja', ja);
 
 const FOLDERS: CollectedFolder[] = [
   { id: 'study', name: 'Study', parentFolderId: null, order: 0 },

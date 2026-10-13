@@ -1,10 +1,13 @@
 import {
   agentPermissionRank,
+  evaluateAgentToolAccess,
+  getAgentToolOperation,
   isAgentPermissionLevel,
   STRICTEST_AGENT_PERMISSION,
   type AgentPermissionLevel,
   type AgentToolOperationId,
 } from './localAgent';
+import { agentInverseOperation } from './agentInverseOperations';
 
 export type AgentProfileRole = 'tutor' | 'media' | 'research' | 'automation' | 'custom';
 export type AgentResponseLength = 'brief' | 'balanced' | 'detailed';
@@ -418,4 +421,62 @@ export function effectiveAgentPermission(
 ): AgentPermissionLevel {
   if (!profile) return globalPermission;
   return narrowAgentPermission(globalPermission, profile.permission);
+}
+
+/** What one Undo is authorized against: a permission level and, when a profile is active, its allow-list. */
+export interface AgentUndoAuthority {
+  permission: AgentPermissionLevel;
+  allowedOperations?: readonly AgentToolOperationId[];
+}
+
+/**
+ * The authority an Undo of the Agent's OWN write is checked against.
+ *
+ * Scorecard bug 9. The inverse of a write is often a stronger operation than the write: the
+ * inverse of "schedule a session" is `calendar.delete-event`, which needs `full-automation` and
+ * which neither the Tutor nor the Automation profile enables, deliberately: the model must not
+ * be able to delete the user's events. Checking the Undo against the inverse's own rules
+ * therefore refused every calendar Undo those profiles offered, while the button was still shown.
+ *
+ * Taking back the write it just made is a different act from deleting arbitrary events, and it
+ * is authorized by the WRITE. If the forward operation is still allowed right now (by the
+ * profile's allow-list and by the permission level), its registered inverse is allowed for this
+ * one Undo. The grant is narrow on every axis:
+ *
+ *  - Only the inverse `AGENT_INVERSE_OPERATIONS` names for that forward operation. Nothing else
+ *    is added to the list.
+ *  - Only what the forward operation needs is required. A user who has since narrowed the
+ *    profile or lowered the permission level below the write's own level gets the refusal, and
+ *    the inverse is judged on its own rules again.
+ *  - Only the ids the log recorded for that entry. The caller resolves the target from the log
+ *    (`resolveAgentUndo`), which also refuses when anything newer touched those ids, and the
+ *    calendar inverse refuses when the user edited the event since (`agentUndoClient`).
+ *
+ * Returns the inputs unchanged when the grant does not apply.
+ */
+export function agentUndoAuthority(
+  forward: AgentToolOperationId,
+  permission: AgentPermissionLevel,
+  allowedOperations?: readonly AgentToolOperationId[],
+): AgentUndoAuthority {
+  const unchanged: AgentUndoAuthority = { permission, ...(allowedOperations ? { allowedOperations } : {}) };
+  const inverse = agentInverseOperation(forward);
+  const inverseDefinition = inverse ? getAgentToolOperation(inverse) : undefined;
+  if (!inverse || !inverseDefinition) return unchanged;
+  // `confirmed` because the question is whether the write is ALLOWED, not whether it would
+  // need a fresh confirmation; the Undo asks the user itself.
+  const write = evaluateAgentToolAccess(
+    { callId: 'undo-authority', operation: forward, arguments: {}, confirmed: true },
+    permission,
+    allowedOperations,
+  );
+  if (write.status === 'denied') return unchanged;
+  return {
+    permission: agentPermissionRank(inverseDefinition.minimumPermission) > agentPermissionRank(permission)
+      ? inverseDefinition.minimumPermission
+      : permission,
+    ...(allowedOperations
+      ? { allowedOperations: allowedOperations.includes(inverse) ? allowedOperations : [...allowedOperations, inverse] }
+      : {}),
+  };
 }

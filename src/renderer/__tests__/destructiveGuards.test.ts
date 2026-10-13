@@ -23,7 +23,6 @@ const ROOT = resolve(__dirname, '..', '..', '..');
 
 const CASES = [
   { file: 'src/renderer/components/settings/pages/ReadingLensSection.tsx', api: 'lensHistoryClear' },
-  { file: 'src/renderer/components/settings/pages/MonitorsPage.tsx', api: 'desktopResetAssignments' },
   { file: 'src/renderer/components/settings/pages/ApiKeysPage.tsx', api: 'clearCredential' },
   // Added by the manual half of the class. The scan reported this one as a bare
   // unguarded call and it was worse than the label suggested: `visual-novel:remove`
@@ -71,6 +70,19 @@ const CASES = [
   // beside the button that OPENS the site. BOTH hosts called it bare, so the guard
   // went into one shared helper — see SOLE_CALLERS, which is what keeps it there.
   { file: 'src/renderer/components/immersion/immersionSiteActions.ts', api: 'immersionRemoveSite' },
+] as const;
+
+/**
+ * set8: section resets that moved onto `ResetSectionButton`, which owns the
+ * confirm. `desktopResetAssignments` was the second case above until Monitors'
+ * hand-rolled confirm became that shared button. Its guard is no longer in the
+ * call site's own function, so the CASES walk cannot see it; what is asserted
+ * instead is that the call sits inside the button's `onReset` prop, and that the
+ * button confirms as a danger action and bails on a refusal before calling it.
+ */
+const RESET_BUTTON = 'src/renderer/components/settings/ResetSectionButton.tsx';
+const VIA_RESET_BUTTON = [
+  { file: 'src/renderer/components/settings/pages/MonitorsPage.tsx', api: 'desktopResetAssignments' },
 ] as const;
 
 /**
@@ -223,6 +235,23 @@ describe('destructive actions confirm before they destroy', () => {
     const dangerFile = 'dangerIn' in testCase ? testCase.dangerIn : file;
     expect(readFileSync(resolve(ROOT, dangerFile), 'utf8'), `${api}'s dialog is not danger`)
       .toMatch(/danger:\s*true/);
+  });
+
+  it.each(VIA_RESET_BUTTON)('$api asks first through ResetSectionButton in $file', ({ file, api }) => {
+    const text = withoutComments(readFileSync(resolve(ROOT, file), 'utf8'));
+    const at = text.indexOf(`window.api.${api}(`);
+    expect(at, `${api} call site not found in ${file}`).toBeGreaterThan(-1);
+    const open = text.lastIndexOf('<ResetSectionButton', at);
+    expect(open, `${api} is not inside a ResetSectionButton in ${file}`).toBeGreaterThan(-1);
+    const between = text.slice(open, at);
+    expect(between).toMatch(/onReset=\{/);
+    expect(between, `${api} is after the ResetSectionButton closed`).not.toMatch(/\/>|<\/ResetSectionButton>/);
+    const button = withoutComments(readFileSync(resolve(ROOT, RESET_BUTTON), 'utf8'));
+    const confirmAt = button.indexOf('confirmDialog(');
+    expect(confirmAt).toBeGreaterThan(-1);
+    expect(button).toMatch(/if\s*\(!\s*ok\)\s*return;/);
+    expect(button.indexOf('onReset()')).toBeGreaterThan(confirmAt);
+    expect(button).toMatch(/danger:\s*true/);
   });
 
   it.each(SOLE_CALLERS)('$api is reached only through its guarded route', ({ api, through }) => {

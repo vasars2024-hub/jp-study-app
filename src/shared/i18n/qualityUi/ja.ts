@@ -7,7 +7,6 @@ export const QUALITY_UI_JA: Catalog = {
   'set2.home.recentChanges': '最近変更した設定',
   'set2.home.clearRecentChanges': 'クリア',
   'set2.reset.dialogTitle': '「{section}」をリセットしますか？',
-  'set2.reset.dialogMessage': 'このセクションのすべての項目が既定値に戻ります。元に戻すことはできません。',
   'set2.group.connections': 'AI と接続',
 
   // ---- Widgets ----

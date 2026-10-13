@@ -377,8 +377,10 @@ describe('durable record read', () => {
 });
 
 describe('review statistics', () => {
+  /** The study day by hand: the local date, the day before when it is earlier than 4 am. */
   function key(ms: number): string {
     const d = new Date(ms);
+    if (d.getHours() < 4) d.setDate(d.getDate() - 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
@@ -408,12 +410,16 @@ describe('review statistics', () => {
     const entries = rows(now);
     for (const days of [1, 7, 30, 365]) {
       const daily = stats.dailyReviewStats(entries, days, now);
-      const expected = new Map(daily.map((d) => [d.date, { learning: 0, young: 0, mature: 0, passed: 0, seconds: 0, timed: 0 }]));
+      const expected = new Map(daily.map((d) => [d.date, { learning: 0, young: 0, mature: 0, passed: 0, graded: 0, seconds: 0, timed: 0 }]));
       for (const e of entries) {
         const row = expected.get(key(e.at));
         if (e.mode !== 'review' || !row) continue;
         row[stats.reviewMaturity(e)] += 1;
-        if (e.correct) row.passed += 1;
+        // A game-graded review is no recall test: out of the pass rate.
+        if (e.source === undefined) {
+          row.graded += 1;
+          if (e.correct) row.passed += 1;
+        }
         if (typeof e.durationMs === 'number') {
           row.seconds += e.durationMs / 1000;
           row.timed += 1;
@@ -427,10 +433,10 @@ describe('review statistics', () => {
       let practice = 0;
       for (const e of entries) {
         if (!perDay.has(key(e.at))) continue;
-        if (e.mode === 'review') {
+        if (e.mode === 'review' && e.source === undefined) {
           perDay.set(key(e.at), (perDay.get(key(e.at)) ?? 0) + 1);
           reviews += 1;
-        } else if (e.mode !== 'grammar' && e.mode !== 'game') {
+        } else if (e.mode !== 'grammar' && e.mode !== 'game' && e.mode !== 'review') {
           practice += 1;
         }
       }

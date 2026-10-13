@@ -99,6 +99,8 @@ vi.mock('../agentUndoClient', () => ({
     undoCalls.push(args);
     return Promise.resolve(undoResult);
   },
+  // Reads the calendar store in the real client; the drafts these tests append carry no events.
+  withAgentUndoBaseline: (draft: unknown) => draft,
 }));
 
 vi.mock('../agentConversationPlanner', () => ({
@@ -2171,5 +2173,37 @@ describe('Agent — contextual region adoption', () => {
       expect(el, sel).not.toBeNull();
       expect(el?.closest('.lq-contextual'), `${sel} is outside every contextual surface`).toBeNull();
     }
+  });
+});
+
+describe('Agent: a reply stopped part-way', () => {
+  function withReply(reply: { status: 'cancelled' | 'failed'; text: string; error: string }): AgentWorkspaceState {
+    const base = populated();
+    return {
+      ...base,
+      conversations: base.conversations.map((conversation) => (
+        conversation.id === 'chat-1'
+          ? { ...conversation, messages: conversation.messages.map((message) => ({ ...message, ...reply })) }
+          : conversation
+      )),
+    };
+  }
+
+  it('keeps the text that arrived and says it was stopped, not that it failed', async () => {
+    stored = withReply({ status: 'cancelled', text: 'は marks the topic, and', error: 'cancelled' });
+    await mount();
+    expect(text()).toContain('は marks the topic, and');
+    expect(text()).toContain('agent.message.status.stopped');
+    expect(text()).toContain('agent.message.stoppedPartial');
+    expect(text()).not.toContain('agent.execute.error.cancelled');
+    expect(host.querySelector('.agent-message-stopped')).not.toBeNull();
+  });
+
+  it('still says "cancelled" for a request stopped before any text arrived', async () => {
+    stored = withReply({ status: 'cancelled', text: '', error: 'cancelled' });
+    await mount();
+    expect(text()).toContain('agent.message.status.cancelled');
+    expect(text()).toContain('agent.execute.error.cancelled');
+    expect(text()).not.toContain('agent.message.stoppedPartial');
   });
 });

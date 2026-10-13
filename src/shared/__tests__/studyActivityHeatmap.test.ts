@@ -34,14 +34,15 @@ describe('studyDayFigures', () => {
 });
 
 describe('gameAnswersByDay', () => {
-  it('counts only game answers, per local day', () => {
+  it('counts only game answers, per study day (an answer at 01:00 is the evening before)', () => {
     const at = (day: number, hour: number) => new Date(2026, 9, day, hour).getTime();
     expect(gameAnswersByDay([
       { at: at(7, 9), mode: 'game' },
       { at: at(7, 23), mode: 'game' },
       { at: at(8, 1), mode: 'game' },
       { at: at(8, 2), mode: 'review' },
-    ])).toEqual({ '2026-10-07': 2, '2026-10-08': 1 });
+      { at: at(8, 5), mode: 'game' },
+    ])).toEqual({ '2026-10-07': 3, '2026-10-08': 1 });
   });
 });
 

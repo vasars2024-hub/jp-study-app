@@ -226,3 +226,30 @@ export function fsrsReview(
     : stabilityOnRecall(current, retrievability, grade, weights);
   return { stability, difficulty };
 }
+
+/**
+ * A memory state for a card that only has an SM-2 schedule: fsrs-rs's
+ * `memory_state_from_sm2`, which Anki uses when FSRS is switched on for a card
+ * whose review history is missing or incomplete.
+ *
+ * Stability is the interval the card was given, scaled from the retention SM-2
+ * is assumed to have achieved (`sm2Retention`, 0.9 by default, where the
+ * stability IS the interval). Difficulty is whatever difficulty would have made
+ * FSRS grow stability by the card's ease factor on a review at that retention.
+ * Without this a 200-day SM-2 card switched to FSRS restarted as a new card.
+ */
+export function fsrsMemoryFromSm2(
+  easeFactor: number,
+  intervalDays: number,
+  sm2Retention = 0.9,
+  weights: readonly number[] = DEFAULT_FSRS_WEIGHTS,
+): FsrsMemory {
+  const w = weights;
+  const r = clamp(sm2Retention, 0.5, 0.999);
+  const ease = Number.isFinite(easeFactor) ? easeFactor : 2.5;
+  const interval = Number.isFinite(intervalDays) ? Math.max(intervalDays, FSRS_MIN_STABILITY) : FSRS_MIN_STABILITY;
+  const stability = clampStability((interval * FSRS_FACTOR) / (r ** (1 / FSRS_DECAY) - 1));
+  const growth = Math.exp(w[8]) * stability ** -w[9] * Math.expm1((1 - r) * w[10]);
+  const difficulty = growth > 0 ? 11 - (ease - 1) / growth : FSRS_MAX_DIFFICULTY;
+  return { stability, difficulty: clampDifficulty(difficulty) };
+}

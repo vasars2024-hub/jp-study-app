@@ -44,12 +44,19 @@ import {
   parseVisualNovelHookChunk,
   type VisualNovelHookState,
 } from '../../shared/visualNovelHook';
-import { vn5CleanLine, vn5CompileRule } from '../../shared/visualNovelLineFilters';
+import { VN5_DEDUPE_WINDOW, vn5CleanLine, vn5CompileRule } from '../../shared/visualNovelLineFilters';
 import type { VisualNovelCandidateRequest } from '../../shared/visualNovelRecommendations';
-import type {
-  VisualNovelCaptureSource,
-  VisualNovelSessionState,
-  VisualNovelStudyTime,
+import {
+  detectHookFileEncoding,
+  HOOK_ENCODING_SAMPLE_BYTES,
+  hookFileStartOffset,
+  VisualNovelError,
+  visualNovelErrorCode,
+  type HookFileEncoding,
+  type VisualNovelCaptureSource,
+  type VisualNovelErrorCode,
+  type VisualNovelSessionState,
+  type VisualNovelStudyTime,
 } from '../../shared/visualNovelCapture';
 import { cacheVndbArt, isVndbArtUrl, vndbFailureCode, vndbQuery } from './vndbClient';
 import { createCaptureSession, type CaptureSocket } from './visualNovelCaptureSession';
@@ -93,9 +100,34 @@ interface ActiveHookRelay {
   reading: boolean;
   capturedLines: number;
   lastError: string;
+  lastErrorCode: VisualNovelErrorCode | '';
   remainder: string;
+  /**
+   * The file's encoding, decided once from its START (BOM or content) and kept:
+   * reads begin where the file ended, so the bytes being decoded never show the
+   * BOM. Null while everything seen so far is plain ASCII.
+   */
+  encoding: HookFileEncoding | null;
+  /** Streaming decoder, so a character split across two reads is joined, not garbled. */
+  decoder: TextDecoder | null;
+  /** The file was truncated and is being read again from the top: skip lines already saved. */
+  rewound: boolean;
+  /** The last few lines kept, for the "drop recent duplicates" filter. */
+  recent: string[];
 }
 const activeHookRelays = new Map<string, ActiveHookRelay>();
+
+/** The hook relay's status, with what its error means for the UI. */
+type VisualNovelHookStatus = VisualNovelHookState & { lastErrorCode: VisualNovelErrorCode | '' };
+
+/** A failed IPC response: main's own message for logs, and a code the UI translates. */
+function failure(error: unknown, code?: VisualNovelErrorCode) {
+  return {
+    ok: false as const,
+    error: error instanceof Error ? error.message : String(error),
+    errorCode: code ?? visualNovelErrorCode(error),
+  };
+}
 export const VNDB_VN_FIELDS = [
   'title',
   'alttitle',
@@ -161,15 +193,15 @@ function isManagedCaptureAsset(filePath: string): boolean {
 
 async function saveCaptureScreenshot(dataUrl: string): Promise<string> {
   const match = dataUrl.match(/^data:image\/(jpeg|png);base64,([A-Za-z0-9+/=\r\n]+)$/);
-  if (!match) throw new Error('The capture screenshot format is not supported.');
+  if (!match) throw new VisualNovelError('unsupported-format', 'The capture screenshot format is not supported.');
   const data = Buffer.from(match[2], 'base64');
   if (!data.length || data.length > MAX_CAPTURE_SCREENSHOT_BYTES) {
-    throw new Error('The capture screenshot is too large.');
+    throw new VisualNovelError('too-large', 'The capture screenshot is too large.');
   }
   const isPng = data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   const isJpeg = data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
   if ((match[1] === 'png' && !isPng) || (match[1] === 'jpeg' && !isJpeg)) {
-    throw new Error('The capture screenshot data is invalid.');
+    throw new VisualNovelError('invalid-file', 'The capture screenshot data is invalid.');
   }
   const extension = match[1] === 'png' ? 'png' : 'jpg';
   const directory = captureImageDirectory();
@@ -204,10 +236,10 @@ const CAPTURE_AUDIO_MIME: Record<string, string> = {
 
 async function saveCaptureAudio(sourcePath: string): Promise<string> {
   const extension = path.extname(sourcePath).toLowerCase();
-  if (!CAPTURE_AUDIO_MIME[extension]) throw new Error('The selected audio format is not supported.');
+  if (!CAPTURE_AUDIO_MIME[extension]) throw new VisualNovelError('unsupported-format', 'The selected audio format is not supported.');
   const stat = await fs.promises.stat(sourcePath);
   if (!stat.isFile() || !stat.size || stat.size > MAX_CAPTURE_AUDIO_BYTES) {
-    throw new Error('The selected audio clip must be a file smaller than 12 MB.');
+    throw new VisualNovelError('too-large', 'The selected audio clip must be a file smaller than 12 MB.');
   }
   const directory = captureImageDirectory();
   await fs.promises.mkdir(directory, { recursive: true });
@@ -232,7 +264,7 @@ function saveDatabase(database: VisualNovelDatabase): VisualNovelDatabase {
   return normalized;
 }
 
-function hookState(id: string): VisualNovelHookState {
+function hookState(id: string): VisualNovelHookStatus {
   const relay = activeHookRelays.get(id);
   return {
     visualNovelId: id,
@@ -240,10 +272,11 @@ function hookState(id: string): VisualNovelHookState {
     filePath: relay?.filePath ?? '',
     capturedLines: relay?.capturedLines ?? 0,
     lastError: relay?.lastError ?? '',
+    lastErrorCode: relay?.lastErrorCode ?? '',
   };
 }
 
-function broadcastHookState(id: string): VisualNovelHookState {
+function broadcastHookState(id: string): VisualNovelHookStatus {
   const state = hookState(id);
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send('visual-novel:hookChanged', state);
@@ -251,7 +284,7 @@ function broadcastHookState(id: string): VisualNovelHookState {
   return state;
 }
 
-function stopHookRelay(id: string): VisualNovelHookState {
+function stopHookRelay(id: string): VisualNovelHookStatus {
   const relay = activeHookRelays.get(id);
   if (relay) {
     if (relay.pending) clearTimeout(relay.pending);
@@ -261,14 +294,39 @@ function stopHookRelay(id: string): VisualNovelHookState {
   return broadcastHookState(id);
 }
 
+/**
+ * Text from the next bytes of a hook file. The encoding is fixed on the first
+ * bytes that can tell it (`detectHookFileEncoding`) and decoding is streamed, so
+ * a UTF-8 or Shift-JIS character, or a UTF-16 code unit, cut in two by the end
+ * of one read is completed by the next instead of turning into U+FFFD.
+ */
+function decodeHookBytes(relay: ActiveHookRelay, bytes: Buffer): string {
+  if (!relay.decoder) {
+    const encoding = relay.encoding ?? detectHookFileEncoding(bytes);
+    // Still nothing but ASCII: every candidate encoding reads it the same.
+    if (!encoding) return bytes.toString('latin1');
+    relay.encoding = encoding;
+    relay.decoder = new TextDecoder(encoding);
+  }
+  return relay.decoder.decode(bytes, { stream: true });
+}
+
 async function readHookRelay(id: string): Promise<void> {
   const relay = activeHookRelays.get(id);
   if (!relay || relay.reading) return;
   relay.reading = true;
   try {
     const stat = await fs.promises.stat(relay.filePath);
-    if (!stat.isFile()) throw new Error('The hook output is no longer a file.');
-    if (stat.size < relay.position) relay.position = 0;
+    if (!stat.isFile()) throw new VisualNovelError('not-a-file', 'The hook output is no longer a file.');
+    if (stat.size < relay.position) {
+      // Truncated or rewritten: read it again from the top, where a BOM may now
+      // be, and decide the encoding afresh.
+      relay.position = 0;
+      relay.encoding = null;
+      relay.decoder = null;
+      relay.remainder = '';
+      relay.rewound = true;
+    }
     const available = stat.size - relay.position;
     if (available <= 0) return;
     const bytesToRead = Math.min(available, MAX_HOOK_READ_BYTES);
@@ -277,7 +335,7 @@ async function readHookRelay(id: string): Promise<void> {
       const buffer = Buffer.allocUnsafe(bytesToRead);
       const { bytesRead } = await handle.read(buffer, 0, bytesToRead, relay.position);
       relay.position += bytesRead;
-      const decoded = relay.remainder + decodeScript(buffer.subarray(0, bytesRead));
+      const decoded = relay.remainder + decodeHookBytes(relay, buffer.subarray(0, bytesRead));
       const chunks = decoded.split(/\r?\n/u);
       relay.remainder = chunks.pop()?.slice(-2_000) ?? '';
       // The same cleanup and user filters the live capture session applies.
@@ -285,9 +343,19 @@ async function readHookRelay(id: string): Promise<void> {
       const compiled = filters.rules.map(vn5CompileRule);
       const kept = chunks.flatMap((chunk) => {
         const cleaned = vn5CleanLine(chunk, filters, compiled);
-        return cleaned.dropped ? [] : [cleaned.text];
+        if (cleaned.dropped) return [];
+        if (filters.dedupeRecent) {
+          const collapsed = cleaned.text.replace(/\s+/g, '');
+          if (collapsed && relay.recent.includes(collapsed)) return [];
+          if (collapsed) relay.recent = [...relay.recent, collapsed].slice(-VN5_DEDUPE_WINDOW);
+        }
+        return [cleaned.text];
       });
       const lines = parseVisualNovelHookChunk(kept.join('\n'));
+      // A file read again from the top holds lines already saved; anything else
+      // is new text the game showed, repeats included ("はい。" twice is two lines).
+      const keepRepeats = !relay.rewound;
+      relay.rewound = false;
       if (lines.length) {
         const database = loadDatabase();
         const entry = database.entries.find((candidate) => candidate.id === id);
@@ -304,11 +372,13 @@ async function readHookRelay(id: string): Promise<void> {
           chapter: entry.currentChapter,
           scene: entry.currentScene,
           source: 'hook',
-        })), () => crypto.randomUUID());
+        })), () => crypto.randomUUID(), Date.now(), { keepRepeats });
         const previousIds = new Set(database.captures.map((capture) => capture.id));
         const added = next.captures.filter((capture) => !previousIds.has(capture.id)).length;
         if (added) {
           relay.capturedLines += added;
+          relay.lastError = '';
+          relay.lastErrorCode = '';
           noteCaptured(id, next.captures.filter((capture) => !previousIds.has(capture.id)));
           saveDatabase(next);
           broadcastHookState(id);
@@ -320,9 +390,30 @@ async function readHookRelay(id: string): Promise<void> {
     }
   } catch (error) {
     relay.lastError = error instanceof Error ? error.message : String(error);
+    relay.lastErrorCode = visualNovelErrorCode(error);
     broadcastHookState(id);
   } finally {
     relay.reading = false;
+  }
+}
+
+/**
+ * Where a newly picked hook file is followed from, and in which encoding: its
+ * end (lines already in it were captured before), stepped back to a character
+ * boundary, with the encoding read off its first bytes.
+ */
+async function openHookFile(filePath: string, size: number): Promise<{ position: number; encoding: HookFileEncoding | null }> {
+  if (!size) return { position: 0, encoding: null };
+  const handle = await fs.promises.open(filePath, 'r');
+  try {
+    const head = Buffer.alloc(Math.min(size, HOOK_ENCODING_SAMPLE_BYTES));
+    const { bytesRead } = await handle.read(head, 0, head.length, 0);
+    const encoding = detectHookFileEncoding(head.subarray(0, bytesRead));
+    const tail = Buffer.alloc(Math.min(size, 3));
+    const tailRead = await handle.read(tail, 0, tail.length, size - tail.length);
+    return { position: hookFileStartOffset(size, encoding, tail.subarray(0, tailRead.bytesRead)), encoding };
+  } finally {
+    await handle.close();
   }
 }
 
@@ -465,7 +556,7 @@ function saveCapturedLines(
 ): number {
   const database = loadDatabase();
   const entry = database.entries.find((candidate) => candidate.id === id);
-  if (!entry) throw new Error('The visual novel does not exist.');
+  if (!entry) throw new VisualNovelError('not-found', 'The visual novel does not exist.');
   const next = appendVisualNovelCaptures(database, lines.map((line) => ({
     visualNovelId: id,
     japanese: line.japanese,
@@ -491,9 +582,37 @@ function saveCapturedLines(
 function createNodeSocket(url: string): CaptureSocket {
   // Node's global WebSocket in Electron's main process. Connecting from main
   // keeps the renderer CSP's connect-src exactly as narrow as it is.
-  const Socket = (globalThis as { WebSocket?: new (url: string) => CaptureSocket }).WebSocket;
-  if (!Socket) throw new Error('WebSocket is unavailable in this build.');
-  return new Socket(url);
+  const Socket = (globalThis as { WebSocket?: new (url: string) => CaptureSocket & { binaryType?: string } }).WebSocket;
+  if (!Socket) throw new VisualNovelError('websocket-unavailable', 'WebSocket is unavailable in this build.');
+  const socket = new Socket(url);
+  // Node's WebSocket hands binary frames over as Blobs by default; ArrayBuffers
+  // decode synchronously, in order. (The session handles a Blob too.)
+  try {
+    socket.binaryType = 'arraybuffer';
+  } catch {
+    /* read-only in some implementations */
+  }
+  return socket;
+}
+
+/** The VN reader overlay is loaded with `?vnReader=1` (visualNovelReaderWindow.ts). */
+function isReaderWindow(window: BrowserWindow): boolean {
+  try {
+    return /[?&]vnReader=1(?:&|#|$)/.test(window.webContents.getURL());
+  } catch {
+    return false;
+  }
+}
+
+/** Whether a saved line of the novel, among the newest the reader can show, contains `collapsed`. */
+function savedLineContains(id: string, collapsed: string): boolean {
+  let checked = 0;
+  for (const capture of loadDatabase().captures) {
+    if (capture.visualNovelId !== id) continue;
+    if (capture.japanese.replace(/\s+/g, '').includes(collapsed)) return true;
+    if (++checked >= 200) break;
+  }
+  return false;
 }
 
 const captureSession = createCaptureSession({
@@ -502,8 +621,15 @@ const captureSession = createCaptureSession({
   saveLines: saveCapturedLines,
   // While one of the app's own windows has focus the user is working in the
   // app (copying a word from the dictionary popup, say), not playing; the
-  // hooker writes the clipboard while the GAME has focus.
-  clipboardFromApp: () => BrowserWindow.getFocusedWindow() !== null,
+  // hooker writes the clipboard while the GAME has focus. The reader overlay is
+  // the exception: it is part of playing, so a line arriving while it has focus
+  // is still captured (see `focusedAppWindow` in the session).
+  focusedAppWindow: () => {
+    const focused = BrowserWindow.getFocusedWindow();
+    if (!focused) return 'none';
+    return isReaderWindow(focused) ? 'reader' : 'other';
+  },
+  savedLineContains,
   broadcast: (state) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send('visual-novel:captureChanged', state);
@@ -514,7 +640,7 @@ const captureSession = createCaptureSession({
 function startCapture(id: string, test = false) {
   const database = loadDatabase();
   const entry = database.entries.find((candidate) => candidate.id === id);
-  if (!entry) throw new Error('The visual novel does not exist.');
+  if (!entry) throw new VisualNovelError('not-found', 'The visual novel does not exist.');
   const settings = visualNovelSettings(database);
   return captureSession.start(id, {
     // A test listens to both sources, so it can say which one is wired up.
@@ -945,7 +1071,7 @@ async function addVisualNovel(input: VisualNovelCreateInput): Promise<VisualNove
     (installKey && candidate.installPath && normalizePathKey(candidate.installPath) === installKey)
     || (executableKey && candidate.executablePath && normalizePathKey(candidate.executablePath) === executableKey)
   ));
-  if (duplicate) throw new Error(`"${duplicate.title}" is already in the Visual Novel library.`);
+  if (duplicate) throw new VisualNovelError('duplicate', `"${duplicate.title}" is already in the Visual Novel library.`);
   const entry = createVisualNovelEntry({
     ...input,
     installPath,
@@ -978,11 +1104,11 @@ export function registerVisualNovelIpc(): void {
   ipcMain.handle('visual-novel:art', async (_event, url: string) => {
     try {
       if (!isVndbArtUrl(url) || !isVettedArt(url)) {
-        return { ok: false as const, error: 'That image is not in the visual novel library.' };
+        return { ok: false as const, error: 'That image is not in the visual novel library.', errorCode: 'not-found' as const };
       }
       return { ok: true as const, url: await cacheVndbArt(url, mediaRoot()) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1041,7 +1167,7 @@ export function registerVisualNovelIpc(): void {
       await fs.promises.writeFile(result.filePath, JSON.stringify(loadDatabase(), null, 2), 'utf8');
       return { ok: true as const, path: result.filePath };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1065,7 +1191,7 @@ export function registerVisualNovelIpc(): void {
         addedCaptures: Math.max(0, merged.captures.length - before.captures.length),
       };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1075,7 +1201,7 @@ export function registerVisualNovelIpc(): void {
     content: string,
   ) => {
     if (Buffer.byteLength(content, 'utf8') > MAX_COMMUNITY_BUNDLE_BYTES) {
-      return { ok: false as const, error: 'The community bundle is too large to export.' };
+      return { ok: false as const, error: 'The community bundle is too large to export.', errorCode: 'too-large' as const };
     }
     const printableTitle = [...(title || 'visual-novel')]
       .filter((character) => character.charCodeAt(0) >= 32)
@@ -1095,7 +1221,7 @@ export function registerVisualNovelIpc(): void {
       await fs.promises.writeFile(result.filePath, content, 'utf8');
       return { ok: true as const, path: result.filePath };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1109,14 +1235,14 @@ export function registerVisualNovelIpc(): void {
     try {
       const stat = await fs.promises.stat(result.filePaths[0]);
       if (stat.size > MAX_COMMUNITY_BUNDLE_BYTES) {
-        return { ok: false as const, error: 'The selected community bundle is too large.' };
+        return { ok: false as const, error: 'The selected community bundle is too large.', errorCode: 'too-large' as const };
       }
       return {
         ok: true as const,
         content: await fs.promises.readFile(result.filePaths[0], 'utf8'),
       };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1124,7 +1250,7 @@ export function registerVisualNovelIpc(): void {
     try {
       return { ok: true as const, database: await addVisualNovel(input) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1153,7 +1279,7 @@ export function registerVisualNovelIpc(): void {
       }
       return { ok: true as const, database: saveDatabase(database), imported };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1168,7 +1294,7 @@ export function registerVisualNovelIpc(): void {
         database: saveDatabase(updateVisualNovelMetadata(loadDatabase(), id, patch ?? {})),
       };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1203,7 +1329,7 @@ export function registerVisualNovelIpc(): void {
         database: saveDatabase(updateVisualNovelRoutes(loadDatabase(), id, routes ?? [])),
       };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1213,7 +1339,7 @@ export function registerVisualNovelIpc(): void {
 
   ipcMain.handle('visual-novel:startHook', async (_event, id: string) => {
     const entry = loadDatabase().entries.find((candidate) => candidate.id === id);
-    if (!entry) return { ok: false as const, error: 'The visual novel does not exist.' };
+    if (!entry) return { ok: false as const, error: 'The visual novel does not exist.', errorCode: 'not-found' as const };
     const result = await dialog.showOpenDialog({
       title: mt('polish2.vn.dialog.textHookFile'),
       defaultPath: entry.installPath || undefined,
@@ -1227,26 +1353,33 @@ export function registerVisualNovelIpc(): void {
     try {
       const filePath = result.filePaths[0];
       const stat = await fs.promises.stat(filePath);
-      if (!stat.isFile()) throw new Error('The selected hook output is not a file.');
+      if (!stat.isFile()) throw new VisualNovelError('not-a-file', 'The selected hook output is not a file.');
+      const start = await openHookFile(filePath, stat.size);
       if (activeHookRelays.has(id)) stopHookRelay(id);
       const relay: ActiveHookRelay = {
         watcher: fs.watch(filePath, () => scheduleHookRead(id)),
         filePath,
-        position: stat.size,
+        position: start.position,
         pending: null,
         reading: false,
         capturedLines: 0,
         lastError: '',
+        lastErrorCode: '',
         remainder: '',
+        encoding: start.encoding,
+        decoder: null,
+        rewound: false,
+        recent: [],
       };
       activeHookRelays.set(id, relay);
       relay.watcher.on('error', (error) => {
         relay.lastError = error.message;
+        relay.lastErrorCode = visualNovelErrorCode(error);
         broadcastHookState(id);
       });
       return { ok: true as const, state: broadcastHookState(id) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1254,7 +1387,7 @@ export function registerVisualNovelIpc(): void {
 
   ipcMain.handle('visual-novel:pickScripts', async (_event, id: string) => {
     const entry = loadDatabase().entries.find((candidate) => candidate.id === id);
-    if (!entry) return { ok: false as const, error: 'The visual novel does not exist.' };
+    if (!entry) return { ok: false as const, error: 'The visual novel does not exist.', errorCode: 'not-found' as const };
     const result = await dialog.showOpenDialog({
       title: mt('polish2.vn.dialog.scriptFiles'),
       defaultPath: entry.installPath || undefined,
@@ -1279,7 +1412,7 @@ export function registerVisualNovelIpc(): void {
       }
       return { ok: true as const, lines: lines.slice(0, VISUAL_NOVEL_SCRIPT_LINE_LIMIT) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1309,7 +1442,7 @@ export function registerVisualNovelIpc(): void {
         imported: Math.max(0, database.captures.length - before.captures.length),
       };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1321,7 +1454,7 @@ export function registerVisualNovelIpc(): void {
     try {
       return { ok: true as const, state: startCapture(id, options?.test === true) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1389,7 +1522,7 @@ export function registerVisualNovelIpc(): void {
       );
       return { ok: true as const, database: saveDatabase(database) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1426,7 +1559,7 @@ export function registerVisualNovelIpc(): void {
       if (screenshotPath) {
         await removeManagedCaptureImageIfUnused(screenshotPath, loadDatabase());
       }
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1441,7 +1574,7 @@ export function registerVisualNovelIpc(): void {
         database: saveDatabase(updateVisualNovelCapture(loadDatabase(), id, patch ?? {})),
       };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
@@ -1453,23 +1586,23 @@ export function registerVisualNovelIpc(): void {
   ipcMain.handle('visual-novel:readCaptureImage', async (_event, filePath: string) => {
     try {
       if (!filePath || !isManagedCaptureAsset(filePath)) {
-        throw new Error('The requested capture image is not managed by the visual novel library.');
+        throw new VisualNovelError('not-found', 'The requested capture image is not managed by the visual novel library.');
       }
       const data = await fs.promises.readFile(filePath);
       if (!data.length || data.length > MAX_CAPTURE_SCREENSHOT_BYTES) {
-        throw new Error('The capture image is unavailable or too large.');
+        throw new VisualNovelError('too-large', 'The capture image is unavailable or too large.');
       }
       const mime = path.extname(filePath).toLowerCase() === '.png' ? 'image/png' : 'image/jpeg';
       return { ok: true as const, dataUrl: `data:${mime};base64,${data.toString('base64')}` };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
   ipcMain.handle('visual-novel:attachCaptureAudio', async (_event, id: string) => {
     const before = loadDatabase();
     const capture = before.captures.find((candidate) => candidate.id === id);
-    if (!capture) return { ok: false as const, error: 'The captured sentence does not exist.' };
+    if (!capture) return { ok: false as const, error: 'The captured sentence does not exist.', errorCode: 'line-not-found' as const };
     const entry = before.entries.find((candidate) => candidate.id === capture.visualNovelId);
     const result = await dialog.showOpenDialog({
       title: mt('polish2.vn.dialog.voiceClip'),
@@ -1491,14 +1624,14 @@ export function registerVisualNovelIpc(): void {
       });
       return { ok: true as const, database };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 
   ipcMain.handle('visual-novel:removeCaptureAudio', async (_event, id: string) => {
     const before = loadDatabase();
     if (!before.captures.some((candidate) => candidate.id === id)) {
-      return { ok: false as const, error: 'The captured sentence does not exist.' };
+      return { ok: false as const, error: 'The captured sentence does not exist.', errorCode: 'line-not-found' as const };
     }
     return {
       ok: true as const,
@@ -1514,14 +1647,14 @@ export function registerVisualNovelIpc(): void {
   ipcMain.handle('visual-novel:readCaptureAudio', async (_event, filePath: string) => {
     try {
       if (!filePath || !isManagedCaptureAsset(filePath)) {
-        throw new Error('The requested audio is not managed by the visual novel library.');
+        throw new VisualNovelError('not-found', 'The requested audio is not managed by the visual novel library.');
       }
       const extension = path.extname(filePath).toLowerCase();
       const mime = CAPTURE_AUDIO_MIME[extension];
-      if (!mime) throw new Error('The capture audio format is not supported.');
+      if (!mime) throw new VisualNovelError('unsupported-format', 'The capture audio format is not supported.');
       const data = await fs.promises.readFile(filePath);
       if (!data.length || data.length > MAX_CAPTURE_AUDIO_BYTES) {
-        throw new Error('The capture audio is unavailable or too large.');
+        throw new VisualNovelError('too-large', 'The capture audio is unavailable or too large.');
       }
       return {
         ok: true as const,
@@ -1529,7 +1662,7 @@ export function registerVisualNovelIpc(): void {
         filename: `visual-novel-voice${extension}`,
       };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return failure(error);
     }
   });
 

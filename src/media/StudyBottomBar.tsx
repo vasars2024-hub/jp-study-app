@@ -61,6 +61,12 @@ import {
 } from '../shared/studyLang';
 import { useStudyWorkspace } from './StudyWorkspaceProvider';
 import StudyToolSheet, { StudyToolGroup } from './StudyToolSheet';
+import {
+  CLIP_PAD_MAX_MS,
+  CLIP_PAD_PREF,
+  CLIP_PAD_STEP_MS,
+  clipPaddingFromPreferences,
+} from './clipPadding';
 
 const RATE_PRESETS = [0.5, 0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
 
@@ -74,7 +80,7 @@ const HOVER_KEY_CAPS: Record<'shift' | 'ctrl' | 'alt', string> = {
 /** One enum over the two mutually exclusive stored booleans. */
 export type PracticeMode = 'off' | 'dictation' | 'shadowing';
 
-type Category = 'playback' | 'study' | 'practice' | 'more';
+type Category = 'playback' | 'study' | 'practice' | 'more' | 'keys';
 
 export interface StudyBottomBarProps {
   /**
@@ -132,6 +138,23 @@ export interface StudyBottomBarProps {
    * local file to cut audio from (a stream), so the button is not offered there.
    */
   onMakeSentenceDeck?: () => void;
+  /**
+   * "Condensed audio": every spoken line as one MP3. Absent without a local file (a stream
+   * has nothing to cut), like the sentence deck.
+   */
+  onCondensedAudio?: () => void;
+  /** Lines cut so far while a condensed-audio export runs; `null` when none is running. */
+  condensedProgress?: { done: number; total: number } | null;
+  onCancelCondensed?: () => void;
+  /**
+   * "Previous / next line starts now" (asbplayer's offset-to-subtitle). Absent while there
+   * are no cues to line up.
+   */
+  onAlignLine?: (which: 'previous' | 'next') => void;
+  /** The keyboard help's content (`StudyKeyboardHelp`), passed in so this bar never imports the shortcut store. */
+  renderKeysHelp?: () => React.ReactNode;
+  /** Bumped by the "?" key: each change toggles the keyboard help sheet. */
+  keysHelpSignal?: number;
 
   /* practice */
   practiceMode: PracticeMode;
@@ -300,6 +323,11 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
     const keys = shortcutKeysFor?.(commandId) ?? '';
     return keys ? t('mediaWorkspace.study.shortcutHint', { key: keys }) : undefined;
   }, [shortcutKeysFor, t]);
+  /** A hint, then "Shortcut: X" when the command is bound. */
+  const withShortcut = React.useCallback((hint: string, commandId: string): string => {
+    const keys = shortcutTitle(commandId);
+    return keys ? `${hint} ${keys}` : hint;
+  }, [shortcutTitle]);
 
   const movePosition = React.useCallback((direction: 1 | -1) => {
     const next = nudgeSubtitlePosition(preferences, direction);
@@ -311,6 +339,22 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
     setOpen((current) => (current === category ? null : category));
   }, []);
   const close = React.useCallback(() => setOpen(null), []);
+
+  // The "?" key, from the overlay: each new value toggles the keyboard help. The value the
+  // bar mounted with is not a press.
+  const keysSignalRef = React.useRef(props.keysHelpSignal ?? 0);
+  React.useEffect(() => {
+    const signal = props.keysHelpSignal ?? 0;
+    if (signal === keysSignalRef.current) return;
+    keysSignalRef.current = signal;
+    if (props.renderKeysHelp) toggle('keys');
+  }, [props.keysHelpSignal, props.renderKeysHelp, toggle]);
+
+  const clipPadding = clipPaddingFromPreferences(preferences);
+  const setPadMs = React.useCallback((key: 'beforeMs' | 'afterMs', value: number) => {
+    if (!Number.isFinite(value)) return;
+    updatePreference(CLIP_PAD_PREF[key], Math.max(0, Math.min(CLIP_PAD_MAX_MS, value)));
+  }, [updatePreference]);
 
   /*
     The title a cue-dependent control carries, and why a shortcut hint is the wrong thing
@@ -485,6 +529,28 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               >
                 {t('mediaWorkspace.study.applyDelayToSeries')}
               </button>
+            )}
+            {props.onAlignLine && (
+              <div className="study-tool-cluster" role="group" aria-label={t('vstudy.align.hint')}>
+                <button
+                  type="button"
+                  data-study-action="align-previous-line"
+                  title={withShortcut(t('vstudy.align.hint'), 'video.alignPrevLine')}
+                  disabled={!props.hasCues}
+                  onClick={() => props.onAlignLine?.('previous')}
+                >
+                  {t('vstudy.align.previous')}
+                </button>
+                <button
+                  type="button"
+                  data-study-action="align-next-line"
+                  title={withShortcut(t('vstudy.align.hint'), 'video.alignNextLine')}
+                  disabled={!props.hasCues}
+                  onClick={() => props.onAlignLine?.('next')}
+                >
+                  {t('vstudy.align.next')}
+                </button>
+              </div>
             )}
             <span className="study-tool-note">{t('mediaWorkspace.study.subtitleDelayPerFile')}</span>
           </StudyToolGroup>
@@ -667,7 +733,80 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 {t('sentenceDeck.open')}
               </button>
             )}
+            {props.onCondensedAudio && (props.condensedProgress ? (
+              <span className="study-tool-cluster" data-study-condensed="running">
+                <output aria-live="polite">
+                  {t('vstudy.condensed.progress', {
+                    done: props.condensedProgress.done,
+                    total: props.condensedProgress.total,
+                  })}
+                </output>
+                <button
+                  type="button"
+                  data-study-action="condensed-audio-cancel"
+                  onClick={() => props.onCancelCondensed?.()}
+                >
+                  {t('vstudy.condensed.cancel')}
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                data-study-action="condensed-audio"
+                title={withShortcut(t('vstudy.condensed.hint'), 'video.condensedAudio')}
+                disabled={!props.hasCues}
+                onClick={() => props.onCondensedAudio?.()}
+              >
+                {t('vstudy.condensed.button')}
+              </button>
+            ))}
           </StudyToolGroup>
+
+          <StudyToolGroup labelKey="vstudy.pad.group">
+            <label className="study-tool-number">
+              {t('vstudy.pad.before')}
+              <input
+                type="number"
+                min={0}
+                max={CLIP_PAD_MAX_MS}
+                step={CLIP_PAD_STEP_MS}
+                data-study-pref={CLIP_PAD_PREF.beforeMs}
+                value={clipPadding.beforeMs}
+                aria-label={t('vstudy.pad.before')}
+                onChange={(event) => setPadMs('beforeMs', event.currentTarget.valueAsNumber)}
+              />
+              <span>{t('vstudy.pad.ms', { ms: clipPadding.beforeMs })}</span>
+            </label>
+            <label className="study-tool-number">
+              {t('vstudy.pad.after')}
+              <input
+                type="number"
+                min={0}
+                max={CLIP_PAD_MAX_MS}
+                step={CLIP_PAD_STEP_MS}
+                data-study-pref={CLIP_PAD_PREF.afterMs}
+                value={clipPadding.afterMs}
+                aria-label={t('vstudy.pad.after')}
+                onChange={(event) => setPadMs('afterMs', event.currentTarget.valueAsNumber)}
+              />
+              <span>{t('vstudy.pad.ms', { ms: clipPadding.afterMs })}</span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                data-study-pref={CLIP_PAD_PREF.stopAtNeighbours}
+                checked={clipPadding.stopAtNeighbours}
+                onChange={(event) => updatePreference(CLIP_PAD_PREF.stopAtNeighbours, event.currentTarget.checked)}
+              /> {t('vstudy.pad.stopAtNeighbours')}
+            </label>
+            <span className="study-tool-note">{t('vstudy.pad.note')}</span>
+          </StudyToolGroup>
+        </StudyToolSheet>
+      )}
+
+      {open === 'keys' && props.renderKeysHelp && (
+        <StudyToolSheet id="study-sheet-keys" titleKey="vstudy.keys.title" onClose={close}>
+          {props.renderKeysHelp()}
         </StudyToolSheet>
       )}
 
@@ -1231,6 +1370,22 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
           >
             {t('studyWorkspace.bar.more')}
           </button>
+          {props.renderKeysHelp && (
+            /* The key that opens it, as its face: "?" is a symbol, not copy. */
+            <button
+              type="button"
+              className="study-bar-category study-bar-keys"
+              data-study-sheet-toggle="keys"
+              data-study-category="keys"
+              aria-label={t('vstudy.keys.title')}
+              title={t('vstudy.keys.title')}
+              aria-expanded={open === 'keys'}
+              aria-controls={open === 'keys' ? sheetId : undefined}
+              onClick={() => toggle('keys')}
+            >
+              ?
+            </button>
+          )}
         </div>
       </nav>
     </div>

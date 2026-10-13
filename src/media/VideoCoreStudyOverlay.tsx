@@ -41,8 +41,10 @@ import { shiftCues, shiftCuesMs } from '../shared/subtitleSync';
 import {
   effectiveKeys,
   formatKeysDisplay,
+  getBindings,
   isImeCompositionEvent,
   registerCommandHandler,
+  splitChords,
 } from '../renderer/keyboardShortcuts';
 import { t as translateUi, useT } from '../renderer/i18n';
 import { getChineseScript, getStudyLang } from '../renderer/studyEnvironment';
@@ -176,6 +178,16 @@ import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../renderer/subtitlesEx
 import { useLineLevel } from '../renderer/lineLevel';
 import { recordLinesStudied, recordStudyTime } from '../renderer/stats';
 import { openSentenceDeckDialog } from '../renderer/components/sentenceDeck/SentenceDeckDialog';
+import { clipPaddingFromPreferences, CLIP_PAD_PREF } from './clipPadding';
+import { alignedSecondaryCues } from './secondaryAlignment';
+import { delayToAlignLine, type AlignTarget } from './subtitleAlignOffset';
+import {
+  buildCondensedAudio,
+  condensedFileName,
+  planCondensedSpans,
+} from './condensedAudio';
+import StudyKeyboardHelp from './StudyKeyboardHelp';
+import { isKeyHelpPress } from './studyKeyHelp';
 
 /**
  * The episode brief and quiz (summary, comprehension questions, i+1 lines) in the AI
@@ -330,6 +342,15 @@ function shortcutKeysFor(commandId: string): string {
   }
 }
 
+/** Whether a catalog command (built-in or the user's) is bound to `chord`. */
+function keyClaimedByCommand(chord: string): boolean {
+  try {
+    return getBindings().some((row) => splitChords(row.keys).includes(chord));
+  } catch {
+    return false;
+  }
+}
+
 function trackLabel(
   track: NormalizedTrackInfo,
   t: ReturnType<typeof useT>['t'],
@@ -349,8 +370,16 @@ function trackLabel(
 
 function miningSourceFromPlayback(
   playbackInfo: VideoCore_VideoPlaybackInfo | null,
+  /**
+   * The local file this playback was opened for, from the request. `playbackInfo.localFile`
+   * is optional upstream; without this fallback a local file the reply did not name was
+   * mined as a stream — audio recorded in real time off the player (hijacking it), no clip,
+   * and a screenshot only when the line was on screen.
+   */
+  requestedLocalPath?: string | null,
 ): VideoCoreMiningSource | null {
   if (!playbackInfo) return null;
+  const localPath = playbackInfo.localFile?.path || requestedLocalPath || '';
   // A YouTube download has no media metadata, so its cards used to carry no source title
   // at all; the title yt-dlp wrote into the file name is the video's own.
   const mediaTitle = playbackInfo.media?.title?.userPreferred
@@ -363,9 +392,7 @@ function miningSourceFromPlayback(
     playbackType: String(playbackInfo.playbackType),
     streamType: playbackInfo.streamType,
     ...(playbackInfo.streamPath ? { streamPath: playbackInfo.streamPath } : {}),
-    ...(playbackInfo.localFile?.path
-      ? { localFilePath: playbackInfo.localFile.path }
-      : {}),
+    ...(localPath ? { localFilePath: localPath } : {}),
     ...(playbackInfo.media?.id != null ? { mediaId: playbackInfo.media.id } : {}),
     ...(mediaTitle ? { mediaTitle } : {}),
     ...(playbackInfo.episode?.episodeNumber != null
@@ -526,6 +553,18 @@ export default function VideoCoreStudyOverlay({
   // registrations having to rebind every time one of the preferences changes.
   const preferencesRef = React.useRef(preferences);
   preferencesRef.current = preferences;
+  /** Padding around a line for card audio, clips and condensed audio (`clipPadding.ts`). */
+  const clipPadBefore = preferences[CLIP_PAD_PREF.beforeMs];
+  const clipPadAfter = preferences[CLIP_PAD_PREF.afterMs];
+  const clipPadNeighbours = preferences[CLIP_PAD_PREF.stopAtNeighbours];
+  const clipPadding = React.useMemo(
+    () => clipPaddingFromPreferences({
+      [CLIP_PAD_PREF.beforeMs]: clipPadBefore,
+      [CLIP_PAD_PREF.afterMs]: clipPadAfter,
+      [CLIP_PAD_PREF.stopAtNeighbours]: clipPadNeighbours,
+    }),
+    [clipPadAfter, clipPadBefore, clipPadNeighbours],
+  );
   /*
     Publish the bar's height so the rest of the surface can stay off it.
 
@@ -585,10 +624,32 @@ export default function VideoCoreStudyOverlay({
     () => pretokenizeInIdle(allCues.map((cue) => stripAssCueText(cue.text))),
     [allCues],
   );
-  const trackSecondaryText = activeSecondaryCues
+  /*
+    The second line is the translation OF THE LINE ON SCREEN (`secondaryAlignment.ts`), not
+    whatever secondary cue happens to be active this instant: the two tracks are cut
+    differently, and at an auto-pause the active English cue is usually the next line's.
+    With no study line (playing through a gap) it falls back to the time-active cue, held
+    across short gaps by the bridge below.
+  */
+  const secondaryCueText = (cues: readonly VideoCoreActiveCue[]): string => cues
     .map((cue) => stripAssCueText(cue.text))
     .filter(Boolean)
     .join(' ');
+  const shownLineCue = activeCues[0]
+    ? (studyCue ?? activeCues[0])
+    : (playerPaused ? studyCue : null);
+  const alignedSecondary = React.useMemo(
+    () => alignedSecondaryCues(shownLineCue, secondaryCues),
+    [secondaryCues, shownLineCue],
+  );
+  const trackSecondaryText = alignedSecondary.length
+    ? secondaryCueText(alignedSecondary)
+    : secondaryCueText(activeSecondaryCues);
+  /** The translation of the STUDY line, for the card: never another line's. */
+  const studySecondaryText = React.useMemo(
+    () => secondaryCueText(alignedSecondaryCues(studyCue, secondaryCues)),
+    [secondaryCues, studyCue],
+  );
 
   /**
    * The second line when no track can supply it.
@@ -671,7 +732,20 @@ export default function VideoCoreStudyOverlay({
     translatorFailed: secondaryTranslateFailed,
     secondaryLang: preferences.secondarySubLang,
   });
-  const miningSource = miningSourceFromPlayback(playbackInfo);
+  /**
+   * The second line for the CARD: the translation of the study line itself — the aligned
+   * secondary cues, or the translator's line for the same text — never the cue that happens
+   * to be on screen when the key is pressed.
+   */
+  const cardSecondaryText = resolveSecondaryLine({
+    hasSecondaryTrack: secondaryTrack != null,
+    trackLang: secondaryTrackLang,
+    trackText: studySecondaryText,
+    translation: secondaryTranslation,
+    translatorFailed: secondaryTranslateFailed,
+    secondaryLang: preferences.secondarySubLang,
+  }).text;
+  const miningSource = miningSourceFromPlayback(playbackInfo, localFilePath);
   // Lines of this video that are already cards: the line on screen and the transcript say so.
   const minedCueKeys = useMinedCueKeys(miningSource);
   /** Which file this is, for everything remembered per file (delay, track choice). */
@@ -2114,6 +2188,29 @@ export default function VideoCoreStudyOverlay({
   );
 
   /**
+   * "Previous / next line starts now" (`subtitleAlignOffset.ts`): an absolute delay chosen
+   * by the learner at the moment a line is spoken. That is a manual correction, so it is
+   * remembered for the file and counts as timing evidence exactly like a ±0.1 s press.
+   */
+  const alignLineToNow = React.useCallback((which: AlignTarget): void => {
+    if (!video) return;
+    const next = delayToAlignLine(allCuesRef.current, video.currentTime, subtitleDelayRef.current, which);
+    if (next == null) {
+      showToast({ message: translateUi('vstudy.align.none') });
+      return;
+    }
+    subtitleDelayRef.current = next;
+    setSubtitleDelaySec(next);
+    void manager?.setSubtitleDelay(next);
+    saveSubtitleDelay(delayKeyRef.current, next);
+    showToast({ message: translateUi('vstudy.align.done', { delay: `${next >= 0 ? '+' : ''}${next.toFixed(2)}` }) });
+    if (selectedTrack == null) return;
+    const positionSec = video.currentTime;
+    setTimingSignal((current) =>
+      recordVideoCoreTimingAdjustment(current, selectedTrack, positionSec, next));
+  }, [manager, selectedTrack, video]);
+
+  /**
    * Back to zero in one press. Not timing evidence (it records nothing for the drift
    * tracker, and stops a running track): it is the user abandoning a correction, not making
    * one. Clears the file's stored delay too.
@@ -2218,6 +2315,9 @@ export default function VideoCoreStudyOverlay({
         updatePreference('subtitleAtTop', next.subtitleAtTop);
       }),
       registerCommandHandler('video.subDelayReset', () => resetSubtitleDelay()),
+      // "Previous / next line starts now" — the same handler the Subtitles sheet's buttons call.
+      registerCommandHandler('video.alignPrevLine', () => alignLineToNow('previous')),
+      registerCommandHandler('video.alignNextLine', () => alignLineToNow('next')),
       /*
         Seeks are NOT marked programmatic. The comprehension tracker treats a
         backward seek as evidence the viewer did not follow the line, and a
@@ -2233,7 +2333,7 @@ export default function VideoCoreStudyOverlay({
       registerCommandHandler('video.mineCurrentLine', () => mineCurrentLineRef.current()),
     ];
     return () => offs.forEach((off) => off());
-  }, [changeSubtitleDelay, jumpCue, replayCue, resetSubtitleDelay, seekBy, updatePreference]);
+  }, [alignLineToNow, changeSubtitleDelay, jumpCue, replayCue, resetSubtitleDelay, seekBy, updatePreference]);
 
   /**
    * Workspace commands — registered here for the same reason the `video.*` rows are.
@@ -2807,7 +2907,7 @@ export default function VideoCoreStudyOverlay({
       text: stripAssCueText(cue.text),
     }));
     if (!cues.length) return;
-    const source = miningSourceFromPlayback(playbackInfo);
+    const source = miningSourceFromPlayback(playbackInfo, localFilePath);
     const base = [source?.mediaTitle, source?.episodeNumber != null ? String(source.episodeNumber) : '']
       .filter(Boolean)
       .join(' ')
@@ -2815,7 +2915,7 @@ export default function VideoCoreStudyOverlay({
       .trim() || 'subtitles';
     if (format === 'srt') downloadSubtitles(`${base}.srt`, cuesToSrt(cues), 'text/srt');
     else downloadSubtitles(`${base}.vtt`, cuesToVtt(cues), 'text/vtt');
-  }, [playbackInfo]);
+  }, [localFilePath, playbackInfo]);
   const whisperBusy = whisperState === 'extracting'
     || whisperState === 'loading'
     || whisperState === 'transcribing';
@@ -3017,6 +3117,75 @@ export default function VideoCoreStudyOverlay({
    * has. Only a local file can be cut, so a stream gets no button.
    */
   const sentenceDeckPath = localFilePath || playbackInfo?.localFile?.path || '';
+
+  /*
+    Condensed audio (`condensedAudio.ts`): every spoken line of the study track, with the
+    learner's delay and padding, cut by ffmpeg in main and joined into one MP3. Nothing plays
+    and the player is not touched; a stream has no file, so it gets no button.
+  */
+  const [condensedProgress, setCondensedProgress] = React.useState<{ done: number; total: number } | null>(null);
+  const condensedAbortRef = React.useRef<AbortController | null>(null);
+  React.useEffect(() => () => condensedAbortRef.current?.abort(), []);
+  // A different file is a different export: one still running for the last file stops.
+  React.useEffect(() => {
+    condensedAbortRef.current?.abort();
+  }, [sentenceDeckPath]);
+  const makeCondensedAudio = React.useCallback((): void => {
+    if (!sentenceDeckPath || condensedAbortRef.current || typeof window.api?.extractAudioClip !== 'function') return;
+    const spans = planCondensedSpans(allCuesRef.current, subtitleDelayRef.current, clipPadding);
+    if (!spans.length) {
+      showToast({ message: translateUi('vstudy.condensed.empty') });
+      return;
+    }
+    const controller = new AbortController();
+    condensedAbortRef.current = controller;
+    setCondensedProgress({ done: 0, total: spans.length });
+    const videoPath = sentenceDeckPath;
+    void (async () => {
+      try {
+        const result = await buildCondensedAudio({
+          filePath: videoPath,
+          spans,
+          audioStreamOrdinal,
+          extract: (request) => window.api.extractAudioClip(request),
+          signal: controller.signal,
+          onProgress: (done, total) => setCondensedProgress({ done, total }),
+        });
+        if (!result.bytes.length) {
+          showToast({ message: translateUi('vstudy.condensed.failed') });
+          return;
+        }
+        const blob = new Blob([result.bytes as BlobPart], { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = condensedFileName(videoPath);
+        anchor.click();
+        // Revoked later rather than at once: the download reads the blob after the click.
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        showToast({ message: translateUi('vstudy.condensed.done', { minutes: Math.max(1, Math.round(result.seconds / 60)) }) });
+        if (result.failed > 0) showToast({ message: translateUi('vstudy.condensed.skipped', { count: result.failed }) });
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          showToast({ message: translateUi('vstudy.condensed.cancelled') });
+        } else {
+          showToast({ message: translateUi('vstudy.condensed.failed') });
+        }
+      } finally {
+        if (condensedAbortRef.current === controller) condensedAbortRef.current = null;
+        setCondensedProgress(null);
+      }
+    })();
+  }, [audioStreamOrdinal, clipPadding, sentenceDeckPath]);
+  const cancelCondensedAudio = React.useCallback((): void => {
+    condensedAbortRef.current?.abort();
+  }, []);
+  // The Edit sheet's "Condensed audio" button, as a rebindable (unbound by default) command.
+  // Same guards as the button: a stream has no file, and a running export is not restarted.
+  React.useEffect(
+    () => registerCommandHandler('video.condensedAudio', () => makeCondensedAudio()),
+    [makeCondensedAudio],
+  );
   const makeSentenceDeck = React.useCallback((): void => {
     if (!sentenceDeckPath) return;
     video?.pause();
@@ -3137,6 +3306,26 @@ export default function VideoCoreStudyOverlay({
     },
   });
 
+  /*
+    "?" opens the keyboard help, the way it does in asbplayer and most players. A document
+    listener rather than a catalog command: "?" is a help convention, not a rebindable action,
+    and it stands aside whenever a catalog command has been bound to it, while typing (the
+    dictation box, the card form) and during an IME composition.
+  */
+  const [keysHelpSignal, setKeysHelpSignal] = React.useState(0);
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || !isKeyHelpPress(event) || isImeCompositionEvent(event)) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (keyClaimedByCommand('?')) return;
+      event.preventDefault();
+      setKeysHelpSignal((value) => value + 1);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   /** Track selection, over whichever manager is driving this session. */
   const selectSubtitleTrack = React.useCallback((trackNumber: number | null): void => {
     if (trackNumber == null) {
@@ -3230,6 +3419,8 @@ export default function VideoCoreStudyOverlay({
     return best;
   }, []);
 
+  const renderKeysHelp = React.useCallback(() => <StudyKeyboardHelp />, []);
+
   const miningPanel = (
     <VideoCoreMiningPanel
       cue={studyCue}
@@ -3245,7 +3436,9 @@ export default function VideoCoreStudyOverlay({
         passed unconditionally: with the second line switched off there is nothing the
         user has read and agreed with.
       */
-      translationText={preferences.dualSubs ? secondaryText : ''}
+      translationText={preferences.dualSubs ? cardSecondaryText : ''}
+      clipPadding={clipPadding}
+      trackCues={allCues}
       defaultExpanded={workspace.layout.mode === 'mining'}
     />
   );
@@ -3896,6 +4089,12 @@ export default function VideoCoreStudyOverlay({
         translationBusy={translationBusy}
         onMineCurrentLine={mineCurrentLine}
         onMakeSentenceDeck={sentenceDeckPath ? makeSentenceDeck : undefined}
+        onCondensedAudio={sentenceDeckPath ? makeCondensedAudio : undefined}
+        condensedProgress={condensedProgress}
+        onCancelCondensed={cancelCondensedAudio}
+        onAlignLine={allCues.length > 0 ? alignLineToNow : undefined}
+        renderKeysHelp={renderKeysHelp}
+        keysHelpSignal={keysHelpSignal}
         practiceMode={practiceMode}
         setPracticeMode={setPracticeMode}
         abStartSec={abStartSec}

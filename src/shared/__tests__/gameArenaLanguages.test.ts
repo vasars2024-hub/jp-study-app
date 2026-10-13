@@ -8,10 +8,19 @@ import {
   type GameContent,
   type TypeRound,
 } from '../../renderer/games/engine';
-import { GAME_PACKS, packSize } from '../../renderer/data/gamePacks';
+import { loadGamePack, packSize } from '../../renderer/data/gamePacks/registry';
+import type { GamePack } from '../../renderer/data/gamePacks/types';
 import { parseGameList, packExtrasFromLists, tierOf, type GameList } from '../../renderer/games/gameItemImport';
 import { parseMirrorTexts } from '../../renderer/games/mirrorTextImport';
 import type { StudyLang } from '../levelScale';
+
+// The Chinese and Russian packs load on demand (data/gamePacks/registry.ts); every
+// pack is loaded here so the rounds below can draw on all three.
+const GAME_PACKS: Record<StudyLang, GamePack> = {
+  ja: await loadGamePack('ja'),
+  zh: await loadGamePack('zh'),
+  ru: await loadGamePack('ru'),
+};
 
 const LANGS: StudyLang[] = ['ja', 'zh', 'ru'];
 const FAST = GAME_DEFINITIONS.filter((g) => g.mode === 'fast').map((g) => g.id) as Array<

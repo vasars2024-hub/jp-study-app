@@ -117,12 +117,19 @@ describe('SchedulingPreferencesPanel', () => {
     expect(host.textContent).toContain('flash.schedule.switchNote');
   });
 
-  it('converts on request and reports the count, leaving unstudied cards alone', () => {
+  it('converts on request and reports the count, leaving unstudied cards alone', async () => {
     reviewDeckCard(loadDeck()[0].id, 'good', NOW);
     mount();
     act(() => { radios()[1].click(); });
     click('flash.schedule.convert(count=1)');
+    // Switching to FSRS reads the review log first (to rebuild each card's memory).
+    for (let i = 0; i < 100 && !host.textContent?.includes('flash.schedule.convertReport'); i += 1) {
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
+    }
     expect(host.textContent).toContain('flash.schedule.convertReport(changed=1,unscheduled=2)');
+    expect(host.textContent).toContain('srs4.convert.memory(');
+    // The memory is carried over, not restarted: the card has a stability.
+    expect(loadDeck()[0].srs?.stability).toBeGreaterThan(0);
     expect(loadDeck()[0].srs?.algorithm).toBe('fsrs');
     expect(loadDeck()[2].srs).toBeUndefined();
   });

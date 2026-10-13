@@ -18,6 +18,7 @@ import {
   type IcsImportPlan,
   type IcsWarningCode,
 } from '../../calendarIcsImport';
+import { describeRepeat } from './calendarRepeatText';
 
 /** Rows of the preview list; the rest is counted, not hidden. */
 const PREVIEW_ROWS = 30;
@@ -32,7 +33,14 @@ interface Preview {
 
 type ImportError = 'tooLarge' | 'empty' | 'read';
 
-const WARNING_CODES: readonly IcsWarningCode[] = ['repeat-unsupported', 'multi-day', 'timezone-unknown', 'reminder-rounded'];
+const WARNING_CODES: readonly IcsWarningCode[] = [
+  'repeat-unsupported',
+  'repeat-zone',
+  'month-end-skip',
+  'timezone-shift',
+  'timezone-unknown',
+  'reminder-rounded',
+];
 
 /** Read one file into a preview, or the reason it cannot be imported. */
 export async function readIcsImportPreview(file: File, untitled: string): Promise<Preview | ImportError> {
@@ -157,13 +165,16 @@ export function CalendarIcsImportButton() {
                       <li key={entry.uid}>
                         <span className="cal-import-date">
                           {parseDateKey(entry.event.date).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })}
+                          {entry.event.endDate
+                            ? ` – ${parseDateKey(entry.event.endDate).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}`
+                            : ''}
                         </span>
                         <span className="cal-import-time muted">
                           {entry.event.allDay ? t('calendar.allDay') : `${entry.event.startTime ?? ''}${entry.event.endTime ? `–${entry.event.endTime}` : ''}`}
                         </span>
                         <span className="cal-import-title">{entry.event.title}</span>
                         {entry.event.recurrence !== 'none' && (
-                          <span className="cal-badge cal-import-repeat">{t(`calendar.modal.repeat.${entry.event.recurrence}`)}</span>
+                          <span className="cal-badge cal-import-repeat">{describeRepeat(entry.event, t, locale)}</span>
                         )}
                       </li>
                     ))}

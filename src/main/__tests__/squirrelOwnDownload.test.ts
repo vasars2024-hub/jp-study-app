@@ -13,7 +13,8 @@ import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 import { describeAppUpdate, type AppUpdateDetails, type AppUpdateUnsavedKind } from '../../shared/appUpdate';
 import type { FeedRelease } from '../../shared/release';
-import { createAppUpdateController, PROGRESS_PUSH_MS, type UpdateDownloaderLike } from '../squirrelUpdater';
+import type { FeedFetch } from '../releaseFeed';
+import { createAppUpdateController, PROGRESS_PUSH_MS, SQUIRREL_FEED_URL, type UpdateDownloaderLike } from '../squirrelUpdater';
 import type { UpdateDownloadProgress, UpdateDownloadResult } from '../updateDownloader';
 
 const RELEASE: FeedRelease = {
@@ -37,7 +38,7 @@ function fakeUpdater() {
 interface FakeJob {
   progress: (p: UpdateDownloadProgress) => void;
   finish: (r: UpdateDownloadResult) => void;
-  cancel: ReturnType<typeof vi.fn>;
+  cancel: ReturnType<typeof vi.fn<() => void>>;
   fullOnly: boolean;
 }
 
@@ -48,7 +49,7 @@ function fakeDownloader() {
     start: ({ onProgress, fullOnly }) => {
       let finish!: (r: UpdateDownloadResult) => void;
       const done = new Promise<UpdateDownloadResult>((resolve) => (finish = resolve));
-      const job: FakeJob = { progress: onProgress, finish, fullOnly, cancel: vi.fn() };
+      const job: FakeJob = { progress: onProgress, finish, fullOnly, cancel: vi.fn<() => void>() };
       job.cancel.mockImplementation(() => finish({ ok: false, code: 'canceled', message: 'canceled', received: 1234, total: 5000 }));
       jobs.push(job);
       return { done, cancel: () => void job.cancel() };
@@ -58,7 +59,7 @@ function fakeDownloader() {
   return { downloader, jobs, clear };
 }
 
-function harness(opts: { unsaved?: AppUpdateUnsavedKind[]; release?: FeedRelease } = {}) {
+function harness(opts: { unsaved?: AppUpdateUnsavedKind[]; release?: FeedRelease; resolveRelease?: () => Promise<FeedFetch> } = {}) {
   const updater = fakeUpdater();
   const dl = fakeDownloader();
   const timers: Array<{ fn: () => void; ms: number; repeat: boolean }> = [];
@@ -72,7 +73,7 @@ function harness(opts: { unsaved?: AppUpdateUnsavedKind[]; release?: FeedRelease
     broadcastDetails: (d) => pushed.push(d),
     setTimer: (fn, ms, repeat) => void timers.push({ fn, ms, repeat }),
     now: () => clock,
-    resolveRelease: async () => ({ kind: 'ok', release: opts.release ?? RELEASE }),
+    resolveRelease: opts.resolveRelease ?? (async () => ({ kind: 'ok', release: opts.release ?? RELEASE })),
     downloader: dl.downloader,
     unsavedWork: () => opts.unsaved ?? [],
     markQuitting: vi.fn(),
@@ -258,6 +259,42 @@ describe("Gum's own update download", () => {
     h.updater.emit('update-not-available');
     expect(h.controller.details()).toMatchObject({ state: 'error', error: 'no-feed' });
     expect(h.clear).toHaveBeenCalled();
+  });
+
+  it('a failed stable lookup after a hand-off asks Squirrel on the stable feed, not the cleared staging folder', async () => {
+    // Bug 35: the fallback called checkForUpdates() with the feed still pointing at
+    // the staging folder from the last hand-off, which clear() may have deleted.
+    const answers: FeedFetch[] = [
+      { kind: 'ok', release: RELEASE },
+      { kind: 'failed', reason: 'rate-limited' },
+    ];
+    const h = harness({ resolveRelease: async () => answers.shift() ?? { kind: 'failed', reason: 'offline' } });
+    h.controller.checkNow();
+    await flush();
+    h.jobs[0]!.finish({ ok: true, stagingDir: STAGING, version: '1.1.0', deltas: false, bytes: 5000 });
+    await flush();
+    expect(h.updater.setFeedURL).toHaveBeenLastCalledWith({ url: STAGING });
+    h.updater.emit('update-not-available');
+    expect(h.clear).toHaveBeenCalled();
+    expect(h.controller.details().state).toBe('error');
+    h.updater.checkForUpdates.mockClear();
+    h.updater.setFeedURL.mockClear();
+
+    h.controller.checkNow();
+    await flush();
+    expect(h.updater.setFeedURL).toHaveBeenCalledWith({ url: SQUIRREL_FEED_URL });
+    expect(h.updater.checkForUpdates).toHaveBeenCalledTimes(1);
+    expect(h.updater.setFeedURL.mock.invocationCallOrder[0]!).toBeLessThan(h.updater.checkForUpdates.mock.invocationCallOrder[0]!);
+    expect(h.controller.details().feedUrl).toBe(SQUIRREL_FEED_URL);
+  });
+
+  it('a failed stable lookup with the feed already on stable does not re-set it', async () => {
+    const h = harness({ resolveRelease: async () => ({ kind: 'failed', reason: 'offline' }) });
+    h.updater.setFeedURL.mockClear();
+    h.controller.checkNow();
+    await flush();
+    expect(h.updater.setFeedURL).not.toHaveBeenCalled();
+    expect(h.updater.checkForUpdates).toHaveBeenCalledTimes(1);
   });
 
   it('restart lists every kind of unsaved work and goes ahead only when forced', async () => {

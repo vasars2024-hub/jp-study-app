@@ -32,7 +32,8 @@ export const VIEW_STREAMS: Record<Exclude<NotebookViewId, 'overview'>, NotebookS
   // Vocabulary in every state: looked up, saved, carded, exported, learned.
   words: ['saved-words', 'lookups', 'flashcards', 'anki', 'mining', 'known'],
   translations: ['translations'],
-  highlights: ['highlights'],
+  // What the learner chose to keep: marked passages, and their own notes.
+  highlights: ['highlights', 'notes'],
   // Everything that arrived from outside the app's own reading flow.
   captures: ['extension', 'audio', 'clipboard', 'media', 'transcript'],
 };
@@ -59,6 +60,7 @@ const STREAM_ORDER: Record<NotebookStream, number> = {
   extension: 12,
   media: 13,
   transcript: 14,
+  notes: 15,
 };
 
 export const ALL_NOTEBOOK_STREAMS: NotebookStream[] = (Object.keys(STREAM_ORDER) as NotebookStream[]).sort(

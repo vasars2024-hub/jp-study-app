@@ -38,3 +38,10 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* A compound graded as its parts: the part count beside the combined level. */
+.lexicon-knowledge .lexicon-knowledge-parts {
+  margin-left: 4px;
+  opacity: 0.75;
+  font-size: 0.9em;
+}

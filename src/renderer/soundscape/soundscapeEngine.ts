@@ -1515,16 +1515,49 @@ function createReverbImpulse(ctx: AudioContext): AudioBuffer {
 // ---------------------------------------------------------------------------
 
 const RAMP = 0.12;
+/** How long a cancelled sleep-timer fade takes to come back up (a jump would click). */
+const UNFADE_SECONDS = 0.08;
+
+/**
+ * Freeze `param` at the value its automation has at `now` and drop everything
+ * scheduled after it. Every change to a live param starts here.
+ *
+ * Plain `cancelScheduledValues(now)` is not enough: it deletes a ramp that is
+ * still running, so the param snaps back to where that ramp *started* (a fade-in
+ * cut short drops to 0, which clicks). And a `setTargetAtTime` added without
+ * cancelling leaves a later-ending fade-in in the timeline, which takes over
+ * again and undoes the change when it ends (bug 23: a slider moved during a
+ * fade-in jumped back). `cancelAndHoldAtTime` holds the exact curve value, mid
+ * ramp or mid glide. Without it (an older engine, a fake) the value is read
+ * first and pinned, at worst one render quantum stale.
+ */
+function holdAt(param: AudioParam, now: number): void {
+  const hold = (param as { cancelAndHoldAtTime?: (time: number) => AudioParam }).cancelAndHoldAtTime;
+  if (typeof hold === 'function') {
+    hold.call(param, now);
+    return;
+  }
+  const value = param.value;
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(value, now);
+}
+
+/** An exponential glide from wherever the param is now. */
+function glide(param: AudioParam, value: number, now: number, timeConstant = RAMP): void {
+  holdAt(param, now);
+  param.setTargetAtTime(value, now, timeConstant);
+}
+
+/** A straight line from wherever the param is now. */
+function line(param: AudioParam, value: number, now: number, seconds: number): void {
+  holdAt(param, now);
+  param.linearRampToValueAtTime(value, now + seconds);
+}
 
 /** A level change: a straight line over a cross-fade, the usual short glide otherwise. */
 function rampTo(param: AudioParam, value: number, now: number, crossfade: number): void {
-  if (crossfade > 0) {
-    param.cancelScheduledValues(now);
-    param.setValueAtTime(param.value, now);
-    param.linearRampToValueAtTime(value, now + crossfade);
-  } else {
-    param.setTargetAtTime(value, now, RAMP);
-  }
+  if (crossfade > 0) line(param, value, now, crossfade);
+  else glide(param, value, now);
 }
 
 export class SoundscapeEngine {
@@ -1543,6 +1576,14 @@ export class SoundscapeEngine {
   private timer: ReturnType<typeof setInterval> | null = null;
   private stopTimer: ReturnType<typeof setTimeout> | null = null;
   private playing = false;
+  /** Whether a sleep-timer fade is scheduled on `scheduled` (cancelling is a no-op otherwise). */
+  private fadeScheduled = false;
+  /**
+   * The master and duck levels last scheduled. A reconcile only touches a param
+   * whose target moved: re-issuing the same glide on every reconcile stacked an
+   * event per call into the timeline for as long as the mixer ran.
+   */
+  private applied: { master: number; duck: number } = { master: Number.NaN, duck: Number.NaN };
   private target: SoundscapeTarget = { master: 0.7, layers: {}, music: 'off', musicGain: 0, ducked: false };
 
   /** True when this runtime can make sound at all. */
@@ -1573,11 +1614,7 @@ export class SoundscapeEngine {
     this.reconcile();
     this.cancelScheduledFade();
     const fade = this.fade;
-    if (fade) {
-      fade.gain.cancelScheduledValues(ctx.currentTime);
-      fade.gain.setValueAtTime(fade.gain.value, ctx.currentTime);
-      fade.gain.linearRampToValueAtTime(1, ctx.currentTime + Math.max(0.05, fadeInSeconds));
-    }
+    if (fade) line(fade.gain, 1, ctx.currentTime, Math.max(0.05, fadeInSeconds));
     if (!this.timer) this.timer = setInterval(() => this.tick(), TICK_MS);
     this.tick();
   }
@@ -1591,20 +1628,27 @@ export class SoundscapeEngine {
     const ctx = this.ctx;
     const node = this.scheduled;
     if (!ctx || !node) return;
-    const start = ctx.currentTime + Math.max(0, delaySeconds);
-    node.gain.cancelScheduledValues(ctx.currentTime);
-    node.gain.setValueAtTime(node.gain.value, ctx.currentTime);
-    node.gain.setValueAtTime(node.gain.value, start);
+    const now = ctx.currentTime;
+    const start = now + Math.max(0, delaySeconds);
+    // Read before holding: the level to stay at until the fade begins.
+    const level = node.gain.value;
+    holdAt(node.gain, now);
+    if (start > now) node.gain.setValueAtTime(level, start);
     node.gain.linearRampToValueAtTime(0, start + Math.max(0.05, durationSeconds));
+    this.fadeScheduled = true;
   }
 
-  /** Undo `scheduleFadeOut`: back to full level at once. */
+  /**
+   * Undo `scheduleFadeOut`: back to full level within a few tens of milliseconds.
+   * Not `setValueAtTime(1)`: from a half-faded level that is a step, and a step
+   * is a click.
+   */
   cancelScheduledFade(): void {
     const ctx = this.ctx;
     const node = this.scheduled;
-    if (!ctx || !node) return;
-    node.gain.cancelScheduledValues(ctx.currentTime);
-    node.gain.setValueAtTime(1, ctx.currentTime);
+    if (!ctx || !node || !this.fadeScheduled) return;
+    this.fadeScheduled = false;
+    line(node.gain, 1, ctx.currentTime, UNFADE_SECONDS);
   }
 
   /** Fade out over `fadeSeconds`, then release every node and suspend the context. */
@@ -1614,9 +1658,7 @@ export class SoundscapeEngine {
     const ctx = this.ctx;
     const fade = this.fade;
     if (!ctx || !fade) return;
-    fade.gain.cancelScheduledValues(ctx.currentTime);
-    fade.gain.setValueAtTime(fade.gain.value, ctx.currentTime);
-    fade.gain.linearRampToValueAtTime(0, ctx.currentTime + fadeSeconds);
+    line(fade.gain, 0, ctx.currentTime, Math.max(0.01, fadeSeconds));
     this.stopTimer = setTimeout(() => {
       this.stopTimer = null;
       if (this.playing) return;
@@ -1639,6 +1681,7 @@ export class SoundscapeEngine {
     this.fade.gain.value = 0;
     this.scheduled = ctx.createGain();
     this.master.gain.value = this.target.master;
+    this.applied = { master: this.target.master, duck: 1 };
     this.fade.connect(this.scheduled);
     this.scheduled.connect(this.duck);
     this.duck.connect(this.master);
@@ -1693,10 +1736,17 @@ export class SoundscapeEngine {
     // One-shot: a cross-fade belongs to the change it came with.
     const crossfade = Math.max(0, this.target.crossfadeSec ?? 0);
     this.target = { ...this.target, crossfadeSec: undefined };
-    this.master.gain.setTargetAtTime(this.target.master, now, RAMP);
+    if (this.applied.master !== this.target.master) {
+      this.applied.master = this.target.master;
+      glide(this.master.gain, this.target.master, now);
+    }
     // snd6: duck quickly (the first syllable must be heard), come back slowly.
     const ducked = this.target.ducked;
-    this.duck.gain.setTargetAtTime(ducked ? (this.target.duckGain ?? DUCK_GAIN) : 1, now, ducked ? 0.12 : 0.5);
+    const duckTo = ducked ? (this.target.duckGain ?? DUCK_GAIN) : 1;
+    if (this.applied.duck !== duckTo) {
+      this.applied.duck = duckTo;
+      glide(this.duck.gain, duckTo, now, ducked ? 0.12 : 0.5);
+    }
 
     for (const [id, entry] of this.layers) {
       if ((this.target.layers[id] ?? 0) > 0) continue;
@@ -1717,12 +1767,12 @@ export class SoundscapeEngine {
         if (existing.tone !== tone) {
           existing.tone = tone;
           const { lowDb, highDb } = toneShelfGains(tone);
-          existing.low.gain.setTargetAtTime(lowDb, now, RAMP);
-          existing.high.gain.setTargetAtTime(highDb, now, RAMP);
+          glide(existing.low.gain, lowDb, now);
+          glide(existing.high.gain, highDb, now);
         }
         if (existing.panValue !== panValue) {
           existing.panValue = panValue;
-          existing.pan.pan.setTargetAtTime(panValue, now, RAMP);
+          glide(existing.pan.pan, panValue, now);
         }
         continue;
       }
@@ -1794,14 +1844,14 @@ export class SoundscapeEngine {
     const ctx = this.ctx;
     if (!ctx) return;
     const now = ctx.currentTime;
-    level.gain.cancelScheduledValues(now);
     let holdMs = 600;
+    // From the level it has NOW: a voice removed during its own fade-in used to
+    // lose the fade-in to `cancelScheduledValues` and drop to 0 in one sample.
     if (crossfade > 0) {
-      level.gain.setValueAtTime(level.gain.value, now);
-      level.gain.linearRampToValueAtTime(0, now + crossfade);
+      line(level.gain, 0, now, crossfade);
       holdMs = crossfade * 1000 + 120;
     } else {
-      level.gain.setTargetAtTime(0, now, 0.1);
+      glide(level.gain, 0, now, 0.1);
     }
     const leaving = {
       rig,

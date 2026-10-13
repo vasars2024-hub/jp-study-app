@@ -309,6 +309,59 @@ const FAKE_AI_MODEL = 'gum-e2e-fake';
 /** The optional AI study helpers the fake answers (src/main/aiStudyAssist.ts). */
 const FAKE_AI_FEATURES = ['whyWrong', 'exampleSentences', 'leechRescue', 'contextExplain'];
 
+/**
+ * The speaking and writing helpers the fake also answers (src/main/aiSpeakAssist.ts), and
+ * the preset allows: the conversation partner, writing correction, the journal grade and
+ * the shadowing explanation. Their prompts are kept on the hit (`hit.prompt`), so a flow
+ * can check what was sent — and what was withheld.
+ */
+const FAKE_AI_SPEAK_FEATURES = ['conversationPartner', 'writingCorrection', 'journalGrade', 'shadowingFeedback'];
+
+/**
+ * The Agent's two requests the fake also answers, only when the flow asks for them by name:
+ *
+ *  - `agentChat`: a chat send (src/main/agentProviderRouter.ts) whose prompt carries
+ *    `FAKE_AI_AGENT_MARK`. Answered in prose, streamed in several chunks. With
+ *    `FAKE_AI_AGENT_SLOW_MARK` the first chunk is sent and the rest is held back until the
+ *    app hangs up (a Stop press) or `FAKE_AI_AGENT_HOLD_MS` passes.
+ *  - `agentPlan`: the cloud planner (src/main/localAgent.ts `planWithCloud`) asked for a
+ *    request carrying `FAKE_AI_PLAN_MARK`. Answered with a real plan in the planner's JSON
+ *    shape: one `calendar.create-reminder` step with a yearly, 2nd-weekday repeat (see
+ *    `fakeAiPlanStep`), which the app then validates, queues and runs like any other plan.
+ *
+ * A request without a mark is still refused (400), so nothing reaches the Agent's fake by
+ * accident.
+ */
+const FAKE_AI_AGENT_FEATURES = ['agentChat', 'agentPlan'];
+const FAKE_AI_AGENT_MARK = '[e2e-agent]';
+const FAKE_AI_AGENT_SLOW_MARK = '[e2e-agent-slow]';
+const FAKE_AI_PLAN_MARK = '[e2e-plan]';
+const FAKE_AI_AGENT_HOLD_MS = 30000;
+/** The reply, in the chunks it is streamed in. The flow reads them back from the app. */
+const FAKE_AI_AGENT_REPLY = ['E2E fake AI agent: ', 'は marks the topic, ', 'が marks the subject.'];
+const FAKE_AI_AGENT_PARTIAL = 'E2E fake AI agent: partial reply before Stop. ';
+
+/** `YYYY-MM-DD` of a local date. */
+function localDateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * The step the planner fake proposes: a yearly reminder on the 2nd Tuesday of next month
+ * (computed from today, so it is always in the future and always a real 2nd Tuesday).
+ */
+function fakeAiPlanStep() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const day = 1 + ((2 - first.getDay() + 7) % 7) + 7;
+  const date = localDateKey(new Date(first.getFullYear(), first.getMonth(), day));
+  return {
+    label: 'Yearly JLPT application reminder',
+    operation: 'calendar.create-reminder',
+    arguments: { title: 'E2E yearly JLPT reminder', date, recurrence: 'yearly', recurrenceNth: 2 },
+  };
+}
+
 /** The text of the request's messages: a string, or the parts of a multimodal message. */
 function messageText(message) {
   const content = message && message.content;
@@ -329,11 +382,22 @@ function fakeAiFeatureOf(body) {
   if (props.includes('sentences')) return 'exampleSentences';
   if (props.includes('mnemonic')) return 'leechRescue';
   if (props.includes('sense')) return 'contextExplain';
+  if (props.includes('reply') && props.includes('correction')) return 'conversationPartner';
+  if (props.includes('edits')) return 'writingCorrection';
+  if (props.includes('feedback') && props.includes('words')) return 'journalGrade';
+  if (props.includes('issues') && props.includes('summary')) return 'shadowingFeedback';
   const prompt = (Array.isArray(body && body.messages) ? body.messages : []).map(messageText).join('\n');
+  // The planner first: its system prompt quotes the user's request, marks included.
+  if (/You are the offline planning model for Gum/.test(prompt)) return prompt.includes(FAKE_AI_PLAN_MARK) ? 'agentPlan' : null;
+  if (prompt.includes(FAKE_AI_AGENT_MARK) || prompt.includes(FAKE_AI_AGENT_SLOW_MARK)) return 'agentChat';
   if (/understand a mistake on a flashcard/.test(prompt)) return 'whyWrong';
   if (/example sentences? for a learner/.test(prompt)) return 'exampleSentences';
   if (/keeps forgetting this flashcard/.test(prompt)) return 'leechRescue';
   if (/Which sense does the word have IN THIS SENTENCE/.test(prompt)) return 'contextExplain';
+  if (/You are a conversation partner for a learner of/.test(prompt)) return 'conversationPartner';
+  if (/Find its mistakes in/.test(prompt)) return 'writingCorrection';
+  if (/Grade how they used each word/.test(prompt)) return 'journalGrade';
+  if (/shadowed \(repeated aloud\) this line/.test(prompt)) return 'shadowingFeedback';
   return null;
 }
 
@@ -392,6 +456,37 @@ function fakeAiAnswer(feature, prompt) {
       const sense = count >= 2 ? 2 : 1;
       return { sense, explanation: `E2E fake AI: sense ${sense} fits the words around it here.`, confidence: 'high' };
     }
+    case 'agentPlan':
+      return { summary: 'E2E fake AI plan: a yearly reminder on the 2nd Tuesday.', steps: [fakeAiPlanStep()] };
+    case 'conversationPartner': {
+      // The opening names a word the learner does not know (改札), so the next session can bring it back.
+      if (/Open the conversation with your first line/.test(prompt)) {
+        return { reply: 'いらっしゃいませ。改札はあちらです。', translation: 'E2E fake AI: welcome; the ticket gate is over there.', correction: { corrected: '', explanation: '' } };
+      }
+      const said = [...prompt.matchAll(/^Learner: (.+)$/gm)].pop();
+      const message = said ? said[1].trim() : '';
+      const wrong = message.includes('がください');
+      return {
+        reply: 'そうですか。改札で待ちましょう。',
+        translation: 'E2E fake AI: I see. Let us wait at the ticket gate.',
+        correction: wrong
+          ? { corrected: message.replace('がください', 'をください'), explanation: 'E2E fake AI: ください takes を.' }
+          : { corrected: '', explanation: '' },
+      };
+    }
+    case 'writingCorrection': {
+      const text = firstMatch(prompt, /<<<\n([\s\S]*?)\n>>>/);
+      const edits = text.includes('私はは')
+        ? [{ original: '私はは', corrected: '私は', explanation: 'E2E fake AI: doubled は.', kind: 'particle' }]
+        : [];
+      return { edits, overall: 'E2E fake AI: one slip to fix.' };
+    }
+    case 'journalGrade': {
+      const words = [...prompt.matchAll(/^- ([^\s(:]+)/gm)].map((m) => m[1]);
+      return { words: words.map((word) => ({ word, used: true, correct: true, note: `E2E fake AI: ${word} fits.` })), feedback: 'E2E fake AI: well done.' };
+    }
+    case 'shadowingFeedback':
+      return { summary: 'E2E fake AI: keep the pitch steady.', issues: [] };
     default:
       return null;
   }
@@ -436,6 +531,7 @@ async function startFakeAi({ model = FAKE_AI_MODEL } = {}) {
       const feature = fakeAiFeatureOf(body);
       const prompt = (Array.isArray(body.messages) ? body.messages : []).map(messageText).join('\n');
       const hit = { path: url.pathname, feature, model: body.model ?? null, schema: Boolean(body.response_format), stream: body.stream === true };
+      if (FAKE_AI_SPEAK_FEATURES.includes(feature)) hit.prompt = prompt.slice(0, 8000);
       hits.push(hit);
       if (!feature) {
         hit.status = 400;
@@ -450,6 +546,7 @@ async function startFakeAi({ model = FAKE_AI_MODEL } = {}) {
         hit.status = 500;
         return json(500, { error: { message: `fake AI: ${feature} failed on purpose` } });
       }
+      if (feature === 'agentChat') return answerAgentChat(req, res, body, prompt, hit);
       const content = JSON.stringify(fakeAiAnswer(feature, prompt));
       hit.status = 200;
       const usage = { prompt_tokens: Math.ceil(prompt.length / 4), completion_tokens: Math.ceil(content.length / 4) };
@@ -470,6 +567,52 @@ async function startFakeAi({ model = FAKE_AI_MODEL } = {}) {
       });
     });
   });
+  /**
+   * The Agent's chat: prose, not JSON. Streamed as `FAKE_AI_AGENT_REPLY` when the app asks
+   * for a stream; the slow mark holds the rest back until the app hangs up (recorded as
+   * `hit.aborted`) or the hold time passes.
+   */
+  function answerAgentChat(req, res, body, prompt, hit) {
+    const slow = prompt.includes(FAKE_AI_AGENT_SLOW_MARK);
+    const chunks = slow ? [FAKE_AI_AGENT_PARTIAL, 'and the rest, which a Stop never receives.'] : FAKE_AI_AGENT_REPLY;
+    const content = chunks.join('');
+    const usage = { prompt_tokens: Math.ceil(prompt.length / 4), completion_tokens: Math.ceil(content.length / 4) };
+    usage.total_tokens = usage.prompt_tokens + usage.completion_tokens;
+    hit.status = 200;
+    if (body.stream !== true) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({
+        id: `chatcmpl-e2e-${hits.length}`,
+        object: 'chat.completion',
+        created: 1791000000,
+        model,
+        choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+        usage,
+      }));
+    }
+    res.writeHead(200, { 'content-type': 'text/event-stream' });
+    const send = (delta, finish = null, extra = {}) => res.write(`data: ${JSON.stringify({ id: 'e2e', object: 'chat.completion.chunk', model, choices: [{ index: 0, delta, finish_reason: finish }], ...extra })}\n\n`);
+    const finishStream = () => {
+      if (res.writableEnded || res.destroyed) return;
+      send({}, 'stop', { usage });
+      res.end('data: [DONE]\n\n');
+    };
+    if (!slow) {
+      chunks.forEach((text, index) => send(index === 0 ? { role: 'assistant', content: text } : { content: text }));
+      return finishStream();
+    }
+    send({ role: 'assistant', content: chunks[0] });
+    const timer = setTimeout(() => {
+      send({ content: chunks[1] });
+      finishStream();
+    }, FAKE_AI_AGENT_HOLD_MS);
+    res.on('close', () => {
+      clearTimeout(timer);
+      if (!res.writableEnded) hit.aborted = true;
+    });
+    return undefined;
+  }
+
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   return {
@@ -481,6 +624,10 @@ async function startFakeAi({ model = FAKE_AI_MODEL } = {}) {
     /** The next request for `feature` fails with HTTP 500. */
     failNext(feature) {
       failing.add(feature);
+    },
+    /** The prompts the fake was sent for `feature` (speaking and writing helpers only), oldest first. */
+    prompts(feature) {
+      return hits.filter((h) => h.feature === feature && typeof h.prompt === 'string').map((h) => h.prompt);
     },
     /** Requests that reached chat-completions for `feature` (or for any helper). */
     count(feature) {
@@ -506,7 +653,7 @@ function writeAiPreset(profileDir, ai) {
   fs.writeFileSync(path.join(aiDir, 'settings-v1.json'), JSON.stringify({
     version: 1,
     enabled: true,
-    cloudFeatures: Object.fromEntries(FAKE_AI_FEATURES.map((id) => [id, true])),
+    cloudFeatures: Object.fromEntries([...FAKE_AI_FEATURES, ...FAKE_AI_SPEAK_FEATURES].map((id) => [id, true])),
     openaiModel: '',
     compatBaseUrl: ai.base,
     compatModel: ai.model,
@@ -627,7 +774,7 @@ async function startWorld(dir, options = {}) {
         texthooker: { port: hook.port, handshakes: hook.handshakes.length, clients: hook.clients() },
         providers: { port: providers.port, hits: providers.hits.slice(0, 40), total: providers.hits.length },
         updateFeed: { port: updateFeed.port, hits: updateFeed.hits.slice(0, 40), total: updateFeed.hits.length },
-        ...(ai ? { ai: { port: ai.port, model: ai.model, byFeature: Object.fromEntries(FAKE_AI_FEATURES.map((f) => [f, ai.count(f)])), total: ai.hits.length } } : {}),
+        ...(ai ? { ai: { port: ai.port, model: ai.model, byFeature: Object.fromEntries([...FAKE_AI_FEATURES, ...FAKE_AI_AGENT_FEATURES, ...FAKE_AI_SPEAK_FEATURES].map((f) => [f, ai.count(f)])), total: ai.hits.length } } : {}),
       };
     },
     async close() {
@@ -655,4 +802,11 @@ module.exports = {
   SCREEN_LINES,
   FAKE_AI_MODEL,
   FAKE_AI_FEATURES,
+  FAKE_AI_AGENT_FEATURES,
+  FAKE_AI_SPEAK_FEATURES,
+  FAKE_AI_AGENT_MARK,
+  FAKE_AI_AGENT_SLOW_MARK,
+  FAKE_AI_PLAN_MARK,
+  FAKE_AI_AGENT_REPLY,
+  FAKE_AI_AGENT_PARTIAL,
 };

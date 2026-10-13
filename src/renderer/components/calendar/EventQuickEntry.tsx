@@ -6,7 +6,7 @@
  * model. "Ask the AI" is optional and returns the same draft shape, validated in
  * main. Either way nothing is saved: "Use these details" only fills the form,
  * and the learner still presses Create. A weekly draft on several weekdays
- * becomes one weekly event per weekday, listed before saving.
+ * becomes ONE weekly series on those days (the editor's weekday toggles).
  *
  * Lazy-loaded by `EventModal` on the first press of "Describe it".
  */
@@ -132,9 +132,6 @@ export default function EventQuickEntry({ onApply, onClose }: EventQuickEntryPro
             <dt>{t('calendar.modal.repeat')}</dt>
             <dd>{repeatText(draft)}</dd>
           </dl>
-          {eventDraftExtraDates(draft).length > 0 && (
-            <p className="muted ai-study-meta">{t('aiTutor.event.perWeekday', { count: draft.weekdays.length })}</p>
-          )}
           <div className="ai-study-actions">
             <button type="button" className="btn small primary ai-study-btn lq-hit" onClick={() => onApply(draft, eventDraftExtraDates(draft))}>
               {t('aiTutor.event.apply')}

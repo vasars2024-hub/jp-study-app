@@ -14,20 +14,51 @@
  * 2. Otherwise the first unanswered card that is not waiting on a step, in the
  *    sitting's own order.
  * 3. Otherwise only step cards are left and none is due yet: the one due
- *    soonest is shown early (Anki's "learn ahead"), so the sitting can finish
- *    instead of stalling on a clock.
+ *    soonest is shown early, but only when it is due within the learn-ahead
+ *    limit (Anki's "learn ahead limit", 20 minutes by default). A step due
+ *    later than that is not shown early: a "1 day" or "3 hour" step answered
+ *    after ten seconds was no step at all. The sitting then waits
+ *    (`nextStepWait`) instead of skipping it.
  */
+import { DEFAULT_LEARN_AHEAD_MINUTES } from './flashcardScheduling';
 import { isInSteps, type SrsPhase } from './learningSteps';
+
+const MINUTE_MS = 60_000;
 
 export interface SessionQueueCard {
   id: string;
   srs?: { dueAt: number; phase?: SrsPhase } | null;
 }
 
+function learnAheadMs(minutes: number | undefined): number {
+  const m = minutes === undefined ? DEFAULT_LEARN_AHEAD_MINUTES : Number(minutes);
+  return Number.isFinite(m) && m > 0 ? m * MINUTE_MS : 0;
+}
+
+/**
+ * The one "is this card due for the queue" rule, shared by the review queue,
+ * its counts and the per-deck Due in Statistics: an unscheduled card is due
+ * (the new-card budget is applied separately), a card in its steps is due
+ * within the learn-ahead limit (Anki counts those in "Learning"), and any
+ * other card when its due time has passed.
+ */
+export function isQueueDue(
+  srs: { dueAt?: unknown; phase?: unknown } | null | undefined,
+  now: number,
+  learnAheadMinutes?: number,
+): boolean {
+  if (!srs || typeof srs !== 'object') return true;
+  const due = srs.dueAt;
+  if (typeof due !== 'number' || !Number.isFinite(due)) return true;
+  if (isInSteps(srs as { phase?: SrsPhase })) return due <= now + learnAheadMs(learnAheadMinutes);
+  return due <= now;
+}
+
 export function nextSessionCardId(
   cards: readonly SessionQueueCard[],
   answered: ReadonlySet<string>,
   now: number,
+  learnAheadMinutes: number = DEFAULT_LEARN_AHEAD_MINUTES,
 ): string | null {
   let dueStep: SessionQueueCard | null = null;
   let firstFresh: SessionQueueCard | null = null;
@@ -42,7 +73,30 @@ export function nextSessionCardId(
       firstFresh = card;
     }
   }
-  return (dueStep ?? firstFresh ?? soonestStep)?.id ?? null;
+  const ahead = soonestStep && (soonestStep.srs?.dueAt ?? 0) <= now + learnAheadMs(learnAheadMinutes)
+    ? soonestStep
+    : null;
+  return (dueStep ?? firstFresh ?? ahead)?.id ?? null;
+}
+
+/**
+ * When `nextSessionCardId` has nothing to show but step cards are still
+ * unanswered: the epoch ms at which the soonest one comes inside the
+ * learn-ahead limit, so a sitting can wait for it. Null when nothing waits.
+ */
+export function nextStepWait(
+  cards: readonly SessionQueueCard[],
+  answered: ReadonlySet<string>,
+  learnAheadMinutes: number = DEFAULT_LEARN_AHEAD_MINUTES,
+): { cardId: string; dueAt: number; showAt: number } | null {
+  let soonest: SessionQueueCard | null = null;
+  for (const card of cards) {
+    if (answered.has(card.id) || !card.srs || !isInSteps(card.srs)) continue;
+    if (!soonest || card.srs.dueAt < (soonest.srs?.dueAt ?? 0)) soonest = card;
+  }
+  if (!soonest?.srs) return null;
+  const dueAt = soonest.srs.dueAt;
+  return { cardId: soonest.id, dueAt, showAt: dueAt - learnAheadMs(learnAheadMinutes) };
 }
 
 /**

@@ -11,10 +11,13 @@
  * in the background, with Undo and Open.
  *
  * Clipboard watching is a cheap poll (~500 ms). Electron exposes no clipboard
- * sequence number and the app takes no native dependency for one, so a change
- * is recognised from the format list plus the picture's size and a hash of a
- * few sampled patches; only a changed probe pays for the full content hash,
- * and a content hash already in the history is never read again. The picture
+ * sequence number and the app takes no native dependency for one, so each poll
+ * reads only the format list and the raw bytes of the registered "PNG" format
+ * (a copy, no decode). The picture itself is decoded only when those changed —
+ * or, for a bitmap-only clipboard, on a schedule that backs off to 2 s while
+ * the same picture stays. A decoded picture is told apart by its size and a
+ * hash of a few sampled patches; only a changed probe pays for the full
+ * content hash, and a content hash already in the history is never read again. The picture
  * on the clipboard when watching starts is never treated as a new snip, nor is
  * one that arrives while the app is locked, nor one Gum put there itself.
  *
@@ -38,13 +41,18 @@ import { refreshGlobalCommands, registerGlobalCommand } from './globalCommands';
 import { refreshAppTray } from './systemDictionary';
 import { mt } from './i18n';
 import {
+  cleanSnipDeckName,
   clipboardHasImageFormat,
+  normalizeSnipAction,
   normalizeSnipSettings,
+  normalizeSnipToastPayload,
   normalizeSnipWord,
   pruneSnipHistory,
   snipImageRejection,
   snipMatchesQuery,
+  SNIP_CLEARABLE_FIELDS,
   SNIP_SETTINGS_DEFAULTS,
+  SNIP_TOAST_NOTICE_MS,
   type SnipAction,
   type SnipEntry,
   type SnipEntryPatch,
@@ -161,6 +169,9 @@ function normalizeEntry(raw: unknown): SnipEntry | null {
       : [],
     ...(r.undone === true ? { undone: true } : {}),
     ...(Number.isFinite(Number(r.overLimit)) && Number(r.overLimit) > 0 ? { overLimit: Number(r.overLimit) } : {}),
+    ...(r.review === 'manual' || r.review === 'uncertain' ? { review: r.review } : {}),
+    ...(cleanSnipDeckName(r.deck) ? { deck: cleanSnipDeckName(r.deck) } : {}),
+    ...(typeof r.ocrText === 'string' ? { ocrText: r.ocrText.slice(0, 20_000) } : {}),
   };
 }
 
@@ -209,9 +220,9 @@ function getEntry(id: unknown): SnipEntry | null {
 function patchEntry(id: unknown, patch: unknown): SnipEntry | null {
   const current = getEntry(id);
   if (!current || !patch || typeof patch !== 'object') return null;
-  const p = patch as SnipEntryPatch;
+  const { clear, ...p } = patch as SnipEntryPatch;
   // Identity, size and the picture's hash belong to main; the rest is the pipeline's.
-  const next = normalizeEntry({
+  const merged: Record<string, unknown> = {
     ...current,
     ...p,
     id: current.id,
@@ -220,7 +231,11 @@ function patchEntry(id: unknown, patch: unknown): SnipEntry | null {
     bytes: current.bytes,
     width: current.width,
     height: current.height,
-  });
+  };
+  for (const field of Array.isArray(clear) ? clear : []) {
+    if (SNIP_CLEARABLE_FIELDS.has(field)) delete merged[field];
+  }
+  const next = normalizeEntry(merged);
   if (!next) return null;
   history = loadHistory().map((e) => (e.id === current.id ? next : e));
   saveHistory();
@@ -235,13 +250,34 @@ function historyBytes(): number {
 // ---- Watching ---------------------------------------------------------------
 
 const POLL_MS = 500;
+/**
+ * With no raw-bytes fingerprint (an app that put only a bitmap on the
+ * clipboard), the picture is re-checked on a backing-off schedule up to this.
+ */
+const IDLE_PROBE_MAX_MS = 2000;
 /** Bigger than any real snip's PNG; never hashed or stored. */
 const MAX_PNG_BYTES = 40 * 1024 * 1024;
 const SAMPLE = 8;
+/**
+ * The clipboard formats whose raw bytes identify the picture without decoding
+ * it. The Snipping Tool (Win+Shift+S), ShareX and browsers put the registered
+ * "PNG" format next to the bitmap; reading it is a copy, not a decode.
+ */
+const RAW_FORMATS = ['PNG'] as const;
+/** Above this, the raw fingerprint hashes the length and three slices, not every byte. */
+const RAW_HASH_ALL_BYTES = 8 * 1024 * 1024;
+const RAW_SLICE = 64 * 1024;
 
 let started = false;
 let timer: ReturnType<typeof setInterval> | null = null;
 let lastProbe = '';
+/** The cheap signal (format list + raw-bytes fingerprint) at the last poll. */
+let lastCheap = '';
+/** No raw fingerprint: when the picture may be decoded again, and the current back-off. */
+let nextFullAt = 0;
+let idleDelay = POLL_MS;
+/** How many times a clipboard picture was decoded (`readImage`); a test seam. */
+let decodes = 0;
 const sessionHashes = new Set<string>();
 
 /** Size + a hash of five small patches: cheap, and different for any two real snips. */
@@ -265,17 +301,59 @@ function probeKey(formats: readonly string[], image: Electron.NativeImage): stri
   return h.digest('hex');
 }
 
-/** The current clipboard picture's probe, or '' when there is none. */
-function probeNow(): { key: string; image: Electron.NativeImage | null } {
+/** A hash of the raw bytes of one picture format, or '' when none is on the clipboard. */
+function rawFingerprint(): string {
+  if (typeof clipboard.readBuffer !== 'function') return '';
+  for (const format of RAW_FORMATS) {
+    let buf: Buffer;
+    try {
+      buf = clipboard.readBuffer(format);
+    } catch {
+      continue;
+    }
+    if (!buf || !buf.length) continue;
+    const h = crypto.createHash('sha1');
+    h.update(`${format}:${buf.length}:`);
+    if (buf.length <= RAW_HASH_ALL_BYTES) {
+      h.update(buf);
+    } else {
+      const mid = Math.floor((buf.length - RAW_SLICE) / 2);
+      h.update(buf.subarray(0, RAW_SLICE));
+      h.update(buf.subarray(mid, mid + RAW_SLICE));
+      h.update(buf.subarray(buf.length - RAW_SLICE));
+    }
+    return h.digest('hex');
+  }
+  return '';
+}
+
+interface CheapProbe {
+  formats: string[];
+  hasImage: boolean;
+  /** Raw-bytes fingerprint; '' when the clipboard carries no raw picture format. */
+  raw: string;
+  /** Formats + raw: changes whenever anything on the clipboard visibly changed. */
+  key: string;
+}
+
+/** What can be learned without decoding a picture. */
+function cheapProbe(): CheapProbe {
   let formats: string[];
   try {
     formats = clipboard.availableFormats();
   } catch {
-    return { key: '', image: null };
+    return { formats: [], hasImage: false, raw: '', key: '' };
   }
-  if (!clipboardHasImageFormat(formats)) return { key: '', image: null };
+  const hasImage = clipboardHasImageFormat(formats);
+  const raw = hasImage ? rawFingerprint() : '';
+  return { formats, hasImage, raw, key: `${formats.join(',')}|${raw}` };
+}
+
+/** Decode the clipboard picture and probe it; '' when there is none. */
+function fullProbe(formats: readonly string[]): { key: string; image: Electron.NativeImage | null } {
   let image: Electron.NativeImage;
   try {
+    decodes += 1;
     image = clipboard.readImage();
   } catch {
     return { key: '', image: null };
@@ -284,15 +362,46 @@ function probeNow(): { key: string; image: Electron.NativeImage | null } {
   return { key: probeKey(formats, image), image };
 }
 
-/** Whatever is on the clipboard now is "already seen" (start, resume, unlock). */
-function primeProbe(): void {
-  lastProbe = probeNow().key;
+function resetBackoff(now: number): void {
+  idleDelay = POLL_MS;
+  nextFullAt = now + POLL_MS;
 }
 
-function tick(): void {
+/** Whatever is on the clipboard now is "already seen" (start, resume, unlock). */
+function primeProbe(now = Date.now()): void {
+  const cheap = cheapProbe();
+  lastCheap = cheap.key;
+  lastProbe = cheap.hasImage ? fullProbe(cheap.formats).key : '';
+  resetBackoff(now);
+}
+
+/**
+ * One poll. The picture is decoded only when something may have changed: the
+ * format list or the raw PNG bytes changed, or — for a clipboard that carries
+ * only a bitmap, where nothing cheaper tells two pictures apart — on a schedule
+ * that backs off to `IDLE_PROBE_MAX_MS` while the same picture stays. A
+ * picture that sits on the clipboard for hours is no longer decoded twice a
+ * second.
+ */
+function tick(now = Date.now()): void {
   if (!started || !ensureSettings().enabled) return;
-  const { key, image } = probeNow();
-  if (key === lastProbe) return;
+  const cheap = cheapProbe();
+  const changed = cheap.key !== lastCheap;
+  lastCheap = cheap.key;
+  if (!cheap.hasImage) {
+    lastProbe = '';
+    resetBackoff(now);
+    return;
+  }
+  // The same raw bytes are the same picture; without them, wait for the back-off.
+  if (!changed && (cheap.raw || now < nextFullAt)) return;
+  const { key, image } = fullProbe(cheap.formats);
+  if (key === lastProbe) {
+    idleDelay = Math.min(IDLE_PROBE_MAX_MS, idleDelay * 2);
+    nextFullAt = now + idleDelay;
+    return;
+  }
+  resetBackoff(now);
   lastProbe = key;
   if (!image) return;
   // Seen, never read: a snip taken while Gum is locked is not studied after the
@@ -456,20 +565,44 @@ function broadcast(channel: string, payload: unknown): void {
 
 // ---- Toast window -----------------------------------------------------------
 
-const TOAST_SIZE = { width: 400, height: 128 };
+const TOAST_WIDTH = 400;
+/** Plain toast; one with Undo (and its countdown); one carrying the first-run notice. */
+const TOAST_HEIGHT = { plain: 128, undo: 156, notice: 248 } as const;
 /** The toast closes itself; this is the backstop if its page never does. */
-const TOAST_MAX_MS = 30_000;
+const TOAST_MAX_MS = SNIP_TOAST_NOTICE_MS + 5_000;
 let toast: BrowserWindow | null = null;
 let toastPayload: SnipToastPayload | null = null;
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-function toastBounds(): Electron.Rectangle {
+function toastHeight(payload: SnipToastPayload): number {
+  if (payload.notice) return TOAST_HEIGHT.notice;
+  return payload.kind === 'added' && (payload.count ?? 0) > 0 ? TOAST_HEIGHT.undo : TOAST_HEIGHT.plain;
+}
+
+function toastBounds(payload: SnipToastPayload): Electron.Rectangle {
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const height = toastHeight(payload);
   return {
-    x: Math.round(area.x + area.width - TOAST_SIZE.width - 16),
-    y: Math.round(area.y + area.height - TOAST_SIZE.height - 16),
-    ...TOAST_SIZE,
+    x: Math.round(area.x + area.width - TOAST_WIDTH - 16),
+    y: Math.round(area.y + area.height - height - 16),
+    width: TOAST_WIDTH,
+    height,
   };
+}
+
+/**
+ * The first snip that makes cards carries the one-time notice: watching and
+ * adding are on by default, so the learner is told, once, and asked whether to
+ * keep it. Marked as shown here (main owns the setting), so two windows never
+ * both show it.
+ */
+function withNotice(payload: SnipToastPayload): SnipToastPayload {
+  const s = ensureSettings();
+  if (payload.kind !== 'added' || !(payload.count ?? 0) || s.notice !== 'pending') return payload;
+  settings = { ...s, notice: 'shown' };
+  saveSettings();
+  broadcast('snip:settings-changed', status());
+  return { ...payload, notice: true };
 }
 
 function hideToast(): void {
@@ -484,7 +617,7 @@ function showToast(payload: SnipToastPayload): boolean {
   toastPayload = payload;
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(hideToast, TOAST_MAX_MS);
-  const bounds = toastBounds();
+  const bounds = toastBounds(payload);
   if (toast && !toast.isDestroyed()) {
     toast.setBounds(bounds);
     toast.webContents.send('snip:toast', payload);
@@ -671,27 +804,20 @@ export function registerSnipToCardsIpc(): void {
   });
   // Undo and the per-word toggle run where the deck lives.
   ipcMain.handle('snip:action', (_e, raw: unknown): boolean => {
-    const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-    const id = typeof r.id === 'string' ? r.id : '';
-    if (!getEntry(id)) return false;
-    if (r.action === 'undo') {
-      dispatch({ kind: 'action', payload: { id, action: 'undo' } });
-      return true;
-    }
-    if ((r.action === 'removeWord' || r.action === 'addWord') && Number.isInteger(r.index)) {
-      dispatch({ kind: 'action', payload: { id, action: r.action, index: Number(r.index) } });
-      return true;
-    }
-    return false;
+    const action = normalizeSnipAction(raw);
+    if (!action || !getEntry(action.id)) return false;
+    dispatch({ kind: 'action', payload: action });
+    return true;
   });
   ipcMain.handle('snip:open', (_e, id: unknown): void => {
     hideToast();
     openView(typeof id === 'string' ? id : null);
   });
 
-  ipcMain.handle('snip:toast:show', (_e, payload: unknown): boolean => {
-    if (!payload || typeof payload !== 'object') return false;
-    return showToast(payload as SnipToastPayload);
+  ipcMain.handle('snip:toast:show', (_e, raw: unknown): boolean => {
+    const payload = normalizeSnipToastPayload(raw);
+    if (!payload || !deps || appLocked()) return false;
+    return showToast(withNotice(payload));
   });
   ipcMain.handle('snip:toast:get', (): SnipToastPayload | null => toastPayload);
   ipcMain.handle('snip:toast:close', (): void => hideToast());
@@ -709,6 +835,10 @@ export const __snipToCardsTestables = {
     settingsLoaded = false;
     settings = { ...SNIP_SETTINGS_DEFAULTS };
     lastProbe = '';
+    lastCheap = '';
+    nextFullAt = 0;
+    idleDelay = POLL_MS;
+    decodes = 0;
     sessionHashes.clear();
     readyIds.clear();
     pending.splice(0);
@@ -722,4 +852,6 @@ export const __snipToCardsTestables = {
     started = on;
   },
   settled: (): Promise<void> => chain,
+  /** How many times a clipboard picture has been decoded so far. */
+  decodes: (): number => decodes,
 };

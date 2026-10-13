@@ -217,6 +217,8 @@ interface RowProps {
   onMine?: (cue: VideoCoreActiveCue) => void;
   mineLabel: string;
   minedLabel: string;
+  /** Accessible name of the Mine button, naming the line ("Mine this line: …" / "Mined: …"). */
+  mineLineLabel: (line: string, mined: boolean) => string;
   /** Open the dictionary on one word of this row (click, Enter or Space on the word). */
   onWordLookup?: (hit: WordLookupHit, cue: VideoCoreActiveCue) => void;
   /** Accessible name of the timestamp's seek button when words are their own stops. */
@@ -265,6 +267,7 @@ const TranscriptRow = React.memo(function TranscriptRow({
   onMine,
   mineLabel,
   minedLabel,
+  mineLineLabel,
   onWordLookup,
   seekLabel,
 }: RowProps) {
@@ -419,7 +422,7 @@ const TranscriptRow = React.memo(function TranscriptRow({
           type="button"
           className={`study-transcript-mine${mined ? ' is-mined' : ''}`}
           data-study-action="transcript-mine"
-          aria-label={`${mined ? minedLabel : mineLabel}: ${text}`}
+          aria-label={mineLineLabel(text, mined)}
           onClick={() => onMine(cue)}
         >
           {mined ? minedLabel : mineLabel}
@@ -442,7 +445,7 @@ export default function VideoCoreTranscriptPanel({
   onMineCue,
   onWordLookup,
 }: Props) {
-  const { t } = useT();
+  const { t, lang: uiLang } = useT();
   const [query, setQuery] = React.useState('');
   const [follow, setFollow] = React.useState(true);
   const [translations, setTranslations] = React.useState<Record<number, string>>({});
@@ -712,6 +715,13 @@ export default function VideoCoreTranscriptPanel({
   const translateLabel = t('mediaWorkspace.study.transcriptTranslate');
   const mineLabel = t('studyLoop.lookup.mine');
   const minedLabel = t('studyLoop.lookup.mined');
+  // One whole sentence per language, not "Mine" + ": " + line (ja/zh punctuate it
+  // differently). `uiLang`, not `t`, is what makes this follow a language switch.
+  const mineLineLabel = React.useCallback(
+    (line: string, mined: boolean): string =>
+      t(mined ? 'studyLoop.lookup.minedLine' : 'studyLoop.lookup.mineLine', { line }),
+    [t, uiLang],
+  );
   const seekLabel = t('studyLoop2.transcript.seekTo');
   const destination = useMiningDestination(lang);
 
@@ -845,6 +855,7 @@ export default function VideoCoreTranscriptPanel({
               onMine={onMineCue}
               mineLabel={mineLabel}
               minedLabel={minedLabel}
+              mineLineLabel={mineLineLabel}
               onWordLookup={onWordLookup}
               seekLabel={seekLabel}
             />

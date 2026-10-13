@@ -67,6 +67,11 @@ export const PRODUCT5_UI_JA: Catalog = {
   'kbd5.io.error.notJson': '正しい JSON ではありません。',
   'kbd5.io.error.notKeymap': 'Gum のキーマップではありません。',
   'kbd5.io.error.rejected': 'キーマップを読み込めませんでした: {detail}',
+  // kbd7: import hardening and boot recovery (the import reasons fill {detail} above).
+  'kbd7.import.invalidCustom': 'カスタムショートカットの一部が不完全か壊れています。何も変更していません。',
+  'kbd7.import.invalidCustomNamed': 'カスタムショートカット「{name}」が不完全か壊れています。何も変更していません。',
+  'kbd7.import.saveFailed': '適用できませんでした。ショートカットは元のままです。',
+  'kbd7.boot.storeReset': '保存されたショートカットを読み込めなかったため、既定に戻しました。以前の設定のコピーは保管してあります。',
   'kbd5.custom.edit': '編集',
   'kbd5.custom.editTitle': 'カスタムショートカットを編集',
   'kbd5.custom.save': '変更を保存',

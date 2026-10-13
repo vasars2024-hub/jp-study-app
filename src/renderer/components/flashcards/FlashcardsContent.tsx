@@ -96,7 +96,7 @@ import {
 } from '../../../shared/localSrs';
 import { previewScheduleDelays } from '../../../shared/flashcardScheduling';
 import { isInSteps } from '../../../shared/learningSteps';
-import { nextSessionCardId, requeueStepCard } from '../../../shared/reviewSessionQueue';
+import { nextSessionCardId, nextStepWait, requeueStepCard } from '../../../shared/reviewSessionQueue';
 import { useDueClock } from '../../useDueClock';
 import { loadSchedulingConfig } from '../../flashcardScheduling';
 import { useReviewSessionPrefs } from '../../reviewSessionPrefs';
@@ -386,6 +386,14 @@ export interface FlashcardsState {
   knownReviewCards: ReviewCard[];
   current: ReviewCard | null;
   sessionComplete: boolean;
+  /**
+   * Only learning-step cards are left and none is due within the learn-ahead
+   * limit: when the soonest one is due. The sitting waits for it (and shows it
+   * by itself once it is inside the limit) instead of skipping its step.
+   */
+  stepWait: { cardId: string; dueAt: number; showAt: number } | null;
+  /** Show the waiting step card now, ahead of its step. */
+  showWaitingCardNow: () => void;
   // handlers
   bookCoverStyle: (bookId: string, bookTitle: string) => CSSProperties;
   refreshJitenCovers: () => void;
@@ -680,6 +688,12 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
 
   const current = sessionCards[reviewIndex] ?? null;
   const sessionComplete = sessionCards.length > 0 && masteredIds.size >= sessionCards.length;
+  const stepWait = useMemo(
+    () => (mode === 'review' && !current && !sessionComplete
+      ? nextStepWait(sessionCards, masteredIds, loadSchedulingConfig().learnAheadMinutes)
+      : null),
+    [mode, current, sessionComplete, sessionCards, masteredIds],
+  );
   // A new card on screen (or the same card back after a step or an undo) restarts the timer.
   const currentShowing = mode === 'review' ? `${current?.id ?? ''}:${current?.srs?.lastReviewedAt ?? 0}` : '';
   useEffect(() => {
@@ -939,10 +953,33 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
    */
   function showNextSessionCard(queue: ReviewCard[], answered: Set<string>): void {
     setSessionCards(queue);
-    const nextId = nextSessionCardId(queue, answered, Date.now());
+    const learnAhead = loadSchedulingConfig().learnAheadMinutes;
+    const nextId = nextSessionCardId(queue, answered, Date.now(), learnAhead);
+    if (!nextId && nextStepWait(queue, answered, learnAhead)) {
+      // Only steps due beyond the learn-ahead limit are left: no card on
+      // screen, and `stepWait` says when the next one comes.
+      setReviewIndex(-1);
+      return;
+    }
     const index = nextId ? queue.findIndex((c) => c.id === nextId) : 0;
     setReviewIndex(Math.max(0, index));
     if (nextId) markExplored(nextId);
+  }
+
+  // Waiting on a step: bring it on screen as soon as it is inside the limit.
+  useEffect(() => {
+    if (!stepWait) return undefined;
+    const delay = Math.min(2_147_000_000, Math.max(0, stepWait.showAt - Date.now()));
+    const timer = window.setTimeout(() => showNextSessionCard(sessionCards, masteredIds), delay);
+    return () => window.clearTimeout(timer);
+  }, [stepWait]);
+
+  function showWaitingCardNow(): void {
+    if (!stepWait) return;
+    const index = sessionCards.findIndex((c) => c.id === stepWait.cardId);
+    if (index < 0) return;
+    setReviewIndex(index);
+    markExplored(stepWait.cardId);
   }
 
   /** Persist one grade for the card on screen; returns its new schedule. */
@@ -1075,7 +1112,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const card = sessionCards[reviewIndex];
     if (!card) return;
     setAudioError('');
+    // Taken before the source is read: a card left (or a newer replay) while it
+    // loads makes this ticket stale, so the old card never speaks over the new one.
+    const live = cardAudio.claim();
     const dataUrl = await resolveAudio(card);
+    if (!live()) return;
     if (!dataUrl) {
       setAudioError(t('flash.audioUnavailable'));
       return;
@@ -1129,6 +1170,9 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     if (!card || reviewSource !== 'epub' || audioBusy) return;
     setAudioBusy(true);
     setAudioError('');
+    // Synthesis takes seconds: only a card still on screen (and not replayed
+    // meanwhile) plays its new clip.
+    const live = cardAudio.claim();
     try {
       // The card's own language speaks it (absent is Japanese, as stored).
       const lang = normalizeStudyLang(card.studyLang);
@@ -1150,7 +1194,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
         candidate.id === card.id ? { ...candidate, audioPath: result.path } : candidate
       )));
       const data = await window.api.flashcardReadAudio(result.path);
-      if (data.ok && data.dataUrl) await cardAudio.play(data.dataUrl).catch(() => undefined);
+      if (live() && data.ok && data.dataUrl) await cardAudio.play(data.dataUrl).catch(() => undefined);
     } finally {
       setAudioBusy(false);
     }
@@ -1581,6 +1625,8 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     knownReviewCards,
     current,
     sessionComplete,
+    stepWait,
+    showWaitingCardNow,
     bookCoverStyle,
     refreshJitenCovers,
     createFolder,
@@ -1640,6 +1686,11 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   } = state;
 
   const reviewPrefs = useReviewSessionPrefs();
+
+  // A clip belongs to its card: moving on (or leaving the review) silences it,
+  // and makes a clip still loading for that card stale. React runs this cleanup
+  // before the next card's autoplay below.
+  useEffect(() => () => cardAudio.stop(), [current?.id]);
 
   useEffect(() => {
     if (current?.promptKind === 'listening') void state.playCurrentAudio();
@@ -1730,6 +1781,28 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
           </span>
         )}
       </button>
+    );
+  }
+
+  if (!sessionComplete && !current && state.stepWait) {
+    // Anki's learn-ahead limit: the remaining cards are in learning steps due
+    // later than the limit, so the sitting waits rather than skip the step.
+    const minutes = Math.max(1, Math.ceil((state.stepWait.dueAt - Date.now()) / 60_000));
+    return (
+      <div className="flash-view" ref={state.reviewRootRef}>
+        <div className="flash-done" role="status">
+          <h2>{t('srs4.wait.title')}</h2>
+          <p className="muted">{t('srs4.wait.body', { count: minutes })}</p>
+          <div className="flash-done-actions">
+            <button className="btn primary" onClick={state.showWaitingCardNow}>
+              {t('srs4.wait.showNow')}
+            </button>
+            <button className="btn" onClick={state.endReview}>
+              {t('flash.done')}
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 

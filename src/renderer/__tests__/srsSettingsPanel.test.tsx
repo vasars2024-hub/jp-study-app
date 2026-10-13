@@ -19,6 +19,7 @@ vi.mock('../i18n', () => ({
 }));
 vi.mock('../reviewLog', () => ({
   loadReviewLog: () => Promise.resolve([]),
+  loadFullReviewLog: () => Promise.resolve([]),
   onReviewLogChanged: () => () => undefined,
   appendReviewLog: (entry: object) => ({ ...entry, id: 'x', at: 0 }),
   removeReviewLogEntry: () => undefined,
@@ -98,12 +99,30 @@ describe('same-day steps', () => {
 describe('leeches, spreading and the sitting', () => {
   it('persists every control it shows', () => {
     mount();
-    const select = host.querySelector('select') as HTMLSelectElement;
+    const select = host.querySelector('option[value="suspend"]')?.parentElement as HTMLSelectElement;
     act(() => {
       select.value = 'suspend';
       select.dispatchEvent(new Event('change', { bubbles: true }));
     });
     expect(loadSchedulingConfig().leechAction).toBe('suspend');
+    // The study day's start hour (Anki's "next day starts at", default 4).
+    const dayStart = host.querySelector('select[aria-describedby="srs4-day-start-help"]') as HTMLSelectElement;
+    expect(dayStart.value).toBe('4');
+    expect(dayStart.options).toHaveLength(24);
+    act(() => {
+      dayStart.value = '2';
+      dayStart.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(loadSchedulingConfig().dayStartHour).toBe(2);
+    // The learn-ahead limit (default 20 minutes).
+    const learnAhead = host.querySelector('input[aria-describedby="srs4-learn-ahead-help"]') as HTMLInputElement;
+    expect(learnAhead.value).toBe('20');
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(learnAhead, '5');
+      learnAhead.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(loadSchedulingConfig().learnAheadMinutes).toBe(5);
     const boxes = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
     expect(boxes).toHaveLength(3);
     act(() => { boxes[0].click(); });

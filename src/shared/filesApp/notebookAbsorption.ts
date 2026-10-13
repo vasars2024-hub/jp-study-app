@@ -23,7 +23,7 @@ import type { DesktopWinSection } from '../desktop';
 
 /**
  * The Notebook's stream vocabulary, duplicated from
- * `renderer/notebookTimeline.ts` rather than imported: that module is renderer
+ * `renderer/notebookActivity.ts` rather than imported: that module is renderer
  * code and this one is shared, and the test re-derives the two lists against
  * each other, so a stream added there without a row here fails.
  */
@@ -42,7 +42,8 @@ export type NotebookStreamId =
   | 'clipboard'
   | 'extension'
   | 'media'
-  | 'transcript';
+  | 'transcript'
+  | 'notes';
 
 export interface NotebookStreamAbsorption {
   stream: NotebookStreamId;
@@ -191,6 +192,18 @@ export const NOTEBOOK_STREAM_ABSORPTION: readonly NotebookStreamAbsorption[] = [
       + 'liveCaptions:scripts, and gate 7b/1 moved the panel that reads AND arms it to the '
       + 'Reading captures surface. Putting the arming control in the Files app instead would '
       + 'have made an existing capability Files-app-only, which gate 6 forbids.',
+  },
+  {
+    stream: 'notes',
+    source: 'notebook',
+    route: 'translate',
+    module: 'src/renderer/views/TranslateView.tsx',
+    symbol: 'openNoteViewer',
+    note:
+      'Notes written in the Notes app or Blanc Quick Notes. They live in their own durable '
+      + 'store (userNotesStore.ts), not the capped activity timeline. Files lists them under '
+      + 'the notebook enumerator; outside Files, the note viewer Translate opens leads to the '
+      + 'whole Notes app ("All notes"), and Blanc shows it as Quick Notes.',
   },
 ];
 

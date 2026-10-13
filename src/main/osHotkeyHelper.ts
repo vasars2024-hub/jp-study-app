@@ -16,6 +16,8 @@ import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { spawn, execFileSync } from 'node:child_process';
 import { parseHotkeyChord } from '../shared/osHotkeyChord';
 import { LEGACY_WIN_SECTION_ALIASES } from '../shared/desktop';
+import { osHotkeyStartupCmdPath, updateExePath } from './squirrelEvents';
+import { detectInstallKind } from './squirrelUpdater';
 
 export { parseHotkeyChord } from '../shared/osHotkeyChord';
 
@@ -112,16 +114,12 @@ function scriptPath(): string {
   return path.join(helperDir(), 'helper.ps1');
 }
 
+/**
+ * `<Startup>\GrammarX-OS-Hotkey.cmd`. Squirrel's uninstall (squirrelEvents.ts)
+ * deletes it and stops the helper, so the path is defined there.
+ */
 function startupCmdPath(): string {
-  const startup = path.join(
-    process.env.APPDATA || app.getPath('appData'),
-    'Microsoft',
-    'Windows',
-    'Start Menu',
-    'Programs',
-    'Startup',
-  );
-  return path.join(startup, 'GrammarX-OS-Hotkey.cmd');
+  return osHotkeyStartupCmdPath(process.env.APPDATA || app.getPath('appData'));
 }
 
 function pidPath(): string {
@@ -159,17 +157,58 @@ function buildEntry(
   };
 }
 
-function launchBase(): { exe: string; cwd: string; baseArgs: string[] } {
-  const exe = process.execPath;
-  const baseArgs: string[] = [];
-  if (!app.isPackaged) {
-    baseArgs.push(app.getAppPath());
+/** Where this copy runs from; injectable so the Squirrel branch is testable. */
+export interface HelperLaunchEnv {
+  execPath: string;
+  isPackaged: boolean;
+  platform: string;
+  /** `app.getAppPath()`: the dev build passes it to electron.exe. */
+  appPath: string;
+  cwd: string;
+  exists?: (p: string) => boolean;
+}
+
+/** What the helper launches: `exe` with `baseArgs`, then one hotkey's action arg. */
+export interface HelperLaunchBase {
+  exe: string;
+  cwd: string;
+  baseArgs: string[];
+}
+
+/**
+ * How the helper starts Gum. An installed (Squirrel) copy must NOT store its own
+ * exe: that lives in `app-<version>\`, which the next update deletes, and every
+ * hotkey would then launch nothing. It goes through the stable
+ * `<root>\Update.exe --processStart <exe>` instead (the login item does the same,
+ * appLifecycle.ts), and the hotkey's action is the value of
+ * `--process-start-args`: the helper appends each hotkey's single action arg
+ * (`--toggle`, `--restart`, `--open=<section>`) after the base args, so it lands
+ * right after that flag. The zip build and dev keep the plain exe.
+ */
+export function helperLaunchBase(env: HelperLaunchEnv): HelperLaunchBase {
+  if (detectInstallKind(env.execPath, env.isPackaged, env.platform, env.exists) === 'installed') {
+    const updateExe = updateExePath(env.execPath);
+    return {
+      exe: updateExe,
+      cwd: path.dirname(updateExe),
+      baseArgs: ['--processStart', path.basename(env.execPath), '--process-start-args'],
+    };
   }
   return {
-    exe,
-    cwd: app.isPackaged ? path.dirname(exe) : process.cwd(),
-    baseArgs,
+    exe: env.execPath,
+    cwd: env.isPackaged ? path.dirname(env.execPath) : env.cwd,
+    baseArgs: env.isPackaged ? [] : [env.appPath],
   };
+}
+
+function launchBase(): HelperLaunchBase {
+  return helperLaunchBase({
+    execPath: process.execPath,
+    isPackaged: app.isPackaged === true,
+    platform: process.platform,
+    appPath: app.isPackaged ? '' : app.getAppPath(),
+    cwd: process.cwd(),
+  });
 }
 
 function normalizeBindings(input: OsHotkeyBindings | string | undefined): OsHotkeyBindings {

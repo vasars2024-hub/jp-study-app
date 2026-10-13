@@ -117,12 +117,16 @@ describe('mounted statistics follow the study store', () => {
     expect(summaries().map(s => s.totalSeconds)).toEqual([90, 90]);
   });
 
-  it('rolls today over at midnight without requiring new activity', async () => {
+  it('rolls today over at the study-day start (4 am, as Anki) without requiring new activity', async () => {
     vi.setSystemTime(new Date(2026, 8, 7, 23, 59, 30));
     recordReading('book', '日本語', 90, 42);
     await mount();
     expect(summaries().map(s => s.todaySeconds)).toEqual([90, 90]);
+    // Midnight is not the end of the study day: 00:00:30 is still "tonight".
     await act(async () => { vi.advanceTimersByTime(60_000); });
+    expect(summaries().map(s => s.todaySeconds)).toEqual([90, 90]);
+    // 04:00 is.
+    await act(async () => { vi.advanceTimersByTime(4 * 60 * 60_000); });
     expect(summaries().map(s => s.todaySeconds)).toEqual([0, 0]);
     expect(summaries().map(s => s.totalSeconds)).toEqual([90, 90]);
   });

@@ -42,9 +42,16 @@ export function grammarDueSummary(state: GrammarSrsState, now = Date.now()): Gra
 }
 
 /**
- * Points falling due on one calendar day, for the Calendar's day view: for today
+ * Points falling due on one study day (`studyDay.ts` bounds), for the Calendar's day view: for today
  * everything due by the end of the day (overdue included, since it is still owed
  * today); for a later day only what first falls due within it.
+ *
+ * Today's count is therefore "due today", not "due now": a point in a ten-minute
+ * relearning step, or one falling due this evening, is counted here before the
+ * Review tab (`grammarDueSummary`, `dueAt <= now`) offers it. That is the same
+ * convention the Calendar uses for cards (`localDueForecast` puts later-today in
+ * today's bucket), and the day line labels it so and shows the ready-now count
+ * beside it when the two differ.
  */
 export function grammarDueOnDay(
   state: GrammarSrsState,

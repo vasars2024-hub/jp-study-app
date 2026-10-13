@@ -185,10 +185,33 @@ interface PendingBind {
   conflicts: KeymapConflict[];
 }
 
+/**
+ * set8: `addCustomCommand` and `updateCustomCommand` (keyboardShortcuts.ts)
+ * report a refusal as an English sentence, which this page showed verbatim:
+ * "Pick an action." in a Japanese UI. They are matched here by their text and
+ * shown from the catalog; any other text falls back to a translated generic
+ * message, never to the raw English.
+ */
+const CUSTOM_COMMAND_ERRORS: Record<string, string> = {
+  'Name is required.': 'set8.shortcuts.error.nameRequired',
+  'Pick an action.': 'set8.shortcuts.error.pickAction',
+  'Custom shortcut not found.': 'set8.shortcuts.error.notFound',
+};
+
+export function customCommandErrorText(error: string | undefined, t: TFn): string {
+  return t(CUSTOM_COMMAND_ERRORS[error ?? ''] ?? 'set8.shortcuts.error.generic');
+}
+
 function importErrorText(error: KeymapImportError, detail: string | undefined, t: TFn): string {
   if (error === 'notJson') return t('kbd5.io.error.notJson');
   if (error === 'notKeymap') return t('kbd5.io.error.notKeymap');
-  return t('kbd5.io.error.rejected', { detail: detail ?? '' });
+  // kbd7: `detail` is a custom shortcut's name, never an English error message.
+  if (error === 'invalidCustom') {
+    return t('kbd5.io.error.rejected', {
+      detail: detail ? t('kbd7.import.invalidCustomNamed', { name: detail }) : t('kbd7.import.invalidCustom'),
+    });
+  }
+  return t('kbd5.io.error.rejected', { detail: t('kbd7.import.saveFailed') });
 }
 
 export default function ShortcutSettings({ embedded = false }: { embedded?: boolean } = {}) {
@@ -375,6 +398,8 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
     const onKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      // kbd7: a held key auto-repeats; only the first press is a step (or a binding).
+      if (e.repeat) return;
       const id = captureRef.current;
       if (!id) return;
       if (e.key === 'Escape') {
@@ -460,6 +485,8 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
     const onKeyDown = (e: KeyboardEvent): void => {
       e.preventDefault();
       e.stopPropagation();
+      // kbd7: a held key auto-repeats; only the first press is a step.
+      if (e.repeat) return;
       if (e.key === 'Escape') {
         setKeyFilter(before);
         stop();
@@ -892,7 +919,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
           onSubmit={({ label, keys, action }) => {
             const res = addCustomCommand({ label, keys, action });
             if (!res.ok) {
-              setMsg(res.error);
+              setMsg(customCommandErrorText(res.error, t));
               return;
             }
             setMsg(t('settings.shortcuts.customAdded', { label: label.trim() }));
@@ -1116,7 +1143,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                         onSubmit={({ label, action }) => {
                           const res = updateCustomCommand(r.id, { label, action });
                           setEditId(null);
-                          setMsg(res.ok ? t('kbd5.custom.saved', { label: label.trim() || r.label }) : (res.error ?? ''));
+                          setMsg(res.ok ? t('kbd5.custom.saved', { label: label.trim() || r.label }) : customCommandErrorText(res.error, t));
                         }}
                       />
                     </div>

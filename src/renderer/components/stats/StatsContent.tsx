@@ -24,10 +24,12 @@ import {
   setRestDayEnabled,
   onStatsChanged,
   resetStats,
+  todayDayKey,
   type DayStat,
   type StatsSummary,
 } from '../../stats';
 import { buildStudyHeatmap, gameAnswersByDay } from '../../../shared/studyActivityHeatmap';
+import { shiftStudyDayKey } from '../../../shared/studyDay';
 import './statsActivity.css';
 import ImmersionSitesStats from './ImmersionSitesStats';
 import {
@@ -481,9 +483,9 @@ export function StatsReviews() {
       {forecast && (
         <div className="stats-forecast stats-forecast-30" role="list" aria-label={t('stats.reviews.forecast')}>
           {forecast.days.days.map((day) => {
-            const date = new Date();
-            date.setDate(date.getDate() + day.offsetDays);
-            const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            // Forecast offsets are study days: after midnight, offset 0 is still the evening before.
+            const iso = shiftStudyDayKey(todayDayKey(), day.offsetDays);
+            const date = new Date(`${iso}T00:00:00`);
             const label = t('stats.reviews.forecastDay', { date: chartDayLabel(iso, lang), count: day.due });
             return (
               <div key={day.offsetDays} className="stats-forecast-col" role="listitem" aria-label={label} title={label}>

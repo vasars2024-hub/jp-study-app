@@ -18,6 +18,8 @@ import type { StudyDayActivity } from '../shared/calendarDayDetail';
 import { getStudyLang, STUDY_LANG_EVENT, STUDY_LANG_KEY, type StudyLang } from './studyEnvironment';
 import { LANG_TAGS } from '../shared/i18n/core';
 import { getUiLang, t } from './i18n';
+import { shiftStudyDayKey, studyDayKey } from '../shared/studyDay';
+import { studyDayStartHour } from './flashcardScheduling';
 
 export const LEGACY_STATS_KEY = 'jp-study-stats-v1';
 const GAME_KEY = 'jp-game-progress-v1';
@@ -274,12 +276,15 @@ export interface StatsSummary {
   shows: ShowStat[]; // most-recently-watched first
 }
 
-/** Local calendar date as YYYY-MM-DD (not UTC, so "today" matches the user). */
+/**
+ * The STUDY day as YYYY-MM-DD: local, not UTC, so "today" matches the user,
+ * and rolling over at the configured hour (4 am by default, as in Anki), so
+ * reading or reviewing at 01:30 still counts for the evening it belongs to.
+ * The same day the scheduler, the optimiser and the new-card budget use
+ * (`shared/studyDay.ts`).
+ */
 function dayKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return studyDayKey(d.getTime(), studyDayStartHour());
 }
 
 export function todayDayKey(): string {
@@ -374,9 +379,7 @@ function awardGameBadges(progress: GameProgressData, input: RecordGameResultInpu
 
 function isYesterday(day: string | undefined, today: string): boolean {
   if (!day) return false;
-  const d = new Date(`${today}T00:00:00`);
-  d.setDate(d.getDate() - 1);
-  return dayKey(d) === day;
+  return shiftStudyDayKey(today, -1) === day;
 }
 
 export function recordGameResult(input: RecordGameResultInput): GameProgressData {
@@ -721,25 +724,25 @@ export function computeStreakDetail(
   let streak = 0;
   let steps = 0;
   let lastRest = -Infinity;
-  const cursor = new Date();
+  // Walked as study-day keys, not Dates: a day is a day across DST changes and
+  // the 4 am rollover alike.
+  let cursor = dayKey(new Date());
   // Allow the streak to "end" yesterday if nothing's been studied yet today.
-  if (!dayIsActive(days[dayKey(cursor)])) {
-    cursor.setDate(cursor.getDate() - 1);
+  if (!dayIsActive(days[cursor])) {
+    cursor = shiftStudyDayKey(cursor, -1);
     steps += 1;
   }
   for (;;) {
-    if (dayIsActive(days[dayKey(cursor)])) {
+    if (dayIsActive(days[cursor])) {
       streak += 1;
     } else if (restDays && steps - lastRest >= 7 && (streak > 0 || steps === 1)) {
-      const before = new Date(cursor);
-      before.setDate(before.getDate() - 1);
-      if (!dayIsActive(days[dayKey(before)])) break;
+      if (!dayIsActive(days[shiftStudyDayKey(cursor, -1)])) break;
       lastRest = steps;
-      restDates.push(dayKey(cursor));
+      restDates.push(cursor);
     } else {
       break;
     }
-    cursor.setDate(cursor.getDate() - 1);
+    cursor = shiftStudyDayKey(cursor, -1);
     steps += 1;
   }
   return { streak, restDates };
@@ -784,9 +787,7 @@ export function getSummary(): StatsSummary {
 
   const recent: DayStat[] = [];
   for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const k = dayKey(d);
+    const k = shiftStudyDayKey(todayK, -i);
     const e = data.days[k] ?? { seconds: 0, chars: 0 };
     recent.push({
       date: k,

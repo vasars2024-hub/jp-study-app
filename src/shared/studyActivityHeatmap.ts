@@ -7,9 +7,19 @@
  * place that folds them into "how much did I study that day" and "how much is due that
  * day", so the year view, the 14-day chart and the calendar cannot disagree.
  *
- * Pure: dates in, figures out. Day keys are LOCAL calendar days (`YYYY-MM-DD`), the key
- * the stats store already writes.
+ * Pure: dates in, figures out. Day keys are STUDY days (`YYYY-MM-DD`, `studyDay.ts`: the
+ * local calendar rolling over at the configured hour, 4 am by default), the key the stats
+ * store writes. A day's figures and "today" are both study days here, so at 01:30 tonight's
+ * reviews, games and minutes land on the evening they belong to, and today's cell is that
+ * evening rather than an empty calendar date the stats store never writes to.
  */
+import {
+  shiftStudyDayKey,
+  studyDayIndex,
+  studyDayIndexOfKey,
+  studyDayKey,
+  studyDayKeyer,
+} from './studyDay';
 
 /** The per-day stats fields this module reads. Every field is optional on disk. */
 export interface StudyDayRaw {
@@ -54,9 +64,18 @@ function count(value: unknown): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-/** Local `YYYY-MM-DD` for a date. */
+/**
+ * Local `YYYY-MM-DD` of a CALENDAR date: for laying out a grid of dates. Never for
+ * deciding which day a moment belongs to (that is `studyDayKey`) or which day is today
+ * (`studyTodayKey`).
+ */
 export function localDayKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** The study day `now` is on: the key under which the stats store files what happens now. */
+export function studyTodayKey(now: Date): string {
+  return studyDayKey(now.getTime());
 }
 
 /** `date` moved by whole calendar days (DST-safe: it moves the date, not 24 h blocks). */
@@ -77,14 +96,18 @@ export function studyDayFigures(date: string, raw: StudyDayRaw | undefined, game
   };
 }
 
-/** Game answers per local day, from review-log entries. */
+/**
+ * Game answers per study day, from review-log entries: the same day the stats store files
+ * the minutes and reviews they are shown beside (a game at 01:30 is the evening before).
+ */
 export function gameAnswersByDay(
   entries: readonly { at: number; mode: string }[],
 ): Record<string, number> {
   const out: Record<string, number> = {};
+  const dayOf = studyDayKeyer();
   for (const entry of entries) {
     if (entry.mode !== 'game' || !Number.isFinite(entry.at)) continue;
-    const key = localDayKey(new Date(entry.at));
+    const key = dayOf(entry.at);
     out[key] = (out[key] ?? 0) + 1;
   }
   return out;
@@ -107,8 +130,8 @@ export function heatmapLevel(score: number, peak: number): HeatmapLevel {
 }
 
 /**
- * The last `span` days ending on `end` (inclusive), oldest first, shaded against the
- * busiest of them. `weekStartsOn` is 0 for Sunday, 1 for Monday.
+ * The last `span` study days ending on the one `end` falls on (inclusive), oldest first,
+ * shaded against the busiest of them. `weekStartsOn` is 0 for Sunday, 1 for Monday.
  */
 export function buildStudyHeatmap(
   days: Readonly<Record<string, StudyDayRaw | undefined>>,
@@ -118,10 +141,10 @@ export function buildStudyHeatmap(
   weekStartsOn = 0,
 ): StudyHeatmap {
   const length = Math.max(1, Math.floor(span));
-  const first = addLocalDays(end, -(length - 1));
+  const firstKey = shiftStudyDayKey(studyTodayKey(end), -(length - 1));
   const figures: StudyDayFigures[] = [];
   for (let i = 0; i < length; i += 1) {
-    const key = localDayKey(addLocalDays(first, i));
+    const key = shiftStudyDayKey(firstKey, i);
     figures.push(studyDayFigures(key, days[key], games[key] ?? 0));
   }
   const peak = Math.max(0, ...figures.map(studyActivityScore));
@@ -138,27 +161,28 @@ export function buildStudyHeatmap(
   });
   return {
     cells,
-    leadingBlanks: (first.getDay() - weekStartsOn + 7) % 7,
+    leadingBlanks: (new Date(studyDayIndexOfKey(firstKey) * DAY_MS).getUTCDay() - weekStartsOn + 7) % 7,
     activeDays,
     totals,
   };
 }
 
 /**
- * Reviews due per local day from a local due forecast. Today carries the overdue cards
- * too: an overdue card is due now, and the calendar's today is "now".
+ * Reviews due per study day from a local due forecast (whose offsets are study days).
+ * Today carries the overdue cards too: an overdue card is due now, and today is "now".
  */
 export function dueByDate(
   forecast: { overdue: number; days: readonly { offsetDays: number; due: number }[] },
   now: Date,
 ): Record<string, number> {
   const out: Record<string, number> = {};
+  const today = studyTodayKey(now);
   for (const day of forecast.days) {
     const due = count(day.due) + (day.offsetDays === 0 ? count(forecast.overdue) : 0);
-    if (due > 0) out[localDayKey(addLocalDays(now, day.offsetDays))] = due;
+    if (due > 0) out[shiftStudyDayKey(today, day.offsetDays)] = due;
   }
   if (!forecast.days.some((day) => day.offsetDays === 0) && count(forecast.overdue) > 0) {
-    out[localDayKey(now)] = count(forecast.overdue);
+    out[today] = count(forecast.overdue);
   }
   return out;
 }
@@ -183,10 +207,11 @@ export function calendarStudyDay(
   return { minutes, reviews, due: dueCount };
 }
 
-/** Whole days from `now`'s date to `date`'s (negative in the past). */
+/**
+ * Whole days from the study day `now` is on to `date` (negative in the past). Between
+ * midnight and the day-start hour, today is still the evening before: its stats entry,
+ * its reviews and its due count all live under that date.
+ */
 export function daysFromToday(dateKey: string, now: Date): number {
-  const [y, m, d] = dateKey.split('-').map(Number);
-  const target = Date.UTC(y, (m || 1) - 1, d || 1);
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((target - today) / DAY_MS);
+  return studyDayIndexOfKey(dateKey) - studyDayIndex(now.getTime());
 }

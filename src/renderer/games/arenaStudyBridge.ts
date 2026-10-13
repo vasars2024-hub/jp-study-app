@@ -52,8 +52,15 @@ export function levelForGameStreak(streakDays: number, correct: boolean): 1 | 2 
   return levelForIntervalDays(streakDays, getActiveProfile().deckParams.thresholds);
 }
 
-async function inferWordLevel(word: string, correct: boolean): Promise<void> {
-  const rows = await loadReviewLog();
+/**
+ * `answered` is the row just appended for this answer. `appendReviewLog` does put it into
+ * what `loadReviewLog` returns (the cache, or the rows held for the first load), but the
+ * streak must never be read without the newest answer, so it is merged in by id here
+ * rather than depending on that.
+ */
+async function inferWordLevel(word: string, correct: boolean, answered?: ReviewLogEntry): Promise<void> {
+  const loaded = await loadReviewLog();
+  const rows = !answered || loaded.some((r) => r.id === answered.id) ? loaded : [...loaded, answered];
   const level = levelForGameStreak(correctStreakDays(rows, word), correct);
   const current = getLevel(word);
   // A miss lowers a word to Learning; a right answer only ever raises it.
@@ -150,8 +157,8 @@ export function bankArenaAnswer(
     reviewDeckCard(card.id, correct ? 'good' : 'again', at, { source: 'game' });
     return { kind: 'review', word: key, correct, cardId: card.id };
   }
-  appendReviewLog({ mode: 'game', word: key, correct, at, ...(card ? { cardId: card.id } : {}) });
-  if (word && !card) void inferWordLevel(word, correct).catch(() => undefined);
+  const row = appendReviewLog({ mode: 'game', word: key, correct, at, ...(card ? { cardId: card.id } : {}) });
+  if (word && !card) void inferWordLevel(word, correct, row).catch(() => undefined);
   return { kind: 'practice', word: key, correct, ...(card ? { cardId: card.id } : {}) };
 }
 

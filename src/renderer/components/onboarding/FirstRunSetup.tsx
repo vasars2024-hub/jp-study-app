@@ -37,7 +37,10 @@ import {
   type FirstRunTheme,
   type LevelBand,
 } from '../../firstRunSetup';
-import { seedKnownWords, seedWordsFor } from '../../firstRunSeed';
+import { forgetSeedUndo, seedKnownWords, seedWordsFor, undoSeededKnownWords } from '../../firstRunSeed';
+import { ANKI_UNREACHABLE_MSG, translateAnkiReason } from '../../../shared/anki';
+import type { DictionaryImportJobSnapshot } from '../../../shared/dictionaryImportJob';
+import { holdTourForThemeBoot } from '../../tourBootHold';
 import { trapTab } from '../ui/focusTrap';
 import { useFocusReturn } from '../shell/focusReturn';
 import { currentDeckSize } from '../../firstStepsTracker';
@@ -71,6 +74,11 @@ const STEP_ICON: Record<FirstRunStepId, IconName> = {
   theme: 'brush',
   finish: 'check',
 };
+
+/** The looks that answer with a full-screen boot sequence of their own. */
+function themeBoots(theme: FirstRunTheme | null): boolean {
+  return theme === 'aero' || theme === 'wired';
+}
 
 /**
  * Apply the look the user picked. Aero and WIRED play their own boot, through
@@ -118,16 +126,25 @@ export default function FirstRunSetup({ onClose }: FirstRunSetupProps) {
 
   const close = useCallback(
     (outcome: Outcome, tour = false) => {
+      let runTour = tour;
       if (outcome === 'later') {
         deferFirstRunSetup();
       } else {
+        // Blanc opens its own window; the Study OS tour has nothing to show
+        // there, so it stays in Help instead of starting behind Blanc.
+        if (outcome === 'done' && theme === 'blanc') runTour = false;
         // Skipping setup is a request to be left alone; the tour stays one
         // click away in Start and in Help.
-        if (outcome === 'skipped' || !tour) markTourComplete();
+        if (outcome === 'skipped' || !runTour) markTourComplete();
+        // Aero and WIRED play a boot overlay; the tour waits for it. Armed
+        // before setup closes, so the tour never sees an unheld moment.
+        if (outcome === 'done' && runTour && themeBoots(theme)) holdTourForThemeBoot();
+        // What was seeded is the user's answer now, no longer undone.
+        forgetSeedUndo();
         closeFirstRunSetup(outcome, currentDeckSize());
         if (outcome === 'done') applyFirstRunTheme(theme);
       }
-      onClose?.(outcome, tour);
+      onClose?.(outcome, runTour);
     },
     [onClose, theme],
   );
@@ -135,10 +152,14 @@ export default function FirstRunSetup({ onClose }: FirstRunSetupProps) {
   const next = useCallback(async () => {
     if (step === 'level') {
       patchFirstRun({ level });
-      if (seed && seedWordsFor(studyLang, level).length > 0) {
-        const changed = await seedKnownWords(studyLang, level).catch(() => 0);
-        patchFirstRun({ seededKnown: loadFirstRun().seededKnown + changed });
-      }
+      // Coming back to this step replaces the earlier seed rather than adding
+      // to it: a lower band, or an unticked seed, takes back what a higher one
+      // marked (only words the seed itself set; firstRunSeed.ts).
+      const changed =
+        seed && seedWordsFor(studyLang, level).length > 0
+          ? await seedKnownWords(studyLang, level).catch(() => 0)
+          : await undoSeededKnownWords(studyLang).then(() => 0, () => 0);
+      patchFirstRun({ seededKnown: changed });
     }
     if (step === 'theme') patchFirstRun({ theme });
     const following = FIRST_RUN_STEPS[index + 1];
@@ -242,9 +263,11 @@ export default function FirstRunSetup({ onClose }: FirstRunSetupProps) {
             )}
             {step === 'finish' ? (
               <>
-                <button type="button" className="btn" onClick={() => close('done', true)}>
-                  {t('onb2.finish.tour')}
-                </button>
+                {theme !== 'blanc' && (
+                  <button type="button" className="btn" onClick={() => close('done', true)}>
+                    {t('onb2.finish.tour')}
+                  </button>
+                )}
                 <button type="button" className="btn primary" onClick={() => close('done', false)}>
                   {t('onb2.finish.start')}
                 </button>
@@ -327,6 +350,19 @@ function LevelStep({
   const seedCount = useMemo(() => seedWordsFor(studyLang, level).length, [studyLang, level]);
   // Optional: a short placement check that only SUGGESTS a level (FirstRunAi.tsx).
   const [placementOpen, setPlacementOpen] = useState(false);
+  // Closing the quiz (its × or Escape) removes the control that had focus;
+  // hand focus back to the button that opened it rather than to <body>.
+  const openQuizRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef(false);
+  useEffect(() => {
+    if (placementOpen || !returnFocusRef.current) return;
+    returnFocusRef.current = false;
+    openQuizRef.current?.focus();
+  }, [placementOpen]);
+  const closeQuiz = useCallback(() => {
+    returnFocusRef.current = true;
+    setPlacementOpen(false);
+  }, []);
   return (
     <>
       <div className="frs-choice-list" role="radiogroup" aria-label={t('onb2.step.level.title')}>
@@ -345,10 +381,10 @@ function LevelStep({
         ))}
       </div>
       {placementOpen ? (
-        <PlacementQuiz studyLang={studyLang} onLevel={onLevel} onClose={() => setPlacementOpen(false)} />
+        <PlacementQuiz studyLang={studyLang} onLevel={onLevel} onClose={closeQuiz} />
       ) : (
         <div className="frs-row">
-          <button type="button" className="btn" onClick={() => setPlacementOpen(true)}>
+          <button ref={openQuizRef} type="button" className="btn" onClick={() => setPlacementOpen(true)}>
             {t('aiTutor.placement.open')}
           </button>
         </div>
@@ -387,6 +423,8 @@ interface RowModel {
   state: 'ready' | 'available' | 'busy' | 'paused' | 'failed' | 'unknown';
   sizeLabel: string;
   error: string | null;
+  /** Replaces the state's default status line. */
+  status?: string;
   onStart?: () => void;
   onPause?: () => void;
 }
@@ -395,6 +433,8 @@ function DownloadsStep({ studyLang }: { studyLang: StudyLang }) {
   const { t, lang } = useT();
   const { views, freeSpace, loading, start, pause } = useAssets();
   const [builtInDict, setBuiltInDict] = useState<boolean | null>(null);
+  /** The bundled dictionary's first-boot import, while it runs. */
+  const [builtInSetup, setBuiltInSetup] = useState<{ percent: number | null } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [, setTick] = useState(0);
   const [whisperDone, setWhisperDone] = useState(() => loadDownloaded());
@@ -403,27 +443,56 @@ function DownloadsStep({ studyLang }: { studyLang: StudyLang }) {
   useEffect(() => onDownloadedChanged(setWhisperDone), []);
 
   // Japanese ships its JMdict pack and provisions it on first boot; say so
-  // rather than offering a download the user does not need.
+  // rather than offering a download the user does not need. Provisioning runs
+  // on main's dictionary import stream and can still be going when this step
+  // opens, so the answer is re-read on that stream (onb3) — asking once on
+  // mount offered the JMdict download for a dictionary already being set up.
   useEffect(() => {
     if (studyLang !== 'ja') {
       setBuiltInDict(false);
+      setBuiltInSetup(null);
       return;
     }
     let alive = true;
-    const list = window.api?.dictListYomitan;
+    const api = window.api;
+    const list = api?.dictListYomitan;
     if (typeof list !== 'function') {
       setBuiltInDict(false);
       return;
     }
-    void list()
-      .then((dicts) => {
-        if (alive) setBuiltInDict(Array.isArray(dicts) && dicts.length > 0);
-      })
-      .catch(() => {
-        if (alive) setBuiltInDict(false);
-      });
+    const recheck = (): void => {
+      void list()
+        .then((dicts) => {
+          if (alive) setBuiltInDict(Array.isArray(dicts) && dicts.length > 0);
+        })
+        .catch(() => {
+          if (alive) setBuiltInDict(false);
+        });
+    };
+    let lastJob: string | null = null;
+    const onSnapshot = (snapshot: DictionaryImportJobSnapshot | null | undefined): void => {
+      if (!alive || !snapshot) return;
+      // A Yomitan store being imported into the database ('legacy') is the
+      // bundled pack on a first boot: show it as being set up.
+      if (snapshot.kind === 'legacy') {
+        setBuiltInSetup(
+          snapshot.status === 'running' ? { percent: snapshot.progress?.percent ?? null } : null,
+        );
+      }
+      // A new job, or any job settling, may have changed the list.
+      if (snapshot.jobId !== lastJob || snapshot.status !== 'running') recheck();
+      lastJob = snapshot.jobId;
+    };
+    recheck();
+    if (typeof api?.dictImportStatus === 'function') {
+      void api.dictImportStatus().then((snapshot) => {
+        if (snapshot?.status === 'running') onSnapshot(snapshot);
+      }, () => undefined);
+    }
+    const off = typeof api?.onDictImportChanged === 'function' ? api.onDictImportChanged(onSnapshot) : undefined;
     return () => {
       alive = false;
+      off?.();
     };
   }, [studyLang]);
 
@@ -482,6 +551,23 @@ function DownloadsStep({ studyLang }: { studyLang: StudyLang }) {
       sizeLabel: '',
       error: null,
     });
+  } else if (studyLang === 'ja' && builtInSetup) {
+    // Already on its way: nothing to download, and nothing to pause either.
+    rows.push({
+      id: 'dictionary-builtin',
+      label: t('onb2.dl.dictionary'),
+      name: t('onb2.dl.builtInName'),
+      desc: t('onb3.dl.builtInSettingUpDesc'),
+      optional: false,
+      percent: builtInSetup.percent ?? 0,
+      state: 'busy',
+      sizeLabel: '',
+      error: null,
+      status:
+        builtInSetup.percent === null
+          ? t('onb3.dl.builtInSettingUpIndeterminate')
+          : t('onb3.dl.builtInSettingUp', { percent: builtInSetup.percent }),
+    });
   } else {
     const dict = assetRow(dictionaryAssetFor(studyLang), t('onb2.dl.dictionary'), false);
     if (dict) rows.push(dict);
@@ -533,7 +619,8 @@ function DownloadsStep({ studyLang }: { studyLang: StudyLang }) {
 function DownloadRow({ row }: { row: RowModel }) {
   const { t } = useT();
   const statusText =
-    row.state === 'ready'
+    row.status ??
+    (row.state === 'ready'
       ? t('onb2.dl.ready')
       : row.state === 'busy'
         ? t('onb2.dl.progress', { percent: row.percent })
@@ -543,7 +630,7 @@ function DownloadRow({ row }: { row: RowModel }) {
             ? (row.error ?? t('storage.state.failed'))
             : row.optional
               ? t('onb2.dl.optional')
-              : t('onb2.dl.recommended');
+              : t('onb2.dl.recommended'));
   return (
     <li className={`frs-dl-row is-${row.state}`} data-download={row.id}>
       <div className="frs-dl-main">
@@ -598,17 +685,24 @@ type AnkiCheck =
   | { kind: 'missing'; error: string };
 
 function AnkiStep() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [check, setCheck] = useState<AnkiCheck>({ kind: 'idle' });
   const run = async (): Promise<void> => {
     setCheck({ kind: 'checking' });
     try {
       const status = await window.api.ankiStatus();
       setCheck(status.connected ? { kind: 'ok', decks: status.decks.length } : { kind: 'missing', error: status.error ?? '' });
-    } catch (err) {
-      setCheck({ kind: 'missing', error: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // The bridge itself failed: Electron's "Error invoking remote method…"
+      // plumbing says nothing actionable. From here, Anki is simply unreachable.
+      setCheck({ kind: 'missing', error: ANKI_UNREACHABLE_MSG });
     }
   };
+  // The reasons this app authors arrive in English from main and are mapped to
+  // the UI language; anything else is AnkiConnect's own text, kept verbatim for
+  // its detail but marked as English so it is read (and spoken) as such.
+  const reason = check.kind === 'missing' && check.error ? translateAnkiReason(check.error, t) : undefined;
+  const reasonIsRaw = check.kind === 'missing' && reason === check.error;
   return (
     <>
       <ul className="frs-points">
@@ -630,7 +724,14 @@ function AnkiStep() {
       {check.kind === 'missing' && (
         <p className="frs-note" role="status">
           {t('onb2.anki.missing')}
-          {check.error ? ` (${check.error})` : ''}
+          {reason && (
+            <>
+              {' '}
+              <span lang={reasonIsRaw && lang !== 'en' ? 'en' : undefined}>
+                {reason}
+              </span>
+            </>
+          )}
         </p>
       )}
     </>
@@ -690,6 +791,7 @@ function FinishStep({ studyLang, level, theme }: { studyLang: StudyLang; level: 
         <li>{t('onb2.checklist.media')}</li>
       </ul>
       <p className="frs-note">{t('onb2.finish.note')}</p>
+      {theme === 'blanc' && <p className="frs-note">{t('onb3.finish.blancTour')}</p>}
     </>
   );
 }

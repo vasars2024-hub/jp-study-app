@@ -43,6 +43,9 @@ describe('Anki problem-state evidence', () => {
       modelName: 'Japanese',
       leech: true,
       suspended: true,
+      // The flag is still unioned for the problem-state surfaces, but the live
+      // note keeps the WORD in rotation for knowledge (SCORECARD bug 41).
+      allSuspended: false,
     });
   });
 });

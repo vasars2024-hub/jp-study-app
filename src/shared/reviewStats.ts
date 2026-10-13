@@ -2,8 +2,10 @@
  * Review statistics beyond the daily totals: what Anki's and jpdb's stats
  * pages answer, computed from the review log and the deck the app already has.
  *
- * Pure, clock-injected, and bucketed by LOCAL calendar day so a chart and the
- * Calendar agree about which day a review belongs to.
+ * Pure, clock-injected, and bucketed by STUDY day (`studyDay.ts`: the local
+ * calendar, rolling over at the configured hour, 4 am by default, as in Anki)
+ * so a chart, the Calendar, the streak and the scheduler agree about which day
+ * a review belongs to. A review at 01:30 belongs to the evening before.
  *
  * Card maturity follows Anki: a review of a card whose previous interval was
  * under one day is a learning review (new cards included), 1-20 days is young,
@@ -14,52 +16,36 @@
  */
 import { fsrsRetrievability } from './fsrs';
 import { isRecallReview, type ReviewLogEntry } from './reviewLog';
+import { isQueueDue } from './reviewSessionQueue';
+import { lastStudyDayKeys, startOfStudyDayKey, studyDayKey, studyDayKeyer } from './studyDay';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const REVIEW_MATURE_INTERVAL_DAYS = 21;
 
+/** The study day of `ms` as YYYY-MM-DD (the configured day-start hour). */
 export function localDateKey(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return studyDayKey(ms);
 }
 
 /**
- * `localDateKey` for a whole pass over the log. The local day's bounds are kept
- * from the last call, so a run of rows on one day — and a time-ordered log is
+ * `localDateKey` for a whole pass over the log. The day's bounds are kept from
+ * the last call, so a run of rows on one day — and a time-ordered log is
  * nothing but such runs — costs one `Date` per day instead of one per row
  * (50,000 rows per chart, re-run on every review). Same answer for every input:
- * the bounds are that day's own local midnights, so DST days are exact.
+ * the bounds are that study day's own start and end, so DST days are exact.
  */
 export function localDateKeyer(): (ms: number) => string {
-  let from = Number.POSITIVE_INFINITY;
-  let to = Number.NEGATIVE_INFINITY;
-  let key = '';
-  return (ms: number): string => {
-    if (ms >= from && ms < to) return key;
-    const d = new Date(ms);
-    key = localDateKey(ms);
-    from = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    to = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
-    return key;
-  };
+  return studyDayKeyer();
 }
 
-/** Local midnight that starts `YYYY-MM-DD`: no row before it can fall on or after that day. */
+/** Start of the study day `YYYY-MM-DD`: no row before it can fall on or after that day. */
 export function startOfLocalDateKey(dateKey: string): number {
-  const [y, m, d] = dateKey.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1).getTime();
+  return startOfStudyDayKey(dateKey);
 }
 
-/** `count` local dates ending today, oldest first. */
+/** `count` study days ending today, oldest first. */
 export function lastLocalDays(count: number, now: number): string[] {
-  const out: string[] = [];
-  for (let i = Math.max(1, Math.floor(count)) - 1; i >= 0; i -= 1) {
-    const d = new Date(now);
-    d.setHours(12, 0, 0, 0);
-    d.setDate(d.getDate() - i);
-    out.push(localDateKey(d.getTime()));
-  }
-  return out;
+  return lastStudyDayKeys(count, now);
 }
 
 export type ReviewMaturity = 'learning' | 'young' | 'mature';
@@ -79,8 +65,13 @@ export interface DailyReviewStat {
   learning: number;
   young: number;
   mature: number;
-  /** Not Again, among all reviews that day. */
+  /**
+   * Not Again, among that day's recall tests (`graded`). A review graded from
+   * a game is counted in the maturity columns but never in a pass rate.
+   */
   passed: number;
+  /** Reviews that day that were recall tests: the denominator of `passed`. */
+  graded: number;
   /** Seconds spent answering, from timed reviews only. */
   seconds: number;
   /** Reviews that day that carried a time. */
@@ -94,7 +85,7 @@ export function dailyReviewStats(
   now: number,
 ): DailyReviewStat[] {
   const rows = lastLocalDays(days, now).map((date) => ({
-    date, learning: 0, young: 0, mature: 0, passed: 0, seconds: 0, timed: 0,
+    date, learning: 0, young: 0, mature: 0, passed: 0, graded: 0, seconds: 0, timed: 0,
   }));
   const index = new Map(rows.map((row) => [row.date, row]));
   // Rows before the window are skipped on a number compare, not a date format.
@@ -105,7 +96,10 @@ export function dailyReviewStats(
     const row = index.get(dayOf(entry.at));
     if (!row) continue;
     row[reviewMaturity(entry)] += 1;
-    if (entry.correct) row.passed += 1;
+    if (isRecallReview(entry)) {
+      row.graded += 1;
+      if (entry.correct) row.passed += 1;
+    }
     if (typeof entry.durationMs === 'number') {
       row.seconds += entry.durationMs / 1000;
       row.timed += 1;
@@ -210,11 +204,15 @@ export interface HourlyStat {
   passed: number;
 }
 
-/** Reviews by local hour of day — when the user studies, and how well. */
+/**
+ * Reviews by local hour of day — when the user studies, and how well. Recall
+ * tests only: `passed / reviews` is a pass rate, and a game-graded review is
+ * not one.
+ */
 export function hourlyBreakdown(entries: readonly ReviewLogEntry[], since = 0): HourlyStat[] {
   const rows = Array.from({ length: 24 }, (_, hour) => ({ hour, reviews: 0, passed: 0 }));
   for (const entry of entries) {
-    if (!isReview(entry) || entry.at < since) continue;
+    if (!isRecallReview(entry) || entry.at < since) continue;
     const row = rows[new Date(entry.at).getHours()];
     row.reviews += 1;
     if (entry.correct) row.passed += 1;
@@ -302,16 +300,38 @@ export interface DeckStat {
   retention: RetentionCell;
 }
 
+export interface DeckStatOptions {
+  /**
+   * Each deck's Due as the review queue would present it (the renderer passes
+   * `reviewSessionCounts`: new-card limit, Anki-owned cards, suspended cards
+   * and learn-ahead all applied). When absent, Due is computed here with the
+   * queue's due rule and `newAllowance` new cards per deck.
+   */
+  dueByDeck?: ReadonlyMap<string, number>;
+  /** New cards a deck may count as due when `dueByDeck` is absent (default: all). */
+  newAllowance?: number;
+  /** The learn-ahead limit for cards in their steps (default 20 minutes). */
+  learnAheadMinutes?: number;
+}
+
 /**
  * Per-deck counts and the last window's reviews and true retention, joining
  * the log to the deck by card id. Sorted by reviews, then size.
+ *
+ * Due follows the queue (bug 39: it counted every new card, 3,001 shown
+ * against 21 in the queue).
  */
 export function deckStats(
   cards: readonly DeckStatCard[],
   entries: readonly ReviewLogEntry[],
   since: number,
   now: number,
+  options: DeckStatOptions = {},
 ): DeckStat[] {
+  const allowance = options.newAllowance === undefined || !Number.isFinite(options.newAllowance)
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, Math.floor(options.newAllowance));
+  const newTaken = new Map<string, number>();
   const byDeck = new Map<string, DeckStat>();
   const deckOf = new Map<string, string>();
   for (const card of cards) {
@@ -332,13 +352,20 @@ export function deckStats(
     const srs = card.srs;
     if (!srs) {
       row.newCards += 1;
-      row.dueNow += 1;
+      const taken = newTaken.get(card.deckKey) ?? 0;
+      if (taken < allowance) {
+        newTaken.set(card.deckKey, taken + 1);
+        row.dueNow += 1;
+      }
       continue;
     }
     if (srs.phase || srs.intervalDays < 1) row.learning += 1;
     else if (srs.intervalDays >= REVIEW_MATURE_INTERVAL_DAYS) row.mature += 1;
     else row.young += 1;
-    if (srs.dueAt <= now) row.dueNow += 1;
+    if (isQueueDue(srs, now, options.learnAheadMinutes)) row.dueNow += 1;
+  }
+  if (options.dueByDeck) {
+    for (const row of byDeck.values()) row.dueNow = options.dueByDeck.get(row.deckKey) ?? 0;
   }
   for (const entry of entries) {
     if (!isReview(entry) || entry.at < since || !entry.cardId) continue;

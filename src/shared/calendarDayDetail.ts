@@ -9,7 +9,9 @@
  * its file and cue) and the Arena's recent results. This module is the one place that folds
  * them into a day, so the day panel, its export and its tests read the same figures.
  *
- * Pure: plain data in, plain data out. Day keys are LOCAL calendar days (`YYYY-MM-DD`).
+ * Pure: plain data in, plain data out. Day keys are STUDY days (`YYYY-MM-DD`, `studyDay.ts`),
+ * the key the stats store writes: a review, a game or a mined card at 01:30 is the evening
+ * before, so the day panel lists it on the same day the grid counts it.
  */
 import type { ReviewLogEntry } from './reviewLog';
 import {
@@ -19,9 +21,11 @@ import {
   localDayKey,
   studyActivityScore,
   studyDayFigures,
+  studyTodayKey,
   type HeatmapLevel,
   type StudyDayRaw,
 } from './studyActivityHeatmap';
+import { shiftStudyDayKey, studyDayKey } from './studyDay';
 
 /** A day's stats entry as `renderer/stats.ts` hands it over (every field optional on disk). */
 export interface StudyDayActivity extends StudyDayRaw {
@@ -132,10 +136,10 @@ function minutes(seconds: unknown): number {
 }
 
 function onDay(at: number, dateKey: string): boolean {
-  return Number.isFinite(at) && localDayKey(new Date(at)) === dateKey;
+  return Number.isFinite(at) && studyDayKey(at) === dateKey;
 }
 
-/** The day kind relative to `now`'s local date. */
+/** The day kind relative to the study day `now` is on. */
 export function calendarDayKind(dateKey: string, now: Date): CalendarDayKind {
   const offset = daysFromToday(dateKey, now);
   return offset < 0 ? 'past' : offset === 0 ? 'today' : 'future';
@@ -267,13 +271,13 @@ export function streakRunDates(
   now: Date,
 ): string[] {
   const out: string[] = [];
-  let cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (!activeDates.has(localDayKey(cursor))) cursor = addLocalDays(cursor, -1);
+  // Study-day keys, as `computeStreakDetail` walks them: at 01:30 today is the evening before.
+  let key = studyTodayKey(now);
+  if (!activeDates.has(key)) key = shiftStudyDayKey(key, -1);
   for (let guard = 0; guard < 3660; guard += 1) {
-    const key = localDayKey(cursor);
     if (!activeDates.has(key) && !restDates.has(key)) break;
     out.push(key);
-    cursor = addLocalDays(cursor, -1);
+    key = shiftStudyDayKey(key, -1);
   }
   // A trailing rest date with no active day before it is not part of a run.
   while (out.length && restDates.has(out[out.length - 1])) out.pop();

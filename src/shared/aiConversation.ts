@@ -15,6 +15,12 @@
  *   still works.
  * - Fallback with AI off or unavailable: scripted drills — a few fixed partner
  *   lines per scene, so the view is never empty.
+ * - Memory across sessions (round 2): the words the learner met and did not yet
+ *   know in earlier conversations (and the ones they mined from them) are kept on
+ *   the device (`ConversationMemory`); a new conversation asks the partner to
+ *   bring a few of them back, and each reply is checked for which ones it did.
+ *   Like the known-word sample this is study data: main strips it for a cloud
+ *   engine unless study data may leave the device.
  *
  * Pure: the renderer, main and the tests share it.
  */
@@ -31,7 +37,7 @@ import { immerseTextInStudyLang } from './aiImmerseCommon';
 import type { UiLang } from './i18n/core';
 import { normalizeStudyLang, type StudyLang } from './studyLang';
 
-export const CONVERSATION_PROMPT_VERSION = 1;
+export const CONVERSATION_PROMPT_VERSION = 2;
 
 export const CONVERSATION_SCENARIOS = ['free', 'selfIntro', 'restaurant', 'shopping', 'directions', 'hobbies'] as const;
 export type ConversationScenario = (typeof CONVERSATION_SCENARIOS)[number];
@@ -52,6 +58,8 @@ export const CONVERSATION_CONTEXT_TURNS = 12;
 export const CONVERSATION_HISTORY_CAP = 40;
 export const CONVERSATION_MESSAGE_MAX = 300;
 export const CONVERSATION_KNOWN_SAMPLE_MAX = 80;
+/** Words from earlier sessions a conversation asks the partner to bring back. */
+export const CONVERSATION_RECALL_MAX = 8;
 /** An i+1 reply has at most this share of unknown content words. */
 export const CONVERSATION_I1_UNKNOWN_RATE = 0.15;
 
@@ -69,6 +77,8 @@ export interface ConversationRequest {
   level: string;
   /** Words the learner knows (a sample). Emptied by main when it may not be sent. */
   knownWords: string[];
+  /** Words from earlier sessions to bring back. Emptied by main when study data may not be sent. */
+  recallWords: string[];
   /** The conversation so far, oldest first, without `message`. */
   history: ConversationTurn[];
   /** The learner's new message; '' asks the partner to open the conversation. */
@@ -94,6 +104,8 @@ export interface ConversationReplyResult {
   correction: ConversationCorrection | null;
   /** Whether a known-word sample went with the request. */
   knownSampleSent: boolean;
+  /** Whether the earlier-session words went with the request. */
+  recallSent?: boolean;
 }
 
 function isScenario(value: unknown): value is ConversationScenario {
@@ -134,6 +146,7 @@ export function normalizeConversationRequest(input: unknown): ConversationReques
     formality: raw.formality === 'casual' ? 'casual' : 'polite',
     level: normalizeConversationLevel(raw.level, studyLang),
     knownWords: clipList(raw.knownWords, CONVERSATION_KNOWN_SAMPLE_MAX, 24),
+    recallWords: clipList(raw.recallWords, CONVERSATION_RECALL_MAX, 24),
     history,
     message,
     correct: raw.correct === true && Boolean(message),
@@ -146,7 +159,7 @@ export function conversationKeyParts(request: ConversationRequest): string[] {
   return [
     request.studyLang, request.answerLang, request.scenario, request.formality, request.level,
     request.knownWords.join('|'), request.history.map((turn) => `${turn.role}:${turn.text}`).join('\n'),
-    request.message, request.correct ? 'c' : '-',
+    request.message, request.correct ? 'c' : '-', request.recallWords.join('|'),
   ];
 }
 
@@ -170,6 +183,9 @@ export function buildConversationPrompt(request: ConversationRequest): string {
     `Scene: ${SCENE_TEXT[request.scenario]}. Use ${register}.`,
     'Stay at the learner\'s level: short, natural sentences (one or two), common words, and at most ONE word they probably do not know yet.',
     request.knownWords.length ? `Words the learner already knows (prefer these): ${request.knownWords.join(', ')}` : '',
+    request.recallWords.length
+      ? `Words the learner met in earlier conversations and is still learning: ${request.recallWords.join(', ')}. When it fits naturally, use one of them (never more than two in a reply).`
+      : '',
     'Usually end with a short question so the conversation continues. Stay in the scene and in character.',
     '',
     request.history.length ? 'The conversation so far:' : '',
@@ -227,6 +243,7 @@ export function finalizeConversationReply(
     translation: plainModelText(parsed.translation ?? '', CONVERSATION_MESSAGE_MAX).replace(/\s*\n\s*/g, ' '),
     correction,
     knownSampleSent: request.knownWords.length > 0,
+    recallSent: request.recallWords.length > 0,
   };
 }
 
@@ -257,6 +274,8 @@ export interface StoredConversation {
   formality: ConversationFormality;
   level: string;
   turns: StoredConversationTurn[];
+  /** Words from earlier sessions this conversation brings back (fixed when it starts). */
+  recall?: string[];
 }
 
 export function emptyConversation(lang: StudyLang): StoredConversation {
@@ -286,14 +305,119 @@ export function normalizeStoredConversation(raw: unknown, lang: StudyLang): Stor
     }
     turns.push(out);
   }
+  const recall = clipList(value.recall, CONVERSATION_RECALL_MAX, 24);
   return {
     version: 1,
     scenario: isScenario(value.scenario) ? value.scenario : base.scenario,
     formality: value.formality === 'casual' ? 'casual' : 'polite',
     level: normalizeConversationLevel(value.level, lang),
     turns: capConversationTurns(turns),
+    ...(recall.length ? { recall } : {}),
   };
 }
+
+/**
+ * The turn a Retry answers: the learner's last message when no partner line
+ * followed it (the request failed, was cancelled, or the window closed while it
+ * ran). Its history is everything before it.
+ */
+export function unansweredTurn(
+  turns: readonly StoredConversationTurn[],
+): { turn: StoredConversationTurn; history: StoredConversationTurn[] } | null {
+  const last = turns[turns.length - 1];
+  if (!last || last.role !== 'user') return null;
+  return { turn: last, history: turns.slice(0, -1) };
+}
+
+// ---- memory across sessions ------------------------------------------------------------
+
+export interface ConversationMemoryWord {
+  word: string;
+  /** Last met (ms). */
+  at: number;
+  /** Times met across conversations. */
+  seen: number;
+}
+
+export interface ConversationMemory {
+  version: 1;
+  words: ConversationMemoryWord[];
+  /** Partner turns up to this time have been read into the memory. */
+  through: number;
+}
+
+/** Words kept per profile and study language; the least recently met go first. */
+export const CONVERSATION_MEMORY_CAP = 150;
+
+export function emptyConversationMemory(): ConversationMemory {
+  return { version: 1, words: [], through: 0 };
+}
+
+function capMemory(words: ConversationMemoryWord[]): ConversationMemoryWord[] {
+  if (words.length <= CONVERSATION_MEMORY_CAP) return words;
+  return [...words].sort((a, b) => b.at - a.at).slice(0, CONVERSATION_MEMORY_CAP);
+}
+
+export function normalizeConversationMemory(raw: unknown): ConversationMemory {
+  if (!raw || typeof raw !== 'object') return emptyConversationMemory();
+  const value = raw as Record<string, unknown>;
+  const words: ConversationMemoryWord[] = [];
+  const seen = new Set<string>();
+  for (const item of Array.isArray(value.words) ? value.words : []) {
+    if (!item || typeof item !== 'object') continue;
+    const entry = item as Record<string, unknown>;
+    const word = clipText(entry.word, 24);
+    if (!word || seen.has(word)) continue;
+    seen.add(word);
+    const at = typeof entry.at === 'number' && Number.isFinite(entry.at) ? entry.at : 0;
+    const count = typeof entry.seen === 'number' && Number.isFinite(entry.seen) ? Math.max(1, Math.floor(entry.seen)) : 1;
+    words.push({ word, at, seen: count });
+  }
+  const through = typeof value.through === 'number' && Number.isFinite(value.through) ? value.through : 0;
+  return { version: 1, words: capMemory(words), through };
+}
+
+/** Adds words met at `at`: a word met again is counted and moves to the front. */
+export function rememberConversationWords(memory: ConversationMemory, words: readonly string[], at: number): ConversationMemory {
+  const clean = [...new Set(words.map((word) => clipText(word, 24)).filter(Boolean))];
+  if (!clean.length) return memory;
+  const byWord = new Map(memory.words.map((entry) => [entry.word, entry]));
+  for (const word of clean) {
+    const old = byWord.get(word);
+    byWord.set(word, old ? { word, at: Math.max(old.at, at), seen: old.seen + 1 } : { word, at, seen: 1 });
+  }
+  return { ...memory, words: capMemory([...byWord.values()]) };
+}
+
+/**
+ * The words a new conversation brings back: met before `before` (an earlier
+ * session), still not known (`levelOf` < 2, as everywhere in the app), the most
+ * recently met first, the ones met more often first among equals.
+ */
+export function recallConversationWords(
+  memory: ConversationMemory,
+  levelOf: (word: string) => number,
+  before: number,
+  max = CONVERSATION_RECALL_MAX,
+): string[] {
+  return memory.words
+    .filter((entry) => entry.at < before && levelOf(entry.word) < 2)
+    .sort((a, b) => b.at - a.at || b.seen - a.seen)
+    .slice(0, max)
+    .map((entry) => entry.word);
+}
+
+/** Which of the recalled words a reply used (by dictionary form, or as written). */
+export function recalledWordsUsed(
+  tokens: readonly ConversationWordToken[],
+  text: string,
+  recall: readonly string[],
+): string[] {
+  if (!recall.length) return [];
+  const lemmas = new Set(tokens.map((token) => token.lemma).filter(Boolean));
+  return recall.filter((word) => lemmas.has(word) || text.includes(word));
+}
+
 
 export function capConversationTurns<T>(turns: readonly T[], cap = CONVERSATION_HISTORY_CAP): T[] {
   return turns.slice(Math.max(0, turns.length - cap));

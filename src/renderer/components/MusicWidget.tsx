@@ -30,10 +30,13 @@ function fmt(sec: number): string {
 function LyricsStrip({
   lyrics,
   activeIndex,
+  sung = true,
   t,
 }: {
   lyrics: LyricsState;
   activeIndex: number;
+  /** False in an instrumental break: the line just sung stays up, unlit. */
+  sung?: boolean;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   if (lyrics.kind === 'synced' && activeIndex >= 0) {
@@ -42,7 +45,7 @@ function LyricsStrip({
     return (
       <div className="mwidget-lyrics">
         <div className="mwidget-lyrics-track" key={activeIndex}>
-          <div className="mwidget-lyrics-line current">{cur}</div>
+          <div className={`mwidget-lyrics-line${sung ? ' current' : ''}`}>{cur}</div>
           <div className="mwidget-lyrics-line">{next}</div>
         </div>
       </div>
@@ -350,7 +353,7 @@ export default function MusicWidget() {
           {progress}
           {controls}
           {widgetSettings.showLyrics && (
-            <LyricsStrip lyrics={liveLyrics.lyrics} activeIndex={liveLyrics.activeIndex} t={t} />
+            <LyricsStrip lyrics={liveLyrics.lyrics} activeIndex={liveLyrics.activeIndex} sung={liveLyrics.sungIndex === liveLyrics.activeIndex} t={t} />
           )}
         </div>
       ) : (
@@ -366,7 +369,7 @@ export default function MusicWidget() {
           <div className="mwidget-bar-progress">{progress}</div>
           {widgetSettings.showLyrics && (
             <div className="mwidget-bar-lyrics">
-              <LyricsStrip lyrics={liveLyrics.lyrics} activeIndex={liveLyrics.activeIndex} t={t} />
+              <LyricsStrip lyrics={liveLyrics.lyrics} activeIndex={liveLyrics.activeIndex} sung={liveLyrics.sungIndex === liveLyrics.activeIndex} t={t} />
             </div>
           )}
         </div>

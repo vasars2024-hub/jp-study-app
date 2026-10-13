@@ -124,32 +124,107 @@ export interface MokuroMatchResult {
   unmatched: number;
 }
 
+/** `0007` -> 7; anything that is not all digits -> null. */
+function numericStem(stem: string): number | null {
+  const key = stem.normalize('NFKC').trim();
+  if (!/^\d{1,9}$/.test(key)) return null;
+  return Number.parseInt(key, 10);
+}
+
+/** The same order the library used when it renamed the pages (`library.ts` naturalCompare). */
+function naturalCompare(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+/**
+ * The library's numbers, when its page stems are its own 1-based renaming
+ * (`0001`, `0002`, ... — `extractMangaPages` / `copyFolderImages`). Those names
+ * say where a page sits in reading order and nothing about the source file it
+ * came from, so they must not be string-compared with the names Mokuro kept.
+ */
+function ordinalLibraryNumbers(libraryStems: readonly string[]): number[] | null {
+  if (!libraryStems.length) return null;
+  const numbers: number[] = [];
+  for (const stem of libraryStems) {
+    const n = numericStem(stem);
+    if (n === null) return null;
+    numbers.push(n);
+  }
+  if (new Set(numbers).size !== numbers.length) return null;
+  return Math.min(...numbers) === 1 ? numbers : null;
+}
+
 /**
  * Pair each volume page with a library page.
  *
- * By file name first — Mokuro keeps the image names, and so does our import.
- * When NOT ONE name matches but the page counts are equal (the archive was
- * repacked and renamed, e.g. `001.jpg` vs `page_0001.png`), the order is the
- * pairing; anything else would be a guess, and a wrong guess paints one page's
- * text over another, so it is refused rather than attempted.
+ * The library renames every imported page to its 1-based position (`0001.jpg`
+ * is the first page in natural order, whatever the source file was called), so
+ * when the library stems are that numbering they are matched by POSITION:
+ *
+ * - a volume whose image names are all numbers is aligned on its lowest number
+ *   (`000.jpg` from a 0-based scan is library page 1, `001.jpg` from a 1-based
+ *   one is too), which keeps gaps where Mokuro skipped a page;
+ * - otherwise, when the counts agree, the volume's pages are put in the same
+ *   natural order the library used and paired one to one.
+ *
+ * Comparing `0001` with Mokuro's `0001.jpg` as strings, which is what this used
+ * to do, put every page of a 0-based volume one page late.
+ *
+ * Library pages that kept a real name are matched by file name — Mokuro keeps
+ * the image names too. When NOT ONE name matches but the page counts are equal
+ * (the archive was repacked and renamed), the order is the pairing; anything
+ * else would be a guess, and a wrong guess paints one page's text over another,
+ * so it is refused rather than attempted.
  *
  * Every assigned page gets region ids built from ITS stem, so an imported box
  * and a later rescan of the same box share a correction key.
  */
 export function matchMokuroPages(volume: MokuroVolume, libraryStems: readonly string[]): MokuroMatchResult {
-  const byKey = new Map<string, MokuroVolumePage>();
-  for (const page of volume.pages) if (!byKey.has(page.stemKey)) byKey.set(page.stemKey, page);
-  const named: Array<{ stem: string; source: MokuroVolumePage }> = [];
-  for (const stem of libraryStems) {
-    const source = byKey.get(stem.normalize('NFC').toLowerCase());
-    if (source) named.push({ stem, source });
+  let pairs: Array<{ stem: string; source: MokuroVolumePage }> = [];
+  let matchedBy: MokuroMatchResult['matchedBy'] = 'none';
+
+  const ordinals = ordinalLibraryNumbers(libraryStems);
+  const volumeNumbers: number[] = [];
+  for (const page of volume.pages) {
+    const n = numericStem(page.stemKey);
+    if (n === null) break;
+    volumeNumbers.push(n);
   }
-  let pairs = named;
-  let matchedBy: MokuroMatchResult['matchedBy'] = named.length ? 'name' : 'none';
-  if (!named.length && volume.pages.length > 0 && volume.pages.length === libraryStems.length) {
-    pairs = libraryStems.map((stem, index) => ({ stem, source: volume.pages[index] }));
-    matchedBy = 'order';
+  if (ordinals && volume.pages.length > 0) {
+    if (volumeNumbers.length === volume.pages.length) {
+      const base = Math.min(...volumeNumbers);
+      const byNumber = new Map<number, MokuroVolumePage>();
+      volume.pages.forEach((page, index) => {
+        const position = volumeNumbers[index] - base + 1;
+        if (!byNumber.has(position)) byNumber.set(position, page);
+      });
+      libraryStems.forEach((stem, index) => {
+        const source = byNumber.get(ordinals[index]);
+        if (source) pairs.push({ stem, source });
+      });
+      if (pairs.length) matchedBy = 'name';
+    } else if (volume.pages.length === libraryStems.length) {
+      const sorted = [...volume.pages].sort((a, b) => naturalCompare(a.imgPath, b.imgPath));
+      const byPosition = libraryStems
+        .map((stem, index) => ({ stem, n: ordinals[index] }))
+        .sort((a, b) => a.n - b.n);
+      pairs = byPosition.map(({ stem }, index) => ({ stem, source: sorted[index] }));
+      matchedBy = 'order';
+    }
+  } else {
+    const byKey = new Map<string, MokuroVolumePage>();
+    for (const page of volume.pages) if (!byKey.has(page.stemKey)) byKey.set(page.stemKey, page);
+    for (const stem of libraryStems) {
+      const source = byKey.get(stem.normalize('NFC').toLowerCase());
+      if (source) pairs.push({ stem, source });
+    }
+    if (pairs.length) matchedBy = 'name';
+    if (!pairs.length && volume.pages.length > 0 && volume.pages.length === libraryStems.length) {
+      pairs = libraryStems.map((stem, index) => ({ stem, source: volume.pages[index] }));
+      matchedBy = 'order';
+    }
   }
+
   const used = new Set(pairs.map((pair) => pair.source));
   return {
     assignments: pairs.map(({ stem, source }) => ({

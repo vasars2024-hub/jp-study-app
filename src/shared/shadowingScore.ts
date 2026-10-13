@@ -30,6 +30,14 @@ export interface ShadowToken {
   reading?: string;
   /** Chinese: one pinyin syllable per character (tone marks or digits), '' where unknown. */
   syllables?: readonly string[];
+  /** Japanese: the tokenizer's part of speech and dictionary form (for the pitch-accent lookup). */
+  pos?: string;
+  lemma?: string;
+}
+
+/** Sound units (morae for Japanese, syllables for Chinese) of one token: what the prosody check lays out. */
+export function shadowTokenUnits(token: ShadowToken, lang: ShadowLang): number {
+  return tokenUnits(token, 0, lang).length;
 }
 
 export type ShadowTokenStatus = 'match' | 'partial' | 'miss' | 'plain';

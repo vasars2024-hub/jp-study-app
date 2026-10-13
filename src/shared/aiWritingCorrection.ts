@@ -458,3 +458,34 @@ export function lintStudyWriting(text: string, lang: StudyLang): WritingLint[] {
   }
   return out;
 }
+
+// ---- a correction as a card ------------------------------------------------------------
+
+/** Sentence ends inside a note: CJK and Latin terminators, and line breaks. */
+const SENTENCE_END = /[。！？!?\n]|\.(?=\s|$)/gu;
+
+/**
+ * The sentence an edit sits in, before and after the edit — what a correction
+ * card shows (the corrected sentence on the front, the learner's own and the
+ * reason on the back). The checked text's own offsets; trimmed, capped.
+ */
+export function editSentence(text: string, edit: Pick<WritingEdit, 'start' | 'original' | 'corrected'>): { before: string; after: string } {
+  const end = edit.start + edit.original.length;
+  let from = 0;
+  let to = text.length;
+  for (const match of text.matchAll(SENTENCE_END)) {
+    const index = match.index ?? 0;
+    if (index < edit.start) from = index + match[0].length;
+    else if (index >= end) {
+      to = index + (match[0] === '\n' ? 0 : match[0].length);
+      break;
+    }
+  }
+  const before = text.slice(from, to);
+  const after = text.slice(from, edit.start) + edit.corrected + text.slice(end, to);
+  const clip = (value: string): string => {
+    const chars = [...value.trim()];
+    return chars.length > 200 ? chars.slice(0, 200).join('') : chars.join('');
+  };
+  return { before: clip(before), after: clip(after) };
+}

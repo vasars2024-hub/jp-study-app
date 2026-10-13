@@ -5,8 +5,9 @@
 import { IDB_KEYS, LS_KEYS, mirrorToIdb } from './storage/storage';
 
 export type EventCategory = 'study' | 'exam' | 'assignment' | 'reminder' | 'personal';
-export type RecurrenceFreq = 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
-export type ReminderOffset = 'none' | 'at' | '5m' | '15m' | '30m' | '1h' | '1d';
+export type RecurrenceFreq = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+/** `custom` is an exact lead time (`reminderMinutes`) — what an imported VALARM keeps. */
+export type ReminderOffset = 'none' | 'at' | '5m' | '15m' | '30m' | '1h' | '1d' | 'custom';
 
 export interface CalendarEvent {
   id: string;
@@ -14,6 +15,12 @@ export interface CalendarEvent {
   description?: string;
   /** ISO date, 'YYYY-MM-DD'. */
   date: string;
+  /**
+   * The last day of an event that runs over several days (inclusive, after `date`). A
+   * timed one starts on `date` at `startTime` and ends on this day at `endTime`. Absent
+   * for an event that is over the same day — which is every event made before this field.
+   */
+  endDate?: string;
   /** 'HH:MM' 24h, undefined when allDay. */
   startTime?: string;
   endTime?: string;
@@ -21,9 +28,35 @@ export interface CalendarEvent {
   color: string;
   category: EventCategory;
   reminder: ReminderOffset;
+  /** Minutes before the start, only when `reminder === 'custom'`. */
+  reminderMinutes?: number;
   recurrence: RecurrenceFreq;
-  /** Days between occurrences, only used when recurrence === 'custom'. */
+  /**
+   * `custom`: days between occurrences. `weekly` / `monthly` / `yearly`: every N weeks,
+   * months or years (absent or 1 = every one). Unused for `daily`.
+   */
   recurrenceInterval?: number;
+  /**
+   * `weekly`: the weekdays it falls on (0 = Sunday … 6 = Saturday) — "every Tue and Thu"
+   * is ONE series. Absent = the weekday of `date`.
+   */
+  recurrenceWeekdays?: number[];
+  /**
+   * `weekly` every N > 1 weeks on several days: the day the counted weeks start on
+   * (iCalendar's WKST). Absent = Monday, iCalendar's default.
+   */
+  recurrenceWeekStart?: number;
+  /**
+   * `monthly` / `yearly`: the Nth weekday of the month (1–5, or -1 for the last) instead of
+   * the same day number — "the 2nd Tuesday". The weekday is `date`'s.
+   */
+  recurrenceNth?: number;
+  /**
+   * `monthly` on the 29th–31st (or `yearly` on February 29): what a month without that day
+   * does. Absent = Gum's own rule, the month's last day. `skip` = iCalendar's (RFC 5545)
+   * rule, which is what another calendar's file means — that month has no occurrence.
+   */
+  recurrenceMonthEnd?: 'skip';
   /** Last date recurrence may land on (inclusive). Unbounded when absent. */
   recurrenceEndDate?: string;
   /**
@@ -76,6 +109,8 @@ export const REMINDER_LABEL_KEYS: Record<ReminderOffset, string> = {
   '30m': 'calendar.reminder.30m',
   '1h': 'calendar.reminder.1h',
   '1d': 'calendar.reminder.1d',
+  // Never offered in the picker; an event that has one is labelled by `reminderMinutes`.
+  custom: 'planner.reminder.custom',
 };
 
 /**
@@ -93,7 +128,31 @@ export const REMINDER_MINUTES: Record<ReminderOffset, number> = {
   '30m': 30,
   '1h': 60,
   '1d': 1440,
+  // Read through `reminderLeadMinutes`, which takes the event's own `reminderMinutes`.
+  custom: 0,
 };
+
+/** The longest exact reminder kept: four weeks before. */
+export const REMINDER_CUSTOM_MAX_MINUTES = 28 * 1440;
+
+/** Minutes between a reminder and its event's start, or `null` when it has none. */
+export function reminderLeadMinutes(ev: Pick<CalendarEvent, 'reminder' | 'reminderMinutes'>): number | null {
+  const r = ev.reminder;
+  if (!r || r === 'none') return null;
+  if (r === 'custom') {
+    const m = ev.reminderMinutes;
+    if (typeof m !== 'number' || !Number.isFinite(m)) return null;
+    return Math.min(REMINDER_CUSTOM_MAX_MINUTES, Math.max(0, Math.round(m)));
+  }
+  return r in REMINDER_MINUTES ? REMINDER_MINUTES[r] : null;
+}
+
+/** A lead time as the reminder fields: a picker choice when one matches exactly, else `custom`. */
+export function reminderForMinutes(minutes: number): Pick<CalendarEvent, 'reminder' | 'reminderMinutes'> {
+  const exact = Math.min(REMINDER_CUSTOM_MAX_MINUTES, Math.max(0, Math.round(minutes)));
+  const preset = REMINDER_OFFSETS.find((r) => r !== 'none' && REMINDER_MINUTES[r] === exact);
+  return preset ? { reminder: preset } : { reminder: 'custom', reminderMinutes: exact };
+}
 
 function newId(): string {
   return `ev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -170,8 +229,22 @@ export type RepeatEditScope = 'this' | 'following' | 'all';
 
 /** The occurrence-specific fields a one-off copy of a series must not carry. */
 function asOneOff(payload: Omit<CalendarEvent, 'id' | 'createdAt'>): Omit<CalendarEvent, 'id' | 'createdAt'> {
-  const { recurrenceInterval: _i, recurrenceEndDate: _e, excludedDates: _x, icsUid: _u, ...rest } = payload;
+  const { excludedDates: _x, icsUid: _u, ...rest } = withoutRepeatRule(payload);
   return { ...rest, recurrence: 'none' };
+}
+
+/** An event without any of the fields that only a repeating event has. */
+function withoutRepeatRule<T extends Partial<CalendarEvent>>(event: T): T {
+  const {
+    recurrenceInterval: _i,
+    recurrenceEndDate: _e,
+    recurrenceWeekdays: _w,
+    recurrenceWeekStart: _s,
+    recurrenceNth: _n,
+    recurrenceMonthEnd: _m,
+    ...rest
+  } = event;
+  return rest as T;
 }
 
 /**
@@ -308,17 +381,27 @@ export function daysBetweenKeys(from: string, to: string): number {
  * dragged landing exactly where it was dropped. Null when nothing would change.
  */
 export function rescheduleEventPatch(
-  event: Pick<CalendarEvent, 'date' | 'recurrence' | 'recurrenceEndDate'>,
+  event: Pick<CalendarEvent, 'date' | 'recurrence' | 'recurrenceEndDate'> & Partial<Pick<CalendarEvent, 'endDate' | 'recurrenceWeekdays' | 'recurrenceNth'>>,
   fromDate: string,
   toDate: string,
-): Pick<CalendarEvent, 'date'> & Partial<Pick<CalendarEvent, 'recurrenceEndDate'>> | null {
+): Pick<CalendarEvent, 'date'> & Partial<Pick<CalendarEvent, 'recurrenceEndDate' | 'endDate' | 'recurrenceWeekdays' | 'recurrenceNth'>> | null {
   if (!isCalendarDateKey(fromDate) || !isCalendarDateKey(toDate)) return null;
   const delta = daysBetweenKeys(fromDate, toDate);
   if (delta === 0) return null;
-  if (event.recurrence === 'none') return { date: toDate };
+  // A multi-day event keeps its length.
+  const span = eventSpanDays(event);
+  if (event.recurrence === 'none') return { date: toDate, ...(span ? { endDate: shiftDateKey(toDate, span) } : {}) };
+  const date = shiftDateKey(event.date, delta);
   return {
-    date: shiftDateKey(event.date, delta),
+    date,
+    ...(span ? { endDate: shiftDateKey(date, span) } : {}),
     ...(event.recurrenceEndDate ? { recurrenceEndDate: shiftDateKey(event.recurrenceEndDate, delta) } : {}),
+    // "Every Tue and Thu" moved a day later is every Wed and Fri.
+    ...(event.recurrenceWeekdays?.length
+      ? { recurrenceWeekdays: [...new Set(event.recurrenceWeekdays.map((d) => (((d + delta) % 7) + 7) % 7))].sort() }
+      : {}),
+    // "The last Friday" stays the last one; otherwise the week of the month follows the date.
+    ...(event.recurrenceNth ? { recurrenceNth: event.recurrenceNth === -1 && nthOfDateKey(date).last ? -1 : nthOfDateKey(date).nth } : {}),
   };
 }
 
@@ -337,14 +420,15 @@ export function detachOccurrence(
   const {
     id: _id,
     createdAt: _createdAt,
-    recurrenceInterval: _interval,
-    recurrenceEndDate: _end,
     excludedDates: _excluded,
+    // The series' UID names the series; a second event exported under it would collide.
+    icsUid: _uid,
     ...rest
-  } = event;
+  } = withoutRepeatRule(event);
+  const span = eventSpanDays(event);
   return {
     seriesPatch: { excludedDates },
-    single: { ...rest, date: toDate, recurrence: 'none' },
+    single: { ...rest, date: toDate, ...(span ? { endDate: shiftDateKey(toDate, span) } : {}), recurrence: 'none' },
   };
 }
 
@@ -358,12 +442,169 @@ export function excludeOccurrence(event: CalendarEvent, occurrenceDate: string):
 
 /** One concrete occurrence of an event on a specific calendar date. */
 export interface EventOccurrence extends CalendarEvent {
+  /** The day this occurrence starts on — what identifies it in its series. */
   occurrenceDate: string;
+  /**
+   * Set only by `expandDayOccurrences`, for an event over several days: the day this entry
+   * draws on (from `occurrenceDate` to its last day), its index from 0, and the day count.
+   */
+  spanDay?: string;
+  spanIndex?: number;
+  spanDays?: number;
 }
 
 /** Custom repeats use whole calendar days, including when loading older events. */
 export function normalizeRecurrenceInterval(value = 1): number {
   return Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1;
+}
+
+/** Whole days after `date` an event runs on (0 for an event that is over the same day). */
+export function eventSpanDays(ev: Partial<Pick<CalendarEvent, 'date' | 'endDate'>>): number {
+  if (!ev.date || !ev.endDate || !isCalendarDateKey(ev.endDate) || ev.endDate <= ev.date) return 0;
+  return daysBetweenKeys(ev.date, ev.endDate);
+}
+
+/** Which week of its month a date is in, for "the 2nd Tuesday", and whether it is the last such weekday. */
+export function nthOfDateKey(key: string): { nth: number; last: boolean } {
+  const d = parseDateKey(key);
+  const length = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  return { nth: Math.ceil(d.getDate() / 7), last: d.getDate() + 7 > length };
+}
+
+/** The `nth` (1–5, or -1 = last) `weekday` of a month, or null when that month has none. */
+function nthWeekdayInMonth(year: number, month: number, weekday: number, nth: number): Date | null {
+  const length = new Date(year, month + 1, 0).getDate();
+  if (nth === -1) {
+    const lastDay = new Date(year, month, length);
+    return new Date(year, month, length - ((lastDay.getDay() - weekday + 7) % 7));
+  }
+  const day = 1 + ((weekday - new Date(year, month, 1).getDay() + 7) % 7) + (nth - 1) * 7;
+  return day <= length ? new Date(year, month, day) : null;
+}
+
+/** Day `day` of a month; a month too short for it takes its last day, or none when `skip`. */
+function dayInMonth(year: number, month: number, day: number, skip: boolean): Date | null {
+  const length = new Date(year, month + 1, 0).getDate();
+  if (day <= length) return new Date(year, month, day);
+  return skip ? null : new Date(year, month, length);
+}
+
+/** The weekdays a weekly series falls on: its own list, else the weekday of its first date. */
+export function weeklyWeekdays(ev: Pick<CalendarEvent, 'date' | 'recurrenceWeekdays'>): number[] {
+  const own = (ev.recurrenceWeekdays ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  return [...new Set(own.length ? own : [parseDateKey(ev.date).getDay()])].sort();
+}
+
+const validNth = (n: unknown): n is number => n === -1 || (Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 5);
+
+/**
+ * Every date of `ev` in [fromKey, toKey] (inclusive), before skipped dates are taken out.
+ * Each rule jumps straight to the range, so a series that began years ago costs no more
+ * than one that begins today.
+ */
+function seriesDateKeys(ev: CalendarEvent, fromKey: string, toKey: string): string[] {
+  const out: string[] = [];
+  const first = ev.date;
+  if (!isCalendarDateKey(first)) return out;
+  const recurrence = ev.recurrence;
+  if (!recurrence || recurrence === 'none' || !['daily', 'weekly', 'monthly', 'yearly', 'custom'].includes(recurrence)) {
+    if (first >= fromKey && first <= toKey) out.push(first);
+    return out;
+  }
+  const stop = ev.recurrenceEndDate && ev.recurrenceEndDate < toKey ? ev.recurrenceEndDate : toKey;
+  const lo = fromKey > first ? fromKey : first;
+  if (lo > stop) return out;
+  const base = parseDateKey(first);
+  const take = (d: Date | null): void => {
+    if (!d) return;
+    const key = toDateKey(d);
+    if (key >= lo && key <= stop) out.push(key);
+  };
+
+  if (recurrence === 'daily' || recurrence === 'custom') {
+    const step = recurrence === 'daily' ? 1 : normalizeRecurrenceInterval(ev.recurrenceInterval);
+    // Calendar days, not 24-hour blocks: DST cannot shift the series.
+    const cursor = new Date(base);
+    cursor.setDate(cursor.getDate() + Math.max(0, Math.ceil(daysBetweenKeys(first, lo) / step)) * step);
+    for (let guard = 0; guard < 100_000 && toDateKey(cursor) <= stop; guard++) {
+      take(cursor);
+      cursor.setDate(cursor.getDate() + step);
+    }
+    return out;
+  }
+
+  const every = normalizeRecurrenceInterval(ev.recurrenceInterval);
+  if (recurrence === 'weekly') {
+    const days = new Set(weeklyWeekdays(ev));
+    const weekStart = Number.isInteger(ev.recurrenceWeekStart) && (ev.recurrenceWeekStart as number) >= 0 && (ev.recurrenceWeekStart as number) <= 6
+      ? ev.recurrenceWeekStart as number
+      : 1;
+    // Weeks are counted from the week the series starts in, as iCalendar counts them.
+    const period = new Date(base);
+    period.setDate(period.getDate() - ((period.getDay() - weekStart + 7) % 7));
+    const periodKey = toDateKey(period);
+    const weeksToRange = Math.max(0, Math.floor(daysBetweenKeys(periodKey, lo) / 7));
+    let week = Math.floor(weeksToRange / every) * every;
+    for (let guard = 0; guard < 20_000; guard++, week += every) {
+      const monday = new Date(period);
+      monday.setDate(monday.getDate() + week * 7);
+      if (toDateKey(monday) > stop) break;
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(monday);
+        day.setDate(day.getDate() + i);
+        if (days.has(day.getDay())) take(day);
+      }
+    }
+    return out;
+  }
+
+  const nth = validNth(ev.recurrenceNth) ? ev.recurrenceNth : null;
+  const skip = ev.recurrenceMonthEnd === 'skip';
+  const loDate = parseDateKey(lo);
+  if (recurrence === 'monthly') {
+    const monthsToRange = (loDate.getFullYear() - base.getFullYear()) * 12 + (loDate.getMonth() - base.getMonth());
+    let k = Math.max(0, Math.floor(monthsToRange / every) * every);
+    for (let guard = 0; guard < 20_000; guard++, k += every) {
+      const month = new Date(base.getFullYear(), base.getMonth() + k, 1);
+      if (toDateKey(month) > stop) break;
+      take(nth !== null
+        ? nthWeekdayInMonth(month.getFullYear(), month.getMonth(), base.getDay(), nth)
+        : dayInMonth(month.getFullYear(), month.getMonth(), base.getDate(), skip));
+    }
+    return out;
+  }
+
+  // Yearly: the same month every N years.
+  let k = Math.max(0, Math.floor((loDate.getFullYear() - base.getFullYear()) / every) * every);
+  for (let guard = 0; guard < 5_000; guard++, k += every) {
+    const year = base.getFullYear() + k;
+    if (toDateKey(new Date(year, base.getMonth(), 1)) > stop) break;
+    take(nth !== null
+      ? nthWeekdayInMonth(year, base.getMonth(), base.getDay(), nth)
+      : dayInMonth(year, base.getMonth(), base.getDate(), skip));
+  }
+  return out;
+}
+
+/**
+ * The date of the `count`-th occurrence of a series (1 = its first date), skipped dates
+ * included — iCalendar's COUNT counts the rule, not what EXDATE leaves of it. Null when the
+ * series ends first.
+ */
+export function nthOccurrenceDate(ev: CalendarEvent, count: number): string | null {
+  if (!Number.isInteger(count) || count < 1) return null;
+  let seen = 0;
+  let from = ev.date;
+  for (let chunk = 0; chunk < 40; chunk++) {
+    const to = shiftDateKey(from, 5 * 366);
+    for (const key of seriesDateKeys(ev, from, to)) {
+      seen++;
+      if (seen === count) return key;
+    }
+    if (ev.recurrence === 'none' || (ev.recurrenceEndDate && ev.recurrenceEndDate <= to)) return null;
+    from = shiftDateKey(to, 1);
+  }
+  return null;
 }
 
 /** Expand recurring events into concrete occurrences within [start, end] (inclusive, date-only). */
@@ -372,55 +613,109 @@ export function expandOccurrences(events: CalendarEvent[], start: Date, end: Dat
   const endKey = toDateKey(end);
   const out: EventOccurrence[] = [];
   for (const ev of events) {
-    const base = parseDateKey(ev.date);
-    if (ev.recurrence === 'none') {
-      if (ev.date >= startKey && ev.date <= endKey) out.push({ ...ev, occurrenceDate: ev.date });
-      continue;
-    }
-    const excluded = Array.isArray(ev.excludedDates) && ev.excludedDates.length ? new Set(ev.excludedDates) : null;
-    const push = (key: string): void => {
+    const excluded = ev.recurrence !== 'none' && Array.isArray(ev.excludedDates) && ev.excludedDates.length
+      ? new Set(ev.excludedDates)
+      : null;
+    for (const key of seriesDateKeys(ev, startKey, endKey)) {
       if (!excluded?.has(key)) out.push({ ...ev, occurrenceDate: key });
-    };
-    const stopKey = ev.recurrenceEndDate && ev.recurrenceEndDate < endKey ? ev.recurrenceEndDate : endKey;
-    const cursor = new Date(base);
-    const stepDays =
-      ev.recurrence === 'daily' ? 1 : ev.recurrence === 'weekly' ? 7 : ev.recurrence === 'custom' ? normalizeRecurrenceInterval(ev.recurrenceInterval) : 0;
-    if (ev.recurrence === 'monthly') {
-      const cur = new Date(base);
-      let guard = 0;
-      while (toDateKey(cur) <= stopKey && guard < 1200) {
-        const key = toDateKey(cur);
-        if (key >= startKey && key <= stopKey) push(key);
-        // Clamp to the next month's last day without losing the original day.
-        // Advancing Jan 31 directly with setMonth would skip February entirely.
-        cur.setMonth(cur.getMonth() + 1, 1);
-        const lastDay = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
-        cur.setDate(Math.min(base.getDate(), lastDay));
-        guard++;
-      }
-      continue;
-    }
-    if (stepDays > 0) {
-      // Skip past occurrences before applying the iteration limit. Count local
-      // calendar dates via UTC components so DST and `start`'s time of day
-      // cannot shift the recurrence or skip an occurrence on the first day.
-      const daysToStart = (Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())
-        - Date.UTC(base.getFullYear(), base.getMonth(), base.getDate())) / 86_400_000;
-      const skipped = Math.max(0, Math.ceil(daysToStart / stepDays));
-      cursor.setDate(cursor.getDate() + skipped * stepDays);
-      let guard = 0;
-      while (toDateKey(cursor) <= stopKey && guard < 3660) {
-        const key = toDateKey(cursor);
-        if (key >= startKey && key <= stopKey) push(key);
-        cursor.setDate(cursor.getDate() + stepDays);
-        guard++;
-      }
     }
   }
   return out.sort((a, b) => {
     if (a.occurrenceDate !== b.occurrenceDate) return a.occurrenceDate < b.occurrenceDate ? -1 : 1;
     return (a.startTime ?? '').localeCompare(b.startTime ?? '');
   });
+}
+
+/**
+ * Occurrences as the grids draw them: an event over several days appears on EACH day it
+ * covers in [start, end] — including one that began before `start` — with `spanDay` naming
+ * the day. Every entry keeps `occurrenceDate` (its first day), so opening, moving or skipping
+ * it still means that whole occurrence. One-day events come back exactly as
+ * `expandOccurrences` gives them.
+ */
+export function expandDayOccurrences(events: CalendarEvent[], start: Date, end: Date): EventOccurrence[] {
+  const from = new Date(start.getFullYear(), start.getMonth(), start.getDate() - longestSpanDays(events));
+  const startKey = toDateKey(start);
+  const endKey = toDateKey(end);
+  const out: EventOccurrence[] = [];
+  for (const o of expandOccurrences(events, from, end)) {
+    const span = eventSpanDays(o);
+    if (!span) {
+      if (o.occurrenceDate >= startKey) out.push(o);
+      continue;
+    }
+    for (let i = 0; i <= span; i++) {
+      const day = shiftDateKey(o.occurrenceDate, i);
+      if (day >= startKey && day <= endKey) out.push({ ...o, spanDay: day, spanIndex: i, spanDays: span + 1 });
+    }
+  }
+  const dayOf = (o: EventOccurrence): string => o.spanDay ?? o.occurrenceDate;
+  return out.sort((a, b) => {
+    if (dayOf(a) !== dayOf(b)) return dayOf(a) < dayOf(b) ? -1 : 1;
+    // A day an event runs through sits above that day's own events, as the longest bars do.
+    const aRuns = a.spanDays ? 0 : 1;
+    const bRuns = b.spanDays ? 0 : 1;
+    if (aRuns !== bRuns) return aRuns - bRuns;
+    return (a.startTime ?? '').localeCompare(b.startTime ?? '');
+  });
+}
+
+/**
+ * The repeat, span and reminder fields as the store keeps them: only what the rule uses,
+ * and nothing that says the same as its absence. The editor, the importer and the exporter all go through
+ * it, which is what makes an export → import round trip give back the same event.
+ */
+export function normalizeEventFields<T extends Omit<CalendarEvent, 'id' | 'createdAt'>>(event: T): T {
+  const out: T = { ...event };
+  const r = out.recurrence;
+  const weekly = r === 'weekly';
+  const monthOrYear = r === 'monthly' || r === 'yearly';
+  if (!weekly) delete out.recurrenceWeekdays;
+  if (!weekly) delete out.recurrenceWeekStart;
+  if (!monthOrYear) delete out.recurrenceNth;
+  if (!monthOrYear) delete out.recurrenceMonthEnd;
+  if (r === 'none' || r === 'daily') delete out.recurrenceInterval;
+  else if (r === 'custom') out.recurrenceInterval = normalizeRecurrenceInterval(out.recurrenceInterval);
+  else if (out.recurrenceInterval !== undefined) {
+    const every = normalizeRecurrenceInterval(out.recurrenceInterval);
+    if (every > 1) out.recurrenceInterval = every;
+    else delete out.recurrenceInterval;
+  }
+  if (weekly && isCalendarDateKey(out.date)) {
+    const own = parseDateKey(out.date).getDay();
+    const days = weeklyWeekdays({ date: out.date, recurrenceWeekdays: [...(out.recurrenceWeekdays ?? []), own] });
+    if (days.length > 1) out.recurrenceWeekdays = days;
+    else delete out.recurrenceWeekdays;
+    const ws = out.recurrenceWeekStart;
+    if (!(days.length > 1 && out.recurrenceInterval && Number.isInteger(ws) && ws !== 1 && (ws as number) >= 0 && (ws as number) <= 6)) {
+      delete out.recurrenceWeekStart;
+    }
+  }
+  if (monthOrYear) {
+    if (!validNth(out.recurrenceNth)) delete out.recurrenceNth;
+    const d = isCalendarDateKey(out.date) ? parseDateKey(out.date) : null;
+    // The month-end rule only matters on a day some months (or years) lack.
+    const lacking = d !== null && (r === 'monthly' ? d.getDate() > 28 : d.getMonth() === 1 && d.getDate() === 29);
+    if (out.recurrenceMonthEnd !== 'skip' || out.recurrenceNth || !lacking) delete out.recurrenceMonthEnd;
+  }
+  if (!eventSpanDays(out)) delete out.endDate;
+  // A timed event over several days ends at a time on its last day; without one, that day's end.
+  else if (!out.allDay && out.startTime && !out.endTime) out.endTime = '23:59';
+  if (out.reminder === 'custom') {
+    const exact = reminderLeadMinutes(out);
+    if (exact === null) {
+      out.reminder = 'none';
+      delete out.reminderMinutes;
+    } else {
+      const fields = reminderForMinutes(exact);
+      out.reminder = fields.reminder;
+      if (fields.reminderMinutes === undefined) delete out.reminderMinutes;
+      else out.reminderMinutes = fields.reminderMinutes;
+    }
+  } else {
+    delete out.reminderMinutes;
+  }
+  return out;
 }
 
 function eventDateTime(ev: CalendarEvent | EventOccurrence): Date {
@@ -454,8 +749,15 @@ export function occurrenceStartsAt(o: EventOccurrence): number {
 /**
  * When an occurrence is over: its end time, else its start, else (all-day) the
  * end of its day. A reminder for an event that is over is history, not a nudge.
+ * An event over several days is over on its last day.
  */
 export function occurrenceEndsAt(o: EventOccurrence): number {
+  const span = eventSpanDays(o);
+  if (span) {
+    const lastDay = shiftDateKey(o.occurrenceDate, span);
+    if (o.allDay || !o.startTime || !o.endTime) return atClock(lastDay, '23:59', 0).getTime();
+    return atClock(lastDay, o.endTime, 0).getTime();
+  }
   if (o.allDay || !o.startTime) return eventDateTime(o).getTime();
   const end = o.endTime && o.endTime >= o.startTime ? o.endTime : o.startTime;
   return atClock(o.occurrenceDate, end, 0).getTime();
@@ -463,8 +765,14 @@ export function occurrenceEndsAt(o: EventOccurrence): number {
 
 /** The instant an occurrence's reminder is due, or `null` when it has none. */
 export function reminderTriggerAt(o: EventOccurrence): number | null {
-  if (!o.reminder || o.reminder === 'none' || !(o.reminder in REMINDER_MINUTES)) return null;
-  return occurrenceStartsAt(o) - REMINDER_MINUTES[o.reminder] * 60_000;
+  const lead = reminderLeadMinutes(o);
+  if (lead === null) return null;
+  return occurrenceStartsAt(o) - lead * 60_000;
+}
+
+/** The longest run of days any of `events` covers, so a range can reach back to its start. */
+function longestSpanDays(events: readonly CalendarEvent[]): number {
+  return events.reduce((max, ev) => Math.max(max, eventSpanDays(ev)), 0);
 }
 
 /** Ongoing and upcoming occurrences, soonest first — powers the Agenda view and the Home Workspace widget. */
@@ -472,14 +780,18 @@ export function getUpcomingOccurrences(limit = 20, withinDays = 60): EventOccurr
   const now = new Date();
   const end = new Date(now);
   end.setDate(end.getDate() + withinDays);
-  const occs = expandOccurrences(readList(), now, end);
+  const list = readList();
+  // A trip that began last week is still on.
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - longestSpanDays(list));
+  const occs = expandOccurrences(list, from, end);
   return occs.filter((o) => occurrenceEndsAt(o) >= now.getTime() - 60_000).slice(0, limit);
 }
 
 /** Today's occurrences only. */
 export function getTodayOccurrences(): EventOccurrence[] {
   const today = new Date();
-  return expandOccurrences(readList(), today, today);
+  // Including an event over several days that runs through today.
+  return expandDayOccurrences(readList(), today, today);
 }
 
 /**
@@ -492,9 +804,10 @@ export function getOverdueReminders(withinDays = 14): EventOccurrence[] {
   const now = new Date();
   const end = new Date(now);
   end.setDate(end.getDate() + withinDays);
+  const list = readList();
   const start = new Date(now);
-  start.setDate(start.getDate() - withinDays);
-  const occs = expandOccurrences(readList(), start, end);
+  start.setDate(start.getDate() - withinDays - longestSpanDays(list));
+  const occs = expandOccurrences(list, start, end);
   return occs.filter((o) => {
     const triggerAt = reminderTriggerAt(o);
     if (triggerAt === null) return false;

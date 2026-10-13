@@ -100,7 +100,7 @@ const inRendererZone = (relative) =>
 
 /** `src/shared/x.ts` → `shared`, `src/main/y.ts` → `main`, `src/main.ts` → `main`. */
 function layerOf(relative) {
-  if (relative === 'src/main.ts') return 'main';
+  if (relative === 'src/main.ts' || relative === 'src/squirrelEntry.ts') return 'main';
   if (relative === 'src/preload.ts') return 'preload';
   if (relative.startsWith('src/shared/')) return 'shared';
   if (inRendererZone(relative)) return 'renderer';
@@ -178,7 +178,8 @@ function collectRoots(files) {
   for (const file of files) {
     const relative = rel(file);
     // Process entry points, and every test — a test is entered by vitest, not imported.
-    if (relative === 'src/main.ts' || relative === 'src/preload.ts') roots.add(relative);
+    // `src/squirrelEntry.ts` is the bundle package.json `main` names (forge.config.ts).
+    if (relative === 'src/main.ts' || relative === 'src/preload.ts' || relative === 'src/squirrelEntry.ts') roots.add(relative);
     if (isTest(relative)) roots.add(relative);
     // Ambient declaration files are never imported; they are picked up by tsconfig.
     if (relative.endsWith('.d.ts')) roots.add(relative);

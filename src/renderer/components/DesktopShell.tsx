@@ -2599,19 +2599,33 @@ export default function DesktopShell({
     setWall({ kind: 'preset', id: 'crimsonveil' });
   };
 
-  const resetDesktop = async () => {
-    const ok = await confirmDialog({
-      title: t('desktop.dialog.resetTitle'),
-      message: t('desktop.dialog.resetMessage'),
-      confirmLabel: t('desktop.dialog.resetConfirm'),
-      danger: true,
-    });
-    if (!ok) return;
+  /**
+   * Settings → Desktop layout → Reset desktop. The caller (ResetSectionButton)
+   * has already confirmed, and raises the Undo this returns.
+   *
+   * set8: sticky notes are no longer part of it. They are the user's writing,
+   * not layout, and the old reset deleted them with the windows and icons behind
+   * one generic "Reset?" — with no Undo, so a note was simply gone. Everything
+   * else it clears is snapshotted first so the Undo can put it back, on the same
+   * desktop only: after a desktop switch these setters would write the snapshot
+   * over a different desktop's layout, so a late Undo refuses and says so.
+   */
+  const resetDesktop = (): (() => boolean) => {
+    const desktop = activeDesktopRef.current;
+    const before = { wins, icons, widgets, wall };
     setWins([]);
-    setIcons(defaultIcons(activeDesktop));
-    setNotes({});
+    setIcons(defaultIcons(desktop));
     setWidgets([]);
     setWall({ kind: 'preset', id: 'crimsonveil' });
+    return () => {
+      // `false` makes the toast say it could not be restored, rather than claim it was.
+      if (activeDesktopRef.current !== desktop) return false;
+      setWins(before.wins);
+      setIcons(before.icons);
+      setWidgets(before.widgets);
+      setWall(before.wall);
+      return true;
+    };
   };
 
   const activateIcon = async (ic: DeskIcon) => {
@@ -2917,7 +2931,7 @@ export default function DesktopShell({
     onWallSlideshowOptions: (opts: { intervalSec?: number; shuffle?: boolean }) =>
       wallActionsRef.current.setSlideshowOptions(opts),
     onWallClear: () => void wallActionsRef.current.clearWall(),
-    onReset: () => void wallActionsRef.current.resetDesktop(),
+    onReset: () => wallActionsRef.current.resetDesktop(),
     onOpenVisualizer: () => wallActionsRef.current.open('visualizer'),
     onOpenMusicWidget: () => wallActionsRef.current.open('musicwidget'),
   }).current;

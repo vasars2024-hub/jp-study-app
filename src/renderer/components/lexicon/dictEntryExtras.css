@@ -152,3 +152,8 @@ button.dict-kanji-glyph {
   font-size: 12px;
   margin: 4px 0;
 }
+
+/* Anki already holds this word: the Add button says "Add again" and is drawn dashed. */
+.dict-add.is-dup-known {
+  border-style: dashed;
+}

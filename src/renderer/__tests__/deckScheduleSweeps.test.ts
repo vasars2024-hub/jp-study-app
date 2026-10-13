@@ -112,7 +112,9 @@ describe('convertDeckSchedule', () => {
     reviewDeckCard(card(0).id, 'good', NOW);
     reviewDeckCard(card(1).id, 'good', NOW);
     const report = convertDeckSchedule('fsrs');
-    expect(report).toEqual({ changed: 2, unscheduled: 1, total: 3 });
+    // No review log was handed in: both cards get the SM-2 estimate of their
+    // memory (fsrs-rs `memory_state_from_sm2`), not a restart as new cards.
+    expect(report).toEqual({ changed: 2, unscheduled: 1, total: 3, memoryFromLog: 0, memoryFromSm2: 2 });
     expect(loadDeck().filter((c) => c.srs?.algorithm === 'fsrs')).toHaveLength(2);
     // The never-studied card is still never-studied. Conversion is not a review.
     expect(card(2).srs).toBeUndefined();

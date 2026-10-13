@@ -31,6 +31,7 @@ import {
   onCalendarChanged,
   occurrenceEndsAt,
   occurrenceStartsAt,
+  reminderLeadMinutes,
   reminderTriggerAt,
   type CalendarEvent,
   type EventOccurrence,
@@ -57,7 +58,17 @@ export interface CalendarReminderState {
   fired: Record<string, number>;
   /** The last evaluation, or `null` before the first one ever. */
   lastRunAt: number | null;
+  /**
+   * Reminder key → when a snoozed reminder is due again. Persisted with the rest, so a
+   * snooze survives a restart and is delivered once, by the same scheduler.
+   */
+  snoozed?: Record<string, number>;
 }
+
+/** How long a reminder card can be put off. */
+export type CalendarSnooze = '5m' | '15m' | '1h' | 'start';
+
+const SNOOZE_MS: Record<Exclude<CalendarSnooze, 'start'>, number> = { '5m': 5 * 60_000, '15m': 15 * 60_000, '1h': 60 * 60_000 };
 
 export interface CalendarReminder {
   key: string;
@@ -79,11 +90,14 @@ export interface CalendarReminder {
  * because the reminder the user now asked for has not been given yet.
  */
 export function calendarReminderKey(o: EventOccurrence): string {
-  return `${o.id}|${o.occurrenceDate}|${o.allDay ? 'all-day' : (o.startTime ?? '')}|${o.reminder}`;
+  // A custom lead time is in the key too (and the preset keys are unchanged, so nothing
+  // delivered before this field existed fires a second time).
+  const offset = o.reminder === 'custom' ? `custom${reminderLeadMinutes(o) ?? ''}` : o.reminder;
+  return `${o.id}|${o.occurrenceDate}|${o.allDay ? 'all-day' : (o.startTime ?? '')}|${offset}`;
 }
 
 export function emptyCalendarReminderState(): CalendarReminderState {
-  return { fired: {}, lastRunAt: null };
+  return { fired: {}, lastRunAt: null, snoozed: {} };
 }
 
 export function normalizeCalendarReminderState(value: unknown): CalendarReminderState {
@@ -96,7 +110,38 @@ export function normalizeCalendarReminderState(value: unknown): CalendarReminder
     }
   }
   const lastRunAt = typeof raw.lastRunAt === 'number' && Number.isFinite(raw.lastRunAt) ? raw.lastRunAt : null;
-  return { fired, lastRunAt };
+  const snoozed: Record<string, number> = {};
+  if (typeof raw.snoozed === 'object' && raw.snoozed !== null && !Array.isArray(raw.snoozed)) {
+    for (const [key, at] of Object.entries(raw.snoozed as Record<string, unknown>)) {
+      if (typeof at === 'number' && Number.isFinite(at)) snoozed[key] = at;
+    }
+  }
+  return { fired, lastRunAt, snoozed };
+}
+
+/**
+ * When a snoozed reminder comes back: a few minutes from now, or the event's start ("until
+ * it starts" — offered only while the start is still ahead). Null when that is not later.
+ */
+export function calendarSnoozeUntil(reminder: Pick<CalendarReminder, 'startsAt'>, choice: CalendarSnooze, now: number): number | null {
+  const until = choice === 'start' ? reminder.startsAt : now + SNOOZE_MS[choice];
+  return until > now ? until : null;
+}
+
+/** Put one delivered reminder off until `until`; the scheduler delivers it again then. */
+export function snoozeCalendarReminder(
+  key: string,
+  until: number,
+  storage: CalendarReminderStorage = localStorageBacked,
+): void {
+  let state: CalendarReminderState;
+  try {
+    const raw = storage.read();
+    state = normalizeCalendarReminderState(raw ? JSON.parse(raw) : null);
+  } catch {
+    state = emptyCalendarReminderState();
+  }
+  storage.write(JSON.stringify({ ...state, snoozed: { ...state.snoozed, [key]: until } }));
 }
 
 function toReminder(o: EventOccurrence, triggerAt: number, missed: boolean): CalendarReminder {
@@ -132,6 +177,13 @@ function toReminder(o: EventOccurrence, triggerAt: number, missed: boolean): Cal
  *     once. Before any evaluation has ever run there is no gap to catch up: a
  *     first launch never dumps a history of old reminders on the user.
  *
+ * "Over" allows the same two minutes of lateness as `missed`: an event with no end time ends
+ * the moment it starts, so its "at event time" reminder — seen by the first tick after the
+ * start — used to be reported as missed every time, though it was on time.
+ *
+ * A snoozed reminder is delivered again when its snooze is up (late = missed, as above), and
+ * a snooze whose occurrence no longer exists (deleted, or edited to another time) is dropped.
+ *
  * Missed reminders of one recurring event collapse to the latest occurrence —
  * a daily reminder over a week away is one thing to say, not seven — but every
  * collapsed key is still recorded, so none of them comes back later.
@@ -144,22 +196,36 @@ export function evaluateCalendarReminders(input: {
   const { events, now } = input;
   const state = input.state;
   const gapStart = state.lastRunAt ?? now;
+  const reminded = events.filter((e) => reminderLeadMinutes(e) !== null);
+  // An occurrence as far ahead as the longest lead time (plus its day) can already be due.
+  const longestLead = reminded.reduce((max, e) => Math.max(max, reminderLeadMinutes(e) ?? 0), 0);
   const from = new Date(now - CALENDAR_REMINDER_CATCH_UP_MS - DAY_MS);
-  // The largest offset is one day, so an occurrence two days out can already be due.
-  const to = new Date(now + 2 * DAY_MS);
-  const occurrences = expandOccurrences(events.filter((e) => e.reminder && e.reminder !== 'none'), from, to);
+  const to = new Date(now + Math.max(DAY_MS, longestLead * 60_000) + DAY_MS);
+  const occurrences = expandOccurrences(reminded, from, to);
 
   const fired = { ...state.fired };
+  const snoozed = { ...(state.snoozed ?? {}) };
   const current: CalendarReminder[] = [];
   const missedByEvent = new Map<string, CalendarReminder>();
+  const seen = new Set<string>();
 
   for (const o of occurrences) {
     const triggerAt = reminderTriggerAt(o);
-    if (triggerAt === null || triggerAt > now) continue;
+    if (triggerAt === null) continue;
     const key = calendarReminderKey(o);
+    seen.add(key);
+    const snoozedUntil = snoozed[key];
+    if (snoozedUntil !== undefined) {
+      if (snoozedUntil > now) continue;
+      delete snoozed[key];
+      fired[key] = now;
+      current.push(toReminder(o, triggerAt, now - snoozedUntil > CALENDAR_REMINDER_LATE_MS));
+      continue;
+    }
+    if (triggerAt > now) continue;
     if (fired[key] !== undefined) continue;
     const cameDueInGap = triggerAt > gapStart;
-    const over = occurrenceEndsAt(o) < now;
+    const over = occurrenceEndsAt(o) + CALENDAR_REMINDER_LATE_MS < now;
     if (over) {
       if (!cameDueInGap || triggerAt < now - CALENDAR_REMINDER_CATCH_UP_MS) continue;
       fired[key] = now;
@@ -176,9 +242,13 @@ export function evaluateCalendarReminders(input: {
   for (const [key, at] of Object.entries(fired)) {
     if (now - at > FIRED_RETENTION_MS) delete fired[key];
   }
+  // A snooze that is up but matched no occurrence: its event was deleted or moved.
+  for (const [key, until] of Object.entries(snoozed)) {
+    if (until <= now && !seen.has(key)) delete snoozed[key];
+  }
 
   const due = [...missedByEvent.values(), ...current].sort((a, b) => a.startsAt - b.startsAt);
-  return { due, state: { fired, lastRunAt: now } };
+  return { due, state: { fired, lastRunAt: now, snoozed } };
 }
 
 /* ------------------------------------------------------------------ *

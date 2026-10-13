@@ -1,0 +1,57 @@
+// Snip to cards, round 2 (snip2.) — Chinese.
+
+import type { Catalog } from '../core';
+
+export const SNIP2_UI_ZH: Catalog = {
+  'snip2.notice.title': '截图制卡已开启',
+  'snip2.notice.body': '用 Win+Shift+S 截取的每张图片都会被识别，其中的新词会变成卡片。可以保留，也可以关闭（之后可在托盘或截图应用中重新开启）。',
+  'snip2.notice.turnOff': '关闭',
+  'snip2.notice.keep': '保持开启',
+  'snip2.notice.turnedOff': '截图制卡已关闭。可在托盘或截图应用中重新开启。',
+
+  'snip2.toast.review': { other: '有 {count} 个新词等待确认。' },
+  'snip2.toast.reviewUnsure': { other: '识别不太确定（{percent}%）：添加前请检查 {count} 个词。' },
+  'snip2.toast.reviewAction': '去确认',
+  'snip2.toast.mergedOnly': { other: '没有新词；这句话已作为例句添加到你已有的 {count} 张卡片。' },
+  'snip2.toast.mergedToo': { other: '另外为 {count} 张已有卡片添加了例句。' },
+  'snip2.toast.examplesRemoved': { other: '已删除添加到 {count} 张卡片的例句。' },
+  'snip2.toast.undoLater': '{seconds} 秒后关闭。之后仍可在截图应用中撤销。',
+  'snip2.toast.readBy': '识别引擎：{engine}',
+  'snip2.toast.readByConfidence': '识别引擎：{engine}（{percent}%）',
+
+  'snip2.review.manual': '确认模式：尚未添加任何内容。勾选想要的词（识别错误的先修正），然后添加。',
+  'snip2.review.uncertain': '识别不太确定（{percent}%），因此没有添加任何内容。请检查这些词，修正识别错误，再添加需要的词。',
+  'snip2.review.addSelected': { other: '添加所选的 {count} 个词' },
+  'snip2.review.select': '选择 {word}',
+  'snip2.review.pickColumn': '选择',
+  'snip2.history.review': { other: '{count} 个待确认' },
+  'snip2.history.via': '由 {engine} 识别',
+
+  'snip2.word.edit': '修正 {word}',
+  'snip2.word.editShort': '修正',
+  'snip2.word.formWord': '词（词典形）',
+  'snip2.word.formReading': '读音',
+  'snip2.word.save': '保存',
+  'snip2.word.cancel': '取消',
+  'snip2.word.edited': '已修正',
+  'snip2.word.merge': '把这句话作为例句添加到 {word} 的卡片',
+  'snip2.word.mergeShort': '添加例句',
+  'snip2.word.unmerge': '删除这次截图添加到 {word} 卡片的例句',
+  'snip2.wstatus.merged': '已添加例句',
+
+  'snip2.text.fix': '修正文字',
+  'snip2.text.label': '修正后的文字',
+  'snip2.text.reanalyze': '重新分析词语',
+  'snip2.text.undoFirst': '要修正文字，请先撤销这次截图：它的卡片必须与词语一致。',
+  'snip2.text.original': '识别结果：{text}',
+
+  'snip2.deck.label': '这次截图的卡组',
+  'snip2.deck.placeholder': '默认：{deck}',
+  'snip2.deck.hint': '这次截图添加的卡片会放在这里，已添加的卡片也会移到这里。',
+
+  'snip2.detail.undoExamples': { other: '撤销：从 {count} 张卡片删除例句' },
+  'snip2.detail.undoHint': '只要这次截图还在历史中，就可以在这里撤销。',
+
+  'snip2.settings.autoAddHint': '关闭：确认模式。每次截图都会列出新词，由你修正和选择后再添加。识别不确定时总会等待确认。',
+  'snip2.settings.mergeExisting': '已有卡片的词：把这句话作为例句添加',
+};

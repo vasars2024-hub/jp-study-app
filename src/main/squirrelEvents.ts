@@ -8,20 +8,27 @@
  *
  *   --squirrel-install <v>    first install         -> shortcuts + file associations
  *   --squirrel-updated <v>    new version installed -> re-point associations at it
- *   --squirrel-uninstall <v>  uninstall             -> remove both
+ *   --squirrel-uninstall <v>  uninstall             -> remove both, the sign-in entry and the
+ *                                                     OS-hotkey helper (Startup launcher + process)
  *   --squirrel-obsolete <v>   old version retired   -> nothing, just exit
  *   --squirrel-firstrun       first normal launch   -> a normal launch
  *
  * This replaces `electron-squirrel-startup`, which only made shortcuts and was
  * imported but never configured (the app shipped a zip, so it never ran).
  *
- * Everything here is SYNCHRONOUS on purpose. `main.ts` calls it before
- * `requestSingleInstanceLock()`: during an update the old copy is usually still
- * running, and a lock request from this process would forward
+ * Everything here is SYNCHRONOUS on purpose, and it runs from `src/squirrelEntry.ts`
+ * (`bootEntry`), the bundle Electron starts, BEFORE the app bundle is even loaded and so
+ * long before `requestSingleInstanceLock()`: during an update the old copy is usually
+ * still running, and a lock request from this process would forward
  * `--squirrel-updated` into it as a `second-instance` event (window pops to the
  * front, nothing installs). Handling first and never taking the lock avoids that.
  * The work is one `Update.exe` call and ONE `reg import` of a generated `.reg`
- * file (both with timeouts that together stay under the 15-second budget).
+ * file; uninstall adds two `reg delete`s and one PowerShell. Every step's timeout,
+ * plus the measured start-up allowance and an exit margin, fits Squirrel's 15 s
+ * (`hookWorstCaseMs`, `SQUIRREL_HOOK_LIMIT_MS`).
+ *
+ * This module is the entry's ONLY non-builtin import, so it must stay cheap: Node
+ * builtins only, never Electron, never another app module (`squirrelEntryGraph.test.ts`).
  *
  * File associations are written under HKCU\Software\Classes (no admin), and they
  * are deliberately polite: Gum is added to each type's "Open with" list and gets
@@ -216,9 +223,143 @@ export function encodeRegFile(text: string): Buffer {
 /** Synchronous process runner; throws on a non-zero exit like `execFileSync`. */
 export type SyncRunner = (file: string, args: readonly string[], options: { timeoutMs: number }) => void;
 
-/** Budgets inside Squirrel's ~15 s: worst case shortcut + import stays under it. */
-export const UPDATE_EXE_TIMEOUT_MS = 5_000;
-export const REG_IMPORT_TIMEOUT_MS = 8_000;
+/**
+ * THE BUDGET. Squirrel.Windows waits this long for a lifecycle launch to exit, then gives
+ * up on it (Update.exe's hook timeout). Everything below has to fit inside it: the time the
+ * process takes to reach the hook, every step's worst case, and the exit.
+ */
+export const SQUIRREL_HOOK_LIMIT_MS = 15_000;
+
+/**
+ * Spawn -> first hook step. Measured 2026-10-13 on the owner's machine:
+ * `electron <production build> --squirrel-install 1.0.1`, scratch profile, hidden, the
+ * steps stubbed (no Update.exe, no reg.exe), 7 runs each, medians:
+ *
+ *                                   JS starts   first step   process exit
+ *   src/main.ts as the entry          133 ms       440 ms        629 ms
+ *   src/squirrelEntry.ts (now)        135 ms       137 ms        153 ms
+ *
+ * So the app bundle (~4.8 MB main chunk plus linkedom, adm-zip & co.) cost ~305 ms on a
+ * warm cache before the hook could start; the entry reaches it 2 ms after JS starts. The
+ * rest is Electron's own start, which no entry can shorten, and which varies a lot with
+ * the launching environment (the same runs from Git Bash: ~1,050 ms). The allowance is
+ * twice that slowest figure plus headroom, for a cold first install whose freshly
+ * extracted electron.exe an antivirus scans before it runs; a cold VM is the owner's to
+ * measure (docs/RELEASING.md, "Squirrel hook budget").
+ */
+export const ENTRY_STARTUP_ALLOWANCE_MS = 2_500;
+
+/** After the last step: the `.reg` temp file's removal, `app.exit` and Squirrel noticing. */
+export const HOOK_EXIT_MARGIN_MS = 1_000;
+
+/** What the timed steps of one event may add up to. */
+export const HOOK_STEP_BUDGET_MS = SQUIRREL_HOOK_LIMIT_MS - ENTRY_STARTUP_ALLOWANCE_MS - HOOK_EXIT_MARGIN_MS;
+
+/**
+ * Install/update: one Update.exe (a .NET start plus two .lnk writes, ~0.5 s warm) and one
+ * `reg import` of ~60 values (well under a second). The margins are for a slow or
+ * AV-scanned machine; together they are exactly `HOOK_STEP_BUDGET_MS`.
+ */
+export const UPDATE_EXE_TIMEOUT_MS = 4_500;
+export const REG_IMPORT_TIMEOUT_MS = 7_000;
+
+/**
+ * Uninstall does more than install, so its steps get their own, smaller budgets:
+ * every step's worst case added together (`uninstallBudgetMs`) is at most
+ * `HOOK_STEP_BUDGET_MS`. `reg delete` and the `reg import` of ~22 removals finish in well
+ * under a second on a normal machine; the margins are for a slow or AV-scanned one.
+ */
+export const UNINSTALL_TIMEOUTS_MS = Object.freeze({
+  /** One PowerShell that finds the OS-hotkey helper by its script path and stops it. */
+  stopHotkeyHelper: 2_000,
+  /** Each `reg delete` of a login-item value. */
+  regDelete: 750,
+  removeShortcut: UPDATE_EXE_TIMEOUT_MS,
+  regImport: 3_500,
+});
+
+/** The worst case of every timed install (or update) step together. */
+export function installBudgetMs(): number {
+  return UPDATE_EXE_TIMEOUT_MS + REG_IMPORT_TIMEOUT_MS;
+}
+
+/** The worst case of every timed uninstall step together. */
+export function uninstallBudgetMs(): number {
+  const t = UNINSTALL_TIMEOUTS_MS;
+  return t.stopHotkeyHelper + LOGIN_ITEM_REG_VALUES.length * t.regDelete + t.removeShortcut + t.regImport;
+}
+
+/** Spawn to exit, worst case, for one event: what has to stay within `SQUIRREL_HOOK_LIMIT_MS`. */
+export function hookWorstCaseMs(event: SquirrelEvent): number {
+  const steps = event === 'install' || event === 'updated' ? installBudgetMs() : event === 'uninstall' ? uninstallBudgetMs() : 0;
+  return ENTRY_STARTUP_ALLOWANCE_MS + steps + HOOK_EXIT_MARGIN_MS;
+}
+
+/**
+ * Electron's login item (`app.setLoginItemSettings`, appLifecycle.ts): on Windows it
+ * writes a value under `Run` and its enabled/disabled flag under
+ * `Explorer\StartupApproved\Run`, both named after the AppUserModelID by default —
+ * which `main.ts` sets to `APP_USER_MODEL_ID` before anything else runs.
+ */
+export const LOGIN_ITEM_REG_VALUES: readonly { key: string; name: string; label: string }[] = Object.freeze([
+  { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', name: APP_USER_MODEL_ID, label: 'reg delete Run' },
+  {
+    key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run',
+    name: APP_USER_MODEL_ID,
+    label: 'reg delete StartupApproved',
+  },
+]);
+
+/** osHotkeyHelper.ts's launcher in the user's Startup folder (one per Windows user). */
+export const OS_HOTKEY_STARTUP_CMD = 'GrammarX-OS-Hotkey.cmd';
+
+/** `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\GrammarX-OS-Hotkey.cmd`. */
+export function osHotkeyStartupCmdPath(appData: string): string {
+  return path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', OS_HOTKEY_STARTUP_CMD);
+}
+
+/** The `-File "<helper.ps1>"` the Startup launcher runs, or null. */
+export function helperScriptFromStartupCmd(text: string): string | null {
+  const m = /-File\s+"([^"\r\n]+)"/i.exec(text);
+  return m ? m[1]! : null;
+}
+
+function isInside(root: string, target: string): boolean {
+  const rel = path.relative(root.toLowerCase(), target.toLowerCase());
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+/**
+ * Whether the OS-hotkey helper belongs to the copy being uninstalled. The zip build
+ * shares the userData folder (and so the one helper) with an installed copy: a
+ * helper whose config launches a portable exe that is still there is that copy's,
+ * and uninstalling Gum's installer must leave it alone. One launching anything in
+ * this install root (Update.exe, an `app-<v>\` exe) is ours; one with no readable
+ * target, or a target that is gone, launches nothing and is removed too.
+ */
+export function osHotkeyHelperIsOurs(installRoot: string, configExe: string | null, exists: (p: string) => boolean): boolean {
+  if (!configExe) return true;
+  if (isInside(installRoot, configExe)) return true;
+  return !exists(configExe);
+}
+
+/** A PowerShell single-quoted string literal. */
+function psQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/**
+ * Stops exactly the helper running `scriptPath` (matched on its command line, never
+ * by a PID file that may be stale and name someone else's process).
+ */
+export function stopHotkeyHelperArgs(scriptPath: string): string[] {
+  const script =
+    `$s = ${psQuote(scriptPath)}; ` +
+    `Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ` +
+    `Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($s, [StringComparison]::OrdinalIgnoreCase) -ge 0 } | ` +
+    `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
+  return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script];
+}
 
 const defaultRunner: SyncRunner = (file, args, { timeoutMs }) => {
   execFileSync(file, [...args], { windowsHide: true, stdio: 'ignore', timeout: timeoutMs });
@@ -230,6 +371,56 @@ export interface SquirrelDeps {
   log?: (message: string) => void;
   /** Directory for the temporary `.reg` file; defaults to `os.tmpdir()`. */
   tmpDir?: string;
+  /** `%APPDATA%` (the roaming profile holding the Startup folder); defaults to the env var. */
+  appData?: string;
+}
+
+type Attempt = (label: string, file: string, args: readonly string[], timeoutMs: number) => void;
+
+/**
+ * Uninstall half of osHotkeyHelper.ts: delete its Startup launcher and stop the
+ * running listener, when they belong to this install. Only the launcher is read
+ * to find the helper (its `-File` names the script; the config beside it names
+ * the exe it launches), so this needs neither Electron nor the userData path.
+ */
+function removeOsHotkeyHelper(
+  installRoot: string,
+  appData: string | undefined,
+  attempt: Attempt,
+  fail: (label: string, err: unknown) => void,
+  log: ((message: string) => void) | undefined,
+): void {
+  if (!appData) return;
+  const cmdPath = osHotkeyStartupCmdPath(appData);
+  let text: string;
+  try {
+    text = fs.readFileSync(cmdPath, 'utf8');
+  } catch (err) {
+    // No launcher: the helper was never installed (or was removed in Settings).
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') fail('remove hotkey launcher', err);
+    return;
+  }
+  const script = helperScriptFromStartupCmd(text);
+  let configExe: string | null = null;
+  if (script) {
+    try {
+      const raw = fs.readFileSync(path.join(path.dirname(script), 'config.json'), 'utf8').trimStart(); // trimStart drops a BOM too
+      const exe = (JSON.parse(raw) as { exe?: unknown } | null)?.exe;
+      if (typeof exe === 'string' && exe.trim()) configExe = exe;
+    } catch {
+      /* no readable config: the helper cannot launch anything */
+    }
+  }
+  if (!osHotkeyHelperIsOurs(installRoot, configExe, fs.existsSync)) {
+    log?.(`[squirrel] the OS-hotkey helper launches ${configExe}, not this install; left in place`);
+    return;
+  }
+  try {
+    fs.rmSync(cmdPath, { force: true });
+  } catch (err) {
+    fail('remove hotkey launcher', err);
+  }
+  if (script) attempt('stop hotkey helper', 'powershell.exe', stopHotkeyHelperArgs(script), UNINSTALL_TIMEOUTS_MS.stopHotkeyHelper);
 }
 
 /**
@@ -245,7 +436,7 @@ export function runSquirrelEvent(event: SquirrelEvent, deps: SquirrelDeps): stri
     failed.push(label);
     deps.log?.(`[squirrel] ${label} failed: ${err instanceof Error ? err.message : String(err)}`);
   };
-  const attempt = (label: string, file: string, args: readonly string[], timeoutMs: number) => {
+  const attempt: Attempt = (label, file, args, timeoutMs) => {
     try {
       run(file, args, { timeoutMs });
     } catch (err) {
@@ -255,7 +446,7 @@ export function runSquirrelEvent(event: SquirrelEvent, deps: SquirrelDeps): stri
   const updateExe = updateExePath(deps.execPath);
   const exeName = path.basename(deps.execPath);
   /** Every registry change in one `.reg` file and one `reg import`. */
-  const reg = (ops: RegOp[]) => {
+  const reg = (ops: RegOp[], timeoutMs: number = REG_IMPORT_TIMEOUT_MS) => {
     const file = path.join(deps.tmpDir ?? os.tmpdir(), `gum-associations-${process.pid}-${Date.now()}.reg`);
     try {
       fs.writeFileSync(file, encodeRegFile(buildRegFile(ops)));
@@ -264,7 +455,7 @@ export function runSquirrelEvent(event: SquirrelEvent, deps: SquirrelDeps): stri
       return;
     }
     try {
-      attempt('reg import', 'reg.exe', ['import', file], REG_IMPORT_TIMEOUT_MS);
+      attempt('reg import', 'reg.exe', ['import', file], timeoutMs);
     } finally {
       try {
         fs.rmSync(file, { force: true });
@@ -286,10 +477,20 @@ export function runSquirrelEvent(event: SquirrelEvent, deps: SquirrelDeps): stri
       attempt('createShortcut', updateExe, ['--createShortcut', exeName, '--shortcut-locations', 'StartMenu'], UPDATE_EXE_TIMEOUT_MS);
       reg(associationRegisterOps(deps.execPath));
       break;
-    case 'uninstall':
-      attempt('removeShortcut', updateExe, ['--removeShortcut', exeName], UPDATE_EXE_TIMEOUT_MS);
-      reg(associationUnregisterOps());
+    case 'uninstall': {
+      const t = UNINSTALL_TIMEOUTS_MS;
+      // What would keep running Gum's pieces after Gum is gone goes first: the
+      // OS-hotkey helper (its Startup launcher starts PowerShell at every sign-in)
+      // and the sign-in entry.
+      removeOsHotkeyHelper(path.dirname(updateExe), deps.appData ?? process.env.APPDATA, attempt, fail, deps.log);
+      for (const value of LOGIN_ITEM_REG_VALUES) {
+        // Exit 1 also means "never written" (start at sign-in was off): logged, harmless.
+        attempt(value.label, 'reg.exe', ['delete', value.key, '/v', value.name, '/f'], t.regDelete);
+      }
+      attempt('removeShortcut', updateExe, ['--removeShortcut', exeName], t.removeShortcut);
+      reg(associationUnregisterOps(), t.regImport);
       break;
+    }
     case 'obsolete':
     case 'firstrun':
       break;
@@ -298,7 +499,8 @@ export function runSquirrelEvent(event: SquirrelEvent, deps: SquirrelDeps): stri
 }
 
 /**
- * Called at the top of `main.ts`. Returns `true` when this process was launched
+ * Called by `bootEntry` (and, as a fallback for a build whose `main` still names
+ * `main.js`, at the top of `main.ts`). Returns `true` when this process was launched
  * only to service a Squirrel event — the caller must then skip the single-instance
  * lock and quit. `--squirrel-firstrun` is a normal launch and returns `false`.
  */
@@ -313,6 +515,48 @@ export function handleSquirrelStartup(
     execPath: deps.execPath ?? process.execPath,
     run: deps.run,
     log: deps.log ?? ((m) => console.warn(m)),
+    tmpDir: deps.tmpDir,
+    appData: deps.appData,
   });
   return true;
+}
+
+/** What `src/squirrelEntry.ts` hands `bootEntry`: the process, and the two ways out of it. */
+export interface EntryDeps {
+  argv: readonly string[];
+  platform: string;
+  /** Ends a Squirrel lifecycle launch (`app.exit`). */
+  exit: (code: number) => void;
+  /** Loads the full app (`require` of the sibling `main.js` bundle). */
+  loadApp: () => void;
+  /** Tests inject a recorder; the real entry uses `handleSquirrelStartup`. */
+  handle?: (argv: readonly string[], deps: { platform: string }) => boolean;
+  log?: (message: string) => void;
+}
+
+/**
+ * The first thing the packaged main process does. A Squirrel lifecycle launch
+ * (`--squirrel-install|updated|uninstall|obsolete`) is serviced and the process exits
+ * WITHOUT the app bundle ever being loaded; anything else (including
+ * `--squirrel-firstrun`, and every launch off Windows) loads the app.
+ *
+ * A lifecycle launch never falls through to the app, even when the hook throws: booting
+ * the full app inside Squirrel's install would put a window up mid-install and hold the
+ * process past the budget.
+ */
+export function bootEntry(deps: EntryDeps): 'squirrel' | 'app' {
+  const event = deps.platform === 'win32' ? squirrelEventOf(deps.argv) : null;
+  if (!event || event === 'firstrun') {
+    deps.loadApp();
+    return 'app';
+  }
+  try {
+    (deps.handle ?? handleSquirrelStartup)(deps.argv, { platform: deps.platform });
+  } catch (err) {
+    (deps.log ?? ((m: string) => console.warn(m)))(
+      `[squirrel] ${event} hook threw: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  deps.exit(0);
+  return 'squirrel';
 }

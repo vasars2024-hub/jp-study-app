@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
 import {
   idleVisualNovelCaptureState,
+  visualNovelErrorKey,
   type VisualNovelCaptureSource,
   type VisualNovelCaptureState,
   type VisualNovelSessionState,
@@ -124,11 +125,16 @@ export function VisualNovelCaptureBar({
   const capturing = state.active && state.visualNovelId === entry.id && !state.test;
   const testing = state.active && state.test && state.visualNovelId === entry.id;
   const testEnded = !state.active && state.test && mine;
+  // A real capture is running (for this novel or another). Test would replace
+  // it, and main refuses that ('capture-running'), so the button says why it is off.
+  const liveCapture = state.active && !state.test;
+  const testBlockedKey = liveCapture ? 'vnCapture.test.busy' : '';
 
   const start = async (test: boolean): Promise<void> => {
     setError('');
     const response = await window.api.visualNovelCaptureStart(entry.id, { test });
-    if (!response.ok) setError(response.error ?? t('vnCapture.startFailed'));
+    // The key, not main's English `error` text.
+    if (!response.ok) setError(visualNovelErrorKey(response, 'vnCapture.startFailed'));
   };
 
   let headline = t('vnCapture.status.off');
@@ -166,7 +172,10 @@ export function VisualNovelCaptureBar({
           <span>{state.lastLine.japanese}</span>
         </p>
       )}
-      {error && <p className="media-error">{error}</p>}
+      {(capturing || testing) && state.lastErrorCode && (
+        <p className="media-error" data-vn-capture-error={state.lastErrorCode}>{t(visualNovelErrorKey(state, 'vnCapture.lineFailed'))}</p>
+      )}
+      {error && <p className="media-error">{t(error)}</p>}
       <div className="vn-capture-bar-actions">
         {capturing ? (
           <button type="button" onClick={() => void window.api.visualNovelCaptureStop()}>{t('vnCapture.stop')}</button>
@@ -174,7 +183,15 @@ export function VisualNovelCaptureBar({
           <button type="button" className="primary" onClick={() => void start(false)}>{t('vnCapture.start')}</button>
         )}
         <button type="button" onClick={() => void window.api.visualNovelReaderOpen(entry.id)}>{t('vnCapture.openReader')}</button>
-        <button type="button" disabled={testing} onClick={() => void start(true)}>{t('vnCapture.test')}</button>
+        <button
+          type="button"
+          disabled={testing || liveCapture}
+          title={testBlockedKey ? t(testBlockedKey) : undefined}
+          data-vn-capture-test=""
+          onClick={() => void start(true)}
+        >
+          {t('vnCapture.test')}
+        </button>
       </div>
     </section>
   );

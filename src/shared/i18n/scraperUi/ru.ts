@@ -1131,7 +1131,7 @@ export const SCRAPER_UI_RU: Catalog = {
   'scrApp.result.showing': 'Показано',
   'scrApp.result.perPage': 'на странице',
   'scrApp.result.play.refresh': 'Запустите сбор заново, чтобы обновить ссылку провайдера перед воспроизведением.',
-  'scrApp.result.play.opening': 'Эпизод {n} открывается в VideoCore.',
+  'scrApp.result.play.opening': 'Открывается эпизод {n} в VideoCore.',
   'scrApp.result.play.noPlayerHere': 'В этом окне нет проигрывателя. Откройте результат из главного окна, чтобы воспроизвести зеркало.',
   'scrApp.result.play.serverOff': 'Медиасервер выключен, поэтому это зеркало нельзя воспроизвести.',
   'scrApp.result.emptyEpisodes': 'Эпизодов пока нет. Запустите сбор, чтобы заполнить таблицу.',

@@ -23,6 +23,7 @@ import { ContextualSurface } from '../liquid/LiquidSurface';
 import { addDeckCards, dueDeckCardNow, loadDeckFolders, onDeckChanged } from '../../flashcardDeck';
 import { onLevelListsChanged } from '../../levelLists';
 import { loadArenaContent, levelCoverage, type ArenaContent } from '../../games/contentStore';
+import { GAME_PACK_LOADED_EVENT, loadGamePack, loadedGamePack } from '../../data/gamePacks/registry';
 import { mirrorRotation, mirrorTextsFor, type MirrorText } from '../../data/mirrorTexts';
 import { useStudyLanguage } from '../../useStudyLanguage';
 import { useAiReadiness } from '../../aiSetupClient';
@@ -111,6 +112,7 @@ import {
   type MirrorAxis,
   type MirrorEvaluation,
 } from '../../games/mirrorWriting/evaluator';
+import { trackForegroundMedia } from '../../foregroundAudio';
 type FastGameId = Exclude<GameId, 'mirror-writing' | ArcadeGameId>;
 
 const ARCADE_GAME_IDS: readonly ArcadeGameId[] = [
@@ -335,14 +337,66 @@ export function makeSession(
 }
 
 /**
+ * Whether the bundled game pack for `lang` is loaded, loading it if not. Only
+ * Japanese is in the Arena's chunk; Chinese and Russian are fetched for a
+ * learner of that language (`data/gamePacks/registry.ts`).
+ */
+function useGamePackReady(lang: StudyLang): boolean {
+  const [ready, setReady] = useState(() => loadedGamePack(lang) !== null);
+  useEffect(() => {
+    let live = true;
+    const check = (): void => {
+      if (live) setReady(loadedGamePack(lang) !== null);
+    };
+    check();
+    window.addEventListener(GAME_PACK_LOADED_EVENT, check);
+    if (!loadedGamePack(lang)) {
+      loadGamePack(lang).then(check, (err: unknown) =>
+        console.warn(`[games] could not load the ${lang} game pack:`, err instanceof Error ? err.message : String(err)),
+      );
+    }
+    return () => {
+      live = false;
+      window.removeEventListener(GAME_PACK_LOADED_EVENT, check);
+    };
+  }, [lang]);
+  return ready;
+}
+
+/**
  * `includeSecretArcade={false}` keeps the discovered Aero/Wired arcade games
  * (and their themed chrome) out of a host that must stay neutral — Blanc.
  * Study OS omits the prop and is unchanged.
+ *
+ * The first render waits for the study language's game pack, so no game list
+ * or pool size is drawn from an empty pack. A study-language switch while the
+ * Arena is open keeps it mounted (and any session) and re-reads the content
+ * when the new pack arrives.
  */
-export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?: boolean } = {}) {
+export function GameArena(props: { includeSecretArcade?: boolean } = {}) {
+  const { t } = useT();
+  const { lang: studyLang } = useStudyLanguage();
+  const packReady = useGamePackReady(studyLang);
+  const [opened, setOpened] = useState(packReady);
+  useEffect(() => {
+    if (packReady) setOpened(true);
+  }, [packReady]);
+  if (!opened && !packReady) {
+    return (
+      <div className="game-arena" role="status" aria-busy="true">
+        <p className="muted">{t('common.loading')}</p>
+      </div>
+    );
+  }
+  return <GameArenaBody {...props} />;
+}
+
+function GameArenaBody({ includeSecretArcade = true }: { includeSecretArcade?: boolean }) {
   const { t, lang } = useT();
   const [settings, setSettings] = useState(loadGameArenaSettings);
   const { lang: studyLang, tag: studyTag } = useStudyLanguage();
+  // Flips when a switched-to language's pack arrives: the content below re-reads it.
+  const packReady = useGamePackReady(studyLang);
   const [serviceLevel, setServiceLevel] = useState(() => getUserLevel(studyLang));
   const [importOpen, setImportOpen] = useState(false);
   const [listName, setListName] = useState('');
@@ -405,7 +459,7 @@ export function GameArena({ includeSecretArcade = true }: { includeSecretArcade?
   }, []);
   const content = useMemo<ArenaContent & { kana: KanaSelection }>(
     () => ({ ...loadArenaContent(level, settings.material), kana: settings.kana }),
-    [level, deckNonce, listsNonce, settings.kana, settings.material, studyLang],
+    [level, deckNonce, listsNonce, settings.kana, settings.material, studyLang, packReady],
   );
   // Where a session can draw from: everything, one deck folder, or one imported list.
   const gameLists = useMemo(() => loadGameLists().filter((l) => l.lang === studyLang), [listsNonce, studyLang]);
@@ -1181,6 +1235,8 @@ function TypeRoundPanel({
     if (clip.state === 'ready' && clip.src) {
       playerRef.current?.pause();
       const player = new Audio(clip.src);
+      // snd6: the round's recording is study audio; the Soundscape ducks under it.
+      trackForegroundMedia(player);
       playerRef.current = player;
       const playing = player.play() as Promise<void> | undefined;
       // A recording the element refuses (codec, a revoked file) falls back to the voice.

@@ -6,12 +6,15 @@
  * a saved note could be written and never read again. This dialog is what
  * Open does for a note row in Files, and what "Save as note" in Translate
  * opens straight after saving. It reads, and edits the title and body in
- * place (`updateNotebookEntry`).
+ * place (`updateNotebookEntry`) — in full: nothing is cut any more (the old
+ * 4,000-character limit is gone) and the editor counts characters. "All notes"
+ * opens the Notes app at this note (search, tags, versions, trash, export).
  *
  * Opened imperatively (`openNoteViewer`), the way `dialogService` opens its
  * dialogs, so no window or shell has to mount a host for it.
  */
 import { lazy, Suspense, useState, type JSX } from 'react';
+import { openNotesManager } from './openNotesManager';
 import { createRoot } from 'react-dom/client';
 import { findNotebookEntry, updateNotebookEntry, type NotebookTimelineEntry } from '../../notebookTimeline';
 import { formatDate } from '../filesapp/format';
@@ -63,6 +66,14 @@ export function NoteViewer({
           </>
         ) : (
           <>
+            <Button
+              onClick={() => {
+                onClose();
+                void openNotesManager({ noteId: current.id });
+              }}
+            >
+              {t('notes.viewer.allNotes')}
+            </Button>
             <Button onClick={() => setEditing(true)}>{t('notes.viewer.edit')}</Button>
             <Button variant="primary" onClick={onClose}>
               {t('notes.viewer.close')}
@@ -90,6 +101,7 @@ export function NoteViewer({
               onSelect={(e) => setSelection({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd })}
             />
           </label>
+          <p className="muted note-viewer-count">{t('notes.editor.chars', { count: body.length })}</p>
           {/* Applied corrections land in the editor only; Save still writes the note. */}
           <Suspense fallback={null}>
             <WritingCorrection text={body} selection={selection} studyLang={getStudyLang()} onApply={setBody} />

@@ -10,6 +10,7 @@ import { readJson, writeJsonAtomic } from '../atomicJson';
 import {
   ANKI_INTERVALS_SNAPSHOT_FILE,
   ankiCardIsSuspended,
+  ankiSuspensionFlags,
   ankiTagsContainLeech,
   mergeIntervalEntries,
   withoutDeletedIntervalEntries,
@@ -227,11 +228,12 @@ export async function intervalsForNotes(
       : '';
 
     let maxIvl = 0;
-    let suspended = false;
-    for (const c of n.cards ?? []) {
+    let suspendedCards = 0;
+    const cards = n.cards ?? [];
+    for (const c of cards) {
       const state = stateByCard.get(c);
       maxIvl = Math.max(maxIvl, state?.interval ?? 0);
-      if (state?.suspended) suspended = true;
+      if (state?.suspended) suspendedCards += 1;
     }
     entries.push({
       expression,
@@ -239,7 +241,7 @@ export async function intervalsForNotes(
       noteId: n.noteId,
       modelName: n.modelName,
       ...(ankiTagsContainLeech(n.tags) ? { leech: true } : {}),
-      ...(suspended ? { suspended: true } : {}),
+      ...ankiSuspensionFlags(cards.length, suspendedCards),
     });
   }
 
@@ -616,6 +618,7 @@ function hashEntries(entries: IntervalEntry[]): string {
       e.lastIntervalChangeAt ?? '',
       e.leech === true ? 1 : 0,
       e.suspended === true ? 1 : 0,
+      e.allSuspended === false ? 0 : 1,
     ].join('\x1f'))
     .sort();
   return fnv1a(parts.join('\x1e'));
@@ -705,12 +708,15 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
     const expression = p.expression;
     if (!expression) continue;
 
+    // A note is out of rotation only when EVERY card of it is suspended: one
+    // suspended reverse card beside a live recognition card used to mark the
+    // whole word suspended and drop it to level 0 (SCORECARD bug 41).
     let maxIvl = 0;
-    let suspended = false;
+    let suspendedCards = 0;
     for (const c of p.cards) {
       const state = stateByCard.get(c);
       maxIvl = Math.max(maxIvl, state?.interval ?? 0);
-      if (state?.suspended) suspended = true;
+      if (state?.suspended) suspendedCards += 1;
     }
     best.set(expression, mergeIntervalEntries(best.get(expression), {
       expression,
@@ -718,7 +724,7 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
       noteId: p.noteId,
       modelName: p.modelName,
       ...(p.leech ? { leech: true } : {}),
-      ...(suspended ? { suspended: true } : {}),
+      ...ankiSuspensionFlags(p.cards.length, suspendedCards),
     }));
   }
   checkEpoch(); // discard everything if a switch landed during the fold

@@ -85,6 +85,21 @@ describe('importMokuroVolume', () => {
     expect(fs.existsSync(path.join(ocrDir, '0011.tr.en.json'))).toBe(true);
   });
 
+  it.each([
+    ['0-based', ['000.jpg', '001.jpg']],
+    ['1-based', ['001.jpg', '002.jpg']],
+    ['0-based, four digits', ['img/0000.jpg', 'img/0001.jpg']],
+  ])('puts a %s volume on the library page it came from', async (_label, imgs) => {
+    // The library numbers its pages from 1, so a 0-based volume's 000.jpg is
+    // library page 001 — not "no match", and not page 001 = Mokuro's 001.jpg.
+    const result = await importMokuroVolume(ITEM, volume(imgs));
+    expect(result).toEqual({ ok: true, pages: 2, unmatched: 0, matchedBy: 'name' });
+    const first = await loadMangaOcrCache(ITEM, `media://${ITEM}/pages/001.jpg`);
+    const second = await loadMangaOcrCache(ITEM, `media://${ITEM}/pages/002.jpg`);
+    expect(first?.blocks[0].lines).toEqual(['ページ1']);
+    expect(second?.blocks[0].lines).toEqual(['ページ2']);
+  });
+
   it('says why when it imports nothing', async () => {
     expect(await importMokuroVolume(ITEM, 'not json')).toEqual({ ok: false, reason: 'invalid' });
     expect(await importMokuroVolume(ITEM, volume([]))).toEqual({ ok: false, reason: 'noPages' });

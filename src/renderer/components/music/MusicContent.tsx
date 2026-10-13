@@ -21,6 +21,8 @@ import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface';
 import type { MediaItem } from '../../../shared/types';
 import { guessSongMeta, type SongMeta } from '../../lyrics';
 import { useLiveLyrics } from '../../liveLyrics';
+import { LYRICS_OFFSET_STEP_MS, formatLyricsOffset } from '../../lyricsOffset';
+import { karaokeCharCount, karaokeHighlightSupported, useKaraokeAhead } from './karaokeHighlight';
 import * as player from '../../playerBus';
 import { coverFor } from '../../albumArt';
 import { isLiked, onLikedChanged, toggleLiked } from '../../likedSongs';
@@ -82,6 +84,7 @@ const COLLAPSED_KEY = 'jp-music-collapsed';
 export type SortBy = 'recent' | 'title' | 'artist' | 'folder';
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
+const NO_COMPANIONS: number[] = [];
 
 function loadCollapsed(): Set<string> {
   try {
@@ -1006,11 +1009,146 @@ export function MusicLookupPopup({ state }: { state: MusicState }) {
   );
 }
 
+/** A tokenised lyric line filling in word by word (see `karaokeHighlight.ts`). */
+function MusicKaraokeTokens({ sungChars, children }: { sungChars: number; children: ReactElement }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useKaraokeAhead(ref, sungChars);
+  return (
+    <span ref={ref} className="music-line-karaoke">
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Per-song lyric timing nudge: −0.1 s / readout / +0.1 s. Saved per song
+ * (`lyricsOffset.ts`) and applied to the sheet itself, so loops, replays and mined
+ * clips follow it. The readout resets the nudge.
+ */
+function MusicLyricsOffset({
+  offsetMs,
+  onNudge,
+  onReset,
+}: {
+  offsetMs: number;
+  onNudge: (deltaMs: number) => void;
+  onReset: () => void;
+}) {
+  const { t } = useT();
+  const value = formatLyricsOffset(offsetMs);
+  return (
+    <span
+      className="music-lyrics-offset"
+      role="group"
+      aria-label={t('musicLyrics2.offset.group')}
+      // The pane turns a mouse-up into a dictionary lookup; a timing button is not a word.
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+    >
+      {' · '}
+      {t('musicLyrics2.offset.label')}
+      <button
+        type="button"
+        className="music-lyrics-offset-step music-lyrics-offset-earlier"
+        onClick={() => onNudge(-LYRICS_OFFSET_STEP_MS)}
+        title={t('musicLyrics2.offset.earlier')}
+        aria-label={t('musicLyrics2.offset.earlier')}
+      >
+        −
+      </button>
+      <button
+        type="button"
+        className="music-lyrics-offset-value"
+        onClick={onReset}
+        disabled={offsetMs === 0}
+        title={t('musicLyrics2.offset.reset', { value })}
+        aria-label={t('musicLyrics2.offset.reset', { value })}
+      >
+        {value}
+      </button>
+      <button
+        type="button"
+        className="music-lyrics-offset-step music-lyrics-offset-later"
+        onClick={() => onNudge(LYRICS_OFFSET_STEP_MS)}
+        title={t('musicLyrics2.offset.later')}
+        aria-label={t('musicLyrics2.offset.later')}
+      >
+        +
+      </button>
+    </span>
+  );
+}
+
+/**
+ * Pick (or forget) an offline folder of `.lrc` files. Songs without lyrics of their
+ * own are matched against it by name or `[ti:]`/`[ar:]` tags in the main process.
+ * Hidden on a host without the IPC.
+ */
+function MusicLyricsFolderButton({ onPicked }: { onPicked: () => void }) {
+  const { t } = useT();
+  const [folder, setFolder] = useState<string | null>(null);
+  const api = typeof window !== 'undefined' ? window.api?.musicLyricsFolder : undefined;
+  useEffect(() => {
+    const read = window.api?.musicLyricsFolder;
+    if (!read) return undefined;
+    let alive = true;
+    void read('get').then((f) => alive && setFolder(f ?? null), () => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!api) return null;
+  const pick = async (): Promise<void> => {
+    const before = folder;
+    const next = await api('pick').catch(() => before);
+    setFolder(next ?? null);
+    if (next && next !== before) onPicked();
+  };
+  const clear = async (): Promise<void> => {
+    setFolder(await api('clear').catch(() => folder));
+  };
+  return (
+    <>
+      <button
+        type="button"
+        className="btn small music-lyrics-folder"
+        onClick={() => void pick()}
+        title={folder ? t('musicLyrics2.folder.current', { folder }) : t('musicLyrics2.folder.pickTitle')}
+      >
+        <Icon name="folder" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+        {t('musicLyrics2.folder.pick')}
+      </button>
+      {folder ? (
+        <button type="button" className="btn small" onClick={() => void clear()}>
+          {t('musicLyrics2.folder.clear')}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 /** Karaoke lyrics pane, including click-to-look-up wiring. */
 export function MusicLyricsPane({ state }: { state: MusicState }) {
   const { t } = useT();
   const { ps, liveLyrics, activeIndex } = state;
   const lyrics = liveLyrics.lyrics;
+  // The anchor (`activeIndex`) holds the view and is what Replay / Mine act on; the SUNG
+  // line is the one lit, and nothing is lit in an instrumental break.
+  const sungIndex = liveLyrics.sungIndex ?? activeIndex;
+  const wordIndex = liveLyrics.wordIndex ?? -1;
+  const companions = liveLyrics.companions ?? NO_COMPANIONS;
+  /** Bilingual sheets: the translation lines riding under each primary line. */
+  const translations = useMemo(() => {
+    const out = new Map<number, string[]>();
+    if (lyrics.kind !== 'synced') return out;
+    companions.forEach((owner, i) => {
+      if (owner < 0) return;
+      const text = lyrics.cues[i]?.text;
+      if (text) out.set(owner, [...(out.get(owner) ?? []), text]);
+    });
+    return out;
+  }, [lyrics, companions]);
+  const translationOf = (index: number): string => (translations.get(index) ?? []).join('\n');
   // Slice 17: music joins the study loop video already had. The card goes through the same
   // draft/request/history path, so a mined lyric appears in Review with no extra wiring.
   const mining = useMusicMining(ps.current ?? null);
@@ -1026,6 +1164,46 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
     ) : (
       <span className="music-line-text">{text}</span>
     );
+  /**
+   * The line being sung, word by word, when the sheet is enhanced LRC. Coloured lines
+   * keep their tokens (furigana and known-word marks cannot be split at LRC word
+   * boundaries), so they get the same timing as a sweep bar under the line instead.
+   */
+  const sungLineText = (index: number, text: string): ReactElement => {
+    const words = lyrics.kind === 'synced' ? lyrics.words?.[index] : null;
+    if (!words || words.length === 0) return lyricText(text);
+    const time = ps.time ?? 0;
+    if (colourLines) {
+      // Characters sung so far: every word up to and including the one being sung.
+      const through = wordIndex >= 0 ? wordIndex : time >= words[words.length - 1].end ? words.length - 1 : -1;
+      const sungChars = words.slice(0, through + 1).reduce((n, w) => n + karaokeCharCount(w.text), 0);
+      if (karaokeHighlightSupported()) {
+        return <MusicKaraokeTokens sungChars={sungChars}>{lyricText(text)}</MusicKaraokeTokens>;
+      }
+      // No Highlight API: the same timing as a sweep under the line.
+      const total = Math.max(1, karaokeCharCount(text));
+      return (
+        <>
+          {lyricText(text)}
+          <span className="music-line-sweep" aria-hidden="true">
+            <span style={{ width: `${Math.min(100, Math.round((sungChars / total) * 1000) / 10)}%` }} />
+          </span>
+        </>
+      );
+    }
+    return (
+      <span className="music-line-text music-line-words">
+        {words.map((w, k) => (
+          <span
+            key={k}
+            className={`music-word${k < wordIndex || (wordIndex < 0 && time >= w.end) ? ' is-sung' : ''}${k === wordIndex ? ' is-singing' : ''}`}
+          >
+            {w.text}
+          </span>
+        ))}
+      </span>
+    );
+  };
 
   /**
    * Slice 20 — cue navigation, in the shape video already uses.
@@ -1040,11 +1218,13 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
    */
   const studyCues = useMemo(
     () => (lyrics.kind === 'synced'
-      ? musicTransportCues(lyrics.cues.map((c, i) => ({
+      // A translation line shares its primary's time: stepping, looping and pausing
+      // move by sung line, never onto the translation of the line already playing.
+      ? musicTransportCues(lyrics.cues.flatMap((c, i) => ((companions[i] ?? -1) >= 0 ? [] : [{
         index: i, text: c.text, startSec: c.start, endSec: c.end,
-      })))
+      }])))
       : []),
-    [lyrics],
+    [lyrics, companions],
   );
 
   const stepCue = (direction: -1 | 1): void => {
@@ -1136,7 +1316,9 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
       onMouseDown={(e) => e.stopPropagation()}
       onClick={() => {
         state.noteLyricLineStudied(line.index);
-        void mining.mine(line, kind, ps.time ?? 0);
+        // A bilingual sheet's translation line becomes the card's translation.
+        const translation = kind === 'synced' ? translationOf(line.index) : '';
+        void (translation ? mining.mine(line, kind, ps.time ?? 0, translation) : mining.mine(line, kind, ps.time ?? 0));
       }}
       disabled={mining.outcome.kind === 'busy' || mining.outcome.kind === 'recording'}
       title={t('music.mineHint')}
@@ -1184,6 +1366,7 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
               <Icon name="note" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
               {t('music.loadLrcFile')}
             </button>
+            <MusicLyricsFolderButton onPicked={liveLyrics.reload} />
           </div>
         </div>
       )}
@@ -1245,38 +1428,61 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
           seek={player.seek}
           mineDisabled={mining.outcome.kind === 'busy' || mining.outcome.kind === 'recording'}
           onMineCurrent={() => {
-            // The line being sung now; nothing to mine between lines or on a plain sheet.
+            // The line being sung now — or, in the break after it, the line just heard
+            // (the anchor). Nothing before the first line, nothing on a plain sheet.
             if (lyrics.kind !== 'synced' || activeIndex < 0) return;
             const c = lyrics.cues[activeIndex];
             if (!c) return;
             state.noteLyricLineStudied(activeIndex);
-            void mining.mine({ index: activeIndex, text: c.text, startSec: c.start, endSec: c.end }, 'synced', ps.time ?? 0);
+            const line = { index: activeIndex, text: c.text, startSec: c.start, endSec: c.end };
+            const translation = translationOf(activeIndex);
+            void (translation ? mining.mine(line, 'synced', ps.time ?? 0, translation) : mining.mine(line, 'synced', ps.time ?? 0));
           }}
         />
       )}
       {(lyrics.kind === 'synced' || lyrics.kind === 'plain') && lyrics.source && (
         <p className="muted music-lyrics-source">
-          {t(`music.lyricsSource.${lyrics.source}`)}
+          {lyrics.source === 'folder' ? t('musicLyrics2.source.folder') : t(`music.lyricsSource.${lyrics.source}`)}
           {' · '}
           <button type="button" className="music-lyrics-fix" onClick={() => void state.pickLrcFile()}>
             {t('music.lyricsCorrect')}
           </button>
+          {lyrics.kind === 'synced' && ps.current && (
+            <MusicLyricsOffset
+              offsetMs={liveLyrics.offsetMs ?? 0}
+              onNudge={(ms) => liveLyrics.nudgeOffset?.(ms)}
+              onReset={() => liveLyrics.resetOffset?.()}
+            />
+          )}
         </p>
       )}
       {lyrics.kind === 'synced' &&
-        lyrics.cues.map((c, i) => (
-          <div
-            key={i}
-            ref={i === activeIndex ? state.activeLineRef : undefined}
-            className={`music-line ${i === activeIndex ? 'active' : ''} ${i < activeIndex ? 'past' : ''}`}
-            data-lyric-line={i}
-            onDoubleClick={() => player.seek(c.start)}
-            title={t('music.doubleClickJump')}
-          >
-            {lyricText(c.text)}
-            {mineButton({ index: i, text: c.text, startSec: c.start, endSec: c.end }, 'synced')}
-          </div>
-        ))}
+        lyrics.cues.map((c, i) => {
+          // A translation is drawn under its own line, not as a line of its own.
+          if ((companions[i] ?? -1) >= 0) return null;
+          const sung = i === sungIndex;
+          // Between lines nothing is lit; the line just finished is the anchor the view holds.
+          const anchor = i === activeIndex && !sung;
+          const translation = translations.get(i);
+          return (
+            <div
+              key={i}
+              ref={i === activeIndex ? state.activeLineRef : undefined}
+              className={`music-line${sung ? ' active' : ''}${anchor ? ' anchor' : ''}${i < activeIndex ? ' past' : ''}`}
+              data-lyric-line={i}
+              onDoubleClick={() => player.seek(c.start)}
+              title={t('music.doubleClickJump')}
+            >
+              {sung ? sungLineText(i, c.text) : lyricText(c.text)}
+              {translation?.map((line, k) => (
+                <span key={k} className="music-line-translation" title={t('musicLyrics2.translation')}>
+                  {line}
+                </span>
+              ))}
+              {mineButton({ index: i, text: c.text, startSec: c.start, endSec: c.end }, 'synced')}
+            </div>
+          );
+        })}
       {lyrics.kind === 'plain' && (
         <>
           <p className="muted music-plain-note">{t('music.notSynced')}</p>

@@ -108,7 +108,33 @@ describe('Undo a calendar move', () => {
     const moved = await handlers['calendar.reschedule-event']!({ id: created.id, date: '2026-10-12' });
     // The user drags it somewhere else in the Calendar — nothing the log could see.
     updateEvent(created.id, { date: '2026-10-20' });
-    expect(await performAgentUndo(logMove(moved, created.id), 'move-call|0', t)).toEqual({ ok: false, code: 'undo-failed' });
+    // A refusal with its reason ("changed since"), not a generic failure.
+    expect(await performAgentUndo(logMove(moved, created.id), 'move-call|0', t)).toEqual({ ok: false, code: 'superseded' });
     expect(loadEvents()[0].date).toBe('2026-10-20');
+  });
+
+  it('puts a multi-day event back with its length, not just its first day', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    const trip = await handlers['calendar.schedule-session']!({
+      title: 'Study camp', date: '2026-10-09', endDate: '2026-10-11', startTime: '18:00', endTime: '10:00',
+    }) as { id: string };
+    const moved = await handlers['calendar.reschedule-event']!({ id: trip.id, date: '2026-10-16' });
+    expect(loadEvents()[0]).toMatchObject({ date: '2026-10-16', endDate: '2026-10-18' });
+
+    expect(await performAgentUndo(logMove(moved, trip.id), 'move-call|0', t)).toMatchObject({ ok: true });
+    expect(loadEvents()[0]).toMatchObject({ date: '2026-10-09', endDate: '2026-10-11', startTime: '18:00', endTime: '10:00' });
+  });
+
+  it('puts the weekdays of a multi-weekday series back too', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    // 2026-10-06 is a Tuesday: every Tue and Thu.
+    const series = await handlers['calendar.schedule-session']!({
+      title: 'Grammar', date: '2026-10-06', startTime: '19:00', recurrence: 'weekly', recurrenceWeekdays: [2, 4],
+    }) as { id: string };
+    const moved = await handlers['calendar.reschedule-event']!({ id: series.id, date: '2026-10-07' });
+    expect(loadEvents()[0]).toMatchObject({ date: '2026-10-07', recurrenceWeekdays: [3, 5] });
+
+    expect(await performAgentUndo(logMove(moved, series.id), 'move-call|0', t)).toMatchObject({ ok: true });
+    expect(loadEvents()[0]).toMatchObject({ date: '2026-10-06', recurrenceWeekdays: [2, 4] });
   });
 });

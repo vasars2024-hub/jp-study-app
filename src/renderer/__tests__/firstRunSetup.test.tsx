@@ -7,7 +7,7 @@
  * the tour is held while setup is open and starts only if setup left it armed;
  * the checklist ticks from real app activity, not from its own buttons.
  */
-import { act } from 'react';
+import { act, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CATALOGS } from '../../shared/i18n/catalogs/all';
@@ -28,7 +28,15 @@ import {
   resetFirstRunSessionForTests,
   restartFirstRunSetup,
 } from '../firstRunSetup';
-import { seedWordsFor } from '../firstRunSeed';
+import { FIRST_RUN_SEED_UNDO_KEY, seedKnownWords, seedWordsFor, undoSeededKnownWords } from '../firstRunSeed';
+import { getLevel, resetKnownWordsCacheForTests, setLevel } from '../knownWords';
+import {
+  BOOT_START_WAIT_MS,
+  holdTourForThemeBoot,
+  resetTourBootHoldForTests,
+  tourHeldForThemeBoot,
+} from '../tourBootHold';
+import { ANKI_UNREACHABLE_MSG } from '../../shared/anki';
 import { deckGrew, installFirstStepsTracker } from '../firstStepsTracker';
 import { LOOKUP_HISTORY_EVENT } from '../lookupHistory';
 import { REVIEW_RECORDED_EVENT, MEDIA_STUDY_RECORDED_EVENT, WATCH_RECORDED_EVENT } from '../stats';
@@ -40,6 +48,13 @@ import { ASSET_CATALOG } from '../../shared/assetRegistry';
 import FirstRunSetup from '../components/onboarding/FirstRunSetup';
 import TourOverlay from '../components/onboarding/TourOverlay';
 import FirstStepsChecklist from '../components/onboarding/FirstStepsChecklist';
+
+// Picking Aero at the finish step imports the trigger on demand; its own boot
+// side effects (sound, theme) are not what these tests are about.
+vi.mock('../theme/SecretAeroTrigger', () => ({
+  SECRET_AERO_ENTER_EVENT: 'shell:enterSecretAero',
+  default: () => null,
+}));
 
 const en = (key: string, vars: Record<string, string | number> = {}): string => {
   const entry = CATALOGS.en[key];
@@ -58,6 +73,10 @@ beforeEach(() => {
   localStorage.clear();
   localStorage.setItem(TELEMETRY_CONSENT_KEY, 'no');
   resetFirstRunSessionForTests();
+  resetKnownWordsCacheForTests();
+  resetTourBootHoldForTests();
+  delete document.documentElement.dataset.secretLifecycle;
+  delete document.documentElement.dataset.wiredLifecycle;
   (window as unknown as { api: unknown }).api = {
     assetsList: vi.fn(async () => ({ assets: ASSET_CATALOG, statuses: [] })),
     onAssetStatus: vi.fn(() => () => undefined),
@@ -367,5 +386,261 @@ describe('FirstStepsChecklist card', () => {
       dismiss?.click();
     });
     expect(firstStepsChecklistVisible()).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* onb3                                                                */
+/* ------------------------------------------------------------------ */
+
+async function mountNode(node: ReactNode): Promise<void> {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => {
+    root?.render(node);
+  });
+}
+const buttonByLabel = (label: string): HTMLButtonElement | undefined =>
+  [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === label);
+const clickLabel = async (label: string): Promise<void> => {
+  const target = buttonByLabel(label);
+  expect(target, label).toBeTruthy();
+  await act(async () => {
+    target?.click();
+  });
+};
+/** Let dynamic imports and IPC promises settle. */
+const flush = async (rounds = 5): Promise<void> => {
+  for (let i = 0; i < rounds; i += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+};
+const currentStep = (): string | null | undefined => host.querySelector('.frs-root')?.getAttribute('data-first-run-step');
+
+describe('Anki step errors (onb3)', () => {
+  it('never shows the raw IPC error; says Anki is unreachable in the UI language', async () => {
+    patchFirstRun({ step: 'anki' });
+    (window.api as unknown as Record<string, unknown>).ankiStatus = vi.fn(async () => {
+      throw new Error("Error invoking remote method 'anki:status': Error: connect ECONNREFUSED 127.0.0.1:8765");
+    });
+    await mountNode(<FirstRunSetup />);
+    await clickLabel(en('onb2.anki.check'));
+    await flush();
+    const note = host.querySelector('.frs-note[role="status"]');
+    expect(note?.textContent).toContain(en('onb2.anki.missing'));
+    expect(note?.textContent).toContain(en('anki.unreachableReason'));
+    expect(note?.textContent).not.toMatch(/invoking remote method|ECONNREFUSED/);
+  });
+
+  it('maps the reasons main authors through translateAnkiReason', async () => {
+    patchFirstRun({ step: 'anki' });
+    (window.api as unknown as Record<string, unknown>).ankiStatus = vi.fn(async () => ({
+      connected: false,
+      decks: [],
+      models: [],
+      error: ANKI_UNREACHABLE_MSG,
+    }));
+    await mountNode(<FirstRunSetup />);
+    await clickLabel(en('onb2.anki.check'));
+    await flush();
+    expect(host.querySelector('.frs-note[role="status"]')?.textContent).toContain(en('anki.unreachableReason'));
+  });
+});
+
+describe('downloads step follows the built-in dictionary (onb3)', () => {
+  it('turns a download offer into "setting up", then "ready", without leaving the step', async () => {
+    let dicts: Array<{ id: string }> = [];
+    let emit: ((snapshot: unknown) => void) | null = null;
+    Object.assign(window.api as unknown as Record<string, unknown>, {
+      dictListYomitan: vi.fn(async () => dicts),
+      dictImportStatus: vi.fn(async () => null),
+      onDictImportChanged: vi.fn((cb: (snapshot: unknown) => void) => {
+        emit = cb;
+        return () => {
+          emit = null;
+        };
+      }),
+    });
+    patchFirstRun({ step: 'downloads' });
+    await mountNode(<FirstRunSetup />);
+    await flush();
+    expect(host.querySelector('[data-download="dictionary-builtin"]')).toBeNull();
+    expect(emit).toBeTypeOf('function');
+
+    // Main starts importing the bundled pack: no download offer, a setting-up row instead.
+    await act(async () => {
+      emit?.({
+        jobId: 'j1',
+        kind: 'legacy',
+        status: 'running',
+        progress: { jobId: 'j1', kind: 'legacy', lines: 10, phase: 'importing', percent: 40 },
+      });
+    });
+    await flush();
+    const row = host.querySelector('[data-download="dictionary-builtin"]');
+    expect(row?.className).toContain('is-busy');
+    expect(row?.textContent).toContain(en('onb3.dl.builtInSettingUp', { percent: 40 }));
+    expect(row?.querySelector('button')).toBeNull();
+    expect(host.querySelector(`[data-download="${dictionaryAssetFor('ja')}"]`)).toBeNull();
+
+    // The import commits and the list now has the pack.
+    dicts = [{ id: 'jmdict' }];
+    await act(async () => {
+      emit?.({ jobId: 'j1', kind: 'legacy', status: 'committed', terminal: { state: 'committed' } });
+    });
+    await flush();
+    const ready = host.querySelector('[data-download="dictionary-builtin"]');
+    expect(ready?.className).toContain('is-ready');
+    expect(ready?.textContent).toContain(en('onb2.dl.ready'));
+  });
+});
+
+describe('level seed undo (onb3)', () => {
+  it('a lower band takes back only what the higher seed set', async () => {
+    const upper = seedWordsFor('ja', 'upper');
+    const elementary = seedWordsFor('ja', 'elementary');
+    expect(upper.length).toBeGreaterThan(elementary.length + 2);
+    const inferredBefore = upper[elementary.length];
+    const byHandLater = upper[elementary.length + 1];
+    const plain = upper[upper.length - 1];
+    setLevel(inferredBefore, 1, false);
+
+    await seedKnownWords('ja', 'upper');
+    expect(getLevel(inferredBefore)).toBe(3);
+    expect(getLevel(plain)).toBe(3);
+    // The user then grades one of those words by hand.
+    setLevel(byHandLater, 3, true);
+
+    await seedKnownWords('ja', 'elementary');
+    expect(getLevel(plain)).toBe(0);
+    expect(getLevel(inferredBefore)).toBe(1);
+    expect(getLevel(byHandLater)).toBe(3);
+    expect(getLevel(elementary[0])).toBe(3);
+
+    // Unticking the seed takes the rest back too.
+    await undoSeededKnownWords('ja');
+    expect(getLevel(elementary[0])).toBe(0);
+    expect(localStorage.getItem(FIRST_RUN_SEED_UNDO_KEY)).toBeNull();
+  });
+
+  it('Back to the level step and a lower band replaces the seed in the dialog', async () => {
+    patchFirstRun({ step: 'level' });
+    await mountNode(<FirstRunSetup />);
+    const pick = async (band: string): Promise<void> => {
+      await clickLabel(en(`onb2.level.ja.${band}`) + en(`onb2.level.desc.${band}`));
+    };
+    await pick('upper');
+    await clickLabel(en('onb2.next'));
+    await flush(10);
+    expect(currentStep()).toBe('downloads');
+    expect(loadFirstRun().seededKnown).toBe(seedWordsFor('ja', 'upper').length);
+    await clickLabel(en('onb2.back'));
+    await pick('elementary');
+    await clickLabel(en('onb2.next'));
+    await flush(10);
+    expect(currentStep()).toBe('downloads');
+    expect(loadFirstRun().seededKnown).toBe(LEVEL_SEED_COUNTS.elementary);
+    const upper = seedWordsFor('ja', 'upper');
+    expect(getLevel(upper[upper.length - 1])).toBe(0);
+  });
+
+  it('closing setup keeps the seed and forgets the undo record', async () => {
+    await seedKnownWords('ja', 'elementary');
+    expect(localStorage.getItem(FIRST_RUN_SEED_UNDO_KEY)).not.toBeNull();
+    patchFirstRun({ step: 'finish' });
+    await mountNode(<FirstRunSetup />);
+    await clickLabel(en('onb2.finish.start'));
+    expect(localStorage.getItem(FIRST_RUN_SEED_UNDO_KEY)).toBeNull();
+    expect(getLevel(seedWordsFor('ja', 'elementary')[0])).toBe(3);
+  });
+});
+
+describe('Escape inside the placement check (onb3)', () => {
+  it('closes only the quiz; setup stays open and focus returns to its opener', async () => {
+    patchFirstRun({ step: 'level' });
+    const onClose = vi.fn();
+    await mountNode(<FirstRunSetup onClose={onClose} />);
+    await clickLabel(en('aiTutor.placement.open'));
+    await flush();
+    const textarea = host.querySelector('.frs-placement textarea');
+    expect(textarea).not.toBeNull();
+    await act(async () => {
+      textarea?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(currentStep()).toBe('level');
+    expect(host.querySelector('.frs-placement')).toBeNull();
+    expect(document.activeElement?.textContent?.trim()).toBe(en('aiTutor.placement.open'));
+    // Escape outside the quiz is still "Later".
+    await act(async () => {
+      host.querySelector('.frs-card')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(onClose).toHaveBeenCalledWith('later', false);
+  });
+});
+
+describe('the look picked in setup and the tour (onb3)', () => {
+  function Harness() {
+    const [pending, setPending] = useState(true);
+    return (
+      <>
+        {pending && <FirstRunSetup onClose={() => setPending(false)} />}
+        <TourOverlay holdForSetup={pending} />
+      </>
+    );
+  }
+  const setPhase = async (phase: string): Promise<void> => {
+    await act(async () => {
+      document.documentElement.dataset.secretLifecycle = phase;
+      window.dispatchEvent(new CustomEvent('secret:lifecycle', { detail: { phase } }));
+    });
+  };
+
+  it('Aero: the tour waits for the boot overlay to finish', async () => {
+    patchFirstRun({ step: 'finish', theme: 'aero' });
+    await mountNode(<Harness />);
+    await clickLabel(en('onb2.finish.tour'));
+    expect(host.querySelector('.frs-root')).toBeNull();
+    expect(shouldRunTour()).toBe(true);
+    expect(host.querySelector('.tour-root'), 'held before the boot starts').toBeNull();
+    await setPhase('preboot');
+    await setPhase('boot');
+    await setPhase('welcome');
+    expect(host.querySelector('.tour-root'), 'held during the boot').toBeNull();
+    await setPhase('active');
+    expect(host.querySelector('.tour-root'), 'starts once the boot has run').not.toBeNull();
+  });
+
+  it('Study OS: the tour starts at once', async () => {
+    patchFirstRun({ step: 'finish', theme: 'study-os' });
+    await mountNode(<Harness />);
+    await clickLabel(en('onb2.finish.tour'));
+    expect(host.querySelector('.tour-root')).not.toBeNull();
+  });
+
+  it('Blanc: no Study OS tour to start; it stays in Help', async () => {
+    patchFirstRun({ step: 'finish', theme: 'blanc' });
+    (window.api as unknown as Record<string, unknown>).blancOpen = vi.fn(async () => undefined);
+    await mountNode(<Harness />);
+    expect(buttonByLabel(en('onb2.finish.tour'))).toBeUndefined();
+    expect(host.textContent).toContain(en('onb3.finish.blancTour'));
+    await clickLabel(en('onb2.finish.start'));
+    expect(shouldRunTour()).toBe(false);
+    expect(host.querySelector('.tour-root')).toBeNull();
+  });
+
+  it('a boot that never starts releases the hold on its own', () => {
+    vi.useFakeTimers();
+    try {
+      holdTourForThemeBoot();
+      expect(tourHeldForThemeBoot()).toBe(true);
+      vi.advanceTimersByTime(BOOT_START_WAIT_MS + 1);
+      expect(tourHeldForThemeBoot()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

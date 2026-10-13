@@ -8,6 +8,7 @@
 // `renderer/reviewLog.ts`.
 
 import type { LocalSrsRating } from './localSrs';
+import { lastStudyDayKeys, startOfStudyDayKey, studyDayKeyer } from './studyDay';
 
 /**
  * `grammar` rows are answers in the grammar practice test: they count toward the
@@ -64,8 +65,16 @@ export function isRecallReview(entry: Pick<ReviewLogEntry, 'mode' | 'source'>): 
 /** Longest answer a review row records: one idle minute is not one minute of study. */
 export const REVIEW_ANSWER_CAP_MS = 60_000;
 
-/** Bound on stored rows: roughly a year of heavy daily review. */
+/**
+ * Rows kept live: roughly a year of heavy daily review, what Statistics reads.
+ * Older rows are not deleted: `renderer/reviewLog.ts` moves them into archive
+ * chunks, which the FSRS optimiser and the memory replay still read (a card's
+ * history must reach back to its first review to be replayed exactly).
+ */
 export const REVIEW_LOG_LIMIT = 50_000;
+
+/** Rows per archive chunk record. */
+export const REVIEW_LOG_ARCHIVE_CHUNK = 10_000;
 
 const MODES: readonly ReviewLogMode[] = ['review', 'learn', 'test', 'write', 'grammar', 'game'];
 const RATINGS: readonly LocalSrsRating[] = ['again', 'hard', 'good', 'easy'];
@@ -101,7 +110,7 @@ export function normalizeReviewLogEntry(value: unknown): ReviewLogEntry | null {
   return entry;
 }
 
-export function normalizeReviewLog(value: unknown): ReviewLogEntry[] {
+export function normalizeReviewLog(value: unknown, limit = REVIEW_LOG_LIMIT): ReviewLogEntry[] {
   const list = Array.isArray(value)
     ? value
     : value && typeof value === 'object' && Array.isArray((value as { entries?: unknown }).entries)
@@ -116,7 +125,7 @@ export function normalizeReviewLog(value: unknown): ReviewLogEntry[] {
     out.push(entry);
   }
   out.sort((a, b) => a.at - b.at);
-  return out.length > REVIEW_LOG_LIMIT ? out.slice(out.length - REVIEW_LOG_LIMIT) : out;
+  return out.length > limit ? out.slice(out.length - limit) : out;
 }
 
 /**
@@ -125,7 +134,10 @@ export function normalizeReviewLog(value: unknown): ReviewLogEntry[] {
  * second (and third) time. Loading a 200,000-row history used to normalise it
  * once per row, then again as a list, then again with the session's rows.
  */
-export function mergeNormalizedReviewLog(rows: readonly ReviewLogEntry[]): ReviewLogEntry[] {
+export function mergeNormalizedReviewLog(
+  rows: readonly ReviewLogEntry[],
+  limit = REVIEW_LOG_LIMIT,
+): ReviewLogEntry[] {
   const out: ReviewLogEntry[] = [];
   const seen = new Set<string>();
   for (const entry of rows) {
@@ -134,12 +146,18 @@ export function mergeNormalizedReviewLog(rows: readonly ReviewLogEntry[]): Revie
     out.push(entry);
   }
   out.sort((a, b) => a.at - b.at);
-  return out.length > REVIEW_LOG_LIMIT ? out.slice(out.length - REVIEW_LOG_LIMIT) : out;
+  return out.length > limit ? out.slice(out.length - limit) : out;
+}
+
+/** The rows of one archive chunk record, or none for anything else. */
+export function normalizeReviewLogArchiveChunk(value: unknown): ReviewLogEntry[] {
+  return normalizeReviewLog(value, Number.POSITIVE_INFINITY);
 }
 
 export interface ReviewDaySummary {
-  /** Local calendar date, YYYY-MM-DD. */
+  /** Study day (local, rolling over at the configured hour), YYYY-MM-DD. */
   date: string;
+  /** Recall reviews that day (a review graded from a game is a game answer). */
   reviews: number;
   passed: number;
 }
@@ -166,17 +184,13 @@ export interface ReviewLogSummary {
   /** Grammar practice answers inside the window (not in `practiceAnswers`). */
   grammarAnswers: number;
   grammarCorrect: number;
-  /** Game Arena answers inside the window (in neither of the above). */
+  /**
+   * Game Arena answers inside the window (in neither of the above), including
+   * due cards a game graded: those moved a schedule but are not recall tests,
+   * so they stay out of every review pass rate.
+   */
   gameAnswers: number;
   gameCorrect: number;
-}
-
-function localDayKey(ms: number): string {
-  const d = new Date(ms);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 export function summarizeReviewLog(
@@ -187,11 +201,8 @@ export function summarizeReviewLog(
   const span = Math.max(1, Math.floor(days));
   const perDay: ReviewDaySummary[] = [];
   const index = new Map<string, ReviewDaySummary>();
-  for (let i = span - 1; i >= 0; i -= 1) {
-    const d = new Date(now);
-    d.setHours(12, 0, 0, 0);
-    d.setDate(d.getDate() - i);
-    const row = { date: localDayKey(d.getTime()), reviews: 0, passed: 0 };
+  for (const date of lastStudyDayKeys(span, now)) {
+    const row = { date, reviews: 0, passed: 0 };
     perDay.push(row);
     index.set(row.date, row);
   }
@@ -204,36 +215,27 @@ export function summarizeReviewLog(
   let grammarCorrect = 0;
   let gameAnswers = 0;
   let gameCorrect = 0;
-  // Rows before the window's first local midnight cannot land in it: skipped on
-  // a number compare. The rest reuse the day's bounds while they stay on one
-  // day, so a time-ordered log formats one date per day, not one per row.
-  const [y0, m0, d0] = perDay[0].date.split('-').map(Number);
-  const start = new Date(y0, m0 - 1, d0).getTime();
-  let dayFrom = Number.POSITIVE_INFINITY;
-  let dayTo = Number.NEGATIVE_INFINITY;
-  let dayBucket: ReviewDaySummary | undefined;
+  // Rows before the window's first study day cannot land in it: skipped on a
+  // number compare. The keyer reuses a day's bounds while rows stay on it, so a
+  // time-ordered log formats one date per day, not one per row.
+  const start = startOfStudyDayKey(perDay[0].date);
+  const dayOf = studyDayKeyer();
   for (const entry of entries) {
     if (entry.at < start) continue;
-    if (!(entry.at >= dayFrom && entry.at < dayTo)) {
-      const d = new Date(entry.at);
-      dayBucket = index.get(localDayKey(entry.at));
-      dayFrom = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-      dayTo = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
-    }
-    const bucket = dayBucket;
+    const bucket = index.get(dayOf(entry.at));
     if (!bucket) continue;
-    if (entry.mode === 'review') {
+    if (isRecallReview(entry)) {
       bucket.reviews += 1;
       if (entry.correct) bucket.passed += 1;
       reviews += 1;
-      if (isRecallReview(entry) && !entry.isNew && (entry.prevIntervalDays ?? 0) >= 1) {
+      if (!entry.isNew && (entry.prevIntervalDays ?? 0) >= 1) {
         matureReviews += 1;
         if (entry.correct) maturePassed += 1;
       }
     } else if (entry.mode === 'grammar') {
       grammarAnswers += 1;
       if (entry.correct) grammarCorrect += 1;
-    } else if (entry.mode === 'game') {
+    } else if (entry.mode === 'game' || entry.mode === 'review') {
       gameAnswers += 1;
       if (entry.correct) gameCorrect += 1;
     } else {

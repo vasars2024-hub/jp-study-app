@@ -10,7 +10,7 @@ import { useAeroMaterials, useWiredMaterials } from './ui';
 import { wiredWidgetTitle } from '../widgets/wiredLabels';
 import { aeroGadgetTitle } from '../widgets/aeroLabels';
 import { clearTimer } from '../widgets/timerStore';
-import { alignMove, alignResize, type AlignGuide, type AlignRect } from '../widgets/widgetAlign';
+import { alignMove, alignResize, clampResizeToDesk, type AlignGuide, type AlignRect } from '../widgets/widgetAlign';
 import '../widgets/wid6.css';
 
 // Home Workspace widget host. A lighter cousin of the desktop's FloatingWindow:
@@ -108,6 +108,85 @@ class GuideLayer {
 /** A coordinate the way the Wired readout prints it: four digits, zero-padded. */
 const pad4 = (n: number): string => String(Math.max(0, Math.round(n))).padStart(4, '0');
 
+/**
+ * wid7: wire one drag or resize gesture to its handle, and end it exactly once.
+ *
+ * Both gestures used to listen for `pointerup` alone. A gesture that never sees
+ * its `pointerup` (Alt+Tab mid-drag, a touch the OS takes over, the button let
+ * go over another window) left the move listener attached, so the widget kept
+ * following the mouse until the next click, with its guide lines still drawn.
+ * Now `pointercancel` and `lostpointercapture` end it too, putting the widget
+ * back where it started (`commit: false`), and a mouse move that arrives with
+ * no button held ends it where it was last drawn (the release happened; this
+ * handle just never heard it). The returned function ends the gesture from the
+ * outside, which is how unmounting mid-gesture cleans up.
+ */
+function trackGesture(
+  handle: HTMLElement,
+  pointerId: number,
+  onMove: (ev: PointerEvent) => void,
+  onEnd: (commit: boolean) => void,
+): (commit: boolean) => void {
+  let done = false;
+  const ours = (ev: PointerEvent): boolean => typeof ev.pointerId !== 'number' || ev.pointerId === pointerId;
+  const move = (ev: PointerEvent): void => {
+    if (!ours(ev)) return;
+    if (ev.pointerType === 'mouse' && ev.buttons === 0) {
+      end(true);
+      return;
+    }
+    onMove(ev);
+  };
+  const up = (ev: PointerEvent): void => {
+    if (ours(ev)) end(true);
+  };
+  const cancel = (ev: PointerEvent): void => {
+    if (ours(ev)) end(false);
+  };
+  function end(commit: boolean): void {
+    if (done) return;
+    done = true;
+    handle.removeEventListener('pointermove', move);
+    handle.removeEventListener('pointerup', up);
+    handle.removeEventListener('pointercancel', cancel);
+    handle.removeEventListener('lostpointercapture', cancel);
+    try {
+      handle.releasePointerCapture(pointerId);
+    } catch {
+      /* Capture is already gone, which may be why the gesture is ending. */
+    }
+    onEnd(commit);
+  }
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', up);
+  handle.addEventListener('pointercancel', cancel);
+  handle.addEventListener('lostpointercapture', cancel);
+  return end;
+}
+
+/** The enabled items of an open widget menu, in order. */
+function menuItems(menu: HTMLElement | null): HTMLButtonElement[] {
+  if (!menu) return [];
+  return [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].filter((b) => !b.disabled);
+}
+
+/** wid7: where a menu key moves focus from `at` among `n` items, or null for a key the menu does not take. */
+export function nextMenuIndex(key: string, at: number, n: number): number | null {
+  if (n === 0) return null;
+  switch (key) {
+    case 'ArrowDown':
+      return at < 0 ? 0 : (at + 1) % n;
+    case 'ArrowUp':
+      return at < 0 ? n - 1 : (at - 1 + n) % n;
+    case 'Home':
+      return 0;
+    case 'End':
+      return n - 1;
+    default:
+      return null;
+  }
+}
+
 export interface WidgetFrameProps {
   widget: WidgetSnapshot;
   deskRef: React.RefObject<HTMLDivElement | null>;
@@ -136,6 +215,27 @@ export default function WidgetFrame({
   useEffect(() => {
     if (keyboardFrom) frameRef.current?.focus({ preventScroll: true });
   }, [keyboardFrom]);
+  /** wid7: ends the drag or resize in flight; unmounting mid-gesture must not leave listeners or guides behind. */
+  const gestureEndRef = useRef<((commit: boolean) => void) | null>(null);
+  useEffect(() => () => gestureEndRef.current?.(false), []);
+  /** wid7: the options menu takes focus when it opens and hands it back to its button. */
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const optionsRef = useRef<HTMLButtonElement | null>(null);
+  const menuWasOpen = useRef(false);
+  useEffect(() => {
+    if (menuOpen) {
+      menuWasOpen.current = true;
+      menuItems(menuRef.current)[0]?.focus({ preventScroll: true });
+      return;
+    }
+    if (!menuWasOpen.current) return;
+    menuWasOpen.current = false;
+    // An item that closed the menu took its focused node with it. Unless the
+    // item moved focus somewhere on purpose (settings, keyboard move), focus
+    // goes back to the button that opened the menu instead of the page body.
+    const active = document.activeElement;
+    if (!active || active === document.body) optionsRef.current?.focus({ preventScroll: true });
+  }, [menuOpen]);
   // §6 module-rack mount: scan-reveal + title lamp blink, wired only.
   const [mounting, setMounting] = useState(wired);
   useEffect(() => {
@@ -221,6 +321,30 @@ export default function WidgetFrame({
     </div>
   ) : null;
 
+  /** wid7: arrows and Home/End walk the menu; Escape closes it onto its button; Tab closes it and moves on. */
+  const onMenuKeyDown = (ev: RKeyboardEvent<HTMLDivElement>): void => {
+    if (ev.key === 'Escape') {
+      ev.preventDefault();
+      ev.stopPropagation();
+      setMenuOpen(false);
+      optionsRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    if (ev.key === 'Tab') {
+      // Focus the button first and let Tab's default carry on from it, so Tab
+      // and Shift+Tab land where they would have with the menu shut.
+      optionsRef.current?.focus({ preventScroll: true });
+      setMenuOpen(false);
+      return;
+    }
+    const items = menuItems(menuRef.current);
+    const next = nextMenuIndex(ev.key, items.indexOf(document.activeElement as HTMLButtonElement), items.length);
+    if (next === null) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    items[next]?.focus({ preventScroll: true });
+  };
+
   const settingsPopover = settingsOpen && schema.length > 0 && !collapsed ? (
     <WidgetSettingsPopover
       title={t('wid5.settings.title', { name: t(def.titleKey) })}
@@ -297,19 +421,17 @@ export default function WidgetFrame({
       });
     };
     const handle = e.currentTarget as HTMLElement;
-    const up = () => {
-      handle.releasePointerCapture(e.pointerId);
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
+    gestureEndRef.current?.(false);
+    gestureEndRef.current = trackGesture(handle, e.pointerId, move, (commit) => {
+      gestureEndRef.current = null;
       if (raf != null) cancelAnimationFrame(raf);
       guides.clear();
       el.style.transform = '';
       el.style.willChange = '';
+      if (!commit) return;
       // An edge that caught a guide stays exactly on it; anything else keeps the grid.
       onPatch({ x: snappedX ? Math.round(curX) : snap(curX), y: snappedY ? Math.round(curY) : snap(curY) });
-    };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
+    });
   };
 
   const resizeStart = (e: RPointerEvent<HTMLDivElement>) => {
@@ -333,17 +455,18 @@ export default function WidgetFrame({
     const readout = (w: number, h: number): string => t('wid6.guides.size', { w: pad4(w), h: pad4(h) });
     const corner = (w: number, h: number): { x: number; y: number } => ({ x: widget.x + w, y: widget.y + h });
     let snappedW = false, snappedH = false;
+    // wid7: the far edges stop at the desk's right edge and at the taskbar.
+    const inDesk = (w: number, h: number): { w: number; h: number } =>
+      clampResizeToDesk({ x: widget.x, y: widget.y, w, h }, bounds, def.minSize);
     const move = (ev: PointerEvent) => {
-      curW = Math.max(def.minSize.w, ow + (ev.clientX - sx) / z);
-      curH = Math.max(def.minSize.h, oh + (ev.clientY - sy) / z);
+      ({ w: curW, h: curH } = inDesk(ow + (ev.clientX - sx) / z, oh + (ev.clientY - sy) / z));
       snappedW = false;
       snappedH = false;
       if (!ev.altKey) {
         const aligned = alignResize({ x: widget.x, y: widget.y, w: curW, h: curH }, others, bounds, def.minSize);
-        curW = aligned.w;
-        curH = aligned.h;
-        snappedW = aligned.snappedW;
-        snappedH = aligned.snappedH;
+        ({ w: curW, h: curH } = inDesk(aligned.w, aligned.h));
+        snappedW = aligned.snappedW && curW === aligned.w;
+        snappedH = aligned.snappedH && curH === aligned.h;
         guides.show(aligned.guides, corner(curW, curH), readout(curW, curH));
       } else {
         guides.show([], corner(curW, curH), readout(curW, curH));
@@ -355,16 +478,20 @@ export default function WidgetFrame({
         el.style.height = `${curH}px`;
       });
     };
-    const up = () => {
-      handle.releasePointerCapture(e.pointerId);
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
+    gestureEndRef.current?.(false);
+    gestureEndRef.current = trackGesture(handle, e.pointerId, move, (commit) => {
+      gestureEndRef.current = null;
       if (raf != null) cancelAnimationFrame(raf);
       guides.clear();
-      onPatch({ w: snappedW ? Math.round(curW) : snap(curW), h: snappedH ? Math.round(curH) : snap(curH) });
-    };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
+      // Back to the size React last rendered: a cancelled resize keeps it, and a
+      // committed one is then re-rendered from the patch (React only writes a
+      // style it sees change, so a hand-set width would otherwise outlive it).
+      el.style.width = `${ow}px`;
+      el.style.height = `${oh}px`;
+      if (!commit) return;
+      const next = inDesk(snappedW ? Math.round(curW) : snap(curW), snappedH ? Math.round(curH) : snap(curH));
+      onPatch({ w: next.w, h: next.h });
+    });
   };
 
   const Body = def.component;
@@ -420,6 +547,7 @@ export default function WidgetFrame({
           </button>
           <button
             type="button"
+            ref={optionsRef}
             className="aero-gadget-tool is-options"
             title={t('widgetFrame.options')}
             aria-label={t('widgetFrame.options')}
@@ -442,7 +570,14 @@ export default function WidgetFrame({
           {menuOpen && (
             <>
               <div className="widget-menu-backdrop" onPointerDown={(ev) => { ev.stopPropagation(); setMenuOpen(false); }} />
-              <div className="widget-menu" role="menu" onPointerDown={(ev) => ev.stopPropagation()}>
+              <div
+                ref={menuRef}
+                className="widget-menu"
+                role="menu"
+                aria-label={t('wid7.menu.label', { name: title })}
+                onPointerDown={(ev) => ev.stopPropagation()}
+                onKeyDown={onMenuKeyDown}
+              >
                 {wid5MenuItems('menuitem')}
                 <button role="menuitem" onClick={() => { onPatch({ locked: !locked }); setMenuOpen(false); }}>{locked ? t('widgetFrame.unlock') : t('widgetFrame.lock')}</button>
                 <button role="menuitem" onClick={() => { onPatch({ collapsed: !collapsed }); setMenuOpen(false); }}>{collapsed ? t('widgetFrame.expand') : t('widgetFrame.collapse')}</button>
@@ -461,6 +596,7 @@ export default function WidgetFrame({
     );
   }
 
+  const plainTitle = wired ? wiredWidgetTitle(widget.type, t(def.titleKey)) : t(def.titleKey);
   return (
     <section
       ref={frameRef}
@@ -481,12 +617,15 @@ export default function WidgetFrame({
       onPointerDown={onFocus}
     >
       <div className="widget-bar" title={locked ? undefined : t('wid6.drag.hint')} onPointerDown={dragStart} onDoubleClick={() => onPatch({ collapsed: !collapsed })}>
-        <span className="widget-title">{wired ? wiredWidgetTitle(widget.type, t(def.titleKey)) : t(def.titleKey)}</span>
+        <span className="widget-title">{plainTitle}</span>
         <span className="widget-btns">
           {locked && <span className="widget-lock" title={t('widgetFrame.locked')} aria-hidden>⌧</span>}
           <button
+            ref={optionsRef}
             className="widget-b"
             title={t('widgetFrame.options')} aria-label={t('widgetFrame.options')}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
             onClick={(ev) => { ev.stopPropagation(); setMenuOpen((o) => !o); }}
           >
             ⋯
@@ -496,23 +635,21 @@ export default function WidgetFrame({
           <>
             <div className="widget-menu-backdrop" onPointerDown={(ev) => { ev.stopPropagation(); setMenuOpen(false); }} />
             <div
+              ref={menuRef}
               className="widget-menu"
+              role="menu"
+              aria-label={t('wid7.menu.label', { name: plainTitle })}
               onPointerDown={(ev) => ev.stopPropagation()}
-              onKeyDown={(ev) => {
-                if (ev.key === 'Escape') {
-                  ev.stopPropagation();
-                  setMenuOpen(false);
-                }
-              }}
+              onKeyDown={onMenuKeyDown}
             >
-              {wid5MenuItems()}
-              <button onClick={() => { onPatch({ locked: !locked }); setMenuOpen(false); }}>{locked ? t('widgetFrame.unlock') : t('widgetFrame.lock')}</button>
-              <button onClick={() => { onPatch({ collapsed: !collapsed }); setMenuOpen(false); }}>{collapsed ? t('widgetFrame.expand') : t('widgetFrame.collapse')}</button>
-              <button onClick={() => { setSettings({ __blur: !blur }); setMenuOpen(false); }}>{blur ? t('widgetFrame.disableBlur') : t('widgetFrame.enableBlur')}</button>
-              <button onClick={() => { setSettings({ __opacity: opacity > 0.85 ? 0.7 : 1 }); setMenuOpen(false); }}>{opacity > 0.85 ? t('widgetFrame.makeTransparent') : t('widgetFrame.makeSolid')}</button>
-              <button onClick={() => { onDuplicate(); setMenuOpen(false); }}>{t('widgetFrame.duplicate')}</button>
-              <button onClick={() => { onPatch({ hidden: true }); setMenuOpen(false); }}>{t('widgetFrame.hide')}</button>
-              <button className="danger" onClick={() => { clearTimer(widget.id); onRemove(); setMenuOpen(false); }}>{t('common.remove')}</button>
+              {wid5MenuItems('menuitem')}
+              <button role="menuitem" onClick={() => { onPatch({ locked: !locked }); setMenuOpen(false); }}>{locked ? t('widgetFrame.unlock') : t('widgetFrame.lock')}</button>
+              <button role="menuitem" onClick={() => { onPatch({ collapsed: !collapsed }); setMenuOpen(false); }}>{collapsed ? t('widgetFrame.expand') : t('widgetFrame.collapse')}</button>
+              <button role="menuitem" onClick={() => { setSettings({ __blur: !blur }); setMenuOpen(false); }}>{blur ? t('widgetFrame.disableBlur') : t('widgetFrame.enableBlur')}</button>
+              <button role="menuitem" onClick={() => { setSettings({ __opacity: opacity > 0.85 ? 0.7 : 1 }); setMenuOpen(false); }}>{opacity > 0.85 ? t('widgetFrame.makeTransparent') : t('widgetFrame.makeSolid')}</button>
+              <button role="menuitem" onClick={() => { onDuplicate(); setMenuOpen(false); }}>{t('widgetFrame.duplicate')}</button>
+              <button role="menuitem" onClick={() => { onPatch({ hidden: true }); setMenuOpen(false); }}>{t('widgetFrame.hide')}</button>
+              <button role="menuitem" className="danger" onClick={() => { clearTimer(widget.id); onRemove(); setMenuOpen(false); }}>{t('common.remove')}</button>
             </div>
           </>
         )}

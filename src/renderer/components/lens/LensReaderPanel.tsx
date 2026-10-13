@@ -2,11 +2,19 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import Icon from '../Icons';
 import { useT } from '../../i18n';
-import {
-  clearManualLevel, getLevel, isManualLevel, setLevel, WK_LEVELS, type WkLevel,
-} from '../../knownWords';
+import { onKnowledgeChanged, WK_LEVELS, type WkLevel } from '../../knownWords';
 import { KNOWLEDGE_LEVEL_KEYS, KNOWLEDGE_LEVEL_SHORT_KEYS } from '../lexicon/WordKnowledge';
-import { lemmaOf, type JpToken } from '../../tokenizer';
+import {
+  anyManualLevel,
+  combinedLevel,
+  gradeKnowledgeTargets,
+  knowledgeParts,
+  knowledgeTargets,
+  knowledgeTargetsSync,
+  resetKnowledgeTargets,
+} from '../lexicon/knowledgeTargets';
+import '../lexicon/dictPopupNav.css';
+import type { JpToken } from '../../tokenizer';
 import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../../tts';
 import { getStudyLang } from '../../studyEnvironment';
 import type { DictEntry, DictResult } from '../../../shared/types';
@@ -273,9 +281,6 @@ function GlanceBody({
 }) {
   const { t } = useT();
   const [result, setResult] = useState<DictResult | null>(null);
-  const [level, setLvl] = useState<WkLevel>(0);
-  const [manual, setManual] = useState(false);
-  const [lemma, setLemma] = useState('');
   const [mine, setMine] = useState<MineState>('idle');
 
   useEffect(() => {
@@ -292,38 +297,38 @@ function GlanceBody({
     };
   }, [query]);
 
-  // Resolve to the dictionary form for knowledge grading (JP only, like the popup).
+  // ---- Knowledge grading: the keys the reader reads ------------------------
+  // The same rule as the dictionary popup (`shared/knowledgeKey` via
+  // `lexicon/knowledgeTargets`). This used to grade `lemmaOf(query)` — the FIRST
+  // content token — so grading 携帯電話 here filed the level under 携帯 alone, and
+  // a Chinese or Russian word was graded as written rather than by its reader key.
+  // Synchronous first with whatever tokenizer state there is, then again once
+  // kuromoji is built.
+  const [resolved, setResolved] = useState<{ key: string; keys: string[] } | null>(null);
+  const targetKey = `${lang}\u0000${query}`;
   useEffect(() => {
-    let dead = false;
-    if (lang !== 'ja') {
-      setLemma(query);
-      setLvl(getLevel(query));
-      setManual(isManualLevel(query));
-      return;
-    }
-    lemmaOf(query).then((lm) => {
-      if (dead) return;
-      setLemma(lm);
-      setLvl(getLevel(lm));
-      setManual(isManualLevel(lm));
+    let alive = true;
+    void knowledgeTargets(query, lang).then((keys) => {
+      if (alive) setResolved({ key: targetKey, keys });
     });
     return () => {
-      dead = true;
+      alive = false;
     };
-  }, [query, lang]);
+  }, [targetKey]);
+  const targets = useMemo(
+    () => (resolved?.key === targetKey ? resolved.keys : knowledgeTargetsSync(query, lang)),
+    [resolved, targetKey],
+  );
+  // The store is the source of truth; this counter re-reads it on any write,
+  // including a grade made in another surface while the glance is open.
+  const [knowledgeTick, setKnowledgeTick] = useState(0);
+  useEffect(() => onKnowledgeChanged(() => setKnowledgeTick((n) => n + 1)), []);
+  const level = useMemo(() => combinedLevel(targets), [targets, knowledgeTick]);
+  const manual = useMemo(() => anyManualLevel(targets), [targets, knowledgeTick]);
+  const parts = useMemo(() => (targets.length > 1 ? knowledgeParts(targets) : []), [targets, knowledgeTick]);
 
-  const grade = (n: WkLevel) => {
-    setLevel(lemma || query, n);
-    setLvl(n);
-    setManual(true);
-  };
-
-  const resetToAutomatic = () => {
-    const key = lemma || query;
-    clearManualLevel(key);
-    setLvl(getLevel(key));
-    setManual(false);
-  };
+  const grade = (n: WkLevel) => gradeKnowledgeTargets(targets, n);
+  const resetToAutomatic = () => resetKnowledgeTargets(targets);
 
   const entry = result?.entries?.[0] ?? null;
 
@@ -415,6 +420,26 @@ function GlanceBody({
           </button>
         )}
       </div>
+      {/* A compound has no level of its own: it is graded as the parts the reader
+          colours, and the buttons above show the least-known one (as in the popup). */}
+      {parts.length > 0 && (
+        <div className="dict-popup-parts lens-reader-parts" title={t('dict4.parts.combinedTitle')}>
+          <span>{t('dict4.parts.label')}</span>
+          {parts.map((part) => (
+            <span
+              key={part.key}
+              className={`wk-part wk-g-${part.level}`}
+              data-knowledge-part={part.key}
+              lang={lang}
+              title={t('dict4.parts.levelTitle', { word: part.key, level: t(KNOWLEDGE_LEVEL_KEYS[part.level]) })}
+            >
+              {part.key}
+              <span className="wk-part-level" aria-hidden="true">{t(KNOWLEDGE_LEVEL_SHORT_KEYS[part.level])}</span>
+              <span className="sr-only">{t(KNOWLEDGE_LEVEL_KEYS[part.level])}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {!result && <div className="lens-reader-looking">{t('lens.reader.looking')}</div>}
       {result && !entry && <div className="lens-reader-nomatch">{t('lens.reader.noMatch')}</div>}

@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import LibraryView from '../views/LibraryView';
 import { installReadingSurfaceApi, installResizeObserver } from './helpers/readingCanvasSurface';
 import type { LibraryItem } from '../../shared/types';
+import { LIBRARY_VIEW_STORAGE_KEY } from '../libraryViewPref';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -31,6 +32,8 @@ let root: Root;
 let opened: string[] = [];
 
 beforeEach(() => {
+  // The shelf remembers its layout (libraryViewPref); each case starts from the default grid.
+  localStorage.removeItem(LIBRARY_VIEW_STORAGE_KEY);
   installResizeObserver();
   installReadingSurfaceApi({
     syncLibrary: async () => ITEMS,

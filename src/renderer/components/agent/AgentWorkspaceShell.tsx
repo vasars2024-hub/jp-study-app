@@ -181,7 +181,7 @@ import {
   type AgentUndoEvent,
   type AgentUndoRun,
 } from '../../../shared/agentUndo';
-import { performAgentUndo, readAgentUndoContext } from '../../agentUndoClient';
+import { performAgentUndo, readAgentUndoContext, withAgentUndoBaseline } from '../../agentUndoClient';
 import { runAgentNavigation } from '../../agentNavigationClient';
 import { AgentMessageText } from './AgentMessageText';
 import {
@@ -633,7 +633,7 @@ function MessageRow({
     // types are local, but one async source makes the whole read async.
     let context: Awaited<ReturnType<typeof readAgentUndoContext>>;
     try {
-      context = await readAgentUndoContext(t);
+      context = await readAgentUndoContext(t, { log: operationLog, operationId });
     } catch {
       dispatchUndo(key, { type: 'refused', code: 'store-failed' });
       recordUndo(cardId, actionId, { type: 'refused', code: 'store-failed' });
@@ -674,12 +674,15 @@ function MessageRow({
     dispatchUndo(key, { type: 'failed', code: result.code });
     recordUndo(cardId, actionId, { type: 'failed', code: result.code });
   };
+  // A reply the user stopped part-way keeps what had arrived; it says so, plainly, so the
+  // partial text is never read as a finished answer.
+  const stopped = message.role === 'assistant' && message.status === 'cancelled' && Boolean(message.text);
   return (
-    <li className={`agent-message agent-message-${message.role}`}>
+    <li className={`agent-message agent-message-${message.role}${stopped ? ' agent-message-stopped' : ''}`}>
       <div className="agent-message-head">
         <span className="agent-message-role">{t(`agent.message.role.${message.role}`)}</span>
         <span className={`agent-chip agent-chip-status agent-status-${message.status}`}>
-          {t(`agent.message.status.${message.status}`)}
+          {stopped ? t('agent.message.status.stopped') : t(`agent.message.status.${message.status}`)}
         </span>
         {provider ? (
           <span className="agent-chip agent-chip-provider">
@@ -738,7 +741,9 @@ function MessageRow({
         className="agent-message-text"
         markdown={message.role === 'assistant'}
       />
-      {message.error ? (
+      {stopped ? (
+        <p className="agent-message-error agent-message-stopped-note">{t('agent.message.stoppedPartial')}</p>
+      ) : message.error ? (
         <p className="agent-message-error">
           {EXECUTION_ERROR_CODES.has(message.error as AgentExecutionFailureCode)
             ? t(executionErrorKey(message.error as AgentExecutionFailureCode))
@@ -1446,7 +1451,10 @@ export default function AgentWorkspaceShell() {
   }, [lang, t]);
 
   const appendOperation = useCallback((operation: AgentOperationDraft): void => {
-    setOperationLog((previous) => agentOperationLogAppend(previous, operation, Date.now()));
+    // Taken now, right after the write and outside the state updater (it reads the store):
+    // what an Undo later checks to refuse deleting an event the user has edited since.
+    const recorded = withAgentUndoBaseline(operation);
+    setOperationLog((previous) => agentOperationLogAppend(previous, recorded, Date.now()));
   }, []);
 
   /**

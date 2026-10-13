@@ -1,4 +1,4 @@
-import { Activity, Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
+import { Activity, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
 import type { LibraryItem } from '../../../shared/types';
 import {
   BLANC_TRIM_EVENT,
@@ -16,8 +16,10 @@ import {
   BLANC_OPEN_FLOW_EVENT,
   BLANC_OPEN_INBOX_EVENT,
   BLANC_QUICK_NOTES_EVENT,
+  BLANC_QUICK_NOTES_KEY,
 } from './blancMechBus';
 import { detectCaptureKind } from './blancCaptureInbox';
+
 import type { BlancVerbId } from './blancVerbs';
 import type { CollectedToolsStore } from '../../../shared/collectedTools';
 import {
@@ -61,7 +63,6 @@ import { LANG_LABELS, LANG_TAGS, UI_LANGS, type UiLang } from '../../../shared/i
 import Icon, { type IconName } from '../Icons';
 import VirtualList from '../VirtualList';
 import { retryableLazy } from '../../retryableLazy';
-import { pickCardAiExtras } from '../../../shared/cardAiExtras';
 import { useVisibleInterval } from '../../useVisibleInterval';
 import { writeLocalStorage } from '../../localStorageWrite';
 import FocusMusicBar from '../FocusMusicBar';
@@ -151,21 +152,12 @@ import {
   type LockscreenChange,
 } from '../../lockscreenSettings';
 import { LOCK_PASSPHRASE_MAX_CHARS } from '../../../shared/lockSecret';
-import { getActiveProfile } from '../../profileState';
-import { loadSaved, type SavedWord } from '../../savedWords';
+import type { SavedWord } from '../../savedWords';
 import { loadLookupHistory, type LookupHistoryEntry } from '../../lookupHistory';
 import { getStudyLang, setStudyLang } from '../../studyEnvironment';
-import { normalizeStudyLang, studyLangOfText } from '../../../shared/studyLang';
+import { studyLangOfText } from '../../../shared/studyLang';
 import type { NormalizedGrammarPoint } from '../../data/grammar';
-import {
-  addDeckCards,
-  loadDeck,
-  onDeckChanged,
-  removeDeckCard,
-  updateDeckCard,
-  type DeckFlashcard,
-} from '../../flashcardDeck';
-import { ProfileSwitcher } from '../ProfileSwitcher';
+import type { DeckFlashcard } from '../../flashcardDeck';
 import { BlancStudySettings } from './BlancStudySettings';
 
 // Every BlancReadyToolPanels export is lazy. That module reaches the agent tool
@@ -215,9 +207,14 @@ const BlancFlashcardsPanel = retryableLazy(withStudyOsCompat(() =>
 const BlancStatisticsPanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancStatisticsPanel').then((m) => ({ default: m.BlancStatisticsPanel })),
 ));
-const BlancAnkiPanel = retryableLazy(withStudyOsCompat(() =>
-  import('./BlancAnkiPanel').then((m) => ({ default: m.BlancAnkiPanel })),
-));
+// Blanc-native (no Study OS sheet of its own): the deck table, its Anki export
+// and the manual-card form. A chunk of its own so the deck store (flashcardDeck,
+// review log, stats, the local-deck sync) is not in Blanc's boot bundle
+// (tools/blanc-budget.cjs); its Anki and card-extras sub-panels lazy-load the
+// compat sheet themselves.
+const BlancDeckPanel = retryableLazy(() =>
+  import('./BlancDeckPanel').then((m) => ({ default: m.BlancDeckPanel })),
+);
 const BlancNotebookPanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancNotebookPanel').then((m) => ({ default: m.BlancNotebookPanel })),
 ));
@@ -234,7 +231,6 @@ const BlancGrammarPanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancGrammarPanel').then((m) => ({ default: m.BlancGrammarPanel })),
 ));
 // The Deck tool's per-row saved extras: the panel the Study OS and Aero deck rows open.
-const DeckCardExtrasPanel = retryableLazy(withStudyOsCompat(() => import('../flashcards/DeckCardExtrasPanel')));
 const BlancClipboardPanel = retryableLazy(withStudyOsCompat(() =>
   import('./BlancDictionaryPanels').then((m) => ({ default: m.BlancClipboardPanel })),
 ));
@@ -283,7 +279,8 @@ const BlancConversationPanel = retryableLazy(() =>
   import('./BlancConversationPanel').then((m) => ({ default: m.BlancConversationPanel })),
 );
 // Writing help under Quick Notes, loaded on first open of that tool.
-const WritingCorrection = retryableLazy(() => import('../speak/WritingCorrection'));
+// Quick Notes is the Notes app inline (its own chunk: the editor, search, export).
+const BlancQuickNotesPanel = retryableLazy(() => import('./BlancQuickNotesPanel'));
 
 // Study-native toolbox track — see BlancStudyNativePanels.tsx.
 const BlancFuriganaPanel = retryableLazy(() =>
@@ -485,6 +482,10 @@ export default function BlancShell({
   // The Memory section's scratchpad duplicated Quick Notes; its text moves there once.
   useEffect(() => {
     migrateScratchpadToQuickNotes();
+    // Then the Quick Notes text moves into the notes store (its own chunk: not boot cost).
+    void import('./blancQuickNotes')
+      .then((m) => m.migrateBlancQuickNotes(t('blanc.tb.quickNotes')))
+      .catch(() => undefined);
   }, []);
   useEffect(() => () => {
     if (deferredNavFrame.current !== null) window.cancelAnimationFrame(deferredNavFrame.current);
@@ -617,8 +618,13 @@ export default function BlancShell({
       return;
     }
     let current = true;
-    setMasterSavedWords(loadSaved());
-    setMasterDeckCards(loadDeck());
+    // The saved words and the deck load with the palette, not with the window:
+    // the deck store is not in Blanc's boot bundle (tools/blanc-budget.cjs).
+    void Promise.all([import('../../savedWords'), import('../../flashcardDeck')]).then(([saved, deck]) => {
+      if (!current) return;
+      setMasterSavedWords(saved.loadSaved());
+      setMasterDeckCards(deck.loadDeck());
+    }).catch(() => undefined);
     setMasterDictionaryEntries(loadLookupHistory());
     setMasterGrammarPoints([]);
     setMasterLibraryItems([]);
@@ -786,15 +792,18 @@ export default function BlancShell({
       if (loaded.length) pick(loaded);
       else void import('../../data/grammar').then(({ GRAMMAR }) => pick(GRAMMAR)).catch(() => requestTool('grammar'));
     } else if (verb === 'n') {
-      try {
-        const current = window.localStorage.getItem(BLANC_QUICK_NOTES_KEY) ?? '';
-        const next = current.trim() ? `${current.replace(/\s+$/, '')}\n${arg}` : arg;
-        if (writeLocalStorage(BLANC_QUICK_NOTES_KEY, next)) {
-          window.dispatchEvent(new CustomEvent(BLANC_QUICK_NOTES_EVENT));
-          mechToast(t('blanc.mech.verb.n.done'));
-        }
-      } catch {
-        /* storage unavailable: writeLocalStorage already reported it */
+      // A new note in the notes store (durable, shared with every shell); it
+      // used to be appended to the single Quick Notes text box.
+      if (!arg.trim()) {
+        requestTool('quick-notes');
+      } else {
+        void import('./blancQuickNotes')
+          .then((m) => {
+            m.addQuickNote(arg, t('blanc.tb.quickNotes'));
+            window.dispatchEvent(new CustomEvent(BLANC_QUICK_NOTES_EVENT));
+            mechToast(t('blanc.mech.verb.n.done'));
+          })
+          .catch(() => mechToast(t('notes.save.failed'), 'error'));
       }
     } else if (verb === 'o') {
       const hit = searchBlancMasterIndex(arg, blancTools, [], [], 1).results[0];
@@ -1321,262 +1330,6 @@ function BlancMinePanel({ advanced }: { advanced: boolean }) {
   );
 }
 
-function BlancDeckPanel({ advanced }: { advanced: boolean }) {
-  const { t } = useT();
-  const [cards, setCards] = useState<DeckFlashcard[]>(() => loadDeck());
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [status, setStatus] = useState('');
-  const [decks, setDecks] = useState<string[]>([]);
-  const [connected, setConnected] = useState(false);
-  const [deck, setDeck] = useState(() => getActiveProfile().anki.deckName ?? '');
-  const [term, setTerm] = useState('');
-  const [reading, setReading] = useState('');
-  const [meaning, setMeaning] = useState('');
-  const [sentence, setSentence] = useState('');
-  // Rendered a page at a time: the table mounted one row (six cells and a
-  // checkbox) per card, 20,000 rows on a large deck.
-  const [rowLimit, setRowLimit] = useState(BLANC_DECK_PAGE);
-  const [extrasId, setExtrasId] = useState<string | null>(null);
-
-  useEffect(() => onDeckChanged(() => setCards(loadDeck())), []);
-  useEffect(() => {
-    // Asked once per visit, not on every deck change (picking a deck re-queried
-    // AnkiConnect each time), and not at all when the advanced Anki panel is
-    // shown instead. A rejected IPC reads as "not connected", not as an
-    // unhandled rejection.
-    if (advanced) return undefined;
-    let alive = true;
-    void window.api.ankiStatus()
-      .then((next) => {
-        if (!alive) return;
-        setConnected(!!next.connected);
-        setDecks(next.decks ?? []);
-        setDeck((current) => current || next.decks?.[0] || '');
-      })
-      .catch(() => {
-        if (!alive) return;
-        setConnected(false);
-        setDecks([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [advanced]);
-
-  if (advanced) return <BlancAnkiPanel />;
-
-  const toggle = (id: string): void => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const sendCard = async (
-    card: Pick<DeckFlashcard, 'id' | 'word' | 'reading' | 'meaning' | 'sentence' | 'studyLang'>
-      & Partial<Pick<DeckFlashcard, 'mnemonic' | 'distinction' | 'exampleSentences' | 'acceptedAnswers'>>,
-  ): Promise<boolean> => {
-    const result = await window.api.ankiMineNote({
-      // The card's own language routes it (absent is Japanese, as stored).
-      route: { source: 'other', cardKind: card.sentence ? 'sentence' : 'word', language: normalizeStudyLang(card.studyLang) },
-      term: card.word,
-      reading: card.reading || undefined,
-      meaning: card.meaning || undefined,
-      sentence: card.sentence || undefined,
-      deckName: deck || undefined,
-      // The card's saved extras (memory aid, notes, examples, accepted answers).
-      cardExtras: pickCardAiExtras(card),
-    });
-    const ok = result.ok || result.error === 'duplicate';
-    if (card.id) {
-      updateDeckCard(card.id, {
-        ankiExported: ok,
-        ankiExportedAt: ok ? Date.now() : undefined,
-        ankiNoteId: result.noteId,
-        ankiExportError: ok ? undefined : result.error ?? t('blanc.shell.deck.exportFailed'),
-        ankiDeck: deck || undefined,
-      });
-      setCards(loadDeck());
-    }
-    return ok;
-  };
-
-  const exportSelected = async (): Promise<void> => {
-    const targets = cards.filter((card) => selected.has(card.id));
-    if (!targets.length) {
-      setStatus(t('blanc.shell.deck.selectFirst'));
-      return;
-    }
-    setStatus(t('blanc.shell.deck.exporting', { count: targets.length }));
-    let ok = 0;
-    for (const card of targets) {
-      if (await sendCard(card)) ok += 1;
-    }
-    setStatus(t('blanc.shell.deck.exported', { ok, total: targets.length }));
-  };
-
-  const addManual = async (): Promise<void> => {
-    const word = term.trim();
-    if (!word) return;
-    const payload = {
-      word,
-      reading: reading.trim(),
-      meaning: meaning.trim(),
-      sentence: sentence.trim() || undefined,
-      front: word,
-      back: meaning.trim(),
-      source: 'epub' as const,
-      // Absent means Japanese on a stored card; anything else is said.
-      ...(studyLangOfText(word, getStudyLang()) !== 'ja' ? { studyLang: studyLangOfText(word, getStudyLang()) } : {}),
-    };
-    const created = addDeckCards([payload])[0];
-    setCards(loadDeck());
-    setTerm('');
-    setReading('');
-    setMeaning('');
-    setSentence('');
-    if (connected && created) {
-      const ok = await sendCard(created);
-      setStatus(ok ? t('blanc.shell.deck.savedExported') : t('blanc.shell.deck.savedExportFailed'));
-    } else {
-      setStatus(t('blanc.shell.deck.savedLocal'));
-    }
-  };
-
-  return (
-    <div className="blanc-panel">
-      <ProfileSwitcher compact showHeading={false} />
-      <fieldset>
-        <legend>Anki</legend>
-        <div className="blanc-toolbar">
-          <span className={`blanc-status-dot${connected ? ' ok' : ''}`} />
-          <span>{connected ? t('blanc.shell.deck.connected') : t('blanc.shell.deck.notConnected')}</span>
-          <select value={deck} aria-label={t('blanc.shell.deck.deck')} onChange={(event) => setDeck(event.target.value)}>
-            {deck && !decks.includes(deck) && <option value={deck}>{deck}</option>}
-            <option value="">{t('blanc.shell.deck.profileDefault')}</option>
-            {decks.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <button type="button" onClick={() => void exportSelected()}>
-            {t('blanc.shell.deck.exportSelected')}
-          </button>
-        </div>
-        {status && <p className="blanc-note">{status}</p>}
-      </fieldset>
-
-      <fieldset>
-        <legend>{t('blanc.shell.deck.manualCard')}</legend>
-        <div className="blanc-form-grid">
-          <label>
-            {t('blanc.shell.deck.word')}
-            <input value={term} lang="ja" onChange={(event) => setTerm(event.target.value)} />
-          </label>
-          <label>
-            {t('blanc.shell.deck.reading')}
-            <input value={reading} lang="ja" onChange={(event) => setReading(event.target.value)} />
-          </label>
-          <label>
-            {t('blanc.shell.deck.meaning')}
-            <input value={meaning} onChange={(event) => setMeaning(event.target.value)} />
-          </label>
-          <label>
-            {t('blanc.shell.deck.sentence')}
-            <input value={sentence} lang="ja" onChange={(event) => setSentence(event.target.value)} />
-          </label>
-        </div>
-        <button type="button" onClick={() => void addManual()} disabled={!term.trim()}>
-          {t('blanc.shell.deck.addCard')}
-        </button>
-      </fieldset>
-
-      <div className="blanc-table-wrap">
-        <table className="blanc-table">
-          <thead>
-            <tr>
-              <th />
-              <th>{t('blanc.shell.deck.word')}</th>
-              <th>{t('blanc.shell.deck.meaning')}</th>
-              <th>{t('blanc.shell.deck.source')}</th>
-              <th>Anki</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {cards.slice(0, rowLimit).map((card) => (
-              <Fragment key={card.id}>
-                <tr>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(card.id)}
-                      aria-label={t('blanc.shell.deck.selectCard', { word: card.word })}
-                      onChange={() => toggle(card.id)}
-                    />
-                  </td>
-                  <td lang="ja">{card.word}</td>
-                  <td>{card.meaning || card.back}</td>
-                  <td>{card.bookTitle || card.source}</td>
-                  <td>{card.ankiExported ? t('blanc.shell.deck.stateExported') : card.ankiExportError ? t('blanc.shell.deck.stateFailed') : t('blanc.shell.deck.stateLocal')}</td>
-                  <td>
-                    {/* The card's saved extras (memory aid, notes, kept examples,
-                        accepted answers) — the same panel as the Study OS and Aero
-                        deck rows. Not `data-ai-entry`: it works with AI off. */}
-                    <button
-                      type="button"
-                      data-flash-action="row-card-extras"
-                      aria-pressed={extrasId === card.id}
-                      aria-label={t('aiStudy.extras.open', { word: card.word })}
-                      title={t('aiStudy.extras.open', { word: card.word })}
-                      onClick={() => setExtrasId(extrasId === card.id ? null : card.id)}
-                    >
-                      {t('blanc.shell.deck.extras')}
-                    </button>{' '}
-                    <button type="button" onClick={() => {
-                      removeDeckCard(card.id);
-                      setCards(loadDeck());
-                    }}>
-                      {t('blanc.shell.remove')}
-                    </button>
-                  </td>
-                </tr>
-                {extrasId === card.id && (
-                  <tr>
-                    <td colSpan={6}>
-                      <Suspense fallback={null}>
-                        <DeckCardExtrasPanel card={card} onClose={() => setExtrasId(null)} />
-                      </Suspense>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-            {cards.length === 0 && (
-              <tr>
-                <td colSpan={6}>{t('blanc.shell.deck.empty')}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        {cards.length > rowLimit && (
-          <p className="blanc-note">
-            <span>{t('perf3.deck.rowsShown', { shown: rowLimit, total: cards.length })}</span>{' '}
-            <button type="button" onClick={() => setRowLimit((limit) => limit + BLANC_DECK_PAGE)}>
-              {t('perf3.deck.showMore', { count: Math.min(BLANC_DECK_PAGE, cards.length - rowLimit) })}
-            </button>
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Rows the Blanc deck table mounts per page. */
-const BLANC_DECK_PAGE = 200;
 
 
 /**
@@ -2008,7 +1761,7 @@ function renderBlancTool(
   if (tool === 'unit-converter') return <UnitConverterPanel />;
   if (tool === 'focus-timer') return <FocusTimerPanel />;
   if (tool === 'system-monitor') return <SystemMonitorPanel />;
-  if (tool === 'quick-notes') return <QuickNotesPanel />;
+  if (tool === 'quick-notes') return <BlancQuickNotesPanel />;
   if (tool === 'file-search') return <FileSearchPanel />;
   if (tool === 'hash-checker') return <HashCheckerPanel />;
   if (tool === 'image-converter') return <ImageConverterPanel />;
@@ -3192,14 +2945,14 @@ function AppMemoryReadout({ report }: { report: AppMemoryReport | null }) {
   );
 }
 
-const BLANC_QUICK_NOTES_KEY = 'jp-study.blanc.quickNotes';
 /** The book open when Blanc last closed ("Restore reader on launch"). */
 const BLANC_LAST_BOOK_KEY = 'jp-study.blanc.lastBook';
 
 /**
  * Settings > Memory had a "scratchpad" textarea that duplicated Quick Notes.
  * Its text is appended to Quick Notes once and the scratchpad emptied, so
- * nothing the user wrote is lost when the duplicate goes.
+ * nothing the user wrote is lost when the duplicate goes. `migrateBlancQuickNotes`
+ * then moves that text into the notes store as a note.
  */
 function migrateScratchpadToQuickNotes(): void {
   const scratchpad = loadBlancMemory().scratchpad.trim();
@@ -3212,72 +2965,6 @@ function migrateScratchpadToQuickNotes(): void {
   } catch {
     /* storage unavailable: leave the scratchpad where it is */
   }
-}
-
-function QuickNotesPanel() {
-  const { t } = useT();
-  const [notes, setNotes] = useState(() => {
-    try {
-      return window.localStorage.getItem(BLANC_QUICK_NOTES_KEY) ?? '';
-    } catch {
-      return '';
-    }
-  });
-  const [saved, setSaved] = useState(false);
-  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
-  const save = (next: string): void => {
-    setNotes(next);
-    try {
-      window.localStorage.setItem(BLANC_QUICK_NOTES_KEY, next);
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1200);
-    } catch {
-      setSaved(false);
-    }
-  };
-
-  useEffect(() => registerCommandHandler('quickNotes.newNote', () => {
-    save('');
-    return true;
-  }), []);
-  // The `n` verb appends from Master search; a warm (kept-mounted) panel must
-  // pick that up, or its next keystroke would write the old text back over it.
-  useEffect(() => {
-    const reload = (): void => {
-      try {
-        setNotes(window.localStorage.getItem(BLANC_QUICK_NOTES_KEY) ?? '');
-      } catch {
-        /* storage unavailable */
-      }
-    };
-    reload();
-    window.addEventListener(BLANC_QUICK_NOTES_EVENT, reload);
-    return () => window.removeEventListener(BLANC_QUICK_NOTES_EVENT, reload);
-  }, []);
-
-  return (
-    <div className="blanc-tool-detail">
-      <fieldset>
-        <legend>{t('blanc.tb.quickNotes')}</legend>
-        <p className="blanc-warning">{t('blanc.tb.quickNotesWarning')}</p>
-        <textarea
-          rows={12}
-          value={notes}
-          aria-label={t('blanc.tb.quickNotes')}
-          placeholder={t('blanc.tb.quickNotesPlaceholder')}
-          onChange={(event) => save(event.target.value)}
-          onSelect={(event) => setSelection({ start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd })}
-        />
-        <div className="blanc-row-actions">
-          <button type="button" onClick={() => save('')}>{t('blanc.tb.clear')}</button>
-          <span className="blanc-note">{saved ? t('blanc.tb.saved') : t('blanc.tb.characters', { count: notes.length })}</span>
-        </div>
-        <Suspense fallback={null}>
-          <WritingCorrection text={notes} selection={selection} studyLang={getStudyLang()} onApply={save} />
-        </Suspense>
-      </fieldset>
-    </div>
-  );
 }
 
 function formatDateTime(ms: number): string {

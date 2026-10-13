@@ -7,7 +7,6 @@ export const QUALITY_UI_RU: Catalog = {
   'set2.home.recentChanges': 'Недавно изменённые',
   'set2.home.clearRecentChanges': 'Очистить',
   'set2.reset.dialogTitle': 'Сбросить раздел «{section}»?',
-  'set2.reset.dialogMessage': 'Все параметры этого раздела вернутся к значениям по умолчанию. Это нельзя отменить.',
   'set2.group.connections': 'ИИ и подключения',
 
   // ---- Widgets ----

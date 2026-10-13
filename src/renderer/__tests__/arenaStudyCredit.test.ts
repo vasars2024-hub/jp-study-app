@@ -74,7 +74,9 @@ describe('arena study credit', () => {
     const card = addDeckCardsTracked([{ word: '猫', reading: 'ねこ', meaning: 'cat', source: 'import' }])[0];
     reviewDeckCard(card.id, 'good', Date.now() - 30 * DAY);
     resetReviewLogForTests();
-    const reviewsBefore = getStudyDayActivity(todayDayKey())?.reviews ?? 0;
+    const dayBefore = getStudyDayActivity(todayDayKey());
+    const reviewsBefore = dayBefore?.reviews ?? 0;
+    const practiceBefore = dayBefore?.practice ?? 0;
     const session = newArenaBankSession();
     expect(bankArenaAnswer(round('猫'), true, Date.now(), session).kind).toBe('review');
     expect(bankArenaAnswer(round('猫'), false, Date.now(), session).kind).toBe('repeat');
@@ -82,7 +84,11 @@ describe('arena study credit', () => {
     expect(log.map((r) => [r.mode, r.source])).toEqual([['review', 'game']]);
     // Moved the schedule, but is not a recall test: out of FSRS training and true retention.
     expect(isRecallReview(log[0])).toBe(false);
-    expect(getStudyDayActivity(todayDayKey())?.reviews).toBe(reviewsBefore + 1);
+    // Counted once for the day, as a game answer (practice), never as a recall review, so it
+    // stays out of the day's review pass rate.
+    const dayAfter = getStudyDayActivity(todayDayKey());
+    expect(dayAfter?.reviews ?? 0).toBe(reviewsBefore);
+    expect(dayAfter?.practice ?? 0).toBe(practiceBefore + 1);
     // A new session counts again; the card is no longer due, so it is practice.
     expect(bankArenaAnswer(round('猫'), true, Date.now(), newArenaBankSession()).kind).toBe('practice');
   });

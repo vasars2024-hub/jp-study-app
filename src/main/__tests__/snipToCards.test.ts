@@ -20,7 +20,8 @@ const h = vi.hoisted(() => {
     toBitmap = (): Buffer => Buffer.from(`bmp:${this.content}`);
     crop = (r: { x: number; y: number }) => ({ toBitmap: () => Buffer.from(`${this.content}@${r.x},${r.y}`) });
   }
-  const clip = { image: null as FakeImage | null, text: '' };
+  /** `raw`: the bytes of the registered "PNG" format, when the snipping app wrote one. */
+  const clip = { image: null as FakeImage | null, text: '', raw: '' };
   class FakeWebContents {
     static next = 1;
     id = FakeWebContents.next++;
@@ -92,6 +93,7 @@ vi.mock('electron', () => {
     clipboard: {
       availableFormats: () => [...(h.clip.text ? ['text/plain'] : []), ...(h.clip.image ? ['image/png'] : [])],
       readImage: () => h.clip.image ?? new h.FakeImage(''),
+      readBuffer: (format: string) => (format === 'PNG' && h.clip.raw ? Buffer.from(h.clip.raw) : Buffer.alloc(0)),
       readText: () => h.clip.text,
     },
     nativeImage: { createFromPath: (p: string) => new h.FakeImage(fs.existsSync(p) ? 'stored' : '') },
@@ -147,6 +149,8 @@ async function load(): Promise<Mod> {
   h.paddleLangs = [];
   h.clip.image = null;
   h.clip.text = '';
+  h.clip.raw = '';
+  clock = Date.now();
   const m = await import('../snipToCards');
   gum = await import('../gumClipboardWrites');
   m.configureSnipToCards({
@@ -159,15 +163,19 @@ async function load(): Promise<Mod> {
   });
   m.registerSnipToCardsIpc();
   m.__snipToCardsTestables.setStarted(true);
-  m.__snipToCardsTestables.primeProbe();
+  m.__snipToCardsTestables.primeProbe(clock);
   return m;
 }
+
+/** The poll's clock: each helper step is a few seconds later, past any back-off. */
+let clock = 0;
 
 /** Put a picture on the clipboard and let one poll see it. */
 async function snip(content: string, size?: { width: number; height: number }): Promise<void> {
   h.clip.text = '';
   h.clip.image = new h.FakeImage(content, size?.width, size?.height);
-  mod.__snipToCardsTestables.tick();
+  clock += 5000;
+  mod.__snipToCardsTestables.tick(clock);
   await new Promise((r) => setTimeout(r, 0));
   await mod.__snipToCardsTestables.settled();
 }
@@ -175,7 +183,9 @@ async function snip(content: string, size?: { width: number; height: number }): 
 function clearClipboard(): void {
   h.clip.image = null;
   h.clip.text = 'text';
-  mod.__snipToCardsTestables.tick();
+  h.clip.raw = '';
+  clock += 5000;
+  mod.__snipToCardsTestables.tick(clock);
 }
 
 const history = () => mod.__snipToCardsTestables.loadHistory();
@@ -237,7 +247,8 @@ describe('watching the clipboard', () => {
     await snip('during-pause');
     expect(history()).toHaveLength(0);
     await h.handlers.get('snip:setSettings')!({}, { enabled: true });
-    mod.__snipToCardsTestables.tick();
+    clock += 5000;
+    mod.__snipToCardsTestables.tick(clock);
     await mod.__snipToCardsTestables.settled();
     expect(history()).toHaveLength(0);
     await snip('after-resume');
@@ -352,5 +363,122 @@ describe('the main window and the history', () => {
     await h.handlers.get('snip:open')!({}, 'snip-x');
     expect(h.main.visible).toBe(true);
     expect(h.main.webContents.sent.at(-1)).toEqual({ channel: 'snip:open', payload: { id: 'snip-x' } });
+  });
+});
+
+describe('the poll does not decode a picture that sits on the clipboard (scorecard bug)', () => {
+  it('bitmap only: re-checked on a back-off up to 2 s, not twice a second', async () => {
+    await snip('猫');
+    const after = mod.__snipToCardsTestables.decodes();
+    // Ten seconds of 500 ms polls with the same picture still there.
+    for (let i = 1; i <= 20; i += 1) mod.__snipToCardsTestables.tick(clock + i * 500);
+    const extra = mod.__snipToCardsTestables.decodes() - after;
+    // Was 20 (every poll). Back-off: 1 s, 2 s, 2 s, … → at most 6 in 10 s.
+    expect(extra).toBeLessThanOrEqual(6);
+    expect(extra).toBeGreaterThan(0);
+    expect(history()).toHaveLength(1);
+  });
+
+  it('bitmap only: a new picture is still noticed within the back-off cap', async () => {
+    await snip('猫');
+    for (let i = 1; i <= 20; i += 1) mod.__snipToCardsTestables.tick(clock + i * 500);
+    clock += 10_000;
+    h.clip.image = new h.FakeImage('犬');
+    // Same format list, so only the scheduled re-check can see it: within 2 s.
+    for (let i = 1; i <= 4; i += 1) mod.__snipToCardsTestables.tick(clock + i * 500);
+    await new Promise((r) => setTimeout(r, 0));
+    await mod.__snipToCardsTestables.settled();
+    expect(history()).toHaveLength(2);
+  });
+
+  it('with the raw PNG bytes: never decoded again while they stay, and a new snip is seen on the next poll', async () => {
+    h.clip.raw = 'png-bytes-of-猫';
+    await snip('猫');
+    const after = mod.__snipToCardsTestables.decodes();
+    for (let i = 1; i <= 40; i += 1) mod.__snipToCardsTestables.tick(clock + i * 500);
+    expect(mod.__snipToCardsTestables.decodes()).toBe(after);
+    clock += 20_000;
+    h.clip.image = new h.FakeImage('犬');
+    h.clip.raw = 'png-bytes-of-犬';
+    mod.__snipToCardsTestables.tick(clock + 1);
+    await new Promise((r) => setTimeout(r, 0));
+    await mod.__snipToCardsTestables.settled();
+    expect(mod.__snipToCardsTestables.decodes()).toBe(after + 1);
+    expect(history()).toHaveLength(2);
+  });
+
+  it('no picture on the clipboard: nothing is decoded at all', () => {
+    h.clip.text = 'just text';
+    const before = mod.__snipToCardsTestables.decodes();
+    for (let i = 1; i <= 10; i += 1) mod.__snipToCardsTestables.tick(clock + i * 500);
+    expect(mod.__snipToCardsTestables.decodes()).toBe(before);
+  });
+});
+
+describe('the first-run notice (Snip to cards is on by default)', () => {
+  it('the first toast that reports cards carries the notice once, and main records it', async () => {
+    expect((await h.handlers.get('snip:getStatus')!({})) as { notice: string }).toMatchObject({ enabled: true, autoAdd: true, notice: 'pending' });
+    // A toast that added nothing does not use it up.
+    await h.handlers.get('snip:toast:show')!({}, { id: 'snip-x', kind: 'none' });
+    expect((await h.handlers.get('snip:toast:get')!({})) as { notice?: boolean }).not.toHaveProperty('notice');
+    await h.handlers.get('snip:toast:show')!({}, { id: 'snip-x', kind: 'added', words: ['猫'], count: 1 });
+    expect(await h.handlers.get('snip:toast:get')!({})).toMatchObject({ kind: 'added', notice: true });
+    const stored = JSON.parse(fs.readFileSync(path.join(h.userData, 'snip-to-cards.json'), 'utf8'));
+    expect(stored.notice).toBe('shown');
+    await h.handlers.get('snip:toast:show')!({}, { id: 'snip-y', kind: 'added', words: ['犬'], count: 1 });
+    expect((await h.handlers.get('snip:toast:get')!({})) as { notice?: boolean }).not.toHaveProperty('notice');
+  });
+
+  it('a renderer cannot force the notice, and Turn off answers it and stops watching', async () => {
+    await h.handlers.get('snip:setSettings')!({}, { notice: 'answered' });
+    await h.handlers.get('snip:toast:show')!({}, { id: 'snip-x', kind: 'added', count: 1, notice: true });
+    expect((await h.handlers.get('snip:toast:get')!({})) as { notice?: boolean }).not.toHaveProperty('notice');
+    const off = (await h.handlers.get('snip:setSettings')!({}, { enabled: false, notice: 'answered' })) as { enabled: boolean; notice: string; watching: boolean };
+    expect(off).toMatchObject({ enabled: false, notice: 'answered', watching: false });
+  });
+
+  it('the notice toast is taller than a plain one (it carries the question)', async () => {
+    await h.handlers.get('snip:toast:show')!({}, { id: 'snip-x', kind: 'added', words: ['猫'], count: 1 });
+    const [toast] = h.FakeWindow.all;
+    expect(Number(toast.opts.height)).toBeGreaterThan(200);
+  });
+});
+
+describe('actions and patches are checked in main', () => {
+  it('review, correction, re-analysis and deck actions are forwarded; malformed ones are refused', async () => {
+    await snip('猫');
+    const [entry] = history();
+    h.main = new h.FakeWindow();
+    await h.handlers.get('snip:ready')!({ sender: h.main.webContents });
+    const act = (a: unknown) => h.handlers.get('snip:action')!({}, a);
+    expect(await act({ id: entry.id, action: 'addWords', indices: [2, 0, 2, -1, 'x'] })).toBe(true);
+    expect(await act({ id: entry.id, action: 'editWord', index: 0, reading: 'ねこ\u0007' })).toBe(true);
+    expect(await act({ id: entry.id, action: 'reanalyze', text: '  未来の猫\r\n ' })).toBe(true);
+    expect(await act({ id: entry.id, action: 'setDeck', deck: 'Manga::Vol 1' })).toBe(true);
+    expect(await act({ id: entry.id, action: 'addWords', indices: [] })).toBe(false);
+    expect(await act({ id: entry.id, action: 'editWord', index: 0 })).toBe(false);
+    expect(await act({ id: entry.id, action: 'editWord', index: 0, lemma: '   ' })).toBe(false);
+    expect(await act({ id: entry.id, action: 'reanalyze', text: '   ' })).toBe(false);
+    expect(await act({ id: entry.id, action: 'removeWord', index: '1' })).toBe(false);
+    expect(await act({ id: entry.id, action: 'format-disk' })).toBe(false);
+    expect(h.main.webContents.sent.filter((s) => s.channel === 'snip:action').map((s) => s.payload)).toEqual([
+      { id: entry.id, action: 'addWords', indices: [2, 0] },
+      { id: entry.id, action: 'editWord', index: 0, reading: 'ねこ' },
+      { id: entry.id, action: 'reanalyze', text: '未来の猫' },
+      { id: entry.id, action: 'setDeck', deck: 'Manga::Vol 1' },
+    ]);
+  });
+
+  it('a re-analysis can clear the old error; review, deck and the OCR text are kept', async () => {
+    await snip('猫');
+    const [entry] = history();
+    const update = h.handlers.get('snip:history:update')!;
+    await update({}, entry.id, { status: 'error', error: 'low-confidence', text: '末来' });
+    const next = (await update({}, entry.id, {
+      status: 'done', text: '未来', ocrText: '末来', review: 'manual', deck: 'Manga', clear: ['error', 'id'],
+    })) as Record<string, unknown>;
+    expect(next).toMatchObject({ status: 'done', text: '未来', ocrText: '末来', review: 'manual', deck: 'Manga' });
+    expect(next).not.toHaveProperty('error');
+    expect(next.id).toBe(entry.id);
   });
 });

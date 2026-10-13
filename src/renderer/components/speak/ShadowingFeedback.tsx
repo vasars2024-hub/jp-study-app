@@ -8,6 +8,12 @@
  * named sound issues, and the pace against the original cue — plus Play buttons
  * for the original and the learner's take. All of that works with AI switched off.
  *
+ * Round 2: the recording itself is also measured on the device
+ * (`shared/shadowingProsody.ts`): the pitch the learner used on each word against
+ * the pitch dictionary (Japanese), and the rhythm — morae (syllables) per second
+ * and the pauses inside the line, placed by word. Only when the take was close
+ * enough to the line for the mora layout to mean anything.
+ *
  * "Explain with AI" (a `data-ai-entry`, hidden while AI is off) sends TEXT only —
  * the line, the transcript and the findings — never the audio.
  *
@@ -22,14 +28,23 @@ import {
   shadowMissedWords,
   type ShadowingComparison,
 } from '../../../shared/shadowingScore';
+import {
+  analyzeShadowProsody,
+  awkwardPauses,
+  prosodyComparable,
+  trackPitch,
+  type ShadowProsody,
+} from '../../../shared/shadowingProsody';
 import type { StudyLang } from '../../../shared/studyLang';
 import type { WhisperModelTier } from '../../../shared/whisperModels';
 import { useAiReadiness } from '../../aiSetupClient';
+import { cardAudio } from '../../cardAudioPlayback';
 import { useT } from '../../i18n';
 import { transcribeRecording, whisperReadiness } from '../../speechCapture';
 import { AiStudyStatus, AiSuggestionBadge, useAiStudyRequest } from '../ai/aiStudyRequest';
 import { WhisperInstallPrompt } from './SpeakParts';
-import { shadowTokensFor } from './speakText';
+import { ShadowProsodyView, type ProsodyState } from './ShadowingProsody';
+import { prosodyWordsFor, shadowTokensFor } from './speakText';
 import './speak.css';
 
 export interface ShadowingFeedbackProps {
@@ -47,7 +62,7 @@ type Stage =
   | { kind: 'checking' }
   | { kind: 'needs-model'; tier: WhisperModelTier; sizeBytes: number }
   | { kind: 'transcribing' }
-  | { kind: 'done'; comparison: ShadowingComparison; heard: string }
+  | { kind: 'done'; comparison: ShadowingComparison; heard: string; prosody: ProsodyState }
   | { kind: 'failed'; reason: 'decode-failed' | 'failed' | 'empty' | 'cancelled' | 'no-line' };
 
 export default function ShadowingFeedback({ audioUrl, expected, cueSec, studyLang, onReplayOriginal }: ShadowingFeedbackProps) {
@@ -55,7 +70,8 @@ export default function ShadowingFeedback({ audioUrl, expected, cueSec, studyLan
   const ai = useAiReadiness();
   const [stage, setStage] = useState<Stage>({ kind: 'checking' });
   const controller = useRef<AbortController | null>(null);
-  const player = useRef<HTMLAudioElement | null>(null);
+  /** The take this panel last played, so leaving stops only its own clip. */
+  const played = useRef<string | null>(null);
   const request = useAiStudyRequest<ShadowingFeedbackResult>();
   const supported = studyLang === 'ja' || studyLang === 'zh';
 
@@ -98,7 +114,13 @@ export default function ShadowingFeedback({ audioUrl, expected, cueSec, studyLan
         cueSec,
         spokenSec: transcript.spokenSec,
       });
-      setStage(comparison ? { kind: 'done', comparison, heard: transcript.text } : { kind: 'failed', reason: 'no-line' });
+      if (!comparison) {
+        setStage({ kind: 'failed', reason: 'no-line' });
+        return;
+      }
+      const prosody = await measureProsody(comparison, expectedTokens, transcript, studyLang, cueSec);
+      if (mine.signal.aborted) return;
+      setStage({ kind: 'done', comparison, heard: transcript.text, prosody });
     } catch {
       if (!mine.signal.aborted) setStage({ kind: 'failed', reason: 'failed' });
     }
@@ -115,17 +137,20 @@ export default function ShadowingFeedback({ audioUrl, expected, cueSec, studyLan
     setStage({ kind: 'failed', reason: 'cancelled' });
   };
 
+  // The shared study-clip channel: a second press restarts the take instead of
+  // stacking it, and the Soundscape ducks under the learner's own voice.
   const playMine = (): void => {
-    player.current?.pause();
-    const audio = new Audio(audioUrl);
-    player.current = audio;
-    void audio.play().catch(() => undefined);
+    played.current = audioUrl;
+    void cardAudio.play(audioUrl).catch(() => undefined);
   };
-  useEffect(() => () => player.current?.pause(), []);
+  useEffect(() => () => {
+    if (played.current) cardAudio.stop(played.current);
+  }, []);
 
   const explain = (refresh = false): void => {
     if (stage.kind !== 'done' || (studyLang !== 'ja' && studyLang !== 'zh')) return;
-    const { comparison, heard } = stage;
+    const { comparison, heard, prosody } = stage;
+    const measured = prosody.kind === 'measured' ? prosody.prosody : null;
     void request.run((requestId) => window.api.aiSpeakShadowing({
       requestId,
       lang: studyLang,
@@ -136,6 +161,7 @@ export default function ShadowingFeedback({ audioUrl, expected, cueSec, studyLan
       extra: shadowExtraWords(comparison),
       hints: comparison.hints.map((hint) => hint.kind),
       pace: comparison.timing?.pace ?? '',
+      ...(measured ? prosodyForAi(measured, studyLang) : {}),
       answerLang: uiLang,
       ...(refresh ? { refresh: true } : {}),
     }));
@@ -185,6 +211,8 @@ export default function ShadowingFeedback({ audioUrl, expected, cueSec, studyLan
         <ShadowResult comparison={stage.comparison} lang={studyLang} />
       )}
 
+      {stage.kind === 'done' && <ShadowProsodyView state={stage.prosody} lang={studyLang} />}
+
       {stage.kind === 'done' && ai.loaded && ai.enabled && (
         <div className="speak-ai" data-ai-entry>
           <AiStudyStatus state={request.state} onCancel={request.cancel} busyKey="aiSpeak.shadow.explaining" />
@@ -216,6 +244,39 @@ export default function ShadowingFeedback({ audioUrl, expected, cueSec, studyLan
       )}
     </section>
   );
+}
+
+/**
+ * The on-device pitch and rhythm measurement of a take, when it was close
+ * enough to the line (`prosodyComparable`) and the recording could be read.
+ */
+async function measureProsody(
+  comparison: ShadowingComparison,
+  expectedTokens: Awaited<ReturnType<typeof shadowTokensFor>>,
+  transcript: { pcm?: Float32Array; sampleRate?: number },
+  lang: 'ja' | 'zh',
+  cueSec: number,
+): Promise<ProsodyState> {
+  if (!transcript.pcm || !transcript.sampleRate) return { kind: 'skipped', reason: 'no-audio' };
+  if (!prosodyComparable(comparison.score, comparison.expectedUnits, comparison.heardUnits)) {
+    return { kind: 'skipped', reason: 'not-comparable' };
+  }
+  try {
+    const { words, pitchAvailable } = await prosodyWordsFor(expectedTokens, lang);
+    const prosody = analyzeShadowProsody({ track: trackPitch(transcript.pcm, transcript.sampleRate), words, cueSec });
+    return prosody ? { kind: 'measured', prosody, pitchAvailable } : { kind: 'skipped', reason: 'no-voice' };
+  } catch {
+    return { kind: 'skipped', reason: 'no-audio' };
+  }
+}
+
+/** The measured findings as text for "Explain with AI" (never the audio). */
+function prosodyForAi(prosody: ShadowProsody, lang: 'ja' | 'zh'): { accent?: string[]; pauses?: string[] } {
+  const accent = lang === 'ja'
+    ? prosody.accents.filter((a) => a.verdict === 'mismatch').map((a) => `${a.surface}: ${a.expected.join('/')} → ${a.heard}`)
+    : [];
+  const pauses = awkwardPauses(prosody).map((p) => `${p.inside ? 'inside' : 'after'} ${p.word} ${p.sec}s`);
+  return { ...(accent.length ? { accent } : {}), ...(pauses.length ? { pauses } : {}) };
 }
 
 function ShadowResult({ comparison, lang }: { comparison: ShadowingComparison; lang: StudyLang }) {

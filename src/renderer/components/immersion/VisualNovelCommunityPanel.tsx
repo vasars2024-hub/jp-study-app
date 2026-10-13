@@ -13,6 +13,7 @@ import {
 import { addDeckCards, loadDeck } from '../../flashcardDeck';
 import { loadMediaStudyDatabase } from '../../mediaStudyStore';
 import { useT } from '../../i18n';
+import { visualNovelErrorKey } from '../../../shared/visualNovelCapture';
 import { VN_ACTION_STATE_EMPTY, vnBundleReason, vnSaveReportReason } from '../../../shared/vnActionReason';
 
 interface ReportDraft {
@@ -119,7 +120,7 @@ export default function VisualNovelCommunityPanel({
       communityReports: [...entry.communityReports, report],
     });
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnCommunity.msg.saveFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnCommunity.msg.saveFailed')), true);
       return null;
     }
     onDatabase(response.database);
@@ -163,7 +164,7 @@ export default function VisualNovelCommunityPanel({
     onStatus(
       response.ok
         ? t('vnCommunity.msg.exported', { path: response.path })
-        : response.error ?? t('vnCommunity.msg.exportFailed'),
+        : t(visualNovelErrorKey(response, 'vnCommunity.msg.exportFailed')),
       !response.ok,
     );
   };
@@ -174,7 +175,7 @@ export default function VisualNovelCommunityPanel({
     setBusy(false);
     if (response.canceled) return;
     if (!response.ok || !response.content) {
-      onStatus(response.error ?? t('vnCommunity.msg.importFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnCommunity.msg.importFailed')), true);
       return;
     }
     try {
@@ -184,7 +185,9 @@ export default function VisualNovelCommunityPanel({
       setMismatchConfirmed(false);
       onStatus(t('vnCommunity.msg.loaded'));
     } catch (reason) {
-      onStatus(reason instanceof Error ? reason.message : String(reason), true);
+      // `JSON.parse` throws English ("Unexpected token…"): the file is simply not a bundle.
+      console.warn('[vn] community bundle rejected:', reason);
+      onStatus(t('vnCommunity.msg.notValid'), true);
     }
   };
 
@@ -201,13 +204,13 @@ export default function VisualNovelCommunityPanel({
     });
     if (!metadataResponse.ok || !metadataResponse.database) {
       setBusy(false);
-      onStatus(metadataResponse.error ?? t('vnCommunity.msg.reportsImportFailed'), true);
+      onStatus(t(visualNovelErrorKey(metadataResponse, 'vnCommunity.msg.reportsImportFailed')), true);
       return;
     }
     const routeResponse = await window.api.visualNovelUpdateRoutes(entry.id, merged.routes);
     if (!routeResponse.ok || !routeResponse.database) {
       setBusy(false);
-      onStatus(routeResponse.error ?? t('vnCommunity.msg.routesImportFailed'), true);
+      onStatus(t(visualNovelErrorKey(routeResponse, 'vnCommunity.msg.routesImportFailed')), true);
       return;
     }
     const bookId = `vn:${entry.id}`;

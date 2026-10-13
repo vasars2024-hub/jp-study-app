@@ -9,7 +9,7 @@ import {
   type KanjiReadingPrompt,
   type ParticlePrompt,
 } from '../data/gradedSentences';
-import { GAME_PACKS } from '../data/gamePacks';
+import { gamePack } from '../data/gamePacks/registry';
 import type { GamePack } from '../data/gamePacks/types';
 import { CLOZE_BLANK, type ClozeItem, type SourceCard, type VocabItem } from './contentSource';
 import { autoSelection, kanaInScope, type KanaSelection } from './kanaGroups';
@@ -167,8 +167,13 @@ export interface RoundBase {
  *   pinyin       tones optional (hǎo, hao3 and hao all match)
  *   pinyin-tone  the tone is the point (mā must come back as ma1 or mā)
  *   stress       Russian stress: the stressed vowel in capitals (молокО) or with an accent
+ *   exact        no typo tolerance: a reading, a particle or a counter is the skill itself,
+ *                so びよういん for びょういん or おばさん for おばあさん is a different word.
+ *                Only the safe folds in the normaliser apply (width, katakana/hiragana, ー).
+ *   sentence     a whole-sentence translation: every part of it must be there (see
+ *                `sentenceMeaningMatches`), so half a sentence is not a right answer.
  */
-export type AnswerMode = 'pinyin' | 'pinyin-tone' | 'stress';
+export type AnswerMode = 'pinyin' | 'pinyin-tone' | 'stress' | 'exact' | 'sentence';
 
 /**
  * Every recall game is a typed round: picking from four options let the player
@@ -368,12 +373,51 @@ function gloss(glosses: Glosses, lang: SourceLang, studyLang: StudyLang): string
   return glosses[lang] || glosses.en;
 }
 
+/** The vowel each hiragana ends in, so a long-vowel mark can be spelled out as that vowel. */
+const KANA_VOWEL: Record<string, string> = {};
+for (const [vowel, row] of [
+  ['あ', 'あかさたなはまやらわがざだばぱぁゃゎゕ'],
+  ['い', 'いきしちにひみりぎじぢびぴぃ'],
+  ['う', 'うくすつぬふむゆるぐずづぶぷぅゅゔ'],
+  ['え', 'えけせてねへめれげぜでべぺぇゖ'],
+  ['お', 'おこそとのほもよろをごぞどぼぽぉょ'],
+] as const) {
+  for (const ch of row) KANA_VOWEL[ch] = vowel;
+}
+
+/**
+ * ー after a kana is the same length as that kana's own vowel written out: らーめん and
+ * らあめん, おばーさん and おばあさん. Only the identical vowel — せんせー is not せんせい,
+ * and a dropped or added mora (おばさん) still differs.
+ */
+function spellOutLongVowels(kana: string): string {
+  let out = '';
+  let vowel = '';
+  for (const ch of kana) {
+    if (ch === 'ー' && vowel) {
+      out += vowel;
+      continue;
+    }
+    out += ch;
+    vowel = KANA_VOWEL[ch] ?? '';
+  }
+  return out;
+}
+
+/**
+ * The safe folds for typed Japanese, and nothing else: NFKC (half-width ｶﾀｶﾅ and
+ * full-width ３ or Ａ become their ordinary forms), katakana → hiragana, ー spelled out
+ * as its vowel, punctuation and spaces dropped. Small kana and length are kept, because
+ * びよういん and びょういん, or おばさん and おばあさん, are different words.
+ */
 function normalizeJapanese(input: string): string {
-  return input
+  const folded = input
+    .normalize('NFKC')
     .trim()
-    .replace(/[\s、。,.!?！？]/g, '')
-    .replace(/[ァ-ン]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+    .replace(/[\s、。・,.!?！？「」『』]/g, '')
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
     .toLowerCase();
+  return spellOutLongVowels(folded);
 }
 
 /** Tone and stress marks are optional in a typed answer; ё and е are the same letter to a typist. */
@@ -385,7 +429,7 @@ function normalizeLoose(input: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(TONE_AND_STRESS_MARKS, '')
-    .normalize('NFC')
+    .normalize('NFKC')
     .replace(/ё/g, 'е')
     .replace(/[\s、。，,.!?！？；;：:'"“”«»‘’()（）-]/g, '');
 }
@@ -393,6 +437,7 @@ function normalizeLoose(input: string): string {
 /** Pinyin with tones ignored: hǎo, hao3 and hao all read as "hao". ü may be typed as v or u:. */
 function normalizePinyin(input: string): string {
   return input
+    .normalize('NFKC')
     .trim()
     .toLowerCase()
     .normalize('NFD')
@@ -405,7 +450,7 @@ const TONE_OF_MARK: Record<string, string> = { '\u0304': '1', '\u0301': '2', '\u
 
 /** A single syllable as letters + tone number: mā → ma1, ma1 → ma1, nǚ / nu:3 / nv3 → nv3. */
 function toneNumbered(input: string): string {
-  const decomposed = input.trim().toLowerCase().normalize('NFD').replace(/u\u0308|u:/g, 'v');
+  const decomposed = input.normalize('NFKC').trim().toLowerCase().normalize('NFD').replace(/u\u0308|u:/g, 'v');
   let tone = '';
   let letters = '';
   for (const ch of decomposed) {
@@ -470,6 +515,100 @@ function distance(a: string, b: string): number {
   return prev[b.length];
 }
 
+/** Typo room on one string: up to 18% of its length, and only from five characters up. */
+function closeEnough(given: string, expected: string): boolean {
+  if (given === expected) return true;
+  const limit = Math.max(1, Math.floor(expected.length * 0.18));
+  return expected.length >= 5 && distance(given, expected) <= limit;
+}
+
+/** Words a translation can drop or swap without changing what it says. */
+const ARTICLES = new Set(['a', 'an', 'the']);
+/** Markers that flip a sentence's meaning: an answer has to agree on how many there are. */
+const NEGATIONS = new Set(['not', 'no', 'never', 'cannot', 'nothing', 'nobody', 'none', 'не', 'нет', 'ни', 'никогда', 'ничего', 'никто']);
+const ZH_NEGATIONS = /[不没別别未無无]/g;
+const HAN = /[㐀-鿿豈-﫿]/;
+
+const IRREGULAR_CONTRACTIONS: Record<string, string[]> = {
+  "can't": ['can', 'not'],
+  cannot: ['can', 'not'],
+  "won't": ['will', 'not'],
+  "shan't": ['shall', 'not'],
+  "ain't": ['is', 'not'],
+};
+const CONTRACTION_ENDINGS: Record<string, string> = { m: 'am', re: 'are', ve: 'have', ll: 'will', d: 'would', s: 'is' };
+
+/** I'm → i am, don't → do not: a typist's spelling of the same words. ('s is read as "is" on both sides alike.) */
+function expandContraction(word: string): string[] {
+  const irregular = IRREGULAR_CONTRACTIONS[word];
+  if (irregular) return irregular;
+  if (word.endsWith("n't") && word.length > 3) return [word.slice(0, -3), 'not'];
+  const match = /^(.+)'(m|re|ve|ll|d|s)$/.exec(word);
+  return match ? [match[1], CONTRACTION_ENDINGS[match[2]]] : [word];
+}
+
+/**
+ * A translation as comparable tokens: NFKC, lower case, curly quotes folded, punctuation
+ * dropped, English contractions spelled out, articles dropped. Han text has no spaces,
+ * so each character is its own token.
+ */
+function sentenceTokens(input: string): string[] {
+  const text = input
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[‘’ʼ`´]/g, "'")
+    .replace(/ё/g, 'е')
+    .replace(/[^\p{L}\p{N}'\s]/gu, ' ');
+  const tokens: string[] = [];
+  for (const raw of text.split(/\s+/)) {
+    const word = raw.replace(/^'+|'+$/g, '');
+    if (!word || ARTICLES.has(word)) continue;
+    if (HAN.test(word)) tokens.push(...[...word].filter((ch) => ch !== "'"));
+    else tokens.push(...expandContraction(word));
+  }
+  return tokens;
+}
+
+function negationCount(tokens: readonly string[]): number {
+  let count = 0;
+  for (const token of tokens) {
+    if (NEGATIONS.has(token)) count += 1;
+    count += token.match(ZH_NEGATIONS)?.length ?? 0;
+  }
+  return count;
+}
+
+/**
+ * Reverse Recall on a sentence: the whole translation, not one clause of it. It used to
+ * split the translation at commas like a word's gloss ("dog, hound"), so "so I'm staying
+ * home." passed for 雨が降っているので、家にいます。
+ *
+ * Right when the answer agrees on negation and either
+ *   - is the whole sentence give or take a typo: within 18% of its letters and no more
+ *     than 10% shorter (a dropped clause is never "a typo"), or
+ *   - matches at least 85% of the sentence's words (a long word may carry one typo)
+ *     while adding no more than 15% of its own.
+ */
+export function sentenceMeaningMatches(answer: string, expected: string): boolean {
+  const given = sentenceTokens(answer);
+  const target = sentenceTokens(expected);
+  if (!given.length || !target.length) return false;
+  if (negationCount(given) !== negationCount(target)) return false;
+  const givenText = given.join('');
+  const targetText = target.join('');
+  if (givenText.length >= targetText.length * 0.9 && closeEnough(givenText, targetText)) return true;
+  const left = [...given];
+  let matched = 0;
+  for (const word of target) {
+    let at = left.indexOf(word);
+    if (at < 0 && word.length >= 5) at = left.findIndex((g) => g.length >= 5 && distance(g, word) <= 1);
+    if (at < 0) continue;
+    matched += 1;
+    left.splice(at, 1);
+  }
+  return matched / target.length >= 0.85 && matched / given.length >= 0.85;
+}
+
 function fuzzyIncludes(
   answer: string,
   acceptable: readonly string[],
@@ -478,6 +617,7 @@ function fuzzyIncludes(
 ): boolean {
   if (!answer.trim()) return false;
   if (mode === 'stress') return acceptable.some((target) => sameStress(answer, target));
+  if (mode === 'sentence') return acceptable.some((target) => sentenceMeaningMatches(answer, target));
   if (mode === 'pinyin-tone') {
     const given = toneNumbered(answer);
     return acceptable.some((target) => toneNumbered(target) === given && /\d$/.test(given));
@@ -491,9 +631,7 @@ function fuzzyIncludes(
   if (!given) return false;
   return acceptable.some((target) => {
     const expected = normalize(target);
-    if (given === expected) return true;
-    const limit = Math.max(1, Math.floor(expected.length * 0.18));
-    return expected.length >= 5 && distance(given, expected) <= limit;
+    return mode === 'exact' ? given === expected : closeEnough(given, expected);
   });
 }
 
@@ -584,7 +722,7 @@ export function buildGameRound(
   }
 
   const studyLang: StudyLang = content?.studyLang ?? 'ja';
-  const pack = content?.pack ?? GAME_PACKS[studyLang];
+  const pack = content?.pack ?? gamePack(studyLang);
   const sl = studyLang;
   const seed = mixSeed(sequence, level, hashText(gameId), ctx?.salt ?? 0);
   // The round's i+1 slot. Spread, not mutated: `used` stays the one shared Set.
@@ -641,7 +779,7 @@ export function buildGameRound(
         answer: sl === 'ru' ? capitalStress(word.reading) : word.reading,
         acceptable: [word.reading],
         inputLang: sl === 'ja' ? 'ja' : sl === 'zh' ? 'en' : 'ru',
-        answerMode: sl === 'zh' ? 'pinyin' : sl === 'ru' ? 'stress' : undefined,
+        answerMode: sl === 'zh' ? 'pinyin' : sl === 'ru' ? 'stress' : 'exact',
         hint: word.meaning,
       };
     }
@@ -817,7 +955,7 @@ export function buildGameRound(
       answer: sl === 'ru' ? capitalStress(item.reading) : item.reading,
       acceptable: [item.reading],
       inputLang: sl === 'ja' ? 'ja' : sl === 'zh' ? 'en' : 'ru',
-      answerMode: sl === 'zh' ? 'pinyin' : sl === 'ru' ? 'stress' : undefined,
+      answerMode: sl === 'zh' ? 'pinyin' : sl === 'ru' ? 'stress' : 'exact',
       hint: meaning,
     };
   }
@@ -858,6 +996,8 @@ export function buildGameRound(
       answer: item.answer,
       acceptable: [item.answer, ...(item.alternatives ?? [])],
       inputLang: sl,
+      // The particle (or, in Russian, the case ending) is the whole question.
+      answerMode: 'exact',
       hint,
     };
   }
@@ -865,8 +1005,7 @@ export function buildGameRound(
   if (gameId === 'counter-quiz') {
     const item = pickByLevel(pack.counters, level, seed, KEY.counter, ctx);
     const object = gloss(item.object, sourceLang, sl);
-    // Russian: "5 книг" with digits is the same recall as "пять книг".
-    const digits = sl === 'ru' ? [`${item.number} ${item.answer.split(' ').pop() ?? ''}`.trim()] : [];
+    const digits = counterInDigits(item, sl);
     return {
       ...base,
       kind: 'type',
@@ -877,9 +1016,11 @@ export function buildGameRound(
       reading: item.reading || undefined,
       mineMeaning: `${item.number} ${object}`,
       answer: item.answer,
-      // 三冊 or さんさつ — the kanji form and its reading are the same recall.
+      // 三冊, さんさつ or 3冊 — the kanji form, its reading and digits are the same recall.
       acceptable: [item.answer, item.reading, ...digits].filter(Boolean),
       inputLang: sl,
+      // No typo room: one letter is the difference between двадцать одна минута and минуты.
+      answerMode: 'exact',
     };
   }
 
@@ -896,9 +1037,25 @@ export function buildGameRound(
     reading: sentence.reading || undefined,
     mineMeaning: meaning,
     answer: meaning,
-    acceptable: meaningAlternatives(meaning),
+    // A sentence is one meaning: splitting it at commas like a word's gloss accepted
+    // "so I'm staying home." for "It's raining, so I'm staying home."
+    acceptable: [meaning],
     inputLang: sourceLang,
+    answerMode: 'sentence',
   };
+}
+
+/** Numerals a counter answer can start with (Japanese and Chinese). */
+const LEADING_NUMERAL = /^[〇零一二两兩三四五六七八九十百千万萬]+/;
+
+/**
+ * The counter with the number in digits: 三冊 → 3冊, 二十歳 → 20歳, 两个 → 2个,
+ * пять рублей → 5 рублей. Full-width ３冊 needs no entry of its own: NFKC folds it.
+ */
+function counterInDigits(item: CounterPrompt, sl: StudyLang): string[] {
+  if (sl === 'ru') return [`${item.number} ${item.answer.split(' ').pop() ?? ''}`.trim()];
+  const counter = item.answer.replace(LEADING_NUMERAL, '');
+  return counter && counter !== item.answer ? [`${item.number}${counter}`] : [];
 }
 
 /**
@@ -1039,7 +1196,7 @@ export function gamePoolSize(
   content?: GameContent,
 ): number {
   const lang = content?.studyLang ?? 'ja';
-  const pack = content?.pack ?? GAME_PACKS[lang];
+  const pack = content?.pack ?? gamePack(lang);
   switch (gameId) {
     case 'kana-sprint': {
       if (lang !== 'ja') return pack.sprint.length;

@@ -1,5 +1,5 @@
 {
-  "total": 514,
+  "total": 509,
   "namespaces": {
     "aero.found": 5,
     "ankiWorkbench.design": 1,
@@ -42,7 +42,7 @@
     "malSync.profileNotice": 1,
     "manga.fit": 3,
     "mediaWorkspace.capture": 1,
-    "mediaWorkspace.section": 3,
+    "mediaWorkspace.section": 1,
     "mediaWorkspace.study": 3,
     "music.albumSearch": 2,
     "music.likedOnly": 1,
@@ -56,7 +56,6 @@
     "novels.freeNote": 1,
     "novels.freeTag": 1,
     "novels.genre": 2,
-    "novels.intro": 1,
     "novels.meta": 2,
     "novels.noMatches": 1,
     "novels.onListRemove": 1,
@@ -130,7 +129,6 @@
     "trackingSources.up": 1,
     "trackingSources.working": 1,
     "ui.menubar": 1,
-    "ui.splitPane": 1,
     "verifiedSites.activeInDatabase": 1,
     "verifiedSites.addSite": 1,
     "verifiedSites.badge": 1,
@@ -150,7 +148,6 @@
     "verifiedSites.sourceLine": 1,
     "verifiedSites.status": 1,
     "video.exportSrt": 1,
-    "video.intro": 1,
     "video.rate": 1,
     "yt.action": 1
   }

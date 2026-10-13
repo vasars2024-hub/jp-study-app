@@ -82,6 +82,7 @@ import { extractFlashcardAudioClip, pruneMediaClips } from './flashcardAudio';
 import { getMainStudyLang } from './studyLanguage';
 import { bridgeHostWindow } from './extensionBridgeHost';
 import { WHISPER_MULTILINGUAL_REQUIRED } from '../shared/whisperModels';
+import { acceptSliceCues, WHISPER_SLICE_TAIL_SEC } from '../shared/whisperWindowing';
 
 export interface TranscriptionHost {
   listItems: () => MediaItem[];
@@ -462,6 +463,8 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
 
     const texts: string[] = [];
     const timedCues: TranscriptionCue[] = [];
+    /** End of the last line kept, so a slice's overlap cannot write a line twice. */
+    let committedUntilSec = 0;
     for (let i = 0; i < total; i += 1) {
       if (cancelled.has(job.mediaId)) {
         emit('cancelled', i);
@@ -469,11 +472,20 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       }
       if (windowed && i % chunksPerWindow === 0) {
         windowStart = i;
-        samples = new Float32Array(await extractAudioPcmRange(item.path, i * CHUNK_SECONDS, AUDIO_WINDOW_SECONDS));
+        // A tail past the window, so its last slice overlaps the next window like any other.
+        samples = new Float32Array(await extractAudioPcmRange(
+          item.path,
+          i * CHUNK_SECONDS,
+          AUDIO_WINDOW_SECONDS + WHISPER_SLICE_TAIL_SEC,
+        ));
       }
       emit('transcribing', i);
       const offset = (i - windowStart) * perChunk;
-      const slice = samples.subarray(offset, Math.min(offset + perChunk, samples.length));
+      // Each slice carries a few seconds past its nominal end, so a line spoken across the
+      // 30 s mark is heard whole by the slice it starts in (`acceptSliceCues`, below).
+      const isLastSlice = i === total - 1;
+      const sliceEnd = isLastSlice ? samples.length : offset + perChunk + WHISPER_SLICE_TAIL_SEC * SAMPLE_RATE;
+      const slice = samples.subarray(offset, Math.min(sliceEnd, samples.length));
       // A trailing sliver of audio carries no words worth a round trip.
       if (slice.length < SAMPLE_RATE / 2) {
         texts.push('');
@@ -529,15 +541,19 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         modelSubstitution = reply.modelSubstitution;
         emit('transcribing', i);
       }
-      texts.push(reply.text ?? '');
-      for (const cue of reply.cues ?? []) {
-        if (!cue.text.trim() || cue.end <= cue.start) continue;
-        timedCues.push({
+      const accepted = acceptSliceCues(
+        (reply.cues ?? []).map((cue) => ({
           start: cue.start + i * CHUNK_SECONDS,
           end: cue.end + i * CHUNK_SECONDS,
           text: cue.text.trim(),
-        });
-      }
+        })),
+        { nominalEndSec: (i + 1) * CHUNK_SECONDS, isLast: isLastSlice, committedUntilSec },
+      );
+      committedUntilSec = accepted.committedUntilSec;
+      timedCues.push(...accepted.kept);
+      // The untimed fallback text is the slice's own lines when they are known, so the
+      // overlap is not written twice; otherwise whatever the model said for the slice.
+      texts.push(reply.cues?.length ? accepted.kept.map((cue) => cue.text).join(' ') : reply.text ?? '');
     }
 
     emit('aligning', total);

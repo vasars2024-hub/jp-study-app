@@ -440,8 +440,14 @@ export default function DisplayPage() {
           dialogTitle={t('settings.display.reset.dialogTitle')}
           dialogMessage={t('settings.display.reset.dialogMessage')}
           onReset={() => {
+            const before = loadDisplayPrefs();
+            const zoomBefore = zoom;
             setD(resetDisplayPrefs());
             setZoomValue(ZOOM_DEFAULT);
+            return () => {
+              setD(saveDisplayPrefs(before));
+              setZoomValue(zoomBefore);
+            };
           }}
         />
       </SettingsCard>

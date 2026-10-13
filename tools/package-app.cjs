@@ -2,7 +2,7 @@
 /**
  * Reliable Windows packaging: patch Forge/Vite bug, clean caches, package,
  * prune, and (opt-in) zip.
- * Usage: node tools/package-app.cjs [--zip] [--installer] [--no-prune]
+ * Usage: node tools/package-app.cjs [--zip] [--installer] [--no-prune] [--keep-cuda | --drop-cuda]
  *
  *   --installer also build the Squirrel.Windows installer (Gum-<v> Setup.exe,
  *               RELEASES, *-full.nupkg) into out/make/squirrel.windows/x64/,
@@ -16,6 +16,13 @@
  *   --no-prune  skip the node_modules prune (GUM_NO_PRUNE=1 does the same).
  *               See tools/prune-packaged-app.cjs for the rules; it takes the
  *               packaged node_modules from ~2 GB to ~0.4 GB.
+ *   --keep-cuda / --drop-cuda
+ *               node-llama-cpp's CUDA backends (~540 MB) in this build. KEEP is
+ *               the default (GUM_CUDA=keep|drop does the same as the flags);
+ *               a release reaches NVIDIA machines, so dropping is a deliberate
+ *               per-build choice (docs/RELEASING.md, "CUDA backends").
+ *               `npm run package:win`, the local portable build for this AMD
+ *               machine, passes --drop-cuda explicitly.
  *
  * The desktop shortcut points at out\jp-study-app-win32-x64\jp-study-app.exe.
  * This script used to delete out\ before every build, so a failed build left
@@ -39,7 +46,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { prunePackagedApp } = require('./prune-packaged-app.cjs');
+const { prunePackagedApp, resolveCudaChoice, cudaFlag } = require('./prune-packaged-app.cjs');
 
 const root = path.join(__dirname, '..');
 const OUT = path.join(root, 'out');
@@ -157,6 +164,23 @@ function main(argv = process.argv.slice(2), env = process.env) {
   // never quietly also builds a ~1 GB installer, and vice versa.
   const makeTargets = [...(wantInstaller ? ['squirrel'] : []), ...(wantZip ? ['zip'] : [])];
   const wantPrune = !argv.includes('--no-prune') && !env.GUM_NO_PRUNE;
+  let cudaCli;
+  let cudaChoice;
+  try {
+    cudaCli = cudaFlag(argv);
+    cudaChoice = resolveCudaChoice(env, cudaCli);
+  } catch (err) {
+    fail(err.message, null);
+  }
+  if (wantPrune) {
+    console.log(`[package-app] CUDA backends: ${cudaChoice.cuda.toUpperCase()} (${cudaChoice.source})`);
+    if (cudaChoice.cuda === 'drop' && makeTargets.length) {
+      console.warn(
+        '[package-app] WARNING: this build makes distributable artifacts WITHOUT the CUDA backends. ' +
+          'NVIDIA users of it get Vulkan or CPU for local models. Drop them for a release only on purpose.',
+      );
+    }
+  }
   // FIRST, before the multi-minute Vite build: this path calls Forge directly
   // rather than through `npm run package`, so it does not inherit that script's
   // preflight and would otherwise be the one way to package a build with no
@@ -204,7 +228,7 @@ function main(argv = process.argv.slice(2), env = process.env) {
   if (wantPrune) {
     console.log('\n[package-app] Pruning staged node_modules\n');
     try {
-      prunePackagedApp(path.join(stagedApp, 'resources', 'app'));
+      prunePackagedApp(path.join(stagedApp, 'resources', 'app'), { env, cuda: cudaCli });
     } catch (err) {
       console.error(err);
       fail('prune', staging);

@@ -14,6 +14,7 @@ import { useT } from '../../../i18n';
 import type { TVars } from '../../../../shared/i18n/core';
 import DictionaryImportCard from './DictionaryImportCard';
 import TranslatorDefaultsCard from './TranslatorDefaultsCard';
+import SettingsTransferCard from './SettingsTransferCard';
 
 // The one place that lists every downloadable model and dictionary, with its
 // size, version and a delete button. Download buttons also appear inline on the
@@ -270,6 +271,11 @@ export default function StoragePage() {
           (`cf0528f6`): `settingsSearchReachability` derives a page's reachable
           cards from one component per page id plus its local imports. */}
       <TranslatorDefaultsCard />
+
+      {/* WP3 — settings-only export and import, beside the other "what is kept
+          here" inventory. Composed, not inlined, for the reachability reason
+          above. */}
+      <SettingsTransferCard />
 
       {groups.map((group) => (
         <SettingsCard key={group.key} id={`storage-${group.key}`} title={t(group.key)}>

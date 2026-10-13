@@ -43,7 +43,7 @@ export const AI_IMMERSE_UI_EN: Catalog = {
   'aiImmerse.brief.pickNoneValid': 'None of the picked lines is still i+1 for you, so the lines below are shown instead.',
   'aiImmerse.brief.bestLines': 'Best lines to mine',
   'aiImmerse.brief.noLines': 'No line here has exactly one word you do not know.',
-  'aiImmerse.brief.heardTimes': 'The new word comes up {count} times in this video.',
+  'aiImmerse.brief.heardTimes': { one: 'The new word comes up {count} time in this video.', other: 'The new word comes up {count} times in this video.' },
   'aiImmerse.brief.mine': 'Mine',
   'aiImmerse.brief.vocabQuiz': 'Vocabulary quiz ({count})',
   'aiImmerse.brief.analysing': 'Reading the subtitles…',

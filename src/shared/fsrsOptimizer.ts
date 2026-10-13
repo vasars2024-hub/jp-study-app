@@ -27,8 +27,9 @@
  * reported as an improvement when it lowers the log-loss on the same reviews.
  *
  * Known simplifications, stated: elapsed time is in whole days from a
- * configurable day boundary (as the reference does), and the initial
- * stabilities are not re-trained in stage 2.
+ * configurable day boundary (as the reference does; `studyDay.ts`, shared with
+ * the scheduler so the weights are applied with the rule they were trained
+ * on), and the initial stabilities are not re-trained in stage 2.
  *
  * What the app offers goes through `optimizeFsrsWithHoldout`: only real review
  * rows train (game and practice answers never do), the log is split by TIME —
@@ -44,8 +45,8 @@ import {
   type FsrsGrade,
 } from './fsrs';
 import type { LocalSrsRating } from './localSrs';
+import { DEFAULT_DAY_START_HOUR, studyDayIndex } from './studyDay';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const P = 19;
 
 /** One graded review as the log stores it. */
@@ -68,7 +69,10 @@ export interface FsrsTrainingReview {
 export type FsrsTrainingSequence = FsrsTrainingReview[];
 
 export interface SequenceOptions {
-  /** Local time minus UTC, in minutes (`-new Date().getTimezoneOffset()`). */
+  /**
+   * A FIXED local-minus-UTC offset in minutes. Leave it out to use the local
+   * calendar, which is right across daylight-saving changes; the app does.
+   */
   utcOffsetMinutes?: number;
   /** Hour at which a new study day starts, as in Anki (default 4). */
   dayStartHour?: number;
@@ -78,9 +82,17 @@ export interface SequenceOptions {
 
 const GRADE: Record<LocalSrsRating, FsrsGrade> = { again: 1, hard: 2, good: 3, easy: 4 };
 
+/**
+ * The study day of a review, from the one shared definition (`studyDay.ts`)
+ * that the scheduler and the replay also use: the local calendar at
+ * `dayStartHour`, so a DST change is still one day. A fixed
+ * `utcOffsetMinutes` is honoured for callers pinned to one offset.
+ */
 function dayIndex(at: number, options: SequenceOptions): number {
-  const offset = (options.utcOffsetMinutes ?? 0) * 60_000 - (options.dayStartHour ?? 4) * 3_600_000;
-  return Math.floor((at + offset) / DAY_MS);
+  return studyDayIndex(at, {
+    dayStartHour: options.dayStartHour ?? DEFAULT_DAY_START_HOUR,
+    utcOffsetMinutes: options.utcOffsetMinutes,
+  });
 }
 
 /**

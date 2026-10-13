@@ -71,9 +71,11 @@ async function build(appDir = APP) {
   }
 
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+  // The repo's own `main` (src/squirrelEntry.ts's bundle, which loads main.js), so the
+  // harness boots through the same entry a packaged build does.
   fs.writeFileSync(
     path.join(appDir, 'package.json'),
-    JSON.stringify({ name: pkg.name, productName: pkg.productName, version: pkg.version, main: '.vite/build/main.js', private: true }, null, 2),
+    JSON.stringify({ name: pkg.name, productName: pkg.productName, version: pkg.version, main: pkg.main, private: true }, null, 2),
   );
   fs.writeFileSync(path.join(appDir, 'build-info.json'), JSON.stringify({ builtAt: new Date().toISOString(), ms: Date.now() - t0 }, null, 2));
   console.log(`[e2e build] done in ${Math.round((Date.now() - t0) / 1000)} s`);

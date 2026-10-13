@@ -8,6 +8,7 @@ import type { WhisperDevice, WhisperModelTier } from '../../whisperSettings';
 import type { LyricsSettings } from '../../lyricsSettings';
 import type { MiniModeSettings } from '../../miniMode';
 import type { SegButtonProps } from '../ui/segButton';
+import type { SectionUndo } from './ResetSectionButton';
 
 export interface WallChoice {
   kind: 'preset' | 'image' | 'video' | 'slideshow';
@@ -146,7 +147,16 @@ export interface SettingsWallProps {
   onWallSlideshowPrev?: () => void;
   onWallSlideshowOptions?: (opts: { intervalSec?: number; shuffle?: boolean }) => void;
   onWallClear: () => void;
-  onReset: () => void;
+  /**
+   * Resets the active desktop (Settings → Desktop layout → Reset desktop) and
+   * returns how to undo it. The page's ResetSectionButton confirms first and
+   * offers the Undo.
+   *
+   * Absent in a host with no desktop to reset — the pop-out Settings window. The
+   * page then shows the button disabled with a hint, rather than a confirm that
+   * resets nothing (it used to be a no-op stub there).
+   */
+  onReset?: () => SectionUndo | void;
   onOpenVisualizer: () => void;
   onOpenMusicWidget: () => void;
 }

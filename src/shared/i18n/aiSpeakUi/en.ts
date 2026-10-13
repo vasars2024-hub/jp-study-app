@@ -158,7 +158,7 @@ export const AI_SPEAK_UI_EN: Catalog = {
   'aiSpeak.write.empty': 'There is no text to check.',
   'aiSpeak.write.undo': 'Undo the changes',
   'aiSpeak.write.undone': 'Changes undone.',
-  'aiSpeak.journal.prompt': 'Write {count} sentences about your day using:',
+  'aiSpeak.journal.prompt': { one: 'Write {count} sentence about your day using:', other: 'Write {count} sentences about your day using:' },
   'aiSpeak.journal.noWords': 'Add some cards in the language you study to get a journal prompt.',
   'aiSpeak.journal.otherWords': 'Other words',
   'aiSpeak.journal.checkLabel': 'Journal check',

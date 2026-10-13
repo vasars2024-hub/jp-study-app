@@ -39,6 +39,12 @@ const FORBIDDEN: Array<[RegExp, string]> = [
   [/\/views\/AnkiView\.tsx$/, 'the Anki view'],
   [/\/components\/lens\/ReadingLensOverlay\.tsx$/, 'the Reading Lens overlay (its own window only)'],
   [/\/i18n\/aiPack\//, 'the lazy AI strings pack (i18n/catalogs.ts loads it on first use)'],
+  // 2026-10-12, back under the ceiling (8,690,889 -> 8,428,676 measured) by making these lazy:
+  [/\/games\/contentStore\.ts$/, "the Arena's content store (findingReadouts.ts imports it on first use)"],
+  [/\/data\/gamePacks\/(zh|ru)\.ts$/, 'a Chinese / Russian game pack (data/gamePacks/registry.ts loads the active one)'],
+  [/\/userNotesStore\.ts$/, 'the notes store (notebookActivity.ts hands notes over via userNotesHandoff.ts)'],
+  [/\/shared\/userNotes\.ts$/, 'the notes logic (boot needs only shared/userNoteKinds.ts)'],
+  [/\/shared\/agentOperationLog\.ts$/, 'the agent operation log (profiles read shared/agentInverseOperations.ts)'],
 ];
 
 /**

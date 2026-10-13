@@ -15,6 +15,8 @@ import {
   normalizeSchedulingConfig,
   type SchedulingConfig,
 } from '../shared/flashcardScheduling';
+import { setStudyDayStartHour } from '../shared/studyDay';
+import { writeLocalStorage } from './localStorageWrite';
 
 const CONFIG_KEY = 'jp-flashcard-scheduling-v1';
 
@@ -31,21 +33,32 @@ export function loadSchedulingConfig(): SchedulingConfig {
     if (memo && memo.raw === raw) return memo.config;
     const config = normalizeSchedulingConfig(JSON.parse(raw ?? 'null'));
     memo = { raw, config };
+    // The study day's start hour is read by pure code (stats day keys, the
+    // review-log summaries) that is not handed the config: keep it current.
+    setStudyDayStartHour(config.dayStartHour);
     return config;
   } catch {
+    setStudyDayStartHour(DEFAULT_SCHEDULING_CONFIG.dayStartHour);
     return DEFAULT_SCHEDULING_CONFIG;
   }
+}
+
+/**
+ * The hour a study day starts (Settings → Scheduling, 4 am by default). Stats,
+ * the streak and the new-card budget key their days on it.
+ */
+export function studyDayStartHour(): number {
+  return loadSchedulingConfig().dayStartHour;
 }
 
 export function saveSchedulingConfig(next: Partial<SchedulingConfig>): SchedulingConfig {
   const normalized = normalizeSchedulingConfig({ ...loadSchedulingConfig(), ...next });
   // `fsrsWeights: undefined` in `next` is how a caller clears a personal fit.
   if ('fsrsWeights' in next && next.fsrsWeights === undefined) delete normalized.fsrsWeights;
-  try {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(normalized));
-  } catch {
-    /* A locked store still gets session-local settings. */
-  }
+  // A refused write is reported (toast + log) by the guarded writer; the
+  // session still gets the setting.
+  writeLocalStorage(CONFIG_KEY, JSON.stringify(normalized));
   memo = null;
+  setStudyDayStartHour(normalized.dayStartHour);
   return normalized;
 }

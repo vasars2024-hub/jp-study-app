@@ -55,6 +55,14 @@
   cursor: pointer;
   font-size: 12px;
 }
+/* Undo last rating: quiet, under the due summary, as on Flashcards. */
+.gx-review-undo-row {
+  display: flex;
+  justify-content: flex-end;
+}
+.gx-review-undo-row .gx-review-undo {
+  margin-top: 0;
+}
 
 .gx-review-levels {
   margin-top: 16px;

@@ -133,6 +133,8 @@ class SeanimeSidecarStagingPlugin extends PluginBase<Record<string, never>> {
  */
 const PRODUCT_NAME = 'Gum';
 const SQUIRREL_APP_ID = 'jp_study_app';
+/** Under assets/; written by tools/make-installer-gif.cjs. */
+const INSTALLER_LOADING_GIF = 'installer-loading.gif';
 const APP_VERSION: string = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')).version;
 /**
  * Code signing is OFF until the owner has an Authenticode certificate (README,
@@ -335,6 +337,10 @@ const config: ForgeConfig = {
       exe: 'jp-study-app.exe',
       setupExe: `${PRODUCT_NAME}-${APP_VERSION} Setup.exe`,
       setupIcon: path.resolve(process.cwd(), 'assets', 'icon.ico'),
+      // What Setup.exe shows while it installs, instead of Squirrel's stock animation.
+      // Generated from assets/icon.png by `node tools/make-installer-gif.cjs` (ffmpeg-static,
+      // no extra dependency) and committed; rerun it when the icon changes.
+      loadingGif: path.resolve(process.cwd(), 'assets', INSTALLER_LOADING_GIF),
       // Programs and Features fetches the uninstall icon from a URL at install time.
       iconUrl: 'https://raw.githubusercontent.com/vasars2024-hub/jp-study-app/master/assets/icon.ico',
       noMsi: true,
@@ -363,7 +369,20 @@ const config: ForgeConfig = {
       // If you are familiar with Vite configuration, it will look really familiar.
       build: [
         {
+          // THE process entry: package.json `main` is `.vite/build/squirrelEntry.js`. It
+          // services a Squirrel lifecycle launch (`--squirrel-install` & co.) and exits
+          // before the app bundle below is loaded, so the hook gets Squirrel's ~15 s
+          // instead of what is left after ~5 MB of main bundle and its externals load.
+          // Any other launch `require`s the sibling `main.js`. Same config and target as
+          // main, so Vite names the output after the entry file. Its import graph and
+          // built size are capped by src/main/__tests__/squirrelEntryGraph.test.ts.
+          entry: 'src/squirrelEntry.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
+        {
           // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
+          // Loaded by squirrelEntry.js, by path, for every normal launch.
           entry: 'src/main.ts',
           config: 'vite.main.config.ts',
           target: 'main',

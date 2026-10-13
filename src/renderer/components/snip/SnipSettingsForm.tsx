@@ -50,8 +50,9 @@ export function useSnipStatus(): [SnipStatus, (patch: Partial<SnipSettings>) => 
 }
 
 /**
- * The Snip to cards options: on/off, automatic adding, Anki, the deck, the
- * per-snip word limit and whether the analysis comes forward on a snip. Shown
+ * The Snip to cards options: on/off, automatic adding (off = review mode),
+ * merging into existing cards, Anki, the deck, the per-snip word limit and
+ * whether the analysis comes forward on a snip. Shown
  * in Settings → Reading Lens and inside the Snips view itself.
  */
 export default function SnipSettingsForm({ showShortcut = true }: { showShortcut?: boolean }) {
@@ -80,6 +81,13 @@ export default function SnipSettingsForm({ showShortcut = true }: { showShortcut
         checked={status.autoAdd}
         onChange={(e) => void save({ autoAdd: e.target.checked })}
         label={t('snip.settings.autoAdd')}
+      />
+      <p className="muted os-set-hint">{t('snip2.settings.autoAddHint')}</p>
+      <Toggle
+        className="os-toggle os-toggle-compact"
+        checked={status.mergeExisting}
+        onChange={(e) => void save({ mergeExisting: e.target.checked })}
+        label={t('snip2.settings.mergeExisting')}
       />
       <Toggle
         className="os-toggle os-toggle-compact"

@@ -9,7 +9,6 @@ export const QUALITY_UI_EN: Catalog = {
   'set2.home.recentChanges': 'Recently changed',
   'set2.home.clearRecentChanges': 'Clear',
   'set2.reset.dialogTitle': 'Reset {section}?',
-  'set2.reset.dialogMessage': 'Every option in this section goes back to its default. This cannot be undone.',
   'set2.group.connections': 'AI & connections',
 
   // ---- Widgets ----

@@ -1508,6 +1508,50 @@ describe('Agent execution IPC', () => {
       .toEqual({ ok: true, cancelled: false });
   });
 
+  it('keeps the text streamed before a cancel, stored as cancelled (shown as stopped)', async () => {
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async (_policy, _prompt, options) => {
+        options.onTextChunk?.('は is the topic');
+        options.onTextChunk?.(', が marks');
+        return await new Promise((_resolve, reject) => {
+          options.signal?.addEventListener('abort', () => {
+            reject(new AiProviderRuntimeError('cancelled', 'cancelled'));
+          }, { once: true });
+        });
+      },
+    });
+
+    const running = invoke(AGENT_EXECUTION_CHANNELS.run, request('run-partial'));
+    await Promise.resolve();
+    await invoke(AGENT_EXECUTION_CHANNELS.cancel, 'run-partial');
+    const result = await running as {
+      ok: boolean;
+      code: string;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    expect(result).toMatchObject({ ok: false, code: 'cancelled' });
+    const reply = result.state.conversations[0].messages.at(-1);
+    expect(reply).toMatchObject({ role: 'assistant', status: 'cancelled', text: 'は is the topic, が marks', error: 'cancelled' });
+    // What was written is what a reload reads back, not only what this call returned.
+    expect(store.read().conversations[0].messages.at(-1)?.text).toBe('は is the topic, が marks');
+  });
+
+  it('does not present a half answer as a reply when the provider fails mid-stream', async () => {
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async (_policy, _prompt, options) => {
+        options.onTextChunk?.('partial');
+        throw new AiProviderRuntimeError('upstream broke', 'upstream');
+      },
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request('run-broken')) as {
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    expect(result.state.conversations[0].messages.at(-1)).toMatchObject({ status: 'failed', text: '', error: 'upstream' });
+  });
+
   it('scopes cancellation to the renderer that started the request', async () => {
     registerAgentExecutionIpc({
       resolveStore: () => store,

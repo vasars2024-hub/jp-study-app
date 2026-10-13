@@ -22,7 +22,7 @@ vi.mock('../knownWords', () => ({
 }));
 vi.mock('../bookLevelEstimate', () => ({ estimateLevelFromText: async () => null }));
 vi.mock('../studyEnvironment', () => ({ getStudyLang: () => 'ja' }));
-vi.mock('../notebookTimeline', () => ({ appendNotebookEvent: vi.fn() }));
+vi.mock('../notebookActivity', () => ({ appendNotebookEvent: vi.fn() }));
 vi.mock('../translationHistory', () => ({ appendTranslationHistory: vi.fn() }));
 vi.mock('../comprehensibility', () => ({ scoreTextComprehensibility: vi.fn(), knownPercent: vi.fn() }));
 vi.mock('../studyMining', () => ({

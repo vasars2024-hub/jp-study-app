@@ -8,7 +8,14 @@
  * `shared/reviewStats.ts`, tested on its own.
  */
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { loadDeck, onDeckChanged, UNKNOWN_BOOK_TITLE, type DeckFlashcard } from '../../flashcardDeck';
+import {
+  loadDeck,
+  onDeckChanged,
+  reviewSessionCounts,
+  UNKNOWN_BOOK_TITLE,
+  type DeckFlashcard,
+} from '../../flashcardDeck';
+import { loadSchedulingConfig } from '../../flashcardScheduling';
 import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
 import { getStudyDaysByKey, onStatsChanged } from '../../stats';
 import type { ReviewLogEntry } from '../../../shared/reviewLog';
@@ -125,6 +132,13 @@ export default function StatsReviewInsights() {
         entries,
         since,
         now,
+        {
+          // Due is what Review would open for that source: the review picker's
+          // own counts (new-card limit, Anki-owned and suspended cards,
+          // learn-ahead), keyed exactly like `deckKeyOf`.
+          dueByDeck: reviewSessionCounts(deck, true, 'mixed', now),
+          learnAheadMinutes: loadSchedulingConfig().learnAheadMinutes,
+        },
       ),
       recall: recallEstimate(deck, now),
     };

@@ -1,12 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { ToastViewport } from './ui/Toast';
-import ReadingReminderHost from './reading/ReadingReminderHost';
 import CalendarReminderHost from './calendar/CalendarReminderHost';
 import { useT } from '../i18n';
 import { shouldShowToast } from '../notificationStore';
 // Side effect: registers the UI-language byte-size format with `formatBytes`.
 // Here because every renderer shell mounts this host exactly once.
 import './shell/localeFormat';
+
+/**
+ * Reading Lists' reminder card, loaded after first paint. It pulls the reading
+ * lists client and its mutation layer (~35 KB built), which every shell paid for
+ * at boot to render nothing. Safe to defer: main broadcasts a reading reminder
+ * only from its interval tick, never at launch (`readingListsReminders.ts`
+ * `start`), so nothing can arrive before the chunk lands. A chunk that fails to
+ * load leaves the host inert instead of taking the toast layer (and the shell
+ * above it) down; the reminder is still in the Notification Center.
+ */
+const ReadingReminderHost = lazy(() =>
+  import('./reading/ReadingReminderHost').catch(() => ({ default: () => null })),
+);
 
 /**
  * Renders transient `os:toast` messages. Extracted from App.tsx when Blanc got
@@ -229,7 +241,9 @@ export default function ToastHost({ locked = false }: { locked?: boolean }) {
           eleventh mount point would be eleven chances for one shell to be the one
           that never shows a reminder. It renders nothing until main pushes one.
         */}
-        <ReadingReminderHost />
+        <Suspense fallback={null}>
+          <ReadingReminderHost />
+        </Suspense>
         {/* Calendar reminders, same reasoning: renders nothing until one is due. */}
         <CalendarReminderHost />
       </div>

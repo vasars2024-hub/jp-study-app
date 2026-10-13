@@ -143,8 +143,8 @@ describe('training sequences', () => {
       { cardId: 'x', at: Date.UTC(2026, 0, 1, 3), rating: 'good', isNew: true },
       { cardId: 'x', at: Date.UTC(2026, 0, 1, 5), rating: 'good' },
     ];
-    expect(buildTrainingSequences(rows, { dayStartHour: 4 })[0][1].deltaDays).toBe(1);
-    expect(buildTrainingSequences(rows, { dayStartHour: 0 })[0][1].deltaDays).toBe(0);
+    expect(buildTrainingSequences(rows, { dayStartHour: 4, utcOffsetMinutes: 0 })[0][1].deltaDays).toBe(1);
+    expect(buildTrainingSequences(rows, { dayStartHour: 0, utcOffsetMinutes: 0 })[0][1].deltaDays).toBe(0);
   });
 
   it('has enough synthetic data to fit', () => {

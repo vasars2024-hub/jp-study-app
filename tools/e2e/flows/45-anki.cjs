@@ -11,7 +11,7 @@
  *    through the real review UI, "Sync now" pushes them, and the fake receives the
  *    answers — one per note, with the Gum ease, in the order they were given.
  */
-const { installHelpers, poll } = require('./_lib.cjs');
+const { installHelpers, poll, ensureDictionaryReady } = require('./_lib.cjs');
 
 const WORDS = ['飲む', '窓'];
 const PLAN = ['good', 'hard', 'easy', 'good', 'good'];
@@ -31,13 +31,17 @@ module.exports = {
     await installHelpers(ctx);
 
     // --- mine from the dictionary --------------------------------------------------------
+    // A fresh profile may still be loading the built-in dictionary; wait for it here rather
+    // than rely on the `dictionary` flow having run first.
+    const dict = await ensureDictionaryReady(ctx, { word: WORDS[0] });
+    result.check('the built-in dictionary is ready for lookups', dict.ready, dict);
     await ev(`__e2e.open('dictionary')`);
     await poll(ctx, `!!document.querySelector('form.dict-search input')`, 20000);
     for (const word of WORDS) {
-      // On a fresh profile the first search can come before the built-in dictionary is
-      // ready; the user would search again, and so does the flow (for up to 3 minutes).
+      // The page may still be settling under the first search; the user would search
+      // again, and so does the flow (for up to a minute).
       let first = null;
-      for (const until = Date.now() + 180000; !first && Date.now() < until;) {
+      for (const until = Date.now() + 60000; !first && Date.now() < until;) {
         await ev(`(() => { const i = document.querySelector('form.dict-search input'); __e2e.fill(i, ${JSON.stringify(word)}); i.form.requestSubmit(); return true; })()`);
         first = await poll(ctx, `(() => { const e = document.querySelector('.dict-entry'); const w = e?.querySelector('.dict-word')?.textContent; return w === ${JSON.stringify(word)} ? w : null; })()`, 10000);
       }

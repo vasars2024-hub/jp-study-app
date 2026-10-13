@@ -32,6 +32,7 @@ import {
   type WeekPlanDay,
 } from '../shared/agentStudyCoach';
 import { summarizeReviewLog } from '../shared/reviewLog';
+import { studyDayIndex, studyDayIndexOfKey } from '../shared/studyDay';
 import { normalizeStudyLang } from '../shared/studyLang';
 import { segmentStudyText, studyWordKey } from '../shared/studySegmentation';
 import { studyWordStatus } from '../shared/gameStudyMix';
@@ -272,8 +273,15 @@ export async function computeWeekPlan(t: Translate, startTime = '19:00'): Promis
   const cards = studyCards();
   // The deck's own queue rules (suspended / Anki-owned cards excluded, today's new-card
   // allowance applied) — the same counts the Calendar shows for each of these days.
-  const forecast = deckDueForecast(cards, 7, now.getTime());
-  const duePerDay = forecast.days.map((day, i) => (i === 0 ? forecast.overdue + day.due : day.due));
+  // The plan books sessions on calendar dates; the forecast counts study days. A study
+  // day is keyed by the date it starts on, so calendar date D is study day D — but between
+  // midnight and the day-start hour (4 am) the current study day is still yesterday's, and
+  // today's date is study offset 1. What is still owed tonight goes into today's plan.
+  const shift = Math.max(0, studyDayIndexOfKey(dateKey(now)) - studyDayIndex(now.getTime()));
+  const forecast = deckDueForecast(cards, 7 + shift, now.getTime());
+  const duePerDay = Array.from({ length: 7 }, (_, i) => (i === 0
+    ? forecast.overdue + forecast.days.slice(0, shift + 1).reduce((sum, day) => sum + day.due, 0)
+    : forecast.days[i + shift]?.due ?? 0));
   const log = summarizeReviewLog(await loadReviewLog().catch(() => []), 14, now.getTime());
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6);
   const busyDays = new Set(

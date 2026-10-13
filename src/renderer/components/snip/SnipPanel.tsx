@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { alignFurigana, hasKanji, toHiragana } from '../../../shared/furigana';
 import {
   SNIP_HISTORY_MAX_BYTES,
+  snipEngineLabel,
+  snipNoticeOpen,
+  snipOwnsWork,
   type SnipEntry,
   type SnipWord,
 } from '../../../shared/snipToCards';
@@ -33,8 +36,14 @@ const POS_KEYS: Record<string, string> = {
 
 /** Words worth a row in the breakdown's table (punctuation stays in the text above it). */
 const ROW_HIDDEN = new Set<SnipWord['status']>(['punct']);
-/** Words the toggle can make a card. */
+/** Words the toggle can make a card (an in-deck word gets the sentence as an example instead). */
 const ADDABLE = new Set<SnipWord['status']>(['candidate', 'removed', 'overLimit', 'known', 'inDeck', 'duplicate', 'name', 'failed', 'noise', 'function']);
+/** Words the learner can correct (a misread word or reading). */
+const EDITABLE = new Set<SnipWord['status']>(['candidate', 'added', 'removed', 'overLimit', 'known', 'inDeck', 'duplicate', 'name', 'failed', 'noise']);
+/** Review mode: what is ticked to start with. */
+const PRESELECTED = new Set<SnipWord['status']>(['candidate']);
+/** Review mode: what may be ticked. */
+const SELECTABLE = new Set<SnipWord['status']>(['candidate', 'overLimit', 'inDeck', 'name', 'removed', 'failed', 'duplicate', 'known']);
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -44,6 +53,16 @@ function formatBytes(bytes: number): string {
 
 function firstLine(entry: SnipEntry): string {
   return entry.text.split('\n').find((line) => line.trim())?.trim().slice(0, 80) ?? '';
+}
+
+function useEngineName(): (engine: string | undefined) => string {
+  const { t } = useT();
+  // Product names stay as they are; only the descriptions are translated.
+  return (engine) => {
+    const label = snipEngineLabel(engine);
+    if (!label) return '';
+    return label.name ?? t(label.key as string);
+  };
 }
 
 /** The sentence with readings over its words (Japanese furigana, Chinese pinyin). */
@@ -70,18 +89,84 @@ function RubyText({ words, lang, show }: { words: readonly SnipWord[]; lang: Stu
   );
 }
 
+/** The inline form that corrects one word (dictionary form and reading). */
+function WordEditor({
+  entry,
+  word,
+  index,
+  lang,
+  columns,
+  onDone,
+}: {
+  entry: SnipEntry;
+  word: SnipWord;
+  index: number;
+  lang: StudyLang;
+  columns: number;
+  onDone: () => void;
+}) {
+  const { t } = useT();
+  const ids = useId();
+  const [lemma, setLemma] = useState(word.lemma || word.surface);
+  const [reading, setReading] = useState(word.reading ? (lang === 'ja' ? toHiragana(word.reading) : word.reading) : '');
+  const save = async () => {
+    const nextLemma = lemma.trim();
+    if (!nextLemma) return;
+    const patch: { lemma?: string; reading?: string } = {};
+    if (nextLemma !== word.lemma) patch.lemma = nextLemma;
+    const before = word.reading ? (lang === 'ja' ? toHiragana(word.reading) : word.reading) : '';
+    if (reading.trim() !== before) patch.reading = reading.trim();
+    if (patch.lemma !== undefined || patch.reading !== undefined) {
+      await window.api.snipAction({ id: entry.id, action: 'editWord', index, ...patch });
+    }
+    onDone();
+  };
+  return (
+    <tr className="snip-word-editor">
+      <td colSpan={columns}>
+        <form
+          className="snip-edit-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          <label htmlFor={`${ids}-lemma`}>{t('snip2.word.formWord')}</label>
+          <input id={`${ids}-lemma`} className="ui-input" lang={lang} value={lemma} onChange={(e) => setLemma(e.target.value)} />
+          {lang !== 'ru' && (
+            <>
+              <label htmlFor={`${ids}-reading`}>{t('snip2.word.formReading')}</label>
+              <input id={`${ids}-reading`} className="ui-input" lang={lang} value={reading} onChange={(e) => setReading(e.target.value)} />
+            </>
+          )}
+          <button type="submit" className="btn small snip-btn" disabled={!lemma.trim()}>{t('snip2.word.save')}</button>
+          <button type="button" className="btn small snip-btn" onClick={onDone}>{t('snip2.word.cancel')}</button>
+        </form>
+      </td>
+    </tr>
+  );
+}
+
 function WordRow({
   entry,
   word,
   index,
   lang,
   folder,
+  review,
+  selected,
+  onSelect,
+  onEdit,
 }: {
   entry: SnipEntry;
   word: SnipWord;
   index: number;
   lang: StudyLang;
   folder: string;
+  review: boolean;
+  selected: boolean;
+  onSelect: (index: number, on: boolean) => void;
+  onEdit: (index: number) => void;
 }) {
   const { t } = useT();
   const [busy, setBusy] = useState(false);
@@ -97,11 +182,27 @@ function WordRow({
   };
   const pos = word.pos ? (POS_KEYS[word.pos] ? t(POS_KEYS[word.pos]) : word.pos) : '';
   const reading = word.reading ? (lang === 'ja' ? toHiragana(word.reading) : word.reading) : '';
+  const statusLabel = word.status === 'merged' ? t('snip2.wstatus.merged') : t(`snip.wstatus.${word.status}`);
+  const canOpen = (word.status === 'added' || word.status === 'merged' || word.status === 'inDeck') && word.cardId;
   return (
-    <tr className={`snip-word is-${word.status}`}>
+    <tr className={`snip-word is-${word.status}${selected ? ' is-selected' : ''}`}>
+      {review && (
+        <td className="snip-word-pick">
+          {SELECTABLE.has(word.status) ? (
+            <input
+              type="checkbox"
+              className="snip-pick"
+              checked={selected}
+              aria-label={t('snip2.review.select', { word: label })}
+              onChange={(e) => onSelect(index, e.target.checked)}
+            />
+          ) : null}
+        </td>
+      )}
       <th scope="row" lang={lang}>
         <span className="snip-word-surface">{word.surface}</span>
         {word.lemma && word.lemma !== word.surface && <span className="snip-word-lemma"> → {word.lemma}</span>}
+        {word.edited && <span className="snip-chip">{t('snip2.word.edited')}</span>}
       </th>
       <td lang={lang}>{reading}</td>
       <td>
@@ -116,25 +217,35 @@ function WordRow({
         {word.freq ? <span className="snip-chip muted">{t('snip.word.freq', { rank: word.freq })}</span> : null}
       </td>
       <td>
-        <span className={`snip-status is-${word.status}`}>{t(`snip.wstatus.${word.status}`)}</span>
+        <span className={`snip-status is-${word.status}`}>{statusLabel}</span>
       </td>
       <td className="snip-word-actions">
-        {word.status === 'added' && word.cardId && (
+        {canOpen && (
           <button
             type="button"
             className="btn small snip-btn"
             aria-label={t('snip.word.open', { word: label })}
-            onClick={() => requestFlashcardsFocus({ folder, cardId: word.cardId ?? null })}
+            onClick={() => requestFlashcardsFocus({ folder: word.status === 'added' ? folder : null, cardId: word.cardId ?? null })}
           >
             {t('snip.word.openShort')}
           </button>
         )}
-        {word.status === 'added' ? (
+        {EDITABLE.has(word.status) && entry.status === 'done' && (
+          <button
+            type="button"
+            className="btn small snip-btn"
+            aria-label={t('snip2.word.edit', { word: label })}
+            onClick={() => onEdit(index)}
+          >
+            {t('snip2.word.editShort')}
+          </button>
+        )}
+        {word.status === 'added' || word.status === 'merged' ? (
           <button
             type="button"
             className="btn small snip-btn"
             disabled={busy}
-            aria-label={t('snip.word.remove', { word: label })}
+            aria-label={word.status === 'merged' ? t('snip2.word.unmerge', { word: label }) : t('snip.word.remove', { word: label })}
             onClick={() => void run('removeWord')}
           >
             {t('snip.word.removeShort')}
@@ -144,10 +255,10 @@ function WordRow({
             type="button"
             className="btn small snip-btn"
             disabled={busy}
-            aria-label={t('snip.word.add', { word: label })}
+            aria-label={word.status === 'inDeck' && word.cardId ? t('snip2.word.merge', { word: label }) : t('snip.word.add', { word: label })}
             onClick={() => void run('addWord')}
           >
-            {t('snip.word.addShort')}
+            {word.status === 'inDeck' && word.cardId ? t('snip2.word.mergeShort') : t('snip.word.addShort')}
           </button>
         ) : null}
       </td>
@@ -155,17 +266,72 @@ function WordRow({
   );
 }
 
-function SnipDetail({ entry, folder, maxWords }: { entry: SnipEntry; folder: string; maxWords: number }) {
+/** Correct the OCR's text and analyse it again (only while the snip owns nothing). */
+function TextFixer({ entry, onDone }: { entry: SnipEntry; onDone: () => void }) {
+  const { t } = useT();
+  const id = useId();
+  const [text, setText] = useState(entry.text);
+  return (
+    <form
+      className="snip-text-fix"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const next = text.trim();
+        if (!next) return;
+        void window.api.snipAction({ id: entry.id, action: 'reanalyze', text: next }).then(onDone, onDone);
+      }}
+    >
+      <label htmlFor={id}>{t('snip2.text.label')}</label>
+      <textarea id={id} className="ui-input snip-text-input" lang={entry.lang} rows={3} value={text} onChange={(e) => setText(e.target.value)} />
+      <div className="snip-text-fix-actions">
+        <button type="submit" className="btn small snip-btn" disabled={!text.trim()}>{t('snip2.text.reanalyze')}</button>
+        <button type="button" className="btn small snip-btn" onClick={onDone}>{t('snip2.word.cancel')}</button>
+      </div>
+    </form>
+  );
+}
+
+/** This snip's own deck: later adds go there, and the cards it added move there. */
+function SnipDeckField({ entry, defaultDeck }: { entry: SnipEntry; defaultDeck: string }) {
+  const { t } = useT();
+  const id = useId();
+  const [deck, setDeck] = useState(entry.deck ?? '');
+  useEffect(() => setDeck(entry.deck ?? ''), [entry.id, entry.deck]);
+  return (
+    <div className="snip-deck-field">
+      <label htmlFor={id}>{t('snip2.deck.label')}</label>
+      <input
+        id={id}
+        className="ui-input"
+        value={deck}
+        placeholder={t('snip2.deck.placeholder', { deck: defaultDeck })}
+        aria-describedby={`${id}-hint`}
+        onChange={(e) => setDeck(e.target.value)}
+        onBlur={() => {
+          if (deck.trim() !== (entry.deck ?? '')) void window.api.snipAction({ id: entry.id, action: 'setDeck', deck: deck.trim() });
+        }}
+      />
+      <span id={`${id}-hint`} className="muted snip-deck-hint">{t('snip2.deck.hint')}</span>
+    </div>
+  );
+}
+
+function SnipDetail({ entry, folder, defaultDeck, maxWords }: { entry: SnipEntry; folder: string; defaultDeck: string; maxWords: number }) {
   const { t, lang: uiLang } = useT();
+  const engineName = useEngineName();
   const lang = normalizeStudyLang(entry.lang);
   const [image, setImage] = useState<string | null>(null);
   const [furigana, setFurigana] = useState(true);
   const [installState, setInstallState] = useState<'idle' | 'started' | 'failed'>('idle');
+  const [editing, setEditing] = useState<number | null>(null);
+  const [fixingText, setFixingText] = useState(false);
   const headingId = useId();
 
   useEffect(() => {
     let alive = true;
     setImage(null);
+    setEditing(null);
+    setFixingText(false);
     window.api.snipImage(entry.id).then((url) => {
       if (alive) setImage(url);
     }).catch(() => undefined);
@@ -173,6 +339,23 @@ function SnipDetail({ entry, folder, maxWords }: { entry: SnipEntry; folder: str
       alive = false;
     };
   }, [entry.id]);
+
+  const review = entry.status === 'done' && Boolean(entry.review) && !entry.undone;
+  // Review mode: the new words start ticked; the learner unticks or adds others.
+  const wordsKey = entry.words.map((w) => w.status).join(',');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    setSelected(new Set(entry.words.flatMap((w, i) => (PRESELECTED.has(w.status) ? [i] : []))));
+  }, [entry.id, wordsKey]);
+  const onSelect = useCallback((index: number, on: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(index);
+      else next.delete(index);
+      return next;
+    });
+  }, []);
+  const picked = [...selected].filter((i) => SELECTABLE.has(entry.words[i]?.status));
 
   const install = async () => {
     const id = entry.installIds?.[0];
@@ -187,16 +370,11 @@ function SnipDetail({ entry, folder, maxWords }: { entry: SnipEntry; folder: str
 
   const rows = entry.words.filter((w) => !ROW_HIDDEN.has(w.status));
   const added = entry.words.filter((w) => w.status === 'added').length;
-  // Product names stay as they are; only the descriptions are translated.
-  const engine = !entry.engine
-    ? ''
-    : entry.engine === 'basic'
-      ? t('snip.engine.basic')
-      : entry.engine === 'manga'
-        ? 'manga-ocr'
-        : entry.engine === 'web'
-          ? 'PaddleOCR'
-          : t('snip.engine.other');
+  const merged = entry.words.filter((w) => w.status === 'merged').length;
+  const engine = engineName(entry.engine);
+  const owns = snipOwnsWork(entry);
+  const canFixText = (entry.status === 'done' || (entry.status === 'error' && Boolean(entry.text))) && entry.error !== 'models-missing';
+  const columns = review ? 7 : 6;
   const errorKey = entry.error === 'models-missing'
     ? 'snip.error.modelsMissing'
     : entry.error === 'no-text'
@@ -240,24 +418,52 @@ function SnipDetail({ entry, folder, maxWords }: { entry: SnipEntry; folder: str
             ) : null}
           </div>
         )}
+        {review && (
+          <p className={`snip-note snip-review-note${entry.review === 'uncertain' ? ' is-error' : ''}`} role="status">
+            {entry.review === 'uncertain'
+              ? t('snip2.review.uncertain', { percent: Math.round((entry.confidence ?? 0) * 100) })
+              : t('snip2.review.manual')}
+          </p>
+        )}
         {entry.undone && <p className="snip-note">{t('snip.detail.undone')}</p>}
       </div>
 
-      {entry.text && (
+      {(entry.text || canFixText) && (
         <section className="snip-section" aria-label={t('snip.detail.text')}>
           <div className="snip-section-head">
             <h4>{t('snip.detail.text')}</h4>
-            {lang !== 'ru' && entry.words.length > 0 && (
-              <label className="snip-inline-toggle">
-                <input type="checkbox" checked={furigana} onChange={(e) => setFurigana(e.target.checked)} />
-                {t('snip.detail.furigana')}
-              </label>
-            )}
+            <div className="snip-section-tools">
+              {lang !== 'ru' && entry.words.length > 0 && (
+                <label className="snip-inline-toggle">
+                  <input type="checkbox" checked={furigana} onChange={(e) => setFurigana(e.target.checked)} />
+                  {t('snip.detail.furigana')}
+                </label>
+              )}
+              {canFixText && !fixingText && (
+                <button
+                  type="button"
+                  className="btn small snip-btn"
+                  disabled={owns}
+                  aria-describedby={owns ? `${headingId}-fix` : undefined}
+                  onClick={() => setFixingText(true)}
+                >
+                  {t('snip2.text.fix')}
+                </button>
+              )}
+            </div>
           </div>
-          {entry.words.length ? (
+          {canFixText && owns && !fixingText && (
+            <p id={`${headingId}-fix`} className="muted snip-fix-hint">{t('snip2.text.undoFirst')}</p>
+          )}
+          {fixingText ? (
+            <TextFixer entry={entry} onDone={() => setFixingText(false)} />
+          ) : entry.words.length ? (
             <RubyText words={entry.words} lang={lang} show={furigana} />
           ) : (
             <p className="snip-text" lang={lang}>{entry.text}</p>
+          )}
+          {entry.ocrText && entry.ocrText !== entry.text && (
+            <p className="muted snip-fix-hint" lang={lang}>{t('snip2.text.original', { text: entry.ocrText })}</p>
           )}
         </section>
       )}
@@ -279,16 +485,33 @@ function SnipDetail({ entry, folder, maxWords }: { entry: SnipEntry; folder: str
         <section className="snip-section" aria-label={t('snip.detail.words')}>
           <div className="snip-section-head">
             <h4>{t('snip.detail.words')}</h4>
-            {added > 0 && !entry.undone && (
-              <button
-                type="button"
-                className="btn small snip-btn"
-                onClick={() => void window.api.snipAction({ id: entry.id, action: 'undo' })}
-              >
-                {t('snip.detail.undo', { count: added })}
-              </button>
-            )}
+            <div className="snip-section-tools">
+              {review && (
+                <button
+                  type="button"
+                  className="btn small snip-btn snip-add-selected"
+                  disabled={picked.length === 0}
+                  onClick={() => void window.api.snipAction({ id: entry.id, action: 'addWords', indices: picked })}
+                >
+                  {t('snip2.review.addSelected', { count: picked.length })}
+                </button>
+              )}
+              {(added > 0 || merged > 0) && !entry.undone && (
+                <button
+                  type="button"
+                  className="btn small snip-btn"
+                  aria-describedby={`${headingId}-undo`}
+                  onClick={() => void window.api.snipAction({ id: entry.id, action: 'undo' })}
+                >
+                  {added > 0 ? t('snip.detail.undo', { count: added }) : t('snip2.detail.undoExamples', { count: merged })}
+                </button>
+              )}
+            </div>
           </div>
+          {(added > 0 || merged > 0) && !entry.undone && (
+            <p id={`${headingId}-undo`} className="muted snip-undo-hint">{t('snip2.detail.undoHint')}</p>
+          )}
+          {entry.status === 'done' && <SnipDeckField entry={entry} defaultDeck={defaultDeck} />}
           {entry.overLimit ? (
             <p className="muted">{t('snip.detail.overLimit', { count: entry.overLimit, max: maxWords })}</p>
           ) : null}
@@ -296,6 +519,7 @@ function SnipDetail({ entry, folder, maxWords }: { entry: SnipEntry; folder: str
             <table className="snip-words">
               <thead>
                 <tr>
+                  {review && <th scope="col"><span className="snip-sr">{t('snip2.review.pickColumn')}</span></th>}
                   <th scope="col">{t('snip.col.word')}</th>
                   <th scope="col">{t('snip.col.reading')}</th>
                   <th scope="col">{t('snip.col.meaning')}</th>
@@ -306,7 +530,22 @@ function SnipDetail({ entry, folder, maxWords }: { entry: SnipEntry; folder: str
               </thead>
               <tbody>
                 {entry.words.map((word, index) => (ROW_HIDDEN.has(word.status) ? null : (
-                  <WordRow key={`${index}-${word.surface}`} entry={entry} word={word} index={index} lang={lang} folder={folder} />
+                  <Fragment key={`${index}-${word.surface}`}>
+                    <WordRow
+                      entry={entry}
+                      word={word}
+                      index={index}
+                      lang={lang}
+                      folder={folder}
+                      review={review}
+                      selected={selected.has(index)}
+                      onSelect={onSelect}
+                      onEdit={(i) => setEditing((cur) => (cur === i ? null : i))}
+                    />
+                    {editing === index && (
+                      <WordEditor entry={entry} word={word} index={index} lang={lang} columns={columns} onDone={() => setEditing(null)} />
+                    )}
+                  </Fragment>
                 )))}
               </tbody>
             </table>
@@ -343,17 +582,38 @@ function SnipDetail({ entry, folder, maxWords }: { entry: SnipEntry; folder: str
 }
 
 /**
+ * The first-run notice, kept until it is answered: Snip to cards is on by
+ * default, so the learner is told plainly and can turn it off in one click.
+ */
+function SnipNotice({ onAnswer }: { onAnswer: (keep: boolean) => void }) {
+  const { t } = useT();
+  const id = useId();
+  return (
+    <section className="snip-notice" role="region" aria-labelledby={id}>
+      <h3 id={id} className="snip-notice-title">{t('snip2.notice.title')}</h3>
+      <p className="snip-notice-body">{t('snip2.notice.body')}</p>
+      <div className="snip-notice-actions">
+        <button type="button" className="btn small snip-btn" onClick={() => onAnswer(false)}>{t('snip2.notice.turnOff')}</button>
+        <button type="button" className="btn small snip-btn" onClick={() => onAnswer(true)}>{t('snip2.notice.keep')}</button>
+      </div>
+    </section>
+  );
+}
+
+/**
  * The Snips app: every snip newest first (searchable, deletable, capped), and
  * the selected one's analysis — the picture, the text with furigana, the
  * translation, a word-by-word breakdown with readings, meanings, part of
  * speech, conjugation, level and frequency, the grammar points found, and
- * which words became cards (each with Open / Remove / Add).
+ * which words became cards (each with Open / Fix / Remove / Add). In review
+ * mode the new words are ticked for the learner to choose, correct and add.
  *
  * Shared by the Study OS view (`views/SnipsView.tsx`, every theme) and Blanc's
  * panel; updates live from main's history as snips arrive.
  */
 export default function SnipPanel({ compact = false }: { compact?: boolean }) {
   const { t, lang: uiLang } = useT();
+  const engineName = useEngineName();
   const [status, save] = useSnipStatus();
   const [entries, setEntries] = useState<SnipEntry[]>([]);
   const [query, setQuery] = useState('');
@@ -444,6 +704,9 @@ export default function SnipPanel({ compact = false }: { compact?: boolean }) {
           </button>
         </div>
       </header>
+      {snipNoticeOpen(status) && status.enabled && (
+        <SnipNotice onAnswer={(keep) => void save(keep ? { notice: 'answered' } : { enabled: false, notice: 'answered' })} />
+      )}
       {settingsOpen && (
         <section className="snip-settings-panel" aria-label={t('snip.settings.title')}>
           <SnipSettingsForm showShortcut={!compact} />
@@ -477,6 +740,8 @@ export default function SnipPanel({ compact = false }: { compact?: boolean }) {
           <ul className="snip-history-list">
             {entries.map((entry) => {
               const cards = entry.words.filter((w) => w.status === 'added').length;
+              const waiting = entry.review && !entry.undone ? entry.words.filter((w) => w.status === 'candidate').length : 0;
+              const engine = engineName(entry.engine);
               const active = current?.id === entry.id;
               return (
                 <li key={entry.id} className={`snip-history-item${active ? ' is-active' : ''}`}>
@@ -496,7 +761,10 @@ export default function SnipPanel({ compact = false }: { compact?: boolean }) {
                         ? t('snip.history.processing')
                         : entry.status === 'error'
                           ? t('snip.history.failed')
-                          : t('snip.history.cards', { count: cards })}
+                          : waiting
+                            ? t('snip2.history.review', { count: waiting })
+                            : t('snip.history.cards', { count: cards })}
+                      {engine && entry.status !== 'processing' ? ` · ${t('snip2.history.via', { engine })}` : ''}
                     </span>
                   </button>
                   <button
@@ -520,7 +788,7 @@ export default function SnipPanel({ compact = false }: { compact?: boolean }) {
         </nav>
         <div className="snip-detail-wrap">
           {current ? (
-            <SnipDetail entry={current} folder={status.deck} maxWords={status.maxWords} />
+            <SnipDetail entry={current} folder={current.deck || status.deck} defaultDeck={status.deck} maxWords={status.maxWords} />
           ) : (
             <p className="muted snip-empty">{t('snip.detail.select')}</p>
           )}

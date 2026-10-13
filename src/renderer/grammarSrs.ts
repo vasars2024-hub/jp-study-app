@@ -8,14 +8,16 @@
  * user's SM-2 / FSRS choice and interval ceiling) rather than a second opinion.
  *
  * What feeds it:
- *   - every answer in a grammar practice test (right → Good, wrong → Again);
+ *   - a grammar practice-test answer on a point that is due or not yet
+ *     scheduled (right → Good, wrong → Again); answers on a point that is not
+ *     due are practice only (`recordTestAnswer`);
  *   - the recently-missed points from session history, which enter as due now;
  *   - ratings given on the Review tab itself.
  *
  * Familiarity stays as it is — it is the coarse "how well do I know this"
  * label the filters use; this is only "when should I see it next".
  */
-import type { LocalSrsRating, LocalSrsState } from '../shared/localSrs';
+import { LOCAL_SRS_DEFAULT_EASE, type LocalSrsRating, type LocalSrsState } from '../shared/localSrs';
 import { migrateSrsState, scheduleReview, type SchedulingConfig } from '../shared/flashcardScheduling';
 import { loadSchedulingConfig } from './flashcardScheduling';
 import { writeLocalStorageJson } from './localStorageWrite';
@@ -80,11 +82,77 @@ export function reviewGrammarPoint(
   now = Date.now(),
 ): Record<string, LocalSrsState> {
   if (!id) return { ...state };
+  return { ...state, [id]: scheduleReview(schedulerPrior(state[id]), rating, config, now) };
+}
+
+/**
+ * Whether a stored state is a placeholder for a point that has never been
+ * reviewed: what `enrolGrammarPoints` and `seedMissed` write so the point has a
+ * due date. The scheduler must see such a point as the new card it is (no state
+ * at all, which is how a flashcard is new), not as a zero-day interval.
+ *
+ * "Zero repetitions and a zero-day interval" alone is NOT that: a card inside
+ * its learning or relearning steps looks exactly the same, and reading it as new
+ * erased its lapse and ease penalty (SM-2), reset its memory model (FSRS) and
+ * kept a "1m 10m" card on its last step forever. So a placeholder also has no
+ * step state, no FSRS memory (every FSRS review writes one) and the default
+ * ease (an SM-2 Again always lowers it).
+ */
+export function isUnreviewedGrammarState(state: LocalSrsState | undefined): boolean {
+  if (!state) return true;
+  return (
+    state.phase === undefined &&
+    state.step === undefined &&
+    state.stability === undefined &&
+    state.difficulty === undefined &&
+    state.repetitions === 0 &&
+    state.intervalDays === 0 &&
+    state.ease === LOCAL_SRS_DEFAULT_EASE
+  );
+}
+
+/** What the scheduler is handed for a point: nothing for a never-reviewed placeholder. */
+export function schedulerPrior(state: LocalSrsState | undefined): LocalSrsState | undefined {
+  return isUnreviewedGrammarState(state) ? undefined : state;
+}
+
+/** Due at `now`, or not scheduled at all. */
+export function isGrammarPointDueOrUnscheduled(state: GrammarSrsState, id: string, now = Date.now()): boolean {
   const current = state[id];
-  // A seeded or enrolled point has a due date but no review history yet; the
-  // scheduler must see it as the new card it is, not as a zero-day interval.
-  const prior = current && current.repetitions === 0 && current.intervalDays === 0 ? undefined : current;
-  return { ...state, [id]: scheduleReview(prior, rating, config, now) };
+  return !current || current.dueAt <= now;
+}
+
+/**
+ * A practice-test answer as a schedule step, but only for a point the schedule
+ * is asking about (due) or does not know yet (unscheduled). An answer on a
+ * point that is not due is practice only: writing every answer used to push a
+ * brand-new point to an 8-day interval after three Goods inside one sitting.
+ * Returns `state` itself when nothing is written.
+ */
+export function recordTestAnswer(
+  state: GrammarSrsState,
+  id: string,
+  rating: LocalSrsRating,
+  config: SchedulingConfig = loadSchedulingConfig(),
+  now = Date.now(),
+): GrammarSrsState {
+  if (!id || !isGrammarPointDueOrUnscheduled(state, id, now)) return state;
+  return reviewGrammarPoint(state, id, rating, config, now);
+}
+
+/**
+ * Put one point's schedule back as it was before a rating (`undefined`: it had
+ * none). The Review tab's one-step Undo.
+ */
+export function restoreGrammarPoint(
+  state: GrammarSrsState,
+  id: string,
+  previous: LocalSrsState | undefined,
+): Record<string, LocalSrsState> {
+  const next: Record<string, LocalSrsState> = { ...state };
+  if (previous) next[id] = previous;
+  else delete next[id];
+  return next;
 }
 
 /**

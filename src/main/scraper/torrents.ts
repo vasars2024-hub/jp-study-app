@@ -88,20 +88,80 @@ export function looksLikeBatch(name: string): boolean {
   return releaseEpisodeRange(text) !== null;
 }
 
+// `\b` is ASCII-only: it never fires between `[` and `简`, or inside `Рус`, and
+// a pattern with no closing boundary (`rus`) also hits "Rusty". A tag is a
+// whole token when it is not glued to another letter of an alphabetic script
+// or a digit; CJK characters count as separators, because release names run
+// tags straight into titles (`[简日双语]`, `日本語字幕`) with no space.
+const TAG_GLUE = String.raw`[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{N}]`;
+
+/** A case-insensitive pattern that matches only whole tokens. */
+function tagPattern(alternatives: string): RegExp {
+  return new RegExp(`(?<!${TAG_GLUE})(?:${alternatives})(?!${TAG_GLUE})`, 'iu');
+}
+
+interface SubtitleTagRule {
+  languages: readonly string[];
+  /** Latin/Cyrillic tags, matched as whole tokens. */
+  token?: RegExp;
+  /** CJK tags, matched anywhere: CJK has no spaces to delimit a token. */
+  cjk?: RegExp;
+}
+
+const SUBTITLE_TAG_RULES: readonly SubtitleTagRule[] = [
+  {
+    languages: ['en'],
+    token: tagPattern(String.raw`en|eng|english|eng[-_ ]?subs?|softsubs?`),
+  },
+  {
+    languages: ['ja'],
+    token: tagPattern(String.raw`jp|jpn|japanese|raw|jp[-_ ]?subs?`),
+    cjk: /日本語|日本语|日語|日语|日文/u,
+  },
+  {
+    languages: ['zh'],
+    // GB / BIG5 are the encodings Chinese fansubs name their simplified and
+    // traditional releases after. `big5` cannot be anything else; `GB` is
+    // handled separately below because it is also a size unit.
+    token: tagPattern(String.raw`chs|cht|chinese|big5|sc[-_ ]?subs?|tc[-_ ]?subs?`),
+    cjk: /中文|中字|简体|簡体|簡體|简中|簡中|繁体|繁體|繁中|简繁|簡繁/u,
+  },
+  {
+    languages: ['zh', 'ja'],
+    // Bilingual Chinese/Japanese releases: `[简日双语]`, `[繁日內嵌]`, `JPSC`.
+    token: tagPattern(String.raw`jpsc|jptc|chs[-_&]jpn?|cht[-_&]jpn?|jpn?[-_&]chs|jpn?[-_&]cht`),
+    cjk: /[简簡繁中]日|日[简簡繁中]/u,
+  },
+  {
+    languages: ['ru'],
+    // `Rus Sub`, `RusSub`, `[RUS]`, `Russian`, and the Cyrillic spellings:
+    // `рус`, `русские субтитры`, `Русский`, `Русская озвучка`.
+    token: tagPattern(String.raw`rus|russian|rus[-_ ]?subs?|ru[-_ ]?subs?|рус|русск\p{Script=Cyrillic}*`),
+  },
+  {
+    // `[Multiple Subtitle]` is Erai-raws' house style; `[Multi-Sub]` is
+    // everyone else's. Both mean the same thing and both have to match.
+    languages: ['en', 'ja'],
+    token: tagPattern(String.raw`multi(?:ple)?[-_ ]?sub(?:s|titles?)?`),
+  },
+];
+
+// `[GB]`, `[GB_MP4]`, `(CHS&GB)`: the tag sits between brackets or tag
+// separators. A size (`1.4 GB`, `700GB`) never does, so no digit or space may
+// precede it, and it has to be upper case.
+const GB_TAG = /(?<=[[【(（_&+/])GB(?=[\]】)）_&+/.\s]|$)/u;
+
 /** Language tags a release advertises, normalised to ISO 639-1 where obvious. */
 export function parseSubtitleLanguages(name: string): string[] {
   const found = new Set<string>();
-  const text = name ?? '';
-  if (/\b(eng?(?:lish)?|eng[- ]?sub|softsub)\b/i.test(text)) found.add('en');
-  if (/\b(jp|jpn|japanese|raw)\b/i.test(text)) found.add('ja');
-  // `[Multiple Subtitle]` is Erai-raws' house style; `[Multi-Sub]` is everyone
-  // else's. Both mean the same thing and both have to match.
-  if (/\bmulti(?:ple)?[- ]?sub(?:title)?s?\b/i.test(text)) {
-    found.add('en');
-    found.add('ja');
+  // NFKC folds full-width tags (`ＣＨＳ`, `［ＧＢ］`) into the ASCII forms above.
+  const text = (name ?? '').normalize('NFKC');
+  for (const rule of SUBTITLE_TAG_RULES) {
+    if (rule.token?.test(text) || rule.cjk?.test(text)) {
+      for (const language of rule.languages) found.add(language);
+    }
   }
-  if (/\b(chs|cht|chinese|中文|简体|繁體)\b/i.test(text)) found.add('zh');
-  if (/\b(rus|russian|русск)/i.test(text)) found.add('ru');
+  if (GB_TAG.test(text)) found.add('zh');
   return [...found];
 }
 

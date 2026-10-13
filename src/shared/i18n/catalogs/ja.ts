@@ -24,9 +24,11 @@ import { SCRAPER_FIX_JA } from '../scraperFix/ja';
 import { ANIME_SCHEDULE_JA } from '../animeSchedule/ja';
 import { SHELL_UI_JA } from '../shellUi/ja';
 import { TOUR_UI_JA } from '../tourUi/ja';
+import { ONB3_UI_JA } from '../onb3Ui/ja';
 import { COMMANDS_UI_JA } from '../commandsUi/ja';
 import { COMPANION_UI_JA } from '../companionUi/ja';
 import { MUSIC_UI_JA } from '../musicUi/ja';
+import { MUSIC_LYRICS2_JA } from '../musicLyrics2/ja';
 import { RESOURCES_CATALOG_JA } from '../resourcesCatalog/ja';
 import { RESOURCE_BUNDLES_JA } from '../resourceBundles/ja';
 import { INSTALL_UI_JA } from '../installUi/ja';
@@ -41,9 +43,12 @@ import { STUDY_UI_JA } from '../studyUi/ja';
 import { SYSTEM_UI_JA } from '../systemUi/ja';
 import { CAPTIONS_UI_JA } from '../captionsUi/ja';
 import { QUALITY_UI_JA } from '../qualityUi/ja';
+import { SETTINGS8_UI_JA } from '../settings8Ui/ja';
+import { SETTINGS_TRANSFER_UI_JA } from '../settingsTransferUi/ja';
 import { POLISH_UI_JA } from '../polishUi/ja';
 import { PRODUCT5_UI_JA } from '../product5Ui/ja';
 import { DICT3_UI_JA } from '../dict3Ui/ja';
+import { DICT4_UI_JA } from '../dict4Ui/ja';
 import { RECORDER_V2_JA } from '../recorderV2/ja';
 import { SCRAPER_V2_JA } from '../scraperV2/ja';
 import { STUDY_AREAS_UI_JA } from '../studyAreasUi/ja';
@@ -53,6 +58,10 @@ import { LENS_OCR_UI_JA } from '../lensOcrUi/ja';
 import { MEDIA5_JA } from '../media5/ja';
 import { PLANNER_UI_JA } from '../plannerUi/ja';
 import { SNIP_UI_JA } from '../snipUi/ja';
+import { SNIP2_UI_JA } from '../snip2Ui/ja';
+import { NOTES_UI_JA } from '../notesUi/ja';
+import { LIBRARY_MANAGE_UI_JA } from '../libraryManageUi/ja';
+import { VIDEO_STUDY2_UI_JA } from '../videoStudy2Ui/ja';
 
 export const ja: Catalog = {
   'common.download': 'ダウンロード',
@@ -758,9 +767,11 @@ export const ja: Catalog = {
   ...GRAMMAR_TAXONOMY_JA,
   ...SHELL_UI_JA,
   ...TOUR_UI_JA,
+  ...ONB3_UI_JA,
   ...COMMANDS_UI_JA,
   ...COMPANION_UI_JA,
   ...MUSIC_UI_JA,
+  ...MUSIC_LYRICS2_JA,
   ...RESOURCES_CATALOG_JA,
   ...RESOURCE_BUNDLES_JA,
   ...INSTALL_UI_JA,
@@ -775,9 +786,12 @@ export const ja: Catalog = {
   ...SYSTEM_UI_JA,
   ...CAPTIONS_UI_JA,
   ...QUALITY_UI_JA,
+  ...SETTINGS8_UI_JA,
+  ...SETTINGS_TRANSFER_UI_JA,
   ...POLISH_UI_JA,
   ...PRODUCT5_UI_JA,
   ...DICT3_UI_JA,
+  ...DICT4_UI_JA,
   ...RECORDER_V2_JA,
   ...SCRAPER_V2_JA,
   ...STUDY_AREAS_UI_JA,
@@ -789,6 +803,10 @@ export const ja: Catalog = {
   ...MEDIA5_JA,
   ...PLANNER_UI_JA,
   ...SNIP_UI_JA,
+  ...SNIP2_UI_JA,
+  ...NOTES_UI_JA,
+  ...LIBRARY_MANAGE_UI_JA,
+  ...VIDEO_STUDY2_UI_JA,
 
   'settings.appTitle': '設定',
   'settings.group.personalization': '個人設定',
@@ -1817,7 +1835,6 @@ export const ja: Catalog = {
   'settings.lock.save': 'パスコードを保存',
   'settings.lock.update': 'パスコードを更新',
   'settings.lock.clear': 'パスコードを消去',
-  'settings.lock.msg.needFour': '4桁のパスコードを入力してください。',
   'settings.lock.msg.mismatch': 'パスコードが一致しません。',
   'settings.lock.msg.saveFail': 'パスコードを保存できませんでした。',
   'settings.lock.msg.saved': 'パスコードを保存しました。',
@@ -2092,7 +2109,6 @@ export const ja: Catalog = {
   'settings.memory.health.kind.other': 'ストレージを利用できませんでした',
   'settings.memory.health.dismiss': '閉じる',
   'settings.memory.catalogSummary': '設定カタログ ≈ {bytes}（{count} 個のアクティブな領域：パーティクル、コンパニオン、壁紙、表示、学習、ホスト…）',
-  'settings.memory.catalogSummaryOne': '設定カタログ ≈ {bytes}（{count} 個のアクティブな領域：パーティクル、コンパニオン、壁紙、表示、学習、ホスト…）',
   'settings.memory.livingLayer': 'リビングレイヤー',
   'settings.memory.inventoryFail': '設定一覧を読めませんでした。',
   'settings.memory.filterPlaceholder': '領域を絞り込み…',
@@ -2389,7 +2405,6 @@ export const ja: Catalog = {
   'settings.shortcuts.import': 'インポート',
   'settings.shortcuts.resetAll': 'すべてリセット',
   'settings.shortcuts.resetTitle': 'ショートカットをリセット',
-  'settings.shortcuts.resetMessage': 'このプロファイルのすべてのショートカットを既定に戻しますか？',
   'settings.shortcuts.resetDone': 'すべてのショートカットをリセットしました。',
   'settings.shortcuts.customTitle': '新しいカスタムショートカット',
   'settings.shortcuts.field.name': '名前',
@@ -3055,7 +3070,6 @@ export const ja: Catalog = {
   'agent.capabilities.operation.study.known-words': '既知語の数や単語のレベルを読む',
   // polish.* — whole-app polish pass (tray/startup, Lens opt-in)
   'polish.tray.openBlanc': 'Blanc を開く',
-  'polish.tray.recordRegion': '範囲を録画',
   'polish.tray.keepRunning': '閉じてもトレイで実行を続ける',
   'polish.lifecycle.title': 'スタートアップとトレイ',
   'polish.lifecycle.desc': 'ウィンドウを閉じたときの動作と、Windows と一緒に Gum を起動するかを選びます。',
@@ -3380,10 +3394,10 @@ export const ja: Catalog = {
   'agent.undo.error.not-invertible': 'その操作は安全に元に戻せません。',
   'agent.undo.error.entity-not-named': '元に戻す対象が操作に記録されていません。',
   'agent.undo.error.already-undone': 'その操作はすでに元に戻されています。',
-  'agent.undo.error.superseded': '同じ項目が新しい操作で変更されたため、元に戻せません。',
+  'agent.undo.error.superseded': 'エージェントの操作の後に変更されているため、その変更を守るために元に戻しませんでした。何も変更していません。',
   'agent.undo.error.entity-not-found': '対象の項目が存在しないため、元に戻せません。',
   'agent.undo.error.operation-unavailable': 'このビルドには、その操作を安全に戻す機能がありません。',
-  'agent.undo.error.operation-denied': '有効なプロファイルまたは権限レベルでは、これを元に戻す操作が許可されていません。エージェント設定で許可するか、手動で元に戻してください。',
+  'agent.undo.error.operation-denied': '現在のプロファイルまたは権限レベルではこの種類の変更が許可されなくなったため、エージェントは元に戻せません。エージェント設定で再び許可するか、手動で元に戻してください。',
   'agent.undo.error.busy': 'その操作はすでに元に戻している途中です。',
   'agent.undo.error.undo-failed': '変更を元に戻せませんでした。',
   'agent.undo.error.store-failed': '現在の項目状態を読み込めませんでした。',
@@ -4393,7 +4407,6 @@ export const ja: Catalog = {
   'help.tour.title': 'ガイドツアー',
   'help.update.title': 'アップデート',
   'help.update.desc': 'このビルドを最新の公開リリースと比較します。',
-  'help.update.check': 'アップデートを確認',
   'help.update.checking': '確認中…',
   'help.update.available': 'バージョン {latest} が利用できます（現在 {current}）。',
   'help.update.current': '最新のリリースです（{current}）。',
@@ -4617,9 +4630,6 @@ export const ja: Catalog = {
   'desktop.dialog.slideshow': 'スライドショー',
   'desktop.dialog.slideshowEmpty': 'そのフォルダーに画像が見つかりません（.jpg、.png、.webp、.gif）。',
   'desktop.dialog.openFailed': '開けませんでした',
-  'desktop.dialog.resetTitle': 'デスクトップをリセット',
-  'desktop.dialog.resetMessage': 'デスクトップをリセットしますか — すべてのウィンドウを閉じ、アイコンと壁紙をクリアします。',
-  'desktop.dialog.resetConfirm': 'リセット',
 
   // Media library actions (Remove missing / Clear library)
   'mediaLib.pruneBtn': '見つからない項目を削除',
@@ -5113,6 +5123,12 @@ export const ja: Catalog = {
   'gram2.due.review': '文法を復習',
   'gram2.due.nextAt': '次の文法復習：{when}',
   'gram2.due.none': '予定された文法復習はありません',
+  'gram2.due.today': {
+    other: '今日が期限の文法 {count} 件',
+  },
+  'gram2.due.readyNow': '今すぐ {count} 件',
+  'gram2.undo.label': '直前の評価を取り消す',
+  'gram2.undo.hint': '{title} を元のスケジュールに戻します（Ctrl+Z）',
   'gram2.prompt.clozeTitle': '文型を入れてください',
   'gram2.prompt.productionTitle': '文型を使って言ってみましょう',
   'gram2.prompt.answerLabel': 'あなたの答え',
@@ -5729,19 +5745,11 @@ export const ja: Catalog = {
     other: '{name} から翻訳字幕を {count} 行読み込みました。',
   },
   'studyLoop.scene.secondaryEmpty': '{name} に字幕の行が見つかりません。',
-  'studyLoop.scene.grammarTitle': 'ライブラリ内の場面',
-  'studyLoop.scene.grammarHint': '動画から採掘した、この文型を使う行です。',
-  'studyLoop.scene.play': '再生',
-  'studyLoop.scene.playAt': 'この行を動画の {time} から再生',
-  'studyLoop.scene.paletteGroup': '採掘した行',
-  'studyLoop.scene.replayLast': '最後に採掘した行を再生',
-  'studyLoop.scene.replayLastTerms': '場面 動画 再生 採掘 文 カード',
   // studyLoop.lookup — lookup and transcript
   'studyLoop.lookup.mine': '収集',
   'studyLoop.lookup.mined': '収集済み',
   'studyLoop.lookup.mineLine': 'この行を収集：{line}',
   'studyLoop.lookup.minedLine': '収集済み：{line}',
-  'studyLoop.lookup.playFrom': '{time} から再生：{line}',
   // studyLoop.track — subtitle track choice, Whisper, library saves
   // studyLoop.stats — stats, calendar, streak, Aero/Wired integration
   'studyLoop.stats.card.minedToday': '今日動画からマイニングした行',
@@ -6240,7 +6248,7 @@ export const ja: Catalog = {
   'library.chip.deleteTitle': 'このフォルダを削除（本は残ります）',
   'library.chip.createTitle': '作成',
   'library.remove.title': 'ライブラリから削除',
-  'library.remove.message': 'この項目をライブラリから削除しますか？インポート済みのコピーは削除されます。',
+  'library.remove.message': 'この項目をライブラリから削除しますか？「最近削除した項目」に移り、30日間は元に戻せます。その後、インポート済みのコピーは削除されます。',
   'library.deleteFolder.title': 'フォルダを削除',
   'library.deleteFolder.message': 'フォルダ「{name}」を削除しますか？中の本はライブラリに残ります（未整理）。',
   'library.deleteFolder.confirm': '削除',
@@ -6584,7 +6592,6 @@ export const ja: Catalog = {
   'calendar.monthGrid': '月間グリッド — 矢印キーで日を移動、Enter で選択した日に予定を追加',
   'calendar.noEventsToday': 'この日には予定がありません。',
   'calendar.addEvent': '＋ 予定を追加',
-  'calendar.addInline': '＋ 追加',
   'calendar.allDay': '終日',
   'calendar.agenda.nothingToday': '今日の予定はありません。',
   'calendar.agenda.upcoming': '今後の予定',
@@ -8845,6 +8852,17 @@ export const ja: Catalog = {
   'deinflect.reason.shimau': '完了（〜てしまう）',
   'deinflect.reason.chau': '完了（〜ちゃう）',
   'deinflect.reason.teoku': '準備（〜ておく）',
+  'deinflect.reason.teAru': '結果の状態（〜てある）',
+  'deinflect.reason.teMiru': '試み（〜てみる）',
+  'deinflect.reason.teKuru': '方向・変化（〜てくる）',
+  'deinflect.reason.teIku': '方向・変化（〜ていく）',
+  'deinflect.reason.conditionalNara': '条件（〜なら）',
+  'deinflect.reason.tagaru': '第三者の希望（〜たがる）',
+  'deinflect.reason.sou': '様態（〜そう）',
+  'deinflect.reason.nagara': '同時（〜ながら）',
+  'deinflect.reason.zu': '否定（〜ず）',
+  'deinflect.reason.sa': '名詞化（〜さ）',
+  'deinflect.reason.nasai': '命令（〜なさい）',
 
   // Clipboard History panel
   'clipboard.filter.all': 'すべて',
@@ -9440,9 +9458,6 @@ export const ja: Catalog = {
     'これらの設定は Blanc モード専用です。Gum のメインアプリ、メモリとストレージのページ、デスクトップ配置、ウィジェット、通常モードの設定には反映されません。',
   'blanc.settings.rememberLastTab': '最後の Blanc タブを記憶する',
   'blanc.settings.restoreReader': 'リーダーの復元設定を Blanc のみに適用する',
-  'blanc.settings.reviewLimit': '復習の上限',
-  'blanc.settings.scratchpad': 'スクラッチパッド',
-  'blanc.settings.scratchpadPlaceholder': 'このツールボックスモード専用のメモ',
   'blanc.settings.resetMemory': 'Blanc メモリをリセット',
   'blanc.settings.lockscreen': 'ロック画面',
   'blanc.settings.changePin': 'PIN を変更',
@@ -9452,7 +9467,6 @@ export const ja: Catalog = {
   'blanc.settings.pinCleared': 'PIN を消去しました。',
   'blanc.settings.requirePin': '起動時に PIN を要求する',
   'blanc.settings.controlCenter': 'ツールボックス管理センター',
-  'blanc.settings.searchSettings': 'ツールボックス設定を検索',
   'blanc.settings.export': 'エクスポート',
   'blanc.settings.import': 'インポート',
   'blanc.settings.resetAll': 'すべてリセット',
@@ -9494,10 +9508,7 @@ export const ja: Catalog = {
   'blanc.settings.category.layout': 'レイアウト',
   'blanc.settings.category.search': '検索',
   'blanc.settings.category.keyboard-shortcuts': 'キーボードショートカット',
-  'blanc.settings.definitions': '一致する設定定義（{count}）',
-  'blanc.settings.col.setting': '設定',
   'blanc.settings.col.category': 'カテゴリ',
-  'blanc.settings.col.description': '説明',
   'blanc.settings.toolVisibility': 'ツールの表示',
   'blanc.settings.toolEnabled': '有効',
   'blanc.settings.toolHidden': '非表示',
@@ -9505,7 +9516,6 @@ export const ja: Catalog = {
   'blanc.settings.modeNote': 'Blanc モードを終了するとこのツールボックスウィンドウが閉じます。Gum 本体は動作を続けます。',
   'blanc.settings.exitBlanc': 'Blanc モードを終了',
 
-  'blanc.settings.calculatorLocked': 'ツールボックスが空にならないよう、電卓は常に有効です。',
   'blanc.settings.customCss.legend': 'カスタム CSS',
   'blanc.settings.customCss.intro': 'テーマエディターで扱えない部分のために、Blanc ウィンドウに重ねる生の CSS です。Blanc ルートにスコープされるため、素のセレクターは Blanc のみに影響します。',
   'blanc.settings.customCss.placeholder': '.blanc-nav-btn { letter-spacing: 0.02em; }',
@@ -9515,7 +9525,6 @@ export const ja: Catalog = {
   'blanc.settings.customCss.cleared': 'カスタム CSS をクリアしました。',
   'blanc.settings.customCss.guardNote': '「Blanc を終了」と「設定」のコントロールは CSS の後に再適用されるため、カスタムスタイルで Blanc からの出口が隠れることはありません。',
   'blanc.settings.resetCategoryDone': '{category}の設定をリセットしました。',
-  'blanc.settings.pinFourDigits': 'PIN は 4 桁で入力してください。',
   'blanc.settings.pinSaved': 'PIN を保存しました。',
   'blanc.settings.pinFirst': '先に PIN またはパスフレーズを設定してください。',
   'blanc.settings.lockEnabled': 'ロック画面を有効にしました。',
@@ -10068,19 +10077,12 @@ export const ja: Catalog = {
   'mediaWorkspace.study.micStopped': 'マイク録音が予期せず停止しました。',
   'mediaWorkspace.study.micStartFailed': 'マイク録音を開始できませんでした。',
   'mediaWorkspace.study.whisperLocalOnly': 'Whisper生成にはSeanimeライブラリのローカルファイルが必要です。',
-  'mediaWorkspace.study.extractingAudio': 'ffmpegで16 kHzモノラル音声を抽出中…',
-  'mediaWorkspace.study.noAudioTrack': '音声トラックが見つかりませんでした。',
-  'mediaWorkspace.study.audioExtractionFailed': '音声の抽出に失敗しました。',
-  'mediaWorkspace.study.loadingWhisper': 'ローカルWhisperモデルを読み込み中…',
   'mediaWorkspace.study.whisperStartFailed': 'Whisperワーカーを開始できませんでした。',
-  'mediaWorkspace.study.whisperOnDevice': '{device}でWhisperを実行中…',
-  'mediaWorkspace.study.gpu': 'GPU',
   'mediaWorkspace.study.cpu': 'CPU',
   'mediaWorkspace.study.whisperFailed': 'Whisper字幕の生成に失敗しました。',
   'mediaWorkspace.study.noWhisperCues': 'Whisperは完了しましたが字幕を生成しませんでした。',
   'mediaWorkspace.study.whisperGenerated': 'Whisper（生成）',
   'mediaWorkspace.study.whisperMountFailed': 'Whisper字幕を読み込めませんでした。',
-  'mediaWorkspace.study.audioSendFailed': '音声をWhisperへ送信できませんでした。',
   'mediaWorkspace.study.listenType': '聞いてから字幕を入力',
   'mediaWorkspace.study.waitingSubtitle': '字幕を待っています',
   'mediaWorkspace.study.typeWhatYouHear': '聞こえた内容を入力',
@@ -10237,7 +10239,6 @@ export const ja: Catalog = {
   'mediaWorkspace.study.whisperStatus': 'Whisperの状態',
   'mediaWorkspace.study.deviceStatus': 'デバイス：{device}',
   'mediaWorkspace.study.whisperProgress': 'Whisperの進捗',
-  'mediaWorkspace.study.downloadProgress': '{file}をダウンロード中・{progress}%',
   'mediaWorkspace.study.generatedLines': '字幕を{count}行生成しました。',
   'study.favoriteAlternative.title': '{harder}より先に{easier}を試す',
   'study.favoriteAlternative.explanation': 'どちらのお気に入りも現在のキャッシュ済みレディネスに基づいています。代わりの作品は短い予習で楽しめる範囲です。',
@@ -13578,8 +13579,6 @@ export const ja: Catalog = {
   'readingLists.view.author.onlyOne': 'リストにある {author} の本はこれだけです。',
   'readingLists.view.author.goList': 'リスト「{name}」へ移動',
   'readingLists.view.coverReveal': '「{title}」をライブラリで表示',
-  'seanimeDev.collapse': 'サイドカーパネルを折りたたむ',
-  'seanimeDev.expand': 'サイドカーパネルを展開',
   'immersion.rail.search': '保存したサイトを検索',
   'immersion.rail.noMatches': '一致するサイトがありません。検索を消すとすべて表示されます。',
   'immersion.rail.view.bookmarks': 'ブックマーク',
@@ -13662,7 +13661,6 @@ export const ja: Catalog = {
   'settings.lens.history.clearTitle': 'キャプチャ履歴を消去',
   'settings.lens.history.clearMessage': 'リーディングレンズのキャプチャをすべて削除しますか？ピン留めしたキャプチャも削除され、元に戻せません。',
   'settings.lens.history.clearConfirm': 'すべて削除',
-  'settings.monitors.reset.confirm': '画面ごとの設定をすべて破棄しますか？デスクトップとその内容は保持されますが、各デスクトップの表示先の割り当ては解除され、元に戻せません。',
   'credential.remove.title': '保存されたキーを削除',
   'credential.remove.message': '{name} の保存済み認証情報を削除しますか？多くのサービスはキーを一度しか表示しないため、新しく作成し直す必要があるかもしれません。',
   'credential.remove.confirm': '削除',
@@ -14294,7 +14292,6 @@ export const ja: Catalog = {
   'recorder.job.transcriptFailed': '文字起こしを作成できませんでした。',
   'recorder.job.transcriptDone': '字幕を追加しました。',
   'recorder.job.playedDirect': '学習プレーヤーが使えないため、既定のプレーヤーで開きました。',
-  'recorder.job.modelMissing': '文字起こしモデルがまだダウンロードされていません。',
   'recorder.job.modelDownloading': 'モデルをダウンロード中… {pct}%',
   'recorder.job.downloadModel': 'モデルをダウンロード',
   'recorder.job.open': '開く',

@@ -19,11 +19,18 @@ vi.mock('../i18n', () => ({
     lang: 'en',
   }),
 }));
+/** When set, the history read waits for it — the window before any worker exists. */
+let logGate: Promise<void> | null = null;
 vi.mock('../reviewLog', () => ({
-  loadReviewLog: () => Promise.resolve([
-    { id: 'a', at: 1, mode: 'review', cardId: 'c', rating: 'good', correct: true, isNew: true },
-    { id: 'b', at: 2, mode: 'game', cardId: 'c', correct: true },
-  ]),
+  // The optimiser reads the whole history, archived rows included.
+  loadFullReviewLog: async () => {
+    if (logGate) await logGate;
+    return [
+      { id: 'a', at: 1, mode: 'review', cardId: 'c', rating: 'good', correct: true, isNew: true },
+      { id: 'b', at: 2, mode: 'game', cardId: 'c', correct: true },
+    ];
+  },
+  loadReviewLog: () => Promise.resolve([]),
   onReviewLogChanged: () => () => undefined,
   appendReviewLog: (entry: object) => ({ ...entry, id: 'x', at: 0 }),
   removeReviewLogEntry: () => undefined,
@@ -99,6 +106,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.clear();
   jobs.length = 0;
+  logGate = null;
   saveSchedulingConfig({ algorithm: 'fsrs' });
 });
 
@@ -128,6 +136,36 @@ describe('FSRS optimiser in the panel', () => {
     expect(host.textContent).toContain('srs3.optimizer.cancelled');
     expect(host.querySelector('progress')).toBeNull();
     expect(button('srs2.optimizer.run').disabled).toBe(false);
+  });
+
+  it('honours Cancel pressed while the history is still being read: no worker, and says so', async () => {
+    // Cancel is on screen from the click, but the job only exists once the whole log has
+    // been read from IndexedDB. A press in that window used to cancel nothing and let the
+    // fit run to the end (the e2e srs flow's observer presses exactly then).
+    let release: () => void = () => undefined;
+    logGate = new Promise<void>((resolve) => { release = resolve; });
+    mount();
+    await act(async () => { button('srs2.optimizer.run').click(); });
+    expect(jobs).toHaveLength(0);
+    await act(async () => { button('srs3.optimizer.cancel').click(); });
+    await act(async () => { release(); });
+    await flush();
+    expect(jobs, 'a worker was started after Cancel').toHaveLength(0);
+    expect(host.textContent).toContain('srs3.optimizer.cancelled');
+    expect(button('srs2.optimizer.run').disabled).toBe(false);
+  });
+
+  it('starts no worker when the panel closes while the history is being read', async () => {
+    let release: () => void = () => undefined;
+    logGate = new Promise<void>((resolve) => { release = resolve; });
+    mount();
+    await act(async () => { button('srs2.optimizer.run').click(); });
+    act(() => { root.unmount(); });
+    await act(async () => { release(); });
+    await flush();
+    expect(jobs).toHaveLength(0);
+    // afterEach unmounts again; give it a fresh, empty root.
+    root = createRoot(host);
   });
 
   it('shows an error instead of swallowing it, and changes nothing', async () => {

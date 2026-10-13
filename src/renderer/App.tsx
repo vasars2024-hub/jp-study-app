@@ -670,9 +670,11 @@ export default function App() {
         or skipped. Mounted last so its spotlight layers over the shell, and
         outside the `locked` gate so it never competes with the lock screen.
         Held while first-run setup is open; setup's last step decides whether
-        it runs at all.
+        it runs at all. Also held while locked: a look picked in setup that
+        enters through the lock screen plays its boot only after the unlock,
+        and the tour then waits for that boot (tourBootHold.ts).
       */}
-      <TourOverlay holdForSetup={setupPending} />
+      <TourOverlay holdForSetup={setupPending || locked} />
     </>
   );
 }

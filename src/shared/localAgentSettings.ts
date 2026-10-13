@@ -144,15 +144,36 @@ function safeModelFileName(value: unknown): string {
   return name;
 }
 
+/** A stored boolean, or the field's default when it is absent or not a boolean. */
+function flag(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+/**
+ * Every field falls back to its own default.
+ *
+ * A partial document — one written before a field existed, or by a test, a
+ * tool or an older build that only knew a few fields — keeps what it does say
+ * and takes the defaults for the rest. In particular an absent `backend` is the
+ * default backend, not `disabled`: reading it as `disabled` forced `enabled`
+ * off and greyed out the Agent's on switch for a document that never asked for
+ * that. A value that is present but invalid also takes the field's default,
+ * except `backend`, below.
+ */
 export function normalizeLocalAgentSettings(input: unknown): LocalAgentSettings {
-  if (!input || typeof input !== 'object') return { ...DEFAULT_LOCAL_AGENT_SETTINGS };
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { ...DEFAULT_LOCAL_AGENT_SETTINGS };
   const raw = input as Partial<LocalAgentSettings>;
-  const backend = BACKENDS.has(raw.backend as LocalAgentBackend)
-    ? raw.backend as LocalAgentBackend
-    : 'disabled';
+  // Absent is the default backend. A backend that is present but unknown (a newer
+  // build's, or a cloud one this setting never meant) is still refused as `disabled`:
+  // that is a document asking for something this build cannot honour, not a gap.
+  const backend = raw.backend === undefined
+    ? DEFAULT_LOCAL_AGENT_SETTINGS.backend
+    : BACKENDS.has(raw.backend as LocalAgentBackend)
+      ? raw.backend as LocalAgentBackend
+      : 'disabled';
   return {
     version: 1,
-    enabled: raw.enabled === true && backend !== 'disabled',
+    enabled: flag(raw.enabled, DEFAULT_LOCAL_AGENT_SETTINGS.enabled) && backend !== 'disabled',
     backend,
     modelFileName: safeModelFileName(raw.modelFileName),
     modelMode: MODEL_MODES.has(raw.modelMode as LocalAgentModelMode)
@@ -174,21 +195,21 @@ export function normalizeLocalAgentSettings(input: unknown): LocalAgentSettings 
     cpuLimitPct: boundedInteger(raw.cpuLimitPct, DEFAULT_LOCAL_AGENT_SETTINGS.cpuLimitPct, 10, 100),
     gpuLimitPct: boundedInteger(raw.gpuLimitPct, DEFAULT_LOCAL_AGENT_SETTINGS.gpuLimitPct, 10, 100),
     maxConcurrentTasks: boundedInteger(raw.maxConcurrentTasks, DEFAULT_LOCAL_AGENT_SETTINGS.maxConcurrentTasks, 1, 3),
-    backgroundProcessing: raw.backgroundProcessing === true,
+    backgroundProcessing: flag(raw.backgroundProcessing, DEFAULT_LOCAL_AGENT_SETTINGS.backgroundProcessing),
     permission: PERMISSIONS.has(raw.permission as AgentPermissionLevel)
       ? raw.permission as AgentPermissionLevel
       : DEFAULT_LOCAL_AGENT_SETTINGS.permission,
-    memoryEnabled: raw.memoryEnabled !== false,
+    memoryEnabled: flag(raw.memoryEnabled, DEFAULT_LOCAL_AGENT_SETTINGS.memoryEnabled),
     memoryScope: memoryScope(raw.memoryScope),
     chatHistory: CHAT_HISTORIES.has(raw.chatHistory as LocalAgentChatHistory)
       ? raw.chatHistory as LocalAgentChatHistory
       : DEFAULT_LOCAL_AGENT_SETTINGS.chatHistory,
     // Absent means private. A pre-setting document must not silently make
     // sensitive material eligible for a cloud request after an upgrade.
-    excludeSensitiveContext: raw.excludeSensitiveContext !== false,
+    excludeSensitiveContext: flag(raw.excludeSensitiveContext, DEFAULT_LOCAL_AGENT_SETTINGS.excludeSensitiveContext),
     agentCloudShareStudyData: normalizeAgentCloudShareStudyData(raw.agentCloudShareStudyData),
-    privacyMode: raw.privacyMode !== false,
-    debugMode: raw.debugMode === true,
+    privacyMode: flag(raw.privacyMode, DEFAULT_LOCAL_AGENT_SETTINGS.privacyMode),
+    debugMode: flag(raw.debugMode, DEFAULT_LOCAL_AGENT_SETTINGS.debugMode),
   };
 }
 

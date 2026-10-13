@@ -58,6 +58,7 @@ import {
 import { useT } from '../../i18n';
 import { layoutViewport, toLayoutRect } from '../../zoomCoords';
 import { TELEMETRY_CONSENT_DECIDED_EVENT, telemetryConsentPending } from '../../../shared/stats';
+import { onTourBootHoldChanged, tourHeldForThemeBoot } from '../../tourBootHold';
 import { COMMAND_CATALOG, effectiveKeys, formatKeysDisplay, onShortcutsChanged } from '../../keyboardShortcuts';
 import { commandLabel } from '../../commandI18n';
 import { revealShortcut, SHORTCUT_REVEAL_EVENT } from '../../shortcutReveal';
@@ -184,9 +185,19 @@ export default function TourOverlay({ holdForSetup = false }: { holdForSetup?: b
   // card's text behind the bubble. Wait for the card's answer, then start.
   // onb2: first-run setup holds it the same way; its last step either leaves the
   // tour armed ("Show me around") or completes it ("Start studying").
-  const holdRef = useRef(holdForSetup);
-  holdRef.current = holdForSetup;
-  const [active, setActive] = useState(() => shouldRunTour() && !telemetryConsentPending() && !holdForSetup);
+  //
+  // onb3: an Aero or WIRED look picked in setup plays its boot overlay right as
+  // setup closes; the tour waits for that boot to finish (`tourBootHold.ts`).
+  const [bootHeld, setBootHeld] = useState(tourHeldForThemeBoot);
+  useEffect(() => {
+    const sync = (): void => setBootHeld(tourHeldForThemeBoot());
+    sync();
+    return onTourBootHoldChanged(sync);
+  }, []);
+  const held = holdForSetup || bootHeld;
+  const holdRef = useRef(held);
+  holdRef.current = held;
+  const [active, setActive] = useState(() => shouldRunTour() && !telemetryConsentPending() && !held);
   const [where, setWhere] = useState<Where>(() => (shouldRunTour() ? replayWhere() : resumeWhere()));
   const [rect, setRect] = useState<Rect | null>(null);
   const [bubbleSize, setBubbleSize] = useState<{ width: number; height: number } | null>(null);
@@ -299,18 +310,18 @@ export default function TourOverlay({ holdForSetup = false }: { holdForSetup?: b
     return () => window.removeEventListener(TELEMETRY_CONSENT_DECIDED_EVENT, onConsentDecided);
   }, []);
 
-  // Setup closed: start if it left the tour armed (and nothing else holds it).
-  // Only on the held → released edge: the mount already chose where to start,
-  // and `replayWhere` consumes the requested chapter, so a second call on mount
-  // would throw that request away.
-  const wasHeldRef = useRef(holdForSetup);
+  // Setup closed (and any boot it started has run): start if it left the tour
+  // armed and nothing else holds it. Only on the held → released edge: the
+  // mount already chose where to start, and `replayWhere` consumes the
+  // requested chapter, so a second call on mount would throw that request away.
+  const wasHeldRef = useRef(held);
   useEffect(() => {
     const wasHeld = wasHeldRef.current;
-    wasHeldRef.current = holdForSetup;
-    if (!wasHeld || holdForSetup || !shouldRunTour() || telemetryConsentPending()) return;
+    wasHeldRef.current = held;
+    if (!wasHeld || held || !shouldRunTour() || telemetryConsentPending()) return;
     setWhere(replayWhere());
     setActive(true);
-  }, [holdForSetup]);
+  }, [held]);
 
   // A hotkey the user rebinds while the bubble is up must not stay stale on it.
   useEffect(() => onShortcutsChanged(() => setShortcutsVersion((v) => v + 1)), []);

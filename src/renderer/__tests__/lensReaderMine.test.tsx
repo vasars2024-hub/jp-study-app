@@ -23,7 +23,14 @@ vi.mock('../studyEnvironment', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../studyEnvironment')>()),
   getStudyLang: () => h.studyLang,
 }));
-vi.mock('../tokenizer', () => ({ lemmaOf: async (s: string) => s }));
+// No kuromoji here: grading falls back to the spelling rule (knowledgeTargets), which is
+// all a mining test needs. The real-tokenizer grading lives in lensReaderGrading.test.tsx.
+vi.mock('../tokenizer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../tokenizer')>()),
+  lemmaOf: async (s: string) => s,
+  getTokenizer: () => Promise.reject(new Error('no tokenizer in this test')),
+  tokenizerReady: () => false,
+}));
 vi.mock('../studyMining', () => ({
   mineToStudy: async () => {
     h.localMines += 1;

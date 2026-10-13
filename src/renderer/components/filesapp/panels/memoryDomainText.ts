@@ -37,6 +37,7 @@ const LABEL_KEYS: Readonly<Record<string, string>> = {
   calendar: 'settings.memory.domain.calendar',
   bookmarks: 'settings.memory.domain.bookmarks',
   annotations: 'settings.memory.domain.annotations',
+  notes: 'settings.memory.domain.notes',
   lookups: 'settings.memory.domain.lookups',
   'widget-gallery': 'settings.memory.domain.widgetGallery',
   'settings-ui': 'settings.memory.domain.settingsUi',

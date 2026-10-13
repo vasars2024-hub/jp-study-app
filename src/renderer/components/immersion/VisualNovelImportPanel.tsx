@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useT } from '../../i18n';
+import { visualNovelErrorCode, visualNovelErrorKey } from '../../../shared/visualNovelCapture';
 import type { VisualNovelDatabase, VisualNovelDiscoveryCandidate } from '../../../shared/visualNovel';
 
 export default function VisualNovelImportPanel({
@@ -31,7 +32,8 @@ export default function VisualNovelImportPanel({
         ? t('vnImport.msg.found', { count: found.length })
         : t('vnImport.msg.noneFound'));
     } catch (reason) {
-      onStatus(reason instanceof Error ? reason.message : String(reason), true);
+      console.error('[vn] folder scan failed:', reason);
+      onStatus(t(visualNovelErrorKey(visualNovelErrorCode(reason), 'onb3.vn.scanFailed')), true);
     } finally {
       setBusy(false);
     }
@@ -61,7 +63,7 @@ export default function VisualNovelImportPanel({
     })));
     setBusy(false);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnImport.msg.importFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnImport.msg.importFailed')), true);
       return;
     }
     onImported(response.database);
@@ -83,7 +85,7 @@ export default function VisualNovelImportPanel({
       ? t('vnImport.msg.exported', { path: response.path })
       : t('vnImport.msg.exportedOk');
     onStatus(
-      response.ok ? exported : response.error ?? t('vnImport.msg.exportFailed'),
+      response.ok ? exported : t(visualNovelErrorKey(response, 'vnImport.msg.exportFailed')),
       !response.ok,
     );
   };
@@ -94,7 +96,7 @@ export default function VisualNovelImportPanel({
     setBusy(false);
     if (response.canceled) return;
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnImport.msg.libraryImportFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnImport.msg.libraryImportFailed')), true);
       return;
     }
     onImported(response.database);

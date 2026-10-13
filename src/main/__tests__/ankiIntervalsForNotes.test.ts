@@ -1,5 +1,6 @@
 import os from 'node:os';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { ankiEntryKnowledgeLevel } from '../../shared/anki';
 
 vi.mock('electron', () => ({
   app: { getPath: () => os.tmpdir() },
@@ -164,6 +165,26 @@ describe('intervalsForNotes', () => {
     }];
     await intervalsForNotes([504, 504, 504]);
     expect(calls[0].params).toEqual({ notes: [504] });
+  });
+
+  it('marks a note out of rotation only when EVERY card of it is suspended (bug 41)', async () => {
+    notesInfoResult = [
+      { noteId: 701, modelName: 'm', tags: [], cards: [9701, 9702], fields: { Term: { value: '飲む', order: 0 } } },
+      { noteId: 702, modelName: 'm', tags: [], cards: [9703, 9704], fields: { Term: { value: '止む', order: 0 } } },
+    ];
+    cardsInfoResult = [
+      { cardId: 9701, interval: 180, queue: 2 }, // live recognition card
+      { cardId: 9702, interval: 40, queue: -1 }, // suspended reverse card
+      { cardId: 9703, interval: 90, queue: -1 },
+      { cardId: 9704, interval: 10, queue: -1 },
+    ];
+    const snapshot = await intervalsForNotes([701, 702]);
+    const byTerm = Object.fromEntries(snapshot.entries.map((e) => [e.expression, e]));
+    expect(byTerm['飲む']).toMatchObject({ ivlDays: 180, suspended: true, allSuspended: false });
+    expect(byTerm['止む']).toMatchObject({ ivlDays: 90, suspended: true, allSuspended: true });
+    const thresholds = { familiar: 1, known: 21 };
+    expect(ankiEntryKnowledgeLevel(byTerm['飲む'], thresholds)).toBe(3);
+    expect(ankiEntryKnowledgeLevel(byTerm['止む'], thresholds)).toBe(0);
   });
 });
 

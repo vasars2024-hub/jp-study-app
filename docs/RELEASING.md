@@ -21,8 +21,26 @@ and stay where they are.
 - [ ] The Seanime sidecar is staged (`SEANIME_EXE`, or the sibling
       `seanime-upstream` checkout), or `SEANIME_SKIP_SIDECAR_PACKAGING=1` is set
       on purpose (see `forge.config.ts`).
+- [ ] The CUDA backends are decided for this release (section 3, "CUDA
+      backends"). The default keeps them; do nothing unless you mean to drop them.
 - [ ] Tests and guards green: `node tools/i18n-check.cjs`,
       `npx tsc --noEmit -p tsconfig.json`, `npx vitest run`.
+- [ ] Blanc boot bundle within budget: `node tools/blanc-budget.cjs`. It does
+      one production renderer build into a temp dir (~45 s) and sums what
+      `blanc.html` loads before first paint (the entry chunk plus every chunk
+      and stylesheet it preloads). It fails when that passes
+      `blanc.maxBytes` (2,411,724 B unless a local `blanc-budget.json` says
+      otherwise) or a Study OS subsystem appears in Blanc's boot path. The same
+      check runs inside `npx vitest run` as
+      `src/renderer/__tests__/blancBuiltBudget.test.ts`, so a full test run
+      covers it; run it alone with
+      `npx vitest run src/renderer/__tests__/blancBuiltBudget.test.ts`. To
+      measure an existing build without rebuilding, pass
+      `--dist=<renderer output dir>` (the folder that holds `blanc.html`). The
+      tool also prints the Study OS window against its own ceiling and exits
+      1 when that one is over; the vitest gate asserts Blanc only. Raise a
+      ceiling only with a reason (`--update` rewrites the local file from the
+      current build).
 
 ## 1. Signing (optional until a certificate exists)
 
@@ -73,7 +91,14 @@ node tools/package-app.cjs --installer
 ```
 
 This packages, prunes `node_modules`, then runs only the Squirrel maker over the
-pruned app. The output is in `out/make/squirrel.windows/x64/`:
+pruned app. `npm run make` and `npm run publish` run the same thing with `--zip`
+added (the portable zip as well). Neither calls a bare `electron-forge make` or
+`electron-forge publish`: those package the UNPRUNED app (~2 GB of
+`node_modules`) into the installer, and no Forge publisher is configured, so
+uploading stays a manual step (section 4). `squirrelEvents.test.ts` fails if
+either script goes back to the bare command.
+
+The output is in `out/make/squirrel.windows/x64/`:
 
 - `Gum-<version> Setup.exe` - the installer for new users
 - `RELEASES` - the feed index installed copies read first
@@ -86,6 +111,112 @@ Check before uploading:
       (one line each: `<sha1> <file name> <size>`).
 - [ ] The file names in `RELEASES` match the files exactly (GitHub keeps asset
       names as uploaded; spaces in `Setup.exe` are fine, the nupkg names have none).
+- [ ] The build log says `[prune] CUDA backends: KEEP` (or `DROP`, if you chose
+      that for this release).
+
+### CUDA backends
+
+`node-llama-cpp` ships CUDA backends for NVIDIA GPUs
+(`@node-llama-cpp/win-x64-cuda` and `-cuda-ext`, about 540 MB unpacked).
+`getLlama()` (`src/main/llamaBackend.ts`, `gpu: 'auto'`) tries CUDA only when it
+detects CUDA on the machine, and a missing backend falls through to Vulkan and
+then the CPU. So a build without them still works everywhere, but NVIDIA users
+run local models on Vulkan or the CPU instead of CUDA.
+
+Keeping or dropping them is a choice made **per build**. It is not a property
+of the machine that runs the build. (The old prune dropped them from every
+build because the build machine has an AMD GPU, so every release shipped
+without CUDA.)
+
+| How | Effect |
+| --- | --- |
+| nothing | **keep** (the default, and what a release should normally do) |
+| `--keep-cuda` / `GUM_CUDA=keep` | keep, explicitly |
+| `--drop-cuda` / `GUM_CUDA=drop` | drop them from this build only (~540 MB smaller unpacked) |
+| `GUM_KEEP_CUDA=1` | the old spelling of keep, still honoured |
+
+A flag beats the variable. Any other `GUM_CUDA` value, or both flags at once,
+fails the build instead of guessing. When a build that makes an installer or zip
+drops them, `package-app.cjs` prints a warning. `npm run package:win` (the local
+portable build for the owner's AMD machine, no installer) passes `--drop-cuda`
+explicitly; `make`, `publish` and `package:installer` never do
+(`pruneCudaChoice.test.ts`).
+
+Example, a deliberately CUDA-less installer:
+
+```powershell
+node tools/package-app.cjs --installer --drop-cuda
+```
+
+### Installer animation
+
+`Setup.exe` shows `assets/installer-loading.gif` while it installs
+(`MakerSquirrel` `loadingGif`). It is generated offscreen from `assets/icon.png`
+by `node tools/make-installer-gif.cjs`, with the `ffmpeg-static` binary the app
+already depends on, and committed, so a build never needs ffmpeg. Rerun it when
+the icon changes. The script fails rather than write a GIF over 400 KB.
+
+### Squirrel hook budget
+
+Squirrel launches the app with `--squirrel-install`, `--squirrel-updated`,
+`--squirrel-uninstall` or `--squirrel-obsolete` and gives each launch about 15 s
+to exit. Inside that time the app has to create the shortcuts and register the
+file associations (or, on uninstall, remove them, the sign-in entry and the
+OS-hotkey helper).
+
+The process starts at `src/squirrelEntry.ts` (`package.json` `main` is
+`.vite/build/squirrelEntry.js`). It imports only `electron`, Node builtins and
+`src/main/squirrelEvents.ts`. A lifecycle launch is handled there and the
+process exits without loading the app bundle. Every other launch `require`s the
+`main.js` beside it. `squirrelEntryGraph.test.ts` checks the import graph. It
+also builds the entry with Forge's own Vite config (one chunk, at most 16 KB,
+requiring only `electron` and builtins) and checks the wiring.
+
+Measured 2026-10-13 on the owner's machine, from a production build with
+`electron <build> --squirrel-install 1.0.1`, a scratch profile and the steps
+stubbed (no Update.exe, no reg.exe). Medians of 7 runs, in ms from spawn:
+
+| Entry | JS starts | First hook step | Process exits |
+| --- | --- | --- | --- |
+| `src/main.ts` (before) | 133 | 440 | 629 |
+| `src/squirrelEntry.ts` (now) | 135 | 137 | 153 |
+
+Loading the app bundle cost about 305 ms on a warm cache before the hook could
+start. The entry now reaches the hook 2 ms after JS starts. What is left is
+Electron's own start, which varies a lot with the launching environment: the
+same runs launched from Git Bash took about 1,050 ms to reach JS. An attempt to
+measure with a cold file cache (streaming 4 GB of unrelated files through it
+first) gave the same numbers, so it did not actually make the cache cold.
+
+The timeouts in `squirrelEvents.ts` add up to exactly 15 s per event:
+
+| Part | Install / update | Uninstall |
+| --- | --- | --- |
+| Start-up allowance (`ENTRY_STARTUP_ALLOWANCE_MS`) | 2,500 | 2,500 |
+| Update.exe `--createShortcut` / `--removeShortcut` | 4,500 | 4,500 |
+| `reg import` | 7,000 | 3,500 |
+| Stop the OS-hotkey helper (PowerShell) | - | 2,000 |
+| Two `reg delete`s of the sign-in entry | - | 1,500 |
+| Exit margin (`HOOK_EXIT_MARGIN_MS`) | 1,000 | 1,000 |
+| **Total** | **15,000** | **15,000** |
+
+The old budget gave the steps 13 s (install) and 14 s (uninstall). That left
+1 to 2 s for Electron's start and the whole app bundle together. The allowance
+is now twice the slowest measured start plus headroom. The headroom is for a
+cold first install, where antivirus scans the freshly unpacked `electron.exe`
+before it runs. Every step normally finishes in well under a second, so the
+timeouts only matter on a slow or heavily scanned machine.
+
+Still to do on a clean VM (owner, step 5):
+
+- Time a real first install from a cold boot with Defender on.
+  `%LOCALAPPDATA%\SquirrelTemp\SquirrelSetup.log` records when the hook starts
+  and ends.
+- Confirm that the desktop and Start-menu shortcuts and the "Open with Gum"
+  entries appear. Do the same for an uninstall.
+- If Electron's own cold start there is anywhere near 2.5 s, lower
+  `REG_IMPORT_TIMEOUT_MS` before raising the allowance. Keep the budget test in
+  `squirrelEvents.test.ts` green.
 
 ## 4. Publish
 
@@ -118,6 +249,9 @@ Check before uploading:
 - [ ] Help -> Updates now shows the new version and "up to date".
 - [ ] `%LOCALAPPDATA%\jp_study_app\packages\` shows the delta was used when one
       was published (`SquirrelSetup.log` names the package it applied).
+- [ ] First install on a clean VM: `Setup.exe` shows the Gum animation, and the
+      desktop shortcut, the Start-menu shortcut and the "Open with Gum" entries
+      appear. Uninstall removes them again (see "Squirrel hook budget" above).
 
 ## 6. Clean up
 

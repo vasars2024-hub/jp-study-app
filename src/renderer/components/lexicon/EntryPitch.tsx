@@ -20,6 +20,21 @@ import type { PitchLookup } from '../../../shared/pitchAccent';
 import { cachedPitch, fetchPitch } from '../../pitchLookupCache';
 import { useT } from '../../i18n';
 import PitchAccentContour from './PitchAccentContour';
+import { toHiragana } from '../../../shared/furigana';
+
+/**
+ * The entry's own reading first. A pitch dictionary answers by headword, so 上手
+ * comes back with じょうず, うわて and かみて; the row belongs to the reading this
+ * entry is for, and the others follow in the dictionary's order (katakana and
+ * hiragana spellings of one reading count as the same reading).
+ */
+export function orderPitchEntries<P extends { reading: string }>(entries: readonly P[], reading: string | undefined): P[] {
+  const own = toHiragana((reading ?? '').trim());
+  if (!own) return [...entries];
+  const mine = entries.filter((entry) => toHiragana(entry.reading.trim()) === own);
+  const rest = entries.filter((entry) => toHiragana(entry.reading.trim()) !== own);
+  return [...mine, ...rest];
+}
 
 export default function EntryPitch({ entry }: { entry: DictEntry }) {
   const { t } = useT();
@@ -39,7 +54,9 @@ export default function EntryPitch({ entry }: { entry: DictEntry }) {
     };
   }, [entry.word, entry.reading]);
 
-  const drawable = reply?.available ? reply.entries.filter((e) => e.positions.length > 0) : [];
+  const drawable = reply?.available
+    ? orderPitchEntries(reply.entries.filter((e) => e.positions.length > 0), entry.reading || entry.word)
+    : [];
   if (!drawable.length && !entry.pitchHtml) return null;
   return (
     <div className="dict-pitch" lang="ja" data-pitch-source={drawable.length ? 'contour' : 'html'}>

@@ -48,7 +48,7 @@ import {
   looksLikeJsonContainer,
   storageMigrationNeeded,
 } from '../../shared/storageMigrationBoundary';
-import { gunzipOffThread } from '../tokenizer';
+import { gunzipOffThread } from '../tokenizerLoader';
 
 const DECK = JSON.stringify({ folders: [], cards: Array.from({ length: 2_000 }, (_, i) => ({ id: `c${i}`, word: `語${i}` })) });
 

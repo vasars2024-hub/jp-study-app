@@ -67,6 +67,14 @@ export default defineConfig({
   },
   // Some browser libraries (e.g. epub.js dependencies) expect a `global`.
   define: { global: 'globalThis' },
+  // Workers build as IIFE, which Rollup cannot code-split, so a dynamic
+  // `import()` anywhere in a worker's graph used to fail the build. Inline them
+  // instead: `tokenizer.ts` loads kuromoji through `import('./tokenizerLoader')`
+  // so the Blanc window's boot bundle stays without it, and the
+  // studyWords worker that shares tokenizer.ts simply carries the loader inline.
+  worker: {
+    rollupOptions: { output: { inlineDynamicImports: true } },
+  },
   // ~1 GB models/dicts live in public/ and ship via packager extraResource (see
   // forge.config.ts). Skipping copyPublicDir keeps the Vite renderer build fast.
   build: {

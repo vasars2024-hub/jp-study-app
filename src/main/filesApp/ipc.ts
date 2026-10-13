@@ -37,6 +37,7 @@ import {
 import { createCleanupSoftDelete, registerFilesCleanupIpc } from './cleanupIpc';
 import type { FilesCleanupLogEntry } from '../../shared/filesApp/cleanup';
 import { readFilesMineSource } from './mineSource';
+import { resolveFilesMineRequest } from './mineSourceGate';
 import { scanRoots } from './scan';
 import { watchRoots, type FilesWatchArrival, type FilesWatchSession } from './watch';
 import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
@@ -275,25 +276,23 @@ export function registerFilesAppIpc(options: FilesAppIpcOptions = {}): void {
    * nowhere to write. Splitting it here keeps one writer for the deck and
    * leaves this handler pure enough to test against a fixture directory.
    *
-   * The location is validated the same way `filesapp:reveal` validates it —
-   * through `revealTargetFor` — so a caller cannot hand this handler an
-   * arbitrary path and have it read a file the catalogue never indexed.
+   * The renderer's location is only a NAME for a catalogue row: the path must
+   * be a file-backed row of main's own index (`resolveFilesMineRequest`), and
+   * the reader is chosen from that row's kind. A path the catalogue never
+   * indexed is refused, so a caller cannot read an arbitrary file through
+   * this handler (scorecard bug 15). A row too new for the cached snapshot
+   * gets one forced rebuild before the refusal.
    */
   ipcMain.handle(
     'filesapp:mine-source',
-    (_e, location: unknown, kind: unknown): FilesMineSourceResult => {
-      if (!location || typeof location !== 'object') {
-        return { ok: false, reasonKey: 'filesApp.mine.refuse.notFileBacked' };
+    async (_e, location: unknown, kind: unknown): Promise<FilesMineSourceResult> => {
+      let gate = resolveFilesMineRequest((await getFilesIndexAsync()).items, location, kind);
+      if (!gate.ok && gate.reasonKey === 'filesApp.mine.refuse.notIndexed') {
+        gate = resolveFilesMineRequest((await getFilesIndexAsync(true)).items, location, kind);
       }
-      const target = revealTargetFor(location as FilesLocation);
-      if (!target) {
-        return { ok: false, reasonKey: 'filesApp.mine.refuse.notFileBacked' };
-      }
-      if (kind !== 'transcript' && kind !== 'subtitle' && kind !== 'book') {
-        return { ok: false, reasonKey: 'filesApp.mine.refuse.kindHasNoText' };
-      }
+      if (!gate.ok) return { ok: false, reasonKey: gate.reasonKey };
       try {
-        return readFilesMineSource(target, kind);
+        return readFilesMineSource(gate.path, gate.kind);
       } catch (err) {
         // A reader that throws must still answer. An unhandled rejection here
         // would leave the button spinning with no message at all.

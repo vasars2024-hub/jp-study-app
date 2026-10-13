@@ -11,13 +11,45 @@ import { MANGA_FOLDER } from '../shared/libraryFolders';
 import { extractReadableFromUrl } from './readabilityExtract';
 import { fetchReadingContent, type FetchReadingOptions } from './readingFetch';
 import { mt } from './i18n';
-import { extractEpubTitleFromOpf } from './epubMeta';
+import { extractEpubMetadataFromOpf, type EpubOpfMetadata } from './epubMeta';
 import { observeReadingProgress } from './readingFinishWatcher';
 import { broadcastReadingLists } from './readingListsIpc';
 import { getReadingListsStore } from './readingListsStore';
-import { readJsonDetailedSync, readJsonSync, registerJsonFlusher, writeJsonAtomicSync } from './atomicJson';
+import {
+  readJsonDetailedSync,
+  readJsonSync,
+  registerJsonFlusher,
+  removeJsonStore,
+  writeJsonAtomicSync,
+} from './atomicJson';
 import { logDiagnostic } from './errorLog';
 import { resolveCompanionPackFrameFile } from './companionPacks';
+import {
+  forgetLibraryTrashEntry,
+  moveLibraryItemOutOfTrash,
+  moveLibraryItemToTrash,
+  readLibraryTrash,
+  reconcileLibraryTrash,
+  releaseLibraryTrash,
+  summarizeLibraryTrash,
+  type LibraryTrashPaths,
+} from './libraryTrash';
+import {
+  LibraryImportRunner,
+  normalizeImportQueueFile,
+  type LibraryImportFailureCode,
+  type LibraryImportOutcome,
+  type LibraryImportProgress,
+  type LibraryImportQueueFile,
+} from './libraryImportJob';
+import { applyLibraryMetaPatch, normalizeLibraryMetaPatch } from '../shared/libraryMeta';
+import {
+  LIBRARY_IMPORT_PROGRESS_CHANNEL,
+  type LibraryImportStatus,
+  type LibraryMetaUpdateResult,
+  type LibraryRestoreResult,
+  type RelinkMangaResult,
+} from '../shared/libraryManage';
 
 /** Token → absolute path for localfile:// wallpaper/image streaming. */
 const localFileTokens = new Map<string, string>();
@@ -458,10 +490,20 @@ function readEpubOpf(zip: AdmZip): { opf: string; opfDir: string } | undefined {
   }
 }
 
-/** Read the book's real title from its OPF `<dc:title>`, if present. */
-function extractEpubTitle(zip: AdmZip): string | undefined {
+/** Read the book's OPF metadata (title, authors, series, tags), if present. */
+function extractEpubMetadata(zip: AdmZip): EpubOpfMetadata {
   const parsed = readEpubOpf(zip);
-  return parsed ? extractEpubTitleFromOpf(parsed.opf) : undefined;
+  return parsed ? extractEpubMetadataFromOpf(parsed.opf) : {};
+}
+
+/** The OPF fields a library item keeps, ready to spread onto it. */
+function itemFieldsFromOpf(meta: EpubOpfMetadata): Pick<LibraryItem, 'author' | 'series' | 'seriesIndex' | 'tags'> {
+  return {
+    ...(meta.author ? { author: meta.author } : {}),
+    ...(meta.series ? { series: meta.series } : {}),
+    ...(meta.series && meta.seriesIndex !== undefined ? { seriesIndex: meta.seriesIndex } : {}),
+    ...(meta.tags?.length ? { tags: meta.tags } : {}),
+  };
 }
 
 /** Find the cover image inside an EPUB and copy it into destDir. Returns its name. */
@@ -509,29 +551,58 @@ function extractEpubCover(zip: AdmZip, destDir: string): string | undefined {
 
 // ----- importers ---------------------------------------------------------
 
-function importBook(filePath: string): LibraryItem {
-  const id = crypto.randomUUID();
-  const dir = itemDir(id);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.copyFileSync(filePath, path.join(dir, 'original.epub'));
-  let coverPath: string | undefined;
-  let embeddedTitle: string | undefined;
-  try {
-    const zip = new AdmZip(path.join(dir, 'original.epub'));
-    coverPath = extractEpubCover(zip, dir);
-    embeddedTitle = extractEpubTitle(zip);
-  } catch {
-    /* ignore — falls back to a title gradient / the filename */
+/** An archive with no page images in it: not a manga, and not imported. */
+class NoPagesError extends Error {
+  constructor() {
+    super('That archive holds no images.');
+    this.name = 'NoPagesError';
   }
-  return {
-    id,
-    title: embeddedTitle || titleFromFile(filePath),
-    kind: 'book',
-    createdAt: Date.now(),
-    sourcePath: filePath,
-    epubFile: 'original.epub',
-    coverPath,
-  };
+}
+
+/**
+ * Run an importer that fills `itemDir(id)`, removing the folder if it throws:
+ * a failed import must not leave a half-extracted folder no row points at.
+ * Only a folder this call created is removed.
+ */
+function withNewItemDir<T>(id: string, fill: (dir: string) => T): T {
+  const dir = itemDir(id);
+  if (fs.existsSync(dir)) throw new Error('Library item folder already exists.');
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    return fill(dir);
+  } catch (err) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* keep the original failure */
+    }
+    throw err;
+  }
+}
+
+function importBook(filePath: string, id: string = crypto.randomUUID()): LibraryItem {
+  return withNewItemDir(id, (dir) => {
+    fs.copyFileSync(filePath, path.join(dir, 'original.epub'));
+    let coverPath: string | undefined;
+    let meta: EpubOpfMetadata = {};
+    try {
+      const zip = new AdmZip(path.join(dir, 'original.epub'));
+      coverPath = extractEpubCover(zip, dir);
+      meta = extractEpubMetadata(zip);
+    } catch {
+      /* ignore — falls back to a title gradient / the filename */
+    }
+    return {
+      id,
+      title: meta.title || titleFromFile(filePath),
+      kind: 'book',
+      createdAt: Date.now(),
+      sourcePath: filePath,
+      epubFile: 'original.epub',
+      coverPath,
+      ...itemFieldsFromOpf(meta),
+    };
+  });
 }
 
 export function importEpubBufferToLibrary(input: {
@@ -545,30 +616,35 @@ export function importEpubBufferToLibrary(input: {
     const existing = items.find((item) => item.sourcePath === input.sourcePath);
     if (existing) return existing;
   }
+  const contentHash = crypto.createHash('sha256').update(input.buffer).digest('hex');
+  const sameBytes = items.find((item) => item.contentHash === contentHash);
+  if (sameBytes) return sameBytes;
 
   const id = crypto.randomUUID();
-  const dir = itemDir(id);
-  fs.mkdirSync(dir, { recursive: true });
-  const epubPath = path.join(dir, 'original.epub');
-  fs.writeFileSync(epubPath, input.buffer);
-  let coverPath: string | undefined;
-  let embeddedTitle: string | undefined;
-  try {
-    const zip = new AdmZip(epubPath);
-    coverPath = extractEpubCover(zip, dir);
-    embeddedTitle = extractEpubTitle(zip);
-  } catch {
-    /* ignore — falls back to a title gradient / the caller-provided title */
-  }
-  const item: LibraryItem = {
-    id,
-    title: input.title.trim() || embeddedTitle || 'Imported EPUB',
-    kind: 'book',
-    createdAt: Date.now(),
-    sourcePath: input.sourcePath,
-    epubFile: 'original.epub',
-    coverPath,
-  };
+  const item = withNewItemDir(id, (dir): LibraryItem => {
+    const epubPath = path.join(dir, 'original.epub');
+    fs.writeFileSync(epubPath, input.buffer);
+    let coverPath: string | undefined;
+    let meta: EpubOpfMetadata = {};
+    try {
+      const zip = new AdmZip(epubPath);
+      coverPath = extractEpubCover(zip, dir);
+      meta = extractEpubMetadata(zip);
+    } catch {
+      /* ignore — falls back to a title gradient / the caller-provided title */
+    }
+    return {
+      id,
+      title: input.title.trim() || meta.title || 'Imported EPUB',
+      kind: 'book',
+      createdAt: Date.now(),
+      sourcePath: input.sourcePath,
+      contentHash,
+      epubFile: 'original.epub',
+      coverPath,
+      ...itemFieldsFromOpf(meta),
+    };
+  });
   items.unshift(item);
   writeDb(items);
   broadcastLibrary(items);
@@ -578,36 +654,184 @@ export function importEpubBufferToLibrary(input: {
 // PDFs are stored as-is and opened by the reader's PDF loader (which extracts
 // the text on the fly), so they behave like any other book — no separate
 // conversion step or file.
-function importPdf(filePath: string): LibraryItem {
-  const id = crypto.randomUUID();
-  const dir = itemDir(id);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.copyFileSync(filePath, path.join(dir, 'original.pdf'));
-  return {
-    id,
-    title: titleFromFile(filePath),
-    kind: 'book',
-    createdAt: Date.now(),
-    sourcePath: filePath,
-    epubFile: 'original.pdf',
-  };
+function importPdf(filePath: string, id: string = crypto.randomUUID()): LibraryItem {
+  return withNewItemDir(id, (dir) => {
+    fs.copyFileSync(filePath, path.join(dir, 'original.pdf'));
+    return {
+      id,
+      title: titleFromFile(filePath),
+      kind: 'book',
+      createdAt: Date.now(),
+      sourcePath: filePath,
+      epubFile: 'original.pdf',
+    };
+  });
 }
 
-function importMangaArchive(filePath: string): LibraryItem {
-  const id = crypto.randomUUID();
-  const pagesDir = path.join(itemDir(id), 'pages');
-  fs.mkdirSync(itemDir(id), { recursive: true });
-  const names = extractMangaPages(filePath, pagesDir);
-  const cover = names.length ? pickCoverPage(pagesDir, names) : '';
-  return {
-    id,
-    title: titleFromFile(filePath),
-    kind: 'manga',
-    createdAt: Date.now(),
-    sourcePath: filePath,
-    pageCount: names.length,
-    coverPath: cover ? `pages/${cover}` : undefined,
-  };
+function importMangaArchive(filePath: string, id: string = crypto.randomUUID()): LibraryItem {
+  return withNewItemDir(id, (dir) => {
+    const pagesDir = path.join(dir, 'pages');
+    const names = extractMangaPages(filePath, pagesDir);
+    // An archive with no images used to become an empty "manga" on the shelf.
+    if (!names.length) throw new NoPagesError();
+    const cover = pickCoverPage(pagesDir, names);
+    return {
+      id,
+      title: titleFromFile(filePath),
+      kind: 'manga',
+      createdAt: Date.now(),
+      sourcePath: filePath,
+      pageCount: names.length,
+      coverPath: cover ? `pages/${cover}` : undefined,
+    };
+  });
+}
+
+/** Which importer a path goes to, or null when the library does not take it. */
+function importerKindFor(filePath: string): 'epub' | 'pdf' | 'archive' | null {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.epub') return 'epub';
+  if (ext === '.pdf') return 'pdf';
+  if (ARCHIVE_EXT.has(ext)) return 'archive';
+  return null;
+}
+
+/** Import one file with the right importer (synchronous; callers dedupe first). */
+function importByKind(filePath: string, id?: string): LibraryItem | null {
+  switch (importerKindFor(filePath)) {
+    case 'epub':
+      return importBook(filePath, id);
+    case 'pdf':
+      return importPdf(filePath, id);
+    case 'archive':
+      return importMangaArchive(filePath, id);
+    default:
+      return null;
+  }
+}
+
+// ----- duplicate detection ------------------------------------------------
+
+/** SHA-256 of a file, streamed (archives can be hundreds of MB). */
+export function fileSha256(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', reject);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+/** Compare paths the way the OS does (Windows paths are case-insensitive). */
+function samePath(a: string, b: string): boolean {
+  const ra = path.resolve(a);
+  const rb = path.resolve(b);
+  return process.platform === 'win32' ? ra.toLowerCase() === rb.toLowerCase() : ra === rb;
+}
+
+/**
+ * Hashes of stored book copies for items imported before `contentHash`
+ * existed, keyed by item id, so a library is hashed at most once. A stored
+ * EPUB/PDF is a byte copy of what was imported, so its hash is the source's.
+ */
+const legacyStoredHashes = new Map<string, { size: number; hash?: string }>();
+
+function legacyStoredFile(item: LibraryItem): string | null {
+  if (item.kind !== 'book' || item.contentHash || item.inboxMeta) return null;
+  const file = item.ocrOriginal?.epubFile ?? item.epubFile;
+  if (file !== 'original.epub' && file !== 'original.pdf') return null;
+  if (!isSafeLibraryItemId(item.id)) return null;
+  return path.join(itemDir(item.id), file);
+}
+
+/**
+ * The library item that already holds this file, if any: the same source
+ * path, or the same bytes (under any path or name). Items imported before
+ * hashes existed are compared by size first and hashed only on a size match.
+ */
+async function findLibraryDuplicate(
+  filePath: string,
+  sourceHash: string,
+  sourceSize: number,
+  candidates: readonly LibraryItem[],
+): Promise<LibraryItem | undefined> {
+  const byPathOrHash = candidates.find(
+    (item) => (item.sourcePath && samePath(item.sourcePath, filePath)) || item.contentHash === sourceHash,
+  );
+  if (byPathOrHash) return byPathOrHash;
+  for (const item of candidates) {
+    const stored = legacyStoredFile(item);
+    if (!stored) continue;
+    let known = legacyStoredHashes.get(item.id);
+    if (!known) {
+      try {
+        known = { size: fs.statSync(stored).size };
+      } catch {
+        continue;
+      }
+      legacyStoredHashes.set(item.id, known);
+    }
+    if (known.size !== sourceSize) continue;
+    if (!known.hash) {
+      try {
+        known.hash = await fileSha256(stored);
+      } catch {
+        continue;
+      }
+    }
+    if (known.hash === sourceHash) return item;
+  }
+  return undefined;
+}
+
+function failureCodeOf(err: unknown): LibraryImportFailureCode {
+  if (err instanceof NoPagesError) return 'no-pages';
+  const code = (err as { code?: string }).code;
+  if (code === 'ENOSPC') return 'storage-full';
+  if (code === 'ENOENT' || code === 'EACCES' || code === 'EPERM' || code === 'EBUSY') return 'unreadable';
+  return 'bad-file';
+}
+
+/**
+ * One file of an import job: classify, dedupe (path, then bytes), import.
+ * `pending` are this job's imports not yet committed to library.json.
+ */
+async function importOneLibraryFile(
+  filePath: string,
+  id: string,
+  pending: readonly LibraryItem[],
+): Promise<LibraryImportOutcome> {
+  if (!importerKindFor(filePath)) return { status: 'skipped' };
+  let size: number;
+  try {
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) return { status: 'skipped' };
+    size = stat.size;
+  } catch {
+    return { status: 'failed', errorCode: 'unreadable' };
+  }
+  const existingByPath = [...pending, ...readDbSnapshot()].find(
+    (item) => item.sourcePath && samePath(item.sourcePath, filePath),
+  );
+  if (existingByPath) return { status: 'duplicate', existingId: existingByPath.id };
+  let hash: string;
+  try {
+    hash = await fileSha256(filePath);
+  } catch (err) {
+    return { status: 'failed', errorCode: failureCodeOf(err) };
+  }
+  // Re-read after the await: another importer may have written meanwhile.
+  const duplicate = await findLibraryDuplicate(filePath, hash, size, [...pending, ...readDbSnapshot()]);
+  if (duplicate) return { status: 'duplicate', existingId: duplicate.id };
+  try {
+    const item = importByKind(filePath, id);
+    if (!item) return { status: 'skipped' };
+    return { status: 'imported', item: { ...item, contentHash: hash } };
+  } catch (err) {
+    console.error('Library import failed for', filePath, err);
+    return { status: 'failed', errorCode: failureCodeOf(err) };
+  }
 }
 
 function getMangaPages(id: string): string[] {
@@ -673,6 +897,7 @@ export async function relinkBook(id: string, chosenPath?: string): Promise<Relin
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(source, staged);
     fs.renameSync(staged, dest);
+    legacyStoredHashes.delete(id);
   } catch (err) {
     try {
       fs.rmSync(staged, { force: true });
@@ -906,28 +1131,20 @@ function listImportable(dir: string): string[] {
   return out.sort(naturalCompare);
 }
 
-/** Import any new files from the watch folder. Returns the updated library. */
+/**
+ * Queue any new files from the watch folder on the import job and return the
+ * library as it is now. New items arrive through `library:changed` as the job
+ * commits them, with progress on `library:importProgress` — a first sync of
+ * a large folder no longer holds every window until the last file is in.
+ */
 function syncWatchFolder(): LibraryItem[] {
   const cfg = readConfig();
   const items = readDb();
   if (!cfg.watchFolder || !fs.existsSync(cfg.watchFolder)) return items;
 
   const known = new Set(items.map((i) => i.sourcePath).filter(Boolean) as string[]);
-  let changed = false;
-  for (const fp of listImportable(cfg.watchFolder)) {
-    if (known.has(fp)) continue;
-    const ext = path.extname(fp).toLowerCase();
-    try {
-      if (ext === '.epub') items.unshift(importBook(fp));
-      else if (ext === '.pdf') items.unshift(importPdf(fp));
-      else items.unshift(importMangaArchive(fp));
-      known.add(fp);
-      changed = true;
-    } catch (err) {
-      console.error('Auto-import failed for', fp, err);
-    }
-  }
-  if (changed) writeDb(items);
+  const fresh = listImportable(cfg.watchFolder).filter((fp) => !known.has(fp));
+  if (fresh.length) void startLibraryImport(fresh).catch((err) => console.error('Auto-import failed', err));
   return items;
 }
 
@@ -1653,10 +1870,306 @@ function stopWatching(): void {
   watcher = undefined;
 }
 
+// ----- import job (progress, cancel, resume) -----------------------------
+
+function importQueuePath(): string {
+  return path.join(app.getPath('userData'), 'library-import-queue.json');
+}
+
+function readImportQueue(): LibraryImportQueueFile | null {
+  return normalizeImportQueueFile(readJsonSync<unknown>(importQueuePath(), null));
+}
+
+function saveImportQueue(queue: LibraryImportQueueFile | null): void {
+  if (queue) writeJsonAtomicSync(importQueuePath(), queue, { backup: false });
+  else removeJsonStore(importQueuePath());
+}
+
+function broadcastImportProgress(progress: LibraryImportProgress): void {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed()) w.webContents.send(LIBRARY_IMPORT_PROGRESS_CHANNEL, progress);
+  }
+}
+
+const importRunner = new LibraryImportRunner({
+  importOne: importOneLibraryFile,
+  commit: (added) => {
+    const items = readDb();
+    const known = new Set(items.map((item) => item.id));
+    items.unshift(...added.filter((item) => !known.has(item.id)));
+    // Legacy items hashed while checking for duplicates keep the hash, so the
+    // next import does not read their stored copy again.
+    for (const item of items) {
+      const hash = !item.contentHash ? legacyStoredHashes.get(item.id)?.hash : undefined;
+      if (hash) item.contentHash = hash;
+    }
+    writeDb(items);
+    broadcastLibrary(items);
+  },
+  saveQueue: saveImportQueue,
+  emit: broadcastImportProgress,
+  now: () => Date.now(),
+});
+
+/** Import files through the one job (joining it when one is running). */
+export function startLibraryImport(paths: readonly string[]): Promise<LibraryImportProgress> {
+  ensureLibrary();
+  return importRunner.start(paths);
+}
+
+/** Files and folders → the importable files under them (folders walked like the watch folder). */
+function expandImportPaths(paths: readonly unknown[]): string[] {
+  const out: string[] = [];
+  for (const raw of paths) {
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(raw);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) out.push(...listImportable(raw));
+    else if (stat.isFile() && importerKindFor(raw)) out.push(raw);
+  }
+  return out;
+}
+
+function libraryImportStatus(): LibraryImportStatus {
+  const running = importRunner.isRunning();
+  return { progress: importRunner.status(), resumable: running ? 0 : (readImportQueue()?.remaining.length ?? 0) };
+}
+
+/**
+ * At start: an import the app quit (or crashed) during left folders for files
+ * it had begun but not committed. Those are the app's own partial copies of
+ * files it was reading, so they are removed; a folder whose row did land is
+ * kept. The unprocessed paths stay queued for Resume.
+ */
+export function recoverLibraryImportQueue(): void {
+  const queue = readImportQueue();
+  if (!queue) return;
+  if (queue.inflight.length) {
+    const live = new Set(readDb().map((item) => item.id));
+    for (const id of queue.inflight) {
+      if (live.has(id) || !isSafeLibraryItemId(id)) continue;
+      try {
+        fs.rmSync(itemDir(id), { recursive: true, force: true });
+      } catch {
+        /* a locked leftover is only wasted space */
+      }
+    }
+  }
+  saveImportQueue(queue.remaining.length ? { ...queue, inflight: [] } : null);
+}
+
+// ----- removal: the library trash ------------------------------------------
+
+function libraryTrashPaths(): LibraryTrashPaths {
+  return {
+    libraryRoot: libraryRoot(),
+    trashRoot: path.join(app.getPath('userData'), 'library-trash'),
+    indexFile: path.join(app.getPath('userData'), 'library-trash.json'),
+  };
+}
+
+export type LibraryRemoveErrorCode = 'busy' | 'service-error';
+
+/**
+ * Remove an item: its folder moves to the library trash (restorable for
+ * LIBRARY_TRASH_RETENTION_MS), then its row leaves library.json. On failure
+ * nothing has changed.
+ */
+export function removeLibraryItem(id: string): { ok: true; items: LibraryItem[] } | { ok: false; errorCode: LibraryRemoveErrorCode } {
+  // readDb overlays unsaved page-turn progress, so the trashed record carries
+  // the newest position and Restore puts the reader back where they were.
+  const current = readDb();
+  const item = current.find((it) => it.id === id);
+  if (!item) return { ok: true, items: current };
+  const moved = moveLibraryItemToTrash(libraryTrashPaths(), item, Date.now());
+  if (!moved.ok) return { ok: false, errorCode: moved.errorCode === 'busy' ? 'busy' : 'service-error' };
+  pendingProgress.delete(id);
+  legacyStoredHashes.delete(id);
+  const items = current.filter((it) => it.id !== id);
+  writeDb(items);
+  broadcastLibrary(items);
+  return { ok: true, items };
+}
+
+/** Put a removed item back, under the same id, at the top of the shelf. */
+export function restoreLibraryItem(id: string): LibraryRestoreResult {
+  const paths = libraryTrashPaths();
+  // Already back on the shelf (a second Undo, another window): nothing to do,
+  // and the stale entry is the start-up reconcile's to settle.
+  if (readDb().some((it) => it.id === id)) return { ok: false, errorCode: 'conflict' };
+  const out = moveLibraryItemOutOfTrash(paths, id);
+  if (!out.ok) return out;
+  const items = readDb();
+  // A folder the item was filed under may have been deleted since; then it is unfiled.
+  const folders = readConfig().folders ?? [];
+  const restored: LibraryItem = { ...out.item };
+  if (restored.folder && !folders.includes(restored.folder)) delete restored.folder;
+  items.unshift(restored);
+  writeDb(items);
+  forgetLibraryTrashEntry(paths, id);
+  broadcastLibrary(items);
+  return { ok: true, items, item: restored };
+}
+
+/** Finish a remove/restore an exit interrupted (see libraryTrash.ts). */
+function reconcileTrashAtStart(): void {
+  const items = readDb();
+  const { reinsert } = reconcileLibraryTrash(libraryTrashPaths(), new Set(items.map((it) => it.id)));
+  if (!reinsert.length) return;
+  items.unshift(...reinsert);
+  writeDb(items);
+  for (const item of reinsert) forgetLibraryTrashEntry(libraryTrashPaths(), item.id);
+}
+
+/** Expired trash → Recycle Bin. Never `unlink`. */
+function releaseLibraryTrashNow(everything: boolean): Promise<number> {
+  return releaseLibraryTrash(libraryTrashPaths(), {
+    now: Date.now(),
+    everything,
+    trashItem: (target) => shell.trashItem(target),
+  });
+}
+
+// ----- details editing --------------------------------------------------------
+
+export function updateLibraryItemMeta(id: unknown, rawPatch: unknown): LibraryMetaUpdateResult {
+  if (!isSafeLibraryItemId(id)) return { ok: false, errorKey: 'libManage.meta.error.invalid' };
+  const normalized = normalizeLibraryMetaPatch(rawPatch);
+  if (!normalized.ok) return normalized;
+  const items = readDb();
+  const index = items.findIndex((it) => it.id === id);
+  if (index < 0) return { ok: false, errorKey: 'libManage.meta.error.notFound' };
+  const item = applyLibraryMetaPatch(items[index], normalized.patch, Date.now());
+  items[index] = item;
+  writeDb(items);
+  broadcastLibrary(items);
+  return { ok: true, item, items };
+}
+
+// ----- missing files ------------------------------------------------------------
+
+/** True as soon as one page image is found — a volume's folder is not listed whole. */
+function hasPageImage(pagesDir: string): boolean {
+  let dir: fs.Dir | null = null;
+  try {
+    dir = fs.opendirSync(pagesDir);
+    for (let entry = dir.readSync(); entry; entry = dir.readSync()) {
+      if (entry.isFile() && IMAGE_EXT.has(path.extname(entry.name).toLowerCase())) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  } finally {
+    try {
+      dir?.closeSync();
+    } catch {
+      /* already closed */
+    }
+  }
+}
+
+/**
+ * Items whose stored copy is gone (deleted or moved behind the app): a book
+ * whose EPUB/PDF is missing, or a manga with no page images left. The shelf
+ * marks them and offers Relink instead of opening onto an error.
+ */
+export function findMissingLibraryItems(items: readonly LibraryItem[] = readDb()): string[] {
+  const missing: string[] = [];
+  for (const item of items) {
+    if (!isSafeLibraryItemId(item.id)) continue;
+    const dir = path.join(libraryRoot(), item.id);
+    try {
+      if (item.kind === 'book') {
+        const file = item.epubFile ?? 'original.epub';
+        if (!fs.existsSync(path.join(dir, file))) missing.push(item.id);
+      } else {
+        if (!hasPageImage(path.join(dir, 'pages'))) missing.push(item.id);
+      }
+    } catch {
+      missing.push(item.id);
+    }
+  }
+  return missing;
+}
+
+/**
+ * Re-extract a manga whose pages are gone from a chosen archive into the SAME
+ * item (staged, then swapped), so progress, OCR and folder survive. Page names
+ * are regenerated in the same order, which keeps saved page numbers valid.
+ */
+export async function relinkManga(id: string, chosenPath?: string): Promise<RelinkMangaResult> {
+  if (!isSafeLibraryItemId(id)) return { ok: false, errorCode: 'not-found' };
+  const item = readDb().find((x) => x.id === id);
+  if (!item || item.kind !== 'manga') return { ok: false, errorCode: 'not-found' };
+  let source = chosenPath;
+  if (!source) {
+    const picked = await dialog.showOpenDialog({
+      title: mt('libManage.dialog.relinkManga'),
+      properties: ['openFile'],
+      filters: [{ name: mt('dialog.filter.mangaArchive'), extensions: ['cbz', 'zip'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return { ok: false, canceled: true };
+    source = picked.filePaths[0];
+  }
+  const dir = itemDir(id);
+  const staged = path.join(dir, `pages.relink-${process.pid}.tmp`);
+  const pagesDir = path.join(dir, 'pages');
+  const old = path.join(dir, `pages.old-${process.pid}.tmp`);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.rmSync(staged, { recursive: true, force: true });
+    const names = extractMangaPages(source, staged);
+    if (!names.length) {
+      fs.rmSync(staged, { recursive: true, force: true });
+      return { ok: false, errorCode: 'no-pages' };
+    }
+    if (fs.existsSync(pagesDir)) fs.renameSync(pagesDir, old);
+    fs.renameSync(staged, pagesDir);
+    fs.rmSync(old, { recursive: true, force: true });
+    const items = readDb();
+    const live = items.find((x) => x.id === id);
+    if (live) {
+      live.pageCount = names.length;
+      if (!live.coverPath || !fs.existsSync(path.join(dir, live.coverPath))) live.coverPath = `pages/${names[0]}`;
+      writeDb(items);
+      broadcastLibrary(items);
+    }
+    return { ok: true, pageCount: names.length };
+  } catch (err) {
+    try {
+      fs.rmSync(staged, { recursive: true, force: true });
+      if (!fs.existsSync(pagesDir) && fs.existsSync(old)) fs.renameSync(old, pagesDir);
+    } catch {
+      /* keep the original failure */
+    }
+    const code = (err as { code?: string }).code;
+    return { ok: false, errorCode: code === 'ENOSPC' ? 'storage-full' : 'service-error' };
+  }
+}
+
+/** Startup housekeeping, in order: finish interrupted removals and imports. */
+export function prepareLibraryAtStart(): void {
+  try {
+    reconcileTrashAtStart();
+  } catch (err) {
+    logDiagnostic('warn', 'library', 'trash-reconcile-failed', String(err));
+  }
+  try {
+    recoverLibraryImportQueue();
+  } catch (err) {
+    logDiagnostic('warn', 'library', 'import-queue-recover-failed', String(err));
+  }
+}
+
 // ----- IPC registration --------------------------------------------------
 
 export function registerLibraryIpc(): void {
   ensureLibrary();
+  prepareLibraryAtStart();
 
   ipcMain.handle('library:list', () => readDb());
 
@@ -1670,21 +2183,45 @@ export function registerLibraryIpc(): void {
         { name: mt('dialog.filter.mangaArchive'), extensions: ['cbz', 'zip'] },
       ],
     });
-    if (res.canceled) return readDb();
+    if (res.canceled || !res.filePaths.length) return readDb();
+    // Through the job: progress, cancel, duplicates skipped (same path or bytes).
+    await startLibraryImport(expandImportPaths(res.filePaths));
+    return readDb();
+  });
 
-    const items = readDb();
-    for (const fp of res.filePaths) {
-      const ext = path.extname(fp).toLowerCase();
-      try {
-        if (ext === '.epub') items.unshift(importBook(fp));
-        else if (ext === '.pdf') items.unshift(importPdf(fp));
-        else if (ext === '.cbz' || ext === '.zip') items.unshift(importMangaArchive(fp));
-      } catch (err) {
-        console.error('Failed to import', fp, err);
-      }
-    }
-    writeDb(items);
-    return items;
+  /**
+   * Import every book and archive under a folder (recursively, like the watch
+   * folder) — the "add my whole collection" path. Runs as the import job, so
+   * the window shows progress and can cancel; re-running it imports only what
+   * is not already in the library.
+   */
+  ipcMain.handle('library:importBooksFolder', async () => {
+    const res = await dialog.showOpenDialog(focusedWindow()!, {
+      title: mt('libManage.dialog.importBooksFolder'),
+      properties: ['openDirectory'],
+    });
+    if (res.canceled || !res.filePaths[0]) return { started: false, found: 0, canceled: true };
+    const found = listImportable(res.filePaths[0]);
+    if (found.length) void startLibraryImport(found).catch((err) => console.error('Folder import failed', err));
+    return { started: found.length > 0, found: found.length };
+  });
+
+  ipcMain.handle('library:importStatus', () => libraryImportStatus());
+  ipcMain.handle('library:importCancel', (_e, jobId: unknown) =>
+    importRunner.cancel(typeof jobId === 'string' ? jobId : undefined),
+  );
+  /** Pick up where an interrupted or cancelled import stopped. */
+  ipcMain.handle('library:importResume', () => {
+    if (importRunner.isRunning()) return { started: false, remaining: 0 };
+    const queue = readImportQueue();
+    const remaining = queue?.remaining ?? [];
+    if (remaining.length) void startLibraryImport(remaining).catch((err) => console.error('Import resume failed', err));
+    return { started: remaining.length > 0, remaining: remaining.length };
+  });
+  ipcMain.handle('library:importDiscard', () => {
+    if (importRunner.isRunning()) return false;
+    saveImportQueue(null);
+    return true;
   });
 
   /**
@@ -1713,22 +2250,31 @@ export function registerLibraryIpc(): void {
       return { ok: false, error: 'That file no longer exists.' };
     }
 
-    const items = readDb();
     // Re-importing the same archive would duplicate the shelf entry and the
     // extracted pages; handing back what is already there is what the caller
     // actually wants, which is something to open.
-    const existing = items.find((item) => item.sourcePath === filePath);
+    const existing = readDb().find((item) => item.sourcePath && samePath(item.sourcePath, filePath));
     if (existing) return { ok: true, item: existing, alreadyPresent: true };
 
+    const result = await startLibraryImport([filePath]);
+    const items = readDb();
+    const added = items.find((item) => result.addedIds.includes(item.id) && item.sourcePath && samePath(item.sourcePath, filePath));
+    if (added) return { ok: true, item: added, alreadyPresent: false };
+    const byPath = items.find((item) => item.sourcePath && samePath(item.sourcePath, filePath));
+    if (byPath) return { ok: true, item: byPath, alreadyPresent: true };
+    // The same bytes already on the shelf under another name or path.
     try {
-      const item = importMangaArchive(filePath);
-      if (!item.pageCount) return { ok: false, error: 'That archive holds no images.' };
-      items.unshift(item);
-      writeDb(items);
-      return { ok: true, item, alreadyPresent: false };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      const hash = await fileSha256(filePath);
+      const sameBytes = items.find((item) => item.contentHash === hash);
+      if (sameBytes) return { ok: true, item: sameBytes, alreadyPresent: true };
+    } catch {
+      /* fall through to the failure below */
     }
+    const failure = result.failures.find((f) => f.name === path.basename(filePath));
+    return {
+      ok: false,
+      error: failure?.errorCode === 'no-pages' ? 'That archive holds no images.' : 'The archive could not be imported.',
+    };
   });
 
   ipcMain.handle('library:importFolder', async () => {
@@ -1739,16 +2285,24 @@ export function registerLibraryIpc(): void {
     if (res.canceled || res.filePaths.length === 0) return readDb();
 
     const src = res.filePaths[0];
+    // The same folder twice is one volume, not two.
+    if (readDb().some((item) => item.sourcePath && samePath(item.sourcePath, src))) return readDb();
     const id = crypto.randomUUID();
-    const pagesDir = path.join(itemDir(id), 'pages');
-    fs.mkdirSync(itemDir(id), { recursive: true });
-    const names = copyFolderImages(src, pagesDir);
+    let names: string[] = [];
+    let cover = '';
+    try {
+      withNewItemDir(id, (dir) => {
+        const pagesDir = path.join(dir, 'pages');
+        names = copyFolderImages(src, pagesDir);
+        if (!names.length) throw new NoPagesError();
+        cover = pickCoverPage(pagesDir, names);
+      });
+    } catch (err) {
+      if (!(err instanceof NoPagesError)) console.error('Folder import failed for', src, err);
+      return readDb();
+    }
 
     const items = readDb();
-    if (names.length === 0) {
-      fs.rmSync(itemDir(id), { recursive: true, force: true });
-      return items;
-    }
     items.unshift({
       id,
       title: path.basename(src),
@@ -1756,26 +2310,48 @@ export function registerLibraryIpc(): void {
       createdAt: Date.now(),
       sourcePath: src,
       pageCount: names.length,
-      coverPath: `pages/${pickCoverPage(pagesDir, names)}`,
+      coverPath: cover ? `pages/${cover}` : undefined,
     });
     writeDb(items);
     return items;
   });
 
+  /**
+   * Remove = move to the library trash (restorable; see libraryTrash.ts).
+   * Answers the library as before; a removal the OS refused (a file held
+   * open) throws, so no caller mistakes it for done.
+   */
   ipcMain.handle('library:remove', (_e, id: unknown) => {
-    // Validated BEFORE anything is deleted: an id from the renderer is joined
-    // onto the library root and removed recursively.
+    // Validated BEFORE anything is touched: an id from the renderer is joined
+    // onto the library root.
     if (!isSafeLibraryItemId(id)) throw new Error('Invalid library item id');
-    // Only an item the library knows is deleted: a folder is removed because
-    // its entry is, never because a name that happens to resolve to one came in.
-    const current = readDb();
-    if (!current.some((it) => it.id === id)) return current;
-    fs.rmSync(itemDir(id), { recursive: true, force: true });
-    pendingProgress.delete(id);
-    const items = current.filter((it) => it.id !== id);
-    writeDb(items);
-    return items;
+    // Only an item the library knows is moved: a folder goes because its
+    // entry does, never because a name that happens to resolve to one came in.
+    const result = removeLibraryItem(id);
+    if (!result.ok) throw new Error(`library-remove-${result.errorCode}`);
+    return result.items;
   });
+
+  ipcMain.handle('library:restore', (_e, id: unknown) => {
+    if (!isSafeLibraryItemId(id)) return { ok: false, errorCode: 'not-found' };
+    return restoreLibraryItem(id);
+  });
+
+  ipcMain.handle('library:listTrash', () => summarizeLibraryTrash(readLibraryTrash(libraryTrashPaths())));
+
+  /** "Empty" = every trashed folder to the Windows Recycle Bin (still recoverable there). */
+  ipcMain.handle('library:releaseTrash', async () => {
+    const released = await releaseLibraryTrashNow(true);
+    return { released, remaining: readLibraryTrash(libraryTrashPaths()).length };
+  });
+
+  ipcMain.handle('library:updateMeta', (_e, id: unknown, patch: unknown) => updateLibraryItemMeta(id, patch));
+
+  ipcMain.handle('library:checkMissing', () => findMissingLibraryItems());
+
+  ipcMain.handle('library:relinkManga', (_e, id: unknown) =>
+    typeof id === 'string' ? relinkManga(id) : { ok: false, errorCode: 'not-found' },
+  );
 
   ipcMain.handle('library:setProgress', (_e, id: string, progress: Progress) => {
     // Every page turn lands here: a cached read-only parse, not a fresh one.
@@ -2154,31 +2730,12 @@ export function registerLibraryIpc(): void {
   // main process itself (mangaOcr.ts calls `updateLibraryOcrMeta` directly), so the
   // handler that used to sit here was never invoked from a renderer.
 
-  // Import files dropped onto the app window (no dialog).
-  ipcMain.handle('library:importPaths', (_e, paths: string[]) => {
-    const items = readDb();
-    const known = new Set(items.map((i) => i.sourcePath).filter(Boolean) as string[]);
-    let changed = false;
-    for (const fp of Array.isArray(paths) ? paths : []) {
-      if (typeof fp !== 'string') continue;
-      try {
-        if (!fs.existsSync(fp) || known.has(fp)) continue;
-        const ext = path.extname(fp).toLowerCase();
-        if (ext === '.epub') items.unshift(importBook(fp));
-        else if (ext === '.pdf') items.unshift(importPdf(fp));
-        else if (ARCHIVE_EXT.has(ext)) items.unshift(importMangaArchive(fp));
-        else continue;
-        known.add(fp);
-        changed = true;
-      } catch (err) {
-        console.error('Drop import failed for', fp, err);
-      }
-    }
-    if (changed) {
-      writeDb(items);
-      broadcastLibrary(items);
-    }
-    return items;
+  // Import files (or folders of them) dropped onto the app window (no dialog).
+  // Answers once the job has imported them, so a caller can find its new item.
+  ipcMain.handle('library:importPaths', async (_e, paths: unknown) => {
+    const files = expandImportPaths(Array.isArray(paths) ? paths : []);
+    if (files.length) await startLibraryImport(files);
+    return readDb();
   });
 
   ipcMain.handle('library:setItemFolder', (_e, id: string, folder: string | null) => {
@@ -2259,4 +2816,13 @@ export function registerLibraryIpc(): void {
   // Catch up on anything dropped into the watch folder while the app was closed.
   syncWatchFolder();
   startWatching();
+
+  // Removed items past their 30 days go to the Recycle Bin — later, off the
+  // start-up path, and never by unlink.
+  const release = setTimeout(() => {
+    void releaseLibraryTrashNow(false).catch((err) =>
+      logDiagnostic('warn', 'library', 'trash-release-failed', String(err)),
+    );
+  }, 60_000);
+  release.unref?.();
 }

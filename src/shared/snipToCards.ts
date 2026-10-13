@@ -20,6 +20,15 @@ import type { StudyLang } from './studyLang';
 
 export type SnipAnkiMode = 'auto' | 'on' | 'off';
 
+/**
+ * The one-time "Snip to cards is on" notice. Watching and adding are on by
+ * default (the owner asked for it), so the first snip that makes cards says so
+ * and offers Turn off / Keep. `pending` → nothing shown yet; `shown` → the toast
+ * carried it once (the Snips view keeps its banner until it is answered);
+ * `answered` → the learner chose, never shown again.
+ */
+export type SnipNoticeState = 'pending' | 'shown' | 'answered';
+
 export interface SnipSettings {
   /** Watch the clipboard for snips. On by default: the owner asked for it. */
   enabled: boolean;
@@ -35,6 +44,14 @@ export interface SnipSettings {
   maxWords: number;
   /** Bring the Snips view forward inside Gum when a snip arrives. */
   openView: boolean;
+  /**
+   * A word that already has a card gets this snip's sentence as another
+   * example on that card (undone exactly like an added card), instead of
+   * being skipped.
+   */
+  mergeExisting: boolean;
+  /** The first-run notice (see `SnipNoticeState`). */
+  notice: SnipNoticeState;
 }
 
 export const SNIP_MAX_WORDS_DEFAULT = 12;
@@ -49,13 +66,30 @@ export const SNIP_SETTINGS_DEFAULTS: Readonly<SnipSettings> = Object.freeze({
   ankiDeck: '',
   maxWords: SNIP_MAX_WORDS_DEFAULT,
   openView: true,
+  mergeExisting: true,
+  notice: 'pending',
 });
+
+/** `value` without C0 control characters and DEL (a newline survives when asked for). */
+export function stripSnipControls(value: string, keepNewlines = false): string {
+  let out = '';
+  for (const ch of value) {
+    const code = ch.codePointAt(0) ?? 0;
+    if ((code < 0x20 && !(keepNewlines && code === 0x0a)) || code === 0x7f) continue;
+    out += ch;
+  }
+  return out;
+}
 
 function cleanName(value: unknown, fallback: string, max = 120): string {
   if (typeof value !== 'string') return fallback;
   // Deck names travel to Anki, where `::` nests decks; control characters never belong.
-  const out = value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max);
-  return out;
+  return stripSnipControls(value).trim().slice(0, max);
+}
+
+/** A deck name from disk or IPC, repaired ('' when there is none). */
+export function cleanSnipDeckName(value: unknown): string {
+  return cleanName(value, '');
 }
 
 /** A stored or sent settings object, repaired field by field. Unknown input → defaults. */
@@ -75,7 +109,16 @@ export function normalizeSnipSettings(raw: unknown): SnipSettings {
       ? Math.max(1, Math.min(SNIP_MAX_WORDS_LIMIT, Math.round(max)))
       : SNIP_MAX_WORDS_DEFAULT,
     openView: typeof r.openView === 'boolean' ? r.openView : SNIP_SETTINGS_DEFAULTS.openView,
+    mergeExisting: typeof r.mergeExisting === 'boolean' ? r.mergeExisting : SNIP_SETTINGS_DEFAULTS.mergeExisting,
+    notice: r.notice === 'shown' || r.notice === 'answered' || r.notice === 'pending'
+      ? r.notice
+      : SNIP_SETTINGS_DEFAULTS.notice,
   };
+}
+
+/** Whether the first-run notice still needs an answer (the Snips view shows its banner). */
+export function snipNoticeOpen(settings: Pick<SnipSettings, 'notice'>): boolean {
+  return settings.notice !== 'answered';
 }
 
 /**
@@ -122,6 +165,26 @@ export function clipboardHasImageFormat(formats: readonly string[] | null | unde
 
 /** A read below this mean confidence (0–1, when the engine reports one) makes no cards. */
 export const SNIP_MIN_CONFIDENCE = 0.55;
+/**
+ * Between the floor and this, the read is usable but unsure: the words are
+ * listed for the learner to check (and correct) instead of being added.
+ */
+export const SNIP_REVIEW_CONFIDENCE = 0.75;
+
+/** `sure` → may be added automatically; `unsure` → listed for review; null → the engine gave no number. */
+export function snipReadCertainty(confidence: number | null | undefined): 'sure' | 'unsure' | null {
+  if (typeof confidence !== 'number' || !Number.isFinite(confidence)) return null;
+  return confidence < SNIP_REVIEW_CONFIDENCE ? 'unsure' : 'sure';
+}
+
+/** How a stored engine id is named to the learner: a product name, or a catalog key. */
+export function snipEngineLabel(engine: string | undefined): { name?: string; key?: string } | null {
+  if (!engine || engine === 'none') return null;
+  if (engine === 'basic') return { key: 'snip.engine.basic' };
+  if (engine === 'manga') return { name: 'manga-ocr' };
+  if (engine === 'web') return { name: 'PaddleOCR' };
+  return { key: 'snip.engine.other' };
+}
 
 export type SnipTextProblem = 'no-text' | 'garbage' | 'low-confidence';
 
@@ -209,6 +272,8 @@ export type SnipWordStatus =
   | 'candidate'
   /** A card this snip created. */
   | 'added'
+  /** Already a card: this snip's sentence was added to it as another example. */
+  | 'merged'
   /** A card this snip created, then removed (Undo / the toggle). */
   | 'removed'
   /** Already known. */
@@ -251,6 +316,10 @@ export interface SnipWord {
   cardId?: string;
   /** The Anki note this snip created for the word. */
   ankiNoteId?: number;
+  /** For `merged`: the example sentence this snip added to the card (Undo removes exactly it). */
+  example?: string;
+  /** The learner corrected the word or its reading (an OCR or analyser mistake). */
+  edited?: boolean;
 }
 
 const PUNCT = /^[\p{P}\p{S}\s]+$/u;
@@ -280,7 +349,7 @@ function normalizeWord(value: string): string {
 }
 
 /** Why a token can never be a card, or null when it is vocabulary. */
-export function snipTokenSkipReason(token: SnipToken, lang: StudyLang): Exclude<SnipWordStatus, 'candidate' | 'added' | 'removed' | 'known' | 'inDeck' | 'duplicate' | 'overLimit' | 'failed'> | null {
+export function snipTokenSkipReason(token: SnipToken, lang: StudyLang): Exclude<SnipWordStatus, 'candidate' | 'added' | 'merged' | 'removed' | 'known' | 'inDeck' | 'duplicate' | 'overLimit' | 'failed'> | null {
   const surface = token.surface.trim();
   if (!surface || PUNCT.test(surface)) return 'punct';
   if (ONLY_NUMERALS.test(surface) || (lang === 'ja' && token.pos === '名詞' && token.posDetail === '数')) return 'number';
@@ -411,6 +480,30 @@ export interface SnipEntry {
   undone?: boolean;
   /** The words past `maxWords` that were listed but not added. */
   overLimit?: number;
+  /**
+   * Why the candidates wait for the learner instead of being added: `manual`
+   * (automatic adding is off: review mode) or `uncertain` (the OCR was unsure).
+   */
+  review?: SnipReviewReason;
+  /** This snip's own Gum deck (folder), overriding the setting. */
+  deck?: string;
+  /** The OCR's own text, kept once the learner corrected it. */
+  ocrText?: string;
+}
+
+export type SnipReviewReason = 'manual' | 'uncertain';
+
+/** The deck a snip's cards go into: its own, else the setting's. */
+export function snipDeckFor(entry: Pick<SnipEntry, 'deck'>, settings: Pick<SnipSettings, 'deck'>): string {
+  const own = cleanName(entry.deck, '');
+  return own || settings.deck || SNIP_DECK_DEFAULT;
+}
+
+/** Whether a snip still owns something Undo would take back (cards, notes, merged examples). */
+export function snipOwnsWork(entry: Pick<SnipEntry, 'words' | 'cardIds' | 'ankiNoteIds'>): boolean {
+  return entry.cardIds.length > 0
+    || entry.ankiNoteIds.length > 0
+    || entry.words.some((w) => w.status === 'added' || w.status === 'merged');
 }
 
 export const SNIP_HISTORY_MAX_ENTRIES = 200;
@@ -433,18 +526,120 @@ export interface SnipJob {
 
 export type SnipAction =
   | { id: string; action: 'undo' }
-  | { id: string; action: 'removeWord' | 'addWord'; index: number };
+  | { id: string; action: 'removeWord' | 'addWord'; index: number }
+  /** Review mode: add these words (indices into `entry.words`) in one go. */
+  | { id: string; action: 'addWords'; indices: number[] }
+  /** Correct a word the OCR or the analyser got wrong, before (or after) it is a card. */
+  | { id: string; action: 'editWord'; index: number; lemma?: string; reading?: string }
+  /** Analyse corrected text again (no OCR); refused while the snip still owns cards. */
+  | { id: string; action: 'reanalyze'; text: string }
+  /** This snip's own deck: later adds go there, and the cards it owns move there. */
+  | { id: string; action: 'setDeck'; deck: string };
+
+/** Longest text a re-analysis accepts (a snip is a few lines). */
+export const SNIP_TEXT_MAX = 2000;
+const MAX_INDEX = 10_000;
+
+function cleanField(value: unknown, max: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return stripSnipControls(value.normalize('NFC')).trim().slice(0, max);
+}
+
+/**
+ * An action from IPC, repaired; null when it is not one. Main checks this
+ * before forwarding, so the pipeline window only ever sees well-formed actions.
+ */
+export function normalizeSnipAction(raw: unknown): SnipAction | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const id = typeof r.id === 'string' && /^snip-[a-z0-9-]+$/i.test(r.id) ? r.id : null;
+  if (!id) return null;
+  const index = Number(r.index);
+  const okIndex = typeof r.index === 'number' && Number.isInteger(index) && index >= 0 && index < MAX_INDEX;
+  switch (r.action) {
+    case 'undo':
+      return { id, action: 'undo' };
+    case 'removeWord':
+    case 'addWord':
+      return okIndex ? { id, action: r.action, index } : null;
+    case 'addWords': {
+      if (!Array.isArray(r.indices)) return null;
+      const indices = [...new Set(r.indices.filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < MAX_INDEX))]
+        .slice(0, 200);
+      return indices.length ? { id, action: 'addWords', indices } : null;
+    }
+    case 'editWord': {
+      if (!okIndex) return null;
+      const lemma = cleanField(r.lemma, 100);
+      const reading = cleanField(r.reading, 200);
+      if (lemma === undefined && reading === undefined) return null;
+      if (lemma !== undefined && !lemma) return null;
+      return { id, action: 'editWord', index, ...(lemma !== undefined ? { lemma } : {}), ...(reading !== undefined ? { reading } : {}) };
+    }
+    case 'reanalyze': {
+      const text = typeof r.text === 'string'
+        ? stripSnipControls(r.text.replace(/\r\n?/g, '\n'), true).trim().slice(0, SNIP_TEXT_MAX)
+        : '';
+      return text ? { id, action: 'reanalyze', text } : null;
+    }
+    case 'setDeck':
+      return typeof r.deck === 'string' ? { id, action: 'setDeck', deck: cleanName(r.deck, '') } : null;
+    default:
+      return null;
+  }
+}
 
 /** What the background toast shows. */
 export interface SnipToastPayload {
   id?: string;
-  kind: 'added' | 'none' | 'error' | 'undone' | 'paused' | 'resumed';
+  /** `review`: words are waiting to be chosen (review mode, or an unsure read). */
+  kind: 'added' | 'review' | 'none' | 'error' | 'undone' | 'paused' | 'resumed';
   /** The words this snip added (or removed, for `undone`). */
   words?: string[];
   count?: number;
   error?: SnipError;
   /** The snip's study language (names the missing OCR model). */
   lang?: StudyLang;
+  /** Cards that got this snip's sentence as another example. */
+  merged?: number;
+  /** For `review`: why the words wait. */
+  review?: SnipReviewReason;
+  /** The engine that read the snip (`snipEngineLabel`). */
+  engine?: string;
+  /** Rounded OCR confidence 0–100, when the engine reports one. */
+  confidence?: number;
+  /** Set by main only: the one-time "Snip to cards is on" notice rides on this toast. */
+  notice?: boolean;
+}
+
+/** How long the background toast offers Undo before closing (it holds while hovered or focused). */
+export const SNIP_TOAST_UNDO_MS = 12_000;
+/** How long a toast without a decision stays. */
+export const SNIP_TOAST_PLAIN_MS = 5_000;
+/** How long the first-run notice stays (it asks a question). */
+export const SNIP_TOAST_NOTICE_MS = 25_000;
+
+/** A toast payload from IPC, repaired (main never trusts the renderer's `notice`). */
+export function normalizeSnipToastPayload(raw: unknown): SnipToastPayload | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const kinds: ReadonlyArray<SnipToastPayload['kind']> = ['added', 'review', 'none', 'error', 'undone', 'paused', 'resumed'];
+  if (!kinds.includes(r.kind as SnipToastPayload['kind'])) return null;
+  const count = Number(r.count);
+  const merged = Number(r.merged);
+  const confidence = Number(r.confidence);
+  return {
+    kind: r.kind as SnipToastPayload['kind'],
+    ...(typeof r.id === 'string' && /^snip-[a-z0-9-]+$/i.test(r.id) ? { id: r.id } : {}),
+    ...(Array.isArray(r.words) ? { words: r.words.filter((w): w is string => typeof w === 'string').slice(0, 50).map((w) => w.slice(0, 100)) } : {}),
+    ...(Number.isFinite(count) && count >= 0 ? { count: Math.round(count) } : {}),
+    ...(typeof r.error === 'string' ? { error: r.error as SnipError } : {}),
+    ...(r.lang === 'ja' || r.lang === 'zh' || r.lang === 'ru' ? { lang: r.lang } : {}),
+    ...(Number.isFinite(merged) && merged > 0 ? { merged: Math.round(merged) } : {}),
+    ...(r.review === 'manual' || r.review === 'uncertain' ? { review: r.review } : {}),
+    ...(typeof r.engine === 'string' ? { engine: r.engine.slice(0, 40) } : {}),
+    ...(Number.isFinite(confidence) && confidence >= 0 && confidence <= 100 ? { confidence: Math.round(confidence) } : {}),
+  };
 }
 
 export interface SnipStatus extends SnipSettings {
@@ -455,7 +650,15 @@ export interface SnipStatus extends SnipSettings {
 }
 
 /** Patch fields the pipeline may set on an entry (never id/hash/createdAt/bytes). */
-export type SnipEntryPatch = Partial<Omit<SnipEntry, 'id' | 'hash' | 'createdAt' | 'bytes' | 'width' | 'height'>>;
+export type SnipEntryPatch = Partial<Omit<SnipEntry, 'id' | 'hash' | 'createdAt' | 'bytes' | 'width' | 'height'>> & {
+  /** Optional fields to drop (a re-analysis clears the old error and translation). */
+  clear?: SnipClearableField[];
+};
+
+export type SnipClearableField = 'error' | 'installIds' | 'translation' | 'translationError' | 'review' | 'overLimit';
+export const SNIP_CLEARABLE_FIELDS: ReadonlySet<SnipClearableField> = new Set<SnipClearableField>([
+  'error', 'installIds', 'translation', 'translationError', 'review', 'overLimit',
+]);
 
 /**
  * Which entries stay when the history is over its caps. `entries` is newest
@@ -498,7 +701,7 @@ export function snipMatchesQuery(entry: Pick<SnipEntry, 'text' | 'words' | 'tran
 }
 
 const WORD_STATUSES: ReadonlySet<SnipWordStatus> = new Set<SnipWordStatus>([
-  'candidate', 'added', 'removed', 'known', 'inDeck', 'duplicate', 'function', 'punct', 'number', 'noise', 'name',
+  'candidate', 'added', 'merged', 'removed', 'known', 'inDeck', 'duplicate', 'function', 'punct', 'number', 'noise', 'name',
   'overLimit', 'failed',
 ]);
 
@@ -526,6 +729,8 @@ export function normalizeSnipWord(raw: unknown): SnipWord | null {
     meaning: str(r.meaning, 1000),
     level: str(r.level, 20),
     cardId: str(r.cardId, 200),
+    example: str(r.example, 400),
+    ...(r.edited === true ? { edited: true } : {}),
     ...(Number.isFinite(freq) && freq > 0 ? { freq: Math.round(freq) } : {}),
     ...(Number.isFinite(note) && note > 0 ? { ankiNoteId: note } : {}),
     ...(deinflection?.length ? { deinflection } : {}),

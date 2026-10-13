@@ -19,9 +19,12 @@
  * so a newly externalized dependency is kept automatically.
  *
  * Usage:
- *   node tools/prune-packaged-app.cjs <resources/app dir> [--dry-run]
+ *   node tools/prune-packaged-app.cjs <resources/app dir> [--dry-run] [--keep-cuda | --drop-cuda]
  * Env:
- *   GUM_KEEP_CUDA=1   keep node-llama-cpp's CUDA backends (see rule below)
+ *   GUM_CUDA=keep|drop  node-llama-cpp's CUDA backends (~540 MB). DEFAULT: keep. Dropping
+ *                       them is a per-build choice (docs/RELEASING.md, "CUDA backends"),
+ *                       never a property of whatever machine happens to run the build.
+ *   GUM_KEEP_CUDA=1     the old spelling of GUM_CUDA=keep, still honoured.
  */
 'use strict';
 /* eslint-disable @typescript-eslint/no-var-requires -- a plain CommonJS build script */
@@ -52,11 +55,30 @@ const MAIN_RUNTIME_PACKAGES = [
   'pdfjs-dist', // pdfRasterize.ts serves build/pdf.mjs + pdf.worker.min.mjs
 ];
 
+/** The CUDA backend packages `GUM_CUDA=drop` removes. */
+const CUDA_PACKAGES = ['@node-llama-cpp/win-x64-cuda', '@node-llama-cpp/win-x64-cuda-ext'];
+
+/**
+ * Keep or drop node-llama-cpp's CUDA backends for THIS build. `cli` ('keep' | 'drop',
+ * from a flag) wins over the environment; with neither, the answer is KEEP: a release
+ * goes to machines that are not this one, and an NVIDIA user who gets no CUDA backend
+ * silently runs local models on Vulkan or the CPU instead.
+ * Returns { cuda: 'keep' | 'drop', source }.
+ */
+function resolveCudaChoice(env = process.env, cli = null) {
+  if (cli === 'keep' || cli === 'drop') return { cuda: cli, source: `--${cli}-cuda` };
+  const raw = String(env.GUM_CUDA ?? '').trim().toLowerCase();
+  if (raw === 'keep' || raw === 'drop') return { cuda: raw, source: `GUM_CUDA=${raw}` };
+  if (raw) throw new Error(`GUM_CUDA must be "keep" or "drop", not ${JSON.stringify(env.GUM_CUDA)}`);
+  if (String(env.GUM_KEEP_CUDA ?? '').trim()) return { cuda: 'keep', source: 'GUM_KEEP_CUDA' };
+  return { cuda: 'keep', source: 'default' };
+}
+
 /**
  * Packages removed even though a kept package lists them (optional deps for
  * other targets). `why` is logged and is the safety argument.
  */
-function excludedPackages(env) {
+function excludedPackages(env, cli = null) {
   const list = [
     {
       rule: 'foreign-platform-natives',
@@ -69,13 +91,14 @@ function excludedPackages(env) {
       why: "pdfjs-dist's optional canvas is for rendering in Node; this app only serves pdf.mjs to a Chromium window (pdfRasterize.ts), which uses the DOM canvas",
     },
   ];
-  if (!env.GUM_KEEP_CUDA) {
+  const { cuda, source } = resolveCudaChoice(env, cli);
+  if (cuda === 'drop') {
     list.push({
       rule: 'llama-cuda',
-      match: (n) => n === '@node-llama-cpp/win-x64-cuda' || n === '@node-llama-cpp/win-x64-cuda-ext',
+      match: (n) => CUDA_PACKAGES.includes(n),
       why:
-        "getLlama() (llamaBackend.ts, gpu 'auto') tries cuda only when CUDA is detected on the machine, and a missing prebuilt falls through to vulkan, then CPU. " +
-        'This machine has an AMD GPU, so CUDA is never picked; ~540 MB for a backend that cannot run here. GUM_KEEP_CUDA=1 keeps it',
+        `dropped by choice for this build (${source}). getLlama() (llamaBackend.ts, gpu 'auto') tries cuda only when CUDA is detected, ` +
+        'and a missing prebuilt falls through to vulkan, then CPU: an NVIDIA machine running this build gets Vulkan instead of CUDA. ~540 MB',
     });
   }
   return list;
@@ -238,10 +261,10 @@ function walkFiles(dir, cb) {
  * Build the prune plan for a packaged resources/app directory.
  * Returns { actions: [{ rule, path, bytes, why }], roots, kept, removedPackages }.
  */
-function planPrune(appDir, env = process.env) {
+function planPrune(appDir, env = process.env, cli = null) {
   const nm = path.join(appDir, 'node_modules');
   const scanned = scanBuildRequires(path.join(appDir, '.vite', 'build'));
-  const excluded = excludedPackages(env);
+  const excluded = excludedPackages(env, cli);
   const isExcluded = (name) => excluded.find((x) => x.match(name));
 
   const roots = new Set([...MAIN_RUNTIME_PACKAGES, ...scanned.keys()]);
@@ -330,7 +353,7 @@ function planPrune(appDir, env = process.env) {
     if (d && claimed.has(path.resolve(d))) throw new Error(`prune plan would remove runtime package ${r}`);
   }
 
-  return { actions, roots: [...roots].sort(), scanned, missingRoots, kept, removedPackages };
+  return { actions, roots: [...roots].sort(), scanned, missingRoots, kept, removedPackages, cuda: resolveCudaChoice(env, cli) };
 }
 
 function applyPrune(plan) {
@@ -340,10 +363,11 @@ function applyPrune(plan) {
 const MB = (b) => `${(b / 1048576).toFixed(1)} MB`;
 
 /** Plan, log, and (unless dryRun) apply. Returns { before, after, byRule }. */
-function prunePackagedApp(appDir, { dryRun = false, log = console.log, env = process.env } = {}) {
+function prunePackagedApp(appDir, { dryRun = false, log = console.log, env = process.env, cuda = null } = {}) {
   const nm = path.join(appDir, 'node_modules');
   const before = sizeOf(nm);
-  const plan = planPrune(appDir, env);
+  const plan = planPrune(appDir, env, cuda);
+  log(`[prune] CUDA backends: ${plan.cuda.cuda.toUpperCase()} (${plan.cuda.source})`);
   log(`[prune] runtime roots (${plan.roots.length}): ${plan.roots.join(', ')}`);
   if (plan.missingRoots.length) log(`[prune] note: roots not present in node_modules: ${plan.missingRoots.join(', ')}`);
   const byRule = new Map();
@@ -366,10 +390,28 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const dir = args.find((a) => !a.startsWith('--'));
   if (!dir) {
-    console.error('usage: node tools/prune-packaged-app.cjs <resources/app dir> [--dry-run]');
+    console.error('usage: node tools/prune-packaged-app.cjs <resources/app dir> [--dry-run] [--keep-cuda | --drop-cuda]');
     process.exit(2);
   }
-  prunePackagedApp(path.resolve(dir), { dryRun: args.includes('--dry-run') });
+  prunePackagedApp(path.resolve(dir), { dryRun: args.includes('--dry-run'), cuda: cudaFlag(args) });
 }
 
-module.exports = { planPrune, prunePackagedApp, scanBuildRequires, MAIN_RUNTIME_PACKAGES, PATH_RULES, DEV_FILE_RULES };
+/** `--keep-cuda` / `--drop-cuda` -> 'keep' | 'drop' | null; both at once is an error. */
+function cudaFlag(args) {
+  const keep = args.includes('--keep-cuda');
+  const drop = args.includes('--drop-cuda');
+  if (keep && drop) throw new Error('pass --keep-cuda or --drop-cuda, not both');
+  return keep ? 'keep' : drop ? 'drop' : null;
+}
+
+module.exports = {
+  planPrune,
+  prunePackagedApp,
+  scanBuildRequires,
+  resolveCudaChoice,
+  cudaFlag,
+  CUDA_PACKAGES,
+  MAIN_RUNTIME_PACKAGES,
+  PATH_RULES,
+  DEV_FILE_RULES,
+};

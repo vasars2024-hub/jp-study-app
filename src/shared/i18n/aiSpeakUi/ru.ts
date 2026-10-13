@@ -150,7 +150,7 @@ export const AI_SPEAK_UI_RU: Catalog = {
   'aiSpeak.write.empty': 'Нет текста для проверки.',
   'aiSpeak.write.undo': 'Отменить исправления',
   'aiSpeak.write.undone': 'Исправления отменены.',
-  'aiSpeak.journal.prompt': 'Напишите {count} предложения о своём дне, используя:',
+  'aiSpeak.journal.prompt': { one: 'Напишите {count} предложение о своём дне, используя:', few: 'Напишите {count} предложения о своём дне, используя:', many: 'Напишите {count} предложений о своём дне, используя:', other: 'Напишите {count} предложения о своём дне, используя:' },
   'aiSpeak.journal.noWords': 'Добавьте карточки на изучаемом языке, чтобы получить задание для дневника.',
   'aiSpeak.journal.otherWords': 'Другие слова',
   'aiSpeak.journal.checkLabel': 'Проверка дневника',

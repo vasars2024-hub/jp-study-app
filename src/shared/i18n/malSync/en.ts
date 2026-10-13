@@ -68,7 +68,7 @@ export const MAL_SYNC_EN: Catalog = {
   'malSync.list': 'Anime list',
   'malSync.fetching': 'Fetching…',
   'malSync.fetchList': 'Fetch my list',
-  'malSync.listCount': '{count} entries fetched.',
+  'malSync.listCount': { one: '{count} entry fetched.', other: '{count} entries fetched.' },
   'malSync.truncated':
     'MyAnimeList still had more pages when the page limit was reached, so this list is incomplete.',
 

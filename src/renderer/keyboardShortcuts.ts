@@ -11,13 +11,14 @@ import { performUndo, canUndo, peekUndo } from './actionHistory';
 import { bumpZoom, setZoom, ZOOM_DEFAULT, ZOOM_STEP } from './appZoom';
 import { TOOLBOX_SHORTCUT_COMMANDS } from '../shared/toolboxShortcuts';
 import { loadToolboxSettings } from './toolboxSettings';
-import { resumeMostRecentWatched } from './continueWatchingStore';
 import { reachMediaWorkspace } from './mediaWorkspaceBridge';
-import { I18N_PENDING_TEXT, t } from './i18n';
+import { getUiLang, I18N_PENDING_TEXT, t } from './i18n';
+import { ensureCatalog } from '../shared/i18n/catalogs';
 import { GLOBAL_COMMAND_DEFAULTS, migrateLegacyGlobalChords, type GlobalCommandStatus } from '../shared/globalCommands';
 import { reportGlobalShortcutFailures } from './globalShortcutNotice';
-import { isDnd, setDnd } from './notificationStore';
+import { isDnd, notify, setDnd } from './notificationStore';
 import { lockGumNow } from './lockscreenSettings';
+import { writeLocalStorage } from './localStorageWrite';
 
 /** kbd6: most steps in a key sequence ("Ctrl+K S"); see keySequences.ts. */
 export const KEY_SEQUENCE_MAX_STEPS = 4;
@@ -71,6 +72,49 @@ export interface CustomCommandDef {
   label: string;
   defaultKeys: string;
   action: CustomAction;
+}
+
+// kbd7: one gate for custom commands, shared by import and load. A command that only
+// "has an action" was let through before, and `{type:'runCommands'}` without its
+// `commandIds` then threw from `describeCustomAction` on every boot — the window never
+// rendered. Keyed by every `CustomAction['type']`, so a new action type that is not
+// checked here is a compile error, not a crash.
+const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
+const CUSTOM_ACTION_CHECKS: { [K in CustomAction['type']]: (a: Record<string, unknown>) => string | null } = {
+  openApp: (a) => (isNonEmptyString(a.appId) ? null : 'openApp.appId'),
+  runCommand: (a) => (isNonEmptyString(a.commandId) ? null : 'runCommand.commandId'),
+  runCommands: (a) =>
+    Array.isArray(a.commandIds) && a.commandIds.every((id) => typeof id === 'string')
+      ? null
+      : 'runCommands.commandIds',
+  dispatch: (a) => {
+    if (!isNonEmptyString(a.event)) return 'dispatch.event';
+    return a.detail === undefined || typeof a.detail === 'string' ? null : 'dispatch.detail';
+  },
+};
+
+/** kbd7: why a custom action cannot run (a short field path for the log), or null when it can. */
+export function customActionProblem(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'action';
+  const a = raw as Record<string, unknown>;
+  const check = typeof a.type === 'string' && Object.prototype.hasOwnProperty.call(CUSTOM_ACTION_CHECKS, a.type)
+    ? CUSTOM_ACTION_CHECKS[a.type as CustomAction['type']]
+    : null;
+  return check ? check(a) : 'action.type';
+}
+
+/** kbd7: why a stored or imported custom command cannot be used, or null when it can. */
+export function customCommandProblem(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'command';
+  const c = raw as Record<string, unknown>;
+  if (!isNonEmptyString(c.id)) return 'id';
+  if (typeof c.label !== 'string') return 'label';
+  if (typeof c.defaultKeys !== 'string') return 'defaultKeys';
+  return customActionProblem(c.action);
+}
+
+export function isValidCustomCommand(raw: unknown): raw is CustomCommandDef {
+  return customCommandProblem(raw) === null;
 }
 
 // ---------------------------------------------------------------------------
@@ -790,6 +834,33 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'video.subPositionUp', label: 'Move subtitles up', category: 'Video', defaultKeys: 'Shift+ArrowUp' },
   { id: 'video.subPositionDown', label: 'Move subtitles down', category: 'Video', defaultKeys: 'Shift+ArrowDown' },
   { id: 'video.subDelayReset', label: 'Reset subtitle delay', category: 'Video', defaultKeys: '' },
+  // asbplayer's "adjust offset to previous / next subtitle". asbplayer puts them on
+  // Ctrl+Shift+Left/Right, which this catalog retired app-wide in defaults version 2 (it
+  // selects a word in every text field — see MOVED_DEFAULTS). Shift on the line keys instead:
+  // W / S step to the previous / next line, Shift+W / Shift+S make that line start now.
+  // Shift+letter is free of the adopted player's map by construction (it ignores modified keys).
+  {
+    id: 'video.alignPrevLine',
+    label: 'Previous line starts now',
+    category: 'Video',
+    defaultKeys: 'Shift+W',
+    note: 'Press while the previous line is being spoken: the subtitle delay is set so it starts at this moment.',
+  },
+  {
+    id: 'video.alignNextLine',
+    label: 'Next line starts now',
+    category: 'Video',
+    defaultKeys: 'Shift+S',
+    note: 'Press while the next line is being spoken: the subtitle delay is set so it starts at this moment.',
+  },
+  // Unbound: a whole-episode export is not something a stray key should start.
+  {
+    id: 'video.condensedAudio',
+    label: 'Condensed audio (MP3)',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Saves every spoken line of this episode, back to back, as one MP3. Local files only.',
+  },
   // Mining is C (for card): one key makes the whole card. Seeking stays unbound — the
   // player's own A/D and arrows already seek.
   {
@@ -1007,6 +1078,12 @@ interface ShortcutStore {
 }
 
 const KEY = 'jp-shortcuts-v1';
+/**
+ * kbd7: the raw store as it was before load dropped a damaged custom command, or before
+ * boot recovery reset it. Never read back automatically; it is there so nothing the user
+ * had is destroyed by a repair.
+ */
+export const SHORTCUTS_BACKUP_KEY = 'jp-shortcuts-backup-v1';
 const EVENT = 'shortcuts-changed';
 const DEFAULT_PROFILE = 'Default';
 
@@ -1119,30 +1196,69 @@ function migrateHighlightHKey(profiles: Record<string, Overrides>): boolean {
   return changed;
 }
 
+/** kbd7: copy the raw store aside before a repair rewrites it. */
+function backupRawStore(raw: string | null): void {
+  if (raw == null) return;
+  // A refused write is recorded by the guarded writer; the repair still goes ahead.
+  writeLocalStorage(SHORTCUTS_BACKUP_KEY, raw);
+}
+
+/**
+ * Profiles as a plain `name → overrides` map: a profile that is not an object is dropped,
+ * and so is an override that is neither a chord string nor `null` (unbound). Imported
+ * chords are normalized; stored ones are already in normal form.
+ */
+function cleanProfiles(raw: unknown, normalize: boolean): { profiles: Record<string, Overrides>; dropped: boolean } {
+  const profiles: Record<string, Overrides> = {};
+  let dropped = false;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    for (const [name, ov] of Object.entries(raw as Record<string, unknown>)) {
+      if (!ov || typeof ov !== 'object' || Array.isArray(ov)) {
+        dropped = true;
+        continue;
+      }
+      const clean: Overrides = {};
+      for (const [id, v] of Object.entries(ov as Record<string, unknown>)) {
+        if (v === null) clean[id] = null;
+        else if (typeof v === 'string') clean[id] = normalize ? normalizeChord(v) : v;
+        else dropped = true;
+      }
+      profiles[name] = clean;
+    }
+  }
+  if (!profiles[DEFAULT_PROFILE]) profiles[DEFAULT_PROFILE] = {};
+  return { profiles, dropped };
+}
+
 function loadStore(): ShortcutStore {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(KEY);
+    raw = localStorage.getItem(KEY);
     if (raw) {
       const p = JSON.parse(raw) as Partial<ShortcutStore>;
       if (p && p.profiles && typeof p.profiles === 'object') {
-        const profiles = p.profiles as Record<string, Overrides>;
-        if (!profiles[DEFAULT_PROFILE]) profiles[DEFAULT_PROFILE] = {};
+        const { profiles, dropped: droppedOverrides } = cleanProfiles(p.profiles, false);
         const active = typeof p.active === 'string' && profiles[p.active] ? p.active : DEFAULT_PROFILE;
-        const customCommands = Array.isArray(p.customCommands)
-          ? p.customCommands.filter(
-              (c): c is CustomCommandDef =>
-                !!c &&
-                typeof c === 'object' &&
-                typeof (c as CustomCommandDef).id === 'string' &&
-                typeof (c as CustomCommandDef).label === 'string' &&
-                typeof (c as CustomCommandDef).defaultKeys === 'string' &&
-                !!(c as CustomCommandDef).action,
-            )
-          : [];
+        // kbd7: a damaged custom command is dropped (and logged), never kept — keeping
+        // one used to throw from every reader of the list and stop the window booting.
+        const customCommands: CustomCommandDef[] = [];
+        let droppedCustom = 0;
+        for (const c of Array.isArray(p.customCommands) ? (p.customCommands as unknown[]) : []) {
+          const problem = customCommandProblem(c);
+          if (problem === null) {
+            customCommands.push(c as CustomCommandDef);
+          } else {
+            droppedCustom += 1;
+            const id = c && typeof c === 'object' ? (c as { id?: unknown }).id : undefined;
+            console.warn(`[shortcuts] dropped a damaged custom command (${problem}):`, typeof id === 'string' ? id : '?');
+          }
+        }
+        const repaired = droppedCustom > 0 || droppedOverrides;
+        if (repaired) backupRawStore(raw);
         const fromVersion = typeof p.defaultsVersion === 'number' ? p.defaultsVersion : 1;
         const movedDefaults = fromVersion < DEFAULTS_VERSION;
         if (movedDefaults) migrateMovedDefaults(profiles, fromVersion);
-        const migrated = migrateHighlightHKey(profiles) || movedDefaults;
+        const migrated = migrateHighlightHKey(profiles) || movedDefaults || repaired;
         const next: ShortcutStore = {
           active,
           profiles,
@@ -1161,7 +1277,8 @@ function loadStore(): ShortcutStore {
       }
     }
   } catch {
-    /* fall through */
+    // Unreadable: the defaults take over, and the next save would overwrite it — keep a copy.
+    backupRawStore(raw);
   }
   return emptyStore();
 }
@@ -1548,7 +1665,8 @@ function normalizeStep(c: string): string {
 
 /** Normalize full chord string (supports `|` alternatives). */
 export function normalizeChord(c: string): string {
-  if (!c.trim()) return '';
+  // kbd7: stored data reaches here; a non-string reads as unbound instead of throwing.
+  if (typeof c !== 'string' || !c.trim()) return '';
   return c
     .split('|')
     .map((part) => normalizeOne(part))
@@ -1603,6 +1721,8 @@ function builtinLabel(id: string): string | undefined {
 }
 
 function describeCustomAction(action: CustomAction): string {
+  // kbd7: never trust the shape here — this runs for every row on every read.
+  if (customActionProblem(action) !== null) return '';
   if (action.type === 'openApp') {
     const app = SHORTCUT_OPEN_APPS.find((a) => a.id === action.appId);
     const name = translatedOr(`palette.section.${action.appId}`, app?.label ?? action.appId);
@@ -1642,7 +1762,7 @@ export function effectiveKeys(id: string): string {
   if (ov === null) return '';
   if (typeof ov === 'string') return normalizeChord(ov);
   const fromCustom = store.customCommands.find((c) => c.id === id);
-  if (fromCustom) return normalizeChord(fromCustom.defaultKeys);
+  if (fromCustom) return typeof fromCustom.defaultKeys === 'string' ? normalizeChord(fromCustom.defaultKeys) : '';
   return normalizeChord(COMMAND_CATALOG.find((c) => c.id === id)?.defaultKeys ?? '');
 }
 
@@ -1751,7 +1871,7 @@ export function addCustomCommand(input: {
 }): { ok: true; id: string } | { ok: false; error: string } {
   const label = input.label.trim();
   if (!label) return { ok: false, error: 'Name is required.' };
-  if (!input.action) return { ok: false, error: 'Pick an action.' };
+  if (customActionProblem(input.action) !== null) return { ok: false, error: 'Pick an action.' };
   const id = `custom.${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const defaultKeys = input.keys ? normalizeChord(input.keys) : '';
   store.customCommands = [
@@ -1774,7 +1894,7 @@ export function updateCustomCommand(
     label: typeof patch.label === 'string' ? patch.label.trim() || prev.label : prev.label,
     defaultKeys:
       typeof patch.defaultKeys === 'string' ? normalizeChord(patch.defaultKeys) : prev.defaultKeys,
-    action: patch.action ?? prev.action,
+    action: patch.action && customActionProblem(patch.action) === null ? patch.action : prev.action,
   };
   store.customCommands = store.customCommands.map((c, idx) => (idx === i ? next : c));
   // If default keys changed and profile had no override, fine; if user had reset to default, keep.
@@ -1821,37 +1941,83 @@ export function exportShortcuts(): string {
   return JSON.stringify(store, null, 2);
 }
 
-export function importShortcuts(json: string): { ok: boolean; error?: string } {
+/**
+ * Why an import was refused — a code, never English text: the Shortcuts page words it.
+ * - `notJson` / `notShortcuts`: not a shortcuts export at all;
+ * - `invalidCustom`: a custom command in it is incomplete or damaged (`label` names it
+ *   when it has a name);
+ * - `saveFailed`: applying it failed, and the previous shortcuts were put back.
+ */
+export type ShortcutImportError = 'notJson' | 'notShortcuts' | 'invalidCustom' | 'saveFailed';
+
+/**
+ * Replace the whole shortcut store with an export. **All or nothing** (kbd7): everything
+ * is validated before anything is written, and a failure while applying puts the previous
+ * store back, in memory and on disk.
+ */
+export function importShortcuts(json: string): { ok: boolean; error?: ShortcutImportError; label?: string } {
+  let p: Partial<ShortcutStore>;
   try {
-    const p = JSON.parse(json) as Partial<ShortcutStore>;
-    if (!p || typeof p !== 'object' || !p.profiles || typeof p.profiles !== 'object') {
-      return { ok: false, error: 'Not a shortcuts export.' };
+    p = JSON.parse(json) as Partial<ShortcutStore>;
+  } catch {
+    return { ok: false, error: 'notJson' };
+  }
+  if (!p || typeof p !== 'object' || !p.profiles || typeof p.profiles !== 'object') {
+    return { ok: false, error: 'notShortcuts' };
+  }
+  let customCommands: CustomCommandDef[];
+  if (p.customCommands === undefined) {
+    customCommands = store.customCommands;
+  } else if (!Array.isArray(p.customCommands)) {
+    return { ok: false, error: 'invalidCustom' };
+  } else {
+    for (const c of p.customCommands as unknown[]) {
+      if (customCommandProblem(c) === null) continue;
+      const label = c && typeof c === 'object' ? (c as { label?: unknown }).label : undefined;
+      return typeof label === 'string' && label.trim()
+        ? { ok: false, error: 'invalidCustom', label: label.trim() }
+        : { ok: false, error: 'invalidCustom' };
     }
-    const profiles: Record<string, Overrides> = {};
-    for (const [name, ov] of Object.entries(p.profiles)) {
-      if (!ov || typeof ov !== 'object') continue;
-      const clean: Overrides = {};
-      for (const [id, v] of Object.entries(ov as Record<string, unknown>)) {
-        if (v === null) clean[id] = null;
-        else if (typeof v === 'string') clean[id] = normalizeChord(v);
-      }
-      profiles[name] = clean;
-    }
-    if (!profiles[DEFAULT_PROFILE]) profiles[DEFAULT_PROFILE] = {};
-    const active = typeof p.active === 'string' && profiles[p.active] ? p.active : DEFAULT_PROFILE;
-    const customCommands = Array.isArray(p.customCommands)
-      ? (p.customCommands as CustomCommandDef[]).filter(
-          (c) => c && typeof c.id === 'string' && typeof c.label === 'string' && c.action,
-        )
-      : store.customCommands;
-    // An export from before a defaults move carries the old chords as they were then.
-    migrateMovedDefaults(profiles, typeof p.defaultsVersion === 'number' ? p.defaultsVersion : 1);
-    // An import is a whole profile set of its own; the legacy pages were already carried in.
-    store = { active, profiles, customCommands, defaultsVersion: DEFAULTS_VERSION, globalMigrated: true };
+    customCommands = (p.customCommands as CustomCommandDef[]).map((c) => ({
+      id: c.id,
+      label: c.label,
+      defaultKeys: c.defaultKeys,
+      action: c.action,
+    }));
+  }
+  const { profiles } = cleanProfiles(p.profiles, true);
+  const active = typeof p.active === 'string' && profiles[p.active] ? p.active : DEFAULT_PROFILE;
+  // An export from before a defaults move carries the old chords as they were then.
+  migrateMovedDefaults(profiles, typeof p.defaultsVersion === 'number' ? p.defaultsVersion : 1);
+  const prev = store;
+  let prevRaw: string | null = null;
+  try {
+    prevRaw = localStorage.getItem(KEY);
+  } catch {
+    /* no storage */
+  }
+  // An import is a whole profile set of its own; the legacy pages were already carried in.
+  store = { active, profiles, customCommands, defaultsVersion: DEFAULTS_VERSION, globalMigrated: true };
+  try {
+    // Every reader of the store, before it is announced to anyone.
+    getBindings();
     persist();
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Invalid JSON.' };
+    console.warn('[shortcuts] import could not be applied; the previous shortcuts were kept:', err);
+    store = prev;
+    try {
+      if (prevRaw == null) localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, prevRaw);
+    } catch {
+      /* ignore */
+    }
+    try {
+      window.dispatchEvent(new CustomEvent(EVENT));
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, error: 'saveFailed' };
   }
 }
 
@@ -2023,7 +2189,10 @@ async function resumeLastEpisode(): Promise<void> {
     return;
   }
   // `no-host` cannot come back here — checked above, and nothing unmounts a host across
-  // one await — so the only remaining decline is an empty resume store.
+  // these awaits — so the only remaining decline is an empty resume store. The store is
+  // loaded on use: it reaches the Seanime study library, which Blanc's boot must not
+  // pay for (tools/blanc-budget.cjs).
+  const { resumeMostRecentWatched } = await import('./continueWatchingStore');
   if (resumeMostRecentWatched() !== 'opened') {
     resumeToast('mediaWorkspace.resumeLast.nothing');
   }
@@ -2063,6 +2232,8 @@ let runDepth = 0;
 const MAX_RUN_DEPTH = 12;
 
 function runCustomAction(action: CustomAction, e: Event): boolean {
+  // kbd7: a damaged action does nothing rather than throwing out of the key handler.
+  if (customActionProblem(action) !== null) return false;
   if (action.type === 'openApp') {
     openApp(action.appId);
     return true;
@@ -2438,6 +2609,9 @@ function loadKeySequences(): void {
  * Capture-mode in ShortcutSettings uses stopPropagation so it wins first.
  */
 export function installKeyboardShortcuts(): () => void {
+  // First, before any listener exists: this reads every binding, so a store that cannot
+  // be read throws here and leaves nothing half-installed (see installKeyboardShortcutsSafely).
+  loadKeySequences();
   const onKey = (e: KeyboardEvent) => {
     if (e.repeat) return;
     const chord = chordFromEvent(e);
@@ -2460,10 +2634,73 @@ export function installKeyboardShortcuts(): () => void {
   window.addEventListener('keydown', onKey);
   // mousedown alone — auxclick would double-fire the same button after mouseup.
   window.addEventListener('mousedown', onMouse, true);
-  loadKeySequences();
   return () => {
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('mousedown', onMouse, true);
     seq?.cancelKeySequence();
   };
+}
+
+/** Stable Notification Center id for the boot-recovery notice (a repeat replaces it). */
+export const SHORTCUTS_RESET_NOTICE_ID = 'shortcuts-store-reset';
+/** The toast host mounts after the first render; the toast waits for it. */
+const RESET_TOAST_DELAY_MS = 2500;
+
+/** kbd7: say once, in the live language, that the shortcuts were reset at boot. */
+async function announceShortcutStoreReset(): Promise<void> {
+  try {
+    await ensureCatalog(getUiLang());
+  } catch {
+    /* English is always loaded */
+  }
+  const key = 'kbd7.boot.storeReset';
+  notify({
+    id: SHORTCUTS_RESET_NOTICE_ID,
+    message: t(key),
+    i18n: { message: key },
+    kind: 'warning',
+    source: 'system',
+    clientAction: 'open-shortcuts',
+  });
+  window.setTimeout(() => {
+    window.dispatchEvent(
+      new CustomEvent('os:toast', { detail: { message: t(key), kind: 'warn', record: false } }),
+    );
+  }, RESET_TOAST_DELAY_MS);
+}
+
+/**
+ * kbd7: `installKeyboardShortcuts` for the window entry points. Never throws: a store that
+ * makes installing throw is copied to {@link SHORTCUTS_BACKUP_KEY}, the shortcut store
+ * alone is reset to the defaults (nothing else in localStorage is touched), the install is
+ * retried, and a translated notice says what happened. If even the defaults fail, the
+ * window boots without shortcuts rather than not at all.
+ */
+export function installKeyboardShortcutsSafely(): () => void {
+  try {
+    return installKeyboardShortcuts();
+  } catch (err) {
+    console.error('[shortcuts] the saved shortcuts could not be loaded; resetting them:', err);
+  }
+  try {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(KEY);
+    } catch {
+      /* no storage */
+    }
+    backupRawStore(raw);
+    store = emptyStore();
+    try {
+      localStorage.setItem(KEY, JSON.stringify(store));
+    } catch {
+      /* ignore */
+    }
+    const dispose = installKeyboardShortcuts();
+    void announceShortcutStoreReset().catch(() => undefined);
+    return dispose;
+  } catch (err) {
+    console.error('[shortcuts] keyboard shortcuts are unavailable in this window:', err);
+    return () => undefined;
+  }
 }

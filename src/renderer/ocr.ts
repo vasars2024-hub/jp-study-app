@@ -168,6 +168,25 @@ export function ocrFailureKey(err: unknown): string {
   return err instanceof Error && err.name === 'TimeoutError' ? 'manga.ocr.timedOut' : 'manga.ocr.failed';
 }
 
+/**
+ * The catalog key for a failed manga-OCR page scan (`mangaOcr:scanPage`, or the
+ * `error` of its progress event). Main throws English (`main/mangaOcr.ts`), and
+ * an IPC rejection wraps it in Electron's "Error invoking remote method…", so
+ * the reasons main authors are recognised by their text; anything else is the
+ * generic failure. The raw message goes to the console only.
+ */
+export function mangaOcrErrorKey(error: unknown): string {
+  if (error instanceof Error && error.name === 'TimeoutError') return 'manga.ocr.timedOut';
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  if (/models are not installed|model paths missing|models not loaded|Detector not loaded/i.test(message)) {
+    return 'manga.ocr.modelsMissing';
+  }
+  if (/Could not decode page image|Invalid image data/i.test(message)) return 'manga.ocr.readFailed';
+  if (/Invalid manga page URL/i.test(message)) return 'onb3.manga.pageMissing';
+  if (/Region too small|Invalid region box/i.test(message)) return 'onb3.manga.regionTooSmall';
+  return 'manga.ocr.failed';
+}
+
 /** Test seam: forget every cached worker. */
 export function resetOcrWorkersForTests(): void {
   workers.clear();

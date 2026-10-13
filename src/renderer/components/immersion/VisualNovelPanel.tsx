@@ -25,7 +25,7 @@ import {
   estimateVisualNovelDifficultyPrior,
   rankVisualNovelEntries,
 } from '../../../shared/visualNovelRecommendations';
-import type { VisualNovelSessionState } from '../../../shared/visualNovelCapture';
+import { visualNovelErrorKey, type VisualNovelSessionState } from '../../../shared/visualNovelCapture';
 import {
   vnAddCapturedLineReason,
   vnAddEndingReason,
@@ -586,7 +586,8 @@ export default function VisualNovelPanel({
       language: 'ja',
     });
     if (!response.ok || !response.database) {
-      setError(response.error ?? t('vnPanel.msg.addFailed'));
+      // Main's `error` is English (and may name a path); its code is translated.
+      setError(t(visualNovelErrorKey(response, 'vnPanel.msg.addFailed')));
       return;
     }
     setDatabase(response.database);
@@ -685,7 +686,7 @@ export default function VisualNovelPanel({
       source: 'manual',
     });
     if (!response.ok || !response.database) {
-      setError(response.error ?? t('vnPanel.msg.captureFailed'));
+      setError(t(visualNovelErrorKey(response, 'vnPanel.msg.captureFailed')));
       return;
     }
     setDatabase(response.database);
@@ -717,7 +718,7 @@ export default function VisualNovelPanel({
     const response = await window.api.visualNovelStartHook(selected.id);
     if (response.canceled) return;
     if (!response.ok || !response.state) {
-      reportStatus(response.error ?? t('vnPanel.msg.hookStartFailed'), true);
+      reportStatus(t(visualNovelErrorKey(response, 'vnPanel.msg.hookStartFailed')), true);
       return;
     }
     setHookState(response.state);
@@ -728,7 +729,7 @@ export default function VisualNovelPanel({
     if (!selected) return;
     const response = await window.api.visualNovelUpdateRoutes(selected.id, routes);
     if (!response.ok || !response.database) {
-      setError(response.error ?? t('vnPanel.msg.routesSaveFailed'));
+      setError(t(visualNovelErrorKey(response, 'vnPanel.msg.routesSaveFailed')));
       return;
     }
     setDatabase(response.database);
@@ -804,8 +805,9 @@ export default function VisualNovelPanel({
         count: value.sentences.length,
         scope: t(SCOPE_KEYS[miningScope]),
       }));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+    } catch {
+      // The analyzer's own failure text is English; the sentence is ours.
+      setError(t('vnPanel.msg.analyzeFailed'));
     } finally {
       setBusy(false);
     }
@@ -1160,7 +1162,7 @@ export default function VisualNovelPanel({
                         {hookState?.active && (
                           <small title={hookState.filePath}>
                             {t('vnPanel.hookListening', { count: hookState.capturedLines })}
-                            {hookState.lastError ? ` · ${hookState.lastError}` : ''}
+                            {hookState.lastError ? ` · ${t(visualNovelErrorKey(hookState, 'vnPanel.hookReadFailed'))}` : ''}
                           </small>
                         )}
                       </div>

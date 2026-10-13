@@ -128,10 +128,7 @@ export const AI_TUTOR_UI_ZH: Catalog = {
   'aiTutor.event.repeat.none': '一次',
   'aiTutor.event.repeat.daily': '每天',
   'aiTutor.event.repeat.weekly': '每周 {days}',
-  'aiTutor.event.perWeekday': '每个星期几各一个，共创建 {count} 个每周日程。',
   'aiTutor.event.apply': '使用这些信息',
-  'aiTutor.event.alsoCreates': '创建时还会添加同样的每周日程，开始于 {dates}。',
-  'aiTutor.event.dropExtra': '只创建这一个',
 
   // ---- 首次设置 ----
   'aiTutor.onboarding.label': 'AI（可选）',

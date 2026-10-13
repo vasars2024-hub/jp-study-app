@@ -353,3 +353,90 @@
     scroll-behavior: auto;
   }
 }
+
+/* ---- pitch and rhythm of a shadowing take (ShadowingProsody.tsx) ---- */
+.speak-prosody {
+  display: grid;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.speak-pitch-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.speak-pitch-word {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-inline-start: 6px;
+  border-inline-start: 3px solid var(--border);
+}
+
+.speak-pitch-word.is-match {
+  border-inline-start-color: var(--success, var(--accent, currentColor));
+}
+
+.speak-pitch-word.is-mismatch {
+  border-inline-start-color: var(--danger, currentColor);
+}
+
+.speak-pitch-word.is-unclear {
+  border-inline-start-style: dashed;
+}
+
+.speak-pitch-surface {
+  min-width: 3em;
+  font-weight: 600;
+}
+
+.speak-pitch-svg {
+  flex: none;
+  overflow: visible;
+}
+
+.speak-pitch-dot {
+  fill: none;
+  stroke: var(--muted, currentColor);
+  stroke-width: 1.5;
+}
+
+.speak-pitch-dot.is-next {
+  stroke-dasharray: 2 2;
+}
+
+.speak-pitch-line {
+  fill: none;
+  stroke: var(--accent, currentColor);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.speak-pitch-point {
+  fill: var(--accent, currentColor);
+}
+
+.speak-pitch-text {
+  flex: 1 1 14em;
+}
+
+@media (forced-colors: active) {
+  .speak-pitch-dot {
+    stroke: CanvasText;
+  }
+
+  .speak-pitch-line {
+    stroke: Highlight;
+  }
+
+  .speak-pitch-point {
+    fill: Highlight;
+  }
+}

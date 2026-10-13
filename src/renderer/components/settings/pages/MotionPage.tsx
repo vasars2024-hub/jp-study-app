@@ -239,9 +239,11 @@ export default function MotionPage() {
           label={t('settings.motion.reset.action')}
           className="btn small"
           onReset={() => {
+            const before = loadMotionPrefs();
             setM(resetMotionPrefs());
             setPreviewFill(0.35);
             setPreviewScore(0);
+            return () => setM(saveMotionPrefs(before));
           }}
         />
         <p className="muted os-set-hint">

@@ -121,11 +121,21 @@ const SettingsSearch = forwardRef<
   const onKeyDown = (ev: KeyboardEvent) => {
     // Candidate confirmation, navigation and cancellation belong to the IME.
     if (ev.nativeEvent.isComposing || ev.nativeEvent.keyCode === 229) return;
+    // `open` is this render's value: reopening below does not change it until the next
+    // render, so Enter after Escape used to reopen the panel and then bail out on the
+    // stale `false`, and a second Enter was needed to pick. The reopen is tracked here.
+    let isOpen = open;
     if (!open && (ev.key === 'ArrowDown' || ev.key === 'Enter') && query.trim()) {
       dismissed.current = false;
       setOpen(true);
+      isOpen = true;
+      // ArrowDown from a shut panel only shows it, on the row that was active.
+      if (ev.key === 'ArrowDown') {
+        ev.preventDefault();
+        return;
+      }
     }
-    if (!open) return;
+    if (!isOpen) return;
     if (ev.key === 'Escape') {
       dismissed.current = true;
       setOpen(false);
@@ -136,15 +146,16 @@ const SettingsSearch = forwardRef<
       focusInput();
       return;
     }
-    if (ev.key === 'ArrowDown') {
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
       ev.preventDefault();
-      moveActive(Math.min(results.length - 1, active + 1));
-    } else if (ev.key === 'ArrowUp') {
+      // With no results there is no row to land on: `min(length - 1, …)` was -1 here,
+      // and the -1 outlived the next query's first results until it was reset.
+      if (results.length === 0) return;
+      const step = ev.key === 'ArrowDown' ? 1 : -1;
+      moveActive(Math.min(results.length - 1, Math.max(0, active + step)));
+    } else if (ev.key === 'Enter' && (results[active] ?? results[0])) {
       ev.preventDefault();
-      moveActive(Math.max(0, active - 1));
-    } else if (ev.key === 'Enter' && results[active]) {
-      ev.preventDefault();
-      pick(results[active]);
+      pick(results[active] ?? results[0]);
     }
   };
 

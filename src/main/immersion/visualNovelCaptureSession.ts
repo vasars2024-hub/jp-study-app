@@ -13,9 +13,12 @@
  */
 import {
   idleVisualNovelCaptureState,
+  isBlobLike,
   isCapturableText,
   normalizeTexthookerUrl,
   parseTexthookerMessage,
+  VisualNovelError,
+  visualNovelErrorCode,
   type VisualNovelCaptureSource,
   type VisualNovelCaptureState,
 } from '../../shared/visualNovelCapture';
@@ -49,10 +52,27 @@ export interface CaptureSessionDeps {
   saveLines: (visualNovelId: string, lines: VisualNovelHookLine[], source: VisualNovelCaptureSource) => number;
   broadcast: (state: VisualNovelCaptureState) => void;
   /**
-   * True when a clipboard change came from the app itself — the user copying a
-   * word out of the dictionary popup or the reader — rather than from the game's
-   * text hooker. Such a change is skipped, never saved as a line.
+   * Which of the app's own windows has focus when the clipboard changes:
+   *
+   *   - 'none'   — the game (or anything else) has it: the change is the hooker's.
+   *   - 'reader' — the VN reader overlay. The user keeps it focused while playing
+   *                (clicking a word, then the game again), and an auto-advancing
+   *                game keeps writing lines meanwhile, so a change is still a line
+   *                — unless it is a piece of a line just captured, i.e. a word the
+   *                user copied out of the reader.
+   *   - 'other'  — any other app window: the user is working in the app (copying
+   *                a word from the dictionary popup, say), so the change is skipped
+   *                and remembered as seen, or it would be saved as a "line" the
+   *                moment the game got focus back.
    */
+  focusedAppWindow?: () => 'none' | 'reader' | 'other';
+  /**
+   * Whether a saved line of this novel (one the reader may be showing from before
+   * this session) contains `collapsed` — the reader's "copy line" and a copied
+   * word from an older line are the user's copies too.
+   */
+  savedLineContains?: (visualNovelId: string, collapsed: string) => boolean;
+  /** Older form of `focusedAppWindow`: true means 'other'. */
   clipboardFromApp?: () => boolean;
   now?: () => number;
   setInterval?: (fn: () => void, ms: number) => unknown;
@@ -79,6 +99,8 @@ export const TEST_CAPTURE_MS = 60_000;
 export const SAME_SOURCE_BURST_MS = 400;
 /** How long the other pipe of a two-source hooker may lag behind with its copy of a line. */
 export const CROSS_SOURCE_ECHO_MS = 3_000;
+/** Captured lines a copy made in the reader is checked against. */
+export const READER_COPY_WINDOW = 50;
 
 export function createCaptureSession(deps: CaptureSessionDeps) {
   const now = deps.now ?? Date.now;
@@ -115,6 +137,15 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
   let compiledRules: (RegExp | null)[] = [];
   /** The last few accepted lines, for `dedupeRecent`. */
   let recentLines: string[] = [];
+  /**
+   * A longer tail of accepted lines as the reader shows them (no speaker), to
+   * recognise a word or line copied out of the reader. A hooker's own delivery
+   * of a line with a speaker (「…」 / 【…】) is never one of these, so a game
+   * repeating such a line is still captured; a speakerless line repeated while
+   * the reader has focus cannot be told from the reader's "copy line" and is
+   * skipped.
+   */
+  let readerLines: string[] = [];
 
   const setFilters = (next: Vn5LineFilters | undefined): void => {
     filters = vn5NormalizeLineFilters(next ?? VN5_DEFAULT_LINE_FILTERS);
@@ -161,12 +192,14 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     recentLines = [...recentLines, collapsed].slice(-VN5_DEDUPE_WINDOW);
     const line = parseVisualNovelTextBox(text);
     if (!line) return;
+    // What the reader shows (and copies): the line without its speaker.
+    readerLines = [...readerLines, line.japanese.replace(/\s+/g, '')].slice(-READER_COPY_WINDOW);
     let added = 1;
     if (!state.test) {
       try {
         added = deps.saveLines(state.visualNovelId, [line], source);
       } catch (error) {
-        publish({ lastError: error instanceof Error ? error.message : String(error) });
+        publish({ lastError: error instanceof Error ? error.message : String(error), lastErrorCode: visualNovelErrorCode(error) });
         return;
       }
     }
@@ -174,6 +207,7 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
       lines: state.lines + added,
       lastLine: { japanese: line.japanese, speaker: line.speaker, source, at: now() },
       lastError: '',
+      lastErrorCode: '',
     });
   };
 
@@ -186,8 +220,22 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     }
     if (!text || text === lastClipboard) return;
     lastClipboard = text;
-    if (deps.clipboardFromApp?.()) return;
+    const focus = deps.focusedAppWindow?.() ?? (deps.clipboardFromApp?.() ? 'other' : 'none');
+    if (focus === 'other') return;
+    if (focus === 'reader' && copiedFromReader(text)) return;
     receive(text, 'clipboard');
+  };
+
+  /** A word or phrase taken out of a line this session already captured. */
+  const copiedFromReader = (text: string): boolean => {
+    const collapsed = text.replace(/\s+/g, '');
+    if (!collapsed) return false;
+    if (readerLines.some((line) => line.includes(collapsed))) return true;
+    try {
+      return deps.savedLineContains?.(state.visualNovelId, collapsed) === true;
+    } catch {
+      return false;
+    }
   };
 
   const connect = (url: string, token: number): void => {
@@ -197,7 +245,11 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     try {
       opened = deps.createSocket(url);
     } catch (error) {
-      publish({ websocket: 'error', lastError: error instanceof Error ? error.message : String(error) });
+      publish({
+        websocket: 'error',
+        lastError: error instanceof Error ? error.message : String(error),
+        lastErrorCode: visualNovelErrorCode(error),
+      });
       scheduleReconnect(url, token);
       return;
     }
@@ -233,12 +285,35 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
       if (!current()) return;
       markOpen();
     };
+    /**
+     * A binary frame can arrive as a Blob (Node's WebSocket defaults to it),
+     * whose bytes come back asynchronously. Frames behind one wait for it, so
+     * lines are captured in the order the hooker sent them.
+     */
+    let pendingFrames: Promise<void> | null = null;
+    const handleFrame = (data: unknown): void => {
+      const text = parseTexthookerMessage(data);
+      if (text) receive(text, 'websocket');
+    };
     opened.onmessage = (event) => {
       if (!current()) return;
       // Some servers push before the open event reaches us; a line is proof of life.
       markOpen();
-      const text = parseTexthookerMessage(event.data);
-      if (text) receive(text, 'websocket');
+      const data = event.data;
+      if (!pendingFrames && !isBlobLike(data)) {
+        handleFrame(data);
+        return;
+      }
+      const job: Promise<void> = (pendingFrames ?? Promise.resolve())
+        .then(async () => {
+          const bytes = isBlobLike(data) ? await data.arrayBuffer() : data;
+          if (current()) handleFrame(bytes);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (pendingFrames === job) pendingFrames = null;
+        });
+      pendingFrames = job;
     };
     opened.onerror = () => {
       if (!current()) return;
@@ -304,6 +379,12 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     state: (): VisualNovelCaptureState => state,
 
     start(visualNovelId: string, options: CaptureStartOptions): VisualNovelCaptureState {
+      // A test answers "is my hooker wired up?". Run over a live capture it used to
+      // REPLACE it: lines stopped being saved, and when the test ended capture was
+      // simply off, mid-game, with nothing saying so.
+      if (options.test && state.active && !state.test) {
+        throw new VisualNovelError('capture-running', 'Capture is already running; stop it before testing.');
+      }
       teardown();
       const token = generation;
       const websocketUrl = normalizeTexthookerUrl(options.websocketUrl);
@@ -318,6 +399,7 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
       lastSource = null;
       echoedBy = new Set();
       recentLines = [];
+      readerLines = [];
       setFilters(options.lineFilters);
       reconnectAttempt = 0;
       state = {

@@ -22,7 +22,7 @@ import { estimateLevelFromText } from './bookLevelEstimate';
 import { getStudyLang } from './studyEnvironment';
 import { studyLangOfText, type StudyLang } from '../shared/studyLang';
 import { compactLevelBadge, resolvePageLevelLang } from '../shared/pageLevelDetect';
-import { appendNotebookEvent } from './notebookTimeline';
+import { appendNotebookEvent } from './notebookActivity';
 import { appendTranslationHistory } from './translationHistory';
 import { scoreTextComprehensibility, knownPercent } from './comprehensibility';
 import { installRecorderMainBridge } from './recorder/recorderMainBridge';

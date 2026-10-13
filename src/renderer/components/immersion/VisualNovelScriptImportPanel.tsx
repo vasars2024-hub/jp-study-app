@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useT } from '../../i18n';
+import { visualNovelErrorKey } from '../../../shared/visualNovelCapture';
 import type { VisualNovelDatabase, VisualNovelEntry } from '../../../shared/visualNovel';
 import type { VisualNovelScriptLine } from '../../../shared/visualNovelScriptExtraction';
 
@@ -27,7 +28,7 @@ export default function VisualNovelScriptImportPanel({
     setBusy(false);
     if (response.canceled) return;
     if (!response.ok) {
-      onStatus(response.error ?? t('vnScript.msg.extractFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnScript.msg.extractFailed')), true);
       return;
     }
     const next = response.lines ?? [];
@@ -44,7 +45,7 @@ export default function VisualNovelScriptImportPanel({
     const response = await window.api.visualNovelImportScriptLines(entry.id, selectedLines);
     setBusy(false);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnScript.msg.importFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnScript.msg.importFailed')), true);
       return;
     }
     onImported(response.database);

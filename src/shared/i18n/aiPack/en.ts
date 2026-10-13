@@ -21,6 +21,7 @@ import { AI_AGENT_UI_EN } from '../aiAgentUi/en';
 import { AI_IMMERSE_UI_EN } from '../aiImmerseUi/en';
 import { AI_TUTOR_UI_EN } from '../aiTutorUi/en';
 import { AI_SPEAK_UI_EN } from '../aiSpeakUi/en';
+import { AI_SPEAK2_UI_EN } from '../aiSpeak2Ui/en';
 
 export const AI_PACK_EN: Catalog = {
   ...AI_FIX_UI_EN,
@@ -30,4 +31,5 @@ export const AI_PACK_EN: Catalog = {
   ...AI_IMMERSE_UI_EN,
   ...AI_TUTOR_UI_EN,
   ...AI_SPEAK_UI_EN,
+  ...AI_SPEAK2_UI_EN,
 };

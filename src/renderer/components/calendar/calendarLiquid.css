@@ -275,3 +275,50 @@
 .cal-chip[draggable='true']:active {
   cursor: grabbing;
 }
+
+/* Weekly repeat: the weekdays it falls on, as toggle buttons. */
+.cal-weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+}
+.cal-weekdays > legend {
+  padding: 0 4px;
+  font-size: 0.85em;
+}
+.cal-weekday-btn {
+  min-width: 36px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cal-weekday-btn.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+.cal-weekday-btn:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+/* An event over several days: one bar per day; the days after the first continue it. */
+.cal-chip--span {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cal-chip--cont {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  opacity: 0.85;
+}

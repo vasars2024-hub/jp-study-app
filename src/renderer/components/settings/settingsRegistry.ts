@@ -1882,6 +1882,26 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'System',
   },
   {
+    // WP3: settings-only export and import (SettingsTransferCard on Storage).
+    id: 'storage-settings-transfer',
+    titleKey: 'search.settingsTransfer',
+    descKey: 'search.settingsTransfer.desc',
+    keywords: [
+      'export settings',
+      'import settings',
+      'settings file',
+      'backup settings',
+      'restore settings',
+      'transfer settings',
+      'move settings',
+      'copy settings',
+      'migrate',
+      'preferences',
+    ],
+    pageId: 'storage',
+    group: 'System',
+  },
+  {
     // Aero 5.4. Before this entry the Settings app had ZERO translator surface:
     // searching it for "translator" matched two comments and no card, and the
     // languages were reachable only from inside the Translate app's toolbar.
@@ -1987,6 +2007,68 @@ export function settingsEntryRenders(e: SettingsRegistryEntry, opts?: SettingsVi
   return true;
 }
 
+/*
+ * set8: typo tolerance. "notifcations", "langauge" or "wallpapr" found nothing,
+ * because every match was a substring. A query word that matches nothing exactly
+ * now also matches a title or keyword word within a small edit distance (a
+ * transposition counts as one edit), or the start of a longer word within it, so
+ * a half-typed word with a slip still lands. It is weighted well under an exact
+ * word (12 in a title, 6 elsewhere), so a correctly spelled hit always ranks
+ * first. Short words and CJK are left exact: one edit on a three-letter word, or
+ * on a two-kanji term, is a different word, not a typo.
+ */
+const FUZZY_TITLE_SCORE = 4;
+const FUZZY_KEYWORD_SCORE = 3;
+const FUZZY_MIN_LENGTH = 4;
+const CJK = /[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]/;
+
+function fuzzyEligible(word: string): boolean {
+  return word.length >= FUZZY_MIN_LENGTH && !CJK.test(word);
+}
+
+/** Edits a word of this length may be off by and still count as the same word. */
+export function typoBudget(length: number): number {
+  return length >= 8 ? 2 : 1;
+}
+
+function searchTokens(text: string): string[] {
+  return text.split(/[^\p{L}\p{N}]+/u).filter((tok) => tok.length >= FUZZY_MIN_LENGTH - 1);
+}
+
+/**
+ * Optimal-string-alignment distance between `a` and `b` (insert, delete,
+ * substitute, swap two neighbours), or `max + 1` once it is known to exceed `max`.
+ */
+export function typoDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prevPrev: number[] = [];
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let d = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d = Math.min(d, prevPrev[j - 2] + 1);
+      row.push(d);
+      if (d < rowMin) rowMin = d;
+    }
+    if (rowMin > max) return max + 1;
+    prevPrev = prev;
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/** Whether `word` is `token`, or the start of `token`, give or take a typo. */
+function typoMatch(word: string, token: string): boolean {
+  const budget = typoBudget(word.length);
+  if (typoDistance(word, token, budget) <= budget) return true;
+  // A four-letter start is too short to judge: "fron" would be "font" and "mode" "more".
+  if (word.length < FUZZY_MIN_LENGTH + 1 || token.length <= word.length) return false;
+  return typoDistance(word, token.slice(0, word.length), budget) <= budget;
+}
+
 export function searchSettings(
   query: string,
   t: (key: string) => string,
@@ -2005,9 +2087,21 @@ export function searchSettings(
     let score = 0;
     if (titleLower.includes(q)) score += 40;
     if (hay.includes(q)) score += 20;
+    let titleTokens: string[] | null = null;
+    let keywordTokens: string[] | null = null;
     for (const w of words) {
       if (titleLower.includes(w)) score += 12;
       else if (hay.includes(w)) score += 6;
+      else if (fuzzyEligible(w)) {
+        // set8: a typo still finds the card, ranked under any exact or prefix hit.
+        titleTokens ??= searchTokens(titleLower);
+        if (titleTokens.some((tok) => typoMatch(w, tok))) {
+          score += FUZZY_TITLE_SCORE;
+          continue;
+        }
+        keywordTokens ??= searchTokens(e.keywords.join(' ').toLowerCase());
+        if (keywordTokens.some((tok) => typoMatch(w, tok))) score += FUZZY_KEYWORD_SCORE;
+      }
     }
     if (score > 0) scored.push({ e, score, title });
   }

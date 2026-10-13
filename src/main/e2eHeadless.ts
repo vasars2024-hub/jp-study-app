@@ -192,6 +192,16 @@ export function isE2eHeadless(): boolean {
   return active;
 }
 
+/**
+ * A witness the harness reads back from `status.calls`, for a request the app makes that a
+ * flow has no other way to observe (the renderer's `window.api` is frozen by the context
+ * bridge, so a flow cannot wrap it). Nothing is stubbed: the call still runs. A no-op
+ * outside a headless harness run.
+ */
+export function noteE2eWitness(api: string, detail: unknown = ''): void {
+  if (active) record(api, detail);
+}
+
 function record(api: string, detail: unknown = ''): void {
   const entry = { ts: Date.now(), api, detail: typeof detail === 'string' ? detail : safeJson(detail) };
   calls.push(entry);

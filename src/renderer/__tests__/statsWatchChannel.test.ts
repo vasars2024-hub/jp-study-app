@@ -19,15 +19,13 @@ import {
   WATCH_RECORDED_EVENT,
   type WatchDelta,
 } from '../stats';
+import { shiftStudyDayKey } from '../../shared/studyDay';
 
 const store = new Map<string, string>();
 
+/** The study day `daysAgo` before the stats store's today (not the calendar date: they differ 00:00-04:00). */
 function dayKeyOffset(daysAgo: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
+  return shiftStudyDayKey(todayDayKey(), -daysAgo);
 }
 
 /** Write days straight into the store — the only way to author a past day. */

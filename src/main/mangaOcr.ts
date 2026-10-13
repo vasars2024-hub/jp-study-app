@@ -196,17 +196,91 @@ function loadPageImage(full: string): { img: NativeImage; width: number; height:
   return { img, width, height, rgba };
 }
 
-function sampleRgba(
-  rgba: Buffer,
+/**
+ * Bilinear RGB sample at a continuous pixel-centre coordinate (pixel `i`'s
+ * centre is `i`), clamped at the edges.
+ */
+export function sampleRgbaBilinear(
+  rgba: Buffer | Uint8Array,
   srcW: number,
   srcH: number,
   x: number,
   y: number,
 ): [number, number, number] {
-  const xi = Math.min(srcW - 1, Math.max(0, Math.round(x)));
-  const yi = Math.min(srcH - 1, Math.max(0, Math.round(y)));
-  const o = (yi * srcW + xi) * 4;
-  return [rgba[o], rgba[o + 1], rgba[o + 2]];
+  const cx = Math.min(srcW - 1, Math.max(0, x));
+  const cy = Math.min(srcH - 1, Math.max(0, y));
+  const x0 = Math.floor(cx);
+  const y0 = Math.floor(cy);
+  const x1 = Math.min(srcW - 1, x0 + 1);
+  const y1 = Math.min(srcH - 1, y0 + 1);
+  const fx = cx - x0;
+  const fy = cy - y0;
+  const o00 = (y0 * srcW + x0) * 4;
+  const o10 = (y0 * srcW + x1) * 4;
+  const o01 = (y1 * srcW + x0) * 4;
+  const o11 = (y1 * srcW + x1) * 4;
+  const w00 = (1 - fx) * (1 - fy);
+  const w10 = fx * (1 - fy);
+  const w01 = (1 - fx) * fy;
+  const w11 = fx * fy;
+  return [
+    rgba[o00] * w00 + rgba[o10] * w10 + rgba[o01] * w01 + rgba[o11] * w11,
+    rgba[o00 + 1] * w00 + rgba[o10 + 1] * w10 + rgba[o01 + 1] * w01 + rgba[o11 + 1] * w11,
+    rgba[o00 + 2] * w00 + rgba[o10 + 2] * w10 + rgba[o01 + 2] * w01 + rgba[o11 + 2] * w11,
+  ];
+}
+
+/**
+ * Bilinear samples per output pixel along one axis when shrinking by `step`
+ * source pixels per output pixel. A plain bilinear tap skips most of the
+ * source when shrinking 3x, which is what drops thin strokes; averaging a few
+ * taps is the cheap stand-in for the antialiased resize manga-ocr was trained
+ * on (PIL bilinear).
+ */
+function tapsFor(step: number, max: number): number {
+  return Math.min(max, Math.max(1, Math.ceil(step - 1e-9)));
+}
+
+/** Letterboxed RGB (0–1, CHW) for the detector, with the mapping back to page pixels. */
+export function letterboxRgb(
+  rgba: Buffer | Uint8Array,
+  srcW: number,
+  srcH: number,
+  size: number,
+): { data: Float32Array; ratio: number; padX: number; padY: number } {
+  const ratio = Math.min(size / srcW, size / srcH);
+  const newW = Math.round(srcW * ratio);
+  const newH = Math.round(srcH * ratio);
+  const padX = Math.floor((size - newW) / 2);
+  const padY = Math.floor((size - newH) / 2);
+  const data = new Float32Array(3 * size * size);
+  // fill gray letterbox
+  data.fill(0.5);
+  const taps = tapsFor(1 / ratio, 3);
+  const weight = 1 / (taps * taps * 255);
+  for (let y = 0; y < newH; y++) {
+    for (let x = 0; x < newW; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (let ty = 0; ty < taps; ty++) {
+        const sy = (y + (ty + 0.5) / taps) / ratio - 0.5;
+        for (let tx = 0; tx < taps; tx++) {
+          const sx = (x + (tx + 0.5) / taps) / ratio - 0.5;
+          const [sr, sg, sb] = sampleRgbaBilinear(rgba, srcW, srcH, sx, sy);
+          r += sr;
+          g += sg;
+          b += sb;
+        }
+      }
+      const dx = x + padX;
+      const dy = y + padY;
+      data[0 * size * size + dy * size + dx] = r * weight;
+      data[1 * size * size + dy * size + dx] = g * weight;
+      data[2 * size * size + dy * size + dx] = b * weight;
+    }
+  }
+  return { data, ratio, padX, padY };
 }
 
 /** Letterbox RGB float CHW tensor for the detector (0–1). */
@@ -217,32 +291,60 @@ function letterboxTensor(
   srcH: number,
   size: number,
 ): { tensor: OrtNamespace.Tensor; ratio: number; padX: number; padY: number } {
-  const ratio = Math.min(size / srcW, size / srcH);
-  const newW = Math.round(srcW * ratio);
-  const newH = Math.round(srcH * ratio);
-  const padX = Math.floor((size - newW) / 2);
-  const padY = Math.floor((size - newH) / 2);
-  const data = new Float32Array(3 * size * size);
-  // fill gray letterbox
-  data.fill(0.5);
-  for (let y = 0; y < newH; y++) {
-    for (let x = 0; x < newW; x++) {
-      const sx = (x + 0.5) / ratio - 0.5;
-      const sy = (y + 0.5) / ratio - 0.5;
-      const [r, g, b] = sampleRgba(rgba, srcW, srcH, sx, sy);
-      const dx = x + padX;
-      const dy = y + padY;
-      data[0 * size * size + dy * size + dx] = r / 255;
-      data[1 * size * size + dy * size + dx] = g / 255;
-      data[2 * size * size + dy * size + dx] = b / 255;
-    }
-  }
+  const { data, ratio, padX, padY } = letterboxRgb(rgba, srcW, srcH, size);
   return {
     tensor: new runtime.Tensor('float32', data, [1, 3, size, size]),
     ratio,
     padX,
     padY,
   };
+}
+
+/**
+ * One box of the page resampled to `size`×`size` grayscale (0–1), optionally
+ * rotated about the box centre. Bilinear, with a few taps per pixel when the
+ * box is larger than the output — the nearest-neighbour sampling this used to
+ * do turned 1–2 px strokes into broken dots on a large bubble.
+ */
+export function cropGray(
+  rgba: Buffer | Uint8Array,
+  srcW: number,
+  srcH: number,
+  box: MokuroBox,
+  size: number,
+  rotateDeg = 0,
+): Float32Array {
+  const [xmin, ymin, xmax, ymax] = box;
+  const bw = Math.max(1, xmax - xmin);
+  const bh = Math.max(1, ymax - ymin);
+  const out = new Float32Array(size * size);
+  const rad = (rotateDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const cx = (xmin + xmax) / 2;
+  const cy = (ymin + ymax) / 2;
+  const tapsX = tapsFor(bw / size, 4);
+  const tapsY = tapsFor(bh / size, 4);
+  const weight = 1 / (tapsX * tapsY * 255);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let sum = 0;
+      for (let ty = 0; ty < tapsY; ty++) {
+        // crop-local coords of this tap, centred on the box
+        const ly = ((y + (ty + 0.5) / tapsY) / size) * bh - bh / 2;
+        for (let tx = 0; tx < tapsX; tx++) {
+          const lx = ((x + (tx + 0.5) / tapsX) / size) * bw - bw / 2;
+          const rx = lx * cos - ly * sin;
+          const ry = lx * sin + ly * cos;
+          // box edges are pixel edges; the sampler wants pixel centres
+          const [r, g, b] = sampleRgbaBilinear(rgba, srcW, srcH, cx + rx - 0.5, cy + ry - 0.5);
+          sum += 0.299 * r + 0.587 * g + 0.114 * b;
+        }
+      }
+      out[y * size + x] = sum * weight;
+    }
+  }
+  return out;
 }
 
 /** manga-ocr preprocess: gray→RGB, 224×224, normalize (x-0.5)/0.5. */
@@ -254,34 +356,40 @@ function mangaOcrTensorFromCrop(
   box: MokuroBox,
   rotateDeg = 0,
 ): OrtNamespace.Tensor {
-  const [xmin, ymin, xmax, ymax] = box;
-  const bw = Math.max(1, xmax - xmin);
-  const bh = Math.max(1, ymax - ymin);
-  const data = new Float32Array(3 * OCR_SIZE * OCR_SIZE);
-  const rad = (rotateDeg * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const cx = (xmin + xmax) / 2;
-  const cy = (ymin + ymax) / 2;
-  for (let y = 0; y < OCR_SIZE; y++) {
-    for (let x = 0; x < OCR_SIZE; x++) {
-      // map into crop local coords, optionally rotate around crop center
-      const lx = (x / OCR_SIZE) * bw - bw / 2;
-      const ly = (y / OCR_SIZE) * bh - bh / 2;
-      const rx = lx * cos - ly * sin;
-      const ry = lx * sin + ly * cos;
-      const sx = cx + rx;
-      const sy = cy + ry;
-      const [r, g, b] = sampleRgba(rgba, srcW, srcH, sx, sy);
-      // grayscale then RGB (manga-ocr training path)
-      const gray = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-      const v = (gray - 0.5) / 0.5;
-      data[0 * OCR_SIZE * OCR_SIZE + y * OCR_SIZE + x] = v;
-      data[1 * OCR_SIZE * OCR_SIZE + y * OCR_SIZE + x] = v;
-      data[2 * OCR_SIZE * OCR_SIZE + y * OCR_SIZE + x] = v;
-    }
+  const gray = cropGray(rgba, srcW, srcH, box, OCR_SIZE, rotateDeg);
+  const plane = OCR_SIZE * OCR_SIZE;
+  const data = new Float32Array(3 * plane);
+  for (let i = 0; i < plane; i++) {
+    // grayscale then RGB (manga-ocr training path)
+    const v = (gray[i] - 0.5) / 0.5;
+    data[i] = v;
+    data[plane + i] = v;
+    data[2 * plane + i] = v;
   }
   return new runtime.Tensor('float32', data, [1, 3, OCR_SIZE, OCR_SIZE]);
+}
+
+// ----- IPC request hygiene -----------------------------------------------
+
+/** The renderer's detection setting, or undefined (the detector's default) for anything else. */
+export function parseDetectionSensitivity(value: unknown): DetectionSensitivity | undefined {
+  return value === 'low' || value === 'normal' || value === 'high' ? value : undefined;
+}
+
+/**
+ * The `mangaOcr:scanPage` payload as `scanMangaPage` takes it. Rebuilt field by
+ * field (the renderer is not trusted to send only these), and that rebuild used
+ * to leave `detectionSensitivity` out, so every page scan and rescan ran at
+ * "normal" whatever the reader's setting said.
+ */
+export function scanRequestFromIpc(r: MangaOcrScanRequest): MangaOcrScanRequest {
+  const detectionSensitivity = parseDetectionSensitivity(r.detectionSensitivity);
+  return {
+    itemId: r.itemId,
+    mediaUrl: r.mediaUrl,
+    force: !!r.force,
+    ...(detectionSensitivity ? { detectionSensitivity } : null),
+  };
 }
 
 // ----- detection (simplified CTD mask → boxes) ---------------------------
@@ -1975,11 +2083,7 @@ export function registerMangaOcrIpc(): void {
       throw new Error('Invalid scan request');
     }
     try {
-      return await scanMangaPage({
-        itemId: r.itemId,
-        mediaUrl: r.mediaUrl,
-        force: !!r.force,
-      });
+      return await scanMangaPage(scanRequestFromIpc(r));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       broadcastProgress({
@@ -2133,7 +2237,7 @@ export function registerMangaOcrIpc(): void {
       force: !!r.force,
       translate: r.translate !== false,
       targetLang: typeof r.targetLang === 'string' ? r.targetLang : 'en',
-      detectionSensitivity: r.detectionSensitivity,
+      detectionSensitivity: parseDetectionSensitivity(r.detectionSensitivity),
       startPage,
       endPage,
     });

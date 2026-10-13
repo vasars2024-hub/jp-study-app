@@ -7,8 +7,18 @@
 // Phase 8: storage is per study language (`jp-word-knowledge-ja` / `-zh`) so
 // switching environments never mixes JA and ZH lemmas.
 
+//
+// Keys follow ONE rule, `shared/knowledgeKey` (NFKC, the language's own
+// segmenter, する dropped from suru-nouns). A store keyed the old way is
+// re-keyed once per language (`migrateKeysOnce`): two old keys that become one
+// keep the higher level, a hand-set level always wins, and the store as it was
+// is kept in IndexedDB first.
+
 import { getStudyLang, onStudyLangChanged, type StudyLang } from './studyEnvironment';
 import { kvGet, kvSet } from './storage/db';
+import { tokenizeSync, tokenizerReady } from './tokenizer';
+import { migratedKnowledgeKeys, rekeyKnowledgeStore } from '../shared/knowledgeKey';
+import { STUDY_LANGS } from '../shared/studyLang';
 
 export const WK_LEVELS = ['New', 'Learning', 'Familiar', 'Known'] as const;
 export type WkLevel = 0 | 1 | 2 | 3;
@@ -37,6 +47,22 @@ export function resetKnownWordsCacheForTests(): void {
   cache = null;
   migrated = false;
   countsMemo = null;
+  pendingWrite = null;
+  keyRuleChecked.clear();
+}
+
+/**
+ * The one raw localStorage write of this store (the cache, its stamp, the
+ * legacy copy and the key-rule mark). False when the browser refused it: the
+ * IndexedDB mirror is the durable copy, so a refusal is a cache miss, not a loss.
+ */
+function setRaw(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function migrateLegacyOnce(): void {
@@ -47,16 +73,99 @@ function migrateLegacyOnce(): void {
     if (localStorage.getItem(jaKey)) return;
     const legacy = localStorage.getItem(LEGACY_KNOWLEDGE_KEY);
     if (!legacy) return;
-    localStorage.setItem(jaKey, legacy);
+    setRaw(jaKey, legacy);
   } catch {
     /* ignore */
   }
+}
+
+// ----- one key rule: re-keying a store written under the old rules ----------
+
+/** The version of `shared/knowledgeKey` a store's keys follow. */
+export const KNOWLEDGE_KEY_RULE = '2';
+
+/** localStorage mark: this language's cache is keyed by `KNOWLEDGE_KEY_RULE`. */
+export function knowledgeKeyRuleMark(lang: StudyLang): string {
+  return `${knowledgeKey(lang)}-key-rule`;
+}
+
+/** IndexedDB copy of a language's store exactly as it was before its first re-key. */
+export function knowledgeKeyBackupIdbKey(lang: StudyLang): string {
+  return `${knowledgeIdbKey(lang)}-before-key-rule-${KNOWLEDGE_KEY_RULE}`;
+}
+
+/** Languages whose loaded store is known to follow the rule this session. */
+const keyRuleChecked = new Set<StudyLang>();
+
+/** Whether kuromoji is built; false when it cannot even be asked (a partial test double). */
+function kuromojiReady(): boolean {
+  try {
+    return tokenizerReady();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Re-key the loaded store of `lang` to the one key rule, once. Japanese waits
+ * for kuromoji (until then nothing is marked and the check costs a Set lookup);
+ * Chinese and Russian need only NFKC. Idempotent: re-running it on a migrated
+ * store moves nothing. Returns how many old keys moved.
+ */
+function migrateKeysOnce(lang: StudyLang, entries: Record<string, Entry>): number {
+  if (keyRuleChecked.has(lang)) return 0;
+  if (lang === 'ja' && !kuromojiReady()) return 0;
+  keyRuleChecked.add(lang);
+  try {
+    if (localStorage.getItem(knowledgeKeyRuleMark(lang)) === KNOWLEDGE_KEY_RULE) return 0;
+  } catch {
+    /* unreadable mark: re-check, it is idempotent */
+  }
+  let result: ReturnType<typeof rekeyKnowledgeStore>;
+  try {
+    const deps = { tokenizeJapanese: lang === 'ja' ? tokenizeSync : null };
+    result = rekeyKnowledgeStore(entries, (key) => migratedKnowledgeKeys(key, lang, deps));
+  } catch (error) {
+    console.error('[knownWords] key migration failed; the store is left as it was:', error);
+    return 0;
+  }
+  if (result.moved > 0) {
+    // The store as it was, kept before anything changes. The first backup wins:
+    // a re-run (after a durable restore, say) never overwrites the original.
+    const before = { savedAt: Date.now(), rule: `before-${KNOWLEDGE_KEY_RULE}`, entries: { ...entries } };
+    void (async () => {
+      const backupKey = knowledgeKeyBackupIdbKey(lang);
+      if (await kvGet(backupKey)) return;
+      await kvSet(backupKey, before);
+    })().catch((error) => console.error('[knownWords] key-migration backup failed:', error));
+    for (const key of Object.keys(entries)) delete entries[key];
+    Object.assign(entries, result.entries as Record<string, Entry>);
+    storeVersion += 1;
+    writeNow(lang, entries);
+  }
+  setRaw(knowledgeKeyRuleMark(lang), KNOWLEDGE_KEY_RULE);
+  // After the current task: this runs inside a read (often during a render),
+  // and listeners re-render.
+  if (result.moved > 0 && typeof window !== 'undefined') queueMicrotask(() => emit([]));
+  return result.moved;
+}
+
+/** Re-key `lang`'s store now if it still needs it (tests and the boot path). */
+export function migrateKnowledgeKeys(lang: StudyLang = getStudyLang()): number {
+  if (lang !== getStudyLang()) return 0;
+  // Load without the implicit run in `db()`, so the count is this call's.
+  keyRuleChecked.add(lang);
+  const entries = db();
+  keyRuleChecked.delete(lang);
+  return migrateKeysOnce(lang, entries);
 }
 
 function db(): Record<string, Entry> {
   migrateLegacyOnce();
   const lang = getStudyLang();
   if (!cache || cacheLang !== lang) {
+    // A write still queued for this task must land before the store is re-read.
+    flushKnowledgeWrites();
     cacheLang = lang;
     try {
       cache = JSON.parse(localStorage.getItem(knowledgeKey(lang)) ?? '{}') as Record<string, Entry>;
@@ -64,6 +173,7 @@ function db(): Record<string, Entry> {
       cache = {};
     }
   }
+  if (!keyRuleChecked.has(lang)) migrateKeysOnce(lang, cache);
   return cache;
 }
 
@@ -115,29 +225,50 @@ function scheduleMirror(lang: StudyLang, entries: Record<string, Entry>, savedAt
  * loss — which is why it reports rather than raising a toast.
  */
 function writeCache(lang: StudyLang, entries: Record<string, Entry>, savedAt: number): boolean {
+  let text: string;
   try {
-    for (const [key, value] of [
-      [knowledgeKey(lang), JSON.stringify(entries)],
-      [stampKey(lang), String(savedAt)],
-    ] as const) {
-      localStorage.setItem(key, value);
-    }
-    return true;
+    text = JSON.stringify(entries);
   } catch {
     return false;
   }
+  return setRaw(knowledgeKey(lang), text) && setRaw(stampKey(lang), String(savedAt));
 }
 
 /** Bumped by every write of the in-memory store (see `knowledgeCounts`). */
 let storeVersion = 0;
 
+/**
+ * The write queued for the end of the current task. A sentence review nudges
+ * up to eight words and a compound review several; each used to serialise the
+ * whole store (tens of thousands of words) on its own. Writes in one task now
+ * share one serialisation. A microtask, not a timer: it lands before any other
+ * event (a storage event from another window, a quit) can observe the gap.
+ */
+let pendingWrite: { lang: StudyLang; entries: Record<string, Entry> } | null = null;
+
+function writeNow(lang: StudyLang, entries: Record<string, Entry>): void {
+  if (pendingWrite && pendingWrite.lang === lang) pendingWrite = null;
+  const savedAt = Date.now();
+  writeCache(lang, entries, savedAt);
+  scheduleMirror(lang, entries, savedAt);
+}
+
+/** Land a queued write now. Every read of localStorage below calls this first. */
+export function flushKnowledgeWrites(): void {
+  const write = pendingWrite;
+  pendingWrite = null;
+  if (write) writeNow(write.lang, write.entries);
+}
+
 function persist(): void {
   storeVersion += 1;
   const entries = db();
   const lang = cacheLang ?? getStudyLang();
-  const savedAt = Date.now();
-  writeCache(lang, entries, savedAt);
-  scheduleMirror(lang, entries, savedAt);
+  // A write for another language still queued (a switch inside this task) lands first.
+  if (pendingWrite && (pendingWrite.lang !== lang || pendingWrite.entries !== entries)) flushKnowledgeWrites();
+  const queued = pendingWrite !== null;
+  pendingWrite = { lang, entries };
+  if (!queued) queueMicrotask(flushKnowledgeWrites);
 }
 
 /**
@@ -148,6 +279,7 @@ function persist(): void {
  */
 export async function restoreKnowledgeFromIdb(lang: StudyLang = getStudyLang()): Promise<'durable' | 'local' | 'none'> {
   migrateLegacyOnce();
+  flushKnowledgeWrites();
   let durable: DurableKnowledge | null = null;
   try {
     const raw = await kvGet<unknown>(knowledgeIdbKey(lang));
@@ -180,6 +312,13 @@ export async function restoreKnowledgeFromIdb(lang: StudyLang = getStudyLang()):
   }
   // A full cache is fine: the in-memory copy below still serves this session.
   writeCache(lang, durable.entries, durable.savedAt);
+  // The durable copy may predate the key rule: check it again (idempotent).
+  try {
+    localStorage.removeItem(knowledgeKeyRuleMark(lang));
+  } catch {
+    /* the re-check below runs regardless */
+  }
+  keyRuleChecked.delete(lang);
   if (lang === getStudyLang()) {
     cache = { ...durable.entries };
     cacheLang = lang;
@@ -195,7 +334,7 @@ function emit(words: string[]): void {
 function isKnowledgeStorageKey(key: string | null): boolean {
   if (key === null) return true;
   if (key === LEGACY_KNOWLEDGE_KEY) return true;
-  return key === knowledgeKey('ja') || key === knowledgeKey('zh');
+  return STUDY_LANGS.some((lang) => key === knowledgeKey(lang));
 }
 
 // Both of these register a listener at IMPORT time, and both reach `window`.

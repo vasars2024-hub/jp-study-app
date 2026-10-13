@@ -119,12 +119,17 @@ const VOLUME_SUFFIXES: readonly RegExp[] = [
   /(?<=[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}!?])\d{1,3}\s*$/u,
 ];
 
+type SeriesItem = Pick<LibraryItem, 'title' | 'readingSource'> & Partial<Pick<LibraryItem, 'series' | 'seriesIndex'>>;
+
 /**
- * The series a book belongs to: the provider's work title when the item came
- * from one (a downloaded manga chapter knows its work exactly), else the title
- * with its volume number taken off. NFKC first, so `１巻` and `1巻` agree.
+ * The series a book belongs to: the series the book's metadata (or the user)
+ * names, else the provider's work title when the item came from one (a
+ * downloaded manga chapter knows its work exactly), else the title with its
+ * volume number taken off. NFKC first, so `１巻` and `1巻` agree.
  */
-export function librarySeriesName(item: Pick<LibraryItem, 'title' | 'readingSource'>): string {
+export function librarySeriesName(item: SeriesItem): string {
+  const named = item.series?.trim();
+  if (named) return named.normalize('NFKC');
   const work = item.readingSource?.workTitle?.trim();
   if (work) return work;
   const title = item.title.normalize('NFKC').trim();
@@ -135,7 +140,7 @@ export function librarySeriesName(item: Pick<LibraryItem, 'title' | 'readingSour
 }
 
 /** Comparison key for a series name: case- and width-folded. */
-export function librarySeriesKey(item: Pick<LibraryItem, 'title' | 'readingSource'>): string {
+export function librarySeriesKey(item: SeriesItem): string {
   return librarySeriesName(item).toLowerCase();
 }
 
@@ -146,25 +151,53 @@ export interface LibrarySeriesGroup<T> {
 }
 
 /**
- * Books grouped by series. A "series" of one book is not a series: those are
- * gathered in one trailing group (name '') instead of each getting a heading.
- * Within a series the books keep the order they came in with.
+ * Where a book sits in its series: the stored position (OPF or edited), else
+ * the volume number at the end of its title, else null (keeps its place).
  */
-export function groupLibraryBySeries<T extends Pick<LibraryItem, 'title' | 'readingSource'>>(
+export function librarySeriesPosition(item: SeriesItem): number | null {
+  if (typeof item.seriesIndex === 'number' && Number.isFinite(item.seriesIndex)) return item.seriesIndex;
+  const title = item.title.normalize('NFKC');
+  const m =
+    title.match(/(?:vol(?:ume)?\.?|book|v|第|#)\s*(\d+(?:\.\d+)?)\s*(?:巻|冊|話)?\s*[\])）】]?\s*$/iu) ??
+    title.match(/(\d+(?:\.\d+)?)\s*(?:巻|冊)?\s*[\])）】]?\s*$/u);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Books grouped by series. A "series" of one book is not a series unless its
+ * metadata says so: those are gathered in one trailing group (name '')
+ * instead of each getting a heading. Within a series, books are in series
+ * order (stored position, else the title's volume number); books with no
+ * position keep the order they came in with, after the numbered ones.
+ */
+export function groupLibraryBySeries<T extends SeriesItem>(
   items: readonly T[],
 ): Array<LibrarySeriesGroup<T>> {
-  const byKey = new Map<string, LibrarySeriesGroup<T>>();
+  const byKey = new Map<string, LibrarySeriesGroup<T> & { named: boolean }>();
   for (const item of items) {
     const key = librarySeriesKey(item);
     const group = byKey.get(key);
-    if (group) group.items.push(item);
-    else byKey.set(key, { name: librarySeriesName(item), items: [item] });
+    const named = Boolean(item.series?.trim());
+    if (group) {
+      group.items.push(item);
+      group.named ||= named;
+    } else byKey.set(key, { name: librarySeriesName(item), items: [item], named });
   }
   const series: Array<LibrarySeriesGroup<T>> = [];
   const standalone: T[] = [];
-  for (const group of byKey.values()) {
-    if (group.items.length > 1) series.push(group);
-    else standalone.push(...group.items);
+  for (const { named, ...group } of byKey.values()) {
+    if (group.items.length > 1 || named) {
+      const order = new Map(group.items.map((item, index) => [item, index]));
+      group.items.sort((a, b) => {
+        const pa = librarySeriesPosition(a);
+        const pb = librarySeriesPosition(b);
+        if (pa !== null && pb !== null && pa !== pb) return pa - pb;
+        if (pa !== null && pb === null) return -1;
+        if (pa === null && pb !== null) return 1;
+        return (order.get(a) ?? 0) - (order.get(b) ?? 0);
+      });
+      series.push(group);
+    } else standalone.push(...group.items);
   }
   series.sort((a, b) => a.name.localeCompare(b.name));
   if (standalone.length) series.push({ name: '', items: standalone });
@@ -207,4 +240,28 @@ export function libraryHostedActions(
   const hosted: ReadingWorkspaceActionId[] = ['read', 'dictionary'];
   if (item.kind === 'book' && item.epubFile?.toLowerCase().endsWith('.epub')) hosted.push('mine');
   return hosted;
+}
+
+/** Case-, width- and kana-insensitive form for the shelf search. */
+function foldForSearch(text: string): string {
+  return text
+    .normalize('NFKC')
+    .toLowerCase()
+    // Katakana → hiragana, so ヨツバ finds よつば.
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
+/**
+ * The shelf's search: every word of the query must appear in the title,
+ * authors, series or a tag (Calibre's quick search, without its query
+ * language). An empty query matches everything.
+ */
+export function matchesLibraryQuery(
+  item: Pick<LibraryItem, 'title'> & Partial<Pick<LibraryItem, 'author' | 'series' | 'tags'>>,
+  query: string,
+): boolean {
+  const words = foldForSearch(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const haystack = foldForSearch([item.title, item.author ?? '', item.series ?? '', ...(item.tags ?? [])].join('\n'));
+  return words.every((word) => haystack.includes(word));
 }

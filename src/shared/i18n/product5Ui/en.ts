@@ -70,6 +70,11 @@ export const PRODUCT5_UI_EN: Catalog = {
   'kbd5.io.error.notJson': 'That is not valid JSON.',
   'kbd5.io.error.notKeymap': 'That is not a Gum keymap.',
   'kbd5.io.error.rejected': 'The keymap was rejected: {detail}',
+  // kbd7: import hardening and boot recovery (the import reasons fill {detail} above).
+  'kbd7.import.invalidCustom': 'one of its custom shortcuts is incomplete or damaged. Nothing was changed.',
+  'kbd7.import.invalidCustomNamed': 'the custom shortcut “{name}” is incomplete or damaged. Nothing was changed.',
+  'kbd7.import.saveFailed': 'it could not be applied. Your shortcuts were left as they were.',
+  'kbd7.boot.storeReset': 'Your saved shortcuts could not be loaded, so they were reset to the defaults. A copy of the old ones was kept.',
   'kbd5.custom.edit': 'Edit',
   'kbd5.custom.editTitle': 'Edit custom shortcut',
   'kbd5.custom.save': 'Save changes',

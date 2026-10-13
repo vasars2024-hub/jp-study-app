@@ -1267,6 +1267,17 @@
     'completion (–てしまう)': 'content_reason_shimau',
     'completion (–ちゃう)': 'content_reason_chau',
     '–ておく': 'content_reason_teoku',
+    '–てある': 'content_reason_teAru',
+    '–てみる': 'content_reason_teMiru',
+    '–てくる': 'content_reason_teKuru',
+    '–ていく': 'content_reason_teIku',
+    'conditional (–なら)': 'content_reason_conditionalNara',
+    '–たがる': 'content_reason_tagaru',
+    '–そう': 'content_reason_sou',
+    '–ながら': 'content_reason_nagara',
+    '–ず': 'content_reason_zu',
+    'noun (–さ)': 'content_reason_sa',
+    '–なさい': 'content_reason_nasai',
   };
 
   /** A de-inflection step in the UI language; an unknown reason (an importer's own name) keeps its text. */

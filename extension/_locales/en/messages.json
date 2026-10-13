@@ -593,6 +593,39 @@
   "content_reason_teoku": {
     "message": "preparatory (–ておく)"
   },
+  "content_reason_teAru": {
+    "message": "resultative (–てある)"
+  },
+  "content_reason_teMiru": {
+    "message": "attempt (–てみる)"
+  },
+  "content_reason_teKuru": {
+    "message": "toward now / the speaker (–てくる)"
+  },
+  "content_reason_teIku": {
+    "message": "onward / away (–ていく)"
+  },
+  "content_reason_conditionalNara": {
+    "message": "conditional (–なら)"
+  },
+  "content_reason_tagaru": {
+    "message": "desire, third person (–たがる)"
+  },
+  "content_reason_sou": {
+    "message": "appearance (–そう)"
+  },
+  "content_reason_nagara": {
+    "message": "while (–ながら)"
+  },
+  "content_reason_zu": {
+    "message": "negative (–ず)"
+  },
+  "content_reason_sa": {
+    "message": "noun (–さ)"
+  },
+  "content_reason_nasai": {
+    "message": "polite imperative (–なさい)"
+  },
   "content_rpNoSentence": {
     "message": "No surrounding sentence was detected for this word."
   },

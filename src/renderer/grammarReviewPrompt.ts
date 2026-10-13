@@ -19,6 +19,8 @@
  * deterministically from the point and its review count so it rotates.
  */
 import type { LocalSrsState } from '../shared/localSrs';
+import { deinflect } from '../shared/deinflect';
+import { alignFurigana, toHiragana } from '../shared/furigana';
 import {
   findPatternSpans,
   patternAlternatives,
@@ -31,6 +33,8 @@ export type GrammarPromptKind = 'recognition' | 'cloze' | 'production';
 export interface GrammarExampleLike {
   jp: string;
   en: string;
+  /** The whole sentence in kana, when the example has one. */
+  reading?: string;
 }
 
 export interface GrammarPointLike {
@@ -53,6 +57,15 @@ export interface GrammarCloze {
   segments: ClozeSegment[];
   /** The blanked text, in order — what a typed answer is compared with. */
   answers: string[];
+  /**
+   * Japanese only: each blank written in kana, from the example's reading, so
+   * 始め can be answered はじめ. Null for a blank whose reading the example
+   * cannot give (no reading, or one that does not align with the sentence).
+   */
+  readings?: Array<string | null>;
+  /** The point's title, whose dictionary form is also an answer (〜てしまう for a blank てしま). */
+  title?: string;
+  lang?: string;
 }
 
 export interface GrammarReviewPrompt {
@@ -144,7 +157,53 @@ export function clozeForExample(point: GrammarPointLike, example: GrammarExample
   const answers = segments.filter((s) => s.blank).map((s) => s.text);
   // A blank that swallows the whole sentence teaches nothing.
   if (!answers.length || answers.join('').length >= sentence.replace(/[。！？!?.\s]/g, '').length) return null;
-  return { sentence, translation: String(example.en ?? '').trim(), segments, answers };
+  const cloze: GrammarCloze = { sentence, translation: String(example.en ?? '').trim(), segments, answers, title: point.title, lang };
+  if (lang === 'ja') cloze.readings = blankReadings(segments, example.reading);
+  return cloze;
+}
+
+/**
+ * Each blank of a Japanese cloze in kana, read off the example's whole-sentence
+ * reading. The sentence is aligned against the reading on its kana anchors
+ * (`alignFurigana`); a blank that starts or ends inside a kanji run, or a
+ * reading that does not align, gives null rather than a guess.
+ */
+export function blankReadings(segments: readonly ClozeSegment[], reading: string | undefined): Array<string | null> {
+  const blanks = segments.filter((s) => s.blank);
+  const none = blanks.map(() => null);
+  if (!reading) return none;
+  // Readings are spaced between words and sentences are not (or not the same way).
+  // `\s` covers the ideographic space too.
+  const strip = (text: string) => text.replace(/\s+/g, '');
+  const runs = segments.map((s) => ({ text: strip(s.text), blank: s.blank }));
+  const surface = runs.map((r) => r.text).join('');
+  const aligned = alignFurigana(surface, strip(reading));
+  if (aligned.length === 1 && aligned[0].reading !== undefined && aligned[0].text === surface) {
+    // Alignment failed (or one all-kanji run): only a blank that is the whole sentence could use it.
+    return none;
+  }
+  // Per surface character: its kana, or a boundary marker inside a kanji run.
+  const kanaAt: Array<{ kana: string; runStart: boolean; runEnd: boolean }> = [];
+  for (const seg of aligned) {
+    const chars = [...seg.text];
+    if (seg.reading === undefined) {
+      for (const ch of chars) kanaAt.push({ kana: toHiragana(ch), runStart: true, runEnd: true });
+    } else {
+      chars.forEach((_, i) => kanaAt.push({ kana: i === 0 ? seg.reading ?? '' : '', runStart: i === 0, runEnd: i === chars.length - 1 }));
+    }
+  }
+  const out: Array<string | null> = [];
+  let at = 0;
+  for (const run of runs) {
+    const length = [...run.text].length;
+    if (run.blank) {
+      const slice = kanaAt.slice(at, at + length);
+      const clean = slice.length === length && slice.length > 0 && slice[0].runStart && slice[slice.length - 1].runEnd;
+      out.push(clean ? slice.map((c) => c.kana).join('') : null);
+    }
+    at += length;
+  }
+  return out;
 }
 
 function seededIndex(seed: string, length: number): number {
@@ -199,15 +258,97 @@ function normalizeAnswer(text: string): string {
     .replace(/[\s。、，,．.！!？?「」『』（）()〜～~…・]/g, '');
 }
 
+/** Width, case, spacing and punctuation folded away, and katakana read as hiragana. */
+function foldAnswer(text: string): string {
+  return toHiragana(normalizeAnswer(text));
+}
+
+/** What else a typed answer may be checked against besides the blanked text. */
+export interface ClozeCheckOptions {
+  /** Each blank in kana (`GrammarCloze.readings`). */
+  readings?: ReadonlyArray<string | null>;
+  /** The point's title: its dictionary form, and that form conjugated, also answer the blank. */
+  title?: string;
+  /** The point's language; the Japanese-only rules are skipped for any other. */
+  lang?: string;
+}
+
+/** Every spelling of each blank: as written, and in kana when the reading is known. */
+function blankSpellings(answers: readonly string[], readings: ReadonlyArray<string | null> | undefined): string[][] {
+  return answers
+    .map((answer, i) => {
+      const forms = new Set<string>();
+      const written = foldAnswer(answer);
+      if (written) forms.add(written);
+      const reading = readings?.[i];
+      if (reading) forms.add(foldAnswer(reading));
+      return [...forms];
+    })
+    .filter((forms) => forms.length > 0);
+}
+
+/** Joined spellings of several blanks, in order (a handful at most). */
+function joinedSpellings(perBlank: string[][]): Set<string> {
+  let out = [''];
+  for (const forms of perBlank) {
+    out = out.flatMap((head) => forms.map((form) => head + form));
+    if (out.length > 64) out = out.slice(0, 64);
+  }
+  return new Set(out);
+}
+
+/**
+ * The title's forms that a single blank stands for: the alternative the blank
+ * was cut from (〜てしまう for a blank てしま, 〜始める for 始め), written as in
+ * the title and, when the blank's reading is known, in kana (はじめる).
+ */
+function titleForms(title: string, blank: string, blankKana: string | null): Set<string> {
+  const out = new Set<string>();
+  for (const needle of japaneseClozeNeedles(title)) {
+    const form = foldAnswer(needle);
+    const isBlank = form === blank;
+    // The blank is the stem of a dictionary-form ending: てしま of てしまう.
+    const isStemOf = form.length === blank.length + 1 && form.startsWith(blank) && U_ROW_ENDING.test(form);
+    if (!isBlank && !isStemOf) continue;
+    out.add(form);
+    if (blankKana) out.add(blankKana + form.slice(blank.length));
+  }
+  return out;
+}
+
 /**
  * Whether a typed cloze answer gives the blanked text: every blank, in order. The
  * comparison ignores width, case, spaces and punctuation; a frame pattern
  * (虽然…但是…) is answered with its parts in order, separated or not.
+ *
+ * Japanese also accepts (`options`):
+ *   - katakana for hiragana and back (both are folded to hiragana);
+ *   - kana for a kanji blank, from the example's reading (はじめ for 始め);
+ *   - the title's form the blank stands for (てしまう for a blank てしま);
+ *   - that form conjugated when it is a dictionary form (てしまった, ていた),
+ *     through the app's de-inflector.
+ * Anything else is still wrong: では for には, しまった without its て.
  */
-export function checkClozeAnswer(input: string, answers: readonly string[]): boolean {
-  const typed = normalizeAnswer(input);
+export function checkClozeAnswer(input: string, answers: readonly string[], options: ClozeCheckOptions = {}): boolean {
+  const typed = foldAnswer(input);
   if (!typed || !answers.length) return false;
-  const expected = answers.map(normalizeAnswer).filter(Boolean);
+  const perBlank = blankSpellings(answers, options.readings);
+  if (!perBlank.length) return false;
   // Separators were stripped above, so "虽然 … 但是" and "虽然但是" compare alike.
-  return expected.length > 0 && typed === expected.join('');
+  if (joinedSpellings(perBlank).has(typed)) return true;
+  if ((options.lang ?? 'ja') !== 'ja' || !options.title || perBlank.length !== 1) return false;
+
+  const written = foldAnswer(answers[0]);
+  const kana = options.readings?.[0] ? foldAnswer(options.readings[0]) : null;
+  const forms = new Set([...titleForms(options.title, written, kana), ...(kana ? titleForms(options.title, kana, null) : [])]);
+  if (forms.has(typed)) return true;
+  // A conjugated use of a dictionary form: peel the inflection off and compare.
+  const dictionary = [...forms].filter((form) => U_ROW_ENDING.test(form));
+  if (!dictionary.length) return false;
+  return deinflect(typed).some((candidate) => candidate.reasons.length > 0 && dictionary.includes(foldAnswer(candidate.term)));
+}
+
+/** `checkClozeAnswer` with everything the cloze itself knows (readings, title, language). */
+export function checkCloze(input: string, cloze: GrammarCloze): boolean {
+  return checkClozeAnswer(input, cloze.answers, { readings: cloze.readings, title: cloze.title, lang: cloze.lang });
 }

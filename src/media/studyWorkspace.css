@@ -497,6 +497,78 @@
   color: rgb(var(--color-gray-500));
 }
 
+/* Card audio padding: a millisecond field with its unit beside it. */
+#media-workspace .study-tool-group input[type='number'] {
+  width: 5.2rem;
+  min-height: 1.6rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid rgb(var(--color-gray-700) / 0.9);
+  border-radius: 0.45rem;
+  background: rgb(var(--color-gray-900) / 0.9);
+  color: rgb(var(--color-gray-100));
+  font-size: 0.76rem;
+}
+
+/* The "?" key that opens the keyboard help: square, never under the 24px target floor. */
+#media-workspace .study-bar .study-bar-keys {
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  font-weight: 700;
+}
+
+/* Keyboard help: the study keys, then the player's own. */
+#media-workspace .study-keys-help {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  grid-column: 1 / -1;
+}
+
+#media-workspace .study-keys-heading {
+  margin: 0 0 0.3rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--color-gray-500));
+}
+
+#media-workspace .study-keys-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.2rem 1.2rem;
+  margin: 0;
+}
+
+#media-workspace .study-keys-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.76rem;
+  color: rgb(var(--color-gray-300));
+}
+
+#media-workspace .study-keys-row dd {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+#media-workspace .study-keys-row kbd {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid rgb(var(--color-gray-600) / 0.9);
+  border-radius: 0.3rem;
+  background: rgb(var(--color-gray-800) / 0.9);
+  color: rgb(var(--color-gray-50));
+  font-family: inherit;
+  font-size: 0.72rem;
+}
+
+#media-workspace .study-keys-unbound {
+  color: rgb(var(--color-gray-500));
+  font-style: italic;
+}
+
 /* ── Customize mode ─────────────────────────────────────────────────────────────── */
 
 /*

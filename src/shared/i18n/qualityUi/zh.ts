@@ -7,7 +7,6 @@ export const QUALITY_UI_ZH: Catalog = {
   'set2.home.recentChanges': '最近更改',
   'set2.home.clearRecentChanges': '清除',
   'set2.reset.dialogTitle': '重置“{section}”？',
-  'set2.reset.dialogMessage': '此部分的所有选项都将恢复为默认值。此操作无法撤销。',
   'set2.group.connections': 'AI 与连接',
 
   // ---- Widgets ----

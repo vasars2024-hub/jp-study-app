@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { computeStreak, todayDayKey } from '../stats';
+import { shiftStudyDayKey } from '../../shared/studyDay';
 
+/**
+ * Study-day keys, counted back from the stats store's own today. A calendar date
+ * (`new Date()` minus n days) is a different day between midnight and the 4 am
+ * rollover, which made this whole file fail every night from 00:00 to 04:00.
+ */
 function keyDaysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
+  return shiftStudyDayKey(todayDayKey(), -n);
 }
 
 function daysWith(active: number[]) {
@@ -17,7 +19,6 @@ function daysWith(active: number[]) {
 
 describe('computeStreak rest day', () => {
   it('breaks on a missed day by default', () => {
-    expect(todayDayKey()).toBe(keyDaysAgo(0));
     expect(computeStreak(daysWith([0, 1, 3, 4]))).toBe(2);
   });
 

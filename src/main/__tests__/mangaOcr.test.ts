@@ -29,8 +29,18 @@ vi.mock('../library', () => ({
   itemDir: (id: string) => path.join(tmpRoot, id),
 }));
 
-const { mergeOverlappingRegions, finalizeRegions, applyCorrections, readCorrections, writeCorrections } =
-  await import('../mangaOcr');
+const {
+  mergeOverlappingRegions,
+  finalizeRegions,
+  applyCorrections,
+  readCorrections,
+  writeCorrections,
+  parseDetectionSensitivity,
+  scanRequestFromIpc,
+  sampleRgbaBilinear,
+  cropGray,
+  letterboxRgb,
+} = await import('../mangaOcr');
 
 afterAll(() => {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
@@ -203,5 +213,136 @@ describe('applyCorrections', () => {
 
   it('is a no-op for an empty correction map', () => {
     expect(applyCorrections(page, {})).toBe(page);
+  });
+});
+
+describe('mangaOcr:scanPage keeps the detection setting', () => {
+  it.each([
+    ['low', 'low'],
+    ['normal', 'normal'],
+    ['high', 'high'],
+    ['HIGH', undefined],
+    ['max', undefined],
+    [3, undefined],
+    [null, undefined],
+    [undefined, undefined],
+  ])('parseDetectionSensitivity(%j) -> %j', (input, expected) => {
+    expect(parseDetectionSensitivity(input)).toBe(expected);
+  });
+
+  it.each([
+    [{ itemId: 'i', mediaUrl: 'media://i/pages/0001.jpg', force: true, detectionSensitivity: 'high' }, 'high'],
+    [{ itemId: 'i', mediaUrl: 'media://i/pages/0001.jpg', detectionSensitivity: 'low' }, 'low'],
+    [{ itemId: 'i', mediaUrl: 'media://i/pages/0001.jpg', detectionSensitivity: 'normal' }, 'normal'],
+  ])('forwards %j', (req, expected) => {
+    expect(scanRequestFromIpc(req as never).detectionSensitivity).toBe(expected);
+  });
+
+  it.each([
+    [{ itemId: 'i', mediaUrl: 'm' }],
+    [{ itemId: 'i', mediaUrl: 'm', detectionSensitivity: 'turbo' }],
+    [{ itemId: 'i', mediaUrl: 'm', detectionSensitivity: { evil: true } }],
+  ])('drops a missing or bogus setting: %j', (req) => {
+    const out = scanRequestFromIpc(req as never);
+    expect(out).not.toHaveProperty('detectionSensitivity');
+    expect(out).toEqual({ itemId: 'i', mediaUrl: 'm', force: false });
+  });
+
+  it('copies only the known fields', () => {
+    const out = scanRequestFromIpc({ itemId: 'i', mediaUrl: 'm', force: 1, extra: 'x' } as never);
+    expect(out).toEqual({ itemId: 'i', mediaUrl: 'm', force: true });
+  });
+});
+
+/** RGBA buffer from a gray-level function. */
+function grayImage(w: number, h: number, at: (x: number, y: number) => number): Uint8Array {
+  const out = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 4;
+      const v = at(x, y);
+      out[o] = v;
+      out[o + 1] = v;
+      out[o + 2] = v;
+      out[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
+describe('page resampling is bilinear, not nearest-neighbour', () => {
+  // 2×1: black, white.
+  const pair = grayImage(2, 1, (x) => (x === 0 ? 0 : 255));
+
+  it.each([
+    [0, 0],
+    [0.25, 63.75],
+    [0.5, 127.5],
+    [0.75, 191.25],
+    [1, 255],
+    [-3, 0],
+    [9, 255],
+  ])('sampleRgbaBilinear at x=%d -> %d', (x, expected) => {
+    const [r, g, b] = sampleRgbaBilinear(pair, 2, 1, x, 0);
+    expect(r).toBeCloseTo(expected, 5);
+    expect(g).toBeCloseTo(expected, 5);
+    expect(b).toBeCloseTo(expected, 5);
+  });
+
+  it('interpolates in both axes', () => {
+    // 2×2: 0 255 / 255 0 — the centre is the mean.
+    const checker = grayImage(2, 2, (x, y) => ((x + y) % 2 ? 255 : 0));
+    expect(sampleRgbaBilinear(checker, 2, 2, 0.5, 0.5)[0]).toBeCloseTo(127.5, 5);
+    expect(sampleRgbaBilinear(checker, 2, 2, 0, 0)[0]).toBe(0);
+    expect(sampleRgbaBilinear(checker, 2, 2, 1, 0)[0]).toBe(255);
+  });
+
+  it('upscaling a crop produces a ramp, not two flat halves', () => {
+    const crop = cropGray(pair, 2, 1, [0, 0, 2, 1], 8);
+    const row = Array.from(crop.slice(0, 8));
+    const distinct = new Set(row.map((v) => v.toFixed(3)));
+    // nearest-neighbour gave exactly {0, 1}
+    expect(distinct.size).toBeGreaterThan(2);
+    for (let i = 1; i < row.length; i++) expect(row[i]).toBeGreaterThanOrEqual(row[i - 1]);
+    expect(row[0]).toBeCloseTo(0, 5);
+    expect(row[7]).toBeCloseTo(1, 5);
+  });
+
+  it('a 1 px stroke survives a 4x shrink instead of vanishing between taps', () => {
+    // 16×16 white with one black column at x=5. Shrunk to 4×4, nearest-neighbour
+    // sampled x = 0, 4, 8, 12 (never 5) and returned pure white.
+    const stroke = grayImage(16, 16, (x) => (x === 5 ? 0 : 255));
+    const crop = cropGray(stroke, 16, 16, [0, 0, 16, 16], 4);
+    const column1 = [crop[1], crop[5], crop[9], crop[13]];
+    for (const v of column1) expect(v).toBeLessThan(0.95);
+    const column3 = [crop[3], crop[7], crop[11], crop[15]];
+    for (const v of column3) expect(v).toBeCloseTo(1, 5);
+  });
+
+  it('keeps a flat image flat, rotated or not', () => {
+    const flat = grayImage(40, 30, () => 200);
+    for (const deg of [0, 90, -90, 7]) {
+      const crop = cropGray(flat, 40, 30, [5, 5, 35, 25], 16, deg);
+      for (const v of crop) expect(v).toBeCloseTo(200 / 255, 4);
+    }
+  });
+
+  it('letterboxes with the page centred, gray padding, and an averaged shrink', () => {
+    // 8×4 page, columns 0-2 black and 3-7 white, into a 4×4 box: ratio 0.5,
+    // 4×2 content with one row of padding above and below.
+    const page = grayImage(8, 4, (x) => (x < 3 ? 0 : 255));
+    const { data, ratio, padX, padY } = letterboxRgb(page, 8, 4, 4);
+    expect(ratio).toBe(0.5);
+    expect(padX).toBe(0);
+    expect(padY).toBe(1);
+    const red = Array.from(data.slice(0, 16));
+    expect(red.slice(0, 4)).toEqual([0.5, 0.5, 0.5, 0.5]);
+    expect(red.slice(12, 16)).toEqual([0.5, 0.5, 0.5, 0.5]);
+    expect(red[4]).toBeCloseTo(0, 5);
+    // output column 1 covers source columns 2 (black) and 3 (white): blended.
+    // Nearest-neighbour picked column 3 alone and returned pure white.
+    expect(red[5]).toBeCloseTo(0.5, 5);
+    expect(red[6]).toBeCloseTo(1, 5);
+    expect(red[7]).toBeCloseTo(1, 5);
   });
 });

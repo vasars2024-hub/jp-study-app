@@ -37,6 +37,7 @@ import { importTatoeba } from './importers/tatoeba';
 import { migrateLegacyYomitanStores } from './migrate';
 import { runDictionaryRead, type DictionaryReadReply, type DictionaryReadRequest } from './readProtocol';
 import { runSourceLangRelabel } from './sourceLang';
+import { provisionYomitanStore, type YomitanProvisionReply, type YomitanProvisionRequest } from './yomitanZip';
 import type {
   DictionaryImportKind,
   DictionaryImportRequest,
@@ -381,10 +382,42 @@ export function attachDictionaryReadWorker(port: ParentPort, deps: ReadWorkerDep
   port.start?.();
 }
 
+/**
+ * The third role: turn one Yomitan zip into its JSON store
+ * (`yomitanStoreHost.ts`). Parsing the bundled JMdict holds ~300 MB of rows and
+ * leaves ~900 MB of garbage; here both end with the process instead of costing
+ * Electron's main loop ~10 s of parsing and a 5-8 s GC pause later on.
+ */
+export function attachYomitanProvisionWorker(port: ParentPort, onAnswered: () => void = () => undefined): void {
+  port.on('message', (event) => {
+    const message = event?.data as YomitanProvisionRequest | undefined;
+    if (!message || typeof message !== 'object' || message.type !== 'provisionYomitan') return;
+    const send = (out: YomitanProvisionReply): void => port.postMessage(out);
+    send({ type: 'provisionYomitanAccepted' });
+    // The parse is one long synchronous run: start it on the next turn, so the ack
+    // above is on its way before this loop is busy for seconds.
+    setImmediate(() => {
+      try {
+        const done = provisionYomitanStore(message.zipPath, message.outPath, message.overrides);
+        send({ type: 'provisionYomitanResult', ok: true, ...done });
+      } catch (error) {
+        send({ type: 'provisionYomitanResult', ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+      onAnswered();
+    });
+  });
+  port.start?.();
+}
+
 const port = parentPort();
 if (port) {
   attachDictionaryImportWorker(port);
   // `readonly` skips the migration ladder: this role must never change the
   // file, and the main process has already brought it up to date at boot.
   attachDictionaryReadWorker(port, { openDb: (dir) => openDictionaryDb({ dir, readonly: true }) });
+  // The parent kills a provisioning process once it has the answer; the timer is
+  // only a leak guard for a parent that died without reaping it.
+  attachYomitanProvisionWorker(port, () => {
+    setTimeout(() => process.exit(0), WORKER_EXIT_GRACE_MS).unref?.();
+  });
 }

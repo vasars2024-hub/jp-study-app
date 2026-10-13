@@ -17,6 +17,8 @@
 // This file holds the pure parts (bucketing, summary, local backlog) so they test
 // without Electron or a live collection.
 
+import { studyDayIndex } from './studyDay';
+
 /** One day of the forecast. `offsetDays` 0 = today. */
 export interface ForecastDay {
   offsetDays: number;
@@ -188,7 +190,7 @@ export interface LocalForecastCard {
 export interface LocalDueForecast {
   /** Already past due, and every unscheduled card, which is due by definition. */
   overdue: number;
-  /** Exactly `days` entries, offset 0..days-1. Offset 0 is the rest of today. */
+  /** Exactly `days` entries, offset 0..days-1, in study days. Offset 0 is the rest of today's study day. */
   days: ForecastDay[];
   /** Scheduled beyond the window. Counted, never folded into the last day. */
   beyond: number;
@@ -216,14 +218,11 @@ export function localDueForecast(
 ): LocalDueForecast {
   const span = Math.max(1, Math.floor(days));
   const buckets = Array.from({ length: span }, (_, offsetDays) => ({ offsetDays, due: 0 }));
-  const dayMs = 24 * 60 * 60 * 1000;
-  // Compare local calendar dates, not elapsed 24-hour periods: a day can
-  // contain 23 or 25 hours when daylight saving time changes.
-  const calendarDay = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / dayMs;
-  };
-  const today = calendarDay(now);
+  // Study days (`studyDay.ts`), not elapsed 24-hour periods and not calendar
+  // dates: a DST day is still one day, and a card due at 02:00 tonight belongs
+  // to tonight's session (and tonight's stats day), not to tomorrow's date.
+  const studyDay = (timestamp: number) => studyDayIndex(timestamp);
+  const today = studyDay(now);
 
   let overdue = 0;
   let beyond = 0;
@@ -236,7 +235,7 @@ export function localDueForecast(
       overdue += 1;
       continue;
     }
-    const offset = calendarDay(dueAt) - today;
+    const offset = studyDay(dueAt) - today;
     if (offset < 0) overdue += 1;
     else if (offset < span) buckets[offset].due += 1;
     else beyond += 1;

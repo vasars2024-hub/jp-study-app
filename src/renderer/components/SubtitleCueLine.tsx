@@ -8,7 +8,8 @@ import type { StudyLang } from '../../shared/studyLang';
 import { useReadingAid } from '../readingAid';
 import { useStudyLanguage } from '../useStudyLanguage';
 import { getLevel, onKnowledgeChanged } from '../knownWords';
-import { studyWordKey } from '../../shared/studySegmentation';
+import { segmentKnowledgeKey } from '../../shared/knowledgeKey';
+import { readerKeyForToken } from '../studyTokens';
 import type { WordLookupHit } from '../wordLookup';
 import './subtitleCueLine.css';
 
@@ -17,11 +18,9 @@ import './subtitleCueLine.css';
  * being learned are marked lightly, familiar and known words are left plain.
  * `null` when highlighting is off.
  */
-function knownClass(key: string, on: boolean, surface?: string): string {
+function knownClass(key: string, on: boolean): string {
   if (!on || !key) return '';
-  // Known words are stored under the form the learner marked; check the plain
-  // spelling as well as the language's lemma/stem key.
-  const level = Math.max(getLevel(key), surface ? getLevel(surface) : 0);
+  const level = getLevel(key);
   return level === 0 ? ' wk-new' : level === 1 ? ' wk-learning' : '';
 }
 
@@ -32,12 +31,22 @@ function knownClass(key: string, on: boolean, surface?: string): string {
  * second copy of it.
  */
 export function tokenKnownClass(token: JpToken, on = true): string {
-  return token.content && !token.proper ? knownClass(token.lemma || token.surface, on, token.surface) : '';
+  if (!on || !token.content || token.proper) return '';
+  // The reader's key for this token (`studyTokens.readerKeyForToken`): the dictionary form
+  // under the one knowledge-key rule, or the other spelling the learner graded (ネコ / ねこ /
+  // 猫). The line used to look up the raw lemma and the surface instead, so a word the reader
+  // showed as known could light up as new in the subtitle, and the other way round.
+  return knownClass(readerKeyForToken(token) || token.lemma || token.surface, on);
 }
 
-/** The knowledge class for one Chinese or Russian word, as the subtitle line colours it. */
+/**
+ * The knowledge class for one Chinese or Russian word, as the subtitle line colours it —
+ * keyed exactly as the reader keys the same word (`studyTokens`: `segmentKnowledgeKey`, so
+ * a Russian form is found under the dictionary form the learner graded).
+ */
 export function studyWordKnownClass(word: string, lang: StudyLang, on = true): string {
-  return knownClass(studyWordKey(word, lang), on, word.toLowerCase());
+  if (!on) return '';
+  return knownClass(segmentKnowledgeKey(word, lang, getLevel) || word, on);
 }
 
 /**

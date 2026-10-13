@@ -7,19 +7,30 @@
  *
  *   · Times are FLOATING (no `Z`, no `TZID`): an event at 19:00 is 19:00 wherever the
  *     importing calendar is, exactly as the app keeps wall-clock times in local day keys.
- *   · All-day events are `VALUE=DATE` with an exclusive next-day end.
- *   · Repeats map 1:1 — daily / weekly / every N days / monthly — with `UNTIL` taken
- *     from "Repeat until". The app clamps a monthly event on the 29th–31st to the last
- *     day of a shorter month; `BYMONTHDAY=28..d;BYSETPOS=-1` says exactly that.
- *   · A reminder becomes a `VALARM`. An all-day event's reminder is anchored at 09:00 on
- *     its day (`ALL_DAY_REMINDER_HOUR`), so its trigger is measured from that hour.
+ *   · All-day events are `VALUE=DATE` with an exclusive end the day after their last day;
+ *     a timed event over several days ends on its last day (`endDate`).
+ *   · Repeats map 1:1 — daily / every N days / weekly on one or several weekdays, every N
+ *     weeks / monthly or yearly on a day or on the Nth weekday, every N months or years —
+ *     with `UNTIL` taken from "Repeat until". The app clamps a monthly event on the
+ *     29th–31st to the last day of a shorter month; `BYMONTHDAY=28..d;BYSETPOS=-1` says
+ *     exactly that. An imported event that keeps iCalendar's own skip rule
+ *     (`recurrenceMonthEnd: 'skip'`) is written as the plain rule, which means skip.
+ *   · A reminder becomes a `VALARM` with its exact lead time. An all-day event's reminder is
+ *     anchored at 09:00 on its day (`ALL_DAY_REMINDER_HOUR`), so its trigger is measured
+ *     from that hour.
  */
 import {
   ALL_DAY_REMINDER_HOUR,
-  REMINDER_MINUTES,
+  eventSpanDays,
+  normalizeRecurrenceInterval,
+  parseDateKey,
+  reminderLeadMinutes,
   shiftDateKey,
+  weeklyWeekdays,
   type CalendarEvent,
 } from './calendar';
+
+const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 const CRLF = '\r\n';
 
@@ -90,18 +101,37 @@ function durationFromMinutes(minutes: number): string {
 function recurrenceRule(event: CalendarEvent): string | null {
   if (event.recurrence === 'none') return null;
   const parts: string[] = [];
+  const every = normalizeRecurrenceInterval(event.recurrenceInterval);
+  const interval = every > 1 ? [`INTERVAL=${every}`] : [];
+  const start = parseDateKey(event.date);
+  const day = start.getDate();
+  const nth = event.recurrenceNth === -1 || (Number.isInteger(event.recurrenceNth) && (event.recurrenceNth as number) >= 1 && (event.recurrenceNth as number) <= 5)
+    ? event.recurrenceNth as number
+    : null;
+  const skip = event.recurrenceMonthEnd === 'skip';
   if (event.recurrence === 'daily') parts.push('FREQ=DAILY');
-  else if (event.recurrence === 'weekly') parts.push('FREQ=WEEKLY');
-  else if (event.recurrence === 'custom') {
-    const interval = Number.isFinite(event.recurrenceInterval) ? Math.max(1, Math.trunc(event.recurrenceInterval ?? 1)) : 1;
-    parts.push('FREQ=DAILY', ...(interval > 1 ? [`INTERVAL=${interval}`] : []));
+  else if (event.recurrence === 'weekly') {
+    parts.push('FREQ=WEEKLY', ...interval);
+    const days = weeklyWeekdays(event);
+    if (days.length > 1 || days[0] !== start.getDay()) {
+      parts.push(`BYDAY=${days.map((d) => WEEKDAYS[d]).join(',')}`);
+      const weekStart = event.recurrenceWeekStart;
+      if (every > 1 && Number.isInteger(weekStart) && weekStart !== 1) parts.push(`WKST=${WEEKDAYS[weekStart as number]}`);
+    }
+  } else if (event.recurrence === 'custom') {
+    parts.push('FREQ=DAILY', ...interval);
   } else if (event.recurrence === 'monthly') {
-    parts.push('FREQ=MONTHLY');
-    const day = Number(event.date.slice(8, 10));
-    if (day > 28) {
+    parts.push('FREQ=MONTHLY', ...interval);
+    if (nth !== null) parts.push(`BYDAY=${nth}${WEEKDAYS[start.getDay()]}`);
+    else if (day > 28 && !skip) {
       const days = Array.from({ length: day - 27 }, (_, i) => 28 + i).join(',');
       parts.push(`BYMONTHDAY=${days}`, 'BYSETPOS=-1');
     }
+  } else if (event.recurrence === 'yearly') {
+    parts.push('FREQ=YEARLY', ...interval);
+    if (nth !== null) parts.push(`BYMONTH=${start.getMonth() + 1}`, `BYDAY=${nth}${WEEKDAYS[start.getDay()]}`);
+    // February 29 in a common year: Gum's rule is the 28th, said the same way as the monthly clamp.
+    else if (start.getMonth() === 1 && day === 29 && !skip) parts.push('BYMONTH=2', 'BYMONTHDAY=28,29', 'BYSETPOS=-1');
   } else {
     return null;
   }
@@ -117,8 +147,8 @@ function recurrenceRule(event: CalendarEvent): string | null {
 }
 
 function alarmLines(event: CalendarEvent): string[] {
-  if (!event.reminder || event.reminder === 'none' || !(event.reminder in REMINDER_MINUTES)) return [];
-  const before = REMINDER_MINUTES[event.reminder];
+  const before = reminderLeadMinutes(event);
+  if (before === null) return [];
   const allDay = event.allDay || !event.startTime;
   // Measured from DTSTART: midnight for an all-day event, so add the app's 09:00 anchor.
   const offset = (allDay ? ALL_DAY_REMINDER_HOUR * 60 : 0) - before;
@@ -140,15 +170,20 @@ function eventLines(event: CalendarEvent, stamp: string): string[] {
     `DTSTAMP:${stamp}`,
     `CREATED:${utcStamp(Number.isFinite(event.createdAt) ? event.createdAt : Date.now())}`,
   ];
+  const span = eventSpanDays(event);
+  const lastDay = shiftDateKey(event.date, span);
   if (allDay) {
     lines.push(
       `DTSTART;VALUE=DATE:${compactDate(event.date)}`,
-      `DTEND;VALUE=DATE:${compactDate(shiftDateKey(event.date, 1))}`,
+      `DTEND;VALUE=DATE:${compactDate(shiftDateKey(lastDay, 1))}`,
     );
   } else {
     const start = event.startTime as string;
     lines.push(`DTSTART:${compactDate(event.date)}T${compactTime(start)}`);
-    if (event.endTime && event.endTime > start) {
+    if (span) {
+      // Over several days: ends on the last day, at its end time (or that day's end).
+      lines.push(`DTEND:${compactDate(lastDay)}T${compactTime(event.endTime ?? '23:59')}`);
+    } else if (event.endTime && event.endTime > start) {
       lines.push(`DTEND:${compactDate(event.date)}T${compactTime(event.endTime)}`);
     }
   }

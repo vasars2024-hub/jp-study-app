@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
+import { visualNovelErrorKey } from '../../../shared/visualNovelCapture';
 import {
   VISUAL_NOVEL_ENGINE_NAMES,
   VISUAL_NOVEL_ENGINES,
@@ -118,7 +119,7 @@ export default function VisualNovelMetadataEditor({
     const response = await window.api.visualNovelUpdateMetadata(entry.id, patch);
     setSaving(false);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnMeta.msg.saveFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnMeta.msg.saveFailed')), true);
       return;
     }
     onSaved(response.database);

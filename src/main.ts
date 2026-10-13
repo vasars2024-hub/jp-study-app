@@ -210,10 +210,16 @@ import { e2eMarkCreatedShown, initE2eHeadless, isE2eHeadless } from './main/e2eH
 // are one app to Windows (taskbar pins, toast attribution).
 if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
 
-// Squirrel.Windows install/update/uninstall launches (shortcuts, file associations),
-// replacing the never-configured `electron-squirrel-startup`. Handled synchronously and
-// BEFORE the single-instance lock: during an update the old copy is usually running,
-// and taking the lock would forward `--squirrel-updated` into it instead of installing.
+// Squirrel.Windows install/update/uninstall launches (shortcuts, file associations) are
+// serviced by `src/squirrelEntry.ts`, the bundle `package.json` `main` names, which exits
+// before this bundle is ever loaded: by the time this line runs, every import above has
+// already been read and run (~305 ms on a warm cache, measured; more on a cold first
+// install) out of Squirrel's 15 s. So for a real lifecycle
+// launch this module is never reached. The call stays as a fallback for anything that
+// still starts `main.js` directly (an old build's package.json, a hand-run `electron
+// .vite/build/main.js`): handled synchronously and BEFORE the single-instance lock,
+// because during an update the old copy is usually running, and taking the lock would
+// forward `--squirrel-updated` into it instead of installing.
 const squirrelEventOnly = handleSquirrelStartup(process.argv);
 
 // A dev-only, opt-in userData redirect, so a second instance can be driven while

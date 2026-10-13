@@ -18,6 +18,17 @@ const EVENTS: CalendarEvent[] = [
   { ...base, id: 'ev-d', title: 'Weekly class', date: '2026-10-06', startTime: '18:00', endTime: '19:30', recurrence: 'weekly', reminder: 'at' },
   { ...base, id: 'ev-e', title: 'Every 3 days', date: '2026-10-01', allDay: true, recurrence: 'custom', recurrenceInterval: 3, recurrenceEndDate: '2026-12-01', reminder: 'at' },
   { ...base, id: 'ev-f', title: 'Month end report', date: '2026-01-31', startTime: '09:00', recurrence: 'monthly', category: 'assignment', color: '#ff9f43', reminder: '1h' },
+  // The model's newer fields: each has to come back exactly too.
+  { ...base, id: 'ev-g', title: 'Tue/Thu, every other week', date: '2026-10-06', startTime: '18:00', endTime: '19:00', recurrence: 'weekly', recurrenceWeekdays: [2, 4], recurrenceInterval: 2, recurrenceWeekStart: 0, reminder: 'custom', reminderMinutes: 10, excludedDates: ['2026-10-20'] },
+  { ...base, id: 'ev-h', title: 'Second Tuesday, quarterly', date: '2026-10-13', startTime: '12:00', recurrence: 'monthly', recurrenceNth: 2, recurrenceInterval: 3 },
+  { ...base, id: 'ev-i', title: 'Last Friday', date: '2026-10-30', allDay: true, recurrence: 'monthly', recurrenceNth: -1, recurrenceEndDate: '2027-06-30' },
+  { ...base, id: 'ev-j', title: 'Imported 31st (skip rule)', date: '2026-01-31', startTime: '08:00', recurrence: 'monthly', recurrenceMonthEnd: 'skip' },
+  { ...base, id: 'ev-k', title: 'Leap day (clamp)', date: '2028-02-29', allDay: true, recurrence: 'yearly' },
+  { ...base, id: 'ev-l', title: 'Leap day (skip)', date: '2028-02-29', startTime: '10:00', recurrence: 'yearly', recurrenceMonthEnd: 'skip' },
+  { ...base, id: 'ev-m', title: 'Fourth Thursday of November', date: '2026-11-26', allDay: true, recurrence: 'yearly', recurrenceNth: 4, reminder: 'custom', reminderMinutes: 2880 },
+  { ...base, id: 'ev-n', title: 'Winter intensive', date: '2026-12-28', endDate: '2027-01-02', allDay: true, reminder: '1d' },
+  { ...base, id: 'ev-o', title: 'Night shift study', date: '2026-10-30', endDate: '2026-10-31', startTime: '22:00', endTime: '02:00', reminder: 'custom', reminderMinutes: 90 },
+  { ...base, id: 'ev-p', title: 'Weekend retreat', date: '2026-10-10', endDate: '2026-10-11', allDay: true, recurrence: 'weekly', recurrenceInterval: 4 },
 ];
 
 /** The fields an event is made of, minus identity and bookkeeping. */
@@ -32,8 +43,14 @@ function shape(e: Partial<CalendarEvent>) {
     color: e.color,
     category: e.category,
     reminder: e.reminder,
+    reminderMinutes: e.reminderMinutes,
+    endDate: e.endDate,
     recurrence: e.recurrence,
-    recurrenceInterval: e.recurrence === 'custom' ? e.recurrenceInterval : undefined,
+    recurrenceInterval: e.recurrence === 'daily' || e.recurrence === 'none' ? undefined : e.recurrenceInterval,
+    recurrenceWeekdays: e.recurrenceWeekdays,
+    recurrenceWeekStart: e.recurrenceWeekStart,
+    recurrenceNth: e.recurrenceNth,
+    recurrenceMonthEnd: e.recurrenceMonthEnd,
     recurrenceEndDate: e.recurrenceEndDate,
     excludedDates: e.excludedDates?.length ? e.excludedDates : undefined,
   };
@@ -48,7 +65,8 @@ describe('.ics round trip with the exporter', () => {
     expect(parsed.cancelled + parsed.invalid).toBe(0);
     expect(parsed.events.map((p) => p.gumId)).toEqual(EVENTS.map((e) => e.id));
     for (const [i, entry] of parsed.events.entries()) {
-      expect(entry.warnings, EVENTS[i].title).toEqual([]);
+      // The one note a round trip may carry: an event that keeps iCalendar's skip rule says so.
+      expect(entry.warnings, EVENTS[i].title).toEqual(EVENTS[i].recurrenceMonthEnd === 'skip' ? ['month-end-skip'] : []);
       expect(shape(entry.event), EVENTS[i].title).toEqual(shape(EVENTS[i]));
     }
   });
@@ -119,7 +137,7 @@ const FOREIGN = [
   'STATUS:CANCELLED',
   'SUMMARY:Off',
   'END:VEVENT',
-  // A yearly rule: first date only, said
+  // A yearly rule on a three-day all-day event: one yearly series over three days
   'BEGIN:VEVENT',
   'UID:bday-5',
   'DTSTART;VALUE=DATE:20261101',
@@ -150,7 +168,7 @@ describe('.ics from other calendars', () => {
     return { date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, time: `${pad(d.getHours())}:${pad(d.getMinutes())}` };
   };
 
-  it('converts UTC and zoned times to local, splits multi-day weekly rules, keeps skipped dates', () => {
+  it('converts UTC and zoned times to local, keeps a several-weekday rule as one series, keeps skipped dates', () => {
     const parsed = parseIcsCalendar(FOREIGN);
     expect(parsed.calendarName).toBe('Uni');
     expect(parsed.cancelled).toBe(1);
@@ -160,17 +178,20 @@ describe('.ics from other calendars', () => {
     const at = local(Date.UTC(2026, 9, 12, 10, 0));
     expect(utc).toMatchObject({ date: at.date, startTime: at.time, allDay: false, category: 'personal' });
 
-    const tue = byUid.get('class-2@google.com#TU')!;
-    const thu = byUid.get('class-2@google.com#TH')!;
+    // Tue/Thu 09:00 in Tokyo: ONE weekly series, on whatever local weekdays those instants
+    // fall on here (Mon/Wed evening in New York, Tue/Thu in Tokyo itself).
+    const cls = byUid.get('class-2@google.com')!;
     const tokyo9 = local(Date.UTC(2026, 9, 13, 0, 0));
-    expect(tue.event).toMatchObject({ recurrence: 'weekly', startTime: tokyo9.time, category: 'study', reminder: '5m' });
-    // Rounded to the nearest choice (10 minutes → 5, the first of the two equally near), and said.
-    expect(tue.warnings).toContain('reminder-rounded');
-    // COUNT=4 across both weekdays: one end date for both parts.
-    expect(tue.event.recurrenceEndDate).toBeTruthy();
-    expect(tue.event.recurrenceEndDate).toBe(thu.event.recurrenceEndDate);
-    const skipped = local(Date.UTC(2026, 9, 15, 0, 0)).date;
-    expect([...(tue.event.excludedDates ?? []), ...(thu.event.excludedDates ?? [])]).toContain(skipped);
+    const localDay = (ms: number) => new Date(ms).getDay();
+    expect(cls.event).toMatchObject({ recurrence: 'weekly', date: tokyo9.date, startTime: tokyo9.time, category: 'study' });
+    const weekdays = [localDay(Date.UTC(2026, 9, 13)), localDay(Date.UTC(2026, 9, 15))].sort();
+    expect(cls.event.recurrenceWeekdays ?? [localDay(Date.UTC(2026, 9, 13))]).toEqual(weekdays);
+    // The exact reminder is kept (10 minutes), nothing rounded.
+    expect(cls.event).toMatchObject({ reminder: 'custom', reminderMinutes: 10 });
+    expect(cls.warnings).not.toContain('reminder-rounded');
+    // COUNT=4 across both weekdays: Tue 13, Thu 15, Tue 20, Thu 22 (Tokyo).
+    expect(cls.event.recurrenceEndDate).toBe(local(Date.UTC(2026, 9, 22, 0, 0)).date);
+    expect(cls.event.excludedDates).toEqual([local(Date.UTC(2026, 9, 15, 0, 0)).date]);
 
     const lunch = byUid.get('outlook-3')!;
     const noonTokyo = local(Date.UTC(2026, 9, 14, 3, 0));
@@ -178,8 +199,8 @@ describe('.ics from other calendars', () => {
     expect(lunch.warnings).not.toContain('timezone-unknown');
 
     const trip = byUid.get('bday-5')!;
-    expect(trip.event).toMatchObject({ allDay: true, recurrence: 'none', date: '2026-11-01' });
-    expect(trip.warnings).toEqual(expect.arrayContaining(['repeat-unsupported', 'multi-day']));
+    expect(trip.event).toMatchObject({ allDay: true, recurrence: 'yearly', date: '2026-11-01', endDate: '2026-11-03' });
+    expect(trip.warnings).toEqual([]);
 
     const series = byUid.get('series-6')!;
     expect(series.event).toMatchObject({ recurrence: 'daily', recurrenceEndDate: '2026-10-23', excludedDates: ['2026-10-21'] });

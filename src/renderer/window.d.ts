@@ -370,11 +370,30 @@ declare global {
       setWatchFolder(): Promise<{ folder: string | null; items: LibraryItem[] }>;
       clearWatchFolder(): Promise<null>;
       syncLibrary(): Promise<LibraryItem[]>;
+      importBooksFolder?(): Promise<{ started: boolean; found: number; canceled?: boolean }>;
+      libraryImportStatus?(): Promise<import('../shared/libraryManage').LibraryImportStatus>;
+      libraryImportCancel?(jobId?: string): Promise<boolean>;
+      libraryImportResume?(): Promise<{ started: boolean; remaining: number }>;
+      libraryImportDiscard?(): Promise<boolean>;
+      onLibraryImportProgress?(
+        cb: (progress: import('../shared/libraryManage').LibraryImportProgress) => void,
+      ): () => void;
+      restoreLibraryItem?(id: string): Promise<import('../shared/libraryManage').LibraryRestoreResult>;
+      listLibraryTrash?(): Promise<import('../shared/libraryManage').LibraryTrashSummary[]>;
+      releaseLibraryTrash?(): Promise<{ released: number; remaining: number }>;
+      updateLibraryMeta?(
+        id: string,
+        patch: import('../shared/libraryMeta').LibraryMetaPatch,
+      ): Promise<import('../shared/libraryManage').LibraryMetaUpdateResult>;
+      checkLibraryMissing?(): Promise<string[]>;
+      relinkManga?(id: string): Promise<import('../shared/libraryManage').RelinkMangaResult>;
       lookupWord(query: string): Promise<DictResult>;
       /** `limit` is the page size, defaulting to eight and clamped in main. */
       /** `lang` is the word's language: zh and ru are answered by their own dictionaries only. */
       lookupTerm(query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult>;
       lookupTermOffline(query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult>;
+      /** The longest dictionary word at the start of `text`; '' on a miss. Optional: absent in tests and guests. */
+      dictScanLongest?(text: string, lang?: 'ja' | 'zh'): Promise<{ matched: string }>;
       lookupOfflineInterlinear(
         text: string,
         options?: import('../shared/lexiconInterlinear').LexiconInterlinearOptions,
@@ -963,6 +982,7 @@ declare global {
       playerSendVizFrame?(frame: import('./vizFrames').VizFrame): void;
       onPlayerVizFrame?(cb: (frame: unknown) => void): () => void;
       musicLocalLyrics?(id: string): Promise<import('../shared/musicLocalLyrics').LocalLyrics | null>;
+      musicLyricsFolder?(action: 'get' | 'pick' | 'clear'): Promise<string | null>;
       openExternal(url: string): Promise<boolean>;
       gamesMirrorEvaluate?(
         request: import('../shared/mirrorEvaluatorIpc').MirrorEvaluateRequest,

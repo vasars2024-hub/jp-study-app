@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useT } from '../../i18n';
+import { visualNovelErrorKey } from '../../../shared/visualNovelCapture';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import type {
   VisualNovelCapturePatch,
@@ -12,6 +13,7 @@ import { analyzeMediaStudyCues, type MediaStudyAnalysis } from '../../mediaStudy
 import VisualNovelAgentHandoffButton from './VisualNovelAgentHandoffButton';
 import { openGrammarPractice } from '../../extensionBridgeUi';
 import { getTranslateTarget } from '../../translateTarget';
+import { cardAudio } from '../../cardAudioPlayback';
 
 /**
  * Kanji-link cap. `vnAssist.kanjiCount` two lines above reads the full length, so the
@@ -89,7 +91,7 @@ export default function VisualNovelSentenceAssist({
   const persist = async (patch: VisualNovelCapturePatch = draft): Promise<boolean> => {
     const response = await window.api.visualNovelUpdateCapture(capture.id, patch);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnAssist.msg.updateFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnAssist.msg.updateFailed')), true);
       return false;
     }
     onDatabase(response.database);
@@ -110,7 +112,8 @@ export default function VisualNovelSentenceAssist({
     });
     setBusy(false);
     if (!response.ok || !response.text) {
-      onStatus(response.error ?? t('vnAssist.msg.translateUnavailable'), true);
+      // `translateRun` sends English `error` for logs and a catalog `errorKey` for people.
+      onStatus(t(response.errorKey ?? 'vnAssist.msg.translateUnavailable'), true);
       return;
     }
     const translation = response.text.trim();
@@ -129,7 +132,8 @@ export default function VisualNovelSentenceAssist({
       setAnalysis(result);
       onStatus(t('vnAssist.msg.analyzed'));
     } catch (reason) {
-      onStatus(reason instanceof Error ? reason.message : String(reason), true);
+      console.error('[vn] line analysis failed:', reason);
+      onStatus(t('onb3.vn.analyzeFailed'), true);
     } finally {
       setBusy(false);
     }
@@ -153,7 +157,7 @@ export default function VisualNovelSentenceAssist({
     setAudioBusy(false);
     if (response.canceled) return;
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnAssist.msg.attachFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnAssist.msg.attachFailed')), true);
       return;
     }
     onDatabase(response.database);
@@ -165,10 +169,10 @@ export default function VisualNovelSentenceAssist({
     setAudioBusy(true);
     const response = await window.api.visualNovelReadCaptureAudio(capture.audioPath);
     if (response.ok && response.dataUrl) {
-      await new Audio(response.dataUrl).play().catch(() => undefined);
+      await cardAudio.play(response.dataUrl).catch(() => undefined);
       onStatus(t('vnAssist.msg.playing'));
     } else {
-      onStatus(response.error ?? t('vnAssist.msg.playFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnAssist.msg.playFailed')), true);
     }
     setAudioBusy(false);
   };
@@ -185,7 +189,7 @@ export default function VisualNovelSentenceAssist({
     setConfirmRemoveAudio(false);
     const response = await window.api.visualNovelRemoveCaptureAudio(capture.id);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? t('vnAssist.msg.removeAudioFailed'), true);
+      onStatus(t(visualNovelErrorKey(response, 'vnAssist.msg.removeAudioFailed')), true);
       return;
     }
     onDatabase(response.database);

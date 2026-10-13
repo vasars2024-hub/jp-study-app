@@ -2,10 +2,14 @@
 // intervals become knowledge levels; words the user graded by hand are left
 // untouched (handled inside knownWords.bulkSetFromAnki).
 import type { AnkiLinkState, IntervalSnapshot, IntervalSyncOutcome } from '../shared/anki';
-import { ankiEntryKnowledgeLevel, classifyIntervalSyncOutcome } from '../shared/anki';
-import { bulkSetFromAnki, type WkLevel } from './knownWords';
+import { classifyIntervalSyncOutcome, foldIntervalEntriesByKey } from '../shared/anki';
+import { knowledgeKeysFor } from '../shared/knowledgeKey';
+import type { StudyLang } from '../shared/studyLang';
+import { bulkSetFromAnki, getLevel, type WkLevel } from './knownWords';
 import { getActiveProfile } from './profileState';
-import { getTokenizer, tokenizeSync, tokenizerReady } from './tokenizer';
+import { getStudyLang } from './studyEnvironment';
+import { knowledgeKeyDeps } from './studyTokens';
+import { getTokenizer } from './tokenizer';
 
 export interface SyncResult {
   ok: boolean;
@@ -19,38 +23,42 @@ export interface SyncResult {
   stale?: boolean;
 }
 
-/** Lemma + threshold fold shared by the manual sync and the live push listener. */
+/**
+ * Lemma + threshold fold shared by the manual sync and the live push listener.
+ *
+ * Each expression is keyed by the study language's own rule
+ * (`shared/knowledgeKey`): kuromoji for Japanese, ICU words for Chinese and
+ * Russian — the sync used to run the Japanese tokenizer whatever the language,
+ * so Chinese 学习 synced as 学 and 电脑 as 电. Levels are folded per WORD KEY,
+ * so a word is out of rotation only when every card behind it is suspended.
+ */
 async function foldSnapshot(
   snapshot: IntervalSnapshot,
+  lang: StudyLang = getStudyLang(),
 ): Promise<{ levels: Record<string, WkLevel>; scanned: number }> {
   const thresholds = getActiveProfile().deckParams.thresholds;
 
-  // Reduce each expression to its lemma so it lines up with reader highlights.
-  let ready = tokenizerReady();
-  if (!ready) {
+  // Japanese needs kuromoji; without it the keys fall back to the spelling.
+  if (lang === 'ja') {
     try {
       await getTokenizer();
-      ready = true;
     } catch {
-      ready = false;
+      /* keyed by spelling below */
     }
   }
-
-  const levels: Record<string, WkLevel> = {};
-  for (const entry of snapshot.entries) {
-    // Unseen (interval 0) and suspended cards are skipped outright rather than
-    // folded as 0: a 0 would erase a level the built-in SRS inferred.
-    const level = ankiEntryKnowledgeLevel(entry, thresholds);
-    if (level === 0) continue;
-    let key = entry.expression;
-    if (ready) {
-      const toks = tokenizeSync(entry.expression);
-      const content = toks.find((t) => t.content) ?? toks[0];
-      if (content?.lemma) key = content.lemma;
+  const deps = knowledgeKeyDeps(getLevel);
+  const keysByExpression = new Map<string, string[]>();
+  const keysOf = (expression: string): string[] => {
+    let keys = keysByExpression.get(expression);
+    if (!keys) {
+      keys = knowledgeKeysFor(expression, lang, deps);
+      keysByExpression.set(expression, keys);
     }
-    // Keep the highest level if two expressions map to the same lemma.
-    if (!levels[key] || level > levels[key]) levels[key] = level;
-  }
+    return keys;
+  };
+  // Unseen (interval 0) and all-suspended words are left out rather than folded
+  // as 0: a 0 would erase a level the built-in SRS inferred.
+  const levels = foldIntervalEntriesByKey(snapshot.entries, keysOf, thresholds);
   return { levels, scanned: snapshot.entries.length };
 }
 

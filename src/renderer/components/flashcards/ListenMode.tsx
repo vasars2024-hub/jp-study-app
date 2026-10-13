@@ -15,6 +15,7 @@ import { planListenQueue, type ReviewOrder } from '../../../shared/flashcardRevi
 import { loadPracticeDeck, type DeckFlashcard, type DeckFolderFilter } from '../../flashcardDeck';
 import { cardAudio } from '../../cardAudioPlayback';
 import { cardAudioSource } from '../../cardAudioSource';
+import { trackForegroundMedia } from '../../foregroundAudio';
 import { useT } from '../../i18n';
 import { cardContentLang } from '../../studyEnvironment';
 import Icon from '../Icons';
@@ -69,6 +70,8 @@ export default function ListenMode({ onExit, deck = 'all' }: {
       audio.onended = null;
       audio.onerror = null;
       try { audio.pause(); } catch { /* detached */ }
+      // The Soundscape comes back up now, not when the queued `pause` event lands.
+      trackForegroundMedia(audio);
     }
   }, []);
 
@@ -126,12 +129,17 @@ export default function ListenMode({ onExit, deck = 'all' }: {
         playsRef.current += 1;
         setHeard(true);
         if (playsRef.current < repeatsRef.current) {
-          timerRef.current = setTimeout(() => { void audio.play()?.catch(playbackFailed); }, gapRef.current * 1000);
+          timerRef.current = setTimeout(() => {
+            void audio.play()?.catch(playbackFailed);
+            trackForegroundMedia(audio);
+          }, gapRef.current * 1000);
           return;
         }
         timerRef.current = setTimeout(advance, gapRef.current * 1000);
       };
       const started = audio.play();
+      // snd6: Listen mode is study audio too, so the Soundscape ducks under each clip.
+      trackForegroundMedia(audio);
       if (started && typeof started.catch === 'function') {
         started.catch(playbackFailed);
       }

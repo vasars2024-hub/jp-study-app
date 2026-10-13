@@ -23,6 +23,36 @@ describe('local agent settings', () => {
     expect(normalizeLocalAgentSettings(null)).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
   });
 
+  it('falls back to each field’s default for a partial or mistyped document', () => {
+    // An absent backend is the default backend, not `disabled` — which would
+    // force `enabled` off for a document that asked for it on.
+    expect(normalizeLocalAgentSettings({ enabled: true })).toEqual({
+      ...DEFAULT_LOCAL_AGENT_SETTINGS,
+      enabled: true,
+    });
+    expect(normalizeLocalAgentSettings({
+      memoryEnabled: 'no',
+      privacyMode: 0,
+      debugMode: 'yes',
+      permission: 'root',
+      contextSize: 'big',
+    })).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
+    expect(normalizeLocalAgentSettings([])).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
+    // An explicit `disabled` backend is still honoured and still keeps the Agent off.
+    expect(normalizeLocalAgentSettings({ enabled: true, backend: 'disabled' })).toMatchObject({
+      enabled: false,
+      backend: 'disabled',
+    });
+    // An unknown backend is a request this build cannot honour, not a gap: still refused.
+    expect(normalizeLocalAgentSettings({ enabled: true, backend: 'quantum' })).toMatchObject({
+      enabled: false,
+      backend: 'disabled',
+    });
+    // Explicit booleans win over their defaults in both directions.
+    expect(normalizeLocalAgentSettings({ memoryEnabled: false, privacyMode: false, debugMode: true }))
+      .toMatchObject({ memoryEnabled: false, privacyMode: false, debugMode: true });
+  });
+
   it('bounds resources and accepts explicit safe settings', () => {
     expect(normalizeLocalAgentSettings({
       enabled: true,

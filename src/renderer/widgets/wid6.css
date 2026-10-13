@@ -194,9 +194,13 @@
   color: var(--wired-cyan);
   font-weight: 500;
 }
+/* wid7: body text, so it needs 4.5:1. `--wired-cyan-dim` (cyan at 42%) is a
+   line colour and measured about 3.35:1 on this glass; cyan at 72% over the
+   same glass composites to roughly #4fb2bf, about 7.7:1 on the near-black
+   behind it, and still reads as the dimmer cyan beside the name above. */
 :root[data-materials='wired'] .widget-gallery-preview-desc,
 :root[data-materials='wired'] .widget-gallery-preview-meta {
-  color: var(--wired-cyan-dim);
+  color: rgba(109, 241, 255, 0.72);
 }
 /* A monitor bay: black glass, a cyan bezel and a faint raster. */
 :root[data-materials='wired'] .widget-preview-stage {

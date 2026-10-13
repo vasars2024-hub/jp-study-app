@@ -24,9 +24,11 @@ import { SCRAPER_FIX_EN } from '../scraperFix/en';
 import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
 import { SHELL_UI_EN } from '../shellUi/en';
 import { TOUR_UI_EN } from '../tourUi/en';
+import { ONB3_UI_EN } from '../onb3Ui/en';
 import { COMMANDS_UI_EN } from '../commandsUi/en';
 import { COMPANION_UI_EN } from '../companionUi/en';
 import { MUSIC_UI_EN } from '../musicUi/en';
+import { MUSIC_LYRICS2_EN } from '../musicLyrics2/en';
 import { RESOURCES_CATALOG_EN } from '../resourcesCatalog/en';
 import { RESOURCE_BUNDLES_EN } from '../resourceBundles/en';
 import { INSTALL_UI_EN } from '../installUi/en';
@@ -41,9 +43,12 @@ import { STUDY_UI_EN } from '../studyUi/en';
 import { SYSTEM_UI_EN } from '../systemUi/en';
 import { CAPTIONS_UI_EN } from '../captionsUi/en';
 import { QUALITY_UI_EN } from '../qualityUi/en';
+import { SETTINGS8_UI_EN } from '../settings8Ui/en';
+import { SETTINGS_TRANSFER_UI_EN } from '../settingsTransferUi/en';
 import { POLISH_UI_EN } from '../polishUi/en';
 import { PRODUCT5_UI_EN } from '../product5Ui/en';
 import { DICT3_UI_EN } from '../dict3Ui/en';
+import { DICT4_UI_EN } from '../dict4Ui/en';
 import { RECORDER_V2_EN } from '../recorderV2/en';
 import { SCRAPER_V2_EN } from '../scraperV2/en';
 import { STUDY_AREAS_UI_EN } from '../studyAreasUi/en';
@@ -53,6 +58,10 @@ import { LENS_OCR_UI_EN } from '../lensOcrUi/en';
 import { MEDIA5_EN } from '../media5/en';
 import { PLANNER_UI_EN } from '../plannerUi/en';
 import { SNIP_UI_EN } from '../snipUi/en';
+import { SNIP2_UI_EN } from '../snip2Ui/en';
+import { NOTES_UI_EN } from '../notesUi/en';
+import { LIBRARY_MANAGE_UI_EN } from '../libraryManageUi/en';
+import { VIDEO_STUDY2_UI_EN } from '../videoStudy2Ui/en';
 
 export const en: Catalog = {
   // Common actions
@@ -656,7 +665,7 @@ export const en: Catalog = {
   'vnPanel.captureScreenText': 'Capture screen text',
   'vnPanel.stopHook': 'Stop text hook',
   'vnPanel.startHook': 'Start text hook',
-  'vnPanel.hookListening': 'Hook listening · {count} new lines',
+  'vnPanel.hookListening': { one: 'Hook listening · {count} new line', other: 'Hook listening · {count} new lines' },
   'vnPanel.aria.miningScope': 'Mining scope',
   'vnPanel.scope.all': 'Entire visual novel',
   'vnPanel.scope.route': 'Current route',
@@ -861,9 +870,11 @@ export const en: Catalog = {
   ...GRAMMAR_TAXONOMY_EN,
   ...SHELL_UI_EN,
   ...TOUR_UI_EN,
+  ...ONB3_UI_EN,
   ...COMMANDS_UI_EN,
   ...COMPANION_UI_EN,
   ...MUSIC_UI_EN,
+  ...MUSIC_LYRICS2_EN,
   ...RESOURCES_CATALOG_EN,
   ...RESOURCE_BUNDLES_EN,
   ...INSTALL_UI_EN,
@@ -878,9 +889,12 @@ export const en: Catalog = {
   ...SYSTEM_UI_EN,
   ...CAPTIONS_UI_EN,
   ...QUALITY_UI_EN,
+  ...SETTINGS8_UI_EN,
+  ...SETTINGS_TRANSFER_UI_EN,
   ...POLISH_UI_EN,
   ...PRODUCT5_UI_EN,
   ...DICT3_UI_EN,
+  ...DICT4_UI_EN,
   ...RECORDER_V2_EN,
   ...SCRAPER_V2_EN,
   ...STUDY_AREAS_UI_EN,
@@ -892,6 +906,10 @@ export const en: Catalog = {
   ...MEDIA5_EN,
   ...PLANNER_UI_EN,
   ...SNIP_UI_EN,
+  ...SNIP2_UI_EN,
+  ...NOTES_UI_EN,
+  ...LIBRARY_MANAGE_UI_EN,
+  ...VIDEO_STUDY2_UI_EN,
   // The Updates panel's upd3 strings are a lazy pack too (../updateUi3); Study OS
   // loads it before first paint, Blanc never shows them.
 
@@ -1286,13 +1304,13 @@ export const en: Catalog = {
   'media.transcriptCards.audio': 'Attach an aligned audio clip to each sentence',
   'media.transcriptCards.replaceHint': 'Running this media again replaces its earlier transcript batch.',
   'media.transcriptCards.queue': 'Transcribe Japanese + create cards',
-  'media.transcriptCards.ready': '{count} transcript cards ready',
+  'media.transcriptCards.ready': { one: '{count} transcript card ready', other: '{count} transcript cards ready' },
   'media.transcriptCards.source': 'Source: {title}',
   'media.transcriptCards.contents': '{audio} with audio · {translated} translated',
   'media.transcriptCards.estimated': 'Timing is estimated from Whisper chunks, not exact cue alignment.',
   'media.transcriptCards.open': 'Open local cards',
   'media.transcriptCards.remove': 'Remove this batch',
-  'media.transcriptCards.removeConfirm': 'Remove {count} cards and their audio clips?',
+  'media.transcriptCards.removeConfirm': { one: 'Remove {count} card and its audio clip?', other: 'Remove {count} cards and their audio clips?' },
   'media.transcriptCards.removeYes': 'Remove',
   'media.subtitles.search': 'Search now',
   'media.subtitles.searching': 'Searching...',
@@ -1349,7 +1367,7 @@ export const en: Catalog = {
   'media.subtitles.os.none': 'No releases found.',
   'media.subtitles.os.exactFile': 'exact file',
   'media.subtitles.os.hi': 'hearing-impaired',
-  'media.subtitles.os.downloads': '{count} downloads',
+  'media.subtitles.os.downloads': { one: '{count} download', other: '{count} downloads' },
   'media.subtitles.group': 'Group: {group}',
   'media.subtitles.gradeHint': 'Grade from the match to this file, how well the timing locked onto the audio, and your own rating.',
   'media.subtitles.rate': 'Rate this track',
@@ -1427,7 +1445,7 @@ export const en: Catalog = {
   'subtitleAuto.state.searching': 'Searching…',
   'subtitleAuto.state.none': 'None',
   'subtitleAuto.machineTranslated': 'Machine translation',
-  'subtitle.title': 'Subtitle providers', 'subtitle.desc': 'Choose where subtitles come from, how confident a match must be, and which languages download automatically.', 'subtitle.providerCount': '{count} providers', 'subtitle.preferences': 'Subtitle preferences', 'subtitle.primary': 'Primary language', 'subtitle.secondary': 'Secondary language', 'subtitle.none': 'No preference', 'subtitle.style': 'Preferred style', 'subtitle.style.full': 'Full subtitles', 'subtitle.style.signs-songs': 'Signs and songs', 'subtitle.style.forced': 'Forced subtitles', 'subtitle.hearingImpaired': 'Allow hearing-impaired tracks', 'subtitle.hearingImpairedDesc': 'Keep accessibility-labelled releases eligible for ranking.', 'subtitle.inertNote': 'Embedded tracks and files beside your videos are always used first — they need no network and are already in sync.',
+  'subtitle.title': 'Subtitle providers', 'subtitle.desc': 'Choose where subtitles come from, how confident a match must be, and which languages download automatically.', 'subtitle.providerCount': { one: '{count} provider', other: '{count} providers' }, 'subtitle.preferences': 'Subtitle preferences', 'subtitle.primary': 'Primary language', 'subtitle.secondary': 'Secondary language', 'subtitle.none': 'No preference', 'subtitle.style': 'Preferred style', 'subtitle.style.full': 'Full subtitles', 'subtitle.style.signs-songs': 'Signs and songs', 'subtitle.style.forced': 'Forced subtitles', 'subtitle.hearingImpaired': 'Allow hearing-impaired tracks', 'subtitle.hearingImpairedDesc': 'Keep accessibility-labelled releases eligible for ranking.', 'subtitle.inertNote': 'Embedded tracks and files beside your videos are always used first — they need no network and are already in sync.',
   'subtitle.preferredGroups': 'Preferred release groups',
   'subtitle.preferredGroupsPlaceholder': 'Group names, separated by commas',
   'subtitle.preferredGroupsDesc': 'Subtitles from these groups rank first when several fit, in automatic search, the OpenSubtitles list and torrent listings.',
@@ -1632,7 +1650,7 @@ export const en: Catalog = {
   'settings.motion.safeMode.disable': 'Return to normal mode',
   'settings.motion.safeMode.hint': 'Stops animation, particles, weather, companions, ambient audio and system sounds while Secret OS is in use. Turning it off restores your previous settings; no data is deleted.',
   'settings.motion.safeMode.healthHealthy': 'Settings health: no damaged Secret OS settings found.',
-  'settings.motion.safeMode.healthWarning': 'Settings health: {count} damaged Secret OS store(s) found. Safe mode is available; study data is untouched and the check changes nothing.',
+  'settings.motion.safeMode.healthWarning': { one: 'Settings health: {count} damaged Secret OS store found. Safe mode is available; study data is untouched and the check changes nothing.', other: 'Settings health: {count} damaged Secret OS stores found. Safe mode is available; study data is untouched and the check changes nothing.' },
   'settings.motion.safeMode.healthUnavailable': 'The settings could not be checked: local storage is not readable.',
   'settings.motion.safeMode.rescan': 'Check again',
   'settings.motion.mode.normal': 'Normal',
@@ -1969,7 +1987,6 @@ export const en: Catalog = {
   'settings.lock.save': 'Save passcode',
   'settings.lock.update': 'Update passcode',
   'settings.lock.clear': 'Clear passcode',
-  'settings.lock.msg.needFour': 'Enter a 4-digit passcode.',
   'settings.lock.msg.mismatch': 'Passcodes do not match.',
   'settings.lock.msg.saveFail': 'Could not save passcode.',
   'settings.lock.msg.saved': 'Passcode saved.',
@@ -2238,7 +2255,7 @@ export const en: Catalog = {
   'settings.memory.health.ok': 'Local store healthy',
   'settings.memory.health.warn': 'Local store worth a look',
   'settings.memory.health.critical': 'Local store has a defect',
-  'settings.memory.health.footprint': '{bytes} across {count} keys',
+  'settings.memory.health.footprint': { one: '{bytes} across {count} key', other: '{bytes} across {count} keys' },
   'settings.memory.health.overEncoded':
     'Re-encoded values — these grow on every start and must be repaired: {keys}',
   'settings.memory.health.totalOverBudget':
@@ -2250,8 +2267,7 @@ export const en: Catalog = {
   'settings.memory.health.kind.serialize': 'the value could not be encoded, so the store is fine',
   'settings.memory.health.kind.other': 'storage was unavailable',
   'settings.memory.health.dismiss': 'Dismiss',
-  'settings.memory.catalogSummary': 'Settings catalog ≈ {bytes} across {count} active domains (particles, companions, wallpaper, display, study, host…).',
-  'settings.memory.catalogSummaryOne': 'Settings catalog ≈ {bytes} across {count} active domain (particles, companions, wallpaper, display, study, host…).',
+  'settings.memory.catalogSummary': { one: 'Settings catalog ≈ {bytes} across {count} active domain (particles, companions, wallpaper, display, study, host…).', other: 'Settings catalog ≈ {bytes} across {count} active domains (particles, companions, wallpaper, display, study, host…).' },
   'settings.memory.livingLayer': 'Living layer',
   'settings.memory.inventoryFail': 'Could not read settings inventory.',
   'settings.memory.filterPlaceholder': 'Filter domains…',
@@ -2329,7 +2345,7 @@ export const en: Catalog = {
   'settings.memory.agentHistory.claim.deleted': 'Deleted',
   'settings.memory.agentHistory.claim.read': 'Read',
   'settings.memory.agentHistory.clear': 'Delete history',
-  'settings.memory.agentHistory.confirm': 'Delete the record of {count} agent operations? The record cannot be restored, and deleting it does not reverse anything the agent did.',
+  'settings.memory.agentHistory.confirm': { one: 'Delete the record of {count} agent operation? The record cannot be restored, and deleting it does not reverse anything the agent did.', other: 'Delete the record of {count} agent operations? The record cannot be restored, and deleting it does not reverse anything the agent did.' },
   'settings.memory.agentHistory.cleared': 'Agent operation history deleted.',
   'settings.memory.quickTitle': 'Quick clear',
   'settings.memory.quickDesc': 'Common wipe actions. Full domain list is above.',
@@ -2557,7 +2573,6 @@ export const en: Catalog = {
   'settings.shortcuts.import': 'Import',
   'settings.shortcuts.resetAll': 'Reset all',
   'settings.shortcuts.resetTitle': 'Reset shortcuts',
-  'settings.shortcuts.resetMessage': 'Reset every shortcut in this profile to its default?',
   'settings.shortcuts.resetDone': 'All shortcuts reset.',
   'settings.shortcuts.customTitle': 'New custom shortcut',
   'settings.shortcuts.field.name': 'Name',
@@ -2792,8 +2807,8 @@ export const en: Catalog = {
   'dict.lookup.offline': 'No internet connection, and the offline dictionary has no entry for this word.',
   'dict.lookup.unavailable': 'The online dictionary could not be reached, and the offline dictionary has no entry for this word.',
   'dict.results.approximate': 'No exact match for “{query}”. Showing close spellings.',
-  'dict.results.truncated': 'Showing the first {count} matches — there are more.',
-  'dict.results.truncatedMax': 'Showing {count} matches, the most this list loads. Narrow the search to reach the rest.',
+  'dict.results.truncated': { one: 'Showing the first {count} match — there are more.', other: 'Showing the first {count} matches — there are more.' },
+  'dict.results.truncatedMax': { one: 'Showing {count} match, the most this list loads. Narrow the search to reach the rest.', other: 'Showing {count} matches, the most this list loads. Narrow the search to reach the rest.' },
   'dict.results.showMore': 'Show more',
   'dict.results.common': 'common',
   'dict.results.freqTitle': 'Corpus frequency rank',
@@ -2891,8 +2906,8 @@ export const en: Catalog = {
   'storage.dictionaryImport.phase.importing': 'Importing… {lines} lines',
   'storage.dictionaryImport.phase.importingPercent': 'Importing… {percent}%',
   'storage.dictionaryImport.phase.committing': 'Saving imported entries… {lines} lines',
-  'storage.dictionaryImport.status.committed': 'Import complete · {count} recorded items',
-  'storage.dictionaryImport.status.cancelled': 'Import cancelled · {count} recorded items',
+  'storage.dictionaryImport.status.committed': { one: 'Import complete · {count} recorded item', other: 'Import complete · {count} recorded items' },
+  'storage.dictionaryImport.status.cancelled': { one: 'Import cancelled · {count} recorded item', other: 'Import cancelled · {count} recorded items' },
   'storage.dictionaryImport.status.failed': 'Import failed.',
   'storage.dictionaryImport.error.busy': 'Another dictionary import is already running.',
   'storage.dictionaryImport.error.unsupported': 'That dictionary import request is not supported.',
@@ -3260,7 +3275,7 @@ export const en: Catalog = {
   'agent.attachment.reading': 'Reading files…',
   'agent.attachment.sessionOnly': 'Text files stay in this session and are never written to disk.',
   'agent.attachment.selected': 'Selected attachments',
-  'agent.attachment.size': '{count} bytes',
+  'agent.attachment.size': { one: '{count} byte', other: '{count} bytes' },
   'agent.attachment.remove': 'Remove {name}',
   'agent.attachment.cloudConsent': 'Send attached files and any selected sensitive context to {provider}.',
   'agent.attachment.visionUnsupported': 'The selected model cannot read images. Choose Google Gemini 2.5 Flash, or remove the image.',
@@ -3354,7 +3369,7 @@ export const en: Catalog = {
   'yt.news.lastChecked': 'Last checked {time}',
   'yt.news.neverChecked': 'Not checked yet',
   'yt.news.refreshProgress': 'Refreshing {current}/{total}',
-  'yt.news.partialErrors': '{count} playlist(s) failed — {first}',
+  'yt.news.partialErrors': { one: '{count} playlist failed — {first}', other: '{count} playlists failed — {first}' },
   'yt.plan.title': 'Plan to watch',
   'yt.plan.subtitle': 'Videos you marked to watch later',
   'yt.plan.add': 'Add to Plan to watch',
@@ -4317,7 +4332,6 @@ export const en: Catalog = {
   'help.tour.title': 'Guided tour',
   'help.update.title': 'Updates',
   'help.update.desc': 'Compares this build with the latest published release.',
-  'help.update.check': 'Check for updates',
   'help.update.checking': 'Checking…',
   'help.update.available': 'Version {latest} is available (you have {current}).',
   'help.update.current': 'You are on the latest release ({current}).',
@@ -4548,9 +4562,6 @@ export const en: Catalog = {
   'desktop.dialog.slideshow': 'Slideshow',
   'desktop.dialog.slideshowEmpty': 'No images found in that folder (.jpg, .png, .webp, .gif).',
   'desktop.dialog.openFailed': 'Could not open',
-  'desktop.dialog.resetTitle': 'Reset desktop',
-  'desktop.dialog.resetMessage': 'Reset the desktop — close all windows, clear icons and wallpaper?',
-  'desktop.dialog.resetConfirm': 'Reset',
 
   // Media library actions (Remove missing / Clear library)
   'mediaLib.pruneBtn': 'Remove missing',
@@ -4934,7 +4945,7 @@ export const en: Catalog = {
   'translate.lang.sourceGroup': 'Source language',
   'translate.lang.targetGroup': 'Target language',
   'translate.status.pair': '{source} to {target}',
-  'translate.status.sourceChars': '{count} source chars',
+  'translate.status.sourceChars': { one: '{count} source char', other: '{count} source chars' },
   'translate.status.ready': 'Ready',
   'translate.status.complete': 'Complete',
   'translate.status.error': 'Error',
@@ -4951,7 +4962,7 @@ export const en: Catalog = {
   'translate.history.emptyBody': 'Completed translations appear here for copy, re-run, mining, and saving as a note.',
   'translate.history.clear': 'Clear history',
   'translate.history.clearConfirmTitle': 'Clear translation history?',
-  'translate.history.clearConfirmBody': 'All {count} saved translations will be removed. Notes already sent to the Notebook stay.',
+  'translate.history.clearConfirmBody': { one: 'The {count} saved translation will be removed. Notes already sent to the Notebook stay.', other: 'All {count} saved translations will be removed. Notes already sent to the Notebook stay.' },
   'translate.history.mined': 'Added to flashcards in “{folder}”.',
   'translate.history.origin.app': 'in the app',
   'translate.history.origin.extension': 'from the browser extension',
@@ -5069,6 +5080,14 @@ export const en: Catalog = {
   'gram2.due.review': 'Review grammar',
   'gram2.due.nextAt': 'Next grammar review: {when}',
   'gram2.due.none': 'No grammar reviews scheduled',
+  // Calendar today line: "due today" (overdue + later today), and what Review offers now.
+  'gram2.due.today': {
+    one: '{count} grammar point due today',
+    other: '{count} grammar points due today',
+  },
+  'gram2.due.readyNow': '{count} ready now',
+  'gram2.undo.label': 'Undo last rating',
+  'gram2.undo.hint': 'Put {title} back with its previous schedule (Ctrl+Z)',
   'gram2.prompt.clozeTitle': 'Fill in the pattern',
   'gram2.prompt.productionTitle': 'Say it with the pattern',
   'gram2.prompt.answerLabel': 'Your answer',
@@ -5154,9 +5173,9 @@ export const en: Catalog = {
   'grammar.explorer.savePreset': 'Save',
   'grammar.explorer.reason.noSelection': 'Nothing selected.',
   'grammar.explorer.reason.noExamples':
-    'None of the {count} selected points have an example sentence, so the cards would be empty.',
+    { one: 'The {count} selected point has no example sentence, so the card would be empty.', other: 'None of the {count} selected points have an example sentence, so the cards would be empty.' },
   'grammar.explorer.reason.willSkip':
-    '{count} selected points have no example sentence and will be skipped.',
+    { one: '{count} selected point has no example sentence and will be skipped.', other: '{count} selected points have no example sentence and will be skipped.' },
   'grammar.explorer.reason.noPresetName': 'Give the filter a name first.',
   'grammar.explorer.reason.noBack': 'No earlier point to go back to yet.',
   'grammar.explorer.reason.noForward': 'You are already at the newest point.',
@@ -5185,7 +5204,7 @@ export const en: Catalog = {
   'grammar.examples.own.colTranslation': 'Translation',
   'grammar.examples.own.imported': 'Added {added} example sentences ({others} other points; {unmatched} rows named a pattern that was not found).',
   'grammar.examples.own.keep': 'Keep these examples',
-  'grammar.examples.own.kept': 'Kept {count} new examples on this point.',
+  'grammar.examples.own.kept': { one: 'Kept {count} new example on this point.', other: 'Kept {count} new examples on this point.' },
   'grammar.askAgent': 'Ask the Agent about this pattern',
   'grammar.moreExamples': '+ More examples from Tatoeba',
   'grammar.searchingTatoeba': 'Searching Tatoeba…',
@@ -5372,8 +5391,8 @@ export const en: Catalog = {
   'reading.sources.noProviders.body': 'Chapters come from manga provider extensions installed in the media server (Seanime). Install one there, then open this again.',
   'reading.sources.noProviders.action': 'Show installed providers',
   'reading.sources.unavailable': 'Manga sources are unavailable',
-  'reading.sources.providerCount': '{count} providers',
-  'reading.sources.chapterCount': '{count} chapters',
+  'reading.sources.providerCount': { one: '{count} provider', other: '{count} providers' },
+  'reading.sources.chapterCount': { one: '{count} chapter', other: '{count} chapters' },
   'reading.sources.providerError': 'Could not load',
   'reading.sources.noChapters': 'No chapters from this provider.',
   'reading.sources.chapterLabel': 'Chapter {number}',
@@ -5510,7 +5529,7 @@ export const en: Catalog = {
   'subHarvest.error.empty': 'the provider returned nothing',
   'subHarvest.error.noCues': 'The subtitles downloaded but contained no readable lines.',
   'subHarvest.failures': { one: '{count} episode could not be read', other: '{count} episodes could not be read' },
-  'subHarvest.otherScript': 'Dropped {count} subtitle lines whose track carries no Japanese \u2014 a dual-language or karaoke release ({styles}). Only the Japanese track was studied.',
+  'subHarvest.otherScript': { one: 'Dropped {count} subtitle line whose track carries no Japanese — a dual-language or karaoke release ({styles}). Only the Japanese track was studied.', other: 'Dropped {count} subtitle lines whose track carries no Japanese — a dual-language or karaoke release ({styles}). Only the Japanese track was studied.' },
   'subHarvest.truncated': 'The transcript hit the analysis ceiling, so these counts cover only part of the selection. Harvest fewer episodes at a time for exact frequencies.',
   'subHarvest.stat.episodes': 'episodes',
   'subHarvest.stat.lines': 'lines',
@@ -5523,7 +5542,7 @@ export const en: Catalog = {
   'subHarvest.frequencyHint': { one: '{count} word you have not learned yet', other: '{count} words you have not learned yet' },
   'subHarvest.more': { one: '{count} more word not shown', other: '{count} more words not shown' },
   'subHarvest.grammar': 'Grammar points by level:',
-  'subHarvest.segment': 'Episode {episode} \u2014 {count} lines',
+  'subHarvest.segment': { one: 'Episode {episode} — {count} line', other: 'Episode {episode} — {count} lines' },
   'subHarvest.mined': { one: '{count} card added to your deck.', other: '{count} cards added to your deck.' },
   'subHarvest.attach.heading': 'Attach to a video you have',
   'subHarvest.attach.hint': 'Writes these cues onto an item in your media library, so the player and its study tools can read them. Nothing is downloaded.',
@@ -5706,7 +5725,7 @@ export const en: Catalog = {
   'studyLoop2.calendar.studyShort': '{minutes} min · {reviews} rev',
   'studyLoop2.calendar.studyLong': 'studied {minutes} min, {reviews} reviews',
   'studyLoop2.calendar.dueShort': '{count} due',
-  'studyLoop2.calendar.dueLong': '{count} reviews due',
+  'studyLoop2.calendar.dueLong': { one: '{count} review due', other: '{count} reviews due' },
   'studyLoop2.transcript.seekTo': 'Play from',
   'studyLoop2.whisper.chunks': 'Transcribing: part {done} of {total}',
   'studyLoop2.whisper.noHost': 'The transcription queue is not available. Open the main window and try again.',
@@ -5717,19 +5736,11 @@ export const en: Catalog = {
     other: 'Loaded {count} translation subtitle lines from {name}.',
   },
   'studyLoop.scene.secondaryEmpty': 'No subtitle lines found in {name}.',
-  'studyLoop.scene.grammarTitle': 'Scenes in your library',
-  'studyLoop.scene.grammarHint': 'Lines you mined from your videos that use this pattern.',
-  'studyLoop.scene.play': 'Play',
-  'studyLoop.scene.playAt': 'Play this line in the video from {time}',
-  'studyLoop.scene.paletteGroup': 'Mined lines',
-  'studyLoop.scene.replayLast': 'Replay the last mined line',
-  'studyLoop.scene.replayLastTerms': 'rewatch scene video sentence card',
   // studyLoop.lookup — lookup and transcript
   'studyLoop.lookup.mine': 'Mine',
   'studyLoop.lookup.mined': 'Mined',
   'studyLoop.lookup.mineLine': 'Mine this line: {line}',
   'studyLoop.lookup.minedLine': 'Mined: {line}',
-  'studyLoop.lookup.playFrom': 'Play from {time}: {line}',
   // studyLoop.track — subtitle track choice, Whisper, library saves
   // studyLoop.stats — stats, calendar, streak, Aero/Wired integration
   'studyLoop.stats.card.minedToday': 'Lines mined from video today',
@@ -5762,7 +5773,7 @@ export const en: Catalog = {
   'reading.sources.download': 'Download and read',
   'reading.sources.downloading': 'Downloading…',
   'reading.sources.downloadBusy': 'Another chapter is downloading.',
-  'reading.sources.downloaded': 'Downloaded {count} pages to the Library.',
+  'reading.sources.downloaded': { one: 'Downloaded {count} page to the Library.', other: 'Downloaded {count} pages to the Library.' },
   'reading.sources.alreadyDownloaded': 'This chapter is already in the Library.',
   'reading.sources.downloadedCount': '{count} downloaded',
   'reading.sources.searchLabel': 'Search chapters',
@@ -5776,7 +5787,7 @@ export const en: Catalog = {
   'reading.sources.noSearchResults': 'No chapters match this search.',
   'reading.sources.inLibrary': 'In Library',
   'reading.sources.read': 'Read',
-  'reading.sources.showMore': 'Show {count} more chapters',
+  'reading.sources.showMore': { one: 'Show {count} more chapter', other: 'Show {count} more chapters' },
   'reading.mangaSources.title': 'Manga chapters',
   'reading.mangaSources.intro': 'Search for a manga, compare its chapters across your installed providers, and download one into the Library.',
   'reading.mangaSources.searchPlaceholder': 'Manga title…',
@@ -5850,7 +5861,7 @@ export const en: Catalog = {
   'library.intro': 'Your books and manga. Import files to start reading.',
   'library.menu.file': 'File',
   'library.menu.view': 'View',
-  'library.menu.importFiles': 'Import file(s)…',
+  'library.menu.importFiles': 'Import files…',
   'library.menu.importFolder': 'Import image folder…',
   'library.menu.importWeb': 'Import from web…',
   'library.menu.importWiki': 'Random Wikipedia…',
@@ -5925,7 +5936,7 @@ export const en: Catalog = {
   'yt.queue.state.done': 'Done',
   'yt.queue.state.failed': 'Failed',
   'yt.queue.state.cancelled': 'Cancelled',
-  'library.btn.importFiles': '+ Import file(s)',
+  'library.btn.importFiles': '+ Import files',
   'library.btn.moreImports': 'More ways to add',
   'library.btn.importFolder': 'Import image folder',
   'library.btn.webPaste': 'Web / paste',
@@ -6242,7 +6253,7 @@ export const en: Catalog = {
   'library.chip.deleteTitle': 'Delete this folder (books stay)',
   'library.chip.createTitle': 'Create',
   'library.remove.title': 'Remove from library',
-  'library.remove.message': 'Remove this item from your library? The imported copy will be deleted.',
+  'library.remove.message': 'Remove this item from your library? It moves to Recently removed, where you can restore it for 30 days. After that, the imported copy is deleted.',
   'library.deleteFolder.title': 'Delete folder',
   'library.deleteFolder.message': 'Delete the folder “{name}”? The books inside stay in your library (unfiled).',
   'library.deleteFolder.confirm': 'Delete',
@@ -6310,7 +6321,7 @@ export const en: Catalog = {
   'resources.own.added': 'Added {name} to your resources',
   'resources.own.importTitle': 'Import resources',
   'resources.own.importDesc': 'A list of links with a name, a description, the cost, the languages it suits and a group. Rows without a usable link are skipped; importing the same link again updates it.',
-  'resources.own.imported': 'Imported {count} resources ({added} new)',
+  'resources.own.imported': { one: 'Imported {count} resource ({added} new)', other: 'Imported {count} resources ({added} new)' },
   'resources.own.remove': 'Remove {name}',
   'resources.own.removeTitle': 'Remove this resource?',
   'resources.own.removeBody': 'Remove {name} from your resources? You can add it again at any time.',
@@ -6600,7 +6611,6 @@ export const en: Catalog = {
   'calendar.monthGrid': 'Month grid — arrow keys move by day, Enter adds an event on the selected day',
   'calendar.noEventsToday': 'No events on this day.',
   'calendar.addEvent': '+ Add event',
-  'calendar.addInline': '+ Add',
   'calendar.allDay': 'All day',
   'calendar.agenda.nothingToday': 'Nothing today.',
   'calendar.agenda.upcoming': 'Upcoming',
@@ -6864,7 +6874,7 @@ export const en: Catalog = {
   'media.device.gpu': 'the GPU',
   'media.device.cpu': 'the CPU',
   'media.subName.whisperGenerated': 'Whisper (generated)',
-  'media.subStatus.generated': 'Generated {count} subtitle lines.',
+  'media.subStatus.generated': { one: 'Generated {count} subtitle line.', other: 'Generated {count} subtitle lines.' },
   'media.gen.extractAudioFailed': 'Could not extract audio: {detail}',
   'media.gen.subtitleFailed': 'Subtitle generation failed: {detail}',
   'media.gen.transcriberStartFailed': 'Could not start the transcriber: {detail}',
@@ -7138,7 +7148,7 @@ export const en: Catalog = {
   'media.study.loadSubtitles': 'Load subtitles',
   'media.study.analyzing': 'Analyzing subtitle text…',
   'media.study.vocabularyCandidates': { one: '{count} vocabulary candidate', other: '{count} vocabulary candidates' },
-  'media.study.createUpToCards': 'Create up to {count} flashcards',
+  'media.study.createUpToCards': { one: 'Create up to {count} flashcard', other: 'Create up to {count} flashcards' },
   'media.study.createCards': 'Create flashcards',
   'media.study.deckName': 'Deck',
   'media.study.deckDefault': '{title} deck',
@@ -7161,9 +7171,9 @@ export const en: Catalog = {
   'media.study.sampleLimited': 'Analysis used a limited subtitle sample.',
   'media.subStatus.fetching': 'Fetching subtitles from YouTube…',
   'media.subStatus.fetchFailed': 'Could not fetch subtitles from YouTube.',
-  'media.subStatus.loaded': 'Loaded {count} subtitle lines.',
+  'media.subStatus.loaded': { one: 'Loaded {count} subtitle line.', other: 'Loaded {count} subtitle lines.' },
   'media.subStatus.noLines': 'No lines found in "{name}". Is it a .srt / .vtt / .ass file?',
-  'media.subStatus.otherScript': 'Hid {count} lines from tracks carrying no Japanese ({styles}) — a dual-language or karaoke release. Load the file as a translation track to see them.',
+  'media.subStatus.otherScript': { one: 'Hid {count} line from tracks carrying no Japanese ({styles}) — a dual-language or karaoke release. Load the file as a translation track to see it.', other: 'Hid {count} lines from tracks carrying no Japanese ({styles}) — a dual-language or karaoke release. Load the file as a translation track to see them.' },
   'media.conversionFailedGeneric': 'Conversion failed.',
   'media.error.fileMoved': 'That file has moved or been deleted.',
   'media.error.microphoneStartFailed': 'Could not start microphone recording.',
@@ -7720,7 +7730,7 @@ export const en: Catalog = {
     one: 'Start · {count} item × {cards} cards/item ≈ {total} cards',
     other: 'Start · {count} items × {cards} cards/item ≈ {total} cards',
   },
-  'aiStudio.log.generateDone': 'Done · {cards} cards from {count} items',
+  'aiStudio.log.generateDone': { one: 'Done · {cards} cards from {count} item', other: 'Done · {cards} cards from {count} items' },
   'aiStudio.log.generateError': 'Error · {message}',
   'aiStudio.log.changeArrow': '{from} → {to}',
   'aiStudio.section.mapping': '3 · Anki field mapping',
@@ -7772,18 +7782,18 @@ export const en: Catalog = {
   'aiStudio.hint.localMissing':
     'Install the offline model in Settings → AI to generate cards without a cloud key.',
   'aiStudio.hint.starOrPreset': 'Open Dictionary, look up words, and tap the star icon — or switch source to preset generation.',
-  'aiStudio.status.generatedPreset': 'Generated {cards} cards from {count} invented items · review them below, then Save to flashcards.',
-  'aiStudio.status.generatedDict': 'Generated {cards} cards from {count} words · review them below, then Save to flashcards.',
+  'aiStudio.status.generatedPreset': { one: 'Generated {cards} cards from {count} invented item · review them below, then Save to flashcards.', other: 'Generated {cards} cards from {count} invented items · review them below, then Save to flashcards.' },
+  'aiStudio.status.generatedDict': { one: 'Generated {cards} cards from {count} word · review them below, then Save to flashcards.', other: 'Generated {cards} cards from {count} words · review them below, then Save to flashcards.' },
   'aiStudio.progress.msg.enriching': 'Enriching “{term}” ({n} of {total})…',
-  'aiStudio.progress.msg.builtDict': 'Built {cards} cards from {count} words.',
-  'aiStudio.progress.msg.inventing': 'Inventing {count} vocabulary items…',
-  'aiStudio.progress.msg.inventingBatch': 'Inventing {count} items (batch {n} of {total})…',
+  'aiStudio.progress.msg.builtDict': { one: 'Built {cards} cards from {count} word.', other: 'Built {cards} cards from {count} words.' },
+  'aiStudio.progress.msg.inventing': { one: 'Inventing {count} vocabulary item…', other: 'Inventing {count} vocabulary items…' },
+  'aiStudio.progress.msg.inventingBatch': { one: 'Inventing {count} item (batch {n} of {total})…', other: 'Inventing {count} items (batch {n} of {total})…' },
   'aiStudio.progress.msg.invented': 'Invented {done} of {total} items…',
-  'aiStudio.progress.msg.building': 'Building {count} card sets ({cards} per item)…',
+  'aiStudio.progress.msg.building': { one: 'Building {count} card set ({cards} per item)…', other: 'Building {count} card sets ({cards} per item)…' },
   'aiStudio.progress.msg.cardSet': 'Card set {n} of {total}: {term}',
-  'aiStudio.progress.msg.generated': 'Generated {cards} cards from {count} invented items.',
-  'aiStudio.progress.msg.partial': 'Finished {count} items ({cards} cards); {failed} failed and can be retried.',
-  'aiStudio.status.generatedPartial': '{cards} cards from {count} items are ready · {failed} failed. The finished ones are kept; retry the rest below.',
+  'aiStudio.progress.msg.generated': { one: 'Generated {cards} cards from {count} invented item.', other: 'Generated {cards} cards from {count} invented items.' },
+  'aiStudio.progress.msg.partial': { one: 'Finished {count} item ({cards} cards); {failed} failed and can be retried.', other: 'Finished {count} items ({cards} cards); {failed} failed and can be retried.' },
+  'aiStudio.status.generatedPartial': { one: '{cards} cards from {count} item is ready · {failed} failed. The finished ones are kept; retry the rest below.', other: '{cards} cards from {count} items are ready · {failed} failed. The finished ones are kept; retry the rest below.' },
   'aiStudio.status.retryDone': 'Retry finished: {cards} cards ready in total · {failed} still failed.',
   'aiStudio.failed.title': 'Not generated',
   'aiStudio.failed.lead': 'These items failed. Everything already generated is kept.',
@@ -8190,9 +8200,9 @@ export const en: Catalog = {
   'epub.mining.status.analyzed': 'Analyzed {title}: {terms} unique terms ({glossCount} with dictionary definitions). Adjust filters, then download — Qwen runs only on the export set.',
   'epub.mining.status.partial': 'Partially analyzed (cancelled) {title}: {terms} unique terms ({glossCount} with dictionary definitions). Adjust filters, then download — Qwen runs only on the export set.',
   'epub.mining.status.cancelled': 'Cancelled.',
-  'epub.mining.status.preparing': 'Preparing {count} cards…',
+  'epub.mining.status.preparing': { one: 'Preparing {count} card…', other: 'Preparing {count} cards…' },
   'epub.mining.status.downloadCancelled': 'Download cancelled — any dictionary-filled fields were kept.',
-  'epub.mining.status.downloaded': 'Downloaded {count} cards → {path}. Saved to EPUB decks overview.',
+  'epub.mining.status.downloaded': { one: 'Downloaded {count} card → {path}. Saved to EPUB decks overview.', other: 'Downloaded {count} cards → {path}. Saved to EPUB decks overview.' },
   'epub.mining.status.saveFailed': 'Could not save deck file.',
   'epub.mining.status.importFailed': 'Could not import frequency dictionary.',
   'epub.mining.step1.title': 'Choose EPUB',
@@ -8328,13 +8338,13 @@ export const en: Catalog = {
   'epub.mining.maxCommonRank': 'Max common-rank cutoff',
   'epub.mining.maxCommonRank.ignored': 'Max common-rank cutoff is ignored while Dictionary rank filtering is selected.',
   'epub.mining.junkFilter': 'Built-in junk filter',
-  'epub.mining.junkFilter.hint': 'Drops copula, auxiliaries, demonstratives, fillers, and one-mora kana during analyze (Jiten/JL-style — POS + lemma rules). {count} expressions.',
+  'epub.mining.junkFilter.hint': { one: 'Drops copula, auxiliaries, demonstratives, fillers, and one-mora kana during analyze (Jiten/JL-style — POS + lemma rules). {count} expression.', other: 'Drops copula, auxiliaries, demonstratives, fillers, and one-mora kana during analyze (Jiten/JL-style — POS + lemma rules). {count} expressions.' },
   'epub.mining.customBlacklist': 'Custom blacklist',
   'epub.mining.customBlacklist.placeholder': 'One expression per line — merged with built-in junk when enabled',
   'epub.mining.freqLists.lead': 'Bundled and imported frequency lists for dictionary-rank filtering and sorting.',
   'epub.mining.freqLists.loading': 'Loading frequency dictionaries…',
   'epub.mining.freqLists.empty': 'No frequency dictionaries loaded.',
-  'epub.mining.freqLists.entries': '{count} entries',
+  'epub.mining.freqLists.entries': { one: '{count} entry', other: '{count} entries' },
   'epub.mining.freqLists.otherLangs': 'Other language lists',
   'epub.mining.freqLists.otherLangs.summary': '{count} optional (Chinese, Russian)',
   'epub.mining.importFreqDict': 'Import frequency dictionary',
@@ -8351,10 +8361,10 @@ export const en: Catalog = {
   'epub.mining.fill.incompleteExcluded': '{incomplete} of {total} cards have unfilled fields and will be excluded from the export.',
   'epub.mining.fill.incompleteHint': '{incomplete} of {total} cards have unfilled fields. Enable “Exclude incomplete cards” in step 2 to skip them.',
   'epub.mining.deckPreview': 'Deck preview',
-  'epub.mining.deckPreview.first': 'First {count} cards',
+  'epub.mining.deckPreview.first': { one: 'First {count} card', other: 'First {count} cards' },
   'epub.mining.result': 'Result: approx',
   'epub.mining.result.cards': 'cards',
-  'epub.mining.result.termsMined': '{count} terms mined',
+  'epub.mining.result.termsMined': { one: '{count} term mined', other: '{count} terms mined' },
   'epub.mining.preparingDeck': 'Preparing deck…',
   'epub.mining.downloadDeck': 'Download Deck',
   'epub.mining.simple.step1': '1. Choose book',
@@ -8387,10 +8397,10 @@ export const en: Catalog = {
   'epub.mining.simple.analyze': 'Analyze EPUB',
   'epub.mining.simple.saving': 'Saving…',
   'epub.mining.simple.save': 'Save to flashcards',
-  'epub.mining.simple.status.ready': 'Ready — {count} cards match your filter.',
+  'epub.mining.simple.status.ready': { one: 'Ready — {count} card matches your filter.', other: 'Ready — {count} cards match your filter.' },
   'epub.mining.simple.status.building': 'Building deck…',
-  'epub.mining.simple.status.saved': 'Saved {count} cards to flashcards and {path}',
-  'epub.mining.simple.status.imported': 'Imported {count} cards to flashcards.',
+  'epub.mining.simple.status.saved': { one: 'Saved {count} card to flashcards and {path}', other: 'Saved {count} cards to flashcards and {path}' },
+  'epub.mining.simple.status.imported': { one: 'Imported {count} card to flashcards.', other: 'Imported {count} cards to flashcards.' },
   'epub.layout.preset': 'Preset',
   'epub.layout.custom': 'Custom',
   'epub.layout.front': 'Front',
@@ -8945,7 +8955,7 @@ export const en: Catalog = {
   'widgets.todayStudyTime.readValue': '{duration} read',
   'widgets.todayStudyTime.watchedValue': '{duration} watched',
   'widgets.todayStudyTime.splitAria': '{read} reading, {watched} watching',
-  'widgets.todayStudyTime.characters': '{count} characters',
+  'widgets.todayStudyTime.characters': { one: '{count} character', other: '{count} characters' },
   'widgets.readingProgress.totalReading': 'total reading',
   'widgets.vocabProgress.familiarPlusWords': 'familiar+ words',
   'widgets.vocabProgress.known': 'Known',
@@ -9007,6 +9017,17 @@ export const en: Catalog = {
   'deinflect.reason.shimau': 'completion (–てしまう)',
   'deinflect.reason.chau': 'completion (–ちゃう)',
   'deinflect.reason.teoku': 'preparatory (–ておく)',
+  'deinflect.reason.teAru': 'resultative (–てある)',
+  'deinflect.reason.teMiru': 'attempt (–てみる)',
+  'deinflect.reason.teKuru': 'toward now / the speaker (–てくる)',
+  'deinflect.reason.teIku': 'onward / away (–ていく)',
+  'deinflect.reason.conditionalNara': 'conditional (–なら)',
+  'deinflect.reason.tagaru': 'desire, third person (–たがる)',
+  'deinflect.reason.sou': 'appearance (–そう)',
+  'deinflect.reason.nagara': 'while (–ながら)',
+  'deinflect.reason.zu': 'negative (–ず)',
+  'deinflect.reason.sa': 'noun (–さ)',
+  'deinflect.reason.nasai': 'polite imperative (–なさい)',
 
   // Clipboard History panel
   'clipboard.filter.all': 'All',
@@ -9399,7 +9420,7 @@ export const en: Catalog = {
   'blanc.masterSearch.source.unfiled': 'Unfiled',
   'blanc.masterSearch.source.book': 'Book',
   'blanc.masterSearch.source.manga': 'Manga',
-  'blanc.masterSearch.source.lookupCount': '{count} lookups',
+  'blanc.masterSearch.source.lookupCount': { one: '{count} lookup', other: '{count} lookups' },
 
   // ---- Blanc Toolbox settings ----
   // Blanc → Local AI Agent panel. Converted in slice 52; the panel had never been
@@ -9608,7 +9629,7 @@ export const en: Catalog = {
   'blanc.agent.error.nothingToUpdate': 'The operation was given nothing to change.',
   'agent.promptLibrary.title': 'Reusable prompts',
   'agent.promptLibrary.description': 'Save instructions you use often and place them back in the composer.',
-  'agent.promptLibrary.countLabel': '{count} saved prompts',
+  'agent.promptLibrary.countLabel': { one: '{count} saved prompt', other: '{count} saved prompts' },
   'agent.promptLibrary.name': 'Name',
   'agent.promptLibrary.namePlaceholder': 'Grammar explanation',
   'agent.promptLibrary.prompt': 'Prompt',
@@ -9625,7 +9646,7 @@ export const en: Catalog = {
   'agent.promptLibrary.deleteQuestion': 'Delete this reusable prompt?',
   'agent.promptLibrary.confirmDelete': 'Confirm delete',
   'agent.promptLibrary.error.required': 'Enter both a name and prompt.',
-  'agent.promptLibrary.error.limit': 'The library can hold up to {count} prompts.',
+  'agent.promptLibrary.error.limit': { one: 'The library can hold up to {count} prompt.', other: 'The library can hold up to {count} prompts.' },
   'agent.promptLibrary.error.read-failed': 'Saved prompts could not be read.',
   'agent.promptLibrary.error.write-failed': 'That prompt change could not be saved.',
   'agent.promptLibrary.error.invalid-request': 'The workspace refused that prompt change.',
@@ -9634,7 +9655,7 @@ export const en: Catalog = {
   'agent.plan.create': 'Create action plan',
   'agent.plan.attachmentsUnsupported': 'Remove selected files before creating a plan. Plan creation uses the conversation context shelf only.',
   'agent.plan.planning': 'Creating plan…',
-  'agent.plan.queued': 'Queued {count} steps: {summary}',
+  'agent.plan.queued': { one: 'Queued {count} step: {summary}', other: 'Queued {count} steps: {summary}' },
   'agent.plan.error.invalid-objective': 'Action plans need a request of 500 characters or fewer.',
   'agent.plan.error.planner-disabled':
     'The Agent is not allowed to plan actions. Turn it on in Settings → AI.',
@@ -9830,7 +9851,7 @@ export const en: Catalog = {
   'agent.suggestions.explanationLanguageValue': 'Explained in {language}',
   'agent.suggestions.useTitle': '{action} — {context}',
   'agent.suggestions.action.dictionary': 'Explain nuance',
-  'agent.suggestions.action.dictionaryBatch': 'Explain {count} entries',
+  'agent.suggestions.action.dictionaryBatch': { one: 'Explain {count} entry', other: 'Explain {count} entries' },
   'agent.suggestions.action.reading': 'Analyze passage',
   'agent.suggestions.action.readingLens': 'Explain selection',
   'agent.suggestions.action.media': 'Explain this cue',
@@ -9979,7 +10000,6 @@ export const en: Catalog = {
   'agent.capabilities.operation.study.known-words': 'Read known-word counts or one word\'s level',
   // polish.* — whole-app polish pass (tray/startup, Lens opt-in)
   'polish.tray.openBlanc': 'Open Blanc',
-  'polish.tray.recordRegion': 'Record a region',
   'polish.tray.keepRunning': 'Keep running in the tray when closed',
   'polish.lifecycle.title': 'Startup and tray',
   'polish.lifecycle.desc': 'Choose what closing the window does and whether Gum starts with Windows.',
@@ -10030,9 +10050,6 @@ export const en: Catalog = {
     'These settings only belong to Blanc Mode. They do not transfer to the main Gum apps, main Memory & Storage page, desktop layout, widgets, or normal mode preferences.',
   'blanc.settings.rememberLastTab': 'Remember last Blanc tab',
   'blanc.settings.restoreReader': 'Keep reader restore preference for Blanc only',
-  'blanc.settings.reviewLimit': 'Review limit',
-  'blanc.settings.scratchpad': 'Scratchpad',
-  'blanc.settings.scratchpadPlaceholder': 'Plain notes for this toolbox mode only',
   'blanc.settings.resetMemory': 'Reset Blanc memory',
   'blanc.settings.lockscreen': 'Lockscreen',
   'blanc.settings.changePin': 'Change PIN',
@@ -10042,7 +10059,6 @@ export const en: Catalog = {
   'blanc.settings.pinCleared': 'PIN cleared.',
   'blanc.settings.requirePin': 'Require PIN on launch',
   'blanc.settings.controlCenter': 'Toolbox control center',
-  'blanc.settings.searchSettings': 'Search Toolbox settings',
   'blanc.settings.export': 'Export',
   'blanc.settings.import': 'Import',
   'blanc.settings.resetAll': 'Reset all',
@@ -10084,10 +10100,7 @@ export const en: Catalog = {
   'blanc.settings.category.layout': 'layout',
   'blanc.settings.category.search': 'search',
   'blanc.settings.category.keyboard-shortcuts': 'keyboard shortcuts',
-  'blanc.settings.definitions': 'Matching setting definitions ({count})',
-  'blanc.settings.col.setting': 'Setting',
   'blanc.settings.col.category': 'Category',
-  'blanc.settings.col.description': 'Description',
   'blanc.settings.toolVisibility': 'Tool visibility',
   'blanc.settings.toolEnabled': 'Enabled',
   'blanc.settings.toolHidden': 'Hidden',
@@ -10095,7 +10108,6 @@ export const en: Catalog = {
   'blanc.settings.modeNote': 'Leaving Blanc Mode closes this toolbox window. Gum keeps running.',
   'blanc.settings.exitBlanc': 'Exit Blanc Mode',
 
-  'blanc.settings.calculatorLocked': 'Calculator stays enabled so the Toolbox cannot become empty.',
   'blanc.settings.customCss.legend': 'Custom CSS',
   'blanc.settings.customCss.intro': 'Raw CSS layered over the Blanc window, for anything the theme editor does not cover. Scoped to the Blanc root, so bare selectors only affect Blanc.',
   'blanc.settings.customCss.placeholder': '.blanc-nav-btn { letter-spacing: 0.02em; }',
@@ -10105,7 +10117,6 @@ export const en: Catalog = {
   'blanc.settings.customCss.cleared': 'Custom CSS cleared.',
   'blanc.settings.customCss.guardNote': 'The Exit Blanc and Settings controls are re-asserted after your CSS, so custom styling can never hide the way out of Blanc.',
   'blanc.settings.resetCategoryDone': 'Reset {category} settings.',
-  'blanc.settings.pinFourDigits': 'PIN must be exactly four digits.',
   'blanc.settings.pinSaved': 'PIN saved.',
   'blanc.settings.pinFirst': 'Set a PIN or passphrase first.',
   'blanc.settings.lockEnabled': 'Lockscreen enabled.',
@@ -10113,7 +10124,7 @@ export const en: Catalog = {
 
   // ---- Blanc Toolbox keyboard shortcuts ----
   'blanc.shortcuts.title': 'Keyboard shortcuts',
-  'blanc.shortcuts.registry': 'Registry: {status} / {count} commands.',
+  'blanc.shortcuts.registry': { one: 'Registry: {status} / {count} command.', other: 'Registry: {status} / {count} commands.' },
   'blanc.shortcuts.valid': 'valid',
   'blanc.shortcuts.needsAttention': 'needs attention',
   'blanc.shortcuts.conflict': 'Conflict {shortcut} in {scope}: {commands}',
@@ -10353,13 +10364,13 @@ export const en: Catalog = {
   'mediaCenter.video.advancedTools': 'Transcription, watch folder and downloads',
   'mediaCenter.video.youtube': 'Open from YouTube',
   'mediaCenter.video.libraryQueue': 'Library queue',
-  'mediaCenter.video.videoCount': '{count} videos',
+  'mediaCenter.video.videoCount': { one: '{count} video', other: '{count} videos' },
   'mediaCenter.music.eyebrow': 'Listening room',
-  'mediaCenter.music.libraryCount': '{count} songs in your library',
+  'mediaCenter.music.libraryCount': { one: '{count} song in your library', other: '{count} songs in your library' },
   'mediaCenter.music.detachPlayer': 'Detach player',
   'mediaCenter.music.detachMini': 'Detach mini-player',
   'mediaCenter.music.library': 'Music library',
-  'mediaCenter.music.trackCount': '{count} tracks',
+  'mediaCenter.music.trackCount': { one: '{count} track', other: '{count} tracks' },
   'mediaCenter.music.sort': 'Sort',
   'mediaCenter.music.sortRecent': 'Recently played',
   'mediaCenter.music.sortTitle': 'Title',
@@ -10385,7 +10396,7 @@ export const en: Catalog = {
   'mediaCenter.discover.season.fall': 'Fall',
   'mediaCenter.discover.recommended': 'Recommended for {level}',
   'mediaCenter.discover.topMatches': 'Top matches',
-  'mediaCenter.discover.rankedCount': '{count} ranked titles',
+  'mediaCenter.discover.rankedCount': { one: '{count} ranked title', other: '{count} ranked titles' },
   'mediaCenter.settings.eyebrow': 'Watch preferences',
   'mediaCenter.settings.title': 'Playback, subtitles, and where your media comes from.',
   'mediaCenter.settings.detail': 'Quick media-specific controls live here. Advanced provider credentials and system-wide options remain in Settings.',
@@ -10536,7 +10547,7 @@ export const en: Catalog = {
   'mediaCenter.menu.addFolder': 'Add folder…',
   'mediaCenter.menu.navigate': 'Navigate',
   'mediaCenter.menu.window': 'Window',
-  'mediaCenter.shell.songCount': '{count} songs',
+  'mediaCenter.shell.songCount': { one: '{count} song', other: '{count} songs' },
   'mediaCenter.library.subtitleMissing': 'That subtitle file could not be read.',
   'mediaCenter.library.itemMissing': 'That item is no longer in your library.',
   'mediaCenter.video.searchMal': 'Search MyAnimeList',
@@ -10681,19 +10692,12 @@ export const en: Catalog = {
   'mediaWorkspace.study.micStopped': 'The microphone recording stopped unexpectedly.',
   'mediaWorkspace.study.micStartFailed': 'Could not start microphone recording.',
   'mediaWorkspace.study.whisperLocalOnly': 'Whisper generation requires a local Seanime library file.',
-  'mediaWorkspace.study.extractingAudio': 'Extracting 16 kHz mono audio with ffmpeg…',
-  'mediaWorkspace.study.noAudioTrack': 'No audio track was found.',
-  'mediaWorkspace.study.audioExtractionFailed': 'Audio extraction failed.',
-  'mediaWorkspace.study.loadingWhisper': 'Loading the local Whisper model…',
   'mediaWorkspace.study.whisperStartFailed': 'The Whisper worker could not start.',
-  'mediaWorkspace.study.whisperOnDevice': 'Running Whisper on {device}…',
-  'mediaWorkspace.study.gpu': 'the GPU',
   'mediaWorkspace.study.cpu': 'the CPU',
   'mediaWorkspace.study.whisperFailed': 'Whisper subtitle generation failed.',
   'mediaWorkspace.study.noWhisperCues': 'Whisper completed without producing subtitle cues.',
   'mediaWorkspace.study.whisperGenerated': 'Whisper (generated)',
   'mediaWorkspace.study.whisperMountFailed': 'Could not mount Whisper cues.',
-  'mediaWorkspace.study.audioSendFailed': 'Audio could not be sent to Whisper.',
   'mediaWorkspace.study.listenType': 'Listen, then type the cue',
   'mediaWorkspace.study.waitingSubtitle': 'Waiting for subtitle',
   'mediaWorkspace.study.typeWhatYouHear': 'Type what you hear',
@@ -10705,7 +10709,7 @@ export const en: Catalog = {
   'mediaWorkspace.study.missedLines': { one: '{count} missed line', other: '{count} missed lines' },
   'mediaWorkspace.study.shadowRecommendation': 'Shadowing recommendation',
   'mediaWorkspace.study.shadowWorth': 'This line may be worth shadowing',
-  'mediaWorkspace.study.replayedTimes': 'You replayed it {count} times in this session. Practice it without leaving the player.',
+  'mediaWorkspace.study.replayedTimes': { one: 'You replayed it once in this session. Practice it without leaving the player.', other: 'You replayed it {count} times in this session. Practice it without leaving the player.' },
   'mediaWorkspace.study.startShadowing': 'Start shadowing',
   'mediaWorkspace.study.notNow': 'Not now',
   'mediaWorkspace.study.comprehensionRescue': 'Comprehension rescue',
@@ -10803,7 +10807,7 @@ export const en: Catalog = {
   'mediaWorkspace.study.subtitleFileGroup': 'Subtitle file',
   'mediaWorkspace.study.importSubtitle': 'Load a subtitle file…',
   'mediaWorkspace.study.importSubtitleEmpty': 'That file has no subtitle lines this player can read.',
-  'mediaWorkspace.study.importSubtitleDone': 'Loaded {name}: {count} lines.',
+  'mediaWorkspace.study.importSubtitleDone': { one: 'Loaded {name}: {count} line.', other: 'Loaded {name}: {count} lines.' },
   'mediaWorkspace.study.grammarSource': 'Captured from the video player',
   'mediaWorkspace.study.grammarLoading': 'Analyzing this line…',
   'mediaWorkspace.study.grammarError': 'The analysis failed.',
@@ -10852,18 +10856,17 @@ export const en: Catalog = {
   'mediaWorkspace.study.whisperStatus': 'Whisper status',
   'mediaWorkspace.study.deviceStatus': 'Device: {device}',
   'mediaWorkspace.study.whisperProgress': 'Whisper progress',
-  'mediaWorkspace.study.downloadProgress': 'Downloading {file} — {progress}%',
-  'mediaWorkspace.study.generatedLines': 'Generated {count} subtitle lines.',
+  'mediaWorkspace.study.generatedLines': { one: 'Generated {count} subtitle line.', other: 'Generated {count} subtitle lines.' },
   'study.favoriteAlternative.title': 'Try {easier} before {harder}',
   'study.favoriteAlternative.explanation': 'Both favorites have current cached readiness. The alternative is already within a comfortable preview range.',
   'study.favoriteAlternative.harderCoverage': '{title} · {coverage}% known coverage',
   'study.favoriteAlternative.easierCoverage': '{title} · {coverage}% known coverage',
   'study.favoriteAlternative.delta': '{delta} percentage points easier',
   'study.favoriteAlternative.action': 'Open easier favorite',
-  'study.grammarWeakness.title': '{pattern} in {count} prepared scenes',
+  'study.grammarWeakness.title': { one: '{pattern} in {count} prepared scene', other: '{pattern} in {count} prepared scenes' },
   'study.grammarWeakness.explanation': 'You missed this pattern in more than one recent Grammar session. Study can now show literal matches from current prepared subtitles.',
-  'study.grammarWeakness.failedSessions': 'Missed in {count} recent sessions',
-  'study.grammarWeakness.preparedContexts': '{count} exact prepared scenes',
+  'study.grammarWeakness.failedSessions': { one: 'Missed in {count} recent session', other: 'Missed in {count} recent sessions' },
+  'study.grammarWeakness.preparedContexts': { one: '{count} exact prepared scene', other: '{count} exact prepared scenes' },
   'study.grammarWeakness.literalCore': 'Literal pattern match: {core}',
   'study.grammarWeakness.action': 'Preview grammar scenes',
   'study.grammarWeakness.eyebrow': 'Grammar recovery · exact prepared cues',
@@ -10883,10 +10886,10 @@ export const en: Catalog = {
   'study.listeningFirst.audioConfirmed': 'Decoded audio track confirmed by the current player',
   'study.listeningFirst.subtitlesReady': 'Exact study-language subtitles ready for reveal',
   'study.listeningFirst.action': 'Start listening first',
-  'study.properNames.title': '{count} recurring names in {title}',
+  'study.properNames.title': { one: '{count} recurring name in {title}', other: '{count} recurring names in {title}' },
   'study.properNames.explanation': 'These proper names repeat often enough to matter for following the story, but they are not vocabulary. Review them once here instead of turning them into cards.',
-  'study.properNames.nameCount': '{count} recurring proper names',
-  'study.properNames.occurrences': '{count} appearances in prepared cues',
+  'study.properNames.nameCount': { one: '{count} recurring proper name', other: '{count} recurring proper names' },
+  'study.properNames.occurrences': { one: '{count} appearance in prepared cues', other: '{count} appearances in prepared cues' },
   'study.properNames.inCards': '{count} of them are currently selected as cards',
   'study.properNames.outOfCards': 'None of them are selected as cards',
   'study.properNames.action': 'Review names',
@@ -10899,7 +10902,7 @@ export const en: Catalog = {
   'study.properNames.episode': 'Episode {episode}',
   'study.properNames.openAt': 'Open at {time}',
   'study.properNames.appearances': '{count}×',
-  'study.properNames.inCardsNotice': 'This workspace has the proper-noun filter switched off, so {count} of these names are currently selected as cards.',
+  'study.properNames.inCardsNotice': { one: 'This workspace has the proper-noun filter switched off, so {count} of these names is currently selected as cards.', other: 'This workspace has the proper-noun filter switched off, so {count} of these names are currently selected as cards.' },
   'study.properNames.exclude': 'Keep names out of cards',
   'study.properNames.undo': 'Undo this filter change',
   'study.properNames.noContext': 'Spoken on its own in this cue.',
@@ -10907,14 +10910,14 @@ export const en: Catalog = {
   'study.properNames.appliedNotice': 'Proper names are no longer selected as cards. Nothing was deleted — undo restores your previous filters.',
   'study.properNames.footer': 'Existing analysis candidates · proper-noun tagging from the current analysis · no speaker identity is used',
   'study.properNames.stale': 'This proper-name set is no longer current. Refresh the Study analysis first.',
-  'study.properNames.previewStatus': 'Reviewing {count} recurring names from {title}.',
+  'study.properNames.previewStatus': { one: 'Reviewing {count} recurring name from {title}.', other: 'Reviewing {count} recurring names from {title}.' },
   'study.properNames.changed': 'The prepared selection changed. Review the refreshed name list first.',
-  'study.properNames.applied': 'Proper names are now excluded: {count} words remain selected. This can be undone.',
-  'study.properNames.undone': 'Restored the previous filters: {count} words selected.',
+  'study.properNames.applied': { one: 'Proper names are now excluded: {count} word remains selected. This can be undone.', other: 'Proper names are now excluded: {count} words remain selected. This can be undone.' },
+  'study.properNames.undone': { one: 'Restored the previous filters: {count} word selected.', other: 'Restored the previous filters: {count} words selected.' },
   'study.speechRate.title': 'Fast dialogue in {title}',
   'study.speechRate.explanation': 'At your preferred {rate}× speed, this title is still {faster}% faster than your measured norm. Preview a reversible speed adjustment.',
   'study.speechRate.effectiveEvidence': '{rate} words/sec at your preferred speed',
-  'study.speechRate.baselineEvidence': '{rate} words/sec median across {count} titles',
+  'study.speechRate.baselineEvidence': { one: '{rate} words/sec median across {count} title', other: '{rate} words/sec median across {count} titles' },
   'study.speechRate.suggestionEvidence': 'Suggested player speed: {rate}×',
   'study.speechRate.action': 'Review playback speed',
   'study.speechRate.stale': 'This speech-rate comparison is no longer current. Reopen it from the refreshed stream.',
@@ -10925,7 +10928,7 @@ export const en: Catalog = {
   'study.speechRate.heading': 'A steadier pace for {title}',
   'study.speechRate.close': 'Close speech-rate preview',
   'study.speechRate.closeAndRestore': 'Close and restore {rate}',
-  'study.speechRate.body': 'This compares real word occurrences and spoken cue time with your personal median across {count} prepared titles. Your existing player preference is {rate}.',
+  'study.speechRate.body': { one: 'This compares real word occurrences and spoken cue time with your personal median across {count} prepared title. Your existing player preference is {rate}.', other: 'This compares real word occurrences and spoken cue time with your personal median across {count} prepared titles. Your existing player preference is {rate}.' },
   'study.speechRate.episode': 'Episode {episode}',
   'study.speechRate.usualLabel': 'Your usual title',
   'study.speechRate.thisTitleLabel': 'This title at {rate}',
@@ -10963,14 +10966,14 @@ export const en: Catalog = {
   'study.ankiLeech.openAt': 'Open scene at {time}',
   'study.ankiLeech.footer': 'Current Anki note tags and scheduler state · existing prepared candidates · no review log, subtitle rescan, or Anki mutation',
   'study.seriesRecurrence.title': 'Words worth keeping from {title} episode {episode}',
-  'study.seriesRecurrence.explanation': '{count} selected lemmas return across {episodes} later prepared episodes. Preview the strongest recurrence evidence before mining cards.',
+  'study.seriesRecurrence.explanation': { one: '{count} selected lemma returns across {episodes} later prepared episodes. Preview the strongest recurrence evidence before mining cards.', other: '{count} selected lemmas return across {episodes} later prepared episodes. Preview the strongest recurrence evidence before mining cards.' },
   'study.seriesRecurrence.lemmaEvidence': 'Selected lemmas that return: {count}',
   'study.seriesRecurrence.episodeEvidence': 'Later prepared episodes compared: {count}',
   'study.seriesRecurrence.occurrenceEvidence': 'Future prepared occurrences: {count}',
   'study.seriesRecurrence.exactEvidence': 'Current and future cues use exact prepared Japanese subtitle records',
   'study.seriesRecurrence.action': 'Preview recurring words',
   'study.seriesRecurrence.stale': 'This series forecast is no longer current. Reopen it from the refreshed stream.',
-  'study.seriesRecurrence.previewStatus': 'Previewing {count} recurring words from {title}.',
+  'study.seriesRecurrence.previewStatus': { one: 'Previewing {count} recurring word from {title}.', other: 'Previewing {count} recurring words from {title}.' },
   'study.seriesRecurrence.eyebrow': 'Series recurrence · read-only ranked preview',
   'study.seriesRecurrence.heading': '{title} after episode {episode}',
   'study.seriesRecurrence.body': 'These selected words occur again in later normal episodes that are already prepared. The ranking uses stored candidates only and does not predict unprepared episodes.',
@@ -10979,12 +10982,12 @@ export const en: Catalog = {
   'study.seriesRecurrence.episodesLabel': 'later episodes',
   'study.seriesRecurrence.occurrencesLabel': 'future uses',
   'study.seriesRecurrence.anchorEpisode': 'From episode {episode}',
-  'study.seriesRecurrence.futureEpisodeCount': '{count} later episodes',
-  'study.seriesRecurrence.currentContext': 'Selected in episode {episode} · {count} prepared occurrences',
-  'study.seriesRecurrence.futureContext': 'Returns in episode {episode} · {count} prepared occurrences',
+  'study.seriesRecurrence.futureEpisodeCount': { one: '{count} later episode', other: '{count} later episodes' },
+  'study.seriesRecurrence.currentContext': { one: 'Selected in episode {episode} · {count} prepared occurrence', other: 'Selected in episode {episode} · {count} prepared occurrences' },
+  'study.seriesRecurrence.futureContext': { one: 'Returns in episode {episode} · {count} prepared occurrence', other: 'Returns in episode {episode} · {count} prepared occurrences' },
   'study.seriesRecurrence.openCurrentAt': 'Open current scene at {time}',
   'study.seriesRecurrence.openFutureAt': 'Open episode {episode} at {time}',
-  'study.seriesRecurrence.moreEpisodes': '+{count} more prepared episodes',
+  'study.seriesRecurrence.moreEpisodes': { one: '+{count} more prepared episode', other: '+{count} more prepared episodes' },
   'study.seriesRecurrence.footer': 'Newest fingerprint-current workspaces · exact attached Japanese subtitles · normal episodes only · no subtitle rescan, recurrence index, or stored forecast score',
 
   'study.crossTitle.eyebrow': 'Comparison session · prepared locally',
@@ -11609,9 +11612,9 @@ export const en: Catalog = {
   'agent.execute.error.spendBudget': 'This request would take you past the monthly spending limit you set. Raise it under Request limits, or wait until next month.',
   'agent.spend.title': 'Monthly spending across every cloud provider',
   'agent.spend.loading': 'Reading the spending record…',
-  'agent.spend.total': 'US${amount} in {period}, across {count} priced request(s)',
+  'agent.spend.total': { one: 'US${amount} in {period}, across {count} priced request', other: 'US${amount} in {period}, across {count} priced requests' },
   'agent.spend.unpriced':
-    '{count} earlier request(s) ran before rates existed, so what they cost is not in that total.',
+    { one: '{count} earlier request ran before rates existed, so what it cost is not in that total.', other: '{count} earlier requests ran before rates existed, so what they cost is not in that total.' },
   'agent.spend.limitEnable': 'Refuse requests that would take the month past a limit',
   'agent.spend.limit': 'Monthly limit in US dollars',
   'agent.spend.limitNote':
@@ -11620,7 +11623,7 @@ export const en: Catalog = {
   'agent.spend.exhausted': 'The limit is reached. Priced cloud requests are refused until it is raised or the month turns over.',
   'agent.spend.clear': 'Erase the record',
   'agent.spend.clearTitle': 'Erase the spending record',
-  'agent.spend.clearConfirm': 'Erase the record of US${amount} across {count} request(s) and restart the count from zero? The monthly limit itself stays exactly as it is — this does not raise it.',
+  'agent.spend.clearConfirm': { one: 'Erase the record of US${amount} across {count} request and restart the count from zero? The monthly limit itself stays exactly as it is — this does not raise it.', other: 'Erase the record of US${amount} across {count} requests and restart the count from zero? The monthly limit itself stays exactly as it is — this does not raise it.' },
   'agent.spend.error.invalidRequest': 'That limit was refused as malformed, so it was not applied. The previous limit is still in force.',
   'agent.spend.error.readFailed': 'The spending record could not be read, so no total can be shown here. What has been spent is not lost — it is only unreadable from this window.',
   'agent.spend.error.writeFailed': 'The change could not be written to disk, so it did not take effect.',
@@ -11630,7 +11633,7 @@ export const en: Catalog = {
   'agent.card.approve.checking': 'Checking whether this step is available…',
   'agent.card.undo.title': 'Undo an Agent change',
   'agent.card.undo.review': 'Review undo',
-  'agent.card.undo.target': 'Reverse {operation} for {count} item(s)',
+  'agent.card.undo.target': { one: 'Reverse {operation} for {count} item', other: 'Reverse {operation} for {count} items' },
   'agent.card.undo.confirm': 'Undo this change',
   'agent.card.undo.cancel': 'Keep the change',
   'agent.card.undo.running': 'Undoing the change…',
@@ -11643,10 +11646,10 @@ export const en: Catalog = {
   'agent.undo.error.not-invertible': 'That operation cannot be safely undone.',
   'agent.undo.error.entity-not-named': 'The operation did not record an item to undo.',
   'agent.undo.error.already-undone': 'That operation has already been undone.',
-  'agent.undo.error.superseded': 'A newer operation changed the same item, so this undo was refused.',
+  'agent.undo.error.superseded': 'This was changed after the Agent did it, so Undo was refused to keep that change. Nothing was changed.',
   'agent.undo.error.entity-not-found': 'The item no longer exists, so it cannot be undone.',
   'agent.undo.error.operation-unavailable': 'This build does not have a safe inverse for that operation.',
-  'agent.undo.error.operation-denied': 'The active profile or permission level does not allow the action that would undo this. Allow it in Agent settings, or undo it by hand.',
+  'agent.undo.error.operation-denied': 'The active profile or permission level no longer allows this kind of change, so the Agent cannot take it back. Allow it again in Agent settings, or undo it by hand.',
   'agent.undo.error.busy': 'That operation is already being undone.',
   'agent.undo.error.undo-failed': 'The change could not be undone.',
   'agent.undo.error.store-failed': 'The current item state could not be read.',
@@ -11751,7 +11754,7 @@ export const en: Catalog = {
   'lexicon.difficulty.ungrounded': 'No installed dictionary has {count} of them.',
   'lexicon.difficulty.hardest': 'Rarest words here',
   'lexicon.difficulty.rankBadge': 'rank {rank}',
-  'lexicon.difficulty.occurrences': 'used {count} times',
+  'lexicon.difficulty.occurrences': { one: 'used once', other: 'used {count} times' },
   'lexicon.difficulty.sources': 'Ranks from {sources}.',
   'lexicon.difficulty.unscored': 'None of these words is in your frequency lists, so they cannot say how hard this passage is.',
   'lexicon.difficulty.functionWords': 'Set aside as grammar: {count} particles, endings and other function words.',
@@ -11771,8 +11774,8 @@ export const en: Catalog = {
   'lexicon.concordance.action': 'Search my subtitles',
   'lexicon.concordance.running': 'Searching…',
   'lexicon.concordance.failed': 'Your local subtitles could not be searched.',
-  'lexicon.concordance.empty': 'No literal matches were found in {count} readable subtitle tracks.',
-  'lexicon.concordance.summary': '{count} examples from {sources} readable subtitle tracks',
+  'lexicon.concordance.empty': { one: 'No literal matches were found in {count} readable subtitle track.', other: 'No literal matches were found in {count} readable subtitle tracks.' },
+  'lexicon.concordance.summary': { one: '{count} example from {sources} readable subtitle tracks', other: '{count} examples from {sources} readable subtitle tracks' },
   'lexicon.concordance.scope': 'Literal matches only. Inflections and words implied by context are not included.',
   'lexicon.wild.title': 'In the wild',
   'lexicon.wild.note': 'Places on this device where you have already met these words, closest to this passage’s level first.',
@@ -11836,7 +11839,7 @@ export const en: Catalog = {
   'lexicon.collocations.running': 'Scanning dictionaries…',
   'lexicon.collocations.failed': 'Could not search the dictionary database.',
   'lexicon.collocations.empty': 'Your dictionaries carry no phrase joining {query} to another word.',
-  'lexicon.collocations.attested': '{count} entries',
+  'lexicon.collocations.attested': { one: '{count} entry', other: '{count} entries' },
   'lexicon.examples.title': 'Example sentences',
   'lexicon.examples.note': 'Sentences from an installed example corpus that contain this word, shortest first. The word is highlighted in each.',
   'lexicon.examples.action': 'Find example sentences',
@@ -12055,11 +12058,11 @@ export const en: Catalog = {
   'ankiWorkbench.source.empty': 'No source read yet.',
   'ankiWorkbench.facts.page': '{loaded} of {total} notes read so far ({cards} cards)',
   'ankiWorkbench.facts.loadedAll': 'All {loaded} notes read ({cards} cards)',
-  'ankiWorkbench.facts.decks': '{count} decks',
-  'ankiWorkbench.facts.noteTypes': '{count} note types',
-  'ankiWorkbench.facts.media': '{count} media references',
-  'ankiWorkbench.diagnostics.blocking': '{count} items block an export: {codes}',
-  'ankiWorkbench.diagnostics.warning': '{count} items need a look: {codes}',
+  'ankiWorkbench.facts.decks': { one: '{count} deck', other: '{count} decks' },
+  'ankiWorkbench.facts.noteTypes': { one: '{count} note type', other: '{count} note types' },
+  'ankiWorkbench.facts.media': { one: '{count} media reference', other: '{count} media references' },
+  'ankiWorkbench.diagnostics.blocking': { one: '{count} item blocks an export: {codes}', other: '{count} items block an export: {codes}' },
+  'ankiWorkbench.diagnostics.warning': { one: '{count} item needs a look: {codes}', other: '{count} items need a look: {codes}' },
   'ankiWorkbench.diagnostics.clean': 'Nothing unsupported was found in this source.',
   'ankiWorkbench.sessions.title': 'Recent reads',
   'ankiWorkbench.sessions.none': 'No recent reads.',
@@ -12091,29 +12094,29 @@ export const en: Catalog = {
   'ankiWorkbench.sessions.status.cancelled': 'Cancelled',
   'ankiWorkbench.sessions.status.failed': 'Failed',
   'ankiWorkbench.sessions.status.complete': 'Complete',
-  'ankiWorkbench.step.browse.outcome': '{count} notes selected',
-  'ankiWorkbench.step.browse.outcomeAll': 'All {count} matching notes selected',
+  'ankiWorkbench.step.browse.outcome': { one: '{count} note selected', other: '{count} notes selected' },
+  'ankiWorkbench.step.browse.outcomeAll': { one: 'The {count} matching note selected', other: 'All {count} matching notes selected' },
   'ankiWorkbench.step.enrich.lead':
     'Add dictionary data, readings or reviewed AI additions to the notes you selected.',
   'ankiWorkbench.step.enrich.noSelection':
     'Nothing is selected. Go back to “Browse and select” and choose the notes to enrich.',
-  'ankiWorkbench.step.enrich.outcome': '{count} notes enriched',
+  'ankiWorkbench.step.enrich.outcome': { one: '{count} note enriched', other: '{count} notes enriched' },
   'ankiWorkbench.step.enrich.outcomeNone': 'Nothing added yet — this step is optional',
   'ankiWorkbench.step.fields.lead':
     'Move, clean up or rewrite the text these notes already hold, and change how their cards are laid out.',
   'ankiWorkbench.step.fields.noSelection':
     'Nothing is selected. Go back to “Browse and select” and choose the notes to edit.',
-  'ankiWorkbench.step.fields.outcome': '{count} notes edited',
+  'ankiWorkbench.step.fields.outcome': { one: '{count} note edited', other: '{count} notes edited' },
   'ankiWorkbench.step.fields.outcomeNone': 'No field changes yet — this step is optional',
   'ankiWorkbench.step.rules.lead':
     'Decide what these notes count as: what they are tagged, what you are held to know, and when they come up.',
   'ankiWorkbench.step.rules.noSelection':
     'Nothing is selected. Go back to “Browse and select” and choose the notes to set rules for.',
-  'ankiWorkbench.step.rules.outcome': '{count} notes given learning rules',
+  'ankiWorkbench.step.rules.outcome': { one: '{count} note given learning rules', other: '{count} notes given learning rules' },
   'ankiWorkbench.step.rules.outcomeNone': 'No learning rules yet — this step is optional',
   'ankiWorkbench.step.review.lead':
     'Look at what the whole session adds up to before anything is applied.',
-  'ankiWorkbench.step.review.outcome': '{count} notes would change',
+  'ankiWorkbench.step.review.outcome': { one: '{count} note would change', other: '{count} notes would change' },
   'ankiWorkbench.step.review.outcomeMastery':
     'Only knowledge levels changed — {count} already written',
   'ankiWorkbench.step.review.outcomeNone': 'No net changes — the draft matches its source',
@@ -12123,15 +12126,15 @@ export const en: Catalog = {
   'ankiWorkbench.review.empty':
     'Nothing in this draft has changed. If this deck needs no edits, continue — otherwise go back to steps 3–5.',
   'ankiWorkbench.review.changed': '{count} of {total} notes would change',
-  'ankiWorkbench.review.field': '{name} — {count} notes',
-  'ankiWorkbench.review.tags': 'Tags change on {count} notes',
-  'ankiWorkbench.review.cardMoves': '{count} new cards move in the queue',
+  'ankiWorkbench.review.field': { one: '{name} — {count} note', other: '{name} — {count} notes' },
+  'ankiWorkbench.review.tags': { one: 'Tags change on {count} note', other: 'Tags change on {count} notes' },
+  'ankiWorkbench.review.cardMoves': { one: '{count} new card moves in the queue', other: '{count} new cards move in the queue' },
   'ankiWorkbench.review.reverted':
-    '{count} notes were edited and are back to their original values',
+    { one: '{count} note was edited and is back to its original values', other: '{count} notes were edited and are back to their original values' },
   'ankiWorkbench.review.overwrites':
-    '{count} values were written by more than one step — the later step’s value is what lands',
+    { one: '{count} value was written by more than one step — the later step’s value is what lands', other: '{count} values were written by more than one step — the later step’s value is what lands' },
   'ankiWorkbench.review.mastery':
-    '{count} knowledge levels are already written to this app — live now, not waiting for Apply',
+    { one: '{count} knowledge level is already written to this app — live now, not waiting for Apply', other: '{count} knowledge levels are already written to this app — live now, not waiting for Apply' },
   'ankiWorkbench.review.cost':
     'Applying contacts no provider and costs nothing; every change here is already computed.',
   'ankiWorkbench.review.diffs': 'Every change ({count})',
@@ -12207,22 +12210,22 @@ export const en: Catalog = {
   'ankiWorkbench.apply.live.cancelled.written':
     '{notes} notes and {cards} cards were written to {profile} before you stopped.',
   'ankiWorkbench.apply.live.cancelled.unwritten':
-    'Reading the collection back, {count} of your changes are still not in it.',
+    { one: 'Reading the collection back, {count} of your changes is still not in it.', other: 'Reading the collection back, {count} of your changes are still not in it.' },
   'ankiWorkbench.apply.liveError.cancelled':
     'You stopped the commit part-way, so only some of your changes are in Anki.',
   'ankiWorkbench.apply.liveError.io': 'The changes could not be written to Anki.',
   'ankiWorkbench.apply.blocked':
     'Problems found in this source block an export. Go back to step 1 to see them.',
   'ankiWorkbench.apply.empty': 'The session adds up to no changes — there is nothing to export.',
-  'ankiWorkbench.apply.notes': '{count} notes will be written with their new content',
-  'ankiWorkbench.apply.cardMoves': '{count} cards will move in the queue',
+  'ankiWorkbench.apply.notes': { one: '{count} note will be written with its new content', other: '{count} notes will be written with their new content' },
+  'ankiWorkbench.apply.cardMoves': { one: '{count} card will move in the queue', other: '{count} cards will move in the queue' },
   'ankiWorkbench.apply.original': 'Export writes a new package. The original file is never modified.',
   'ankiWorkbench.apply.export': 'Export a new package…',
   'ankiWorkbench.apply.writing': 'Writing the package…',
   'ankiWorkbench.apply.ok.file': 'Written to {path}',
   'ankiWorkbench.apply.ok.counts': '{notes} notes and {cards} cards updated in the new package',
   'ankiWorkbench.apply.ok.templatesFormatted':
-    '{count} card templates had their front and back rewritten',
+    { one: '{count} card template had its front and back rewritten', other: '{count} card templates had their front and back rewritten' },
   'ankiWorkbench.apply.ok.verified':
     'Verified: the file was read back from disk and every change was found in it.',
   'ankiWorkbench.apply.error.nothing-to-export':
@@ -12276,22 +12279,22 @@ export const en: Catalog = {
     'A commit is one way on the destination itself. This session can put a supported change back afterwards, but only while the deck stays open — close it and that record is gone.',
   'ankiWorkbench.apply.reverse.title': 'Put this commit back',
   'ankiWorkbench.apply.reverse.notes':
-    '{count} notes return to the content they had before this commit',
+    { one: '{count} note returns to the content it had before this commit', other: '{count} notes return to the content they had before this commit' },
   'ankiWorkbench.apply.reverse.cards':
-    '{count} cards return to the state they had before this commit',
-  'ankiWorkbench.apply.reverse.decks': '{count} decks return to their previous names',
+    { one: '{count} card returns to the state it had before this commit', other: '{count} cards return to the state they had before this commit' },
+  'ankiWorkbench.apply.reverse.decks': { one: '{count} deck returns to its previous name', other: '{count} decks return to their previous names' },
   'ankiWorkbench.apply.reverse.templates':
-    '{count} card templates this commit added are removed again, along with the cards they created',
+    { one: '{count} card template this commit added is removed again, along with the cards it created', other: '{count} card templates this commit added are removed again, along with the cards they created' },
   'ankiWorkbench.apply.reverse.button': 'Reverse this commit',
   'ankiWorkbench.apply.reverse.working': 'Putting the commit back…',
   'ankiWorkbench.apply.reverse.empty': 'Nothing in this commit can be put back.',
   'ankiWorkbench.apply.reverse.ok': '{notes} notes and {cards} cards were put back',
   'ankiWorkbench.apply.reverse.refused.template-restore-loses-scheduling':
-    'The card template “{subject}” cannot be restored. Its {count} cards were deleted with it, and they carried interval, ease and review counts that nothing here can bring back — they would return as new cards, losing that history a second time.',
+    { one: 'The card template “{subject}” cannot be restored. Its {count} card was deleted with it, and it carried interval, ease and review counts that nothing here can bring back — it would return as a new card, losing that history a second time.', other: 'The card template “{subject}” cannot be restored. Its {count} cards were deleted with it, and they carried interval, ease and review counts that nothing here can bring back — they would return as new cards, losing that history a second time.' },
   'ankiWorkbench.apply.reverse.refused.template-unadd-field-unsupported':
     'The field “{subject}” cannot be taken back off the note type. Removing it rewrites every note in the destination, including notes this session never loaded, so it is refused rather than half-written.',
   'ankiWorkbench.apply.reverse.refused.note-not-in-commit':
-    'Note {subject} is not in the record of what was written, so the {count} field values it changed cannot be put back without guessing the rest of the row.',
+    { one: 'Note {subject} is not in the record of what was written, so the {count} field value it changed cannot be put back without guessing the rest of the row.', other: 'Note {subject} is not in the record of what was written, so the {count} field values it changed cannot be put back without guessing the rest of the row.' },
   'ankiWorkbench.apply.reverse.refused.text-export-not-reversible':
     'A text export wrote a new file and never touched the original, so the state before this export is still on disk under its own name. There is nothing to put back.',
   'ankiWorkbench.apply.text.original':
@@ -12304,9 +12307,9 @@ export const en: Catalog = {
   'ankiWorkbench.apply.text.writing': 'Writing the text file…',
   'ankiWorkbench.apply.text.ok.file': 'Written to {path}',
   'ankiWorkbench.apply.text.ok.counts': '{notes} notes rewritten across {rows} rows',
-  'ankiWorkbench.apply.text.ok.tags': '{count} notes had their tags column rewritten',
+  'ankiWorkbench.apply.text.ok.tags': { one: '{count} note had its tags column rewritten', other: '{count} notes had their tags column rewritten' },
   'ankiWorkbench.apply.text.ok.provenance':
-    'This file stores plain text, so it cannot mark generated words inside a field. On {count} notes that mark was recorded as a note tag instead.',
+    { one: 'This file stores plain text, so it cannot mark generated words inside a field. On {count} note that mark was recorded as a note tag instead.', other: 'This file stores plain text, so it cannot mark generated words inside a field. On {count} notes that mark was recorded as a note tag instead.' },
   'ankiWorkbench.apply.text.ok.verified':
     'The written file was read back from disk and every change was found in it.',
   'ankiWorkbench.apply.textError.nothing-to-export':
@@ -12349,7 +12352,7 @@ export const en: Catalog = {
   'ankiWorkbench.browser.selectFound': 'Select the {count} found here',
   'ankiWorkbench.browser.clear': 'Clear selection',
   'ankiWorkbench.browser.wholeSource': 'Covers the whole source, including notes not loaded yet.',
-  'ankiWorkbench.browser.edited': '{count} notes edited',
+  'ankiWorkbench.browser.edited': { one: '{count} note edited', other: '{count} notes edited' },
   'ankiWorkbench.edit.undo': 'Undo ({count})',
   'ankiWorkbench.edit.redo': 'Redo ({count})',
   'ankiWorkbench.edit.draftOnly': 'Edits stay in this draft. Nothing is written to Anki yet.',
@@ -12372,7 +12375,7 @@ export const en: Catalog = {
   'ankiWorkbench.inspector.provenance': 'Written from: {sources}',
   'ankiWorkbench.preview.title': 'Card preview',
   'ankiWorkbench.preview.siblings': 'Cards this note generates',
-  'ankiWorkbench.preview.tabProblems': '{label} — {count} problems',
+  'ankiWorkbench.preview.tabProblems': { one: '{label} — {count} problem', other: '{label} — {count} problems' },
   'ankiWorkbench.preview.sideGroup': 'Side',
   'ankiWorkbench.preview.viewportGroup': 'Width',
   'ankiWorkbench.preview.themeGroup': 'Theme',
@@ -12408,8 +12411,8 @@ export const en: Catalog = {
   'ankiWorkbench.design.asks': 'New card asks',
   'ankiWorkbench.design.answers': 'and answers',
   'ankiWorkbench.design.effect': 'Adds {cards} cards across {notes} notes.',
-  'ankiWorkbench.design.skippedUnflagged': '{count} notes are skipped because the flag field is empty.',
-  'ankiWorkbench.design.skippedEmpty': '{count} notes are skipped because the question field is empty.',
+  'ankiWorkbench.design.skippedUnflagged': { one: '{count} note is skipped because the flag field is empty.', other: '{count} notes are skipped because the flag field is empty.' },
+  'ankiWorkbench.design.skippedEmpty': { one: '{count} note is skipped because the question field is empty.', other: '{count} notes are skipped because the question field is empty.' },
   'ankiWorkbench.design.problems': 'Design problems',
   'ankiWorkbench.design.formats': 'Question format',
   'ankiWorkbench.design.sample': 'A card this design would generate:',
@@ -12423,9 +12426,9 @@ export const en: Catalog = {
   'ankiWorkbench.design.problem.same-field-both-sides': 'The card would ask with the field it answers with: {detail}.',
   'ankiWorkbench.design.problem.duplicate-template-name': 'This note type already has a template named {detail}.',
   'ankiWorkbench.design.problem.design-already-present': 'A template already asks this question, so the design would double every card.',
-  'ankiWorkbench.design.problem.flag-field-added': 'Adds the field {detail} to all {count} notes; cards appear as you fill it.',
+  'ankiWorkbench.design.problem.flag-field-added': { one: 'Adds the field {detail} to {count} note; cards appear as you fill it.', other: 'Adds the field {detail} to all {count} notes; cards appear as you fill it.' },
   'ankiWorkbench.design.problem.no-notes-flagged': 'No note has {detail} set, so this design would never generate a card.',
-  'ankiWorkbench.design.problem.empty-question-field': '{count} notes have an empty {detail} and generate no card.',
+  'ankiWorkbench.design.problem.empty-question-field': { one: '{count} note has an empty {detail} and generates no card.', other: '{count} notes have an empty {detail} and generate no card.' },
   'ankiWorkbench.preview.problem.empty-first-field': 'The first field is empty; Anki uses it to detect duplicates.',
   'ankiWorkbench.preview.problem.duplicate-first-field': 'Another note has the same first field: {detail}.',
   'ankiWorkbench.browser.view': 'View',
@@ -12451,7 +12454,7 @@ export const en: Catalog = {
   'ankiWorkbench.browser.views.name': 'Name this view',
   'ankiWorkbench.browser.views.save': 'Save view',
   'ankiWorkbench.browser.views.delete': 'Delete view',
-  'ankiWorkbench.browser.views.partial': '{count} columns of this view do not exist in this deck.',
+  'ankiWorkbench.browser.views.partial': { one: '{count} column of this view does not exist in this deck.', other: '{count} columns of this view do not exist in this deck.' },
   'ankiWorkbench.browser.views.sortDropped': 'The saved sort column is not in this deck, so the sort was cleared.',
   'ankiWorkbench.browser.dupes.title': 'Find duplicates',
   'ankiWorkbench.browser.dupes.field': 'Compare',
@@ -12699,8 +12702,8 @@ export const en: Catalog = {
   'ankiWorkbench.samples.reason.random': 'Sample',
   'ankiWorkbench.tray.title': 'Change tray',
   'ankiWorkbench.tray.lead': 'Ordered actions. Each one runs on the previous one’s result, and applying the whole tray is a single undo.',
-  'ankiWorkbench.tray.scope': 'Acting on {count} loaded notes',
-  'ankiWorkbench.tray.beyondPage': '{count} more selected notes are not loaded and cannot change yet.',
+  'ankiWorkbench.tray.scope': { one: 'Acting on {count} loaded note', other: 'Acting on {count} loaded notes' },
+  'ankiWorkbench.tray.beyondPage': { one: '{count} more selected note is not loaded and cannot change yet.', other: '{count} more selected notes are not loaded and cannot change yet.' },
   'ankiWorkbench.tray.empty': 'No actions yet.',
   'ankiWorkbench.tray.enable': 'Include this action',
   'ankiWorkbench.tray.up': 'Move earlier',
@@ -12726,17 +12729,17 @@ export const en: Catalog = {
   'ankiWorkbench.tray.describe.remove-tags': 'Remove tags: {tags}',
   'ankiWorkbench.tray.outcome': '{changed} of {matched} notes',
   'ankiWorkbench.tray.outcomeNone': 'not run',
-  'ankiWorkbench.tray.summary': '{count} notes would change.',
+  'ankiWorkbench.tray.summary': { one: '{count} note would change.', other: '{count} notes would change.' },
   'ankiWorkbench.tray.summaryNone': 'Nothing would change.',
-  'ankiWorkbench.tray.diffMore': 'And {count} more changed notes.',
+  'ankiWorkbench.tray.diffMore': { one: 'And {count} more changed note.', other: 'And {count} more changed notes.' },
   'ankiWorkbench.tray.apply': 'Apply to draft',
-  'ankiWorkbench.tray.applied': 'Applied to {count} notes. Undo takes the whole batch back.',
+  'ankiWorkbench.tray.applied': { one: 'Applied to {count} note. Undo takes the whole batch back.', other: 'Applied to {count} notes. Undo takes the whole batch back.' },
   'ankiWorkbench.tray.problem.empty-selection': 'Select notes first.',
   'ankiWorkbench.tray.problem.no-actions': 'Add an action first.',
   'ankiWorkbench.tray.problem.invalid-regex': 'That regular expression will not compile: {detail}',
   'ankiWorkbench.tray.problem.empty-parameter': 'An action is missing a value.',
-  'ankiWorkbench.tray.problem.field-absent': 'The field {detail} does not exist on {count} selected notes.',
-  'ankiWorkbench.tray.problem.cloze-cards-change': 'On {count} notes the cloze numbers change, so Anki would add or drop cards on commit.',
+  'ankiWorkbench.tray.problem.field-absent': { one: 'The field {detail} does not exist on {count} selected note.', other: 'The field {detail} does not exist on {count} selected notes.' },
+  'ankiWorkbench.tray.problem.cloze-cards-change': { one: 'On {count} note the cloze numbers change, so Anki would add or drop cards on commit.', other: 'On {count} notes the cloze numbers change, so Anki would add or drop cards on commit.' },
   'ankiWorkbench.tray.problem.media-missing': 'Media this source does not contain: {detail}',
   'ankiWorkbench.tray.problem.media-dropped': 'Last reference removed: {detail}',
   'ankiWorkbench.tray.kind.swap-fields': 'Swap two fields',
@@ -12753,7 +12756,7 @@ export const en: Catalog = {
   'ankiWorkbench.tray.conflict.append': 'append after it',
   'ankiWorkbench.tray.field.choose': 'choose a field',
   'ankiWorkbench.tray.problem.same-field': 'A field cannot be swapped or copied onto itself ({detail}).',
-  'ankiWorkbench.tray.problem.overwrite-nonempty': 'On {count} notes {detail} already held text and would be overwritten.',
+  'ankiWorkbench.tray.problem.overwrite-nonempty': { one: 'On {count} note {detail} already held text and would be overwritten.', other: 'On {count} notes {detail} already held text and would be overwritten.' },
   'ankiWorkbench.tray.kind.normalize-text': 'Clean up text',
   'ankiWorkbench.tray.describe.normalize-text': 'Clean up {field}: {ops}',
   'ankiWorkbench.tray.normalize.strip-html': 'remove HTML',
@@ -12769,11 +12772,11 @@ export const en: Catalog = {
   'ankiWorkbench.tray.tagNormalize.drop-redundant-parents':
     'drop a parent tag a child already implies',
   'ankiWorkbench.tray.problem.tag-normalize-renamed':
-    '{count} tags change spelling, for example {detail}.',
+    { one: '{count} tag changes spelling: {detail}.', other: '{count} tags change spelling, for example {detail}.' },
   'ankiWorkbench.tray.problem.tag-normalize-removed':
-    '{count} tags are removed from their notes as duplicates or implied parents. No note loses a tag that only it carried.',
+    { one: '{count} tag is removed from its notes as a duplicate or implied parent. No note loses a tag that only it carried.', other: '{count} tags are removed from their notes as duplicates or implied parents. No note loses a tag that only it carried.' },
   'ankiWorkbench.tray.problem.tag-normalize-clean':
-    'Nothing to tidy: the {count} selected notes already tag consistently.',
+    { one: 'Nothing to tidy: the {count} selected note already tags consistently.', other: 'Nothing to tidy: the {count} selected notes already tag consistently.' },
   'ankiWorkbench.tray.kind.normalize-decks': 'Tidy up deck names',
   'ankiWorkbench.tray.kind.split-deck': 'Split a deck into subdecks',
   'ankiWorkbench.tray.kind.merge-glossary': 'Merge glossary data from another deck',
@@ -12790,7 +12793,7 @@ export const en: Catalog = {
     'Fills fields in the selected notes from a second package, matched on a field both decks share. The other deck is never changed.',
   'ankiWorkbench.tray.glossary.pick': 'Choose a deck to merge from…',
   'ankiWorkbench.tray.glossary.repick': 'Choose a different deck…',
-  'ankiWorkbench.tray.glossary.loaded': 'Merging from {label}: {count} notes read.',
+  'ankiWorkbench.tray.glossary.loaded': { one: 'Merging from {label}: {count} note read.', other: 'Merging from {label}: {count} notes read.' },
   'ankiWorkbench.tray.glossary.partial':
     'Only the first {count} of this deck’s {total} notes could be read at once, so anything after that is not in the merge. Split the deck or merge the rest separately.',
   'ankiWorkbench.tray.glossary.keyField': 'Match on',
@@ -12825,7 +12828,7 @@ export const en: Catalog = {
   'ankiWorkbench.tray.split.bands.hint': '1000, 5000',
   'ankiWorkbench.tray.split.bands.preview': 'Subdecks: {detail}',
   'ankiWorkbench.tray.split.filteredDecks':
-    '{count} filtered decks cannot be split: their cards are on loan from another deck.',
+    { one: '{count} filtered deck cannot be split: its cards are on loan from another deck.', other: '{count} filtered decks cannot be split: their cards are on loan from another deck.' },
   'ankiWorkbench.tray.split.add': 'Add split to the tray',
   'ankiWorkbench.tray.problem.split-refused': 'This deck cannot be split: {detail}',
   'ankiWorkbench.tray.split.refusal.empty-selection': 'no notes are selected',
@@ -12837,52 +12840,52 @@ export const en: Catalog = {
   'ankiWorkbench.tray.split.refusal.empty-unmatched-name':
     'the subdeck that gathers notes with no value on this axis needs a name',
   'ankiWorkbench.tray.problem.split-moved':
-    '{count} cards move to another deck, starting with {detail}.',
+    { one: '{count} card moves to another deck, starting with {detail}.', other: '{count} cards move to another deck, starting with {detail}.' },
   'ankiWorkbench.tray.problem.split-clean':
-    'Nothing to file: all {count} notes are already in the deck this split would put them in.',
+    { one: 'Nothing to file: the {count} note is already in the deck this split would put it in.', other: 'Nothing to file: all {count} notes are already in the deck this split would put them in.' },
   'ankiWorkbench.tray.problem.split-unmatched':
-    '{count} notes carry no value on this axis.',
+    { one: '{count} note carries no value on this axis.', other: '{count} notes carry no value on this axis.' },
   'ankiWorkbench.tray.problem.split-outside-parent':
-    '{count} selected cards sit outside the deck being split, so they were left alone.',
+    { one: '{count} selected card sits outside the deck being split, so it was left alone.', other: '{count} selected cards sit outside the deck being split, so they were left alone.' },
   'ankiWorkbench.tray.problem.split-filtered-card':
-    '{count} selected cards are on loan to a filtered deck; moving them would strand them when Anki rebuilds it, so they were left alone.',
+    { one: '{count} selected card is on loan to a filtered deck; moving it would strand it when Anki rebuilds that deck, so it was left alone.', other: '{count} selected cards are on loan to a filtered deck; moving them would strand them when Anki rebuilds it, so they were left alone.' },
   'ankiWorkbench.tray.problem.split-ambiguous':
-    '{count} notes are tagged with two JLPT levels at once, so the split will not pick one for you.',
+    { one: '{count} note is tagged with two JLPT levels at once, so the split will not pick one for you.', other: '{count} notes are tagged with two JLPT levels at once, so the split will not pick one for you.' },
   'ankiWorkbench.tray.problem.split-no-cards':
-    '{count} selected notes generate no card, so there is nothing to file.',
+    { one: '{count} selected note generates no card, so there is nothing to file.', other: '{count} selected notes generate no card, so there is nothing to file.' },
   'ankiWorkbench.tray.problem.glossary-missing':
     'Pick the deck to merge glossary data from before applying this action.',
   'ankiWorkbench.tray.problem.glossary-mismatch':
     'This merge was built for a different deck ({detail}). Rebuild it against the deck you picked.',
   'ankiWorkbench.tray.problem.glossary-key-empty':
-    '{count} notes have nothing in {detail}, so there is no value to match them on.',
+    { one: '{count} note has nothing in {detail}, so there is no value to match it on.', other: '{count} notes have nothing in {detail}, so there is no value to match them on.' },
   'ankiWorkbench.tray.problem.glossary-unmatched':
-    '{count} notes are not in the other deck. Nothing was written to them.',
+    { one: '{count} note is not in the other deck. Nothing was written to it.', other: '{count} notes are not in the other deck. Nothing was written to them.' },
   'ankiWorkbench.tray.problem.glossary-key-ambiguous':
     'The other deck holds {count} of these keys more than once with different content, so the merge will not pick one for you. Find its duplicates first.',
   'ankiWorkbench.tray.problem.glossary-kept-stronger':
-    '{count} fields were kept because what you already have is stronger ({detail}).',
+    { one: '{count} field was kept because what you already have is stronger ({detail}).', other: '{count} fields were kept because what you already have is stronger ({detail}).' },
   'ankiWorkbench.tray.problem.glossary-kept-equal':
-    '{count} fields were kept because neither version is stronger than the other.',
+    { one: '{count} field was kept because neither version is stronger than the other.', other: '{count} fields were kept because neither version is stronger than the other.' },
   'ankiWorkbench.tray.problem.glossary-kept-occupied':
-    '{count} fields already had content, so this mode left them alone.',
+    { one: '{count} field already had content, so this mode left it alone.', other: '{count} fields already had content, so this mode left them alone.' },
   'ankiWorkbench.tray.problem.glossary-source-empty':
-    '{count} matched notes have nothing in the field being merged from.',
+    { one: '{count} matched note has nothing in the field being merged from.', other: '{count} matched notes have nothing in the field being merged from.' },
   'ankiWorkbench.tray.problem.glossary-nothing-to-add':
-    '{count} fields already contain every meaning the other deck offers.',
+    { one: '{count} field already contains every meaning the other deck offers.', other: '{count} fields already contain every meaning the other deck offers.' },
   'ankiWorkbench.tray.problem.glossary-html-refused':
-    '{count} fields contain formatting or an HTML entity, so their meanings cannot be split apart safely. Use a mode that writes the whole field instead.',
+    { one: '{count} field contains formatting or an HTML entity, so its meanings cannot be split apart safely. Use a mode that writes the whole field instead.', other: '{count} fields contain formatting or an HTML entity, so their meanings cannot be split apart safely. Use a mode that writes the whole field instead.' },
   'ankiWorkbench.tray.problem.glossary-clean':
-    'Nothing to merge into these {count} notes, from a glossary of {detail} entries. Check that the matching field holds the same kind of value in both decks.',
-  'ankiWorkbench.review.cardDeckMoves': '{count} card(s) moved to another deck',
+    { one: 'Nothing to merge into this {count} note, from a glossary of {detail} entries. Check that the matching field holds the same kind of value in both decks.', other: 'Nothing to merge into these {count} notes, from a glossary of {detail} entries. Check that the matching field holds the same kind of value in both decks.' },
+  'ankiWorkbench.review.cardDeckMoves': { one: '{count} card moved to another deck', other: '{count} cards moved to another deck' },
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
-    '{count} decks change name, for example {detail}. No card changes deck.',
+    { one: '{count} deck changes name: {detail}. No card changes deck.', other: '{count} decks change name, for example {detail}. No card changes deck.' },
   'ankiWorkbench.tray.problem.deck-normalize-merge-refused':
-    '{count} decks keep their name because another deck already uses the tidied one ({detail}). Combining them would move cards, so they are left alone.',
+    { one: '{count} deck keeps its name because another deck already uses the tidied one ({detail}). Combining them would move cards, so it is left alone.', other: '{count} decks keep their name because another deck already uses the tidied one ({detail}). Combining them would move cards, so they are left alone.' },
   'ankiWorkbench.tray.problem.deck-normalize-filtered':
-    '{count} filtered decks are left alone: their cards are on loan and Anki rebuilds them.',
+    { one: '{count} filtered deck is left alone: its cards are on loan and Anki rebuilds it.', other: '{count} filtered decks are left alone: their cards are on loan and Anki rebuilds them.' },
   'ankiWorkbench.tray.problem.deck-normalize-clean':
-    'Nothing to tidy: all {count} decks are already named consistently.',
+    { one: 'Nothing to tidy: the {count} deck is already named consistently.', other: 'Nothing to tidy: all {count} decks are already named consistently.' },
   'ankiWorkbench.tray.kind.enrich-dictionary': 'Fill from installed dictionaries',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     'Write {aspect} into {to} ({conflict}; {rule}; {provenance})',
@@ -12908,19 +12911,19 @@ export const en: Catalog = {
   'ankiWorkbench.tray.reading.threshold': 'Fill in without asking when',
   'ankiWorkbench.tray.reading.threshold.certain': 'two dictionaries agree',
   'ankiWorkbench.tray.reading.threshold.likely': 'one dictionary answers',
-  'ankiWorkbench.tray.problem.reading-no-word': '{count} notes declare no word field to look up.',
+  'ankiWorkbench.tray.problem.reading-no-word': { one: '{count} note declares no word field to look up.', other: '{count} notes declare no word field to look up.' },
   'ankiWorkbench.tray.problem.reading-no-entry':
-    'No installed dictionary gives a reading for the word on {count} notes: {detail}',
+    { one: 'No installed dictionary gives a reading for the word on {count} note: {detail}', other: 'No installed dictionary gives a reading for the word on {count} notes: {detail}' },
   'ankiWorkbench.tray.problem.reading-ambiguous':
-    '{count} words have more than one reading, so they were left for you to choose: {detail}',
+    { one: '{count} word has more than one reading, so it was left for you to choose: {detail}', other: '{count} words have more than one reading, so they were left for you to choose: {detail}' },
   'ankiWorkbench.tray.problem.reading-below-threshold':
-    '{count} readings were less certain than you allowed, so they were left alone: {detail}',
+    { one: '{count} reading was less certain than you allowed, so it was left alone: {detail}', other: '{count} readings were less certain than you allowed, so they were left alone: {detail}' },
   'ankiWorkbench.tray.problem.reading-occupied':
-    '{count} notes already have a reading in {detail}, so nothing was written over it.',
+    { one: '{count} note already has a reading in {detail}, so nothing was written over it.', other: '{count} notes already have a reading in {detail}, so nothing was written over it.' },
   'ankiWorkbench.tray.problem.reading-no-kanji':
-    '{count} words have no kanji, so there is nothing to put furigana over: {detail}',
+    { one: '{count} word has no kanji, so there is nothing to put furigana over: {detail}', other: '{count} words have no kanji, so there is nothing to put furigana over: {detail}' },
   'ankiWorkbench.tray.problem.reading-not-kana':
-    'The only readings found for {count} words are not kana, so they came from a non-Japanese dictionary and nothing was written: {detail}',
+    { one: 'The only readings found for {count} word are not kana, so they came from a non-Japanese dictionary and nothing was written: {detail}', other: 'The only readings found for {count} words are not kana, so they came from a non-Japanese dictionary and nothing was written: {detail}' },
   'ankiWorkbench.tray.kind.add-cloze': 'Hide the word in its own sentence',
   'ankiWorkbench.tray.describe.add-cloze': 'Hide the word inside the sentence ({modes})',
   'ankiWorkbench.tray.cloze.modes': 'How the word may be found in the sentence',
@@ -12928,19 +12931,19 @@ export const en: Catalog = {
   'ankiWorkbench.tray.cloze.mode.reading': 'spelled out in kana',
   'ankiWorkbench.tray.cloze.mode.stem': 'in a changed form, hiding only the unchanging part',
   'ankiWorkbench.tray.problem.cloze-wrong-note-type':
-    '{count} notes use the {detail} note type, which does not make cards from hidden words — the braces would show up on the card, so nothing was written.',
+    { one: '{count} note uses the {detail} note type, which does not make cards from hidden words — the braces would show up on the card, so nothing was written.', other: '{count} notes use the {detail} note type, which does not make cards from hidden words — the braces would show up on the card, so nothing was written.' },
   'ankiWorkbench.tray.problem.cloze-already':
-    '{count} notes already have that word hidden, so they were left as they are.',
+    { one: '{count} note already has that word hidden, so it was left as it is.', other: '{count} notes already have that word hidden, so they were left as they are.' },
   'ankiWorkbench.tray.problem.cloze-no-sentence':
-    '{count} notes have no sentence to hide the word in.',
+    { one: '{count} note has no sentence to hide the word in.', other: '{count} notes have no sentence to hide the word in.' },
   'ankiWorkbench.tray.problem.cloze-no-word':
-    '{count} notes do not say which word they teach, so there is nothing to hide.',
+    { one: '{count} note does not say which word it teaches, so there is nothing to hide.', other: '{count} notes do not say which word they teach, so there is nothing to hide.' },
   'ankiWorkbench.tray.problem.cloze-html-split':
-    'In {count} notes the word is split by formatting inside the sentence, so it cannot be hidden without rewriting your formatting.',
+    { one: 'In {count} note the word is split by formatting inside the sentence, so it cannot be hidden without rewriting your formatting.', other: 'In {count} notes the word is split by formatting inside the sentence, so it cannot be hidden without rewriting your formatting.' },
   'ankiWorkbench.tray.problem.cloze-not-found':
-    '{count} sentences do not contain the word they teach.',
+    { one: '{count} sentence does not contain the word it teaches.', other: '{count} sentences do not contain the word they teach.' },
   'ankiWorkbench.tray.problem.cloze-undecidable':
-    '{count} words change shape in a way this cannot follow, so they were left for you rather than guessed at.',
+    { one: '{count} word changes shape in a way this cannot follow, so it was left for you rather than guessed at.', other: '{count} words change shape in a way this cannot follow, so they were left for you rather than guessed at.' },
   'ankiWorkbench.tray.kind.restore-source': 'Restore where each card came from',
   'ankiWorkbench.tray.describe.restore-source': 'Write {facets} into {to}, where the note records it',
   'ankiWorkbench.tray.source.to': 'Write the source context to',
@@ -12952,13 +12955,13 @@ export const en: Catalog = {
   'ankiWorkbench.tray.source.noUrl':
     'Only what your cards already record can be restored. This app stores no page address or screenshot alongside a mined card, so neither can be brought back.',
   'ankiWorkbench.tray.problem.source-field-absent':
-    '{count} notes have no {detail} field, so there is nowhere to put their source context.',
+    { one: '{count} note has no {detail} field, so there is nowhere to put its source context.', other: '{count} notes have no {detail} field, so there is nowhere to put their source context.' },
   'ankiWorkbench.tray.problem.source-occupied':
-    '{count} notes already have something in {detail}, so nothing was written over it.',
+    { one: '{count} note already has something in {detail}, so nothing was written over it.', other: '{count} notes already have something in {detail}, so nothing was written over it.' },
   'ankiWorkbench.tray.problem.source-none':
-    '{count} notes record nothing about where they came from, so nothing was invented for them.',
+    { one: '{count} note records nothing about where it came from, so nothing was invented for it.', other: '{count} notes record nothing about where they came from, so nothing was invented for them.' },
   'ankiWorkbench.tray.problem.source-unreadable-clip':
-    'The clip attached to {count} notes has been renamed ({detail}), so the moment it came from can no longer be read from it.',
+    { one: 'The clip attached to {count} note has been renamed ({detail}), so the moment it came from can no longer be read from it.', other: 'The clip attached to {count} notes has been renamed ({detail}), so the moment it came from can no longer be read from it.' },
   'ankiWorkbench.tray.problem.source-clean':
     'Nothing was restored. At most {detail} of the {count} selected notes record anything about where they came from.',
   'ankiWorkbench.tray.kind.reschedule-stale': 'Bring stale cards back on schedule',
@@ -12979,18 +12982,18 @@ export const en: Catalog = {
   'ankiWorkbench.tray.problem.stale-no-origin':
     'This source reports no collection creation date, so a card’s due day counts from an unknown origin and every day this would write would be wrong by the same unknown amount.',
   'ankiWorkbench.tray.problem.stale-withheld':
-    '{count} suspended or buried cards were left alone: a new due day changes nothing they show.',
+    { one: '{count} suspended or buried card was left alone: a new due day changes nothing it shows.', other: '{count} suspended or buried cards were left alone: a new due day changes nothing they show.' },
   'ankiWorkbench.tray.problem.stale-not-review':
-    '{count} cards are new or still being learned, so they have no due day to move.',
+    { one: '{count} card is new or still being learned, so it has no due day to move.', other: '{count} cards are new or still being learned, so they have no due day to move.' },
   'ankiWorkbench.tray.problem.stale-not-stale':
-    '{count} cards are inside both thresholds, so they were left where they are.',
+    { one: '{count} card is inside both thresholds, so it was left where it is.', other: '{count} cards are inside both thresholds, so they were left where they are.' },
   'ankiWorkbench.tray.problem.stale-history-unreadable':
-    'This source’s review log cannot be read ({detail}), so “not reviewed lately” could not be answered at all — the {count} cards moved were chosen on overdue days alone.',
+    { one: 'This source’s review log cannot be read ({detail}), so “not reviewed lately” could not be answered at all — the {count} card moved was chosen on overdue days alone.', other: 'This source’s review log cannot be read ({detail}), so “not reviewed lately” could not be answered at all — the {count} cards moved were chosen on overdue days alone.' },
   'ankiWorkbench.tray.problem.stale-clean':
     'Nothing was stale under these thresholds, so no due day moved.',
   'ankiWorkbench.tray.kind.remove-template': 'Remove a duplicate card template',
   'ankiWorkbench.tray.describe.remove-template':
-    'Remove {count} template(s) from {noteType}, deleting every card they made',
+    { one: 'Remove {count} template from {noteType}, deleting every card it made', other: 'Remove {count} templates from {noteType}, deleting every card they made' },
   'ankiWorkbench.tray.problem.template-no-audit':
     'The card templates have not been compared yet, so nothing can say whether this one is a redundant copy or the only place a question is asked. Run the template check first.',
   'ankiWorkbench.tray.problem.template-note-type-missing':
@@ -13006,7 +13009,7 @@ export const en: Catalog = {
   'ankiWorkbench.tray.problem.template-last':
     'That would leave {detail} with no card template at all, so nothing was removed. A note type needs at least one.',
   'ankiWorkbench.tray.problem.template-removed':
-    'Removing {detail} deletes {count} cards along with it, including their review history. Undo puts them back.',
+    { one: 'Removing {detail} deletes {count} card along with it, including its review history. Undo puts it back.', other: 'Removing {detail} deletes {count} cards along with it, including their review history. Undo puts them back.' },
   'ankiWorkbench.tray.problem.template-clean':
     'No template was removed. Nothing chosen was a removable duplicate.',
   'ankiWorkbench.tray.kind.set-card-state':
@@ -13064,11 +13067,11 @@ export const en: Catalog = {
   'ankiWorkbench.tray.problem.card-state-no-cards':
     '{count} of the selected notes make no card in this source, so they have no card state to change.',
   'ankiWorkbench.tray.problem.card-state-not-scheduled':
-    '{count} cards have never been studied, so they have no interval or ease yet. Their flag and suspension still changed.',
+    { one: '{count} card has never been studied, so it has no interval or ease yet. Its flag and suspension still changed.', other: '{count} cards have never been studied, so they have no interval or ease yet. Their flag and suspension still changed.' },
   'ankiWorkbench.tray.problem.card-state-unknown':
-    '{count} cards are in a state this source does not describe, so there is no queue to return them to. They were left suspended.',
+    { one: '{count} card is in a state this source does not describe, so there is no queue to return it to. It was left suspended.', other: '{count} cards are in a state this source does not describe, so there is no queue to return them to. They were left suspended.' },
   'ankiWorkbench.tray.problem.card-state-already':
-    '{count} notes already held that state on every card, so nothing about them changed.',
+    { one: '{count} note already held that state on every card, so nothing about it changed.', other: '{count} notes already held that state on every card, so nothing about them changed.' },
   'ankiWorkbench.tray.aiTo': 'Write the approved suggestion to',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Apply reviewed AI suggestions',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Write each approved AI suggestion to {to} ({conflict})',
@@ -13084,19 +13087,19 @@ export const en: Catalog = {
   'ankiWorkbench.tray.prioritize.start':
     'Start at new-card position',
   'ankiWorkbench.tray.prioritize.moved':
-    '{count} cards move to the front of the new queue: {detail}',
+    { one: '{count} card moves to the front of the new queue: {detail}', other: '{count} cards move to the front of the new queue: {detail}' },
   'ankiWorkbench.tray.prioritize.protects':
     'Words you already know are never moved, and cards you have already started keep their schedule.',
   'ankiWorkbench.tray.problem.prioritize-known':
-    '{count} words were left where they were because you already know them: {detail}',
+    { one: '{count} word was left where it was because you already know it: {detail}', other: '{count} words were left where they were because you already know them: {detail}' },
   'ankiWorkbench.tray.problem.prioritize-no-rank':
-    '{count} words are not ranked by any installed frequency list, so there is no frequency to order them by: {detail}',
+    { one: '{count} word is not ranked by any installed frequency list, so there is no frequency to order it by: {detail}', other: '{count} words are not ranked by any installed frequency list, so there is no frequency to order them by: {detail}' },
   'ankiWorkbench.tray.problem.prioritize-no-word':
-    '{count} notes declare no word, so they have no frequency either: {detail}',
+    { one: '{count} note declares no word, so it has no frequency either: {detail}', other: '{count} notes declare no word, so they have no frequency either: {detail}' },
   'ankiWorkbench.tray.problem.prioritize-not-new':
-    '{count} words have already been started, so a new-queue position would not apply to them: {detail}',
+    { one: '{count} word has already been started, so a new-queue position would not apply to it: {detail}', other: '{count} words have already been started, so a new-queue position would not apply to them: {detail}' },
   'ankiWorkbench.tray.problem.prioritize-no-cards':
-    '{count} notes generate no card in this deck, so there is nothing to position: {detail}',
+    { one: '{count} note generates no card in this deck, so there is nothing to position: {detail}', other: '{count} notes generate no card in this deck, so there is nothing to position: {detail}' },
   'ankiWorkbench.tray.kind.rescue-leeches':
     'Rescue words you keep forgetting',
   'ankiWorkbench.tray.describe.rescue-leeches':
@@ -13116,21 +13119,21 @@ export const en: Catalog = {
   'ankiWorkbench.tray.leech.keepsHints':
     'A hint field that already holds text is left exactly as it is, and the hint only ever reveals the first character.',
   'ankiWorkbench.tray.leech.found':
-    '{count} leeches found, {rescued} rescued; {tagged} of them counted only because Anki had already tagged them',
+    { one: '{count} leech found, {rescued} rescued; {tagged} of them counted only because Anki had already tagged them', other: '{count} leeches found, {rescued} rescued; {tagged} of them counted only because Anki had already tagged them' },
   'ankiWorkbench.tray.problem.leech-not-leech':
-    '{count} notes are under the lapse threshold and carry no leech tag, so they were left alone: {detail}',
+    { one: '{count} note is under the lapse threshold and carries no leech tag, so it was left alone: {detail}', other: '{count} notes are under the lapse threshold and carry no leech tag, so they were left alone: {detail}' },
   'ankiWorkbench.tray.problem.leech-no-cards':
-    '{count} notes generate no card in this deck, so they have no lapse count: {detail}',
+    { one: '{count} note generates no card in this deck, so it has no lapse count: {detail}', other: '{count} notes generate no card in this deck, so they have no lapse count: {detail}' },
   'ankiWorkbench.tray.problem.leech-already-tagged':
-    '{count} notes already carry the rescue tag: {detail}',
+    { one: '{count} note already carries the rescue tag: {detail}', other: '{count} notes already carry the rescue tag: {detail}' },
   'ankiWorkbench.tray.problem.leech-hint-field-absent':
-    '{count} notes do not have both hint fields, so no hint was written: {detail}',
+    { one: '{count} note does not have both hint fields, so no hint was written: {detail}', other: '{count} notes do not have both hint fields, so no hint was written: {detail}' },
   'ankiWorkbench.tray.problem.leech-hint-source-empty':
-    '{count} notes have nothing in the field the hint would come from: {detail}',
+    { one: '{count} note has nothing in the field the hint would come from: {detail}', other: '{count} notes have nothing in the field the hint would come from: {detail}' },
   'ankiWorkbench.tray.problem.leech-hint-source-too-short':
-    '{count} notes are so short that a hint would show the whole answer, so nothing was written: {detail}',
+    { one: '{count} note is so short that a hint would show the whole answer, so nothing was written: {detail}', other: '{count} notes are so short that a hint would show the whole answer, so nothing was written: {detail}' },
   'ankiWorkbench.tray.problem.leech-hint-occupied':
-    '{count} notes already have a hint, which was kept exactly as you wrote it: {detail}',
+    { one: '{count} note already has a hint, which was kept exactly as you wrote it: {detail}', other: '{count} notes already have a hint, which was kept exactly as you wrote it: {detail}' },
   'ankiWorkbench.tray.problem.leech-reschedule-unsupported':
     'A slower scheduling preset cannot be applied here: this editor changes notes and new-card order only. Change the leech settings in the deck options in Anki.',
   'ankiWorkbench.tray.describe.set-mastery': 'Mark the selected words as {level}',
@@ -13141,21 +13144,21 @@ export const en: Catalog = {
   'ankiWorkbench.tray.mastery.wordsValue':
     '{changed} words move, {unchanged} are already there, across {notes} selected notes',
   'ankiWorkbench.tray.mastery.noWord': 'Cannot be mapped',
-  'ankiWorkbench.tray.mastery.noWordValue': '{count} selected notes declare no word',
+  'ankiWorkbench.tray.mastery.noWordValue': { one: '{count} selected note declares no word', other: '{count} selected notes declare no word' },
   'ankiWorkbench.tray.mastery.phrase': 'Held a phrase',
   'ankiWorkbench.tray.mastery.phraseValue':
-    '{count} selected notes hold a phrase rather than a single word, and are left alone',
+    { one: '{count} selected note holds a phrase rather than a single word, and is left alone', other: '{count} selected notes hold a phrase rather than a single word, and are left alone' },
   'ankiWorkbench.tray.mastery.scheduling': 'Anki scheduling',
   'ankiWorkbench.tray.mastery.schedulingValue':
-    '{count} cards rescheduled — this changes what this app knows about the words, not any due date, interval or ease in Anki',
+    { one: '{count} card rescheduled — this changes what this app knows about the words, not any due date, interval or ease in Anki', other: '{count} cards rescheduled — this changes what this app knows about the words, not any due date, interval or ease in Anki' },
   'ankiWorkbench.tray.problem.no-vocab-context':
     'The words for this selection have not been read yet, so the mapping cannot be planned.',
   'ankiWorkbench.tray.problem.mastery-no-word':
-    '{count} selected notes declare no word, so there is nothing to mark on them.',
+    { one: '{count} selected note declares no word, so there is nothing to mark on it.', other: '{count} selected notes declare no word, so there is nothing to mark on them.' },
   'ankiWorkbench.tray.problem.mastery-phrase':
-    '{count} selected notes hold a phrase rather than a single word. They are left alone, because what this records has to be a word.',
+    { one: '{count} selected note holds a phrase rather than a single word. It is left alone, because what this records has to be a word.', other: '{count} selected notes hold a phrase rather than a single word. They are left alone, because what this records has to be a word.' },
   'ankiWorkbench.tray.problem.mastery-local-only':
-    'Moves {count} words in this app only. Nothing in Anki is rescheduled.',
+    { one: 'Moves {count} word in this app only. Nothing in Anki is rescheduled.', other: 'Moves {count} words in this app only. Nothing in Anki is rescheduled.' },
   'ankiWorkbench.ai.title': 'AI suggestions',
   'ankiWorkbench.ai.lead': 'Generate alternatives for the selected words. Nothing is written until you approve one and add the step above.',
   'ankiWorkbench.ai.kind': 'Generate',
@@ -13186,8 +13189,8 @@ export const en: Catalog = {
   'ankiWorkbench.translate.language.zh': 'Chinese',
   'ankiWorkbench.translate.disclosure': '{provider} ({model}) receives {notes} note(s) in {requests} request(s).',
   'ankiWorkbench.translate.sends': 'It sends the text of the {field} field — {chars} characters of your deck — and returns {language}.',
-  'ankiWorkbench.translate.skipped.cloze-source': '{count} note(s) will not be sent: their text contains a cloze marker, which a translation would break.',
-  'ankiWorkbench.translate.skipped.empty-source': '{count} note(s) will not be sent: this field is empty for them.',
+  'ankiWorkbench.translate.skipped.cloze-source': { one: '{count} note will not be sent: its text contains a cloze marker, which a translation would break.', other: '{count} notes will not be sent: their text contains a cloze marker, which a translation would break.' },
+  'ankiWorkbench.translate.skipped.empty-source': { one: '{count} note will not be sent: this field is empty for it.', other: '{count} notes will not be sent: this field is empty for them.' },
   'ankiWorkbench.translate.problem.no-source': 'Choose the field to translate.',
   'ankiWorkbench.translate.problem.no-destination': 'Choose a destination field in the action above, so the original is kept.',
   'ankiWorkbench.translate.problem.same-field': 'The destination is the field being translated. Choose another one, or the original text is lost.',
@@ -13210,29 +13213,29 @@ export const en: Catalog = {
   'ankiWorkbench.ai.error.no-batch-id': 'The request was malformed, so nothing was sent.',
   'ankiWorkbench.ai.error.bridge-missing': 'This window cannot reach the generator. Reload the app.',
   'ankiWorkbench.ai.error.provider': 'The provider failed: {detail}',
-  'ankiWorkbench.tray.enrichLoading': 'Reading the installed dictionaries for {count} words…',
+  'ankiWorkbench.tray.enrichLoading': { one: 'Reading the installed dictionaries for {count} word…', other: 'Reading the installed dictionaries for {count} words…' },
   'ankiWorkbench.tray.enrichReady': '{found} of {count} words found in the installed dictionaries.',
   'ankiWorkbench.tray.problem.no-enrich-data':
     'No dictionary answers are loaded yet, so nothing can be filled in. If this stays, the installed dictionaries are unreachable from here.',
   'ankiWorkbench.tray.problem.enrich-no-entry':
-    'No installed dictionary knows the word on {count} notes: {detail}',
-  'ankiWorkbench.tray.problem.enrich-no-word': '{count} notes declare no word field to look up.',
+    { one: 'No installed dictionary knows the word on {count} note: {detail}', other: 'No installed dictionary knows the word on {count} notes: {detail}' },
+  'ankiWorkbench.tray.problem.enrich-no-word': { one: '{count} note declares no word field to look up.', other: '{count} notes declare no word field to look up.' },
   'ankiWorkbench.tray.problem.enrich-sense-conflict':
-    'On {count} notes the installed dictionaries disagreed, so those notes were left alone: {detail}',
+    { one: 'On {count} note the installed dictionaries disagreed, so that note was left alone: {detail}', other: 'On {count} notes the installed dictionaries disagreed, so those notes were left alone: {detail}' },
   'ankiWorkbench.tray.problem.enrich-sources-merged':
-    'On {count} notes several dictionaries disagreed and all of their answers were written: {detail}',
+    { one: 'On {count} note several dictionaries disagreed and all of their answers were written: {detail}', other: 'On {count} notes several dictionaries disagreed and all of their answers were written: {detail}' },
   'ankiWorkbench.tray.problem.no-ai-review':
     'No generated suggestions are loaded yet, so there is nothing to apply. Generate a batch first.',
   'ankiWorkbench.tray.problem.ai-batch-mismatch':
     'This step was set up for an earlier generation ({detail}) that has since been replaced. Remove it and add it again.',
   'ankiWorkbench.tray.problem.ai-not-reviewed':
-    '{count} notes are still waiting for you to accept or reject a suggestion. Nothing is written until you decide.',
+    { one: '{count} note is still waiting for you to accept or reject a suggestion. Nothing is written until you decide.', other: '{count} notes are still waiting for you to accept or reject a suggestion. Nothing is written until you decide.' },
   'ankiWorkbench.tray.problem.ai-generation-failed':
-    'Generation failed on {count} notes. You can retry just those.',
+    { one: 'Generation failed on {count} note. You can retry just that one.', other: 'Generation failed on {count} notes. You can retry just those.' },
   'ankiWorkbench.tray.problem.ai-cancelled':
-    'You cancelled before {count} notes were generated, so they are left unchanged.',
+    { one: 'You cancelled before {count} note was generated, so it is left unchanged.', other: 'You cancelled before {count} notes were generated, so they are left unchanged.' },
   'ankiWorkbench.tray.problem.ai-all-rejected':
-    'You rejected every suggestion on {count} notes, so nothing is written to them.',
+    { one: 'You rejected every suggestion on {count} note, so nothing is written to it.', other: 'You rejected every suggestion on {count} notes, so nothing is written to them.' },
 
   'ankiWorkbench.design.packageOnly':
     'Exporting a package adds this card template and its cards for real. Writing to a live Anki collection does not: Anki would generate the cards itself, so the count above would stop being this workbench’s to guarantee.',
@@ -13736,9 +13739,9 @@ export const en: Catalog = {
   'filesApp.bulk.progress': 'Processed {completed} of {total} items.',
   'filesApp.bulk.summary':
     '{succeeded} of {total} items added {cards} cards; {failed} failed.',
-  'filesApp.bulk.itemAdded': '{count} cards added.',
+  'filesApp.bulk.itemAdded': { one: '{count} card added.', other: '{count} cards added.' },
   'filesApp.bulk.undo': 'Undo all added cards',
-  'filesApp.bulk.undone': 'Removed all {count} cards added by this bulk action.',
+  'filesApp.bulk.undone': { one: 'Removed the {count} card added by this bulk action.', other: 'Removed all {count} cards added by this bulk action.' },
   'filesApp.mine.refuse.writeFailed': 'The cards could not be written to the deck.',
   // Gate 12: a record whose file is gone is still file-backed, so Explorer
   // would have opened the nearest surviving ancestor and called that a success.
@@ -14275,8 +14278,6 @@ export const en: Catalog = {
   'readingLists.view.author.onlyOne': 'This is the only book by {author} on your lists.',
   'readingLists.view.author.goList': 'Go to the list “{name}”',
   'readingLists.view.coverReveal': 'Show “{title}” in the library',
-  'seanimeDev.collapse': 'Collapse sidecar panel',
-  'seanimeDev.expand': 'Expand sidecar panel',
   'immersion.rail.search': 'Search saved sites',
   'immersion.rail.noMatches': 'No saved sites match. Clear the search to show all sites.',
   'immersion.rail.view.bookmarks': 'Bookmarks',
@@ -14363,7 +14364,6 @@ export const en: Catalog = {
   'settings.lens.history.clearTitle': 'Clear capture history',
   'settings.lens.history.clearMessage': 'Delete every Reading Lens capture? Pinned captures are deleted too, and this cannot be undone.',
   'settings.lens.history.clearConfirm': 'Delete all',
-  'settings.monitors.reset.confirm': 'Forget every per-screen setting? Desktops and everything on them are kept, but each desktop returns to no assigned display and this cannot be undone.',
   'credential.remove.title': 'Remove stored key',
   'credential.remove.message': 'Remove the stored credential for {name}? Providers usually show a key only once, so you may have to create a new one.',
   'credential.remove.confirm': 'Remove',
@@ -14502,7 +14502,7 @@ export const en: Catalog = {
   'verifiedSites.fmhy.placeholder': 'Paste the saved HTML source of https://fmhy.net/video',
   'verifiedSites.fmhy.reviewHtml': 'Review supplied HTML',
   'verifiedSites.fmhy.reviewCached': 'Review cached snapshot',
-  'verifiedSites.fmhy.cached': 'Cached snapshot: {at} · {count} direct entries.',
+  'verifiedSites.fmhy.cached': { one: 'Cached snapshot: {at} · {count} direct entry.', other: 'Cached snapshot: {at} · {count} direct entries.' },
   'verifiedSites.fmhy.previewAria': 'FMHY refresh reconciliation preview',
   'verifiedSites.fmhy.preview': 'Reconciliation preview',
   'verifiedSites.fmhy.stats': '{added} new · {changed} metadata changes · {unchanged} unchanged · {absent} absent (retained) · {encoded} encoded skipped · {duplicate} duplicate URLs skipped.',
@@ -15063,7 +15063,6 @@ export const en: Catalog = {
   'recorder.job.transcriptFailed': 'The transcript could not be made.',
   'recorder.job.transcriptDone': 'Subtitles added.',
   'recorder.job.playedDirect': 'The study player was not available, so it opened in your default player.',
-  'recorder.job.modelMissing': 'The transcription model is not downloaded yet.',
   'recorder.job.modelDownloading': 'Downloading the model… {pct}%',
   'recorder.job.downloadModel': 'Download model',
   'recorder.job.open': 'Open',
@@ -15359,7 +15358,7 @@ export const en: Catalog = {
   'agent2.action.calendar': 'Open the calendar',
   'agent2.action.grammar': 'Open the grammar library',
   'agent2.cite.deckQueue': 'Deck: {due} due, {learning} learning, {fresh} new',
-  'agent2.cite.reviewLog': 'Review log: {count} reviews in 14 days, {average} a day',
+  'agent2.cite.reviewLog': { one: 'Review log: {count} review in 14 days, {average} a day', other: 'Review log: {count} reviews in 14 days, {average} a day' },
   'agent2.cite.statsToday': 'Statistics: {reviews} reviews and {minutes} min of focused study today',
   'agent2.cite.minedToday': 'Cards added today: {count}',
   'agent2.cite.knownSkipped': 'Known words skipped: {count}',

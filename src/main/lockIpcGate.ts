@@ -16,8 +16,11 @@
  *    hydration and polls in the windows behind the lock therefore resume on
  *    unlock instead of failing, and a poll cannot spin while it waits. Past
  *    `MAX_HELD_INVOKES` a call is rejected outright with `IPC_LOCKED_MESSAGE`.
- *  - a `send` (fire-and-forget) keeps only its LATEST message per window and
- *    channel, delivered on unlock; anything beyond `MAX_HELD_MESSAGES` is dropped.
+ *  - a `send` (fire-and-forget) on a snapshot channel keeps only its LATEST
+ *    message per window and channel, delivered on unlock. A reply or an
+ *    acknowledgement (`*-reply`, `*-ack`: one per request id) is not a snapshot:
+ *    every one is kept, in order (`ipcSendIsSnapshot`). Anything beyond
+ *    `MAX_HELD_MESSAGES` held sends is dropped.
  *  - lock4: on unlock both drain from ONE queue in arrival order, at most
  *    `HELD_DRAIN_CONCURRENCY` invokes at a time (a call still running after
  *    `HELD_SLOT_RELEASE_MS` frees its slot), and a call made while the queue is
@@ -72,6 +75,17 @@ export const IPC_OPEN_WHILE_LOCKED: Readonly<Record<string, string>> = Object.fr
 export function ipcChannelOpenWhileLocked(channel: string): boolean {
   if (Object.prototype.hasOwnProperty.call(IPC_OPEN_WHILE_LOCKED, channel)) return true;
   return Object.keys(IPC_OPEN_WHILE_LOCKED_PREFIXES).some((prefix) => channel.startsWith(prefix));
+}
+
+/**
+ * Whether a newer `send` on `channel` makes an older held one from the same window
+ * worthless ("latest wins"). True for state snapshots (`player:publish`,
+ * `companionHost:pushState`, `lens:setInteractive`, …). False for a reply or an
+ * acknowledgement: each `*-reply` answers ONE request id and each `*-ack` settles
+ * one pending operation, so collapsing two would leave a caller waiting forever.
+ */
+export function ipcSendIsSnapshot(channel: string): boolean {
+  return !/[-:](?:reply|ack)$/i.test(channel);
 }
 
 export const MAX_HELD_INVOKES = 256;
@@ -167,7 +181,8 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
    * `HELD_DRAIN_CONCURRENCY` held invokes run at once (the next starts when one
    * settles), so 256 hydration calls from the windows behind the lock no longer
    * all hit the database in the same tick. A newer `send` from the same window
-   * on the same channel supersedes the older one, which leaves the queue.
+   * on the same snapshot channel supersedes the older one, which leaves the
+   * queue; a reply or ack is never superseded (`key` null).
    */
   type Held =
     | {
@@ -178,10 +193,12 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
         resolve: (value: unknown) => void;
         reject: (reason: unknown) => void;
       }
-    | { kind: 'send'; key: string; sender: SenderLike | null; run: () => void };
+    | { kind: 'send'; key: string | null; sender: SenderLike | null; run: () => void };
   const queue: Held[] = [];
-  /** The latest held `send` per window and channel (each one is also in `queue`). */
+  /** The latest held snapshot `send` per window and channel (each one is also in `queue`). */
   const latestSend = new Map<string, Held>();
+  /** Held sends of both kinds (the cap counts them all). */
+  let heldSendCount = 0;
   let heldInvokeCount = 0;
   let running = 0;
   const refused: string[] = [];
@@ -211,7 +228,8 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
       if (head.kind === 'invoke' && running >= HELD_DRAIN_CONCURRENCY) return;
       queue.shift();
       if (head.kind === 'send') {
-        if (latestSend.get(head.key) === head) latestSend.delete(head.key);
+        heldSendCount -= 1;
+        if (head.key !== null && latestSend.get(head.key) === head) latestSend.delete(head.key);
         if (senderGone(head.sender)) continue;
         try {
           head.run();
@@ -221,8 +239,10 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
         continue;
       }
       heldInvokeCount -= 1;
-      if (senderGone(head.sender)) {
-        head.reject(ipcLockedError(head.channel));
+      // A const, so the narrowing to an invoke holds inside the callbacks below.
+      const call = head;
+      if (senderGone(call.sender)) {
+        call.reject(ipcLockedError(call.channel));
         continue;
       }
       running += 1;
@@ -241,7 +261,7 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
       (slotTimer as { unref?: () => void }).unref?.();
       let out: unknown;
       try {
-        out = head.run();
+        out = call.run();
       } catch (err) {
         out = Promise.reject(err);
       }
@@ -249,13 +269,13 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
         (value) => {
           clearTimeout(slotTimer);
           releaseSlot();
-          head.resolve(value);
+          call.resolve(value);
           pump();
         },
         (reason) => {
           clearTimeout(slotTimer);
           releaseSlot();
-          head.reject(reason);
+          call.reject(reason);
           pump();
         },
       );
@@ -271,7 +291,7 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
     }
     refused.length = 0;
     refusedSet.clear();
-    if (queue.length) log(`releasing ${heldInvokeCount} held call(s), ${latestSend.size} message(s) in order`);
+    if (queue.length) log(`releasing ${heldInvokeCount} held call(s), ${heldSendCount} message(s) in order`);
     pump();
   }
 
@@ -307,23 +327,29 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
     if (ipcChannelOpenWhileLocked(channel)) return listener;
     const existing = wrappers.get(listener);
     if (existing) return existing;
+    const snapshot = ipcSendIsSnapshot(channel);
     const wrapped = ((event: IpcMainEvent, ...args: unknown[]) => {
       const run = () => (listener as (e: IpcMainEvent, ...a: unknown[]) => unknown)(event, ...args);
       const isLocked = locked();
       if (!isLocked && !queue.length) return run();
       if (isLocked) noteRefused(channel);
       const sender = senderOf(event);
-      const key = `${sender?.id ?? '?'}|${channel}`;
-      const older = latestSend.get(key);
-      if (!older && isLocked && latestSend.size >= MAX_HELD_MESSAGES) return undefined;
-      // Latest wins: a stream of state snapshots collapses to the one that
-      // matters, and the superseded one leaves the line (no duplicate delivery).
+      const key = snapshot ? `${sender?.id ?? '?'}|${channel}` : null;
+      const older = key !== null ? latestSend.get(key) : undefined;
+      if (!older && isLocked && heldSendCount >= MAX_HELD_MESSAGES) return undefined;
+      // Latest wins, for snapshots only: a stream of state snapshots collapses to
+      // the one that matters, and the superseded one leaves the line (no
+      // duplicate delivery). Replies and acks each keep their own place.
       if (older) {
         const at = queue.indexOf(older);
-        if (at >= 0) queue.splice(at, 1);
+        if (at >= 0) {
+          queue.splice(at, 1);
+          heldSendCount -= 1;
+        }
       }
       const entry: Held = { kind: 'send', key, sender, run };
-      latestSend.set(key, entry);
+      if (key !== null) latestSend.set(key, entry);
+      heldSendCount += 1;
       queue.push(entry);
       if (isLocked) schedule();
       else pump();
@@ -352,7 +378,7 @@ export function installIpcLockGate(ipc: IpcMain, partial: Partial<IpcLockGateDep
   const gate: IpcLockGate = {
     registered: () => [...channels].sort(),
     heldInvokes: () => heldInvokeCount,
-    heldMessages: () => latestSend.size,
+    heldMessages: () => heldSendCount,
     refusedSinceUnlock: () => [...refused],
     flush,
   };

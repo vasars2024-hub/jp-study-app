@@ -212,12 +212,28 @@ function wordList(dir) {
   return { file, unique: ['窓辺', '雀', '台所', '眺める', '静か'] };
 }
 
-/** Two invented songs (sine tones, AAC) with a synced `.lrc` beside each. */
+/**
+ * Three invented songs (sine tones, AAC) with a synced `.lrc` each. The second is
+ * enhanced LRC: its first line carries word times and ends at 4 s with an instrumental
+ * break to 8 s (a blank stamp). The third has no sidecar: its `.lrc` sits in a
+ * `Lyrics` folder beside it, for the offline folder match.
+ */
 const SONGS = [
   { title: 'E2E 雨の歌', freq: 392, lines: [[1.0, '雨が静かに降っている'], [4.0, '窓辺で一緒に歌おう'], [8.0, '明日は晴れるかな']] },
-  { title: 'E2E 朝の歌', freq: 523, lines: [[1.0, 'おはよう、新しい朝'], [5.0, 'パンを食べて出かけよう']] },
+  {
+    title: 'E2E 朝の歌',
+    freq: 523,
+    lines: [[1.0, 'おはよう、新しい朝', [[1.0, 'おはよう、'], [2.0, '新しい'], [3.0, '朝']], 4.0], [8.0, 'パンを食べて出かけよう']],
+  },
+  { title: 'E2E 夜の歌', freq: 330, lines: [[1.0, '星が窓に光る'], [5.0, '静かな夜に眠ろう']], lyricsDir: 'Lyrics' },
 ];
 const lrcTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${(s % 60).toFixed(2).padStart(5, '0')}`;
+/** One LRC line: `[t]text`, or enhanced `[t]<t1>w1<t2>w2…<end>` plus a blank `[end]` stamp. */
+const lrcLine = ([t, l, words, end]) => {
+  if (!words) return [`[${lrcTime(t)}]${l}`];
+  const body = words.map(([wt, w]) => `<${lrcTime(wt)}>${w}`).join('') + `<${lrcTime(end)}>`;
+  return [`[${lrcTime(t)}]${body}`, `[${lrcTime(end)}]`];
+};
 
 async function music(dir) {
   const folder = path.join(dir, 'music');
@@ -227,8 +243,10 @@ async function music(dir) {
     const file = path.join(folder, `${song.title}.m4a`);
     await ffmpeg(['-f', 'lavfi', '-i', `sine=frequency=${song.freq}:sample_rate=44100:duration=12`, '-c:a', 'aac', '-b:a', '96k',
       '-metadata', `title=${song.title}`, '-metadata', 'artist=Gum E2E', file]);
-    const lrc = path.join(folder, `${song.title}.lrc`);
-    fs.writeFileSync(lrc, [`[ti:${song.title}]`, '[ar:Gum E2E]', ...song.lines.map(([t, l]) => `[${lrcTime(t)}]${l}`), ''].join('\n'), 'utf8');
+    const lrcDir = song.lyricsDir ? path.join(folder, song.lyricsDir) : folder;
+    fs.mkdirSync(lrcDir, { recursive: true });
+    const lrc = path.join(lrcDir, `${song.title}.lrc`);
+    fs.writeFileSync(lrc, [`[ti:${song.title}]`, '[ar:Gum E2E]', ...song.lines.flatMap(lrcLine), ''].join('\n'), 'utf8');
     out.push({ ...song, file, lrc });
   }
   return out;
@@ -254,4 +272,190 @@ async function youtubeDownload(dir) {
   return { id, mp4, srt, title: '朝の会話 E2E' };
 }
 
-module.exports = { yomitanFrequencyZip, kanjidicXml, epub, manga, video, wordList, music, youtubeDownload, SUBS, SONGS };
+// ----- a library's worth of small books and manga --------------------------------------
+
+const zlib = require('node:zlib');
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * A PNG drawn in plain Node (no ffmpeg): a paper-coloured page with a seeded noise band.
+ * The noise keeps the page from compressing to nothing, so importing an archive of them
+ * takes measurable time (a Stop pressed part-way has something to stop).
+ */
+function noisePng(width, height, seed, noiseRows = height) {
+  let s = (seed * 2654435761) >>> 0 || 1;
+  const rand = () => {
+    s ^= s << 13;
+    s >>>= 0;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    s >>>= 0;
+    return s & 0xff;
+  };
+  const raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) {
+    const row = y * (width * 3 + 1);
+    raw[row] = 0;
+    for (let x = 0; x < width; x++) {
+      const at = row + 1 + x * 3;
+      if (y < noiseRows) {
+        raw[at] = rand();
+        raw[at + 1] = rand();
+        raw[at + 2] = rand();
+      } else {
+        raw[at] = 0xf4;
+        raw[at + 1] = 0xf1;
+        raw[at + 2] = 0xe8;
+      }
+    }
+  }
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // RGB
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(raw, { level: 1 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+/** A minimal EPUB 3 (one chapter, optional OPF series / creator / subjects). */
+function smallEpubBuffer({ title, uid, body, creator = 'Gum E2E', cover = null }) {
+  const opf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid" xml:lang="ja">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:identifier id="uid">${uid}</dc:identifier>
+<dc:title>${title}</dc:title><dc:creator>${creator}</dc:creator><dc:language>ja</dc:language>
+<meta property="dcterms:modified">2026-10-01T00:00:00Z</meta>${cover ? '\n<meta name="cover" content="cover"/>' : ''}
+</metadata>
+<manifest>
+<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+<item id="c1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>${cover ? '\n<item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>' : ''}
+</manifest>
+<spine><itemref idref="c1"/></spine>
+</package>`;
+  const page = (head, inner) => `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja" lang="ja">
+<head><meta charset="UTF-8"/><title>${head}</title></head>
+<body>${inner}</body></html>`;
+  const zip = new AdmZip();
+  zip.addFile('mimetype', Buffer.from('application/epub+zip'));
+  zip.getEntry('mimetype').header.method = 0;
+  zip.addFile('META-INF/container.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`));
+  zip.addFile('OEBPS/content.opf', Buffer.from(opf));
+  zip.addFile('OEBPS/nav.xhtml', Buffer.from(page('目次', '<nav epub:type="toc"><ol><li><a href="chapter1.xhtml">一</a></li></ol></nav>')));
+  zip.addFile('OEBPS/chapter1.xhtml', Buffer.from(page(title, body)));
+  if (cover) {
+    zip.addFile('OEBPS/cover.png', cover);
+    zip.getEntry('OEBPS/cover.png').header.method = 0;
+  }
+  return zip.toBuffer();
+}
+
+/**
+ * The library flow's media, generated into `<dir>/library-e2e/`:
+ *
+ *  - `shelf/`: two single books the flow removes, restores and edits (unique titles, so
+ *    they never collide with what another flow imported);
+ *  - `collection/`: 30 files, the "import my whole folder" case — 18 EPUBs and 10 manga
+ *    archives (each different bytes), one byte-for-byte copy of the first EPUB under
+ *    another name (a duplicate) and one .cbz with no images in it (a failure).
+ *    Natural-sorted names, so the job meets them in that order.
+ *
+ * The pages carry incompressible noise (~0.7 MB a page), so an import takes long
+ * enough for the flow to press Stop part-way through it.
+ */
+function libraryCollection(dir, { pageWidth = 480, pageHeight = 480 } = {}) {
+  const root = path.join(dir, 'library-e2e');
+  const shelfDir = path.join(root, 'shelf');
+  const collectionDir = path.join(root, 'collection');
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.mkdirSync(shelfDir, { recursive: true });
+  fs.mkdirSync(collectionDir, { recursive: true });
+  const uid = (n) => `urn:uuid:00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const pad = (n) => String(n).padStart(2, '0');
+
+  const shelf = [
+    { title: 'E2E 書庫の本 甲', file: 'shokoshelf-ko.epub', body: '<p>甲の本。窓辺で猫が眠る。</p>' },
+    { title: 'E2E 書庫の本 乙', file: 'shokoshelf-otsu.epub', body: '<p>乙の本。雨の日に傘を差す。</p>' },
+  ].map((b, i) => {
+    const file = path.join(shelfDir, b.file);
+    fs.writeFileSync(file, smallEpubBuffer({ title: b.title, uid: uid(9000 + i), body: b.body }));
+    return { ...b, file };
+  });
+
+  const books = [];
+  for (let i = 1; i <= 18; i++) {
+    const title = `E2E 蔵書 ${pad(i)}`;
+    const file = path.join(collectionDir, `${pad(i)}-zousho-${pad(i)}.epub`);
+    const cover = noisePng(pageWidth, pageHeight, 1000 + i);
+    fs.writeFileSync(file, smallEpubBuffer({ title, uid: uid(1000 + i), body: `<p>第${i}冊。今日は${i}日目です。</p>`, cover }));
+    books.push({ title, file, kind: 'book' });
+  }
+  const manga = [];
+  for (let i = 1; i <= 10; i++) {
+    const n = 18 + i;
+    const title = `${pad(n)}-manga-e2e-${pad(i)}`;
+    const zip = new AdmZip();
+    for (let p = 1; p <= 2; p++) {
+      zip.addFile(`${pad(p)}.png`, noisePng(pageWidth, pageHeight, 5000 + i * 10 + p));
+      zip.getEntry(`${pad(p)}.png`).header.method = 0;
+    }
+    const file = path.join(collectionDir, `${title}.cbz`);
+    zip.writeZip(file);
+    manga.push({ title, file, kind: 'manga' });
+  }
+  // The same bytes as the first book, under another name: "already in the library".
+  const duplicate = path.join(collectionDir, '29-zousho-01-copy.epub');
+  fs.copyFileSync(books[0].file, duplicate);
+  // An archive with no page in it: imported as a failure, named in the receipt.
+  const broken = path.join(collectionDir, '30-broken-e2e.cbz');
+  const empty = new AdmZip();
+  empty.addFile('readme.txt', Buffer.from('no pages here'));
+  empty.writeZip(broken);
+
+  const files = fs.readdirSync(collectionDir).map((f) => path.join(collectionDir, f));
+  return {
+    root,
+    shelf,
+    collectionDir,
+    files,
+    books,
+    manga,
+    duplicate,
+    broken,
+    /** What a complete import of `collectionDir` into a library without these must report. */
+    expected: { total: files.length, imported: books.length + manga.length, duplicates: 1, failed: 1 },
+  };
+}
+
+module.exports = { yomitanFrequencyZip, kanjidicXml, epub, manga, video, wordList, music, youtubeDownload, libraryCollection, SUBS, SONGS };

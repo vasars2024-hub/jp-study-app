@@ -24,9 +24,11 @@ import { SCRAPER_FIX_ZH } from '../scraperFix/zh';
 import { ANIME_SCHEDULE_ZH } from '../animeSchedule/zh';
 import { SHELL_UI_ZH } from '../shellUi/zh';
 import { TOUR_UI_ZH } from '../tourUi/zh';
+import { ONB3_UI_ZH } from '../onb3Ui/zh';
 import { COMMANDS_UI_ZH } from '../commandsUi/zh';
 import { COMPANION_UI_ZH } from '../companionUi/zh';
 import { MUSIC_UI_ZH } from '../musicUi/zh';
+import { MUSIC_LYRICS2_ZH } from '../musicLyrics2/zh';
 import { RESOURCES_CATALOG_ZH } from '../resourcesCatalog/zh';
 import { RESOURCE_BUNDLES_ZH } from '../resourceBundles/zh';
 import { INSTALL_UI_ZH } from '../installUi/zh';
@@ -41,9 +43,12 @@ import { STUDY_UI_ZH } from '../studyUi/zh';
 import { SYSTEM_UI_ZH } from '../systemUi/zh';
 import { CAPTIONS_UI_ZH } from '../captionsUi/zh';
 import { QUALITY_UI_ZH } from '../qualityUi/zh';
+import { SETTINGS8_UI_ZH } from '../settings8Ui/zh';
+import { SETTINGS_TRANSFER_UI_ZH } from '../settingsTransferUi/zh';
 import { POLISH_UI_ZH } from '../polishUi/zh';
 import { PRODUCT5_UI_ZH } from '../product5Ui/zh';
 import { DICT3_UI_ZH } from '../dict3Ui/zh';
+import { DICT4_UI_ZH } from '../dict4Ui/zh';
 import { RECORDER_V2_ZH } from '../recorderV2/zh';
 import { SCRAPER_V2_ZH } from '../scraperV2/zh';
 import { STUDY_AREAS_UI_ZH } from '../studyAreasUi/zh';
@@ -53,6 +58,10 @@ import { LENS_OCR_UI_ZH } from '../lensOcrUi/zh';
 import { MEDIA5_ZH } from '../media5/zh';
 import { PLANNER_UI_ZH } from '../plannerUi/zh';
 import { SNIP_UI_ZH } from '../snipUi/zh';
+import { SNIP2_UI_ZH } from '../snip2Ui/zh';
+import { NOTES_UI_ZH } from '../notesUi/zh';
+import { LIBRARY_MANAGE_UI_ZH } from '../libraryManageUi/zh';
+import { VIDEO_STUDY2_UI_ZH } from '../videoStudy2Ui/zh';
 
 export const zh: Catalog = {
   'common.download': '下载',
@@ -756,9 +765,11 @@ export const zh: Catalog = {
   ...GRAMMAR_TAXONOMY_ZH,
   ...SHELL_UI_ZH,
   ...TOUR_UI_ZH,
+  ...ONB3_UI_ZH,
   ...COMMANDS_UI_ZH,
   ...COMPANION_UI_ZH,
   ...MUSIC_UI_ZH,
+  ...MUSIC_LYRICS2_ZH,
   ...RESOURCES_CATALOG_ZH,
   ...RESOURCE_BUNDLES_ZH,
   ...INSTALL_UI_ZH,
@@ -773,9 +784,12 @@ export const zh: Catalog = {
   ...SYSTEM_UI_ZH,
   ...CAPTIONS_UI_ZH,
   ...QUALITY_UI_ZH,
+  ...SETTINGS8_UI_ZH,
+  ...SETTINGS_TRANSFER_UI_ZH,
   ...POLISH_UI_ZH,
   ...PRODUCT5_UI_ZH,
   ...DICT3_UI_ZH,
+  ...DICT4_UI_ZH,
   ...RECORDER_V2_ZH,
   ...SCRAPER_V2_ZH,
   ...STUDY_AREAS_UI_ZH,
@@ -787,6 +801,10 @@ export const zh: Catalog = {
   ...MEDIA5_ZH,
   ...PLANNER_UI_ZH,
   ...SNIP_UI_ZH,
+  ...SNIP2_UI_ZH,
+  ...NOTES_UI_ZH,
+  ...LIBRARY_MANAGE_UI_ZH,
+  ...VIDEO_STUDY2_UI_ZH,
 
   'settings.appTitle': '设置',
   'settings.group.personalization': '个性化',
@@ -1808,7 +1826,6 @@ export const zh: Catalog = {
   'settings.lock.save': '保存密码',
   'settings.lock.update': '更新密码',
   'settings.lock.clear': '清除密码',
-  'settings.lock.msg.needFour': '请输入 4 位数字密码。',
   'settings.lock.msg.mismatch': '两次密码不一致。',
   'settings.lock.msg.saveFail': '无法保存密码。',
   'settings.lock.msg.saved': '密码已保存。',
@@ -2079,7 +2096,6 @@ export const zh: Catalog = {
   'settings.memory.health.kind.other': '存储不可用',
   'settings.memory.health.dismiss': '知道了',
   'settings.memory.catalogSummary': '设置目录 ≈ {bytes}，覆盖 {count} 个活动域（粒子、伙伴、壁纸、显示、学习、主机…）',
-  'settings.memory.catalogSummaryOne': '设置目录 ≈ {bytes}，覆盖 {count} 个活动域（粒子、伙伴、壁纸、显示、学习、主机…）',
   'settings.memory.livingLayer': '动态图层',
   'settings.memory.inventoryFail': '无法读取设置清单。',
   'settings.memory.filterPlaceholder': '筛选域…',
@@ -2377,7 +2393,6 @@ export const zh: Catalog = {
   'settings.shortcuts.import': '导入',
   'settings.shortcuts.resetAll': '全部重置',
   'settings.shortcuts.resetTitle': '重置快捷键',
-  'settings.shortcuts.resetMessage': '将此配置中的所有快捷键恢复为默认？',
   'settings.shortcuts.resetDone': '已重置全部快捷键。',
   'settings.shortcuts.customTitle': '新建自定义快捷键',
   'settings.shortcuts.field.name': '名称',
@@ -3041,7 +3056,6 @@ export const zh: Catalog = {
   'agent.capabilities.operation.study.known-words': '读取已知词数量或单词等级',
   // polish.* — whole-app polish pass (tray/startup, Lens opt-in)
   'polish.tray.openBlanc': '打开 Blanc',
-  'polish.tray.recordRegion': '录制区域',
   'polish.tray.keepRunning': '关闭后在托盘中继续运行',
   'polish.lifecycle.title': '启动和托盘',
   'polish.lifecycle.desc': '选择关闭窗口时的行为，以及是否随 Windows 启动 Gum。',
@@ -3364,10 +3378,10 @@ export const zh: Catalog = {
   'agent.undo.error.not-invertible': '该操作无法安全撤销。',
   'agent.undo.error.entity-not-named': '操作未记录可撤销的项目。',
   'agent.undo.error.already-undone': '该操作已被撤销。',
-  'agent.undo.error.superseded': '较新的操作已更改同一项目，因此拒绝撤销。',
+  'agent.undo.error.superseded': '在智能体操作之后又有更改，为保留该更改已拒绝撤销。未做任何更改。',
   'agent.undo.error.entity-not-found': '项目已不存在，无法撤销。',
   'agent.undo.error.operation-unavailable': '此版本没有该操作的安全逆操作。',
-  'agent.undo.error.operation-denied': '当前配置文件或权限级别不允许执行撤销此操作所需的操作。请在智能体设置中允许，或手动撤销。',
+  'agent.undo.error.operation-denied': '当前配置文件或权限级别已不再允许此类更改，因此智能体无法撤销。请在智能体设置中重新允许，或手动撤销。',
   'agent.undo.error.busy': '该操作正在撤销中。',
   'agent.undo.error.undo-failed': '无法撤销该更改。',
   'agent.undo.error.store-failed': '无法读取项目的当前状态。',
@@ -4372,7 +4386,6 @@ export const zh: Catalog = {
   'help.tour.title': '引导教程',
   'help.update.title': '更新',
   'help.update.desc': '将当前版本与最新发布的版本进行比较。',
-  'help.update.check': '检查更新',
   'help.update.checking': '正在检查…',
   'help.update.available': '有新版本 {latest}（当前 {current}）。',
   'help.update.current': '已是最新版本（{current}）。',
@@ -4594,9 +4607,6 @@ export const zh: Catalog = {
   'desktop.dialog.slideshow': '幻灯片',
   'desktop.dialog.slideshowEmpty': '该文件夹中未找到图片（.jpg、.png、.webp、.gif）。',
   'desktop.dialog.openFailed': '无法打开',
-  'desktop.dialog.resetTitle': '重置桌面',
-  'desktop.dialog.resetMessage': '重置桌面 — 关闭所有窗口，清除图标和壁纸？',
-  'desktop.dialog.resetConfirm': '重置',
 
   // Media library actions (Remove missing / Clear library)
   'mediaLib.pruneBtn': '移除缺失项',
@@ -5091,6 +5101,12 @@ export const zh: Catalog = {
   'gram2.due.review': '复习语法',
   'gram2.due.nextAt': '下一次语法复习：{when}',
   'gram2.due.none': '没有已安排的语法复习',
+  'gram2.due.today': {
+    other: '今天有 {count} 个语法点到期',
+  },
+  'gram2.due.readyNow': '现在可复习 {count} 个',
+  'gram2.undo.label': '撤销上一次评分',
+  'gram2.undo.hint': '将 {title} 恢复到原来的复习安排（Ctrl+Z）',
   'gram2.prompt.clozeTitle': '填入句型',
   'gram2.prompt.productionTitle': '用这个句型说出来',
   'gram2.prompt.answerLabel': '你的答案',
@@ -5700,19 +5716,11 @@ export const zh: Catalog = {
     other: '已从 {name} 加载 {count} 行翻译字幕。',
   },
   'studyLoop.scene.secondaryEmpty': '在 {name} 中未找到字幕行。',
-  'studyLoop.scene.grammarTitle': '媒体库中的场景',
-  'studyLoop.scene.grammarHint': '你从视频中挖掘的、用到这个句型的台词。',
-  'studyLoop.scene.play': '播放',
-  'studyLoop.scene.playAt': '从 {time} 起在视频中播放这句台词',
-  'studyLoop.scene.paletteGroup': '已挖掘的台词',
-  'studyLoop.scene.replayLast': '重播最近挖掘的台词',
-  'studyLoop.scene.replayLastTerms': '场景 视频 重播 挖掘 句子 卡片',
   // studyLoop.lookup — lookup and transcript
   'studyLoop.lookup.mine': '收集',
   'studyLoop.lookup.mined': '已收集',
   'studyLoop.lookup.mineLine': '收集此行：{line}',
   'studyLoop.lookup.minedLine': '已收集：{line}',
-  'studyLoop.lookup.playFrom': '从 {time} 播放：{line}',
   // studyLoop.track — subtitle track choice, Whisper, library saves
   // studyLoop.stats — stats, calendar, streak, Aero/Wired integration
   'studyLoop.stats.card.minedToday': '今日从视频采集的句子',
@@ -6208,7 +6216,7 @@ export const zh: Catalog = {
   'library.chip.deleteTitle': '删除此文件夹（图书保留）',
   'library.chip.createTitle': '创建',
   'library.remove.title': '从资料库移除',
-  'library.remove.message': '要从资料库移除此项吗？已导入的副本将被删除。',
+  'library.remove.message': '要从资料库移除此项吗？它会移到“最近移除”，30 天内仍可恢复。之后，已导入的副本将被删除。',
   'library.deleteFolder.title': '删除文件夹',
   'library.deleteFolder.message': '删除文件夹“{name}”？其中的图书仍会留在资料库（未归类）。',
   'library.deleteFolder.confirm': '删除',
@@ -6547,7 +6555,6 @@ export const zh: Catalog = {
   'calendar.monthGrid': '月历网格 — 方向键按天移动，Enter 在所选日期添加日程',
   'calendar.noEventsToday': '这一天没有日程。',
   'calendar.addEvent': '＋ 添加日程',
-  'calendar.addInline': '＋ 添加',
   'calendar.allDay': '全天',
   'calendar.agenda.nothingToday': '今天没有安排。',
   'calendar.agenda.upcoming': '即将到来',
@@ -8797,6 +8804,17 @@ export const zh: Catalog = {
   'deinflect.reason.shimau': '完成（〜てしまう）',
   'deinflect.reason.chau': '完成（〜ちゃう）',
   'deinflect.reason.teoku': '准备（〜ておく）',
+  'deinflect.reason.teAru': '结果状态（〜てある）',
+  'deinflect.reason.teMiru': '尝试（〜てみる）',
+  'deinflect.reason.teKuru': '趋向（〜てくる）',
+  'deinflect.reason.teIku': '趋向（〜ていく）',
+  'deinflect.reason.conditionalNara': '条件（〜なら）',
+  'deinflect.reason.tagaru': '第三人称愿望（〜たがる）',
+  'deinflect.reason.sou': '样态（〜そう）',
+  'deinflect.reason.nagara': '同时（〜ながら）',
+  'deinflect.reason.zu': '否定（〜ず）',
+  'deinflect.reason.sa': '名词化（〜さ）',
+  'deinflect.reason.nasai': '命令（〜なさい）',
 
   // Clipboard History panel
   'clipboard.filter.all': '全部',
@@ -9391,9 +9409,6 @@ export const zh: Catalog = {
     '这些设置仅属于 Blanc 模式，不会同步到 Gum 主应用、主“内存与存储”页面、桌面布局、小组件或普通模式的偏好设置。',
   'blanc.settings.rememberLastTab': '记住上次的 Blanc 标签页',
   'blanc.settings.restoreReader': '仅在 Blanc 中保留阅读器恢复设置',
-  'blanc.settings.reviewLimit': '复习上限',
-  'blanc.settings.scratchpad': '草稿纸',
-  'blanc.settings.scratchpadPlaceholder': '仅用于此工具箱模式的纯文本笔记',
   'blanc.settings.resetMemory': '重置 Blanc 记忆',
   'blanc.settings.lockscreen': '锁屏',
   'blanc.settings.changePin': '更改 PIN',
@@ -9403,7 +9418,6 @@ export const zh: Catalog = {
   'blanc.settings.pinCleared': 'PIN 已清除。',
   'blanc.settings.requirePin': '启动时要求输入 PIN',
   'blanc.settings.controlCenter': '工具箱控制中心',
-  'blanc.settings.searchSettings': '搜索工具箱设置',
   'blanc.settings.export': '导出',
   'blanc.settings.import': '导入',
   'blanc.settings.resetAll': '全部重置',
@@ -9445,10 +9459,7 @@ export const zh: Catalog = {
   'blanc.settings.category.layout': '布局',
   'blanc.settings.category.search': '搜索',
   'blanc.settings.category.keyboard-shortcuts': '键盘快捷键',
-  'blanc.settings.definitions': '匹配的设置定义（{count}）',
-  'blanc.settings.col.setting': '设置',
   'blanc.settings.col.category': '类别',
-  'blanc.settings.col.description': '说明',
   'blanc.settings.toolVisibility': '工具可见性',
   'blanc.settings.toolEnabled': '启用',
   'blanc.settings.toolHidden': '隐藏',
@@ -9456,7 +9467,6 @@ export const zh: Catalog = {
   'blanc.settings.modeNote': '退出 Blanc 模式会关闭此工具箱窗口，Gum 仍会继续运行。',
   'blanc.settings.exitBlanc': '退出 Blanc 模式',
 
-  'blanc.settings.calculatorLocked': '为避免工具箱变空，计算器将始终保持启用。',
   'blanc.settings.customCss.legend': '自定义 CSS',
   'blanc.settings.customCss.intro': '叠加在 Blanc 窗口上的原始 CSS，用于主题编辑器未覆盖的部分。作用域限定在 Blanc 根元素，因此裸选择器只影响 Blanc。',
   'blanc.settings.customCss.placeholder': '.blanc-nav-btn { letter-spacing: 0.02em; }',
@@ -9466,7 +9476,6 @@ export const zh: Catalog = {
   'blanc.settings.customCss.cleared': '已清除自定义 CSS。',
   'blanc.settings.customCss.guardNote': '“退出 Blanc”和“设置”控件会在你的 CSS 之后重新生效，因此自定义样式永远无法隐藏退出 Blanc 的入口。',
   'blanc.settings.resetCategoryDone': '已重置{category}设置。',
-  'blanc.settings.pinFourDigits': 'PIN 必须为 4 位数字。',
   'blanc.settings.pinSaved': 'PIN 已保存。',
   'blanc.settings.pinFirst': '请先设置 PIN 或密码短语。',
   'blanc.settings.lockEnabled': '锁屏已启用。',
@@ -10019,19 +10028,12 @@ export const zh: Catalog = {
   'mediaWorkspace.study.micStopped': '麦克风录音意外停止。',
   'mediaWorkspace.study.micStartFailed': '无法开始麦克风录音。',
   'mediaWorkspace.study.whisperLocalOnly': 'Whisper 生成需要 Seanime 媒体库中的本地文件。',
-  'mediaWorkspace.study.extractingAudio': '正在用 ffmpeg 提取 16 kHz 单声道音频…',
-  'mediaWorkspace.study.noAudioTrack': '未找到音轨。',
-  'mediaWorkspace.study.audioExtractionFailed': '音频提取失败。',
-  'mediaWorkspace.study.loadingWhisper': '正在加载本地 Whisper 模型…',
   'mediaWorkspace.study.whisperStartFailed': '无法启动 Whisper 工作线程。',
-  'mediaWorkspace.study.whisperOnDevice': '正在{device}上运行 Whisper…',
-  'mediaWorkspace.study.gpu': 'GPU',
   'mediaWorkspace.study.cpu': 'CPU',
   'mediaWorkspace.study.whisperFailed': 'Whisper 字幕生成失败。',
   'mediaWorkspace.study.noWhisperCues': 'Whisper 已完成，但没有生成字幕。',
   'mediaWorkspace.study.whisperGenerated': 'Whisper（生成）',
   'mediaWorkspace.study.whisperMountFailed': '无法加载 Whisper 字幕。',
-  'mediaWorkspace.study.audioSendFailed': '无法将音频发送给 Whisper。',
   'mediaWorkspace.study.listenType': '先听，然后输入字幕',
   'mediaWorkspace.study.waitingSubtitle': '正在等待字幕',
   'mediaWorkspace.study.typeWhatYouHear': '输入你听到的内容',
@@ -10187,7 +10189,6 @@ export const zh: Catalog = {
   'mediaWorkspace.study.whisperStatus': 'Whisper 状态',
   'mediaWorkspace.study.deviceStatus': '设备：{device}',
   'mediaWorkspace.study.whisperProgress': 'Whisper 进度',
-  'mediaWorkspace.study.downloadProgress': '正在下载 {file} — {progress}%',
   'mediaWorkspace.study.generatedLines': '已生成 {count} 行字幕。',
   'study.favoriteAlternative.title': '先尝试 {easier}，再看 {harder}',
   'study.favoriteAlternative.explanation': '两个收藏都使用当前缓存的就绪度。替代作品已经处于只需简短预习的舒适范围。',
@@ -13440,8 +13441,6 @@ export const zh: Catalog = {
   'readingLists.view.author.onlyOne': '清单里 {author} 的书只有这一本。',
   'readingLists.view.author.goList': '前往清单“{name}”',
   'readingLists.view.coverReveal': '在书库中显示“{title}”',
-  'seanimeDev.collapse': '折叠辅助面板',
-  'seanimeDev.expand': '展开辅助面板',
   'immersion.rail.search': '搜索已保存的网站',
   'immersion.rail.noMatches': '没有匹配的网站。清除搜索以显示所有网站。',
   'immersion.rail.view.bookmarks': '书签',
@@ -13524,7 +13523,6 @@ export const zh: Catalog = {
   'settings.lens.history.clearTitle': '清除捕获历史',
   'settings.lens.history.clearMessage': '删除所有阅读透镜捕获？置顶的捕获也会被删除，且无法撤销。',
   'settings.lens.history.clearConfirm': '全部删除',
-  'settings.monitors.reset.confirm': '忘记所有按屏幕的设置？桌面及其内容会保留，但每个桌面将不再分配显示器，且无法撤销。',
   'credential.remove.title': '移除已保存的密钥',
   'credential.remove.message': '移除 {name} 的已保存凭据？服务商通常只显示一次密钥，你可能需要重新创建。',
   'credential.remove.confirm': '移除',
@@ -14156,7 +14154,6 @@ export const zh: Catalog = {
   'recorder.job.transcriptFailed': '无法生成转写。',
   'recorder.job.transcriptDone': '已添加字幕。',
   'recorder.job.playedDirect': '学习播放器不可用，已用默认播放器打开。',
-  'recorder.job.modelMissing': '转写模型尚未下载。',
   'recorder.job.modelDownloading': '正在下载模型… {pct}%',
   'recorder.job.downloadModel': '下载模型',
   'recorder.job.open': '打开',

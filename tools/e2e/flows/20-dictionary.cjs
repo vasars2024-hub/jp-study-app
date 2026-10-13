@@ -81,5 +81,22 @@ module.exports = {
     const marker = await poll(ctx, `document.querySelector('.dict-entry .dict-presence.in-deck')?.textContent`, 20000);
     result.check('"in deck" marker shows after adding', Boolean(marker), marker);
     await ctx.shot('in-deck');
+
+    // Popup round 4 (10ten / Yomitan parity), through the real preload and database:
+    // the longest word across the cursor, the other kana script, keyboard grading.
+    const scan = await ev(`window.api.dictScanLongest('食べ物を買う', 'ja')`, { await: true });
+    result.check('popup scan: the longest word at the cursor (食べ → 食べ物)', scan?.matched === '食べ物', scan);
+    const kana = await ev(`window.api.lookupTerm('タベル', 8, 'ja').then((r) => r.entries.map((e) => e.word))`, { await: true });
+    result.check('kana variant: katakana タベル finds 食べる', Array.isArray(kana) && kana.includes('食べる'), kana);
+    await ev(`(window.dispatchEvent(new CustomEvent('dict:lookup', { detail: { query: '食べ', context: '食べ物を買う', scan: true } })), true)`);
+    const head = await poll(ctx, `(() => { const q = document.querySelector('.dict-popup .dict-q')?.textContent; const opts = [...document.querySelectorAll('.dict-popup .dict-scan-opt')].map((b) => b.textContent); return q === '食べ物' ? { q, opts } : null; })()`, 20000);
+    result.check('popup opens on the longest match, the clicked word one click away', Boolean(head && head.opts.includes('食べ')), head);
+    await ev(`(() => { const p = document.querySelector('.dict-popup'); p.focus(); p.dispatchEvent(new KeyboardEvent('keydown', { key: '4', bubbles: true })); return true; })()`);
+    const known = await poll(ctx, `document.querySelector('.dict-popup .wk-grade-btn.wk-g-3')?.getAttribute('aria-pressed') === 'true' || null`, 5000);
+    result.check('popup: the 4 key grades the word Known', known === true, known);
+    await ctx.shot('popup-longest');
+    await ev(`(() => { const p = document.querySelector('.dict-popup'); p?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true; })()`);
+    const closed = await poll(ctx, `!document.querySelector('.dict-popup') || null`, 5000);
+    result.check('popup closes on Escape', closed === true, closed);
   },
 };

@@ -182,4 +182,91 @@ describe('local agent settings store events', () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  /**
+   * The regression: a key removed in this window (a reset, a test harness, a
+   * flow restoring "no settings yet") fires no `storage` event here, and the
+   * store used to keep answering with its last value — so an Agent that had
+   * been switched off stayed off after its settings were gone.
+   */
+  it('re-reads a key removed in this window instead of keeping the last value', async () => {
+    const store = await import('../localAgentSettingsStore');
+    store.saveLocalAgentSettings({ backend: 'disabled', permission: 'full-automation' });
+    expect(store.loadLocalAgentSettings().backend).toBe('disabled');
+
+    localStorage.removeItem(SETTINGS_KEY);
+
+    expect(store.loadLocalAgentSettings()).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
+  });
+
+  it('tells this window’s subscribers when a load notices an out-of-band removal', async () => {
+    const store = await import('../localAgentSettingsStore');
+    const listener = vi.fn();
+    cleanups.push(store.onLocalAgentSettingsChanged(listener));
+    store.saveLocalAgentSettings({ backend: 'disabled' });
+    listener.mockClear();
+
+    localStorage.removeItem(SETTINGS_KEY);
+    store.loadLocalAgentSettings();
+    // Deferred: loads run inside React render.
+    expect(listener).not.toHaveBeenCalled();
+    await Promise.resolve();
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith(DEFAULT_LOCAL_AGENT_SETTINGS);
+    // A second load of the same (absent) key is not a change.
+    store.loadLocalAgentSettings();
+    await Promise.resolve();
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('resets to the defaults and publishes through resetLocalAgentSettings', async () => {
+    const store = await import('../localAgentSettingsStore');
+    const listener = vi.fn();
+    cleanups.push(store.onLocalAgentSettingsChanged(listener));
+    store.saveLocalAgentSettings({ backend: 'disabled', permission: 'limited-actions' });
+
+    expect(store.resetLocalAgentSettings()).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
+
+    expect(localStorage.getItem(SETTINGS_KEY)).toBeNull();
+    expect(listener.mock.calls.at(-1)?.[0]).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
+    expect(store.loadLocalAgentSettings()).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
+  });
+
+  it('treats a sibling window’s localStorage.clear() (key null) as a removal', async () => {
+    const store = await import('../localAgentSettingsStore');
+    const listener = vi.fn();
+    cleanups.push(store.onLocalAgentSettingsChanged(listener));
+    store.saveLocalAgentSettings({ permission: 'limited-actions' });
+
+    localStorage.clear();
+    window.dispatchEvent(new StorageEvent('storage', { key: null, newValue: null }));
+
+    expect(listener.mock.calls.at(-1)?.[0]).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
+    expect(store.loadLocalAgentSettings()).toEqual(DEFAULT_LOCAL_AGENT_SETTINGS);
+  });
+
+  it('fills a partial stored entry from the defaults field by field', async () => {
+    const store = await import('../localAgentSettingsStore');
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ enabled: true, permission: 'limited-actions' }));
+
+    expect(store.loadLocalAgentSettings()).toEqual({
+      ...DEFAULT_LOCAL_AGENT_SETTINGS,
+      enabled: true,
+      permission: 'limited-actions',
+    });
+  });
+
+  it('keeps the in-memory value when storage itself is unavailable', async () => {
+    const store = await import('../localAgentSettingsStore');
+    store.saveLocalAgentSettings({ permission: 'limited-actions' });
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage unavailable');
+    });
+    try {
+      expect(store.loadLocalAgentSettings().permission).toBe('limited-actions');
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });

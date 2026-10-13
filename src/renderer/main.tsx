@@ -24,7 +24,7 @@ import { bootUiCustomization } from './uiCustomizationStore';
 import { runStorageMigrations } from './storage/migrationRunner';
 import { initProfileState } from './profileState';
 import { initDesktopState } from './desktopState';
-import { installKeyboardShortcuts } from './keyboardShortcuts';
+import { installKeyboardShortcutsSafely } from './keyboardShortcuts';
 import { clearOnExitIfConfigured } from './clipboardHistory';
 import { startReleaseCheck } from './releaseCheck';
 import { showCrashRecoveryNotice } from './crashRecoveryNotice';
@@ -420,7 +420,8 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !i
     if (hasDiscoveredWired()) prefetchThemeSheets(MATERIAL_SHEETS.wired);
   }, 20000);
 
-  installKeyboardShortcuts();
+  // kbd7: a damaged shortcut store is backed up and reset, never a window that will not render.
+  installKeyboardShortcutsSafely();
   runWhenIdle(startReleaseCheck, 12000);
   // A window main reloaded after a renderer crash says so (crashRecovery.ts).
   runWhenIdle(() => void showCrashRecoveryNotice(), 4000);

@@ -8,6 +8,7 @@
  * missing or fails to play falls through to the next one.
  */
 import { cardAudioSource } from '../cardAudioSource';
+import { trackForegroundMedia } from '../foregroundAudio';
 
 export interface CardMediaFields {
   /** Mined scene clip (video file). Read structurally: older cards lack it. */
@@ -55,7 +56,12 @@ const defaultDeps: CardMediaDeps = {
   },
   resolveAudio: cardAudioSource,
   // An <audio> element plays a video container's audio track; the clip is heard, not shown.
-  createElement: (src) => new Audio(src) as unknown as MediaElementLike,
+  // snd6: reported as foreground audio, so the Soundscape ducks under the clip.
+  createElement: (src) => {
+    const element = new Audio(src);
+    trackForegroundMedia(element);
+    return element as unknown as MediaElementLike;
+  },
 };
 
 let current: MediaElementLike | null = null;

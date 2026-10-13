@@ -75,7 +75,15 @@ export async function decodeRecording(blob: Blob): Promise<DecodedSpeech> {
 }
 
 export type SpeechTranscript =
-  | { ok: true; text: string; durationSec: number; spokenSec: number | null }
+  | {
+    ok: true;
+    text: string;
+    durationSec: number;
+    spokenSec: number | null;
+    /** The decoded take (16 kHz mono), for the on-device pitch and rhythm check. Never sent anywhere. */
+    pcm?: Float32Array;
+    sampleRate?: number;
+  }
   | { ok: false; reason: 'not-installed' | 'cancelled' | 'decode-failed' | 'failed' | 'empty' };
 
 /**
@@ -98,7 +106,7 @@ export async function transcribeRecording(blob: Blob, lang: StudyLang, signal?: 
   if (!result.ok) return { ok: false, reason: result.error === 'cancelled' ? 'cancelled' : 'failed' };
   const text = (result.text ?? '').trim();
   if (!text) return { ok: false, reason: 'empty' };
-  return { ok: true, text, durationSec: speech.durationSec, spokenSec: speech.spokenSec };
+  return { ok: true, text, durationSec: speech.durationSec, spokenSec: speech.spokenSec, pcm: speech.pcm, sampleRate: SPEECH_SAMPLE_RATE };
 }
 
 export interface MicRecording {
@@ -120,7 +128,14 @@ export async function startMicRecording(maxMs = SPEECH_MAX_MS, onAutoStop?: (blo
   });
   const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
     .find((candidate) => MediaRecorder.isTypeSupported(candidate));
-  const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  let recorder: MediaRecorder;
+  try {
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  } catch (error) {
+    // The microphone is already open: never leave it (and the OS mic indicator) on.
+    for (const track of stream.getTracks()) track.stop();
+    throw error;
+  }
   const chunks: Blob[] = [];
   let discard = false;
   let resolveStop: ((blob: Blob | null) => void) | null = null;
@@ -136,7 +151,12 @@ export async function startMicRecording(maxMs = SPEECH_MAX_MS, onAutoStop?: (blo
     const blob = !discard && chunks.length ? new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }) : null;
     resolveStop?.(blob);
   };
-  recorder.start(250);
+  try {
+    recorder.start(250);
+  } catch (error) {
+    for (const track of stream.getTracks()) track.stop();
+    throw error;
+  }
   const timer = window.setTimeout(() => {
     if (recorder.state === 'recording') {
       recorder.stop();

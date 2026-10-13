@@ -14,7 +14,8 @@
  *     review here before it can ride the prefix.
  *  4. BEHAVIOUR: held invokes resolve on unlock in order, a re-lock keeps them
  *     held, the cap rejects, a closed window's calls are dropped, and a `send`
- *     keeps only its latest message per window and channel.
+ *     keeps only its latest message per window and channel (snapshot channels;
+ *     every reply and ack is kept, in order).
  */
 import { EventEmitter } from 'node:events';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -28,6 +29,7 @@ import {
   IPC_LOCKED_MESSAGE,
   IPC_OPEN_WHILE_LOCKED,
   IPC_OPEN_WHILE_LOCKED_PREFIXES,
+  ipcSendIsSnapshot,
   MAX_HELD_INVOKES,
   MAX_HELD_MESSAGES,
 } from '../lockIpcGate';
@@ -312,6 +314,67 @@ describe('behaviour', () => {
     expect(got).toEqual([]);
     unlock();
     expect(got).toEqual(['b', 'c']);
+  });
+
+  it('a reply or an ack is not a snapshot: every one is kept, in order, and delivered on unlock', () => {
+    const { ipc, state, gate, unlock } = makeGate();
+    const got: string[] = [];
+    ipc.on('extension:annotate-reply', (_e: unknown, p: { id: number }) => void got.push(`reply ${p.id}`));
+    ipc.on('extension:mined-ack', (_e: unknown, p: { mineId: number }) => void got.push(`ack ${p.mineId}`));
+    ipc.on('player:publish', (_e: unknown, snap: string) => void got.push(`snap ${snap}`));
+    state.locked = true;
+    ipc.emit('extension:annotate-reply', sender(1), { id: 1 });
+    ipc.emit('player:publish', sender(1), 'old');
+    ipc.emit('extension:annotate-reply', sender(1), { id: 2 });
+    ipc.emit('extension:mined-ack', sender(1), { mineId: 7 });
+    ipc.emit('extension:mined-ack', sender(1), { mineId: 8 });
+    ipc.emit('player:publish', sender(1), 'new');
+    ipc.emit('extension:annotate-reply', sender(1), { id: 3 });
+    expect(got).toEqual([]);
+    // Two snapshots collapsed into one; five replies/acks kept.
+    expect(gate.heldMessages()).toBe(6);
+    unlock();
+    expect(got).toEqual(['reply 1', 'reply 2', 'ack 7', 'ack 8', 'snap new', 'reply 3']);
+    expect(gate.heldMessages()).toBe(0);
+  });
+
+  it('latest wins only on snapshot channels', () => {
+    for (const ch of [
+      'extension:annotate-reply',
+      'extension:known-levels-reply',
+      'extension:known-snapshot-reply',
+      'extension:mined-ack',
+      'recorder:model-check-reply',
+      'recorder:open-in-player-reply',
+      'recorder:study-tag-reply',
+      'captions:mine-reply',
+      'captions:host-reply',
+      'transcription:chunk-reply',
+    ]) {
+      expect(ipcSendIsSnapshot(ch), ch).toBe(false);
+    }
+    for (const ch of ['player:publish', 'companionHost:pushState', 'lens:setInteractive', 'studyblock:publish', 'unsavedWork:report', 'buddyScheduler:sync']) {
+      expect(ipcSendIsSnapshot(ch), ch).toBe(true);
+    }
+    // Every literal `ipcMain.on` channel in main that answers or acknowledges is held in full.
+    const onChannels = new Set<string>();
+    for (const file of [resolve(REPO, 'src/main.ts'), ...sourceFiles(resolve(REPO, 'src/main'))]) {
+      for (const m of readFileSync(file, 'utf8').matchAll(/ipcMain\.(?:on|once)\(\s*['"`]([^'"`$]+)['"`]/g)) onChannels.add(m[1]!);
+    }
+    const answering = [...onChannels].filter((ch) => /(?:reply|ack)$/i.test(ch));
+    expect(answering.length).toBeGreaterThanOrEqual(5);
+    for (const ch of answering) expect(ipcSendIsSnapshot(ch), ch).toBe(false);
+  });
+
+  it('the cap counts held replies too', () => {
+    const { ipc, state, gate, unlock } = makeGate();
+    const got: number[] = [];
+    ipc.on('extension:annotate-reply', (_e: unknown, id: number) => void got.push(id));
+    state.locked = true;
+    for (let i = 0; i < MAX_HELD_MESSAGES + 5; i += 1) ipc.emit('extension:annotate-reply', sender(1), i);
+    expect(gate.heldMessages()).toBe(MAX_HELD_MESSAGES);
+    unlock();
+    expect(got).toEqual(Array.from({ length: MAX_HELD_MESSAGES }, (_, i) => i));
   });
 
   it('caps held sends, and passes the open plumbing channels straight through', () => {

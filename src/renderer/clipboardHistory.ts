@@ -5,7 +5,10 @@
 
 import { IDB_KEYS, LS_KEYS, mirrorToIdb } from './storage/storage';
 import type { FlashcardSource } from './flashcardDeck';
-import { mineToStudy, type MineToStudyInput } from './studyMining';
+// Type-only: the mining pipeline (studyMining → flashcardDeck, wordLookup, …)
+// loads on the first send, not with every window that imports this store —
+// Blanc's boot imports it for `clearOnExitIfConfigured` alone.
+import type { MineToStudyInput } from './studyMining';
 import { studyLangOfText } from '../shared/studyLang';
 import { getStudyLang } from './studyEnvironment';
 
@@ -254,6 +257,7 @@ export function sendEntriesToFlashcards(entries: ClipboardEntry[], source: Flash
   // through mineToStudy, so a copy sent twice finds its card instead of adding
   // another; mineToStudy also runs the user's auto-enrich preference.
   void (async () => {
+    const { mineToStudy } = await import('./studyMining');
     for (const input of clipboardStudyInputs(entries, source)) {
       await mineToStudy(input).catch(() => undefined);
     }

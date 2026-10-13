@@ -1,0 +1,48 @@
+// Settings-only export and import (settingsTransfer.) — en.
+// The Storage page card that writes and reads a settings file, its preview of
+// what an import changes, and the reasons it refuses a file.
+
+import type { Catalog } from '../core';
+
+export const SETTINGS_TRANSFER_UI_EN: Catalog = {
+  'settingsTransfer.title': 'Settings export and import',
+  'settingsTransfer.desc': 'Move your preferences to another install, or keep a known-good set. Only settings travel: no API keys or passwords, no decks, notes, review history or known words, and nothing tied to this PC.',
+  'settingsTransfer.export.legend': 'Groups to export',
+  'settingsTransfer.export.all': 'Select all',
+  'settingsTransfer.export.none': 'Select none',
+  'settingsTransfer.export.button': 'Export settings',
+  'settingsTransfer.export.done': 'Settings exported to {file}.',
+  'settingsTransfer.export.skipped': 'Left out because they could not be read or name a file on this PC: {keys}',
+  'settingsTransfer.import.button': 'Import settings file…',
+  'settingsTransfer.import.fileLabel': 'Settings file to import',
+  'settingsTransfer.import.previewTitle': 'Review before applying',
+  'settingsTransfer.import.summary': 'Changes to apply: {n}. Already the same: {same}.',
+  'settingsTransfer.import.nothing': 'Everything in this file already matches your settings.',
+  'settingsTransfer.import.from': 'Exported from Gum {version}.',
+  'settingsTransfer.import.studyLang': 'This file was made while studying {lang}. Your study language stays as it is.',
+  'settingsTransfer.import.skipTheme': 'The theme is not changed: Aero and WIRED are entered and left with their own switch.',
+  'settingsTransfer.import.default': '(default)',
+  'settingsTransfer.import.value': 'value',
+  'settingsTransfer.import.apply': 'Apply changes',
+  'settingsTransfer.import.done': 'Settings imported.',
+  'settingsTransfer.import.undone': 'The import is undone.',
+  'settingsTransfer.import.undoFailed': 'The import could not be undone.',
+  'settingsTransfer.error.readFailed': 'The file could not be read.',
+  'settingsTransfer.error.badJson': 'That file is not valid JSON.',
+  'settingsTransfer.error.notSettings': 'That file is not a Gum settings export.',
+  'settingsTransfer.error.newerSchema': 'That file comes from a newer version of Gum. Update Gum, then import it again.',
+  'settingsTransfer.error.unknownGroup': 'The file has a group this version does not know: {key}. Nothing was imported.',
+  'settingsTransfer.error.unknownKey': 'The file has a setting this version does not know: {key}. Nothing was imported.',
+  'settingsTransfer.error.forbiddenKey': 'The file carries {key}, which a settings import never accepts (secrets, user data or state of one PC). Nothing was imported.',
+  'settingsTransfer.error.badValue': 'The value of {key} is not valid. Nothing was imported.',
+  'settingsTransfer.error.machinePath': '{key} names a file on another PC. Nothing was imported.',
+  'settingsTransfer.error.empty': 'The file has no settings in it.',
+  'settingsTransfer.error.writeFailed': 'Saving {key} failed, so every change was rolled back.',
+  'settingsTransfer.error.applyFailed': '{key} could not be applied, so every change was rolled back.',
+  'settingsTransfer.hint.appearance': 'An import never switches into or out of Aero or WIRED.',
+  'settingsTransfer.hint.environment': 'Image and video wallpapers stay on this PC.',
+  'settingsTransfer.hint.music': 'Widget and lyrics options only. Liked songs and playlists stay here.',
+  'settingsTransfer.hint.dictionary': 'Example and translation languages. The study language is not changed.',
+  'search.settingsTransfer': 'Export or import settings',
+  'search.settingsTransfer.desc': 'Save chosen settings groups to a file, or preview and apply one, with Undo.',
+};

@@ -150,22 +150,31 @@ describe('localBacklog', () => {
 });
 
 describe('localDueForecast', () => {
+  // Study days (4 am rollover): 00:30 and 03:30 the next morning are still tonight's
+  // session; 04:30 is the next day. Both clock changes of 2026 in New York.
   it.each([
-    { month: 2, day: 8, hour: 0, minute: 30, expected: [0, 1] },
+    { month: 2, day: 8, hour: 4, minute: 30, expected: [0, 1] },
+    { month: 2, day: 8, hour: 0, minute: 30, expected: [1, 0] },
     { month: 10, day: 1, hour: 23, minute: 30, expected: [1, 0] },
-  ])('uses calendar days across a clock change ($month)', ({ month, day, hour, minute, expected }) => {
+    { month: 10, day: 1, hour: 3, minute: 30, expected: [1, 0] },
+  ])('uses study days across a clock change ($month, $hour:$minute)', ({ month, day, hour, minute, expected }) => {
     // Start Node in a known zone: changing TZ inside a Vitest worker is not
-    // reliable on every platform. Exercise the actual module in that process.
+    // reliable on every platform. Exercise the actual modules in that process.
     const script = `
       const ts = require('typescript');
-      const source = require('fs').readFileSync('src/shared/reviewForecast.ts', 'utf8');
-      const code = ts.transpileModule(source, {
-        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-      }).outputText;
-      const api = {};
-      new Function('exports', code)(api);
+      const load = (file, deps) => {
+        const source = require('fs').readFileSync(file, 'utf8');
+        const code = ts.transpileModule(source, {
+          compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+        }).outputText;
+        const api = {};
+        new Function('exports', 'require', code)(api, (name) => deps[name]);
+        return api;
+      };
+      const studyDay = load('src/shared/studyDay.ts', {});
+      const api = load('src/shared/reviewForecast.ts', { './studyDay': studyDay });
       const now = new Date(2026, ${month}, ${day}, 12).getTime();
-      const dueAt = new Date(2026, ${month}, ${day + (hour === 0 ? 1 : 0)}, ${hour}, ${minute}).getTime();
+      const dueAt = new Date(2026, ${month}, ${day + (hour < 12 ? 1 : 0)}, ${hour}, ${minute}).getTime();
       const result = api.localDueForecast([{ srs: { dueAt } }], 2, now);
       process.stdout.write(JSON.stringify(result));
     `;

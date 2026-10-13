@@ -10,7 +10,8 @@ import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
-import { confirmDialog, Toggle } from '../../ui';
+import { Toggle } from '../../ui';
+import ResetSectionButton from '../ResetSectionButton';
 import type { DisplaySummary } from '../../../../main/displays';
 import type { DisplayAssignment, TaskbarMode } from '../../../../shared/desktop';
 import { getAssignments, onDesktopChanged } from '../../../desktopState';
@@ -22,6 +23,21 @@ import {
 } from '../../../displayPrefs';
 
 const MAX_SIMULATED = 3;
+
+/**
+ * set8: write a snapshot of display assignments back after a reset. Each row
+ * goes through the same `deskwin:setOptions` path the controls above use, so
+ * main sanitises and re-homes it exactly as it would a hand-made change.
+ */
+async function restoreAssignments(rows: readonly DisplayAssignment[]): Promise<boolean> {
+  let ok = true;
+  for (const row of rows) {
+    const res = await window.api.deskwinSetOptions({ ...row });
+    if (!res?.ok) ok = false;
+  }
+  await window.api.deskwinSync();
+  return ok;
+}
 
 export default function MonitorsPage() {
   const { t } = useT();
@@ -210,28 +226,24 @@ export default function MonitorsPage() {
         description={t('settings.monitors.reset.desc')}
         highlight={focusSettingId === 'monitors-reset'}
       >
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            // Throws away every desktop→monitor assignment the user has made, for every
-            // display, in one click — and there is no undo. It sat next to two harmless
-            // buttons with nothing to distinguish it.
-            void (async () => {
-              const ok = await confirmDialog({
-                title: t('settings.monitors.reset'),
-                message: t('settings.monitors.reset.confirm'),
-                confirmLabel: t('settings.monitors.reset.action'),
-                danger: true,
-              });
-              if (!ok) return;
-              await window.api.desktopResetAssignments();
-              await window.api.deskwinSync();
-            })();
+        {/* Throws away every desktop→monitor assignment the user has made, for every
+            display, in one click. It sat next to two harmless buttons with nothing to
+            distinguish it, so it confirms as a danger action (ResetSectionButton), and
+            set8 made it reversible: the rows are snapshotted first and written back by
+            the toast's Undo. */}
+        <ResetSectionButton
+          settingId="monitors-reset"
+          section={t('settings.monitors.reset')}
+          label={t('settings.monitors.reset.action')}
+          dialogTitle={t('settings.monitors.reset')}
+          dialogMessage={t('set8.monitors.dialogMessage')}
+          onReset={async () => {
+            const before = getAssignments().map((row) => ({ ...row }));
+            await window.api.desktopResetAssignments();
+            await window.api.deskwinSync();
+            return () => restoreAssignments(before);
           }}
-        >
-          {t('settings.monitors.reset.action')}
-        </button>
+        />
         <p className="muted os-set-hint">{t('settings.monitors.reset.hint')}</p>
       </SettingsCard>
     </>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useT } from '../../i18n';
+import { visualNovelErrorKey } from '../../../shared/visualNovelCapture';
 import type {
   VisualNovelDatabase,
   VisualNovelEntry,
@@ -70,7 +71,7 @@ export default function VisualNovelRecommendationsPanel({
     });
     const id = created.ok ? created.database?.entries[0]?.id : undefined;
     if (!created.ok || !id) {
-      onStatus(created.error ?? t('vnRecs.addFailed'), true);
+      onStatus(t(visualNovelErrorKey(created, 'vnRecs.addFailed')), true);
       return;
     }
     const updated = await window.api.visualNovelUpdateMetadata(id, {

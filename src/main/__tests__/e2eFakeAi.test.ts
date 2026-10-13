@@ -42,6 +42,7 @@ import {
   suggestLeechRescue,
   type AiStudyDeps,
 } from '../aiStudyAssist';
+import { correctWriting, gradeJournalEntry, explainShadowing, replyAsConversationPartner } from '../aiSpeakAssist';
 import { normalizeAiFeatureSettings, type AiCloudFeatureId } from '../../shared/aiSetup';
 
 interface FakeAiHit {
@@ -59,6 +60,7 @@ interface FakeAi {
   hits: FakeAiHit[];
   failNext(feature: string): void;
   count(feature?: string): number;
+  prompts(feature: string): string[];
   close(): Promise<void>;
 }
 
@@ -67,6 +69,7 @@ const world = require('../../../tools/e2e/world.cjs') as {
   startFakeAi(options?: { model?: string }): Promise<FakeAi>;
   writeAiPreset(profileDir: string, ai: { base: string; model: string }): void;
   FAKE_AI_FEATURES: string[];
+  FAKE_AI_SPEAK_FEATURES: string[];
 };
 
 let fake: FakeAi | null = null;
@@ -216,5 +219,47 @@ describe('fake OpenAI-compatible AI server (tools/e2e/world.cjs)', () => {
     for (const feature of world.FAKE_AI_FEATURES) expect(normalized.cloudFeatures[feature as AiCloudFeatureId]).toBe(true);
     const mining = JSON.parse(fs.readFileSync(path.join(shared.userData, 'mining', 'config.json'), 'utf8'));
     expect(mining).toEqual({ providerId: 'openai-compatible', engine: 'cloud' });
+  });
+});
+
+describe('fake AI: the speaking and writing helpers (tools/e2e/flows/88b-speak.cjs)', () => {
+  const chatBase = {
+    studyLang: 'ja', answerLang: 'en', scenario: 'free', formality: 'polite', level: 'N4',
+    knownWords: [], recallWords: [], shareStudyData: 'allow',
+  };
+
+  it("the partner opens, answers and corrects through the app's own validation; prompts are kept", async () => {
+    fake = await world.startFakeAi();
+    const opening = await replyAsConversationPartner({ ...chatBase, history: [], message: '', correct: false }, viaFake(fake));
+    expect(opening).toMatchObject({ ok: true, result: { reply: 'いらっしゃいませ。改札はあちらです。', correction: null } });
+    const reply = await replyAsConversationPartner({
+      ...chatBase, recallWords: ['改札'], history: [{ role: 'partner', text: 'いらっしゃいませ。' }], message: '水がください', correct: true,
+    }, viaFake(fake));
+    expect(reply.result?.correction).toMatchObject({ corrected: '水をください' });
+    expect(fake.prompts('conversationPartner')).toHaveLength(2);
+    expect(fake.prompts('conversationPartner')[1]).toContain('Learner: 水がください');
+    expect(fake.prompts('conversationPartner')[1]).toMatch(/earlier conversations[^\n]*改札/);
+  });
+
+  it("writing correction, journal grade and the shadowing explanation pass the app's checks", async () => {
+    fake = await world.startFakeAi();
+    const corrected = await correctWriting({ text: '私はは学生です。', studyLang: 'ja', answerLang: 'en' }, viaFake(fake));
+    expect(corrected.result?.edits).toMatchObject([{ original: '私はは', corrected: '私は', kind: 'particle', start: 0 }]);
+    const graded = await gradeJournalEntry({
+      words: [{ word: '公園', reading: 'こうえん', meaning: 'park' }], text: '公園に行きました。', studyLang: 'ja', answerLang: 'en',
+    }, viaFake(fake));
+    expect(graded.result?.words).toEqual([{ word: '公園', used: true, correct: true, note: 'E2E fake AI: 公園 fits.' }]);
+    const shadow = await explainShadowing({
+      lang: 'ja', expected: '箸が', heard: '箸が', score: 100, missed: [], extra: [], hints: [], pace: 'ok', answerLang: 'en',
+    }, viaFake(fake));
+    expect(shadow.ok).toBe(true);
+    expect(fake.count('writingCorrection') + fake.count('journalGrade') + fake.count('shadowingFeedback')).toBe(3);
+  });
+
+  it('the preset allows the speaking helpers too', async () => {
+    fake = await world.startFakeAi();
+    world.writeAiPreset(shared.userData, fake);
+    const normalized = normalizeAiFeatureSettings(JSON.parse(fs.readFileSync(path.join(shared.userData, 'ai', 'settings-v1.json'), 'utf8')));
+    for (const feature of world.FAKE_AI_SPEAK_FEATURES) expect(normalized.cloudFeatures[feature as AiCloudFeatureId]).toBe(true);
   });
 });

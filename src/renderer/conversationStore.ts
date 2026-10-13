@@ -3,10 +3,17 @@
  * computer per study profile and study language, capped at
  * `CONVERSATION_HISTORY_CAP` turns (oldest dropped first). Written through the
  * guarded writer, so a full store is reported rather than silently refused.
+ *
+ * Also the partner's memory across sessions: the words the learner met and did
+ * not yet know (and mined) in earlier conversations, which a new conversation
+ * brings back. Same scope, same writer.
  */
 import {
   capConversationTurns,
+  emptyConversationMemory,
+  normalizeConversationMemory,
   normalizeStoredConversation,
+  type ConversationMemory,
   type StoredConversation,
 } from '../shared/aiConversation';
 import type { StudyLang } from '../shared/studyLang';
@@ -30,4 +37,26 @@ export function loadConversation(lang: StudyLang): StoredConversation {
 
 export function saveConversation(lang: StudyLang, conversation: StoredConversation): boolean {
   return writeLocalStorageJson(conversationStorageKey(lang), { ...conversation, turns: capConversationTurns(conversation.turns) });
+}
+
+// ---- memory across sessions ----------------------------------------------------------
+
+const MEMORY_PREFIX = 'jp-study.conversation.memory.v1';
+
+export function conversationMemoryKey(lang: StudyLang, profileId: string = getActiveProfileId()): string {
+  return `${MEMORY_PREFIX}.${profileId}.${lang}`;
+}
+
+/** The words met in earlier conversations (per profile and study language). */
+export function loadConversationMemory(lang: StudyLang): ConversationMemory {
+  try {
+    const raw = localStorage.getItem(conversationMemoryKey(lang));
+    return normalizeConversationMemory(raw ? JSON.parse(raw) : null);
+  } catch {
+    return emptyConversationMemory();
+  }
+}
+
+export function saveConversationMemory(lang: StudyLang, memory: ConversationMemory): boolean {
+  return writeLocalStorageJson(conversationMemoryKey(lang), memory);
 }

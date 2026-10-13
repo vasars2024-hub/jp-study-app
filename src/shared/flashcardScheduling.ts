@@ -23,10 +23,18 @@
  * defaults reproduce the schedule this app always had — no learning steps, one
  * ten-minute relearning step — so turning steps on is the user's choice, and
  * Anki's "1m 10m" is one click away in the settings panel.
+ *
+ * FSRS follows Anki's FSRS-5 day model (`studyDay.ts`): a study day starts at
+ * the configured hour (4 am by default); a review on the same study day as the
+ * last one is FSRS-5's short-term step, anything later is a long-term review
+ * over WHOLE study days; and a review card is due from the start of its due
+ * day, so it can be reviewed any time that day, exactly as in Anki. The
+ * optimiser trains on the same day rule, so a fit means what it was fitted on.
  */
 import {
   DEFAULT_FSRS_WEIGHTS,
   fsrsInterval,
+  fsrsMemoryFromSm2,
   fsrsReview,
   fsrsShortTermReview,
   isValidFsrsWeights,
@@ -50,6 +58,13 @@ import {
   type LocalSrsState,
 } from './localSrs';
 import { fuzzedInterval } from './srsFuzz';
+import {
+  DEFAULT_DAY_START_HOUR,
+  normalizeDayStartHour,
+  startOfStudyDayIndex,
+  studyDayIndex,
+  studyDaysBetween,
+} from './studyDay';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
@@ -83,9 +98,23 @@ export interface SchedulingConfig {
   leechAction: LeechAction;
   /** FSRS: a personal fit from `fsrsOptimizer.ts`. Absent means the FSRS-5 defaults. */
   fsrsWeights?: number[];
+  /**
+   * Hour (0-23, local) at which a new study day starts: Anki's "next day
+   * starts at". Decides same-day reviews, whole elapsed days, due days, the
+   * new-card budget and every stats day.
+   */
+  dayStartHour: number;
+  /**
+   * Anki's learn-ahead limit, in minutes: when nothing else is left in a
+   * sitting, a card in its steps due within this long is shown early. A step
+   * due later than that is waited for, not skipped.
+   */
+  learnAheadMinutes: number;
 }
 
 export const DEFAULT_LOCAL_LEECH_THRESHOLD = 8;
+export const DEFAULT_LEARN_AHEAD_MINUTES = 20;
+export const MAX_LEARN_AHEAD_MINUTES = 1440;
 
 export const DEFAULT_SCHEDULING_CONFIG: SchedulingConfig = {
   // SM-2, because it is what every existing deck is already scheduled by.
@@ -97,6 +126,8 @@ export const DEFAULT_SCHEDULING_CONFIG: SchedulingConfig = {
   fuzz: false,
   leechThreshold: DEFAULT_LOCAL_LEECH_THRESHOLD,
   leechAction: 'tag',
+  dayStartHour: DEFAULT_DAY_START_HOUR,
+  learnAheadMinutes: DEFAULT_LEARN_AHEAD_MINUTES,
 };
 
 export const MIN_LOCAL_RETENTION = 0.7;
@@ -108,6 +139,9 @@ export function normalizeSchedulingConfig(
   const retention = Number(value?.desiredRetention);
   const maximum = Number(value?.maximumIntervalDays);
   const leech = Number(value?.leechThreshold);
+  const learnAhead = value?.learnAheadMinutes === undefined || value?.learnAheadMinutes === null
+    ? Number.NaN
+    : Number(value.learnAheadMinutes);
   const config: SchedulingConfig = {
     algorithm: value?.algorithm === 'fsrs' ? 'fsrs' : 'sm2',
     desiredRetention: Number.isFinite(retention)
@@ -126,6 +160,10 @@ export function normalizeSchedulingConfig(
       ? Math.min(99, Math.floor(leech))
       : DEFAULT_LOCAL_LEECH_THRESHOLD,
     leechAction: value?.leechAction === 'suspend' ? 'suspend' : 'tag',
+    dayStartHour: normalizeDayStartHour(value?.dayStartHour),
+    learnAheadMinutes: Number.isFinite(learnAhead) && learnAhead >= 0
+      ? Math.min(MAX_LEARN_AHEAD_MINUTES, Math.round(learnAhead))
+      : DEFAULT_LEARN_AHEAD_MINUTES,
   };
   const weights = value?.fsrsWeights;
   if (isValidFsrsWeights(weights)) config.fsrsWeights = [...weights];
@@ -166,9 +204,20 @@ export function resetSrsState(): undefined {
 
 const GRADES: Record<LocalSrsRating, FsrsGrade> = { again: 1, hard: 2, good: 3, easy: 4 };
 
-function memoryOf(state: LocalSrsState | undefined): FsrsMemory | null {
-  if (!state || state.stability === undefined || state.difficulty === undefined) return null;
-  return { stability: state.stability, difficulty: state.difficulty };
+/**
+ * The memory FSRS continues from. A state FSRS wrote carries it. A graduated
+ * card that only ever had an SM-2 schedule (a deck switched to FSRS) gets
+ * fsrs-rs's `memory_state_from_sm2` estimate from its ease and interval, as
+ * Anki does: never a restart as a new card, which sent a 200-day card back
+ * after three days. A card still in its first steps has no memory yet.
+ */
+function memoryOf(state: LocalSrsState | undefined, weights: readonly number[]): FsrsMemory | null {
+  if (!state) return null;
+  if (state.stability !== undefined && state.difficulty !== undefined) {
+    return { stability: state.stability, difficulty: state.difficulty };
+  }
+  if (state.intervalDays >= 1) return fsrsMemoryFromSm2(state.ease, state.intervalDays, 0.9, weights);
+  return null;
 }
 
 /**
@@ -213,9 +262,25 @@ export function adaptStateForAlgorithm(
   return carried;
 }
 
-function elapsedDays(state: LocalSrsState | undefined, now: number): number {
+/**
+ * Whole study days since the last review: FSRS's `delta_t`, as Anki counts
+ * it. 0 is "the same study day", which is what makes a review short-term.
+ */
+function elapsedStudyDays(state: LocalSrsState | undefined, now: number, config: SchedulingConfig): number {
   if (!state?.lastReviewedAt) return 0;
-  return Math.max(0, (now - state.lastReviewedAt) / DAY_MS);
+  return Math.max(0, studyDaysBetween(state.lastReviewedAt, now, config.dayStartHour));
+}
+
+/**
+ * Due from the START of the study day `intervalDays` after today's: a review
+ * card is due for its whole due day, as in Anki, rather than at the minute of
+ * the day it was last answered. Step states (minutes) are left alone.
+ */
+function alignToStudyDay(state: LocalSrsState, config: SchedulingConfig, now: number): LocalSrsState {
+  if (state.phase || state.intervalDays < 1) return state;
+  const days = Math.round(state.intervalDays);
+  const dueAt = startOfStudyDayIndex(studyDayIndex(now, config.dayStartHour) + days, config.dayStartHour);
+  return dueAt === state.dueAt ? state : { ...state, dueAt };
 }
 
 /** The step list a card in `phase` is walking, or a new card's. */
@@ -346,6 +411,52 @@ function scheduleSm2(
   return scheduleLocalReview(prior, rating, now);
 }
 
+/** Interval in whole days for a stability, inside the user's ceiling. */
+function fsrsDays(stability: number, config: SchedulingConfig): number {
+  const raw = fsrsInterval(stability, config.desiredRetention);
+  return Math.min(config.maximumIntervalDays, Math.max(1, Math.round(raw)));
+}
+
+/**
+ * The memory after rating `grade`: a first sighting, a same-day (short-term)
+ * step, or a long-term review over whole study days. fsrs-rs's rule, which is
+ * Anki's and the optimiser's.
+ */
+function nextFsrsMemory(
+  prior: FsrsMemory | null,
+  grade: FsrsGrade,
+  elapsed: number,
+  weights: readonly number[],
+): FsrsMemory {
+  if (!prior) return fsrsReview(null, grade, 0, weights);
+  return elapsed === 0 ? fsrsShortTermReview(prior, grade, weights) : fsrsReview(prior, grade, elapsed, weights);
+}
+
+/**
+ * Hard <= Good < Easy, as Anki and ts-fsrs enforce for FSRS intervals: the
+ * model can put Hard above Good (a fitted hard penalty above 1 is legal) or
+ * Easy level with Good after rounding, and a button that promises more for a
+ * worse answer is a lie. `graduating` is a card leaving its learning steps (or
+ * a new card with none), where Hard is not a review answer and only
+ * Good < Easy applies.
+ */
+function orderedFsrsDays(
+  rating: Exclude<LocalSrsRating, 'again'>,
+  prior: FsrsMemory | null,
+  elapsed: number,
+  weights: readonly number[],
+  config: SchedulingConfig,
+  graduating: boolean,
+): number {
+  const days = (grade: FsrsGrade) => fsrsDays(nextFsrsMemory(prior, grade, elapsed, weights).stability, config);
+  const rawGood = days(3);
+  const hard = graduating ? 0 : Math.min(days(2), rawGood);
+  if (rating === 'hard') return graduating ? days(2) : hard;
+  const good = graduating ? rawGood : Math.max(rawGood, hard + 1);
+  if (rating === 'good') return good;
+  return Math.max(days(4), good + 1);
+}
+
 function scheduleFsrs(
   previous: LocalSrsState | undefined,
   rating: LocalSrsRating,
@@ -354,18 +465,14 @@ function scheduleFsrs(
 ): LocalSrsState {
   const weights = config.fsrsWeights ?? DEFAULT_FSRS_WEIGHTS;
   const grade = GRADES[rating];
-  const prior = memoryOf(previous);
-  const elapsed = elapsedDays(previous, now);
+  const prior = memoryOf(previous, weights);
+  const elapsed = elapsedStudyDays(previous, now, config);
   const inSteps = previous ? isInSteps(previous) : config.learningStepsMinutes.length > 0;
-  // A review less than a day after the last one is a short-term review
-  // (FSRS-5's w17/w18) — the relearning step after a lapse, a learning step, a
-  // card studied twice in one day. A day or more is a long-term one. This is
-  // the same split the optimiser trains on.
-  const memory = !prior
-    ? fsrsReview(null, grade, elapsed, weights)
-    : elapsed < 1
-      ? fsrsShortTermReview(prior, grade, weights)
-      : fsrsReview(prior, grade, elapsed, weights);
+  // A review on the same STUDY day as the last one is a short-term review
+  // (FSRS-5's w17/w18): a step, or a card studied twice tonight even across
+  // midnight. A later day is long-term, over whole days. The optimiser
+  // (`fsrsOptimizer.ts`) and the replay (`fsrsMemoryReplay.ts`) use this rule.
+  const memory = nextFsrsMemory(prior, grade, elapsed, weights);
 
   const common = {
     version: 2 as const,
@@ -376,11 +483,9 @@ function scheduleFsrs(
     stability: memory.stability,
     difficulty: memory.difficulty,
   };
-  const reviewState = (lapses: number, repetitions: number): LocalSrsState => {
-    const raw = fsrsInterval(memory.stability, config.desiredRetention);
-    const intervalDays = Math.min(config.maximumIntervalDays, Math.max(1, Math.round(raw)));
-    return { ...common, dueAt: now + intervalDays * DAY_MS, intervalDays, repetitions, lapses };
-  };
+  const reviewState = (lapses: number, repetitions: number, intervalDays: number): LocalSrsState => (
+    { ...common, dueAt: now + intervalDays * DAY_MS, intervalDays, repetitions, lapses }
+  );
 
   if (inSteps) {
     const phase: SrsPhase = previous?.phase ?? 'learning';
@@ -396,7 +501,10 @@ function scheduleFsrs(
         step: outcome.step,
       };
     }
-    return reviewState(previous?.lapses ?? 0, (previous?.repetitions ?? 0) + 1);
+    const days = rating === 'again'
+      ? fsrsDays(memory.stability, config)
+      : orderedFsrsDays(outcome.easy ? 'easy' : rating, prior, elapsed, weights, config, true);
+    return reviewState(previous?.lapses ?? 0, (previous?.repetitions ?? 0) + 1, days);
   }
 
   if (rating === 'again') {
@@ -404,7 +512,7 @@ function scheduleFsrs(
     // Again (no learning steps) is not one: Anki leaves its lapse count at 0.
     const lapses = (previous?.lapses ?? 0) + (isReviewState(previous) ? 1 : 0);
     const steps = config.relearningStepsMinutes;
-    if (steps.length === 0) return reviewState(lapses, 0);
+    if (steps.length === 0) return reviewState(lapses, 0, fsrsDays(memory.stability, config));
     return {
       ...common,
       dueAt: now + Math.round(steps[0] * MINUTE_MS),
@@ -416,7 +524,9 @@ function scheduleFsrs(
     };
   }
 
-  return reviewState(previous?.lapses ?? 0, (previous?.repetitions ?? 0) + 1);
+  // A new card with no learning steps graduates on its first answer.
+  const days = orderedFsrsDays(rating, prior, elapsed, weights, config, !previous);
+  return reviewState(previous?.lapses ?? 0, (previous?.repetitions ?? 0) + 1, days);
 }
 
 /**
@@ -435,10 +545,11 @@ export function scheduleReview(
   const normalized = normalizeSchedulingConfig(config);
   const at = Number.isFinite(now) ? now : Date.now();
   const prior = adaptStateForAlgorithm(migrateSrsState(previous), normalized.algorithm);
-  const next = normalized.algorithm === 'fsrs'
-    ? scheduleFsrs(prior, rating, normalized, at)
-    : scheduleSm2(prior, rating, normalized, at);
-  return applyFuzz(applyCeiling(next, normalized, at), normalized, at, options);
+  if (normalized.algorithm === 'fsrs') {
+    const next = scheduleFsrs(prior, rating, normalized, at);
+    return alignToStudyDay(applyFuzz(applyCeiling(next, normalized, at), normalized, at, options), normalized, at);
+  }
+  return applyFuzz(applyCeiling(scheduleSm2(prior, rating, normalized, at), normalized, at), normalized, at, options);
 }
 
 const RATINGS: LocalSrsRating[] = ['again', 'hard', 'good', 'easy'];
@@ -478,7 +589,11 @@ export function previewScheduleDelays(
   const preview = {} as Record<LocalSrsRating, number>;
   for (const rating of RATINGS) {
     const next = scheduleReview(previous, rating, config, at);
-    preview[rating] = Math.max(0, next.dueAt - at) / DAY_MS;
+    // A day interval reads as its days: an FSRS card is due from the start of
+    // its due day, so "dueAt - now" would say 2.7 days for a 3-day interval.
+    preview[rating] = next.algorithm === 'fsrs' && !next.phase && next.intervalDays >= 1
+      ? next.intervalDays
+      : Math.max(0, next.dueAt - at) / DAY_MS;
   }
   return preview;
 }

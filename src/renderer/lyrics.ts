@@ -104,13 +104,48 @@ export function clearAllLyrics(): void {
 // ----- metadata guessing ----------------------------------------------------
 
 /**
+ * Words a download or rip appends after the title that no lyrics database files the
+ * song under: `Song Official Music Video`, `Song MV`, `Song (TV size)` (the brackets
+ * are already gone by now), `Song full ver`.
+ */
+const TRAILING_NOISE =
+  /\s+(?:official\s+(?:music\s+)?(?:video|audio|mv|lyric\s+video)|music\s+video|lyrics?\s+video|lyrics?|audio|video|mv|pv|hd|hq|4k|full\s+ver(?:sion|\.)?|tv\s*size|short\s+ver(?:sion|\.)?|remaster(?:ed)?)\s*$/i;
+
+function stripNoise(title: string): string {
+  let out = title.trim();
+  for (let i = 0; i < 4; i++) {
+    const next = out.replace(TRAILING_NOISE, '').trim();
+    if (next === out || !next) break;
+    out = next;
+  }
+  return out;
+}
+
+/** `アーティスト「曲名」…` / `アーティスト『曲名』…` → artist + title, the usual Japanese release name. */
+function splitJapaneseQuoted(raw: string): { artist: string; title: string } | null {
+  const m = /^(.+?)\s*[「『]([^」』]+)[」』]/.exec(raw);
+  if (!m) return null;
+  const artist = cleanTag(m[1]);
+  const title = cleanTag(m[2]);
+  return artist && title ? { artist, title } : null;
+}
+
+/** Tags the library knows (Media Hub edits) beat a guess from the path. */
+function withLibraryTags(meta: SongMeta, item: MediaItem, useAlbum: boolean): SongMeta {
+  const artist = item.artist?.trim() || meta.artist;
+  const album = useAlbum ? item.album?.trim() || meta.album : '';
+  return { artist, album, title: stripNoise(meta.title) || meta.title };
+}
+
+/**
  * Derive artist / album / title from the file name and its folder path.
- * Handles "Artist - Title.mp3", "Artist - Album - Title.mp3", and
- * folder layouts like ".../Artist/Album/01 - Title.flac".
+ * Handles "Artist - Title.mp3", "Artist - Album - Title.mp3", "Artist「Title」.mp3",
+ * and folder layouts like ".../Artist/Album/01 - Title.flac".
  */
 function guessSongMetaWithAlbum(item: MediaItem): SongMeta {
   const dirs = splitPath(item.path).slice(0, -1);
-  const base = cleanTag(item.fileName.replace(/\.[a-z0-9]+$/i, ''));
+  const rawBase = item.fileName.replace(/\.[a-z0-9]+$/i, '');
+  const base = cleanTag(rawBase);
 
   const parts = base.split(/\s+[-–—]\s+/);
   if (parts.length >= 3) {
@@ -127,6 +162,12 @@ function guessSongMetaWithAlbum(item: MediaItem): SongMeta {
     const album =
       parent && !sameName(parent, artist) && !sameName(parent, title) ? parent : '';
     return { artist, album, title };
+  }
+  const quoted = splitJapaneseQuoted(rawBase);
+  if (quoted) {
+    const parent = dirs.length ? cleanTag(dirs[dirs.length - 1]) : '';
+    const album = parent && !sameName(parent, quoted.artist) && !sameName(parent, quoted.title) ? parent : '';
+    return { ...quoted, album };
   }
 
   if (dirs.length >= 2) {
@@ -153,13 +194,16 @@ function guessSongMetaFileOnly(item: MediaItem): SongMeta {
     }
     return { artist: parts[0].trim(), album: '', title: parts.slice(1).join(' - ').trim() };
   }
+  const quoted = splitJapaneseQuoted(rawBase);
+  if (quoted) return { ...quoted, album: '' };
   const base = cleanTag(rawBase);
   return { artist: '', album: '', title: base || item.title };
 }
 
 export function guessSongMeta(item: MediaItem, useAlbumInSearch?: boolean): SongMeta {
   const useAlbum = useAlbumInSearch ?? loadLyricsSettings().useAlbumInSearch;
-  return useAlbum ? guessSongMetaWithAlbum(item) : guessSongMetaFileOnly(item);
+  const guessed = useAlbum ? guessSongMetaWithAlbum(item) : guessSongMetaFileOnly(item);
+  return withLibraryTags(guessed, item, useAlbum);
 }
 
 // ----- LRCLIB ---------------------------------------------------------------
@@ -190,23 +234,34 @@ function toResult(hit: LrclibHit | null): LyricsResult | null {
   return null;
 }
 
-function albumScore(want: string, hit?: string): number {
-  if (!want || !hit) return 0;
-  const a = want.toLowerCase();
-  const b = hit.toLowerCase();
-  if (a === b) return 4;
-  if (b.includes(a) || a.includes(b)) return 2;
+/**
+ * A comparable form of a title or name: NFKC (full-width Ｌｉｓａ → Lisa, half-width
+ * ｶﾀｶﾅ → カタカナ), lower case, brackets and "feat." credits out, and no spaces or
+ * punctuation — `夜に駆ける`, `夜に駆ける (YOASOBI)` and `夜に駆ける！` are one key.
+ */
+export function lyricsMatchKey(s: string | undefined): string {
+  if (!s) return '';
+  return s
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[[(（【〔][^\])）】〕]*[\])）】〕]/g, ' ')
+    .replace(/\s(?:feat|ft)\.?\s.*$/i, ' ')
+    .replace(/[\s\p{P}\p{S}]+/gu, '');
+}
+
+function keyScore(want: string, hit: string | undefined, exact: number, partial: number): number {
+  const a = lyricsMatchKey(want);
+  const b = lyricsMatchKey(hit);
+  if (!a || !b) return 0;
+  if (a === b) return exact;
+  // A short key inside a long one ("ai" in "aikotoba") is chance, not a match.
+  const shorter = Math.min(a.length, b.length);
+  if (shorter >= 2 && (b.includes(a) || a.includes(b)) && shorter * 2 >= Math.max(a.length, b.length)) return partial;
   return 0;
 }
 
-function textScore(want: string, hit?: string): number {
-  if (!want || !hit) return 0;
-  const a = want.toLowerCase();
-  const b = hit.toLowerCase();
-  if (a === b) return 10;
-  if (b.includes(a) || a.includes(b)) return 5;
-  return 0;
-}
+const albumScore = (want: string, hit?: string): number => keyScore(want, hit, 4, 2);
+const textScore = (want: string, hit?: string): number => keyScore(want, hit, 10, 5);
 
 function normalizeSearchTerm(s: string): string {
   return s
@@ -242,9 +297,37 @@ function scoreHit(meta: SongMeta, hit: LrclibHit, durationSec: number): number {
   );
 }
 
+/** Seconds a hit's length may differ from the file and still be the same recording. */
+const DURATION_TOLERANCE_SEC = 8;
+/** With the artist confirmed, a radio edit or a live cut may run this much longer or shorter. */
+const DURATION_TOLERANCE_ARTIST_SEC = 20;
+
+/**
+ * Whether a fuzzy search hit is this song, rather than the best of a bad batch.
+ *
+ * It used to be "the best scored hit, else any hit at all", so a search by title
+ * alone would happily return another artist's song of the same name, or a remix
+ * twice as long: wrong lyrics are worse than none, because the learner studies them.
+ * Now the title must agree, and so must the length (or, failing that, the artist).
+ */
+export function acceptLyricsHit(meta: SongMeta, hit: LrclibHit, durationSec: number): boolean {
+  if (!hit.syncedLyrics && !hit.plainLyrics) return false;
+  if (textScore(meta.title, hit.trackName) === 0) return false;
+  const artistOk = !!meta.artist && textScore(meta.artist, hit.artistName) > 0;
+  const artistContradicts = !!meta.artist && !!hit.artistName && !artistOk;
+  const known = durationSec > 0 && !!hit.duration;
+  const delta = known ? Math.abs((hit.duration ?? 0) - durationSec) : 0;
+  if (known && delta > (artistOk ? DURATION_TOLERANCE_ARTIST_SEC : DURATION_TOLERANCE_SEC)) return false;
+  // A different artist is only believable when the length agrees closely (a cover
+  // tagged under the original's name, a romanised artist name we cannot match).
+  if (artistContradicts && (!known || delta > 2)) return false;
+  return true;
+}
+
 /**
  * Look up lyrics on LRCLIB. Tries an exact match (artist + album + title +
- * duration) first, then a fuzzy search preferring album and duration matches.
+ * duration) first, then a structured search (track + artist), then free-text
+ * searches, and accepts only a hit that is plausibly this song (`acceptLyricsHit`).
  */
 export async function fetchLyrics(meta: SongMeta, durationSec: number): Promise<LyricsResult | null> {
   const q = (params: Record<string, string>) => new URLSearchParams(params).toString();
@@ -270,23 +353,27 @@ export async function fetchLyrics(meta: SongMeta, durationSec: number): Promise<
     }
   }
 
-  const hits: LrclibHit[] = [];
-  for (const query of uniqueQueries(meta)) {
-    const batch = (await getJson<LrclibHit[]>(`https://lrclib.net/api/search?${q({ q: query })}`)) ?? [];
-    hits.push(...batch);
-    if (batch.some((h) => h.syncedLyrics || h.plainLyrics)) break;
+  const searches: string[] = [];
+  const title = normalizeSearchTerm(meta.title);
+  const artist = normalizeSearchTerm(meta.artist);
+  if (title) {
+    searches.push(q(artist ? { track_name: title, artist_name: artist } : { track_name: title }));
   }
-  const byId = new Map<string, LrclibHit>();
-  for (const hit of hits) {
-    const key = [hit.trackName, hit.artistName, hit.albumName, hit.duration].join('\u0000');
-    if (!byId.has(key)) byId.set(key, hit);
+  for (const query of uniqueQueries(meta)) searches.push(q({ q: query }));
+
+  const seen = new Set<string>();
+  const accepted: LrclibHit[] = [];
+  for (const params of [...new Set(searches)]) {
+    const batch = (await getJson<LrclibHit[]>(`https://lrclib.net/api/search?${params}`)) ?? [];
+    for (const hit of Array.isArray(batch) ? batch : []) {
+      const key = [hit.trackName, hit.artistName, hit.albumName, hit.duration].join('\u0000');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (acceptLyricsHit(meta, hit, durationSec)) accepted.push(hit);
+    }
+    // A synced, plausible hit ends the search; a plain one keeps looking for a synced one.
+    if (accepted.some((h) => h.syncedLyrics)) break;
   }
-  const scored = [...byId.values()]
-    .filter((h) => h.syncedLyrics || h.plainLyrics)
-    .sort((a, b) => {
-      return scoreHit(meta, b, durationSec) - scoreHit(meta, a, durationSec);
-    });
-  const tol = meta.album ? 8 : 5;
-  const best = scored.find((h) => durationSec <= 0 || Math.abs((h.duration ?? 0) - durationSec) <= tol) ?? scored[0];
-  return toResult(best ?? null);
+  accepted.sort((a, b) => scoreHit(meta, b, durationSec) - scoreHit(meta, a, durationSec));
+  return toResult(accepted[0] ?? null);
 }

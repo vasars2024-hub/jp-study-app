@@ -24,7 +24,7 @@ import { appendReviewLog } from '../../reviewLog';
 import {
   loadGrammarSrs,
   ratingForTestAnswer,
-  reviewGrammarPoint,
+  recordTestAnswer,
   saveGrammarSrs,
 } from '../../grammarSrs';
 import { useT } from '../../i18n';
@@ -197,8 +197,12 @@ export default function GrammarTestModal({
       // and Statistics can count grammar answers next to flashcard reviews.
       appendReviewLog({ mode: 'grammar', grammarId: question.id, word: point?.title, correct: wasCorrect });
       // And one schedule step, so a tested point comes back on the Review tab
-      // when the flashcard scheduler says it should.
-      saveGrammarSrs(reviewGrammarPoint(loadGrammarSrs(), question.id, ratingForTestAnswer(grade)));
+      // when the flashcard scheduler says it should, but only when the point is
+      // due or not scheduled yet. Answering a point that is not due is practice:
+      // three Goods inside one sitting used to push a new point out to 8 days.
+      const srsBefore = loadGrammarSrs();
+      const srsAfter = recordTestAnswer(srsBefore, question.id, ratingForTestAnswer(grade));
+      if (srsAfter !== srsBefore) saveGrammarSrs(srsAfter);
 
       const nextCorrect = correctCount + (wasCorrect ? 1 : 0);
       const nextMissed =

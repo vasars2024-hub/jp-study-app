@@ -15,7 +15,7 @@ import { slotsForLang, type LevelTier, type StudyLang } from '../../shared/level
 import { getStudyLang } from '../studyEnvironment';
 import { normalizeStudyLang } from '../../shared/studyLang';
 import { segmentStudyText, studyWordKey } from '../../shared/studySegmentation';
-import { packFor } from '../data/gamePacks';
+import { packFor } from '../data/gamePacks/registry';
 import type { GamePack } from '../data/gamePacks/types';
 import { listCards, loadGameLists, packExtrasFromLists } from './gameItemImport';
 import { getLevel } from '../knownWords';
@@ -341,6 +341,15 @@ export function loadArenaContent(level: LevelTier, material = 'auto'): ArenaCont
     pack: packFor(studyLang, lists.length ? packExtrasFromLists(lists) : undefined),
     ...studyTiers(cards, vocab, cloze),
   };
+}
+
+/**
+ * Just the vocabulary `loadArenaContent(level).vocab` deals (default material):
+ * the finding overlays' readout, which needs neither the cloze or sentence
+ * pools nor the bundled pack.
+ */
+export function loadArenaVocab(level: LevelTier): VocabItem[] {
+  return buildVocabPool(deckCards(), wordsForLevel(level), level, lemmaOf);
 }
 
 /** The deck's study queue for the warm-up: counts per kind of round the due words can fill. */

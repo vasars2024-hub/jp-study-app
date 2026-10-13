@@ -59,7 +59,7 @@ export const MINING_UI_EN: Catalog = {
   'jiten.mining.noTags': 'No Jiten tags',
   'jiten.mining.downloading': 'Downloading deck',
   'jiten.mining.mine': 'Mine Jiten vocab',
-  'jiten.mining.importedCount': '{count} cards in the latest import.',
+  'jiten.mining.importedCount': { one: '{count} card in the latest import.', other: '{count} cards in the latest import.' },
   'jiten.mining.saved': 'Saved {count} Jiten cards for {title}.',
   'jiten.mining.err.noDeck': 'Jiten did not return a deck.',
   'jiten.mining.err.noCards': 'No usable cards were found in the Jiten deck.',

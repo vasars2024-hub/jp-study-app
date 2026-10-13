@@ -12,6 +12,11 @@
  *   run without any model: the fallback with AI off.
  * - The journal prompt is graded deterministically (which words appear, how many
  *   sentences) and, optionally, by the model word by word.
+ * - Round 2: every correction is kept in a per-language history (with the kinds
+ *   of mistake the learner makes most), any edit can be saved as a card (the
+ *   corrected sentence, with the reason and the learner's own sentence on the
+ *   back), and a complete journal entry marks the study day for a streak — all on
+ *   this computer, the streak decided without any model.
  *
  * Hosts: the note editor (`NoteViewer`) and Blanc's Quick Notes. Lazy-loaded.
  */
@@ -19,18 +24,24 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   applyWritingEdits,
   checkJournalEntry,
+  editSentence,
   JOURNAL_SENTENCES_TARGET,
   lintStudyWriting,
   spliceText,
   type JournalGradeResult,
   type JournalWord,
   type WritingCorrectionResult,
+  type WritingEdit,
 } from '../../../shared/aiWritingCorrection';
+import { LANG_TAGS } from '../../../shared/i18n/core';
+import { studyDayKey } from '../../../shared/studyDay';
+import { journalStreak, mistakeKindCounts, type WritingHistory } from '../../../shared/writingHistory';
 import { normalizeStudyLang, type StudyLang } from '../../../shared/studyLang';
 import { useAiReadiness } from '../../aiSetupClient';
 import { dueDeckCards, loadDeck } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import { studyTokens } from '../../studyTokens';
+import { clearWritingCorrections, loadWritingHistory, rememberJournalDay, rememberWritingCorrection } from '../../writingHistoryStore';
 import { AiStudyStatus, AiSuggestionBadge, useAiStudyRequest } from '../ai/aiStudyRequest';
 import { StudyDiff } from './SpeakParts';
 import { prepareStudyText } from './speakText';
@@ -47,6 +58,8 @@ export interface WritingCorrectionProps {
 }
 
 const JOURNAL_WORD_COUNT = 3;
+const SOURCE_TITLE = 'Writing help';
+const HISTORY_SHOWN = 20;
 
 /** Due words of the study language first, then the most recently added ones. */
 export function pickJournalWords(lang: StudyLang, round = 0): JournalWord[] {
@@ -84,7 +97,9 @@ export default function WritingCorrection({ text, selection, studyLang, onApply 
   const { t, lang: uiLang } = useT();
   const ai = useAiReadiness();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<'correct' | 'journal'>('correct');
+  const [mode, setMode] = useState<'correct' | 'journal' | 'history'>('correct');
+  const [history, setHistory] = useState<WritingHistory>(() => loadWritingHistory(studyLang));
+  const [clearArmed, setClearArmed] = useState(false);
   const [base, setBase] = useState<{ start: number; end: number } | null>(null);
   const [accepted, setAccepted] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState('');
@@ -127,6 +142,39 @@ export default function WritingCorrection({ text, selection, studyLang, onApply 
 
   const result = correction.state.status === 'done' ? correction.state.result : null;
   const graded = journal.state.status === 'done' ? journal.state.result : null;
+
+  // Every correction received goes into the history (a re-check of the same text replaces it).
+  useEffect(() => {
+    if (result) setHistory(rememberWritingCorrection(studyLang, result));
+  }, [result, studyLang]);
+
+  // A complete journal entry marks today's study day (once a day).
+  const complete = journalCheck?.complete === true;
+  useEffect(() => {
+    if (complete) setHistory(rememberJournalDay(studyLang));
+  }, [complete, studyLang]);
+
+  const streak = useMemo(() => journalStreak(history.journalDays, studyDayKey(Date.now())), [history.journalDays]);
+  const kinds = useMemo(() => mistakeKindCounts(history), [history]);
+
+  const saveCard = async (checked: string, edit: WritingEdit): Promise<void> => {
+    const { before, after } = editSentence(checked, edit);
+    try {
+      const { mineToStudy } = await import('../../studyMining');
+      await mineToStudy({
+        word: after,
+        sentence: after,
+        meaning: t('aiSpeak.chat.correctionCardBack', { reason: edit.explanation, original: before }),
+        source: 'analysis',
+        sourceTitle: SOURCE_TITLE,
+        studyLang,
+        studyKind: 'sentence',
+      });
+      setNotice(t('aiSpeak.chat.mined', { word: after }));
+    } catch {
+      setNotice(t('aiSpeak.chat.mineFailed'));
+    }
+  };
 
   const runCorrection = (refresh = false): void => {
     setNotice('');
@@ -183,7 +231,7 @@ export default function WritingCorrection({ text, selection, studyLang, onApply 
       <div className="speak-head">
         <h4 className="speak-title">{t('aiSpeak.write.title')}</h4>
         <div className="speak-tabs" role="tablist" aria-label={t('aiSpeak.write.title')}>
-          {(['correct', 'journal'] as const).map((id) => (
+          {(['correct', 'journal', 'history'] as const).map((id) => (
             <button key={id} type="button" role="tab" aria-selected={mode === id} className={`btn small speak-btn${mode === id ? ' is-active' : ''}`} onClick={() => setMode(id)}>
               {t(`aiSpeak.write.tab.${id}`)}
             </button>
@@ -235,6 +283,9 @@ export default function WritingCorrection({ text, selection, studyLang, onApply 
                               <input type="checkbox" checked={accepted.has(edit.id)} onChange={() => toggle(edit.id)} />
                               <span>{t('aiSpeak.write.accept')}</span>
                             </label>
+                            <button type="button" className="btn small speak-btn" onClick={() => void saveCard(result.text, edit)}>
+                              {t('aiSpeak.write.saveCard')}
+                            </button>
                           </li>
                         ))}
                       </ol>
@@ -273,6 +324,11 @@ export default function WritingCorrection({ text, selection, studyLang, onApply 
                   {t('aiSpeak.journal.otherWords')}
                 </button>
               </div>
+              <p className="speak-note" data-journal-streak={streak.current}>
+                {streak.current > 0
+                  ? t(streak.today ? 'aiSpeak.journal.streakToday' : 'aiSpeak.journal.streakOpen', { count: streak.current, best: streak.best })
+                  : t('aiSpeak.journal.streakNone')}
+              </p>
               {journalCheck && (
                 <ul className="speak-facts" aria-label={t('aiSpeak.journal.checkLabel')}>
                   {journalCheck.words.map((entry) => (
@@ -318,6 +374,57 @@ export default function WritingCorrection({ text, selection, studyLang, onApply 
                   )}
                 </div>
               )}
+            </>
+          )}
+        </div>
+      )}
+
+      {mode === 'history' && (
+        <div className="speak-history" data-writing-history={history.entries.length}>
+          {history.entries.length === 0 ? (
+            <p className="speak-note">{t('aiSpeak.history.empty')}</p>
+          ) : (
+            <>
+              {kinds.length > 0 && (
+                <p className="speak-note">
+                  {t('aiSpeak.history.kinds', { kinds: kinds.slice(0, 3).map((row) => t('aiSpeak.history.kindCount', { kind: t(`aiSpeak.write.kind.${row.kind}`), count: row.count })).join(', ') })}
+                </p>
+              )}
+              <ol className="speak-edits">
+                {history.entries.slice(0, HISTORY_SHOWN).map((entry) => (
+                  <li key={`${entry.at}-${entry.text.slice(0, 16)}`} className="speak-edit">
+                    <details>
+                      <summary>
+                        <span className="speak-meta">{new Date(entry.at).toLocaleDateString(LANG_TAGS[uiLang])}</span>{' '}
+                        <span lang={studyLang}>{[...entry.text].slice(0, 40).join('')}{[...entry.text].length > 40 ? '…' : ''}</span>{' '}
+                        <span className="speak-meta">{t('aiSpeak.history.changes', { count: entry.edits.length })}</span>
+                      </summary>
+                      {entry.overall && <p>{entry.overall}</p>}
+                      <ul className="speak-facts">
+                        {entry.edits.map((edit, index) => (
+                          <li key={index}>
+                            <StudyDiff before={edit.original} after={edit.corrected} lang={studyLang} />{' '}
+                            <span className="speak-meta">{t(`aiSpeak.write.kind.${edit.kind}`)}</span>
+                            {edit.explanation && <> — {edit.explanation}</>}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </li>
+                ))}
+              </ol>
+              <div className="speak-actions">
+                <button type="button" className="btn small speak-btn" onClick={() => {
+                  if (!clearArmed) {
+                    setClearArmed(true);
+                    return;
+                  }
+                  setClearArmed(false);
+                  setHistory(clearWritingCorrections(studyLang));
+                }}>
+                  {t(clearArmed ? 'aiSpeak.chat.clearConfirm' : 'aiSpeak.history.clear')}
+                </button>
+              </div>
             </>
           )}
         </div>

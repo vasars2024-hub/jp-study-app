@@ -12,7 +12,6 @@
  */
 import type { FilesSoftDeleteCommit } from '../../../shared/filesApp/softDelete';
 import { removeDeckCards } from '../../flashcardDeck';
-import { removeNotebookEntry } from '../../notebookTimeline';
 import { removeSaved } from '../../savedWords';
 import { removeTranslationHistory } from '../../translationHistory';
 import { deleteEntry as deleteClipboardEntry } from '../../clipboardHistory';
@@ -86,9 +85,17 @@ export async function runOwnerDelete(
       case 'deck-card':
         removeDeckCards([id]);
         return { ok: true };
-      case 'notebook':
+      case 'notebook': {
+        // The notes store is not in the boot graph (notebookActivity.ts); load it
+        // and let it read IndexedDB, or a note only IndexedDB holds looks unknown.
+        const [{ removeNotebookEntry }, { whenUserNotesReady }] = await Promise.all([
+          import('../../notebookTimeline'),
+          import('../../userNotesStore'),
+        ]);
+        await whenUserNotesReady();
         removeNotebookEntry(id);
         return { ok: true };
+      }
       case 'saved-word':
         removeSaved(id);
         return { ok: true };

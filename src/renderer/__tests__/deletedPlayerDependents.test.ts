@@ -255,7 +255,7 @@ describe('the study keys reach a player that exists', () => {
     expect(collisions).toEqual([]);
   });
 
-  it('the overlay owns all seventeen, and MediaContent owns none', () => {
+  it('the overlay owns every video.* row, and MediaContent owns none', () => {
     const overlay = code(readFileSync(OVERLAY, 'utf8'));
     const registered = [...overlay.matchAll(/registerCommandHandler\('(video\.[a-zA-Z]+)'/g)]
       .flatMap((match) => (match[1] ? [match[1]] : []));
@@ -286,8 +286,12 @@ describe('the study keys reach a player that exists', () => {
       // The study loop's A-B cycle and translation reveal (bound to X and T).
       'video.abLoopCycle',
       'video.revealTranslation',
+      // "Previous / next line starts now" (Shift+W / Shift+S) and condensed audio (unbound).
+      'video.alignPrevLine',
+      'video.alignNextLine',
+      'video.condensedAudio',
     ]));
-    expect(registered).toHaveLength(21);
+    expect(registered).toHaveLength(24);
 
     // And exactly one dispatcher: the hardcoded `event.code` switch is gone, so a keypress
     // cannot fire both the overlay's own handler and the command it is registered under.

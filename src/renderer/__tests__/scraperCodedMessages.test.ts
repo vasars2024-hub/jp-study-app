@@ -32,7 +32,12 @@ describe('coded scraper messages from main', () => {
       message: 'x',
       messageCode: 'sentDebrid',
       messageVars: { count: 3 },
-    })).toBe('3 torrent(s) sent to Seanime debrid.');
+    })).toBe('3 torrents sent to Seanime debrid.');
+    expect(sxAcquisitionMessage({
+      message: 'x',
+      messageCode: 'sentDebrid',
+      messageVars: { count: 1 },
+    })).toBe('1 torrent sent to Seanime debrid.');
     expect(sxAcquisitionMessage({ message: 'sidecar down' })).toBe('sidecar down');
   });
 

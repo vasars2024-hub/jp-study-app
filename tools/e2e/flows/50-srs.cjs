@@ -7,8 +7,10 @@
  *    returns AHEAD of fresh cards once due (`shared/reviewSessionQueue.ts`'s rule 1);
  *  - undo puts the card back with its previous step;
  *  - leech: one card lapses for real, twice, through the review UI (threshold 2);
- *  - the FSRS optimizer worker runs on a synthetic 1,200-row log: progress shows, Cancel
- *    stops it, a second run finishes with the held-out decision.
+ *  - the FSRS optimizer worker runs on a synthetic 1,200-row log: progress shows; Cancel
+ *    pressed while the log is still loading starts no worker; Cancel mid-fit terminates
+ *    the worker (its final reply is withheld until then, so the race is gone) and a late
+ *    reply is ignored; a further run finishes with the held-out decision.
  *
  * Time: same-day steps are minutes and lapses need days, so the page clock is moved with
  * a Date.now offset (`__e2eClock`) — the scheduler reads Date.now for every grade. Nothing
@@ -233,17 +235,102 @@ module.exports = {
     }
     await ev(`(window.__e2eOptObs?.disconnect(), delete window.__e2eOptObs, true)`);
     result.check('a run shows progress that moves (worker reports back)', Boolean(shown) && moved !== null, { shown, percent: moved });
-    // Cancel mid-fit. A fit on a fast machine can finish between the progress sample and
-    // the click (measured: sampled at 93 %, done before Cancel landed), so a run that
-    // finished first is started again and cancelled the moment its progress shows.
-    let cancelled = await ev(`(() => { const b = __e2e.byText('.srs2-optimizer button', 'Cancel'); return b ? __e2e.click(b) : false; })()`);
-    let cancelMsg = cancelled ? await poll(ctx, `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return r && /cancel/i.test(r.textContent) ? r.textContent : null; })()`, 10000) : null;
-    for (let attempt = 0; attempt < 3 && !cancelMsg; attempt++) {
-      await ev(`__e2e.click(document.querySelector('.srs2-optimizer .btn'))`);
-      cancelled = await poll(ctx, `(() => { const b = __e2e.byText('.srs2-optimizer button', 'Cancel'); return b ? __e2e.click(b) : null; })()`, 10000, 20);
-      cancelMsg = cancelled ? await poll(ctx, `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return r && /cancel/i.test(r.textContent) ? r.textContent : null; })()`, 10000) : null;
-    }
-    result.check('Cancel stops the worker and says so', Boolean(cancelled) && Boolean(cancelMsg), cancelMsg);
+    // Cancel, made deterministic. A fit on a fast machine finishes in about a second, so
+    // "press Cancel before it ends" was a race the harness kept losing (sampled at 93 %,
+    // done before the click landed). The page's Worker is wrapped for the rest of this
+    // section: the optimizer worker is the real one and runs the real fit, but once the
+    // panel shows a whole percent of progress, every further reply (later progress, and
+    // the final "done" / "error") is held back until Cancel has been pressed, so the panel
+    // is mid-fit when Cancel lands and the run cannot end first. What the check proves is
+    // unchanged and now observed directly: the worker was terminated, the panel says the
+    // run was cancelled, and the held replies, delivered afterwards as a late worker would
+    // send them, are ignored (no decision appears).
+    await poll(ctx, `!__e2e.byText('.srs2-optimizer button', 'Cancel') || null`, 120000, 200);
+    await ev(`(() => {
+      const Real = window.__e2eRealWorker || window.Worker;
+      window.__e2eRealWorker = Real;
+      const gate = { spawned: 0, terminated: 0, held: [], workers: [], progress: 0, releasing: false };
+      window.__e2eOptGate = gate;
+      window.Worker = class extends Real {
+        constructor(url, opts) {
+          super(url, opts);
+          if (!/fsrsOptimizer/i.test(String(url))) return;
+          gate.spawned++;
+          gate.workers.push(this);
+          // Added before the app sets onmessage, so it runs first and can withhold a reply.
+          this.addEventListener('message', (event) => {
+            const reply = event.data;
+            if (gate.releasing || !reply) return;
+            // Progress reaches the panel until it shows a whole percent (the bar rounds);
+            // from then on everything is withheld.
+            if (reply.kind === 'progress' && !(gate.progress >= 0.01)) {
+              gate.progress = Math.max(gate.progress, Number(reply.fraction) || 0);
+              return;
+            }
+            event.stopImmediatePropagation();
+            gate.held.push({ worker: this, reply });
+          });
+        }
+        terminate() {
+          if (gate.workers.includes(this)) gate.terminated++;
+          return super.terminate();
+        }
+      };
+      return true;
+    })()`);
+    const cancelReport = `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return r && /cancel/i.test(r.textContent) ? r.textContent : null; })()`;
+    const decisionShown = `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return !!(r && !/cancel/i.test(r.textContent) && r.textContent.trim()); })()`;
+
+    // 1. Cancel pressed the instant it appears — while the whole history is still being
+    //    read from IndexedDB, before any worker exists. The button is on screen then, so
+    //    the press must count: no worker is started and the panel says so. (The observer
+    //    runs in the click's own microtasks; the IndexedDB read answers in a later task.)
+    await ev(`(() => {
+      const rec = { clicked: false };
+      rec.obs = new MutationObserver(() => {
+        if (rec.clicked) return;
+        const b = __e2e.byText('.srs2-optimizer button', 'Cancel');
+        if (!b) return;
+        rec.clicked = true;
+        rec.spawnedAtClick = window.__e2eOptGate.spawned;
+        rec.obs.disconnect();
+        b.click();
+      });
+      rec.obs.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+      window.__e2eOptEarly = rec;
+      __e2e.click(document.querySelector('.srs2-optimizer .btn'));
+      return true;
+    })()`);
+    const earlyMsg = await poll(ctx, cancelReport, 15000, 50);
+    await ctx.sleep(1500); // room for a wrongly started worker to show itself
+    const early = await ev(`(() => { const r = window.__e2eOptEarly; r.obs.disconnect(); return { clicked: r.clicked, spawnedAtClick: r.spawnedAtClick, spawned: window.__e2eOptGate.spawned, cancelShown: !!__e2e.byText('.srs2-optimizer button', 'Cancel') }; })()`);
+    result.check('Cancel pressed before the worker starts is honoured (no worker started)',
+      Boolean(earlyMsg) && early.clicked && early.spawnedAtClick === 0 && early.spawned === 0 && !early.cancelShown,
+      { earlyMsg, ...early });
+
+    // 2. Cancel mid-fit: the panel shows the worker's first whole percent; the rest is held.
+    await ev(`__e2e.click(document.querySelector('.srs2-optimizer .btn'))`);
+    const midFit = await poll(ctx, `(() => {
+      const g = window.__e2eOptGate;
+      const p = document.querySelector('.srs3-optimizer-progress progress');
+      return g.spawned === 1 && g.progress >= 0.01 && p && Number(p.value) > 0 && Number(p.value) < 100 ? { percent: Number(p.value) } : null;
+    })()`, 120000, 100);
+    const clicked = midFit ? await ev(`__e2e.clickText('.srs2-optimizer button', 'Cancel')`) : false;
+    const cancelMsg = clicked ? await poll(ctx, cancelReport, 15000, 50) : null;
+    // Deliver the withheld replies now, as late worker messages would arrive: they must
+    // not turn the cancelled run into a result.
+    const held = await ev(`(() => {
+      const g = window.__e2eOptGate;
+      g.releasing = true;
+      for (const { worker, reply } of g.held) worker.dispatchEvent(new MessageEvent('message', { data: reply }));
+      return g.held.length;
+    })()`);
+    await ctx.sleep(1000);
+    const after = await ev(`(() => ({ terminated: window.__e2eOptGate.terminated, decision: ${decisionShown}, stillCancelled: ${cancelReport} !== null, cancelShown: !!__e2e.byText('.srs2-optimizer button', 'Cancel') }))()`);
+    await ev(`(window.Worker = window.__e2eRealWorker, delete window.__e2eOptGate, true)`);
+    result.check('Cancel stops the worker and says so',
+      Boolean(midFit) && Boolean(cancelMsg) && after.terminated === 1 && !after.decision && after.stillCancelled && !after.cancelShown,
+      { cancelMsg, panelPercentAtCancel: midFit?.percent, heldReplies: held, ...after });
 
     await ev(`__e2e.click(document.querySelector('.srs2-optimizer .btn'))`);
     const decision = await poll(ctx, `(() => { const r = document.querySelector('.srs2-optimizer .auto-reading-options__report'); return r && !/cancel/i.test(r.textContent) && r.textContent.trim() ? r.innerText : null; })()`, 180000, 500);

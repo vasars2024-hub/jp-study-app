@@ -5,14 +5,13 @@
 // readouts. Mirrors the games/contentSource ↔ games/contentStore split.
 //
 // Cost discipline matters here. The overlays render on an animation interval,
-// and `loadArenaContent` walks the whole deck through the tokenizer — doing
+// and `loadArenaVocab` walks the whole deck through the tokenizer — doing
 // that per frame would stall the compositor and reintroduce exactly the
 // window-dragging lag the project forbids. So the deck is loaded once per
 // mount and refreshed only on the events that can actually change it.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { loadArenaContent } from './games/contentStore';
 import { loadEnvironment, saveEnvironment } from './environment/environmentStore';
 import type { CompanionInstance, CompanionTypeId } from './environment/companionCatalog';
 import { migrateLegacyCompanionStorage } from './environment/companionLegacyIds';
@@ -32,6 +31,20 @@ import {
   type InterceptedTerm,
 } from './findingModules';
 import type { VocabItem } from './games/contentSource';
+
+const NO_VOCAB: VocabItem[] = [];
+
+let contentStore: Promise<typeof import('./games/contentStore')> | null = null;
+function loadContentStore(): Promise<typeof import('./games/contentStore')> {
+  if (!contentStore) {
+    contentStore = import('./games/contentStore');
+    // A failed chunk fetch may succeed on the next deck change.
+    contentStore.catch(() => {
+      contentStore = null;
+    });
+  }
+  return contentStore;
+}
 
 export interface FindingReadouts {
   /** The user's own vocabulary for their current level. Empty when the deck is. */
@@ -75,14 +88,33 @@ export function useFindingReadouts(enabled: boolean): FindingReadouts {
     return () => window.clearInterval(id);
   }, [enabled]);
 
-  const vocab = useMemo<VocabItem[]>(() => {
-    if (!enabled) return [];
-    try {
-      return loadArenaContent(getUserLevel()).vocab;
-    } catch {
-      // A corrupt deck must not take the desktop down with it.
-      return [];
+  // The Arena's content store (and the deck walk behind it) is a dynamic
+  // import: both overlays mount at boot, and the store is not first-paint
+  // material. The readout is empty for the moment it takes to arrive.
+  const [vocab, setVocab] = useState<VocabItem[]>(NO_VOCAB);
+  useEffect(() => {
+    if (!enabled) {
+      setVocab(NO_VOCAB);
+      return undefined;
     }
+    let live = true;
+    void loadContentStore().then(
+      (store) => {
+        if (!live) return;
+        try {
+          setVocab(store.loadArenaVocab(getUserLevel()));
+        } catch {
+          // A corrupt deck must not take the desktop down with it.
+          setVocab(NO_VOCAB);
+        }
+      },
+      () => {
+        if (live) setVocab(NO_VOCAB);
+      },
+    );
+    return () => {
+      live = false;
+    };
   }, [deckNonce, enabled]);
 
   const challenge = useMemo(

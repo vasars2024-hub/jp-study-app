@@ -79,7 +79,20 @@ export default function Lockscreen({
   }, []);
   const maxDigits = kind === 'pin4' ? 4 : LOCK_PIN_MAX_DIGITS;
   const padKeys: readonly PadKey[] = kind === 'pin' ? KEYS_LONG : KEYS;
-  const [digits, setDigits] = useState('');
+  const [digits, setDigitsState] = useState('');
+  /**
+   * The digits as typed so far, updated synchronously. `press` reads and writes
+   * this instead of computing the next value inside a state updater: StrictMode
+   * runs updaters twice, so a submit scheduled from one fired twice and one wrong
+   * PIN cost two of main's attempts (bug 37).
+   */
+  const digitsRef = useRef('');
+  const setDigits = useCallback((next: string) => {
+    digitsRef.current = next;
+    setDigitsState(next);
+  }, []);
+  /** A PIN is with main: a second submit (Enter during the auto-submit delay) waits for its answer. */
+  const verifyingRef = useRef(false);
   const [password, setPassword] = useState('');
   const [shake, setShake] = useState(false);
   const [error, setError] = useState(false);
@@ -242,7 +255,7 @@ export default function Lockscreen({
       setShake(false);
       setError(false);
     }, 420);
-  }, []);
+  }, [setDigits]);
 
   const tryUnlock = useCallback(
     (pin: string) => {
@@ -254,17 +267,23 @@ export default function Lockscreen({
         return;
       }
       setTooShort(false);
+      if (verifyingRef.current) return;
+      verifyingRef.current = true;
       // Main checks the hash (and backs off after repeated misses), so this is async.
-      void verifyLockscreenPinDetailed(pin).then((res) => {
-        if (!res.ok) {
-          if (res.retryAfterMs && res.retryAfterMs > 0) setRetryUntil(Date.now() + res.retryAfterMs);
-          fail();
-          return;
-        }
-        setUnlocking(true);
-        markLockscreenUnlocked();
-        onUnlocked();
-      });
+      void verifyLockscreenPinDetailed(pin)
+        .then((res) => {
+          if (!res.ok) {
+            if (res.retryAfterMs && res.retryAfterMs > 0) setRetryUntil(Date.now() + res.retryAfterMs);
+            fail();
+            return;
+          }
+          setUnlocking(true);
+          markLockscreenUnlocked();
+          onUnlocked();
+        })
+        .finally(() => {
+          verifyingRef.current = false;
+        });
     },
     [fail, onUnlocked, kind],
   );
@@ -274,25 +293,25 @@ export default function Lockscreen({
       if (unlocking || shake || waiting) return;
       if (key === '') return;
       if (key === 'ok') {
-        tryUnlock(digits);
+        tryUnlock(digitsRef.current);
         return;
       }
       if (key === 'del') {
-        setDigits((d) => d.slice(0, -1));
+        setDigits(digitsRef.current.slice(0, -1));
         setError(false);
         setTooShort(false);
         return;
       }
       setTooShort(false);
-      setDigits((d) => {
-        if (d.length >= maxDigits) return d;
-        const next = d + key;
-        // Only the classic 4-digit PIN submits by itself; a longer one waits for Enter.
-        if (kind === 'pin4' && next.length === 4) window.setTimeout(() => tryUnlock(next), 80);
-        return next;
-      });
+      // Outside any state updater (see digitsRef): the submit is scheduled once.
+      const d = digitsRef.current;
+      if (d.length >= maxDigits) return;
+      const next = d + key;
+      setDigits(next);
+      // Only the classic 4-digit PIN submits by itself; a longer one waits for Enter.
+      if (kind === 'pin4' && next.length === 4) window.setTimeout(() => tryUnlock(next), 80);
     },
-    [unlocking, shake, waiting, tryUnlock, digits, maxDigits, kind],
+    [unlocking, shake, waiting, tryUnlock, setDigits, maxDigits, kind],
   );
 
   useEffect(() => {

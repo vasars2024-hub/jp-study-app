@@ -15,8 +15,10 @@ import { mineToStudy } from '../studyMining';
 
 beforeEach(() => vi.clearAllMocks());
 
+/** The mining pipeline is imported on the first send (not with the store), then each entry is awaited. */
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  await import('../studyMining');
+  for (let i = 0; i < 3; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('sending clipboard passages to flashcards', () => {

@@ -27,7 +27,7 @@
 
 import { hasCyrillic, hasHan, hasHangul, hasKana, hasLatin } from '../../shared/langs';
 import { foldRussianYo, russianLemmaCandidates, stripRussianStress } from '../../shared/russianMorphology';
-import { deinflect } from '../../shared/deinflect';
+import { deinflect, posMatchesWordTypes, type WordType } from '../../shared/deinflect';
 import {
   MAX_NEIGHBOR_RESULTS,
   neighborWordKey,
@@ -155,6 +155,12 @@ export interface LookupEntry {
   ipa?: string[];
   /** JMdict priority codes the contributing rows carried; absent when none did. */
   prio?: string[];
+  /**
+   * The best rank any enabled frequency corpus gives the headword, when one does.
+   * Ranking only (see `compareLookupEntries`); the per-corpus chips are read
+   * separately through `dict:frequency`.
+   */
+  freqRank?: number;
 }
 
 export interface CharacterSource {
@@ -259,12 +265,17 @@ function stripSuffixes(word: string, suffixes: string[], minStem: number): strin
  * The Japanese branch is the only one that returns a *reason chain*, because it is
  * the only one backed by a real morphology table rather than a suffix list.
  */
-export function candidateForms(lang: DictLangCode, text: string): { form: string; reasons: string[] }[] {
+export function candidateForms(
+  lang: DictLangCode,
+  text: string,
+): { form: string; reasons: string[]; wordTypes?: WordType[] }[] {
   const norm = normalizeForLookup(text);
   if (!norm) return [];
   switch (lang) {
     case 'ja':
-      return deinflect(norm).map((d) => ({ form: d.term, reasons: d.reasons }));
+      // wordTypes: what each de-inflected candidate was reached as (飲んでいた →
+      // 飲む as godan), checked against the headword's part of speech in lookup().
+      return deinflect(norm).map((d) => ({ form: d.term, reasons: d.reasons, ...(d.wordTypes ? { wordTypes: d.wordTypes } : {}) }));
     case 'ru': {
       // Stress marks are notation (a pasted `кни́ги` is `книги`), and a form is
       // probed as its likely dictionary forms too: `книги` → `книга`,
@@ -278,6 +289,25 @@ export function candidateForms(lang: DictLangCode, text: string): { form: string
     default:
       return [{ form: norm, reasons: [] }];
   }
+}
+
+const KANA_ONLY_QUERY = /^[ぁ-ゖァ-ヺー゛゜ゝゞヽヾ]+$/u;
+
+/**
+ * The other kana script of an all-kana Japanese query: ネコ → ねこ, てれび → テレビ.
+ *
+ * Yomitan and 10ten both fold katakana and hiragana before probing, because a
+ * learner types (and subtitles print) a word in either script: ネコ in a manga
+ * caption is 猫, whose reading JMdict stores as ねこ. Without the fold the reading
+ * probe misses and the only answer is a prefix near-miss or nothing. A single
+ * kana is left alone — at that length it is a particle far more often than a word.
+ */
+export function kanaScriptVariants(text: string): string[] {
+  const norm = normalizeForLookup(text);
+  if ([...norm].length < 2 || !KANA_ONLY_QUERY.test(norm)) return [];
+  const hira = norm.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+  const kata = norm.replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  return [...new Set([hira, kata])].filter((variant) => variant !== norm);
 }
 
 /**
@@ -544,11 +574,39 @@ const VIA_RANK: Record<LookupEntry['via'], number> = {
   exact: 0, variant: 1, reading: 2, deinflected: 3, prefix: 4, gloss: 5, fuzzy: 6,
 };
 
+/**
+ * Japanese de-inflection depth: fewer steps first, as Yomitan sorts. 見た read as
+ * one step (past of 見る) outranks a three-step reading of the same surface. Only
+ * for Japanese chains — an importer's Russian paradigm row lists grammatical tags,
+ * whose count says nothing about how likely the reading is.
+ */
+function inflectionDepthOrder(a: LookupEntry, b: LookupEntry): number {
+  if (a.via !== 'deinflected' || b.via !== 'deinflected' || a.lang !== 'ja' || b.lang !== 'ja') return 0;
+  return (a.reasons?.length ?? 0) - (b.reasons?.length ?? 0);
+}
+
+/**
+ * More frequent first, among entries reached the same way. A ranked word beats
+ * an unranked one; two unranked words fall through to dictionary priority, so an
+ * install with no frequency corpus orders exactly as before. This is what puts
+ * 紙 / 神 / 髪 ahead of the rare かみ homophones on a reading lookup.
+ */
+function frequencyOrder(a: LookupEntry, b: LookupEntry): number {
+  const ra = a.freqRank;
+  const rb = b.freqRank;
+  if (ra === undefined && rb === undefined) return 0;
+  if (ra === undefined) return 1;
+  if (rb === undefined) return -1;
+  return ra - rb;
+}
+
 export function compareLookupEntries(a: LookupEntry, b: LookupEntry): number {
   return VIA_RANK[a.via] - VIA_RANK[b.via] ||
     // Only fuzzy entries carry a distance, and they never share a result with
     // exact ones, so this term is inert for every other kind of match.
     (a.fuzzyDistance ?? 0) - (b.fuzzyDistance ?? 0) ||
+    inflectionDepthOrder(a, b) ||
+    frequencyOrder(a, b) ||
     (a.dictionaryPriority ?? Number.MAX_SAFE_INTEGER) -
       (b.dictionaryPriority ?? Number.MAX_SAFE_INTEGER) ||
     b.score - a.score ||
@@ -690,6 +748,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     via: LookupEntry['via'],
     reasons: string[],
     fuzzyDistance?: number,
+    wordTypes?: readonly WordType[],
   ) => {
     // One headword, one entry. A Russian row's reading is its stressed spelling,
     // which normalises back to the headword, so the reading probe found the row
@@ -700,6 +759,10 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     // matching headword. Do not let that empty shell consume the result limit or
     // render as a definition-less card; it is not a result in the requested pair.
     if (entry.senses.length === 0) return;
+    // Yomitan's part-of-speech check: a de-inflected candidate is only this
+    // headword if the headword conjugates that way (まず peels to まる as an
+    // ichidan ず-negative, and the noun 丸 is not that word).
+    if (!posMatchesWordTypes(entry.senses.flatMap((sense) => sense.pos), wordTypes)) return;
     const semanticKey = [entry.lang, entry.text, entry.readingNorm, entry.via, entry.fuzzyDistance ?? ''].join('\u0000');
     const existingIndex = semanticEntries.get(semanticKey);
     if (existingIndex !== undefined) {
@@ -729,9 +792,9 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     // Russian candidates past the first are guesses (`книги` → `книга`); they
     // are probed only when the dictionary's own paradigm rows name no lemma.
     const guesses = lang === 'ru' ? forms.slice(1) : [];
-    for (const { form, reasons } of lang === 'ru' ? forms.slice(0, 1) : forms) {
+    for (const { form, reasons, wordTypes } of lang === 'ru' ? forms.slice(0, 1) : forms) {
       const via = reasons.length ? 'deinflected' : 'exact';
-      for (const row of byNorm.all(pair, lang, form) as HeadwordRow[]) push(row, via, reasons);
+      for (const row of byNorm.all(pair, lang, form) as HeadwordRow[]) push(row, via, reasons, undefined, wordTypes);
     }
     let inflectionHits = 0;
 
@@ -768,6 +831,14 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     for (const key of readingKeys) {
       if (!key) continue;
       for (const row of byReading.all(pair, lang, key) as HeadwordRow[]) push(row, 'reading', []);
+    }
+    // The other kana script (ネコ → ねこ → 猫, てれび → テレビ): a headword written in
+    // it, or a reading stored in it. Same index probes, so still no scan.
+    if (lang === 'ja') {
+      for (const variant of kanaScriptVariants(text)) {
+        for (const row of byNorm.all(pair, lang, variant) as HeadwordRow[]) push(row, 'reading', []);
+        for (const row of byReading.all(pair, lang, variant) as HeadwordRow[]) push(row, 'reading', []);
+      }
     }
 
     if (result.entries.length < gather) {
@@ -869,6 +940,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     }
   }
 
+  if (result.entries.length > 1) attachFrequencyRanks(db, result.entries);
   result.entries.sort(compareLookupEntries);
   // Either kind of evidence is enough: more entries survived than will be shown,
   // or a probe that was capped came back full. Neither is `entries.length ===
@@ -885,6 +957,32 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     if (missing.length) result.missingSourceLangs = missing;
   }
   return result;
+}
+
+/**
+ * Each entry's best rank across the enabled frequency corpora, for ordering.
+ * One indexed `IN` probe per language present (`findLexiconFrequencyRanks`); a
+ * database without the frequency table simply orders as before.
+ */
+function attachFrequencyRanks(db: SqliteDb, entries: LookupEntry[]): void {
+  const byLang = new Map<string, LookupEntry[]>();
+  for (const entry of entries) {
+    const list = byLang.get(entry.lang);
+    if (list) list.push(entry);
+    else byLang.set(entry.lang, [entry]);
+  }
+  for (const [lang, list] of byLang) {
+    let ranks: Map<string, number>;
+    try {
+      ranks = findLexiconFrequencyRanks(db, [...new Set(list.map((entry) => entry.text))], lang === 'und' ? undefined : [lang]);
+    } catch {
+      return;
+    }
+    for (const entry of list) {
+      const rank = ranks.get(entry.text);
+      if (rank !== undefined) entry.freqRank = rank;
+    }
+  }
 }
 
 /**

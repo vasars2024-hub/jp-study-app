@@ -37,6 +37,8 @@ import { mineToStudy, notifyMined, videoCoreStudyInput } from '../renderer/study
 import { getStudyLang } from '../renderer/studyEnvironment';
 import { studyLangOfText } from '../shared/studyLang';
 import MediaCueAgentHandoffButton from './MediaCueAgentHandoffButton';
+import { DEFAULT_CLIP_PADDING, paddedCueRange, type ClipPadding } from './clipPadding';
+import { planCueFrame } from './cueFrameChoice';
 
 interface Props {
   cue: VideoCoreStudyCue | null;
@@ -75,6 +77,13 @@ interface Props {
   mineRequest?: VideoCoreMineRequest | null;
   /** The listened-to audio stream (0-based among the file's audio streams), for cue audio. */
   audioStreamOrdinal?: number | null;
+  /** The learner's padding around a line for audio and clips (`clipPadding.ts`). */
+  clipPadding?: ClipPadding;
+  /**
+   * The study track the line belongs to, so the padding can stop at the neighbouring lines.
+   * Without it the padding is applied as set.
+   */
+  trackCues?: readonly VideoCoreStudyCue[];
 }
 
 function loadHistory(): VideoCoreMiningHistoryEntry[] {
@@ -180,6 +189,8 @@ export default function VideoCoreMiningPanel({
   defaultExpanded = false,
   mineRequest = null,
   audioStreamOrdinal = null,
+  clipPadding = DEFAULT_CLIP_PADDING,
+  trackCues,
 }: Props): React.ReactElement {
   const { t } = useT();
   const [draft, setDraft] = React.useState<VideoCoreMiningDraft | null>(null);
@@ -279,16 +290,60 @@ export default function VideoCoreMiningPanel({
     setDraft((current) => current ? { ...current, [key]: value } : current);
   }, []);
 
+  /** The line's range with the learner's padding, stopped at its neighbours (`clipPadding.ts`). */
+  const rangeFor = (lineCue: VideoCoreStudyCue) =>
+    paddedCueRange(lineCue, trackCues ?? [], subtitleDelaySec, clipPadding);
+
+  /**
+   * The line's picture: the frame on screen while playback is inside the line, otherwise a
+   * frame from inside the line cut from the file (`cueFrameChoice.ts`). `null` when neither
+   * is possible (a stream, away from the line).
+   */
+  const screenshotFor = async (
+    lineCue: VideoCoreStudyCue,
+    cueText: string,
+    filePath: string,
+  ): Promise<CapturedAsset | null> => {
+    const plan = planCueFrame({
+      currentSec: video ? video.currentTime : null,
+      frameReady: !!video && video.videoWidth > 0 && video.videoHeight > 0,
+      startSec: cuePlaybackStartSec(lineCue, subtitleDelaySec),
+      endSec: cuePlaybackEndSec(lineCue, subtitleDelaySec),
+      hasFile: !!filePath && typeof window.api?.extractVideoFrame === 'function',
+    });
+    if (plan.kind === 'element' && video) return captureFrame(video, cueText, lineCue);
+    if (plan.kind !== 'file') return null;
+    const result = await window.api.extractVideoFrame({
+      filePath,
+      atSec: plan.atSec,
+      maxWidth: SCREENSHOT_MAX_WIDTH,
+    });
+    if (!result.ok || !result.base64) {
+      const key = videoClipErrorKey(result.error);
+      throw new Error(key ? translateUi(key) : translateUi('mediaWorkspace.capture.screenshotFailed'));
+    }
+    return {
+      base64: result.base64,
+      filename: `jp-video-cue-${lineCue.trackNumber}-${lineCue.index}-${lineCue.startMs}.jpg`,
+      mimeType: result.mimeType ?? 'image/jpeg',
+      bytes: result.bytes ?? 0,
+    };
+  };
+
   const onScreenshot = async (): Promise<void> => {
-    if (!draft || !selectedCue || !video) return;
+    if (!draft || !selectedCue) return;
     setBusy('screenshot');
     setMessage('');
     try {
-      const captured = await captureFrame(
-        video,
-        draft.provenance.cue.text,
+      const captured = await screenshotFor(
         selectedCue,
+        draft.provenance.cue.text,
+        draft.provenance.source.localFilePath ?? '',
       );
+      if (!captured) {
+        setMessage(t('vstudy.frame.notOnScreen'));
+        return;
+      }
       setDraft((current) => current
         ? withVideoCoreMiningAsset(current, 'screenshot', {
             base64: captured.base64,
@@ -308,18 +363,46 @@ export default function VideoCoreMiningPanel({
   };
 
   const onAudio = async (): Promise<void> => {
-    if (!draft || !selectedCue || !video) return;
+    if (!draft || !selectedCue) return;
+    const filePath = draft.provenance.source.localFilePath ?? '';
+    const canCut = !!filePath && typeof window.api?.extractAudioClip === 'function';
+    // Only a stream is recorded off the element; a local file is cut by ffmpeg, which is
+    // instant, leaves the player alone, and is the same MP3 the one-key mine attaches.
+    if (!canCut && !video) return;
     setBusy('audio');
-    setMessage(t('mediaWorkspace.capture.recordingCue'));
+    setMessage(t(canCut ? 'mediaWorkspace.mining.clipping' : 'mediaWorkspace.capture.recordingCue'));
     try {
       // The cue -> playback-range conversion stays HERE, because the subtitle delay is a
       // video concern. The shared recorder takes a plain range and knows nothing about cues.
-      const captured = await recordCueAudio(video, {
-        startSec: cuePlaybackStartSec(selectedCue, subtitleDelaySec),
-        endSec: cuePlaybackEndSec(selectedCue, subtitleDelaySec),
-        filenameStem:
-          `jp-video-cue-${selectedCue.trackNumber}-${selectedCue.index}-${selectedCue.startMs}`,
-      });
+      const range = rangeFor(selectedCue);
+      const stem = `jp-video-cue-${selectedCue.trackNumber}-${selectedCue.index}-${selectedCue.startMs}`;
+      let captured: CapturedAsset;
+      if (canCut) {
+        const result = await window.api.extractAudioClip({
+          filePath,
+          startSec: range.cueStartSec,
+          endSec: range.cueEndSec,
+          padBeforeSec: range.padBeforeSec,
+          padAfterSec: range.padAfterSec,
+          audioStreamOrdinal,
+        });
+        if (!result.ok || !result.base64) {
+          const key = videoClipErrorKey(result.error);
+          throw new Error(key ? t(key) : t('mediaWorkspace.capture.cueAudioFailed'));
+        }
+        captured = {
+          base64: result.base64,
+          filename: `${stem}.mp3`,
+          mimeType: result.mimeType ?? 'audio/mpeg',
+          bytes: result.bytes ?? 0,
+        };
+      } else {
+        captured = await recordCueAudio(video as HTMLVideoElement, {
+          startSec: range.startSec,
+          endSec: range.endSec,
+          filenameStem: stem,
+        });
+      }
       setDraft((current) => current
         ? withVideoCoreMiningAsset(current, 'audio', {
             base64: captured.base64,
@@ -354,11 +437,14 @@ export default function VideoCoreMiningPanel({
     setBusy('clip');
     setMessage(t('mediaWorkspace.mining.clipping'));
     try {
-      const startSec = cuePlaybackStartSec(selectedCue, subtitleDelaySec);
+      const range = rangeFor(selectedCue);
+      const startSec = range.cueStartSec;
       const result = await window.api.extractVideoClip({
         filePath,
         startSec,
-        endSec: cuePlaybackEndSec(selectedCue, subtitleDelaySec),
+        endSec: range.cueEndSec,
+        padSec: range.padBeforeSec,
+        padAfterSec: range.padAfterSec,
         audioStreamOrdinal,
       });
       if (!result.ok || !result.base64) {
@@ -415,15 +501,21 @@ export default function VideoCoreMiningPanel({
         };
       }
     }
-    const startSec = cuePlaybackStartSec(lineCue, subtitleDelaySec);
-    const endSec = cuePlaybackEndSec(lineCue, subtitleDelaySec);
+    const range = rangeFor(lineCue);
     const filePath = next.provenance.source.localFilePath ?? '';
     const stem = `jp-video-cue-${lineCue.trackNumber}-${lineCue.index}-${lineCue.startMs}`;
     if (!next.audio) {
       try {
         if (filePath && typeof window.api?.extractAudioClip === 'function') {
           // Cut from the file: instant, and the player keeps playing.
-          const result = await window.api.extractAudioClip({ filePath, startSec, endSec, audioStreamOrdinal });
+          const result = await window.api.extractAudioClip({
+            filePath,
+            startSec: range.cueStartSec,
+            endSec: range.cueEndSec,
+            padBeforeSec: range.padBeforeSec,
+            padAfterSec: range.padAfterSec,
+            audioStreamOrdinal,
+          });
           if (result.ok && result.base64) {
             next = withVideoCoreMiningAsset(next, 'audio', {
               base64: result.base64,
@@ -432,7 +524,11 @@ export default function VideoCoreMiningPanel({
           }
         } else if (video) {
           // A stream has no file to cut: record the line off the element, as asbplayer does.
-          const captured = await recordCueAudio(video, { startSec, endSec, filenameStem: stem });
+          const captured = await recordCueAudio(video, {
+            startSec: range.startSec,
+            endSec: range.endSec,
+            filenameStem: stem,
+          });
           next = withVideoCoreMiningAsset(next, 'audio', { base64: captured.base64, asset: captured });
         }
       } catch {
@@ -441,24 +537,10 @@ export default function VideoCoreMiningPanel({
     }
     if (!next.screenshot) {
       try {
-        const onScreen = video
-          && video.currentTime >= startSec - 0.5
-          && video.currentTime <= endSec + 2;
-        if (video && onScreen) {
-          const captured = await captureFrame(video, next.provenance.cue.text, lineCue);
+        // The frame on screen only while it is this line's; otherwise one cut from inside it.
+        const captured = await screenshotFor(lineCue, next.provenance.cue.text, filePath);
+        if (captured) {
           next = withVideoCoreMiningAsset(next, 'screenshot', { base64: captured.base64, asset: captured });
-        } else if (filePath && typeof window.api?.extractVideoFrame === 'function') {
-          const result = await window.api.extractVideoFrame({
-            filePath,
-            atSec: (startSec + endSec) / 2,
-            maxWidth: SCREENSHOT_MAX_WIDTH,
-          });
-          if (result.ok && result.base64) {
-            next = withVideoCoreMiningAsset(next, 'screenshot', {
-              base64: result.base64,
-              asset: { filename: `${stem}.jpg`, mimeType: result.mimeType ?? 'image/jpeg', bytes: result.bytes ?? 0 },
-            });
-          }
         }
       } catch {
         // No screenshot on this card; the rest still goes.

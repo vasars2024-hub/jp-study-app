@@ -70,6 +70,11 @@ export const PRODUCT5_UI_RU: Catalog = {
   'kbd5.io.error.notJson': 'Это не корректный JSON.',
   'kbd5.io.error.notKeymap': 'Это не раскладка клавиш Gum.',
   'kbd5.io.error.rejected': 'Раскладка отклонена: {detail}',
+  // kbd7: import hardening and boot recovery (the import reasons fill {detail} above).
+  'kbd7.import.invalidCustom': 'одно из пользовательских сочетаний в ней неполное или повреждено. Ничего не изменено.',
+  'kbd7.import.invalidCustomNamed': 'пользовательское сочетание «{name}» неполное или повреждено. Ничего не изменено.',
+  'kbd7.import.saveFailed': 'её не удалось применить. Ваши сочетания клавиш остались прежними.',
+  'kbd7.boot.storeReset': 'Сохранённые сочетания клавиш не удалось загрузить, поэтому они сброшены к стандартным. Копия старых настроек сохранена.',
   'kbd5.custom.edit': 'Изменить',
   'kbd5.custom.editTitle': 'Изменить своё сочетание',
   'kbd5.custom.save': 'Сохранить изменения',

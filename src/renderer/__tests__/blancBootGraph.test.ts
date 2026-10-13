@@ -111,6 +111,17 @@ const FORBIDDEN_FILES: Array<[RegExp, string]> = [
   // (keyboardShortcuts.ts, globalShortcutNotice.ts).
   [/\/renderer\/readerSettings\.ts$/, 'the reader settings (word-highlight shortcut loads them)'],
   [/\/renderer\/extensionBridgeUi\.ts$/, 'the app-section bridge (refused-shortcut toast loads it)'],
+  // Moved out of the built boot bundle 2026-10-12, when it had grown to 2,538,528 B
+  // against its 2,411,724 B gate (tools/blanc-budget.cjs). Each is loaded on use:
+  // the deck store with the Deck tab (BlancDeckPanel.tsx) and the master-search
+  // palette; the mining pipeline on a clipboard "send to cards"; the continue-watching
+  // store by the resume-last shortcut; Reading Lists' reminder card after first
+  // paint (ToastHost); kuromoji by `getTokenizer()` (tokenizerLoader.ts).
+  [/\/renderer\/flashcardDeck\.ts$/, 'the deck store (the Deck tab and master search load it)'],
+  [/\/renderer\/studyMining\.ts$/, 'the mining pipeline (clipboard send-to-cards loads it)'],
+  [/\/renderer\/continueWatchingStore\.ts$/, 'the continue-watching store (resume-last loads it)'],
+  [/\/components\/reading\/ReadingReminderHost\.tsx$/, "Reading Lists' reminder card (ToastHost loads it after paint)"],
+  [/\/renderer\/tokenizerLoader\.ts$/, 'the kuromoji loader (getTokenizer loads it)'],
 ];
 
 const FORBIDDEN_PACKAGES: Array<[RegExp, string]> = [
@@ -118,12 +129,15 @@ const FORBIDDEN_PACKAGES: Array<[RegExp, string]> = [
   [/^@huggingface\/transformers/, 'transformers.js'],
   [/^onnxruntime/, 'onnxruntime'],
   [/^pdfjs-dist/, 'pdf.js'],
-  // kuromoji's CODE (~40 KB with `async`) is allowed: the global lookup gesture
-  // asks `tokenizerReady()`, and making the library a dynamic import breaks the
-  // IIFE worker build that shares `tokenizer.ts` (measured: Rollup refuses
-  // code-splitting for `studyWords.worker`). Its 20 MB DICTIONARY is fetched on
-  // first use, never at startup. Only the bundled full build is forbidden.
-  [/^kuromoji$|kuromoji\/build\//, 'the bundled kuromoji build'],
+  // kuromoji's CODE (~70 KB built with async.js and doublearray) used to be
+  // allowed here because a dynamic import broke the IIFE worker build that shares
+  // `tokenizer.ts`. The worker now builds with `inlineDynamicImports`
+  // (vite.renderer.config.ts), so `tokenizer.ts` keeps the synchronous state
+  // (`tokenizerReady`, `tokenizeSync`) and `getTokenizer()` imports the library
+  // from `tokenizerLoader.ts` on first use. Its 20 MB DICTIONARY was always
+  // fetched on first use.
+  [/^kuromoji$|kuromoji\//, 'kuromoji (tokenizerLoader.ts loads it on first use)'],
+  [/^async$|^doublearray$/, "kuromoji's dependencies"],
 ];
 
 describe('Blanc startup import graph', () => {

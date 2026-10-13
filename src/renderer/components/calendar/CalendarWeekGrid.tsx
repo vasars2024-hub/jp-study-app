@@ -289,7 +289,8 @@ export function CalendarWeekGrid({ state }: { state: WeekGridState }) {
 
   // Timed events per day, with their lane columns.
   const timed = useMemo(() => keys.map((key) => {
-    const list = (occsByDay.get(key) ?? []).filter((o) => !o.allDay && o.startTime);
+    // An event over several days rides in the all-day row, one bar per day, as other calendars draw it.
+    const list = (occsByDay.get(key) ?? []).filter((o) => !o.allDay && o.startTime && !o.spanDays);
     const layout = weekEventLayout(list.map((o) => ({ key: `${o.id}|${o.occurrenceDate}`, ...occurrenceSpan(o) })));
     return list.map((o) => ({ o, ...occurrenceSpan(o), ...(layout.get(`${o.id}|${o.occurrenceDate}`) ?? { col: 0, cols: 1 }) }));
   }), [keys, occsByDay]);
@@ -373,7 +374,7 @@ export function CalendarWeekGrid({ state }: { state: WeekGridState }) {
         <div role="rowheader" className="cal-wk-alldaylabel">{t('calendar.allDay')}</div>
         {days.map((d, i) => {
           const slot = { day: i, row: -1 };
-          const list = (occsByDay.get(keys[i]) ?? []).filter((o) => o.allDay || !o.startTime);
+          const list = (occsByDay.get(keys[i]) ?? []).filter((o) => o.allDay || !o.startTime || o.spanDays);
           return (
             <div
               key={keys[i]}
@@ -389,18 +390,22 @@ export function CalendarWeekGrid({ state }: { state: WeekGridState }) {
                 <button
                   key={`${o.id}|${o.occurrenceDate}`}
                   type="button"
-                  className="cal-chip"
+                  className={`cal-chip${o.spanDays ? ' cal-chip--span' : ''}${o.spanIndex ? ' cal-chip--cont' : ''}`}
                   style={{ borderLeftColor: o.color }}
                   data-occurrence={`${o.id}|${o.occurrenceDate}`}
+                  aria-label={o.spanDays
+                    ? `${o.title}, ${t('planner.multiDay.dayOf', { index: (o.spanIndex ?? 0) + 1, count: o.spanDays })}`
+                    : undefined}
                   aria-keyshortcuts={state.moveByKeyboard ? KEYBOARD_MOVE_KEYS : undefined}
                   onClick={(e) => {
                     e.stopPropagation();
                     openEdit(o);
                   }}
                   onKeyDown={keyMove(o, 'week')}
-                  draggable={Boolean(state.moveOccurrence)}
+                  draggable={Boolean(state.moveOccurrence) && !o.spanIndex}
                   onDragStart={dragStart(o)}
                 >
+                  {o.spanDays && !o.spanIndex && !o.allDay && o.startTime ? <span className="cal-chip-time">{o.startTime}</span> : null}
                   <span className="cal-chip-title">{o.title}</span>
                 </button>
               ))}

@@ -16,22 +16,22 @@ import {
   todayDayKey,
   type MediaStudyDelta,
 } from '../stats';
+import { shiftStudyDayKey } from '../../shared/studyDay';
 
 const store = new Map<string, string>();
 
+/**
+ * Days are STUDY days (4 am rollover), counted back from the store's own today. The
+ * calendar-date helpers these replaced were a day off between 00:00 and 04:00, so the
+ * week window and the streak read a different day than the one the store wrote.
+ */
 function dayKeyOffset(daysAgo: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
+  return shiftStudyDayKey(todayDayKey(), -daysAgo);
 }
 
+/** Noon of the study day `daysAgo` back: inside that day whatever the day-start hour. */
 function atDaysAgo(daysAgo: number): number {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  d.setHours(12, 0, 0, 0);
-  return d.getTime();
+  return new Date(`${dayKeyOffset(daysAgo)}T12:00:00`).getTime();
 }
 
 function seed(days: Record<string, Record<string, unknown>>): void {

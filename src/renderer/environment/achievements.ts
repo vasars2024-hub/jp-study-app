@@ -1,7 +1,7 @@
 /**
  * Study milestone detector — emits companion events for streaks & daily goals (L5).
  */
-import { getSummary, MEDIA_STUDY_RECORDED_EVENT, READING_RECORDED_EVENT, REVIEW_RECORDED_EVENT } from '../stats';
+import { getSummary, MEDIA_STUDY_RECORDED_EVENT, READING_RECORDED_EVENT, REVIEW_RECORDED_EVENT, todayDayKey } from '../stats';
 import { emitCompanionEvent } from './companionEvents';
 import { STREAK_MILESTONES, unlockTrinketsForStreak } from './companionTrinkets';
 import { t } from '../i18n';
@@ -23,8 +23,14 @@ interface AchState {
   dayKey: string;
 }
 
-function dayKey(d = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/**
+ * The stats store's today (a study day, rolling over at 4 am by default). The daily buckets
+ * are measured against `summary.todayChars` / `todayReviews`, which are study-day figures: a
+ * midnight key re-armed the buckets at 00:00 while the totals ran on, so tonight's 2,000
+ * characters were celebrated a second time at midnight.
+ */
+function dayKey(): string {
+  return todayDayKey();
 }
 
 function load(): AchState {

@@ -13,6 +13,8 @@ let events: string[] = ['event-1'];
 let mediaIds: string[] = ['media-1'];
 let deleteCalls: unknown[][] = [];
 let deleteFailure = false;
+/** The calendar inverse refuses the way the real adapter does when the event changed since. */
+let calendarChangedSince = false;
 let enabledOperations: string[] = [
   'flashcard.delete-cards',
   'flashcard.delete-deck',
@@ -58,6 +60,8 @@ vi.mock('../localAgentSettingsStore', () => ({
 }));
 
 vi.mock('../agentToolRegistry', () => ({
+  AGENT_UNDO_CHANGED_SINCE: 'changed-since',
+  agentCalendarEventFingerprint: (event: { id: string }) => `fp:${event.id}`,
   createCentralAgentToolRegistry: () => ({
     'flashcard.delete-cards': (arguments_: { ids?: unknown }) => {
       deleteCalls.push([arguments_]);
@@ -74,6 +78,7 @@ vi.mock('../agentToolRegistry', () => ({
     },
     'calendar.delete-event': (arguments_: { id?: unknown }) => {
       deleteCalls.push([arguments_]);
+      if (calendarChangedSince) throw Object.assign(new Error('edited since'), { code: 'changed-since' });
       events = events.filter((id) => id !== arguments_.id);
       return { events: events.length };
     },
@@ -88,10 +93,15 @@ vi.mock('../agentToolRegistry', () => ({
     'flashcard.delete-deck',
     'calendar.delete-event',
     'media.delete-item',
+    // The forward writes, which now authorize the Undo of their own effect.
+    'calendar.schedule-session',
+    'calendar.schedule-sessions',
+    'calendar.create-reminder',
+    'flashcard.add-cards',
   ],
 }));
 
-import { performAgentUndo } from '../agentUndoClient';
+import { performAgentUndo, readAgentUndoContext, withAgentUndoBaseline } from '../agentUndoClient';
 
 const t = (key: string): string => key;
 const log = () => agentOperationLogAppend(AGENT_OPERATION_LOG_EMPTY, {
@@ -121,6 +131,7 @@ beforeEach(() => {
   mediaIds = ['media-1'];
   deleteCalls = [];
   deleteFailure = false;
+  calendarChangedSince = false;
   enabledOperations = [
     'flashcard.delete-cards',
     'flashcard.delete-deck',
@@ -255,5 +266,124 @@ describe('performAgentUndo across entity types', () => {
 
     expect(result).toMatchObject({ ok: true });
     expect(events).toEqual([]);
+  });
+});
+
+describe("Undo of the Agent's own write (scorecard bug 9)", () => {
+  // The built-in Tutor's shape: it may schedule sessions, it may NOT delete events, and it
+  // runs at limited actions while `calendar.delete-event` needs full automation.
+  const tutorLike = () => {
+    enabledOperations = ['calendar.schedule-session', 'calendar.schedule-sessions', 'calendar.create-reminder'];
+    permission = 'limited-actions';
+  };
+
+  it('undoes a scheduled session under a profile that may schedule but not delete events', async () => {
+    tutorLike();
+    const result = await performAgentUndo(
+      logFor('calendar.schedule-session', 'calendar-event', ['event-1']),
+      'save-call|0',
+      t,
+    );
+
+    expect(result).toMatchObject({ ok: true, operation: { operation: 'calendar.delete-event', claim: 'deleted' } });
+    expect(events).toEqual([]);
+  });
+
+  it('grants only the registered inverse, only for that entry, and only what the write needs', async () => {
+    tutorLike();
+    const own = await readAgentUndoContext(t, {
+      log: logFor('calendar.schedule-sessions', 'calendar-event', ['event-1']),
+      operationId: 'save-call|0',
+    });
+    expect(own.permission).toBe('full-automation');
+    expect(own.allowedOperations).toContain('calendar.delete-event');
+    expect(own.allowedOperations).not.toContain('flashcard.delete-cards');
+
+    // Without a subject nothing is granted: deleting events in general stays refused.
+    const general = await readAgentUndoContext(t);
+    expect(general.permission).toBe('limited-actions');
+    expect(general.allowedOperations).not.toContain('calendar.delete-event');
+  });
+
+  it('still refuses when the profile no longer allows the write itself', async () => {
+    tutorLike();
+    enabledOperations = ['calendar.list'];
+    expect(await performAgentUndo(logFor('calendar.schedule-session', 'calendar-event', ['event-1']), 'save-call|0', t))
+      .toEqual({ ok: false, code: 'operation-denied' });
+    expect(deleteCalls).toHaveLength(0);
+    expect(events).toEqual(['event-1']);
+  });
+
+  it("still refuses below the write's own permission level", async () => {
+    tutorLike();
+    permission = 'read-only';
+    expect(await performAgentUndo(logFor('calendar.schedule-session', 'calendar-event', ['event-1']), 'save-call|0', t))
+      .toEqual({ ok: false, code: 'operation-denied' });
+    expect(deleteCalls).toHaveLength(0);
+  });
+
+  it('records a digest of each created event, and only for created calendar events', () => {
+    events = ['event-1', 'event-2'];
+    const draft = {
+      operation: 'calendar.schedule-sessions',
+      claim: 'created',
+      entityType: 'calendar-event',
+      entityIds: ['event-1', 'event-2'],
+      callId: 'plan-call',
+    } as const;
+    expect(withAgentUndoBaseline(draft as never).inverseArguments).toEqual([
+      { id: 'event-1', expect: 'fp:event-1' },
+      { id: 'event-2', expect: 'fp:event-2' },
+    ]);
+    const cards = { ...draft, operation: 'flashcard.add-cards', entityType: 'flashcard' };
+    expect(withAgentUndoBaseline(cards as never)).toBe(cards);
+    // An id that is not live: nothing to protect, and the Undo will refuse it anyway.
+    expect(withAgentUndoBaseline({ ...draft, entityIds: ['gone'] } as never).inverseArguments).toBeUndefined();
+  });
+
+  it('refuses, deleting none of them, when the user edited one of the created events since', async () => {
+    tutorLike();
+    events = ['event-1', 'event-2'];
+    const edited = agentOperationLogAppend(AGENT_OPERATION_LOG_EMPTY, {
+      operation: 'calendar.schedule-sessions',
+      claim: 'created',
+      entityType: 'calendar-event',
+      entityIds: ['event-1', 'event-2'],
+      // event-2's digest no longer matches: the user changed it after the Agent made it.
+      inverseArguments: [{ id: 'event-1', expect: 'fp:event-1' }, { id: 'event-2', expect: 'fp:before-edit' }],
+      callId: 'save-call',
+    }, 100);
+
+    expect(await performAgentUndo(edited, 'save-call|0', t)).toEqual({ ok: false, code: 'superseded' });
+    expect(deleteCalls).toEqual([]);
+    expect(events).toEqual(['event-1', 'event-2']);
+  });
+
+  it('passes the digest to the inverse when the events are unchanged', async () => {
+    tutorLike();
+    const unchanged = agentOperationLogAppend(AGENT_OPERATION_LOG_EMPTY, {
+      operation: 'calendar.schedule-session',
+      claim: 'created',
+      entityType: 'calendar-event',
+      entityIds: ['event-1'],
+      inverseArguments: [{ id: 'event-1', expect: 'fp:event-1' }],
+      callId: 'save-call',
+    }, 100);
+
+    expect(await performAgentUndo(unchanged, 'save-call|0', t)).toMatchObject({ ok: true });
+    expect(deleteCalls).toEqual([[{ id: 'event-1', expect: 'fp:event-1' }]]);
+  });
+
+  it('says "changed since" when the inverse itself refuses for that reason', async () => {
+    tutorLike();
+    calendarChangedSince = true;
+    expect(await performAgentUndo(logFor('calendar.schedule-session', 'calendar-event', ['event-1']), 'save-call|0', t))
+      .toEqual({ ok: false, code: 'superseded' });
+    expect(events).toEqual(['event-1']);
+    // A plain adapter error is still a failure, not a refusal.
+    permission = 'full-automation';
+    enabledOperations = ['flashcard.delete-cards'];
+    deleteFailure = true;
+    expect(await performAgentUndo(log(), 'save-call|0', t)).toEqual({ ok: false, code: 'undo-failed' });
   });
 });
