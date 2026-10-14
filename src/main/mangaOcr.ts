@@ -55,6 +55,7 @@ import {
 } from '../shared/mangaOcrText';
 import { sequenceConfidence, tokenProbability } from '../shared/ocrConfidence';
 import { sortReadingOrder } from '../shared/readingOrder';
+import { groupTextLines, lineCropBox } from '../shared/mangaTextLines';
 import { getMainStudyLang } from './studyLanguage';
 import { recognizePaddleOcrDataUrl } from './paddleOcr';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
@@ -460,6 +461,23 @@ export interface DetectedRegion {
   box: MokuroBox;
   score: number;
   points: Array<{ x: number; y: number }>;
+  /**
+   * Set by the line grouping (`finalizeTextBlocks`): the block's text lines in
+   * reading order, each read on its own, as Mokuro does. Absent on a region
+   * that is not a grouped block (a whole image, a hand-drawn box).
+   */
+  lines?: Array<{ box: MokuroBox; fontSize: number }>;
+  vertical?: boolean;
+  fontSize?: number;
+}
+
+function boxPoints(box: MokuroBox): Array<{ x: number; y: number }> {
+  return [
+    { x: box[0], y: box[1] },
+    { x: box[2], y: box[1] },
+    { x: box[2], y: box[3] },
+    { x: box[0], y: box[3] },
+  ];
 }
 
 function boxArea(box: MokuroBox): number {
@@ -608,6 +626,47 @@ export function finalizeRegions(
   const nearby = mergeNearbyRegions(capped, 14);
   const merged = mergeOverlappingRegions(nearby);
   return sortReadingOrder(merged);
+}
+
+/**
+ * The detection pipeline the scanner uses: drop weak speckles, cap runaway
+ * detections by area, then group the mask's fragments into text lines and the
+ * lines into speech-bubble blocks in reading order (`shared/mangaTextLines.ts`).
+ *
+ * `finalizeRegions` above unions anything within 14 px into one box, so two
+ * close bubbles or a caption beside a bubble became one crop, read in no line
+ * order. The fragment cap is wider than the block cap because a fragment is now
+ * a line or part of one, not a bubble.
+ */
+export function finalizeTextBlocks(
+  regions: DetectedRegion[],
+  pageW = 0,
+  pageH = 0,
+  tuning: DetectTuning = LEGACY_TUNING,
+): DetectedRegion[] {
+  const sized =
+    pageW > 0 && pageH > 0 ? filterWeakRegions(regions, pageW, pageH, tuning) : regions.slice();
+  const fragments = sized
+    .sort((a, b) => boxArea(b.box) - boxArea(a.box))
+    .slice(0, tuning.maxRegions * 4);
+  const blocks = groupTextLines(fragments);
+  // Keep the largest blocks when a page overflows the cap, in reading order.
+  const kept = new Set(
+    blocks
+      .slice()
+      .sort((a, b) => boxArea(b.box) - boxArea(a.box))
+      .slice(0, tuning.maxRegions),
+  );
+  return blocks
+    .filter((block) => kept.has(block))
+    .map((block) => ({
+      box: block.box,
+      score: block.score,
+      points: boxPoints(block.box),
+      lines: block.lines.map((line) => ({ box: line.box, fontSize: line.fontSize })),
+      vertical: block.vertical,
+      fontSize: block.fontSize,
+    }));
 }
 
 function pick2dMask(outputs: OrtNamespace.Tensor[]): Float32Array | null {
@@ -816,8 +875,8 @@ async function detectRegions(
       ],
     });
   }
-  // Cap by area, merge nearby/overlapping fragments, drop speckles, sort.
-  return finalizeRegions(regions, srcW, srcH, tuning);
+  // Drop speckles, cap by area, group fragments into lines and lines into blocks.
+  return finalizeTextBlocks(regions, srcW, srcH, tuning);
 }
 
 // ----- manga-ocr recognize -----------------------------------------------
@@ -1158,6 +1217,39 @@ function applyManualOrder(blocks: MokuroBlock[]): MokuroBlock[] {
     .map((x) => x.b);
 }
 
+/**
+ * Read one detected block. A grouped block is read line by line, like Mokuro:
+ * each line's crop goes to manga-ocr on its own and its text is one entry of
+ * the block's `lines`, in the block's reading order. The confidence is the
+ * lines' mean weighted by text length. Anything else — no lines, or a study
+ * language manga-ocr does not read (PaddleOCR finds its own lines in the crop)
+ * — is read as one crop, as before.
+ */
+async function recognizeRegion(
+  rgba: Buffer,
+  width: number,
+  height: number,
+  region: DetectedRegion,
+): Promise<{ lines: string[]; confidence: number }> {
+  if (region.lines?.length && getMainStudyLang() === 'ja') {
+    const lines: string[] = [];
+    let weighted = 0;
+    let chars = 0;
+    for (const line of region.lines) {
+      const crop = lineCropBox(line, width, height);
+      const read = await recognizeCropJapanese(rgba, width, height, crop, boxPoints(crop));
+      const text = read.text.trim();
+      if (!text) continue;
+      lines.push(text);
+      weighted += read.confidence * text.length;
+      chars += text.length;
+    }
+    return { lines, confidence: chars ? weighted / chars : 0 };
+  }
+  const read = await recognizeCrop(rgba, width, height, region.box, region.points);
+  return { lines: read.text ? [read.text] : [], confidence: read.confidence };
+}
+
 /** Recognize one arbitrary box on an already-decoded page image. */
 async function recognizeBox(
   rgba: Buffer,
@@ -1256,8 +1348,8 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
         rawLines = prevRaw;
       } else {
         try {
-          const read = await recognizeCrop(rgba, width, height, region.box, region.points);
-          rawLines = read.text ? [read.text] : [];
+          const read = await recognizeRegion(rgba, width, height, region);
+          rawLines = read.lines;
           readConfidence = read.confidence;
         } catch (err) {
           console.error('[mangaOcr] region raw-backfill failed', regionId, err);
@@ -1267,8 +1359,8 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
       lines = [...correction.lines];
     } else {
       try {
-        const read = await recognizeCrop(rgba, width, height, region.box, region.points);
-        rawLines = read.text ? [read.text] : [];
+        const read = await recognizeRegion(rgba, width, height, region);
+        rawLines = read.lines;
         readConfidence = read.confidence;
       } catch (err) {
         console.error('[mangaOcr] region failed', regionId, err);
@@ -1276,8 +1368,10 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
       }
       lines = [...rawLines];
     }
-    const vertical = correction?.vertical ?? guessVertical(bw, bh);
-    const fontSize = Math.max(10, Math.min(bw, bh) * 0.12);
+    const vertical = correction?.vertical ?? region.vertical ?? guessVertical(bw, bh);
+    // The grouped block's own glyph size when there is one (Mokuro's
+    // `font_size`); the old box-proportional guess otherwise.
+    const fontSize = region.fontSize ? Math.max(10, region.fontSize) : Math.max(10, Math.min(bw, bh) * 0.12);
     const joined = lines.join('\n');
     const junk =
       !correction?.lines &&
@@ -1721,14 +1815,15 @@ export async function recognizeMangaOcrRegionsDataUrl(
 
   const lines: MangaOcrRegionLine[] = [];
   for (const region of regions) {
-    const read = await recognizeCrop(rgba, width, height, region.box, region.points);
-    const text = read.text.trim();
+    const read = await recognizeRegion(rgba, width, height, region);
+    // One entry per bubble: its lines, in reading order, make one text.
+    const text = read.lines.join('').trim();
     if (!text) continue;
     const [x0, y0, x1, y1] = region.box;
     lines.push({
       text,
       box: [x0, y0, x1, y1],
-      vertical: y1 - y0 > x1 - x0,
+      vertical: region.vertical ?? y1 - y0 > x1 - x0,
       confidence: read.confidence,
     });
   }

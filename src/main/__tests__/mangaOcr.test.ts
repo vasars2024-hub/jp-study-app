@@ -32,6 +32,8 @@ vi.mock('../library', () => ({
 const {
   mergeOverlappingRegions,
   finalizeRegions,
+  finalizeTextBlocks,
+  detectTuning,
   applyCorrections,
   readCorrections,
   writeCorrections,
@@ -129,6 +131,48 @@ describe('finalizeRegions', () => {
     // Reading order (top tier first) should put the top region first even
     // though it is far larger — confirms area-sort is no longer the final order.
     expect(out[0].box).toEqual([0, 0, 300, 100]);
+  });
+});
+
+describe('finalizeTextBlocks (Mokuro-style lines and blocks, what the scanner runs)', () => {
+  /** A vertical column at x, `w` wide, as the mask's connected components break it. */
+  const col = (x: number, w: number, ...ys: Array<[number, number]>) =>
+    ys.map(([y0, y1]) => region([x, y0, x + w, y1]));
+
+  it('turns the column fragments into one block whose lines read right to left', () => {
+    const fragments = [...col(160, 30, [100, 250]), ...col(200, 30, [100, 170], [182, 280]), ...col(120, 30, [110, 190])];
+    const out = finalizeTextBlocks(fragments, 1000, 1500);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ box: [120, 100, 230, 280], vertical: true, fontSize: 30 });
+    expect(out[0].lines?.map((l) => l.box[0])).toEqual([200, 160, 120]);
+    expect(out[0].points).toEqual([
+      { x: 120, y: 100 },
+      { x: 230, y: 100 },
+      { x: 230, y: 280 },
+      { x: 120, y: 280 },
+    ]);
+  });
+
+  it('keeps SFX lettering out of the bubble beside it, which the old 14 px proximity union swallowed', () => {
+    const bubble = [...col(300, 30, [100, 260]), ...col(260, 30, [100, 220])];
+    const sfx = col(170, 80, [90, 380]);
+    expect(finalizeRegions([...bubble, ...sfx], 1000, 1500)).toHaveLength(1);
+    const grouped = finalizeTextBlocks([...bubble, ...sfx], 1000, 1500);
+    expect(grouped).toHaveLength(2);
+    const text = grouped.find((block) => block.fontSize === 30);
+    expect(text?.lines?.map((l) => l.box[0])).toEqual([300, 260]);
+  });
+
+  it('still drops weak speckles before grouping', () => {
+    const out = finalizeTextBlocks([...col(200, 30, [100, 260]), region([500, 500, 508, 508], 0.05)], 1000, 1500);
+    expect(out).toHaveLength(1);
+  });
+
+  it('caps blocks per page at the tuning limit, keeping the largest', () => {
+    const tuning = detectTuning('low');
+    const many = Array.from({ length: 80 }, (_, i) => region([(i % 10) * 200, Math.floor(i / 10) * 300, (i % 10) * 200 + 60 + (i % 3), Math.floor(i / 10) * 300 + 200], 0.9));
+    const out = finalizeTextBlocks(many, 4000, 4000, tuning);
+    expect(out.length).toBe(tuning.maxRegions);
   });
 });
 

@@ -118,11 +118,15 @@ ${filler}
   return file;
 }
 
-/** The manga's speech-box layout: one vertical box per page, same coordinates in .mokuro. */
+/**
+ * The manga's speech-box layout: vertical columns, same coordinates in .mokuro. Pages 1
+ * and 2 carry one block per column; page 3 carries one block of two lines, right column
+ * first, the shape the OCR's line grouping writes for a bubble (`shared/mangaTextLines.ts`).
+ */
 const MANGA_PAGES = [
   { name: '001', lines: ['おはよう', 'ございます'] },
   { name: '002', lines: ['今日は', '雨ですね'] },
-  { name: '003', lines: ['パンを', '食べる'] },
+  { name: '003', lines: ['パンを', '食べる'], grouped: true },
 ];
 const PAGE_W = 600;
 const PAGE_H = 900;
@@ -166,18 +170,33 @@ async function manga(dir) {
       img_width: PAGE_W,
       img_height: PAGE_H,
       img_path: `${page.name}.png`,
-      blocks: boxes.map(({ box, line }) => ({
-        box,
-        vertical: true,
-        font_size: 44,
-        lines_coords: [[[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]]]],
-        lines: [line],
-      })),
+      blocks: page.grouped
+        ? [{
+          box: boxes.reduce((u, { box }) => [Math.min(u[0], box[0]), Math.min(u[1], box[1]), Math.max(u[2], box[2]), Math.max(u[3], box[3])], boxes[0].box),
+          vertical: true,
+          font_size: 44,
+          lines_coords: boxes.map(({ box }) => [[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]]]),
+          lines: boxes.map(({ line }) => line),
+        }]
+        : boxes.map(({ box, line }) => ({
+          box,
+          vertical: true,
+          font_size: 44,
+          lines_coords: [[[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]]]],
+          lines: [line],
+        })),
     })),
   };
   const mokuroFile = path.join(dir, 'ame-no-hi-e2e.mokuro');
   fs.writeFileSync(mokuroFile, JSON.stringify(mokuro, null, 2), 'utf8');
-  return { cbz, mokuroFile, pages: MANGA_PAGES.length, expectedLines: MANGA_PAGES.map((p) => p.lines) };
+  return {
+    cbz,
+    mokuroFile,
+    pages: MANGA_PAGES.length,
+    expectedLines: MANGA_PAGES.map((p) => p.lines),
+    /** Per page, each block's lines in reading order. */
+    expectedBlocks: MANGA_PAGES.map((p) => (p.grouped ? [p.lines] : p.lines.map((line) => [line]))),
+  };
 }
 
 const SUBS = [

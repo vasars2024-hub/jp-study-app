@@ -4,7 +4,7 @@
  * Dictionary page: 食べる → entries with a pitch contour, frequency chips, POS tooltips,
  * the kanji breakdown, i+1 examples, and the "in deck" marker after adding the word.
  */
-const { installHelpers, poll, ensureDictionaryReady } = require('./_lib.cjs');
+const { installHelpers, poll, ensureDictionaryReady, runDictionaryImport } = require('./_lib.cjs');
 const fixtures = require('../fixtures.cjs');
 
 module.exports = {
@@ -21,19 +21,11 @@ module.exports = {
     const kanjidic = fixtures.kanjidicXml(ctx.mediaDir);
     const freq = await ev(`window.api.dictImportYomitan(${JSON.stringify(freqZip)})`, { await: true });
     result.check('frequency dictionary imports (Yomitan zip)', freq?.ok === true, freq);
-    // One import job at a time: the Yomitan import above runs as one, so wait it out.
-    const idle = async () => {
-      for (let i = 0; i < 240; i++) {
-        const s = await ev(`window.api.dictImportStatus()`, { await: true });
-        if (!s || s.status !== 'running') return s;
-        await ctx.sleep(500);
-      }
-      return null;
-    };
-    await idle();
-    const start = await ev(`window.api.dictImportStart({ kind: 'kanjidic', filePath: ${JSON.stringify(kanjidic)} })`, { await: true });
-    const job = start?.ok ? await idle() : start;
-    result.check('KANJIDIC2 excerpt imports (job committed)', start?.ok === true && job?.jobId === start.snapshot?.jobId && job?.status === 'committed', { start, job });
+    // One import job at a time: the Yomitan import above queues its own database job,
+    // and a fresh profile may still be migrating the built-in dictionary. A busy start
+    // is retried once the slot frees, and the outcome is read for this job's id.
+    const { start, job, busyRetries, ms } = await runDictionaryImport(ctx, { kind: 'kanjidic', filePath: kanjidic });
+    result.check('KANJIDIC2 excerpt imports (job committed)', start?.ok === true && job?.jobId === start.snapshot?.jobId && job?.status === 'committed', { start, job, busyRetries, ms });
 
     // A fresh profile (first boot of a new snapshot) may still be loading the built-in
     // dictionary: the search below must not race it (seen once in a full run: no entries).

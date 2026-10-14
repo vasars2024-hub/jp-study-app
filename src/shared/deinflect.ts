@@ -468,13 +468,24 @@ const NON_CONJUGATING_POS = new Set([
 /** The candidate word type a JMdict POS tag names, 'other' for a known non-match, null when unknown. */
 function wordTypeOfPos(tag: string): WordType | 'other' | null {
   const t = tag.trim().toLowerCase();
-  if (/^v1(?:-|$)/.test(t)) return 'v1'; // v1, v1-s (くれる)
+  if (/^v1(?:[dp]?$|-)/.test(t)) return 'v1'; // v1, v1-s (くれる); Yomitan's v1d / v1p rule names
   if (/^v5/.test(t)) return 'v5'; // v5r, v5k-s (行く), v5r-i (ある), v5aru (いらっしゃる), v5u-s …
   if (/^vs(?:-|$)/.test(t)) return 'vs'; // vs, vs-i (する), vs-s, vs-c
   if (t === 'vk') return 'vk';
   if (t === 'vz') return 'vz';
   if (/^adj-ix?$/.test(t)) return 'adjI'; // adj-i, adj-ix (いい / よい)
   return NON_CONJUGATING_POS.has(t) ? 'other' : null;
+}
+
+/**
+ * The word type a Yomitan term bank's rules column (`row[3]`: `v1`, `v5`, `vs`,
+ * `vk`, `vz`, `adj-i`) names, or null when the code is not a conjugation rule.
+ * The rules column is what Yomitan itself de-inflects against; a dictionary is
+ * free to leave its definition tags empty and still carry it.
+ */
+export function wordTypeOfRule(rule: string): WordType | null {
+  const type = wordTypeOfPos(rule);
+  return type === null || type === 'other' ? null : type;
 }
 
 /**

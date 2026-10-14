@@ -109,6 +109,12 @@ export interface YomitanDictInfo {
   glossLangs?: string[];
   /** Manual language override from Settings — wins over detection. */
   glossLangOverride?: string;
+  /**
+   * Imported by a build that reads the term bank's rules column into the
+   * de-inflection part-of-speech check. Absent on stores imported before it;
+   * Settings offers a re-import for those, since the zip is not kept.
+   */
+  rulesColumn?: boolean;
 }
 
 /** Conjugation trace when the query was matched via de-inflection (see shared/deinflect.ts). */

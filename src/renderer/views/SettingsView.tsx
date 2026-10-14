@@ -29,6 +29,7 @@ import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import type { DictionaryImportJobSnapshot } from '../../shared/dictionaryImportJob';
 import DictionaryDisplaySettings from '../components/settings/DictionaryDisplaySettings';
+import DictRulesReimportNote from '../components/dictionary/DictRulesReimportNote';
 
 /** Study-profile picker and controls — shared by Settings and Anki views. */
 export function ProfileSettingsSection() {
@@ -383,6 +384,7 @@ export function DictionarySettingsSection() {
                       })
                     : ''}
                 </div>
+                <DictRulesReimportNote dict={d} />
               </div>
               <div className="dict-manage-actions">
                 {d.hasTerms && (

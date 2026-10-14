@@ -59,14 +59,43 @@ module.exports = {
     await ctx.shot('boxes');
 
     // Next page (never scanned): its boxes can only have come from the .mokuro file.
+    // The key that turns forward depends on the reading direction: remember it for page 3.
+    let forward = 'ArrowLeft';
     for (const key of ['ArrowLeft', 'ArrowRight']) {
       await ctx.request('/key', { window: 'main', key });
-      if (await poll(ctx, `/\\b2 \\/ 3\\b/.test(document.body.innerText) ? true : null`, 3000)) break;
+      if (await poll(ctx, `/\\b2 \\/ 3\\b/.test(document.body.innerText) ? true : null`, 3000)) {
+        forward = key;
+        break;
+      }
     }
     const want2 = m.expectedLines[1];
     const page2 = await poll(ctx, `(() => { const b = ${blockTexts}; return b.length === ${want2.length} && ${JSON.stringify(want2)}.every((w) => b.includes(w)) ? b : null; })()`, 10000);
     result.check('page 2 (never scanned) shows its .mokuro boxes', Boolean(page2), page2 ?? (await ev(blockTexts)));
     await ctx.shot('page2');
+
+    // Page 3 holds one bubble of two lines, the shape the OCR's line grouping writes
+    // (shared/mangaTextLines.ts; the grouping itself is unit-tested, there is no model
+    // here). The reader must keep it one block, set vertically, its lines in the stored
+    // order with the first line in the right-hand column.
+    await ctx.request('/key', { window: 'main', key: forward });
+    const onPage3 = await poll(ctx, `/\\b3 \\/ 3\\b/.test(document.body.innerText) ? true : null`, 5000);
+    result.check('the reader turns to page 3', Boolean(onPage3));
+    const want3 = m.expectedBlocks[2];
+    const grouped = await poll(ctx, `(() => {
+      const blocks = [...document.querySelectorAll('.manga-ocr-block')];
+      if (blocks.length !== ${want3.length}) return null;
+      const text = blocks[0].querySelector('.manga-ocr-text');
+      const ps = text ? [...text.querySelectorAll('p')] : [];
+      if (ps.length !== ${want3[0].length}) return null;
+      return {
+        lines: ps.map((p) => p.textContent),
+        writingMode: getComputedStyle(text).writingMode,
+        lefts: ps.map((p) => Math.round(p.getBoundingClientRect().left)),
+      };
+    })()`, 10000);
+    result.check('page 3: a grouped two-line bubble stays one block, lines in reading order', Boolean(grouped) && JSON.stringify(grouped.lines) === JSON.stringify(want3[0]), { grouped, want: want3 });
+    result.check('page 3: the bubble is set vertically, first line in the right-hand column', Boolean(grouped) && grouped.writingMode === 'vertical-rl' && grouped.lefts[0] > grouped.lefts[1], grouped);
+    await ctx.shot('page3-grouped');
     const still = await ev(`window.api.mangaOcrAvailable()`, { await: true });
     result.check('still no OCR model afterwards (nothing was downloaded)', still === false, still);
   },

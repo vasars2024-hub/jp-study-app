@@ -147,6 +147,63 @@ async function ensureDictionaryReady(ctx, { word = '猫', lang = 'ja', timeout =
   return { ready: false, ms: Date.now() - t0, entries };
 }
 
+/**
+ * Run one dictionary import job (`window.api.dictImportStart(request)`) to its end.
+ *
+ * The main process runs one import at a time, and a Yomitan store imported a moment
+ * earlier queues its own database job that starts the instant the slot frees. So a
+ * start can be refused `busy` even right after the status read idle, and the job
+ * after ours can start before a status poll sees ours settle. This retries a busy
+ * start (waiting for the job that holds the slot) and reads our job's outcome from
+ * the `dictImport:changed` stream by id, all under one deadline instead of a fixed
+ * wait. Returns `{ start, job, busyRetries, ms }`; `job` is the terminal snapshot,
+ * or null when the deadline passed first.
+ */
+async function runDictionaryImport(ctx, request, { timeout = 360000 } = {}) {
+  const t0 = Date.now();
+  const left = () => timeout - (Date.now() - t0);
+  const status = () => ctx.eval(`window.api.dictImportStatus()`, { await: true }).catch(() => null);
+  await ctx.eval(`(() => {
+    if (!window.__e2eDictJobs) {
+      window.__e2eDictJobs = {};
+      window.api.onDictImportChanged((s) => { if (s && s.jobId) window.__e2eDictJobs[s.jobId] = s; });
+    }
+    return true;
+  })()`);
+
+  let start = null;
+  let busyRetries = 0;
+  while (left() > 0) {
+    start = await ctx
+      .eval(`window.api.dictImportStart(${JSON.stringify(request)})`, { await: true })
+      .catch((error) => ({ ok: false, error: String(error && error.message ? error.message : error) }));
+    if (!start || start.ok || start.error !== 'busy') break;
+    busyRetries += 1;
+    const holder = start.snapshot && start.snapshot.jobId;
+    while (left() > 0) {
+      const s = await status();
+      if (!s || s.status !== 'running' || (holder && s.jobId !== holder)) break;
+      await ctx.sleep(500);
+    }
+  }
+  if (!start || !start.ok) return { start, job: null, busyRetries, ms: Date.now() - t0 };
+
+  const jobId = start.snapshot.jobId;
+  let job = start.snapshot.status !== 'running' ? start.snapshot : null;
+  while (!job && left() > 0) {
+    job = await ctx
+      .eval(`(async () => {
+        const seen = window.__e2eDictJobs && window.__e2eDictJobs[${JSON.stringify(jobId)}];
+        if (seen && seen.status !== 'running') return seen;
+        const s = await window.api.dictImportStatus();
+        return s && s.jobId === ${JSON.stringify(jobId)} && s.status !== 'running' ? s : null;
+      })()`, { await: true })
+      .catch(() => null);
+    if (!job) await ctx.sleep(500);
+  }
+  return { start, job, busyRetries, ms: Date.now() - t0 };
+}
+
 /** A real (CDP) mouse click on the first occurrence of `needle` inside `sel`. */
 async function clickText(ctx, sel, needle, offset = 0) {
   const pt = await ctx.eval(`__e2e.textPoint(${JSON.stringify(sel)}, ${JSON.stringify(needle)}, ${offset})`);
@@ -155,4 +212,4 @@ async function clickText(ctx, sel, needle, offset = 0) {
   return { ...r, point: pt };
 }
 
-module.exports = { PAGE_HELPERS, installHelpers, poll, pollAsync, clickText, toDesktop, ensureDictionaryReady, DECK };
+module.exports = { PAGE_HELPERS, installHelpers, poll, pollAsync, clickText, toDesktop, ensureDictionaryReady, runDictionaryImport, DECK };

@@ -22,7 +22,17 @@ vi.mock('electron', () => ({
 vi.mock('../i18n', () => ({ mt: (key: string) => key }));
 vi.mock('../dictionary/service', () => ({ initDictionaryService: () => undefined }));
 
-import { definitionsToSenses, ensureYomitanTerms, importYomitanZip, lookupGlossary } from '../dictionary/yomitan';
+import {
+  definitionsToSenses,
+  ensureYomitanTerms,
+  importYomitanZip,
+  listYomitanDicts,
+  lookupGlossary,
+  lookupOfflineDeinflected,
+} from '../dictionary/yomitan';
+import { openDictionaryDb } from '../dictionary/db';
+import { importLegacyIndex } from '../dictionary/migrate';
+import { lookup } from '../dictionary/dictService';
 
 const TAG_BANK = [
   ['n', 'partOfSpeech', 0, 'noun (common) (futsuumeishi)', 0],
@@ -129,5 +139,79 @@ describe('structured senses at import', () => {
     }]);
     expect(out.senses[0].html).not.toContain('<img');
     expect(out.senses[0].definitions).toEqual(['<img src=x onerror=alert(1)>']);
+  });
+});
+
+/**
+ * The rules column (`row[3]`) is what Yomitan de-inflects against. A dictionary
+ * may leave its definition tags empty (or ship no tag bank) and still carry it,
+ * and the import used to drop it, so the part-of-speech check had nothing to
+ * read and let every candidate through.
+ */
+describe('rules column at import', () => {
+  const RULES_TAG_BANK = [
+    ['n', 'partOfSpeech', 0, 'noun (common) (futsuumeishi)', 0],
+    ['v5r', 'partOfSpeech', 0, 'Godan verb with ru ending', 0],
+  ];
+  const RULES_TERM_BANK = [
+    // No definition tags at all: the rules column is the only grammar the row has.
+    ['帰る', 'かえる', '', 'v5', 0, ['to return'], 1, ''],
+    // Tags that name only a non-conjugating part of speech, plus a rule.
+    ['話す', 'はなす', 'n', 'v5', 0, ['to speak'], 2, ''],
+    // JMdict shape: the tag already names the rule's word type, so nothing is added.
+    ['眠る', 'ねむる', 'v5r', 'v5', 0, ['to sleep'], 3, ''],
+    // A rules field that is not a conjugation class is ignored.
+    ['猫', 'ねこ', 'n', 'unknown-rule', 0, ['cat'], 4, ''],
+  ];
+
+  async function importRulesFixture(): Promise<string> {
+    const zipPath = path.join(tempRoot, 'rules.zip');
+    const zip = new AdmZip();
+    zip.addFile('index.json', Buffer.from(JSON.stringify({ title: 'Fixture rules', revision: 'r1', format: 3 })));
+    zip.addFile('term_bank_1.json', Buffer.from(JSON.stringify(RULES_TERM_BANK)));
+    zip.addFile('tag_bank_1.json', Buffer.from(JSON.stringify(RULES_TAG_BANK)));
+    zip.writeZip(zipPath);
+    ensureYomitanTerms();
+    const res = await importYomitanZip(zipPath);
+    expect(res.ok).toBe(true);
+    return res.info!.id;
+  }
+
+  it('folds the rule into the part of speech only where the tags do not already name it', async () => {
+    await importRulesFixture();
+    expect(lookupGlossary('帰る')[0].senses[0].partsOfSpeech).toEqual(['v5']);
+    expect(lookupGlossary('話す')[0].senses[0].partsOfSpeech).toEqual(['n', 'v5']);
+    expect(lookupGlossary('眠る')[0].senses[0].partsOfSpeech).toEqual(['v5r']);
+    expect(lookupGlossary('猫')[0].senses[0].partsOfSpeech).toEqual(['n']);
+  });
+
+  it('marks the store as read with the rules column, so Settings offers no re-import', async () => {
+    const id = await importRulesFixture();
+    expect(listYomitanDicts().find((d) => d.id === id)?.rulesColumn).toBe(true);
+  });
+
+  it('runs the part-of-speech check on a dictionary with empty definition tags (legacy lookup)', async () => {
+    await importRulesFixture();
+    // 帰ます is the ichidan-shaped polite form: 帰る is godan by its rule, so it is not the word.
+    expect(lookupOfflineDeinflected('帰ます', true).entries).toEqual([]);
+    expect(lookupOfflineDeinflected('帰った', true).entries.map((e) => e.word)).toEqual(['帰る']);
+    // Tagged only as a noun, but its rule says godan: 話した is 話す.
+    expect(lookupOfflineDeinflected('話した', true).entries.map((e) => e.word)).toEqual(['話す']);
+  });
+
+  it('carries the rule into the unified database, where lookup() applies the same check', async () => {
+    const id = await importRulesFixture();
+    const stored = JSON.parse(fs.readFileSync(path.join(tempRoot, 'yomitan', id, 'index.json'), 'utf-8'));
+    const db = openDictionaryDb({ dir: path.join(tempRoot, 'dictionary') });
+    try {
+      importLegacyIndex(db, stored);
+      const deinflected = (text: string) =>
+        lookup(db, { text }).entries.filter((e) => e.via === 'deinflected').map((e) => e.text);
+      expect(deinflected('帰ます')).not.toContain('帰る');
+      expect(deinflected('帰った')).toContain('帰る');
+      expect(deinflected('話した')).toContain('話す');
+    } finally {
+      db.close();
+    }
   });
 });

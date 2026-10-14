@@ -19,6 +19,7 @@ import { parseTagBankRows, splitSenseTags, splitTagField, type DictTagBank } fro
 import { decodeBasicEntities, escapeHtmlText, sanitizeDictHtml } from '../../shared/dictHtmlSanitize';
 import { extractStructuredSenses } from '../../shared/structuredSenses';
 import { isJmdictPriorityCode, jmdictPriorityCodes } from '../../shared/jmdictPriority';
+import { wordTypeOfRule, type WordType } from '../../shared/deinflect';
 
 export interface StoredGlossaryEntry {
   word: string;
@@ -334,6 +335,12 @@ function parseTermBank(entries: unknown[], out: StoredDictIndex): void {
     // Parked beside whatever the structured content already marked on a sense;
     // `resolveSenseTags` merges the two once the tag bank is known.
     if (rawTags.length) for (const sense of senses) (sense as SenseWithRowTags).rowTags = rawTags;
+    // Column 3 is the row's conjugation rules (`v1`, `v5`, `vs`, `vk`, `vz`,
+    // `adj-i`): what Yomitan itself checks a de-inflected candidate against. It
+    // is parked too, because whether it adds anything depends on the parts of
+    // speech the tag bank resolves above.
+    const rules = splitTagField(row[3]).filter((rule) => wordTypeOfRule(rule) !== null);
+    if (rules.length && senses.length) (senses[0] as SenseWithRowTags).rowRules = rules;
     const prio = jmdictPriorityCodes([...splitTagField(row[7]), ...rawTags]);
     const key = term;
     const list = out.terms[key] ?? [];
@@ -356,7 +363,8 @@ function resolveSenseTags(out: StoredDictIndex): void {
   const bank = out.tags ?? {};
   for (const list of Object.values(out.terms)) {
     for (const entry of list) {
-      for (const sense of entry.senses as SenseWithRowTags[]) {
+      const senses = entry.senses as SenseWithRowTags[];
+      for (const sense of senses) {
         // A JMdict priority code in this column is the headword's `prio`, never a usage label.
         const rowTags = sense.rowTags?.filter((tag) => !isJmdictPriorityCode(tag));
         delete sense.rowTags;
@@ -367,12 +375,47 @@ function resolveSenseTags(out: StoredDictIndex): void {
         sense.partsOfSpeech = [...new Set([...partsOfSpeech, ...sense.partsOfSpeech])];
         sense.tags = [...new Set([...usage, ...sense.tags])];
       }
+      mergeRowRules(senses);
     }
   }
 }
 
-/** A sense while its row's raw tag codes wait for the tag bank. */
-type SenseWithRowTags = DictSense & { rowTags?: string[] };
+/**
+ * Fold the row's rules column into the part-of-speech list the de-inflection
+ * check reads (`posMatchesWordTypes`), on the first sense, since the check reads
+ * the entry's senses together.
+ *
+ * Only a rule whose word type no resolved tag already names is added. A
+ * dictionary whose definition tags say `v5r` gains nothing from its `v5` rule,
+ * so JMdict's part-of-speech line reads exactly as before; one with empty or
+ * undescribed definition tags, or only `n` beside a `vs` rule, gets the rule
+ * code — without it the check either could not tell (and let まず reach 丸) or
+ * rejected a word Yomitan accepts.
+ */
+function mergeRowRules(senses: SenseWithRowTags[]): void {
+  const first = senses[0];
+  const rules = first?.rowRules;
+  if (!first || !rules) return;
+  delete first.rowRules;
+  const named = new Set<WordType>();
+  for (const sense of senses) {
+    for (const tag of sense.partsOfSpeech) {
+      const type = wordTypeOfRule(tag);
+      if (type) named.add(type);
+    }
+  }
+  const added: string[] = [];
+  for (const rule of rules) {
+    const type = wordTypeOfRule(rule);
+    if (!type || named.has(type)) continue;
+    named.add(type);
+    added.push(rule);
+  }
+  if (added.length) first.partsOfSpeech = [...first.partsOfSpeech, ...added];
+}
+
+/** A sense while its row's raw tag codes and rules wait for the tag bank. */
+type SenseWithRowTags = DictSense & { rowTags?: string[]; rowRules?: string[] };
 
 /**
  * Yomitan term_meta rows: `pitch`, `freq` and `ipa` modes. Exported for the
@@ -517,6 +560,7 @@ export function parseYomitanZip(zipPath: string, priority = 0): StoredDictIndex 
   }
   if (stored.info.hasTerms) {
     stored.info.glossLangs = detectGlossLangs(stored, indexJson);
+    stored.info.rulesColumn = true;
   }
   return stored;
 }

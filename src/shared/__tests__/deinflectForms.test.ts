@@ -13,7 +13,7 @@
 // false positive) fails just like a chain that does not reach it at all.
 
 import { describe, expect, it } from 'vitest';
-import { deinflect, posMatchesWordTypes, type WordType } from '../deinflect';
+import { deinflect, posMatchesWordTypes, wordTypeOfRule, type WordType } from '../deinflect';
 import { DEINFLECT_KNOWN_REASONS } from '../deinflectTrace';
 
 type Case = readonly [surface: string, term: string, type: WordType];
@@ -295,5 +295,19 @@ describe('posMatchesWordTypes (Yomitan part-of-speech check)', () => {
     expect(posMatchesWordTypes([], ['v5'])).toBe(true);
     expect(posMatchesWordTypes(['Godan verb'], ['v5'])).toBe(true); // another dictionary's own vocabulary
     expect(posMatchesWordTypes(['n'], undefined)).toBe(true); // the surface form itself
+  });
+});
+
+describe('wordTypeOfRule (the rules column of a Yomitan term bank)', () => {
+  it('names the word type of every rule Yomitan dictionaries write', () => {
+    expect(['v1', 'v5', 'vs', 'vk', 'vz', 'adj-i'].map(wordTypeOfRule)).toEqual(['v1', 'v5', 'vs', 'vk', 'vz', 'adjI']);
+    expect(wordTypeOfRule('v1d')).toBe('v1');
+    expect(wordTypeOfRule('v1p')).toBe('v1');
+  });
+
+  it('is null for anything that is not a conjugation class', () => {
+    expect(wordTypeOfRule('n')).toBeNull();
+    expect(wordTypeOfRule('')).toBeNull();
+    expect(wordTypeOfRule('Godan verb')).toBeNull();
   });
 });
