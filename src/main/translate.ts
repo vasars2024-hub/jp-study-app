@@ -5,7 +5,8 @@ import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import crypto from 'node:crypto';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import { langSpec } from '../shared/langs';
-import { acquireLlamaSession, isLlamaSessionLost, type LlamaSessionHandle } from './llamaHost';
+import { extractJsonReply } from '../shared/jsonReply';
+import { acquireLlamaSession, isLlamaSessionLost, type LlamaJsonGrammar, type LlamaSessionHandle } from './llamaHost';
 import {
   LocalModelMissingError,
   findLocalModelFile,
@@ -109,28 +110,41 @@ interface TranslationCacheFile {
   entries: Record<string, string>;
 }
 
+/**
+ * How many translations the mining cache keeps. It had no limit: every EPUB line, subtitle and
+ * glossary term ever translated stayed in one JSON file that is read whole at the first lookup and
+ * rewritten whole after every batch. At this size the file stays a few MB — a long novel's worth
+ * of lines — and the least recently USED entries go first, so a book being read keeps its lines.
+ */
+export const MAX_TRANSLATION_CACHE_ENTRIES = 20_000;
+
 // Load the cache once into memory and flush it once per batch (mirrors the gloss
 // cache in dictionary.ts). The previous implementation read and re-parsed the
 // whole JSON file on every getCachedTranslation and rewrote the whole file on
 // every setCachedTranslation — thousands of full-file disk operations per
 // analyze, which was the main source of the laggy mining UI.
-let translationCache: TranslationCacheFile | null = null;
+// In memory it is a Map — insertion order is recency, so the oldest entry is `keys().next()` and
+// a bounded write costs O(1) — and it is written to disk as the same `{ entries }` object as ever.
+let translationCache: Map<string, string> | null = null;
 let translationCacheDirty = false;
 
 function translationCachePath(): string {
   return path.join(app.getPath('userData'), 'mining', 'translation-cache.json');
 }
 
-function loadTranslationCache(): TranslationCacheFile {
+function loadTranslationCache(): Map<string, string> {
   if (translationCache) return translationCache;
   try {
-    translationCache = readJsonSync<TranslationCacheFile>(translationCachePath(), () => ({ entries: {} }), {
+    const file = readJsonSync<TranslationCacheFile>(translationCachePath(), () => ({ entries: {} }), {
       validate: (v) => !!v && typeof v === 'object' && !!(v as TranslationCacheFile).entries,
     });
+    translationCache = new Map(Object.entries(file.entries).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    // A file written before the bound existed can be far over it; it is trimmed on the next flush.
+    if (trimTranslationCache(translationCache)) translationCacheDirty = true;
   } catch {
     // A best-effort cache: no userData path (or an unreadable one) means an
     // in-memory cache for this session, never a failed translation.
-    translationCache = { entries: {} };
+    translationCache = new Map();
   }
   return translationCache;
 }
@@ -139,22 +153,57 @@ function loadTranslationCache(): TranslationCacheFile {
 export function flushTranslationCache(): void {
   if (!translationCache || !translationCacheDirty) return;
   try {
-    writeJsonAtomicSync(translationCachePath(), translationCache, { space: 0, backup: false });
+    const file: TranslationCacheFile = { entries: Object.fromEntries(translationCache) };
+    writeJsonAtomicSync(translationCachePath(), file, { space: 0, backup: false });
     translationCacheDirty = false;
   } catch {
     /* best-effort cache; ignore write failures */
   }
 }
 
+/** Drops the least recently used entries past the bound. True when anything went. */
+function trimTranslationCache(entries: Map<string, string>): boolean {
+  if (entries.size <= MAX_TRANSLATION_CACHE_ENTRIES) return false;
+  // Insertion order is recency: a hit is moved to the young end (`getCachedTranslation`).
+  const keys = entries.keys();
+  while (entries.size > MAX_TRANSLATION_CACHE_ENTRIES) entries.delete(keys.next().value as string);
+  return true;
+}
+
 /**
- * `engine` names who produced the translation. The offline model keeps the
- * original key (so its existing cache stays valid); every other engine — a cloud
- * provider id — gets its own namespace, so a cloud answer is never served later
- * as the offline model's, nor one provider's as another's.
+ * The offline model's identity for the cache, resolved at most once every few seconds: a batch
+ * looks up thousands of lines, and resolving the model file means walking the model folders.
  */
-export function translationCacheKey(text: string, source: TransLang, target: TransLang, engine = 'local'): string {
+let localModelKeyMemo: { key: string; at: number } | null = null;
+const LOCAL_MODEL_KEY_TTL_MS = 5_000;
+
+function currentLocalModelKey(): string {
+  const now = Date.now();
+  if (!localModelKeyMemo || now - localModelKeyMemo.at > LOCAL_MODEL_KEY_TTL_MS) {
+    localModelKeyMemo = { key: localModelCacheKey(), at: now };
+  }
+  return localModelKeyMemo.key;
+}
+
+/**
+ * `engine` names who produced the translation. Every cloud engine — a provider
+ * id — gets its own namespace, so a cloud answer is never served later as the
+ * offline model's, nor one provider's as another's. The offline engine is
+ * scoped by its model FILE (`localModelCacheKey`, or `localModel` when given):
+ * it used to share one namespace whatever model was installed, so after a
+ * different GGUF went in, the old model's lines kept coming back as the new one's.
+ */
+export function translationCacheKey(
+  text: string,
+  source: TransLang,
+  target: TransLang,
+  engine = 'local',
+  localModel?: string,
+): string {
   const normalized = text.trim().normalize('NFKC');
-  const scope = engine && engine !== 'local' ? `${engine}\0` : '';
+  const scope = engine && engine !== 'local'
+    ? `${engine}\0`
+    : `local\0${localModel ?? currentLocalModelKey()}\0`;
   return crypto
     .createHash('sha256')
     .update(`${scope}${source}\0${target}\0${normalized}`)
@@ -168,7 +217,16 @@ export function getCachedTranslation(
   target: TransLang,
   engine = 'local',
 ): string | undefined {
-  return loadTranslationCache().entries[translationCacheKey(text, source, target, engine)];
+  const entries = loadTranslationCache();
+  const key = translationCacheKey(text, source, target, engine);
+  const hit = entries.get(key);
+  if (hit === undefined) return undefined;
+  // Used again: it moves to the young end, so the bound evicts something older first. Not marked
+  // dirty on its own — a run of pure hits must not rewrite the whole file; the new order is saved
+  // with the next write.
+  entries.delete(key);
+  entries.set(key, hit);
+  return hit;
 }
 
 export function setCachedTranslation(
@@ -178,8 +236,19 @@ export function setCachedTranslation(
   translated: string,
   engine = 'local',
 ): void {
-  loadTranslationCache().entries[translationCacheKey(text, source, target, engine)] = translated;
+  const entries = loadTranslationCache();
+  const key = translationCacheKey(text, source, target, engine);
+  entries.delete(key);
+  entries.set(key, translated);
+  trimTranslationCache(entries);
   translationCacheDirty = true;
+}
+
+/** Test seam: forget the in-memory cache and the memoised model identity. */
+export function resetTranslationCacheForTests(): void {
+  translationCache = null;
+  translationCacheDirty = false;
+  localModelKeyMemo = null;
 }
 
 export interface RunTranslationBatchOptions {
@@ -244,6 +313,7 @@ async function promptWithTimeout(
   prompt: string,
   maxTokens: number,
   timeoutMs: number,
+  grammar?: LlamaJsonGrammar,
 ): Promise<string> {
   const controller = new AbortController();
   activeBatchAbort = controller;
@@ -279,7 +349,7 @@ async function promptWithTimeout(
     // Every batch, strict-retry and single-sentence prompt in this module funnels through here, so
     // this is the one place that can hold all four of them inside the context.
     const fitted = await Promise.race([fitOutputBudget(prompt, maxTokens, s), timeoutPromise, cancelPromise]);
-    promptPromise = s.prompt(prompt, { maxTokens: fitted, signal: controller.signal });
+    promptPromise = s.prompt(prompt, { maxTokens: fitted, signal: controller.signal, ...(grammar ? { grammar } : {}) });
     return await Promise.race([promptPromise, timeoutPromise, cancelPromise]);
   } catch (err) {
     dropLostSession(s, err);
@@ -304,13 +374,31 @@ export function cancelTranslationBatch(): void {
   activeBatchAbort?.abort();
 }
 
+/**
+ * The batch reply's shape, enforced while it is generated: `[{"id":"…","text":"…"}, …]`. The 1.7B
+ * model used to answer the batch prompt with prose, a fence or a `<think>` block often enough that
+ * whole chunks of a book came back untranslated and went to the one-by-one retry.
+ */
+const BATCH_REPLY_GRAMMAR: LlamaJsonGrammar = {
+  kind: 'json-schema',
+  schema: {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: { id: { type: 'string' }, text: { type: 'string' } },
+    },
+  },
+};
+
 async function translateBatchPrompt(items: TranslateBatchItem[]): Promise<Map<string, string>> {
   const s = await ensureSession();
   // Long literary lines need more tokens than glossary terms.
   const maxTokens = Math.min(4096, Math.max(512, items.length * 256));
-  const raw = await promptWithTimeout(s, buildBatchPrompt(items), maxTokens, BATCH_PROMPT_TIMEOUT_MS);
+  const raw = await promptWithTimeout(s, buildBatchPrompt(items), maxTokens, BATCH_PROMPT_TIMEOUT_MS, BATCH_REPLY_GRAMMAR);
   const expected = new Set(items.map((i) => i.id));
-  return parseBatchJson(raw, expected);
+  // The array is dug out first: without a grammar (a backend that could not build one) the reply may
+  // still be fenced or prefaced, and `parseBatchJson` parses exactly what it is given.
+  return parseBatchJson(extractJsonReply(cleanLlmOutput(raw), { prefer: 'array' }), expected);
 }
 
 /** Stricter one-item retry after validation rejected the batch output. */
@@ -478,6 +566,28 @@ export function isTranslateAvailable(): boolean {
 }
 
 /**
+ * Which local weights would answer, as a cache-key part: the resolved GGUF's
+ * file name and size (`local:<file>:<bytes>`), or `local:none`.
+ *
+ * The caches in front of the local model used to key on a constant, so a user
+ * who dropped a different model into the models folder kept being served the
+ * old model's answers. The size is in it because two quantisations of one model
+ * are routinely saved under the same file name.
+ */
+export function localModelCacheKey(modelFileName?: string): string {
+  const wanted = modelFileName?.trim();
+  const modelPath = wanted ? findLocalModelFile(wanted) : resolveModelPath();
+  if (!modelPath) return 'local:none';
+  let size = 0;
+  try {
+    size = fs.statSync(modelPath).size;
+  } catch {
+    /* A file that cannot be read now is still named; the load will say what is wrong. */
+  }
+  return `local:${path.basename(modelPath).toLowerCase()}:${size}`;
+}
+
+/**
  * Whether the model is loaded right now. Distinct from `isTranslateAvailable`, which only asks
  * whether the file is on disk: since the runtime idle-unloads, "available" and "resident" are no
  * longer the same question.
@@ -488,8 +598,8 @@ export function isTranslateReady(): boolean {
 
 /**
  * The catalog key for an error this module words itself, so the renderer can
- * say it in the interface language (the English sentence stays as fallback
- * and for logs). A platform message has no key and is passed on verbatim.
+ * say it in the interface language (the English sentence stays for logs).
+ * `undefined` for anything else; `translateErrorKey` gives those the generic one.
  */
 export function friendlyErrorKey(err: unknown): string | undefined {
   const msg = err instanceof Error ? err.message : String(err);
@@ -497,8 +607,21 @@ export function friendlyErrorKey(err: unknown): string | undefined {
   if (err instanceof Error && err.name === 'TimeoutError') return 'translate.error.timeout';
   if (/timed out after/i.test(msg)) return 'translate.error.timeout';
   if (err instanceof LocalModelMissingError || /model not found|ENOENT|no such file/i.test(msg)) return 'translate.error.modelMissing';
+  if (/too long for the offline translator/i.test(msg)) return 'xlate2.error.tooLong';
+  if (/no usable output/i.test(msg)) return 'xlate2.error.noOutput';
+  if (/needs a known source and target language/i.test(msg)) return 'xlate2.error.badLanguage';
   if (/llama|gguf|cuda|vulkan|backend|native/i.test(msg)) return 'translate.error.engineFailed';
   return undefined;
+}
+
+/**
+ * Always a catalog key: this module's own errors by name, and everything else
+ * (a platform message, a library's English) as "Translation failed." The
+ * renderer used to show `res.error` whenever no key came with it, which put raw
+ * English in front of a Japanese, Chinese or Russian interface.
+ */
+export function translateErrorKey(err: unknown): string {
+  return friendlyErrorKey(err) ?? 'translate.error.failed';
 }
 
 function friendlyError(err: unknown): string {
@@ -653,8 +776,7 @@ export async function ensureTranslateReady(): Promise<{ ok: boolean; error?: str
     await ensureSession();
     return { ok: true };
   } catch (err) {
-    const errorKey = friendlyErrorKey(err);
-    return { ok: false, error: friendlyError(err), ...(errorKey ? { errorKey } : {}) };
+    return { ok: false, error: friendlyError(err), errorKey: translateErrorKey(err) };
   }
 }
 
@@ -727,6 +849,13 @@ export interface LocalQwenPromptOptions {
    * disk is a `LocalModelMissingError`, never a quiet fallback to a different model.
    */
   modelFileName?: string;
+  /**
+   * Constrained decoding for a structured call (`LlamaJsonGrammar`): `{ kind: 'json' }` for any
+   * object, `{ kind: 'json-schema', schema }` for one shape. The reply can then only be JSON, which
+   * the 1.7B model otherwise produces unreliably. Keep the prompt's "JSON only" sentence anyway: a
+   * grammar the backend cannot build is dropped and the generation runs free. Ignored with `raw`.
+   */
+  jsonGrammar?: LlamaJsonGrammar;
 }
 
 /**
@@ -800,10 +929,12 @@ export async function runLocalQwenPrompt(
       // After the session exists, so the weights — and therefore the real tokenizer — are loaded.
       // The callers of this function are the ones that could ask for a whole context of output.
       const maxTokens = await Promise.race([fitOutputBudget(prompt, requestedTokens, s), expired, aborted]);
+      const grammar = options?.raw ? undefined : options?.jsonGrammar;
       const raw = await s.prompt(prompt, {
         maxTokens,
         signal: controller.signal,
         onTextChunk: options?.onTextChunk,
+        ...(grammar ? { grammar } : {}),
       });
       const cleaned = cleanLlmOutput(raw);
       return options?.raw ? cleaned : extractJsonish(cleaned);
@@ -832,15 +963,8 @@ export async function runLocalQwenPrompt(
  * protected from.
  */
 export function extractJsonish(cleaned: string): string {
-  const fence = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence?.[1]) return fence[1].trim();
-  const objStart = cleaned.indexOf('{');
-  const objEnd = cleaned.lastIndexOf('}');
-  if (objStart >= 0 && objEnd > objStart) return cleaned.slice(objStart, objEnd + 1);
-  const arrStart = cleaned.indexOf('[');
-  const arrEnd = cleaned.lastIndexOf(']');
-  if (arrStart >= 0 && arrEnd > arrStart) return cleaned.slice(arrStart, arrEnd + 1);
-  return cleaned;
+  // An object is what most callers asked for; an array-only reply (subtitle lines) still comes back.
+  return extractJsonReply(cleaned, { prefer: 'object' });
 }
 
 async function translateText(
@@ -1093,8 +1217,8 @@ export function registerTranslateIpc(): void {
             },
           };
         }
-        const errorKey = friendlyErrorKey(err);
-        return { ok: false, error: friendlyError(err), ...(errorKey ? { errorKey } : {}) };
+        // `error` stays English, for logs; the window says `errorKey` in its own language.
+        return { ok: false, error: friendlyError(err), errorKey: translateErrorKey(err) };
       } finally {
         if (inFlightTranslations.get(runKey) === controller) inFlightTranslations.delete(runKey);
       }

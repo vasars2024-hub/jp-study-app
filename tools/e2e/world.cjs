@@ -121,16 +121,24 @@ const REMOTE_HOSTS = [
   'api.themoviedb.org',
   'api.vndb.org',
   'lrclib.net',
+  // DeepL (Translate's cloud engine): a fake that translates (tools/e2e/fixtures.cjs).
+  'api-free.deepl.com',
+  'api.deepl.com',
 ];
 
 /** "Nothing found", in each provider's own shape. Every hit is recorded. */
 async function startProviders() {
   const hits = [];
+  /** Every request the fake DeepL answered (fixtures.cjs `answerFakeDeepl`), newest last. */
+  const deepl = [];
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://providers.invalid');
     const [, host = '', ...rest] = url.pathname.split('/');
     const p = `/${rest.join('/')}`;
     hits.push(`${req.method} ${host}${p}`);
+    if (host === 'api-free.deepl.com' || host === 'api.deepl.com') {
+      return require('./fixtures.cjs').answerFakeDeepl(req, res, p, deepl);
+    }
     req.resume();
     const json = (status, body) => {
       res.writeHead(status, { 'content-type': 'application/json' });
@@ -163,6 +171,7 @@ async function startProviders() {
     port,
     base: `http://127.0.0.1:${port}`,
     hits,
+    deepl,
     close: () => new Promise((resolve) => {
       server.closeAllConnections();
       server.close(() => resolve());

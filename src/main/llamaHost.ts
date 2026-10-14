@@ -15,12 +15,30 @@ import type {
   LlamaContextPoolRow,
   LlamaHostRequest,
   LlamaHostResponse,
+  LlamaJsonGrammar,
   LlamaModelPoolRow,
   LlamaSessionId,
 } from '../shared/llamaHostProtocol';
 import { isLlamaHostFarewell, llamaAbortedError } from '../shared/llamaHostProtocol';
 import { acquireLlamaContext, llamaContextPoolStats } from './llamaContextPool';
 import { llamaModelPoolStats } from './llamaModelPool';
+import { llamaOf, resolveLlamaGrammar } from './llamaGrammar';
+
+export type { LlamaJsonGrammar } from '../shared/llamaHostProtocol';
+
+/** What one `LlamaSessionHandle.prompt` call may ask for besides the prompt itself. */
+export interface LlamaPromptOptions {
+  maxTokens: number;
+  signal?: AbortSignal;
+  onTextChunk?: (chunk: string) => void;
+  /**
+   * Constrained decoding: the reply can only be JSON of this shape (see `LlamaJsonGrammar`). For
+   * structured calls on small models. A grammar the backend cannot build is dropped silently and
+   * the generation runs free, so keep the prompt's own "JSON only" instruction as the fallback,
+   * and still validate what comes back.
+   */
+  grammar?: LlamaJsonGrammar;
+}
 
 /**
  * Vite names the output after the entry file, so `llamaHostWorker.ts` builds to
@@ -46,7 +64,7 @@ export interface LlamaSessionHandle {
    * carries the reasoning. Partial output is still delivered through `onTextChunk` as it arrives;
    * it is only refused as a return value.
    */
-  prompt(text: string, opts: { maxTokens: number; signal?: AbortSignal; onTextChunk?: (chunk: string) => void }): Promise<string>;
+  prompt(text: string, opts: LlamaPromptOptions): Promise<string>;
   /** The real tokenizer's count. Rejects if the weights cannot answer; callers estimate instead. */
   countTokens(text: string): Promise<number>;
   resetHistory(): Promise<void>;
@@ -289,7 +307,15 @@ function remoteSession(id: LlamaSessionId, modelPath: string, contextSize: numbe
       opts.signal?.addEventListener('abort', forward, { once: true });
       try {
         const reply = await post(
-          { id: requestId, kind: 'prompt', session: id, prompt: text, maxTokens: opts.maxTokens, stream: Boolean(opts.onTextChunk) },
+          {
+            id: requestId,
+            kind: 'prompt',
+            session: id,
+            prompt: text,
+            maxTokens: opts.maxTokens,
+            stream: Boolean(opts.onTextChunk),
+            ...(opts.grammar ? { grammar: opts.grammar } : {}),
+          },
           opts.onTextChunk,
         );
         return reply.kind === 'prompt' ? reply.text : '';
@@ -360,11 +386,13 @@ async function inProcessSession(modelPath: string, contextSize: number): Promise
     contextSize,
     warm: lease.warm,
     async prompt(text, opts) {
+      const grammar = opts.grammar ? await resolveLlamaGrammar(llamaOf(lease.model), opts.grammar) : null;
       const generated = await session.prompt(text, {
         maxTokens: opts.maxTokens,
         signal: opts.signal,
         stopOnAbortSignal: true,
         onTextChunk: opts.onTextChunk,
+        ...(grammar ? { grammar } : {}),
       });
       // See `llamaAbortedError`. `stopOnAbortSignal` resolves with the partial response rather than
       // throwing, so this is the only place the in-process path can tell a finished generation from

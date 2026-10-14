@@ -2,6 +2,7 @@ import type { MirrorText } from '../../data/mirrorTexts';
 import { migrateMirrorApiKey, type GameArenaSettings, type MirrorEvaluatorBackend } from '../settings';
 import type { StudyLang } from '../../../shared/levelScale';
 import { aiErrorMessageKey } from '../../../shared/aiConnectionTest';
+import { extractJsonReply } from '../../../shared/jsonReply';
 import {
   MIRROR_CREDENTIAL_ID,
   mirrorChatCompletionsUrl,
@@ -102,17 +103,13 @@ export function validateMirrorEvaluation(value: unknown): MirrorEvaluation | nul
 }
 
 /**
- * The JSON inside a model's text: a ```json fence's body, else the outermost
- * object. Models fence their JSON whatever the prompt says, and a bare
- * `JSON.parse` of a fenced reply failed every time (audit E11).
+ * The JSON object inside a model's text, fenced or not. Models fence their JSON
+ * whatever the prompt says, and a bare `JSON.parse` of a fenced reply failed
+ * every time (audit E11); `shared/jsonReply.ts` also keeps a fence that sits
+ * inside a string from being taken for the reply's own (bug 13).
  */
 function unfence(content: string): string {
-  const trimmed = content.trim();
-  const fence = trimmed.match(/```(?:json|JSON)?\s*([\s\S]*?)```/u);
-  if (fence?.[1]?.trim()) return fence[1].trim();
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  return start >= 0 && end > start ? trimmed.slice(start, end + 1) : trimmed;
+  return extractJsonReply(content, { prefer: 'object' });
 }
 
 function extractJson(value: unknown): unknown {

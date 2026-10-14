@@ -4,6 +4,7 @@ import { KNOWN_LANGS } from '../../shared/langs';
 import { useT } from '../i18n';
 import { usePopupFocus } from '../popupFocus';
 import { openAiSettings } from '../aiSetupClient';
+import { translateErrorText } from './translate/translateErrorText';
 
 interface Props {
   /** The highlighted Japanese text. */
@@ -77,7 +78,8 @@ export default function SentenceTranslatePopup({ text, onMine, onClose }: Props)
       })
       .catch((e) => {
         if (id !== reqRef.current) return;
-        setError(e instanceof Error ? e.message : String(e));
+        // Worded by main in the UI language, or the generic message: never platform English.
+        setError(translateErrorText(e, t));
         setState('error');
       })
       .finally(() => {

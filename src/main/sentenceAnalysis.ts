@@ -28,6 +28,7 @@ import {
 } from '../shared/sentenceAnalysisPrefs';
 import type { AnalysisSnapshot } from '../shared/analysisSnapshot';
 import { callAiProvider } from './aiProviderClient';
+import { getAiProviderHealth } from './providerRuntime';
 import { getConfiguredAiEngine, getConfiguredAiProvider } from './mining';
 import type { AiCloudFeatureId } from '../shared/aiSetup';
 import {
@@ -187,6 +188,14 @@ export interface AnalyzeSentenceOptions {
   feature?: AiCloudFeatureId;
 }
 
+function cloudModel(providerId: AiProviderId): string {
+  try {
+    return getAiProviderHealth(providerId).model;
+  } catch {
+    return '';
+  }
+}
+
 export async function analyzeSentence(
   req: SentenceAnalyzeRequest,
   options: AnalyzeSentenceOptions = {},
@@ -232,7 +241,12 @@ export async function analyzeSentence(
     }
   }
 
-  const providerKey: string = engine === 'local-qwen' ? 'local-qwen' : (providerId as AiProviderId);
+  // The model is part of who answered: the provider id alone (or, for the
+  // offline engine, the constant 'local-qwen') kept serving one model's analyses
+  // after the user switched to another. Same shape as `aiStudyAssist.ts`.
+  const providerKey: string = engine === 'local-qwen'
+    ? (await import('./translate')).localModelCacheKey()
+    : `${providerId as AiProviderId}:${cloudModel(providerId)}`;
   const context = typeof req.context === 'string' ? req.context.slice(0, 2000) : '';
   const learnerLevel = typeof req.learnerLevel === 'string' && req.learnerLevel
     ? req.learnerLevel.slice(0, 16)
@@ -255,6 +269,8 @@ export async function analyzeSentence(
         {
           maxTokens: Math.min(8192, Math.max(2048, analysisItemCount(sentence) * 450)),
           timeoutMs: 120_000,
+          // The reply can only be a JSON object; the sentence above stays for a backend without grammars.
+          jsonGrammar: { kind: 'json' },
           ...(options.signal ? { signal: options.signal } : {}),
         },
       );

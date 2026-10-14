@@ -465,4 +465,70 @@ function libraryCollection(dir, { pageWidth = 480, pageHeight = 480 } = {}) {
   };
 }
 
-module.exports = { yomitanFrequencyZip, kanjidicXml, epub, manga, video, wordList, music, youtubeDownload, libraryCollection, SUBS, SONGS };
+/**
+ * A fake DeepL (`/v2/translate`), answered by the world's providers server for
+ * api-free.deepl.com and api.deepl.com (GUM_E2E_REMOTE), so the Translate flow does a real
+ * translation through a cloud engine with no key and no internet. A line it knows gets a fixed
+ * English sentence, any other line a numbered one, so every result is checkable. A request that
+ * asks for more formality (`prefer_more`) gets " (formal)" on every line: the flow's proof that
+ * the option reached DeepL. Every request is recorded in `log`, newest last.
+ */
+const DEEPL_LINES = {
+  '猫は窓辺で眠っていた。': 'The cat was sleeping by the window.',
+  '今日は雨ですね。': 'It is raining today, isn\'t it?',
+};
+const DEEPL_AUTH = /^DeepL-Auth-Key \S+/;
+
+function fakeDeeplAnswer(body) {
+  const texts = Array.isArray(body && body.text) ? body.text : [];
+  const formal = Boolean(body) && (body.formality === 'prefer_more' || body.formality === 'more');
+  return {
+    translations: texts.map((text) => ({
+      detected_source_language: String((body && body.source_lang) || 'JA'),
+      text: String(text)
+        .split('\n')
+        .map((line, index) => `${DEEPL_LINES[line.trim()] || `E2E DeepL line ${index + 1}.`}${formal ? ' (formal)' : ''}`)
+        .join('\n'),
+    })),
+  };
+}
+
+/** Answers one request to the fake DeepL; `route` is the path after the host. */
+function answerFakeDeepl(req, res, route, log) {
+  const chunks = [];
+  req.on('data', (c) => chunks.push(c));
+  req.on('end', () => {
+    const json = (status, payload) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    };
+    let body = null;
+    try {
+      body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } catch {
+      /* answered below as a bad request */
+    }
+    const entry = { method: req.method, route, authorized: DEEPL_AUTH.test(String(req.headers.authorization || '')), body };
+    log.push(entry);
+    if (req.method !== 'POST' || route !== '/v2/translate') return json(404, { message: 'fake DeepL: no such route' });
+    if (!entry.authorized) return json(403, { message: 'fake DeepL: no DeepL-Auth-Key' });
+    if (!body || !Array.isArray(body.text)) return json(400, { message: 'fake DeepL: the body has no text array' });
+    return json(200, fakeDeeplAnswer(body));
+  });
+}
+
+module.exports = {
+  fakeDeeplAnswer,
+  answerFakeDeepl,
+  yomitanFrequencyZip,
+  kanjidicXml,
+  epub,
+  manga,
+  video,
+  wordList,
+  music,
+  youtubeDownload,
+  libraryCollection,
+  SUBS,
+  SONGS,
+};

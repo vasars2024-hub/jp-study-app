@@ -10,7 +10,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ userData: '', call: null as null | ReturnType<typeof import('vitest').vi.fn> }));
+const h = vi.hoisted(() => ({
+  userData: '',
+  call: null as null | ReturnType<typeof import('vitest').vi.fn>,
+  engine: 'cloud' as 'cloud' | 'local-qwen',
+  model: 'gemini-2.5-flash',
+  localKey: 'local:qwen3-1.7b.gguf:100',
+  local: null as null | ReturnType<typeof import('vitest').vi.fn>,
+}));
 
 vi.mock('electron', () => ({
   app: { getPath: () => h.userData },
@@ -18,13 +25,21 @@ vi.mock('electron', () => ({
   ipcMain: { handle: () => undefined },
 }));
 vi.mock('../mining', () => ({
-  getConfiguredAiEngine: () => 'cloud',
+  getConfiguredAiEngine: () => h.engine,
   getConfiguredAiProvider: () => ({ providerId: 'gemini-2.5-flash', apiKey: 'k' }),
 }));
 vi.mock('../aiProviderClient', () => ({
   callAiProvider: (...args: unknown[]) => (h.call as (...a: unknown[]) => unknown)(...args),
 }));
 vi.mock('../aiFeatureGate', () => ({ aiFeaturesEnabled: () => true, AI_FEATURES_OFF_MESSAGE: 'off' }));
+vi.mock('../providerRuntime', () => ({
+  getAiProviderHealth: (providerId: string) => ({ providerId, model: h.model, credentialBucket: 'gemini', configured: true }),
+}));
+vi.mock('../translate', () => ({
+  isTranslateAvailable: () => true,
+  localModelCacheKey: () => h.localKey,
+  runLocalQwenPrompt: (...args: unknown[]) => (h.local as (...a: unknown[]) => unknown)(...args),
+}));
 
 import { analyzeSentence, sentenceAnalysisCacheKey } from '../sentenceAnalysis';
 
@@ -40,6 +55,39 @@ afterEach(() => {
 });
 
 describe('sentence analysis cache', () => {
+  afterEach(() => {
+    h.engine = 'cloud';
+    h.model = 'gemini-2.5-flash';
+    h.localKey = 'local:qwen3-1.7b.gguf:100';
+  });
+
+  it('switching the cloud model asks again (W1-A)', async () => {
+    const sentence = `犬が好きです${Math.random()}。`;
+    h.call = vi.fn(async () => reply('one'));
+    await analyzeSentence({ text: sentence, lang: 'ja', explainIn: 'en' });
+    expect((await analyzeSentence({ text: sentence, lang: 'ja', explainIn: 'en' })).cached).toBe(true);
+    h.model = 'gemini-3-pro';
+    const switched = await analyzeSentence({ text: sentence, lang: 'ja', explainIn: 'en' });
+    expect(switched.cached).toBeUndefined();
+    expect(h.call).toHaveBeenCalledTimes(2);
+  });
+
+  it('switching the local model file asks again, and the local call is grammar-constrained (W1-A)', async () => {
+    h.engine = 'local-qwen';
+    const sentence = `鳥が好きです${Math.random()}。`;
+    h.local = vi.fn(async () => reply('local'));
+    await analyzeSentence({ text: sentence, lang: 'ja', explainIn: 'en' });
+    expect((await analyzeSentence({ text: sentence, lang: 'ja', explainIn: 'en' })).cached).toBe(true);
+    expect(h.local).toHaveBeenCalledTimes(1);
+    const [prompt, options] = h.local.mock.calls[0] as [string, Record<string, unknown>];
+    expect(options.jsonGrammar).toEqual({ kind: 'json' });
+    // The prompt's own "JSON only" sentence stays: the fallback for a backend without grammars.
+    expect(prompt).toMatch(/single JSON object only/);
+    h.localKey = 'local:qwen3-4b.gguf:200';
+    expect((await analyzeSentence({ text: sentence, lang: 'ja', explainIn: 'en' })).cached).toBeUndefined();
+    expect(h.local).toHaveBeenCalledTimes(2);
+  });
+
   it('answers a repeat from the cache, and Re-analyze (refresh) asks again', async () => {
     const sentence = `猫が好きです${Math.random()}。`;
     h.call = vi.fn(async () => reply('first'));

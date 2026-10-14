@@ -79,6 +79,12 @@ import {
   type TranslateResultMeta,
 } from '../shared/translateProviders';
 import { TranslateResultCache, translateCacheKey } from '../shared/translateCache';
+import {
+  deeplOptionsCacheVariant,
+  deeplRequestFields,
+  normalizeDeeplOptions,
+  type DeeplOptions,
+} from '../shared/translateDeeplOptions';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { readSecret } from './credentials/vault';
 import { listLocalModelFiles, resolveQwenSmallModelPath } from './localModelFiles';
@@ -117,6 +123,10 @@ export interface TranslateRouterDeps {
   largeModel?: () => string | null;
   settings?: () => TranslateProviderSettings;
   readDeeplKey?: () => string;
+  /** DeepL's formality and context (`translate/deepl-options.json`). */
+  deeplOptions?: () => DeeplOptions;
+  /** File name of the default offline model, part of its cache key. */
+  smallModel?: () => string | null;
   cloudConfigured?: (id: AiProviderId) => boolean;
   runCloud?: typeof runCloudAiRequest;
   fetchImpl?: typeof fetch;
@@ -271,6 +281,41 @@ function writeTranslateProviderSettings(next: TranslateProviderSettings): void {
 /** Test seam: forget the cached settings so the next read goes to disk. */
 export function resetTranslateProviderSettingsCache(): void {
   settingsCache = null;
+  deeplOptionsCache = null;
+}
+
+// DeepL's formality and context live in their own file: they are DeepL's alone, and the
+// provider settings file is shared with every engine.
+let deeplOptionsCache: DeeplOptions | null = null;
+
+function deeplOptionsPath(): string {
+  return path.join(app.getPath('userData'), 'translate', 'deepl-options.json');
+}
+
+export function readDeeplOptions(): DeeplOptions {
+  if (deeplOptionsCache) return deeplOptionsCache;
+  try {
+    deeplOptionsCache = normalizeDeeplOptions(readJsonSync<unknown>(deeplOptionsPath(), () => ({})));
+  } catch {
+    deeplOptionsCache = normalizeDeeplOptions(null);
+  }
+  return deeplOptionsCache;
+}
+
+export function writeDeeplOptions(raw: unknown): DeeplOptions {
+  const next = normalizeDeeplOptions(raw);
+  deeplOptionsCache = next;
+  try {
+    writeJsonAtomicSync(deeplOptionsPath(), next, { space: 2 });
+  } catch {
+    /* kept in memory for this session */
+  }
+  return next;
+}
+
+function defaultSmallModel(): string | null {
+  const small = resolveQwenSmallModelPath();
+  return small ? path.basename(small) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -358,6 +403,8 @@ interface EngineInput {
   terms: TranslateGlossaryTerm[];
   onSegment?: TranslateSegmentListener;
   signal?: AbortSignal;
+  /** DeepL's request options, read once per request (so the cache key and the body agree). */
+  deepl?: DeeplOptions;
 }
 
 /** An engine's answer. `missing` lists the sentences (0-based) it could not translate. */
@@ -460,6 +507,9 @@ async function translateWithDeepl(
     source_lang: sourceLang,
     target_lang: targetLang,
     preserve_formatting: true,
+    // The learner's formality and context (Translate > Engine > DeepL options). They were stored
+    // nowhere and sent never, so every DeepL translation was DeepL's default register.
+    ...deeplRequestFields(input.deepl ?? (deps.deeplOptions ?? readDeeplOptions)()),
     ...(terms.length ? { tag_handling: 'xml', ignore_tags: [GLOSSARY_IGNORE_TAG] } : {}),
   };
   await pace('deepl', deps);
@@ -564,9 +614,29 @@ export async function routeTranslation(
 
   // ---- cache ----
   const cache = deps.cache ?? null;
-  const keyFor = (provider: TranslateProviderId, modelFileName?: string): string => translateCacheKey({
-    provider, source, target, style, text, terms, hints, ...(modelFileName ? { modelFileName } : {}),
-  });
+  // `variant` is whatever else decides the answer besides the passage: the model file of a local
+  // engine (the default one's too, so installing another small model is not served the old one's
+  // answers) and DeepL's formality and context.
+  const deeplOptions = requested === 'deepl' ? (deps.deeplOptions ?? readDeeplOptions)() : undefined;
+  const smallModel = (): string => {
+    try {
+      return (deps.smallModel ?? defaultSmallModel)() ?? '';
+    } catch {
+      return '';
+    }
+  };
+  const variantFor = (provider: TranslateProviderId, modelFileName?: string): string | undefined => {
+    if (modelFileName) return modelFileName;
+    if (provider === 'local') return smallModel() || undefined;
+    if (provider === 'deepl' && deeplOptions) return deeplOptionsCacheVariant(deeplOptions) || undefined;
+    return undefined;
+  };
+  const keyFor = (provider: TranslateProviderId, modelFileName?: string): string => {
+    const variant = variantFor(provider, modelFileName);
+    return translateCacheKey({
+      provider, source, target, style, text, terms, hints, ...(variant ? { modelFileName: variant } : {}),
+    });
+  };
   const fromCache = (provider: TranslateProviderId, modelFileName?: string): RoutedTranslateResult | null => {
     if (!cache || req.fresh) return null;
     const hit = cache.get(keyFor(provider, modelFileName));
@@ -644,7 +714,16 @@ export async function routeTranslation(
     const sentences = splitTranslationSentences(text);
     if (!sentences.length) return { text: '', segments: [], meta: { provider: requested } };
     const input: EngineInput = {
-      text, sentences, source, target, style, hints, terms, onSegment: req.onSegment, ...(signal ? { signal } : {}),
+      text,
+      sentences,
+      source,
+      target,
+      style,
+      hints,
+      terms,
+      onSegment: req.onSegment,
+      ...(signal ? { signal } : {}),
+      ...(deeplOptions ? { deepl: deeplOptions } : {}),
     };
     const raw: EngineResult = requested === 'deepl'
       ? await translateWithDeepl(input, deps)
@@ -725,6 +804,9 @@ export function registerTranslateProviderIpc(): void {
       return update(withTranslateConsent(readTranslateProviderSettings(), provider, granted === true, Date.now()));
     },
   );
+
+  ipcMain.handle('translate:deeplOptions', (): DeeplOptions => readDeeplOptions());
+  ipcMain.handle('translate:setDeeplOptions', (_event, options: unknown): DeeplOptions => writeDeeplOptions(options));
 
   ipcMain.handle('translate:setFallback', (_event, on: unknown): TranslateProviderSnapshot => {
     return update({ ...readTranslateProviderSettings(), fallbackToLocal: on !== false });

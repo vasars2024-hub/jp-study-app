@@ -36,6 +36,7 @@
 import type { LlamaChatSession } from 'node-llama-cpp';
 import { acquireLlamaContext, llamaContextPoolStats, type LlamaContextLease } from './llamaContextPool';
 import { llamaModelPoolStats } from './llamaModelPool';
+import { llamaOf, resolveLlamaGrammar, sanitizeLlamaGrammar } from './llamaGrammar';
 import type { LlamaHostRequest, LlamaHostResponse, LlamaSessionId } from '../shared/llamaHostProtocol';
 import { llamaAbortedError } from '../shared/llamaHostProtocol';
 
@@ -129,10 +130,15 @@ export async function handle(port: ParentPort, request: LlamaHostRequest): Promi
       const controller = new AbortController();
       inflight.set(request.id, controller);
       try {
+        // Built from the backend this session's weights live on; `null` (unbuildable) means free text.
+        // Only awaited when one was asked for, so a free-text prompt starts exactly as before.
+        const spec = sanitizeLlamaGrammar(request.grammar);
+        const grammar = spec ? await resolveLlamaGrammar(llamaOf(entry.lease.model), spec) : null;
         const text = await entry.session.prompt(request.prompt, {
           maxTokens: request.maxTokens,
           signal: controller.signal,
           stopOnAbortSignal: true,
+          ...(grammar ? { grammar } : {}),
           onTextChunk: request.stream
             ? (chunk: string) => send(port, { id: request.id, kind: 'chunk', text: chunk })
             : undefined,

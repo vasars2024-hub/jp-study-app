@@ -17,24 +17,16 @@
  */
 import type { ZodType, ZodTypeDef } from 'zod';
 import { AiProviderRuntimeError } from './providerRuntime';
+import { extractJsonReply } from '../shared/jsonReply';
 
 /**
- * The JSON inside a reply: a fenced block's body, else the outermost object or
- * array, else the trimmed text unchanged.
+ * The JSON inside a reply: the first object or array in it that parses, fenced
+ * or not (`shared/jsonReply.ts`). It used to look for a ``` fence before a
+ * leading `{`, which cut a reply whose STRING held a fence down to that string's
+ * middle (bug 13).
  */
 export function stripJsonFences(text: string): string {
-  const trimmed = text.trim();
-  const fence = trimmed.match(/```(?:json|JSON)?\s*([\s\S]*?)```/u);
-  if (fence?.[1]?.trim()) return fence[1].trim();
-  if (/^[[{]/u.test(trimmed)) return trimmed;
-  const objStart = trimmed.indexOf('{');
-  const objEnd = trimmed.lastIndexOf('}');
-  const arrStart = trimmed.indexOf('[');
-  const arrEnd = trimmed.lastIndexOf(']');
-  const useObject = objStart >= 0 && objEnd > objStart && (arrStart < 0 || objStart < arrStart);
-  if (useObject) return trimmed.slice(objStart, objEnd + 1);
-  if (arrStart >= 0 && arrEnd > arrStart) return trimmed.slice(arrStart, arrEnd + 1);
-  return trimmed;
+  return extractJsonReply(text);
 }
 
 /** Parses a reply as JSON, tolerating fences and surrounding prose. */

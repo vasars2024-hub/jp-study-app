@@ -13,6 +13,7 @@
 // the transport, the provider policy and the cache all live in main.
 
 import type { AgentProviderPolicy } from './agentWorkspace';
+import { extractJsonReply } from './jsonReply';
 import {
   EXPLANATION_MODEL_MAX_CHARS,
   EXPLANATION_SECTION_KINDS,
@@ -163,22 +164,17 @@ export function buildExplanationPrompt(
 }
 
 /**
- * The JSON object inside a model reply, as raw text.
+ * The JSON object inside a model reply, as raw text, or '' when it holds none.
  *
  * Models wrap JSON in ``` fences, prefix it with "Here you go:", or both, and a
  * strict `JSON.parse` of the whole reply then fails on an answer that is
- * perfectly good. The fence is stripped when present; otherwise the first `{`
- * through the last `}` is taken. Deliberately not a brace-matching scan — a
- * reply with trailing prose containing a `}` is rare, and the cost of getting it
- * wrong is a parse failure that surfaces as "ask again", not a wrong answer.
+ * perfectly good. `shared/jsonReply.ts` finds the object the way a parser
+ * would, so trailing prose with a `}` in it no longer breaks the answer, and a
+ * fence inside an explanation string is not taken for the reply's (bug 13).
  */
 export function extractJsonBlock(reply: string): string {
-  const fenced = reply.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = fenced ? fenced[1] : reply;
-  const start = body.indexOf('{');
-  const end = body.lastIndexOf('}');
-  if (start < 0 || end <= start) return '';
-  return body.slice(start, end + 1);
+  const block = extractJsonReply(reply, { only: 'object' });
+  return block.startsWith('{') ? block : '';
 }
 
 /**

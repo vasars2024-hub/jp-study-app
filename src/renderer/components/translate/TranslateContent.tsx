@@ -49,6 +49,7 @@ import {
   type TranslateResultMeta,
 } from '../../../shared/translateProviders';
 import { loadTranslateGlossary } from '../../translateGlossaryStore';
+import { translateErrorText } from './translateErrorText';
 
 export type TranslateState = 'idle' | 'loading' | 'translating' | 'done' | 'error';
 export type TranslateTab = 'translate' | 'history';
@@ -362,7 +363,8 @@ export function useTranslate(): TranslateController {
         setMsg(t('risk4.translate.cancelled'));
         return;
       }
-      setError(e instanceof Error ? e.message : String(e));
+      // Main's failures arrive already worded in the UI language; platform text never does.
+      setError(translateErrorText(e, t));
       setState('error');
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
@@ -543,14 +545,14 @@ export function useTranslate(): TranslateController {
           if (controller.signal.aborted || (e instanceof Error && e.name === 'AbortError')) return;
           setBackTranslations((prev) => ({
             ...prev,
-            [row]: { status: 'error', error: e instanceof Error ? e.message : String(e) },
+            [row]: { status: 'error', error: translateErrorText(e, t) },
           }));
         }
       }
     } finally {
       backControllers.current.delete(controller);
     }
-  }, []);
+  }, [t]);
 
   const backTranslate = useCallback((row: number) => {
     void runBackTranslation([row]);

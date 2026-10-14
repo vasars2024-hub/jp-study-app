@@ -1907,6 +1907,13 @@ const api = {
     ipcRenderer.invoke('translate:setProviderConsent', provider, granted),
   translateSetFallback: (on: boolean): Promise<import('./shared/translateProviders').TranslateProviderSnapshot> =>
     ipcRenderer.invoke('translate:setFallback', on),
+  /** DeepL's formality and context, as main stores and sends them. */
+  translateDeeplOptions: (): Promise<import('./shared/translateDeeplOptions').DeeplOptions> =>
+    ipcRenderer.invoke('translate:deeplOptions'),
+  translateSetDeeplOptions: (
+    options: import('./shared/translateDeeplOptions').DeeplOptions,
+  ): Promise<import('./shared/translateDeeplOptions').DeeplOptions> =>
+    ipcRenderer.invoke('translate:setDeeplOptions', options),
   onTranslateProvidersChanged: (
     cb: (snapshot: import('./shared/translateProviders').TranslateProviderSnapshot) => void,
   ): (() => void) => {

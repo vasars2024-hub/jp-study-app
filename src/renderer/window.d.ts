@@ -1112,6 +1112,11 @@ declare global {
         granted: boolean,
       ): Promise<import('../shared/translateProviders').TranslateProviderSnapshot>;
       translateSetFallback(on: boolean): Promise<import('../shared/translateProviders').TranslateProviderSnapshot>;
+      /** DeepL's formality and context (Translate > Engine > DeepL options). */
+      translateDeeplOptions?(): Promise<import('../shared/translateDeeplOptions').DeeplOptions>;
+      translateSetDeeplOptions?(
+        options: import('../shared/translateDeeplOptions').DeeplOptions,
+      ): Promise<import('../shared/translateDeeplOptions').DeeplOptions>;
       onTranslateProvidersChanged(
         cb: (snapshot: import('../shared/translateProviders').TranslateProviderSnapshot) => void,
       ): () => void;

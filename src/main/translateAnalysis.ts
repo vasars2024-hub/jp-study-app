@@ -21,6 +21,7 @@ import {
 import { aiErrorCodeOf } from '../shared/aiErrorCodes';
 import { hasTranslateConsent, isTranslateProviderId } from '../shared/translateProviders';
 import { callAiProvider } from './aiProviderClient';
+import { getAiProviderHealth } from './providerRuntime';
 import { getConfiguredAiProvider } from './mining';
 import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
 import { readTranslateProviderSettings } from './translateRouter';
@@ -68,13 +69,18 @@ const norm = (text: string): string => text.trim().normalize('NFKC');
  * two different source sentences that translated to the same English ("Yes.")
  * shared one analysis — particle notes for the wrong Japanese sentence — and a
  * prompt change could never reach a sentence analyzed before it.
+ *
+ * `modelKey` is the provider AND its model (`analysisModelKey`): it used to be
+ * the provider id alone, so switching OpenAI from one model to another, or
+ * pointing the local server at a different model, kept serving the old model's
+ * analyses as if the new one had written them.
  */
-export function analysisCacheKey(req: TranslateAnalyzeRequest, providerId: AiProviderId): string {
+export function analysisCacheKey(req: TranslateAnalyzeRequest, modelKey: string): string {
   return crypto
     .createHash('sha256')
     .update([
       `v${TRANSLATE_ANALYSIS_PROMPT_VERSION}`,
-      providerId,
+      modelKey,
       req.source,
       req.target,
       req.explainIn || 'en',
@@ -122,6 +128,21 @@ export interface TranslateAnalysisDeps {
   provider?: () => { providerId: AiProviderId; apiKey: string };
   consented?: (providerId: AiProviderId) => boolean;
   enabled?: () => boolean;
+  /** The model a provider id resolves to right now (cache key). */
+  modelOf?: (providerId: AiProviderId) => string;
+}
+
+function providerModel(providerId: AiProviderId): string {
+  try {
+    return getAiProviderHealth(providerId).model;
+  } catch {
+    return '';
+  }
+}
+
+/** `provider:model`, the same shape `aiStudyAssist.ts` keys its cache on. */
+export function analysisModelKey(providerId: AiProviderId, model: string): string {
+  return `${providerId}:${model.trim()}`;
 }
 
 function translateConsentFor(providerId: AiProviderId): boolean {
@@ -155,7 +176,7 @@ export async function analyzeTranslation(
     return { ok: false, needsConsent: true, code: 'consent', error: 'The provider is not allowed to receive translate text.' };
   }
   const flags = computeAnalysisFlags(req.source, req.target);
-  const key = analysisCacheKey(req, providerId);
+  const key = analysisCacheKey(req, analysisModelKey(providerId, (deps.modelOf ?? providerModel)(providerId)));
   if (!req.refresh) {
     const cached = loadAnalysisCache().entries[key];
     if (cached) return { ok: true, result: cached, cached: true };

@@ -95,6 +95,21 @@ describe('translate analysis cache', () => {
     expect(analysisCacheKey(req(), 'gemini-2.5-flash')).not.toBe(analysisCacheKey(req({ sourceText: 'ええ。' }), 'gemini-2.5-flash'));
   });
 
+  it('switching the model asks again: the model is part of the key (W1-A)', async () => {
+    const call = vi.fn(async () => GOOD);
+    let model = 'gpt-5-mini';
+    const withModel = { ...deps(call), modelOf: () => model };
+    await analyzeTranslation(req(), withModel);
+    expect((await analyzeTranslation(req(), withModel)).cached).toBe(true);
+    model = 'gpt-5';
+    const switched = await analyzeTranslation(req(), withModel);
+    expect(switched.cached).toBeUndefined();
+    expect(call).toHaveBeenCalledTimes(2);
+    // And the first model's answer is still there for it.
+    model = 'gpt-5-mini';
+    expect((await analyzeTranslation(req(), withModel)).cached).toBe(true);
+  });
+
   it('refresh bypasses the cache', async () => {
     const call = vi.fn(async () => GOOD);
     await analyzeTranslation(req(), deps(call));

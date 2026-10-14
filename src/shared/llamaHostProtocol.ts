@@ -28,6 +28,23 @@ export interface LlamaContextPoolRow {
   graceMs: number;
 }
 
+/**
+ * Constrained decoding for a structured call: the model may only generate text the grammar allows.
+ *
+ *  - `json`: any JSON object (llama.cpp's `json.gbnf`).
+ *  - `json-array`: any JSON array (`json_arr.gbnf`).
+ *  - `json-schema`: an object matching `schema`, a JSON Schema in the subset node-llama-cpp's
+ *    `GbnfJsonSchema` accepts (type, properties, required, items, enum, const, oneOf, …).
+ *
+ * Plain data, so it crosses the process boundary as is; `llamaGrammar.ts` builds the native grammar
+ * where llama.cpp runs. One that cannot be built there is dropped and the generation runs
+ * unconstrained, which is why callers keep their "reply with JSON only" sentence as the fallback.
+ */
+export type LlamaJsonGrammar =
+  | { kind: 'json' }
+  | { kind: 'json-array' }
+  | { kind: 'json-schema'; schema: Record<string, unknown> };
+
 export type LlamaHostRequest =
   | { id: number; kind: 'acquire'; modelPath: string; contextSize: number }
   | {
@@ -38,6 +55,8 @@ export type LlamaHostRequest =
       maxTokens: number;
       /** When true the child posts `chunk` messages as tokens arrive. */
       stream: boolean;
+      /** Restricts generation to JSON (see `LlamaJsonGrammar`). Absent = free text. */
+      grammar?: LlamaJsonGrammar;
     }
   /** Aborts the in-flight `prompt` whose request id is `target`. Never answered itself. */
   | { id: number; kind: 'abort'; target: number }

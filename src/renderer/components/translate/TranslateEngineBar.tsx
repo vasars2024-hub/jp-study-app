@@ -25,6 +25,7 @@ import {
   type TranslateResultMeta,
 } from '../../../shared/translateProviders';
 import { translateProviderAvailability, useTranslateProviders } from '../../translateProviderClient';
+import { TranslateDeeplOptions } from './TranslateDeeplOptions';
 
 const REASON_KEYS: Record<NonNullable<TranslateProviderAvailability['reason']>, string> = {
   'no-key': 'xlate2.engine.needsKey',
@@ -39,6 +40,7 @@ export function TranslateEngineBar({ source, target, disabled }: { source: strin
   const engines = useTranslateProviders(source, target);
   const { snapshot, provider } = engines;
   const [asking, setAsking] = useState<TranslateCloudProviderId | null>(null);
+  const [deeplOpen, setDeeplOpen] = useState(false);
   const consentId = useId();
   const pairLabel = `${source.toUpperCase()} → ${target.toUpperCase()}`;
 
@@ -95,6 +97,18 @@ export function TranslateEngineBar({ source, target, disabled }: { source: strin
         />
         {t('xlate2.engine.fallback')}
       </label>
+      {/* On the picker's own row: these options belong to the engine chosen there. */}
+      {provider === 'deepl' && current?.consented && !asking && (
+        <button
+          type="button"
+          className="btn ghost xlate2-deepl-toggle"
+          aria-expanded={deeplOpen}
+          aria-controls={deeplOpen ? `${consentId}-deepl` : undefined}
+          onClick={() => setDeeplOpen((open) => !open)}
+        >
+          {t('xlate2.deepl.toggle')}
+        </button>
+      )}
 
       {provider === 'local-large' && current && !current.ready && (
         <p className="xlate2-note muted">{t('xlate2.engine.largeMissing', { file: LARGE_MODEL_HINT_FILE })}</p>
@@ -116,6 +130,10 @@ export function TranslateEngineBar({ source, target, disabled }: { source: strin
             {t('xlate2.consent.revoke', { provider: translateProviderLabel(provider, t) })}
           </button>
         </p>
+      )}
+
+      {provider === 'deepl' && current?.consented && !asking && deeplOpen && (
+        <TranslateDeeplOptions id={`${consentId}-deepl`} disabled={disabled} />
       )}
 
       {asking && askingDef && (

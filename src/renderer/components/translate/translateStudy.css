@@ -306,3 +306,142 @@
   margin: 10px 0 0;
   font-size: 0.95em;
 }
+
+/* ---- DeepL options (formality, context) ---- */
+
+.xlate2-deepl {
+  flex-basis: 100%;
+  display: grid;
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgb(127 127 127 / 0.25));
+  border-radius: 8px;
+}
+
+.xlate2-deepl > * {
+  max-width: 640px;
+}
+
+.xlate2-deepl-title {
+  margin: 0;
+}
+
+.xlate2-deepl-row,
+.xlate2-deepl-context {
+  display: grid;
+  gap: 4px;
+  min-height: 24px;
+}
+
+.xlate2-deepl-row {
+  grid-template-columns: max-content minmax(0, 240px);
+  align-items: center;
+  gap: 8px;
+}
+
+.xlate2-deepl-row select {
+  min-height: 26px;
+}
+
+.xlate2-deepl-context textarea {
+  width: 100%;
+  min-height: 48px;
+  resize: vertical;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.xlate2-deepl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.xlate2-deepl-status.is-error {
+  color: var(--danger, #d9534f);
+}
+
+/* ---- Engine comparison ---- */
+
+.xlate2-compare {
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgb(127 127 127 / 0.25));
+  border-radius: 8px;
+}
+
+.xlate2-compare-title {
+  margin: 0 0 4px;
+  font-size: 1em;
+}
+
+.xlate2-compare-engines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 8px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border, rgb(127 127 127 / 0.2));
+  border-radius: 6px;
+}
+
+.xlate2-compare-engine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.xlate2-compare-engine.is-blocked {
+  opacity: 0.75;
+}
+
+.xlate2-compare-actions,
+.xlate2-compare-cell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.xlate2-compare-grid {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 8px;
+}
+
+.xlate2-compare-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border, rgb(127 127 127 / 0.35));
+  border-radius: 6px;
+  border-top: 3px solid var(--accent, #4aa3ff);
+}
+
+.xlate2-compare-cell.is-error {
+  border-top-color: var(--danger, #d9534f);
+}
+
+.xlate2-compare-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.xlate2-compare-text,
+.xlate2-compare-error {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.xlate2-compare-error {
+  color: var(--danger, #d9534f);
+}

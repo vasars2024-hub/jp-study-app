@@ -14,6 +14,7 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import SubtitleCueLine from '../SubtitleCueLine';
 import { TranslateEngineBar, TranslateResultSource } from './TranslateEngineBar';
 import { TranslateGlossaryPanel } from './TranslateGlossaryPanel';
+import { TranslateComparePanel } from './TranslateComparePanel';
 import { useTranslateGlossary } from '../../translateGlossaryStore';
 import { useT } from '../../i18n';
 import { isStudyLang, studyLangFromTag, type StudyLang } from '../../../shared/studyLang';
@@ -101,6 +102,7 @@ export function TranslateOptionsBar({ state, className = '' }: { state: Translat
   const { t } = useT();
   const glossaryId = useId();
   const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const glossaryCount = useTranslateGlossary().length;
   return (
     <>
@@ -114,6 +116,15 @@ export function TranslateOptionsBar({ state, className = '' }: { state: Translat
           onClick={() => setGlossaryOpen((open) => !open)}
         >
           {t('xlate2.glossary.toggle', { count: glossaryCount })}
+        </button>
+        <button
+          type="button"
+          className="btn ghost xlate2-compare-toggle"
+          aria-expanded={compareOpen}
+          aria-controls={compareOpen ? `${glossaryId}-compare` : undefined}
+          onClick={() => setCompareOpen((open) => !open)}
+        >
+          {t('xlate2.compare.toggle')}
         </button>
         <div className="dict-lang-toggle" role="radiogroup" aria-label={t('xlate.style.label')}>
           {(['natural', 'literal'] as const).map((style) => (
@@ -166,6 +177,7 @@ export function TranslateOptionsBar({ state, className = '' }: { state: Translat
           passage={state.input}
         />
       )}
+      {compareOpen && <TranslateComparePanel id={`${glossaryId}-compare`} state={state} />}
     </>
   );
 }

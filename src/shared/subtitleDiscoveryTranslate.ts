@@ -18,6 +18,7 @@ import { selectDialogueCues } from './subtitleFusionCore';
 import { cuesToSrt } from './subtitlesExport';
 import { cleanLlmOutput, parseBatchJson } from './translateCore';
 import { langLabel } from './langs';
+import { extractJsonReply } from './jsonReply';
 
 export interface SubtitleTranslationUnit {
   /** Stable id inside one track: the 1-based position among translated lines. */
@@ -118,20 +119,14 @@ export function buildSubtitleTranslationPrompt(
   return parts.join('\n');
 }
 
-/** Pulls a JSON array or object out of a reply that may be fenced or wrapped in prose. */
+/**
+ * Pulls a JSON array or object out of a reply that may be fenced or wrapped in
+ * prose (`shared/jsonReply.ts`). The array the prompt asks for wins over an
+ * object, and a subtitle line that itself holds ``` is no longer taken for the
+ * reply's fence (bug 13).
+ */
 export function extractJsonPayload(raw: string): string {
-  const cleaned = cleanLlmOutput(raw);
-  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(cleaned);
-  if (fence?.[1]) return fence[1].trim();
-  const arrayStart = cleaned.indexOf('[');
-  const arrayEnd = cleaned.lastIndexOf(']');
-  const objectStart = cleaned.indexOf('{');
-  const objectEnd = cleaned.lastIndexOf('}');
-  if (arrayStart >= 0 && arrayEnd > arrayStart && (objectStart < 0 || arrayStart < objectStart)) {
-    return cleaned.slice(arrayStart, arrayEnd + 1);
-  }
-  if (objectStart >= 0 && objectEnd > objectStart) return cleaned.slice(objectStart, objectEnd + 1);
-  return cleaned;
+  return extractJsonReply(cleanLlmOutput(raw), { prefer: 'array' });
 }
 
 /** id → translated line, for ids this chunk asked about. Anything else is ignored. */
