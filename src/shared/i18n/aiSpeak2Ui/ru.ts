@@ -70,4 +70,18 @@ export const AI_SPEAK2_UI_RU: Catalog = {
     other: 'Серия дневника: {count} дня (рекорд: {best}). Закончите сегодняшнюю запись, чтобы её сохранить.',
   },
   'aiSpeak.journal.streakNone': 'Закончите запись (все слова, достаточно предложений), чтобы начать серию дневника.',
+  // ---- the conversation partner: hands-free voice (W2-A) ----
+  'aiSpeak.voiceMode.label': 'Голосовой ввод',
+  'aiSpeak.voiceMode.push': 'По нажатию',
+  'aiSpeak.voiceMode.handsFree': 'Без рук',
+  'aiSpeak.handsFree.start': 'Включить режим без рук',
+  'aiSpeak.handsFree.stop': 'Выключить режим без рук',
+  'aiSpeak.handsFree.starting': 'Открываю микрофон…',
+  'aiSpeak.handsFree.listening': 'Слушаю. Говорите, когда будете готовы; короткая пауза отправит сказанное.',
+  'aiSpeak.handsFree.hearing': 'Слышу вас…',
+  'aiSpeak.handsFree.transcribing': 'Записываю сказанное речевой моделью на этом компьютере…',
+  'aiSpeak.handsFree.waiting': 'Собеседник отвечает…',
+  'aiSpeak.handsFree.speaking': 'Собеседник говорит. Заговорите или нажмите Esc, чтобы перебить.',
+  'aiSpeak.handsFree.interrupt': 'Перебить (Esc)',
+  'aiSpeak.handsFree.unheard': 'Не удалось разобрать. Повторите чуть громче.',
 };

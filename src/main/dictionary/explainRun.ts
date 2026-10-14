@@ -24,7 +24,12 @@ export type LexiconExplainError =
   /** The model answered, but not with an explanation this app can read. */
   | 'unparsable'
   /** The answer was good and the database would not keep it. */
-  | 'not-stored';
+  | 'not-stored'
+  /**
+   * The reader pressed Cancel. Nothing is stored; the surface keeps what had
+   * streamed so far on screen, marked as stopped.
+   */
+  | 'cancelled';
 
 export interface LexiconExplainResult {
   ok: boolean;
@@ -57,6 +62,10 @@ export interface LexiconExplainRequest {
    * produce a different answer is a dead control. See `providerCache` below.
    */
   refresh?: boolean;
+  /** Cancels the provider call (`dict:explainCancel`). */
+  signal?: AbortSignal;
+  /** The reply as it streams in (`aiStreamRelay.ts`); a preview, never what is stored. */
+  onTextChunk?: (text: string) => void;
 }
 
 export interface LexiconExplainDeps {
@@ -65,7 +74,7 @@ export interface LexiconExplainDeps {
   runProvider(
     policy: AgentProviderPolicy,
     prompt: string,
-    options: { allowLocalFallback: boolean },
+    options: { allowLocalFallback: boolean; signal?: AbortSignal; onTextChunk?: (text: string) => void },
   ): Promise<{ text: string }>;
 }
 
@@ -125,9 +134,14 @@ export async function runLexiconExplain(
     reply = await deps.runProvider(
       policyForRun(request.policy, request.refresh === true),
       prompt,
-      { allowLocalFallback: false },
+      {
+        allowLocalFallback: false,
+        ...(request.signal ? { signal: request.signal } : {}),
+        ...(request.onTextChunk ? { onTextChunk: request.onTextChunk } : {}),
+      },
     );
   } catch (error) {
+    if (request.signal?.aborted) return { ok: false, cached: false, explanation: null, error: 'cancelled' };
     return {
       ok: false,
       cached: false,
@@ -136,6 +150,9 @@ export async function runLexiconExplain(
       ...(providerErrorCode(error) ? { code: providerErrorCode(error) } : {}),
     };
   }
+  // A cancel that lands as the reply completes is still a cancel: nothing the
+  // reader stopped is written to disk behind their back.
+  if (request.signal?.aborted) return { ok: false, cached: false, explanation: null, error: 'cancelled' };
   const input = parseExplanationReply(reply.text);
   // Nothing is stored for an unreadable reply. Caching the failure would serve an
   // instant blank to every later reader with nothing saying why, and the retry

@@ -11,13 +11,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { aiErrorKey, isAiErrorCode, type AiErrorCode } from '../../../shared/aiErrorCodes';
 import type { AiStudyResponse } from '../../../shared/aiStudyCommon';
+import type { StreamPreviewOptions } from '../../../shared/aiStreamPreview';
 import { useT } from '../../i18n';
 import { AiSetupPrompt } from './AiSetupPrompt';
+import { AiStreamDraft, aiStreamPreviewText, subscribeAiStream } from './aiStream';
 import './aiImmerse.css';
 
 export type AiImmerseRunState<T> =
   | { status: 'idle' }
-  | { status: 'running'; done?: number; total?: number }
+  /** `draft`: the readable part of the reply streamed in so far (`aiStream.tsx`). */
+  | { status: 'running'; done?: number; total?: number; draft?: string }
   | { status: 'done'; result: T; cached: boolean; engine?: 'cloud' | 'local' }
   | {
     status: 'failed';
@@ -25,6 +28,8 @@ export type AiImmerseRunState<T> =
     needsKey?: boolean;
     needsConsent?: boolean;
     needsLocalModel?: boolean;
+    /** After a Cancel: what had streamed in by then, kept on screen. */
+    partial?: string;
   };
 
 let requestCounter = 0;
@@ -66,27 +71,43 @@ export function aiImmerseStateFrom<T>(response: AiStudyResponse<T> | null | unde
  * One cancellable request (or a run of several, see `runSteps`). A newer run, a
  * Cancel or an unmount makes any reply still on its way irrelevant: it is
  * dropped rather than rendered.
+ *
+ * A single request's reply streams in as `state.draft` (`preview` picks the JSON
+ * fields that are prose); a Cancel keeps it as `partial`. The result is always
+ * main's complete, validated reply.
  */
-export function useAiImmerseRequest<T>() {
+export function useAiImmerseRequest<T>(preview?: StreamPreviewOptions) {
   const [state, setState] = useState<AiImmerseRunState<T>>({ status: 'idle' });
   const active = useRef<string | null>(null);
   const ticket = useRef(0);
+  const draft = useRef('');
+  const unsubscribe = useRef<(() => void) | null>(null);
+  const previewRef = useRef(preview);
+  previewRef.current = preview;
+
+  const stopStream = useCallback((): void => {
+    unsubscribe.current?.();
+    unsubscribe.current = null;
+  }, []);
 
   const abandon = useCallback((): boolean => {
     const id = active.current;
     const wasRunning = id !== null;
     active.current = null;
     ticket.current += 1;
+    stopStream();
     if (id) cancelAiImmerse(id);
     return wasRunning;
-  }, []);
+  }, [stopStream]);
 
   const cancel = useCallback((): void => {
-    if (abandon()) setState({ status: 'failed', code: 'cancelled' });
+    const partial = draft.current;
+    if (abandon()) setState({ status: 'failed', code: 'cancelled', ...(partial ? { partial } : {}) });
   }, [abandon]);
 
   const reset = useCallback((): void => {
     abandon();
+    draft.current = '';
     setState({ status: 'idle' });
   }, [abandon]);
 
@@ -99,7 +120,15 @@ export function useAiImmerseRequest<T>() {
     const mine = ++ticket.current;
     const id = newAiImmerseRequestId();
     active.current = id;
+    draft.current = '';
     setState({ status: 'running' });
+    unsubscribe.current = subscribeAiStream(id, (raw) => {
+      if (mine !== ticket.current) return;
+      const text = aiStreamPreviewText(raw, previewRef.current);
+      if (text === draft.current) return;
+      draft.current = text;
+      setState({ status: 'running', draft: text });
+    });
     let next: AiImmerseRunState<T>;
     try {
       next = aiImmerseStateFrom(await invoke(id));
@@ -107,10 +136,14 @@ export function useAiImmerseRequest<T>() {
       next = { status: 'failed', code: 'ipc-failed' };
     }
     if (mine !== ticket.current) return null;
+    stopStream();
     active.current = null;
+    if (next.status === 'failed' && next.code === 'cancelled' && draft.current) {
+      next = { ...next, partial: draft.current };
+    }
     setState(next);
     return next.status === 'done' ? next.result : null;
-  }, [abandon]);
+  }, [abandon, stopStream]);
 
   /**
    * Several requests in a row (a long transcript's chunks), with progress. The
@@ -169,40 +202,47 @@ export function AiImmerseBadge() {
 }
 
 /**
- * Spinner (with step progress) + Cancel while running; the setup prompt or the
- * translated error after a failure. Renders nothing when idle or done.
+ * Spinner (with step progress) + Cancel while running, with the reply as it
+ * streams in; the setup prompt or the translated error after a failure, and after
+ * a Cancel what had arrived. Renders nothing when idle or done.
  */
 export function AiImmerseStatus<T>({
   state,
   onCancel,
   busyKey = 'aiImmerse.busy',
+  lang,
 }: {
   state: AiImmerseRunState<T>;
   onCancel: () => void;
   busyKey?: string;
+  /** The language the reply is written in, for the draft. */
+  lang?: string;
 }) {
   const { t } = useT();
   if (state.status === 'running') {
     const progress = typeof state.total === 'number' && state.total > 1;
     return (
-      <div className="ai-immerse-busy" role="status" aria-live="polite">
-        <span className="ai-immerse-spinner" aria-hidden="true" />
-        <span>{t(busyKey)}</span>
-        {progress && (
-          <>
-            <progress
-              className="ai-immerse-progress"
-              max={state.total}
-              value={state.done ?? 0}
-              aria-label={t('aiImmerse.progress', { done: state.done ?? 0, total: state.total ?? 0 })}
-            />
-            <span>{t('aiImmerse.progress', { done: state.done ?? 0, total: state.total ?? 0 })}</span>
-          </>
-        )}
-        <button type="button" className="btn small ai-immerse-btn" onClick={onCancel}>
-          {t('aiImmerse.cancel')}
-        </button>
-      </div>
+      <>
+        <div className="ai-immerse-busy" role="status" aria-live="polite">
+          <span className="ai-immerse-spinner" aria-hidden="true" />
+          <span>{t(busyKey)}</span>
+          {progress && (
+            <>
+              <progress
+                className="ai-immerse-progress"
+                max={state.total}
+                value={state.done ?? 0}
+                aria-label={t('aiImmerse.progress', { done: state.done ?? 0, total: state.total ?? 0 })}
+              />
+              <span>{t('aiImmerse.progress', { done: state.done ?? 0, total: state.total ?? 0 })}</span>
+            </>
+          )}
+          <button type="button" className="btn small ai-immerse-btn" onClick={onCancel}>
+            {t('aiImmerse.cancel')}
+          </button>
+        </div>
+        {state.draft && <AiStreamDraft text={state.draft} state="drafting" lang={lang} />}
+      </>
     );
   }
   if (state.status !== 'failed') return null;
@@ -223,6 +263,7 @@ export function AiImmerseStatus<T>({
     );
   }
   if (state.code === 'cancelled') {
+    if (state.partial) return <AiStreamDraft text={state.partial} state="stopped" lang={lang} />;
     return <p className="muted ai-immerse-note" role="status">{t(aiErrorKey('cancelled'))}</p>;
   }
   return <p className="ai-immerse-error" role="alert">{t(aiErrorKey(state.code))}</p>;

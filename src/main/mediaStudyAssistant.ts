@@ -14,6 +14,7 @@ import {
 import { aiErrorCodeOf, type AiErrorCode } from '../shared/aiErrorCodes';
 import type { AiProviderId } from '../shared/aiProviders';
 import { callAiProvider } from './aiProviderClient';
+import { AiRequestRegistry, aiStreamRequestId, aiStreamSink } from './aiStreamRelay';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { getConfiguredAiProvider } from './mining';
 import {
@@ -129,6 +130,10 @@ export interface MediaStudyAssistDeps {
    * "no key" alone used to block it.
    */
   configured?: (providerId: AiProviderId, apiKey: string) => boolean;
+  /** Cancels the provider call (`media-study:cancel`); the reply is then `code: 'cancelled'`. */
+  signal?: AbortSignal;
+  /** The reply as it streams in (`aiStreamRelay.ts`); a preview, never what is cached. */
+  onTextChunk?: (text: string) => void;
 }
 
 function providerConfigured(providerId: AiProviderId, apiKey: string): boolean {
@@ -162,8 +167,15 @@ export async function assistMediaStudy(input: unknown, deps: MediaStudyAssistDep
       apiKey,
       buildMediaStudyAssistantPrompt(request),
       MEDIA_STUDY_ASSISTANT_SCHEMA,
-      { itemCount: 8, timeoutMs: 60_000, feature: 'mediaAssistant' },
+      {
+        itemCount: 8,
+        timeoutMs: 60_000,
+        feature: 'mediaAssistant',
+        ...(deps.signal ? { signal: deps.signal } : {}),
+        ...(deps.onTextChunk ? { onTextChunk: deps.onTextChunk } : {}),
+      },
     );
+    if (deps.signal?.aborted) return { ok: false, code: 'cancelled' };
     const result = parseMediaStudyAssistantResult(raw, request.mode);
     if (!isCompleteMediaStudyAssistantResult(result)) {
       if (!result.summary && !result.translation && !result.grammar.length && !result.vocabulary.length
@@ -175,6 +187,7 @@ export async function assistMediaStudy(input: unknown, deps: MediaStudyAssistDep
     remember(key, result);
     return { ok: true, result, cached: false };
   } catch (error) {
+    if (deps.signal?.aborted) return { ok: false, code: 'cancelled' };
     return { ok: false, code: aiErrorCodeOf(error), error: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -184,6 +197,21 @@ export function resetMediaStudyAssistantCacheForTests(): void {
   cache = null;
 }
 
+/** Answers in flight, by the renderer's request id (`media-study:cancel`). */
+const assistRequests = new AiRequestRegistry();
+
 export function registerMediaStudyAssistantIpc(): void {
-  ipcMain.handle('media-study:assist', (_event, input: unknown): Promise<MediaStudyAssistResponse> => assistMediaStudy(input));
+  // Streams back to the asking window under the request's id; that id also cancels it.
+  ipcMain.handle('media-study:assist', async (event, input: unknown): Promise<MediaStudyAssistResponse> => {
+    const requestId = aiStreamRequestId(input);
+    if (!requestId) return assistMediaStudy(input);
+    const controller = assistRequests.begin(requestId, event.sender.id);
+    const onTextChunk = aiStreamSink(event.sender, requestId);
+    try {
+      return await assistMediaStudy(input, { signal: controller.signal, ...(onTextChunk ? { onTextChunk } : {}) });
+    } finally {
+      assistRequests.end(requestId, controller);
+    }
+  });
+  ipcMain.handle('media-study:cancel', (event, requestId: unknown): boolean => assistRequests.cancel(requestId, event.sender.id));
 }

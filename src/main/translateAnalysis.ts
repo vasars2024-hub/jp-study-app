@@ -21,6 +21,7 @@ import {
 import { aiErrorCodeOf } from '../shared/aiErrorCodes';
 import { hasTranslateConsent, isTranslateProviderId } from '../shared/translateProviders';
 import { callAiProvider } from './aiProviderClient';
+import { AiRequestRegistry, aiStreamRequestId, aiStreamSink } from './aiStreamRelay';
 import { getAiProviderHealth } from './providerRuntime';
 import { getConfiguredAiProvider } from './mining';
 import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
@@ -130,6 +131,10 @@ export interface TranslateAnalysisDeps {
   enabled?: () => boolean;
   /** The model a provider id resolves to right now (cache key). */
   modelOf?: (providerId: AiProviderId) => string;
+  /** Cancels the provider call (`translate:analyzeCancel`); the reply is then `code: 'cancelled'`. */
+  signal?: AbortSignal;
+  /** The reply as it streams in (`aiStreamRelay.ts`); a preview, never what is cached. */
+  onTextChunk?: (text: string) => void;
 }
 
 function providerModel(providerId: AiProviderId): string {
@@ -185,7 +190,10 @@ export async function analyzeTranslation(
     const raw = await (deps.call ?? callAiProvider)(providerId, apiKey, buildAnalysisPrompt(req, flags), buildAnalysisSchema(flags), {
       itemCount: 6,
       timeoutMs: 45_000,
+      ...(deps.signal ? { signal: deps.signal } : {}),
+      ...(deps.onTextChunk ? { onTextChunk: deps.onTextChunk } : {}),
     });
+    if (deps.signal?.aborted) return { ok: false, code: 'cancelled' };
     // Throws on a reply that is not a JSON object: nothing is cached for it.
     const result = parseAnalysisResponse(raw, flags);
     const completeness = analysisCompleteness(result, flags, req);
@@ -198,6 +206,7 @@ export async function analyzeTranslation(
     }
     return { ok: true, result, partial: true };
   } catch (err) {
+    if (deps.signal?.aborted) return { ok: false, code: 'cancelled' };
     return { ok: false, code: aiErrorCodeOf(err), error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -208,6 +217,21 @@ export function resetTranslateAnalysisCacheForTests(): void {
   analysisCacheDirty = false;
 }
 
+/** Analyses in flight, by the renderer's request id (`translate:analyzeCancel`). */
+const analyzeRequests = new AiRequestRegistry();
+
 export function registerTranslateAnalysisIpc(): void {
-  ipcMain.handle('translate:analyze', (_e, req: unknown): Promise<TranslateAnalyzeResponse> => analyzeTranslation(req));
+  // Streams back to the asking window under the request's id; that id also cancels it.
+  ipcMain.handle('translate:analyze', async (e, req: unknown): Promise<TranslateAnalyzeResponse> => {
+    const requestId = aiStreamRequestId(req);
+    if (!requestId) return analyzeTranslation(req);
+    const controller = analyzeRequests.begin(requestId, e.sender.id);
+    const onTextChunk = aiStreamSink(e.sender, requestId);
+    try {
+      return await analyzeTranslation(req, { signal: controller.signal, ...(onTextChunk ? { onTextChunk } : {}) });
+    } finally {
+      analyzeRequests.end(requestId, controller);
+    }
+  });
+  ipcMain.handle('translate:analyzeCancel', (e, requestId: unknown): boolean => analyzeRequests.cancel(requestId, e.sender.id));
 }

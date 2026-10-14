@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   EXPLANATION_PROMPT_VERSION,
   type LexiconExplanation,
@@ -15,6 +15,23 @@ import {
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { useT } from '../../i18n';
 import './entryExplain.css';
+
+// Lazy: the dictionary results are part of startup; the streaming UI and its strings are not.
+type StreamModule = typeof import('./EntryExplainStream');
+let streamModule: StreamModule | null = null;
+let streamLoading: Promise<StreamModule | null> | null = null;
+function loadStream(): Promise<StreamModule | null> {
+  streamLoading ??= import('./EntryExplainStream').then(
+    (module) => (streamModule = module),
+    () => {
+      streamLoading = null;
+      return null;
+    },
+  );
+  return streamLoading;
+}
+const EntryExplainStream = lazy(() => import('./EntryExplainStream'));
+let explainCounter = 0;
 
 interface Props {
   /** The matched headword, not the raw query — an explanation belongs to the word that was found. */
@@ -52,7 +69,11 @@ export default function EntryExplain({ word, reading, lang, senses }: Props) {
   const [explanation, setExplanation] = useState<LexiconExplanation | null>(null);
   const [state, setState] = useState<RunState>('idle');
   const [failure, setFailure] = useState<{ error?: string; code?: string } | null>(null);
+  /** The reply as it streams in; after a Cancel, as far as it got. */
+  const [draft, setDraft] = useState('');
+  const [stopped, setStopped] = useState(false);
   const run = useRef(0);
+  const activeRequest = useRef<string | null>(null);
 
   // The prose language is the language the app is being read in. A reader who
   // switches the interface to Russian is asking for a Russian explanation, and
@@ -66,6 +87,8 @@ export default function EntryExplain({ word, reading, lang, senses }: Props) {
     setExplanation(null);
     setState('idle');
     setFailure(null);
+    setDraft('');
+    setStopped(false);
     if (!word || !lang) return;
     // A preload without these bindings cannot explain and cannot read a stored
     // explanation either, so the panel stays absent rather than offering a
@@ -85,6 +108,8 @@ export default function EntryExplain({ word, reading, lang, senses }: Props) {
         });
         setEngine(resolved);
         if (!resolved.ok) return;
+        // Explain is on offer: fetch its streaming half now, so the first ask streams from its first word.
+        void loadStream();
         // Cache read only. Reaching `dict:explain` here would explain every word
         // the user looks up, at their expense, without them asking for one.
         const stored = await window.api.dictExplanationGet({
@@ -108,6 +133,24 @@ export default function EntryExplain({ word, reading, lang, senses }: Props) {
     const attempt = run.current;
     setState('running');
     setFailure(null);
+    setDraft('');
+    setStopped(false);
+    explainCounter += 1;
+    const requestId = `exp-${Date.now().toString(36)}-${explainCounter}`;
+    activeRequest.current = requestId;
+    // The reply streams in as it is written; the stored answer is still the whole one.
+    // The streaming half is loaded once Explain is offered (see `loadStream`), never at
+    // startup; on the rare ask that beats it, following starts when it arrives.
+    let unsubscribe: () => void = () => undefined;
+    let done = false;
+    const follow = (module: StreamModule): void => {
+      if (done || activeRequest.current !== requestId) return;
+      unsubscribe = module.followExplainStream(requestId, (text) => {
+        if (attempt === run.current && activeRequest.current === requestId) setDraft(text);
+      });
+    };
+    if (streamModule) follow(streamModule);
+    else void loadStream().then((module) => module && follow(module));
     try {
       /**
        * The policy is resolved HERE, from the live configuration, not carried from mount.
@@ -136,24 +179,59 @@ export default function EntryExplain({ word, reading, lang, senses }: Props) {
         grounding: explainGroundingFromSenses(senses),
         policy: live.policy,
         refresh,
+        requestId,
       });
-      if (attempt !== run.current) return;
+      if (attempt !== run.current || activeRequest.current !== requestId) return;
+      activeRequest.current = null;
       setState('idle');
       if (result.ok && result.explanation) {
+        setDraft('');
         setExplanation(result.explanation);
         return;
       }
+      // Cancel keeps what had streamed in on screen; nothing was stored.
+      if (result.error === 'cancelled') {
+        setStopped(true);
+        return;
+      }
+      setDraft('');
       // A failed refresh leaves the previous answer on screen because it leaves
       // it in the database too — nothing is stored on a failure. Replacing it
       // with an error would suggest the stored one is gone.
       setFailure({ error: result.error, code: result.code });
     } catch {
-      if (attempt === run.current) {
+      if (attempt === run.current && activeRequest.current === requestId) {
+        activeRequest.current = null;
         setState('idle');
+        setDraft('');
         setFailure({});
       }
+    } finally {
+      done = true;
+      unsubscribe();
     }
   }
+
+  /** Stops the answer being written; what had arrived stays, marked as stopped. */
+  function cancel(): void {
+    const requestId = activeRequest.current;
+    if (!requestId) return;
+    activeRequest.current = null;
+    try {
+      void window.api.dictExplainCancel?.(requestId)?.catch(() => undefined);
+    } catch {
+      // A preload without the binding has nothing to cancel.
+    }
+    setState('idle');
+    setStopped(true);
+  }
+
+  // Leaving the word (or the panel) stops an answer still being written for it.
+  useEffect(() => () => {
+    const requestId = activeRequest.current;
+    activeRequest.current = null;
+    if (requestId) void window.api.dictExplainCancel?.(requestId)?.catch(() => undefined);
+  }, [word, reading, lang]);
 
   async function forget(): Promise<void> {
     const attempt = run.current;
@@ -192,6 +270,11 @@ export default function EntryExplain({ word, reading, lang, senses }: Props) {
             </div>
           ) : (
             <p className="muted lexicon-explain-empty">{t('lexicon.wordExplain.empty')}</p>
+          )}
+          {(state === 'running' || stopped) && (
+            <Suspense fallback={null}>
+              <EntryExplainStream text={draft} stopped={stopped} lang={glossLang} onStop={cancel} />
+            </Suspense>
           )}
           <div className="lexicon-explain-actions">
             <button

@@ -44,6 +44,7 @@ import { useAiReadiness } from '../aiSetupClient';
 import FieldMappingEditor from './FieldMappingEditor';
 import AiStudioPreviewPanel from './AiStudioPreviewPanel';
 import AiGenerationProgressPanel from './AiGenerationProgressPanel';
+import AiCardStudioDraft, { useCardStudioStream } from './AiCardStudioDraft';
 import AiStudioConfigLog, { appendStudioLog, type AiStudioLogLine } from './AiStudioConfigLog';
 import type { MappingPreviewState } from './AnkiCardPreview';
 import Icon from './Icons';
@@ -124,6 +125,8 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
   const [wordCount, setWordCount] = useState(10);
   const [aiBusy, setAiBusy] = useState(false);
   const [genProgress, setGenProgress] = useState<AiGenerationProgress | null>(null);
+  // The words the model is writing, as they arrive (a preview; the results below are what is kept).
+  const cardStream = useCardStudioStream();
   const [logLines, setLogLines] = useState<AiStudioLogLine[]>([]);
   const [batchResults, setBatchResults] = useState<AiEnrichmentResult[]>([]);
   /**
@@ -510,10 +513,12 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         t('aiStudio.log.generateStart', { count: itemCount, cards: cardsPerWord, total: estimatedCards }),
       ),
     );
+    let cancelled = false;
     try {
       const request = deckGenerationRequest();
       lastRequestRef.current = request;
-      const results = await window.api.aiGenerateDeck(request);
+      const results = await window.api.aiGenerateDeck({ ...request, requestId: cardStream.begin() });
+      cancelled = results.some((r) => r.failure?.code === 'cancelled');
       setBatchResults(results);
       const cards = results.reduce((n, r) => n + r.cards.length, 0);
       const failed = failedAiItemCount(results);
@@ -553,6 +558,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         ),
       );
     } catch (error) {
+      cancelled = error instanceof Error && error.name === 'cancelled';
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message);
       setLogLines((lines) =>
@@ -563,6 +569,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         ),
       );
     } finally {
+      cardStream.finish(cancelled);
       setAiBusy(false);
     }
   }
@@ -576,17 +583,24 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     setGenProgress(null);
     setStatus('');
     let merged = batchResults;
+    let cancelled = false;
     try {
       for (const request of requests) {
-        const retried = await window.api.aiGenerateDeck(request);
+        const retried = await window.api.aiGenerateDeck({ ...request, requestId: cardStream.begin() });
         merged = mergeAiRetryResults(merged, retried, request);
+        if (retried.some((r) => r.failure?.code === 'cancelled')) {
+          cancelled = true;
+          break;
+        }
       }
       const cards = merged.reduce((n, r) => n + r.cards.length, 0);
       setStatus(t('aiStudio.status.retryDone', { cards, failed: failedAiItemCount(merged) }));
     } catch (error) {
+      cancelled = error instanceof Error && error.name === 'cancelled';
       // The retry itself was refused: the batch is unchanged, failures included.
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
+      cardStream.finish(cancelled);
       setBatchResults(merged);
       setAiBusy(false);
     }
@@ -1025,6 +1039,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
               })}
         </p>
         <AiGenerationProgressPanel progress={genProgress} active={aiBusy} />
+        <AiCardStudioDraft items={cardStream.items} phase={cardStream.phase} lang={aiConfig.frontLang} />
         <div className="download-deck-footer ai-mine-footer">
           <span className="download-deck-result">
             {t('aiStudio.result.approx', { count: batchResults.length ? minedCardCount : estimatedCards })}

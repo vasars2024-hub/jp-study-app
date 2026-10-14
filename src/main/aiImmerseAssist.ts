@@ -19,7 +19,7 @@
  *
  * Failures are shared error codes (`shared/aiErrorCodes.ts`), never prose.
  */
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { z, type ZodType, type ZodTypeDef } from 'zod';
@@ -89,6 +89,8 @@ import {
 } from '../shared/aiStudyCommand';
 import type { StudyCommandIntent } from '../shared/studyFilterRecipe';
 import { callAiProvider } from './aiProviderClient';
+import { aiStreamSinkFor } from './aiStreamRelay';
+import { LOCAL_JSON_GRAMMAR, defaultLocalModelKey, type LocalStructuredRunOptions as AiStudyLocalRunOptions } from './aiLocalStructured';
 import { parseAiReplyWith } from './aiStructuredOutput';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { getConfiguredAiEngine, getConfiguredAiProvider } from './mining';
@@ -379,9 +381,13 @@ export interface AiImmerseDeps {
   cloudAllowed?: (feature: AiImmerseFeature) => boolean;
   localAvailable?: () => boolean | Promise<boolean>;
   call?: typeof callAiProvider;
-  runLocal?: (prompt: string, options: { signal: AbortSignal; maxTokens: number; timeoutMs: number }) => Promise<string>;
+  runLocal?: (prompt: string, options: AiStudyLocalRunOptions) => Promise<string>;
   /** The model a provider id resolves to (cache key). */
   modelOf?: (providerId: AiProviderId) => string;
+  /** The offline model's cache identity (the GGUF file and its size). */
+  localModelKey?: () => string | Promise<string>;
+  /** The reply as it streams in (`aiStreamRelay.ts`); a preview, never what is kept. */
+  onTextChunk?: (text: string) => void;
 }
 
 function providerConfigured(providerId: AiProviderId, apiKey: string): boolean {
@@ -409,10 +415,7 @@ async function defaultLocalAvailable(): Promise<boolean> {
   }
 }
 
-async function defaultRunLocal(
-  prompt: string,
-  options: { signal: AbortSignal; maxTokens: number; timeoutMs: number },
-): Promise<string> {
+async function defaultRunLocal(prompt: string, options: AiStudyLocalRunOptions): Promise<string> {
   return (await import('./translate')).runLocalQwenPrompt(prompt, options);
 }
 
@@ -446,7 +449,8 @@ async function runFeature<Req extends { requestId?: string; refresh?: boolean },
     if (!(await (deps.localAvailable ?? defaultLocalAvailable)())) {
       return { ok: false, needsLocalModel: true, code: 'no-local-model', error: 'The offline AI model is not installed.' };
     }
-    modelKey = 'local-qwen';
+    // The file and its size: another offline model's answers are not this one's.
+    modelKey = await (deps.localModelKey ?? defaultLocalModelKey)();
   } else {
     if (!(deps.cloudAllowed ?? aiCloudAllowedFor)(feature)) {
       return { ok: false, needsConsent: true, code: 'consent', error: AI_CLOUD_FEATURE_OFF_MESSAGE };
@@ -480,11 +484,14 @@ async function runFeature<Req extends { requestId?: string; refresh?: boolean },
         timeoutMs: spec.cloudTimeoutMs,
         feature,
         signal: controller.signal,
+        ...(deps.onTextChunk ? { onTextChunk: deps.onTextChunk } : {}),
       })
       : await (deps.runLocal ?? defaultRunLocal)(`${prompt}${LOCAL_JSON_TAIL}`, {
         signal: controller.signal,
         maxTokens: spec.localMaxTokens,
         timeoutMs: 120_000,
+        jsonGrammar: LOCAL_JSON_GRAMMAR,
+        ...(deps.onTextChunk ? { onTextChunk: deps.onTextChunk } : {}),
       });
     if (controller.signal.aborted) return { ok: false, code: 'cancelled', engine };
     const parsed = parseAiReplyWith(raw, spec.validator, spec.context);
@@ -535,12 +542,19 @@ export function interpretStudyCommand(input: unknown, deps: AiImmerseDeps = {}):
   return runFeature(studyCommandSpec, input, deps);
 }
 
+/** The reply streams back to the window that asked, tagged with the request's id. */
+function streamDeps(event: Pick<IpcMainInvokeEvent, 'sender'>, input: unknown): AiImmerseDeps {
+  const onTextChunk = aiStreamSinkFor(event, input);
+  return onTextChunk ? { onTextChunk } : {};
+}
+
 export function registerAiImmerseAssistIpc(): void {
-  ipcMain.handle('aiImmerse:brief', (_event, input: unknown) => briefMediaChunk(input));
-  ipcMain.handle('aiImmerse:pickLines', (_event, input: unknown) => pickTeachableLines(input));
-  ipcMain.handle('aiImmerse:explainLine', (_event, input: unknown) => explainImmerseLine(input));
-  ipcMain.handle('aiImmerse:simplify', (_event, input: unknown) => simplifyReaderText(input));
-  ipcMain.handle('aiImmerse:translateLine', (_event, input: unknown) => translateLineInContext(input));
+  ipcMain.handle('aiImmerse:brief', (event, input: unknown) => briefMediaChunk(input, streamDeps(event, input)));
+  ipcMain.handle('aiImmerse:pickLines', (event, input: unknown) => pickTeachableLines(input, streamDeps(event, input)));
+  ipcMain.handle('aiImmerse:explainLine', (event, input: unknown) => explainImmerseLine(input, streamDeps(event, input)));
+  ipcMain.handle('aiImmerse:simplify', (event, input: unknown) => simplifyReaderText(input, streamDeps(event, input)));
+  ipcMain.handle('aiImmerse:translateLine', (event, input: unknown) => translateLineInContext(input, streamDeps(event, input)));
+  // A command is acted on, not read: nothing to preview.
   ipcMain.handle('aiImmerse:studyCommand', (_event, input: unknown) => interpretStudyCommand(input));
   ipcMain.handle('aiImmerse:cancel', (_event, requestId: unknown): boolean => cancelAiImmerseRequest(requestId));
 }

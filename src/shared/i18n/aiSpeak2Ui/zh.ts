@@ -50,4 +50,18 @@ export const AI_SPEAK2_UI_ZH: Catalog = {
   'aiSpeak.journal.streakToday': { other: '日记连续记录：{count} 天（最佳：{best} 天）。今天已完成。' },
   'aiSpeak.journal.streakOpen': { other: '日记连续记录：{count} 天（最佳：{best} 天）。完成今天的日记以保持记录。' },
   'aiSpeak.journal.streakNone': '完成一篇日记（用上所有词，写够句子）即可开始连续记录。',
+  // ---- the conversation partner: hands-free voice (W2-A) ----
+  'aiSpeak.voiceMode.label': '语音输入',
+  'aiSpeak.voiceMode.push': '按键说话',
+  'aiSpeak.voiceMode.handsFree': '免提',
+  'aiSpeak.handsFree.start': '开始免提',
+  'aiSpeak.handsFree.stop': '停止免提',
+  'aiSpeak.handsFree.starting': '正在打开麦克风…',
+  'aiSpeak.handsFree.listening': '正在聆听。准备好就说，稍作停顿即会发送。',
+  'aiSpeak.handsFree.hearing': '正在听你说…',
+  'aiSpeak.handsFree.transcribing': '正在用本机的语音模型转写你说的话…',
+  'aiSpeak.handsFree.waiting': '对方正在回答…',
+  'aiSpeak.handsFree.speaking': '对方正在说话。开口说话或按 Esc 即可打断。',
+  'aiSpeak.handsFree.interrupt': '打断（Esc）',
+  'aiSpeak.handsFree.unheard': '没有听清。请再说一遍，声音大一点。',
 };

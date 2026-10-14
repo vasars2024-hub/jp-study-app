@@ -11,13 +11,14 @@
  *      a CLOUD provider needs this feature's own opt-in (Settings > AI) and a key;
  *   4. the cache of validated answers, keyed by feature, prompt version, model
  *      and every prompt input;
- *   5. the call, cancellable from the renderer by request id;
+ *   5. the call, cancellable from the renderer by request id, and streamed back to
+ *      the window that asked while it runs (`aiStreamRelay.ts`; a preview only);
  *   6. zod validates the shape, the feature's own checks validate the content,
  *      and only an answer that passes both is cached or returned.
  *
  * Failures are shared error codes (`shared/aiErrorCodes.ts`), never prose.
  */
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { z, type ZodType, type ZodTypeDef } from 'zod';
@@ -83,6 +84,8 @@ import {
 } from './aiFeatureGate';
 import { getAiProviderHealth } from './providerRuntime';
 import { holdUnsavedWork } from './unsavedWork';
+import { aiStreamSinkFor } from './aiStreamRelay';
+import { LOCAL_JSON_GRAMMAR, defaultLocalModelKey, type LocalStructuredRunOptions } from './aiLocalStructured';
 
 // ---- the feature specs -----------------------------------------------------
 
@@ -306,10 +309,22 @@ export interface AiStudyDeps {
   cloudAllowed?: (feature: AiCloudFeatureId) => boolean;
   localAvailable?: () => boolean | Promise<boolean>;
   call?: typeof callAiProvider;
-  runLocal?: (prompt: string, options: { signal: AbortSignal; maxTokens: number; timeoutMs: number }) => Promise<string>;
+  runLocal?: (prompt: string, options: AiStudyLocalRunOptions) => Promise<string>;
   /** The model a provider id resolves to (cache key). */
   modelOf?: (providerId: AiProviderId) => string;
+  /**
+   * The offline model's cache identity (`translate.localModelCacheKey()`: the GGUF
+   * file and its size), so answers from one local model are never served as another's.
+   */
+  localModelKey?: () => string | Promise<string>;
+  /**
+   * The reply as it streams in (`aiStreamRelay.ts`). A preview only: the answer is
+   * parsed, validated and cached from the complete reply exactly as without it.
+   */
+  onTextChunk?: (text: string) => void;
 }
+
+export type AiStudyLocalRunOptions = LocalStructuredRunOptions;
 
 function providerConfigured(providerId: AiProviderId, apiKey: string): boolean {
   if (apiKey) return true;
@@ -336,10 +351,7 @@ async function defaultLocalAvailable(): Promise<boolean> {
   }
 }
 
-async function defaultRunLocal(
-  prompt: string,
-  options: { signal: AbortSignal; maxTokens: number; timeoutMs: number },
-): Promise<string> {
+async function defaultRunLocal(prompt: string, options: AiStudyLocalRunOptions): Promise<string> {
   return (await import('./translate')).runLocalQwenPrompt(prompt, options);
 }
 
@@ -370,7 +382,9 @@ export async function runAiStudyFeature<Req extends { requestId?: string; refres
     if (!(await (deps.localAvailable ?? defaultLocalAvailable)())) {
       return { ok: false, needsLocalModel: true, code: 'no-local-model', error: 'The offline AI model is not installed.' };
     }
-    modelKey = 'local-qwen';
+    // The file and its size, not the constant 'local-qwen': swapping the offline
+    // model kept serving the previous model's answers (W1-A, same as sentenceAnalysis).
+    modelKey = await (deps.localModelKey ?? defaultLocalModelKey)();
   } else {
     if (!(deps.cloudAllowed ?? aiCloudAllowedFor)(spec.feature)) {
       return { ok: false, needsConsent: true, code: 'consent', error: AI_CLOUD_FEATURE_OFF_MESSAGE };
@@ -406,11 +420,14 @@ export async function runAiStudyFeature<Req extends { requestId?: string; refres
         timeoutMs: 60_000,
         feature: spec.feature,
         signal: controller.signal,
+        ...(deps.onTextChunk ? { onTextChunk: deps.onTextChunk } : {}),
       })
       : await (deps.runLocal ?? defaultRunLocal)(`${prompt}${LOCAL_JSON_TAIL}`, {
         signal: controller.signal,
         maxTokens: spec.localMaxTokens,
         timeoutMs: 120_000,
+        jsonGrammar: LOCAL_JSON_GRAMMAR,
+        ...(deps.onTextChunk ? { onTextChunk: deps.onTextChunk } : {}),
       });
     if (controller.signal.aborted) return { ok: false, code: 'cancelled', engine };
     const parsed = parseAiReplyWith(raw, spec.validator, spec.context);
@@ -454,10 +471,19 @@ export function explainWordInContext(
   return runAiStudyFeature(contextExplainSpec, input, deps);
 }
 
+/**
+ * The deps an IPC invoke runs with: the reply streams back to the window that
+ * asked, tagged with the request's own id. No id, no stream.
+ */
+export function aiStudyStreamDeps(event: Pick<IpcMainInvokeEvent, 'sender'> | null | undefined, input: unknown): AiStudyDeps {
+  const onTextChunk = aiStreamSinkFor(event, input);
+  return onTextChunk ? { onTextChunk } : {};
+}
+
 export function registerAiStudyAssistIpc(): void {
-  ipcMain.handle('aiStudy:whyWrong', (_event, input: unknown) => explainWrongAnswer(input));
-  ipcMain.handle('aiStudy:exampleSentences', (_event, input: unknown) => generateExampleSentences(input));
-  ipcMain.handle('aiStudy:leechRescue', (_event, input: unknown) => suggestLeechRescue(input));
-  ipcMain.handle('aiStudy:contextExplain', (_event, input: unknown) => explainWordInContext(input));
+  ipcMain.handle('aiStudy:whyWrong', (event, input: unknown) => explainWrongAnswer(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiStudy:exampleSentences', (event, input: unknown) => generateExampleSentences(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiStudy:leechRescue', (event, input: unknown) => suggestLeechRescue(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiStudy:contextExplain', (event, input: unknown) => explainWordInContext(input, aiStudyStreamDeps(event, input)));
   ipcMain.handle('aiStudy:cancel', (_event, requestId: unknown): boolean => cancelAiStudyRequest(requestId));
 }

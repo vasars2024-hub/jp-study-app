@@ -114,6 +114,10 @@ import {
   type CacheWarmupLeg,
 } from './dictionary/cacheWarmup';
 import { runLexiconExplain, type LexiconExplainResult } from './dictionary/explainRun';
+import { AiRequestRegistry, aiStreamRequestId, aiStreamSink } from './aiStreamRelay';
+
+/** Explain requests in flight, by the renderer's request id (`dict:explainCancel`). */
+const explainRequests = new AiRequestRegistry();
 import {
   notesToCsv,
   readNoteExportQuery,
@@ -1661,9 +1665,13 @@ export function registerDictionaryIpc(): void {
   // visible conversation per explained word would bury the user's real ones. The
   // policy still goes through `normalizePolicy`, so this channel cannot be the
   // loose one: the same cloud-consent and persistent-cache refusals apply.
+  //
+  // The reply streams back to the asking window under the request's id, and
+  // `dict:explainCancel` stops it; the stored answer is always the whole reply,
+  // parsed as before, so streaming changes what is seen, never what is kept.
   ipcMain.handle(
     'dict:explain',
-    async (_e, raw: unknown): Promise<LexiconExplainResult> => {
+    async (e, raw: unknown): Promise<LexiconExplainResult> => {
       const request = raw && typeof raw === 'object' && !Array.isArray(raw)
         ? raw as Record<string, unknown>
         : {};
@@ -1685,6 +1693,9 @@ export function registerDictionaryIpc(): void {
         promptVersion: EXPLANATION_PROMPT_VERSION,
       };
       const grounding = readExplainGrounding(request.grounding);
+      const requestId = aiStreamRequestId(request);
+      const controller = explainRequests.begin(requestId, e.sender.id);
+      const onTextChunk = aiStreamSink(e.sender, requestId);
       try {
         return await runLexiconExplain(
           {
@@ -1695,15 +1706,25 @@ export function registerDictionaryIpc(): void {
               return runAgentProviderPrompt(target, prompt, options);
             },
           },
-          { key, grounding, policy, refresh: request.refresh === true },
+          {
+            key,
+            grounding,
+            policy,
+            refresh: request.refresh === true,
+            signal: controller.signal,
+            ...(onTextChunk ? { onTextChunk } : {}),
+          },
         );
       } catch {
         // A database that will not open reaches here. It is a failure to explain,
         // not a rejected invoke: the surface offers a retry either way.
         return { ok: false, cached: false, explanation: null, error: 'not-stored' };
+      } finally {
+        explainRequests.end(requestId, controller);
       }
     },
   );
+  ipcMain.handle('dict:explainCancel', (e, requestId: unknown): boolean => explainRequests.cancel(requestId, e.sender.id));
   // The reversal: forget this word's explanations across every prose language,
   // model and prompt version. "This explanation is wrong" is about the word, not
   // about the one model/language pair that happens to be on screen.

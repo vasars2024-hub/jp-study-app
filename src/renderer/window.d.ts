@@ -515,8 +515,10 @@ declare global {
           grounding: import('../shared/lexiconExplainPrompt').LexiconExplainGrounding;
           policy: import('../shared/agentWorkspace').AgentProviderPolicy;
           refresh?: boolean;
+          requestId?: string;
         },
       ): Promise<import('../main/dictionary/explainRun').LexiconExplainResult>;
+      dictExplainCancel?(requestId: string): Promise<boolean>;
       dictListYomitan(): Promise<YomitanDictInfo[]>;
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;
@@ -1142,8 +1144,9 @@ declare global {
         segment?: { index: number; total: number; source: string; target: string };
       }) => void): () => void;
       translateAnalyze(
-        req: import('../shared/translateAnalysisCore').TranslateAnalyzeRequest,
+        req: import('../shared/translateAnalysisCore').TranslateAnalyzeRequest & { requestId?: string },
       ): Promise<import('../shared/translateAnalysisCore').TranslateAnalyzeResponse>;
+      translateAnalyzeCancel?(requestId: string): Promise<boolean>;
       // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
       extractVideoClip(
         req: import('../shared/videoClip').VideoClipRequest,
@@ -1173,8 +1176,9 @@ declare global {
       ): () => void;
       // Whole-sentence AI annotation — AI OCR mode in the Lens and the extension.
       sentenceAnalyze(
-        req: import('../shared/sentenceAnalysisCore').SentenceAnalyzeRequest,
+        req: import('../shared/sentenceAnalysisCore').SentenceAnalyzeRequest & { requestId?: string },
       ): Promise<import('../main/sentenceAnalysis').SentenceAnalyzeResponse>;
+      sentenceAnalyzeCancel?(requestId: string): Promise<boolean>;
       sentenceGetPrefs(): Promise<import('../shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs>;
       sentenceSetPrefs(
         prefs: import('../shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs,
@@ -1819,14 +1823,17 @@ declare global {
         reverse: boolean;
         backGlossLangs: AiMiningLanguage[];
       }>;
-      aiEnrichCard(req: AiEnrichmentRequest): Promise<AiEnrichmentResult>;
-      aiGenerateDeck(req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]>;
+      aiEnrichCard(req: AiEnrichmentRequest & { requestId?: string }): Promise<AiEnrichmentResult>;
+      aiGenerateDeck(req: AiDeckGenerationRequest & { requestId?: string }): Promise<AiEnrichmentResult[]>;
       aiCancelGenerate?(): Promise<{ ok: true; cancelled: number }>;
       onAiGenerateProgress(cb: (p: import('../shared/mining').AiGenerationProgress) => void): () => void;
       aiSaveCsv(csv: string): Promise<{ ok: boolean; path?: string; error?: string }>;
       mediaStudyAssist(
-        req: import('../shared/mediaStudyAssistant').MediaStudyAssistantRequest,
+        req: import('../shared/mediaStudyAssistant').MediaStudyAssistantRequest & { requestId?: string },
       ): Promise<import('../main/mediaStudyAssistant').MediaStudyAssistResponse>;
+      mediaStudyCancel?(requestId: string): Promise<boolean>;
+      /** AI replies streaming back to this window, tagged by request id (main/aiStreamRelay.ts). */
+      onAiStreamChunk?(cb: (chunk: import('../main/aiStreamRelay').AiStreamChunk) => void): () => void;
       aiStudyWhyWrong(
         req: import('../shared/aiWhyWrong').WhyWrongRequest,
       ): Promise<import('../shared/aiStudyCommon').AiStudyResponse<import('../shared/aiWhyWrong').WhyWrongResult>>;

@@ -46,6 +46,11 @@ export interface CallAiProviderOptions {
   feature?: AiCloudFeatureId;
   /** Extra output room; defaults to `maxTokensForItemCount(itemCount)`. */
   maxOutputTokens?: number;
+  /**
+   * Streams the reply as it arrives (`main/aiStreamRelay.ts`, docs/AI_AUDIT.md F9).
+   * A preview only: the returned text, and so the parse, are the same either way.
+   */
+  onTextChunk?: (text: string) => void;
 }
 
 const JSON_SYSTEM_PROMPT =
@@ -84,6 +89,7 @@ export async function callAiProvider(
     maxOutputTokens: options?.maxOutputTokens ?? maxTokensForItemCount(itemCount),
     timeoutMs: options?.timeoutMs ?? AI_PROVIDER_TIMEOUT_MS,
     ...(options?.signal ? { signal: options.signal } : {}),
+    ...(options?.onTextChunk ? { onTextChunk: options.onTextChunk } : {}),
   });
   return stripJsonFences(result.text);
 }

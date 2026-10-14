@@ -60,4 +60,18 @@ export const AI_SPEAK2_UI_EN: Catalog = {
     other: 'Journal streak: {count} days (best: {best}). Complete today\'s entry to keep it.',
   },
   'aiSpeak.journal.streakNone': 'Complete an entry (every word, enough sentences) to start a journal streak.',
+  // ---- the conversation partner: hands-free voice (W2-A) ----
+  'aiSpeak.voiceMode.label': 'Voice input',
+  'aiSpeak.voiceMode.push': 'Push to talk',
+  'aiSpeak.voiceMode.handsFree': 'Hands-free',
+  'aiSpeak.handsFree.start': 'Start hands-free',
+  'aiSpeak.handsFree.stop': 'Stop hands-free',
+  'aiSpeak.handsFree.starting': 'Opening the microphone…',
+  'aiSpeak.handsFree.listening': 'Listening. Speak when you are ready; a short pause sends it.',
+  'aiSpeak.handsFree.hearing': 'Hearing you…',
+  'aiSpeak.handsFree.transcribing': 'Writing down what you said with the speech model on this computer…',
+  'aiSpeak.handsFree.waiting': 'The partner is answering…',
+  'aiSpeak.handsFree.speaking': 'The partner is speaking. Talk, or press Esc, to interrupt.',
+  'aiSpeak.handsFree.interrupt': 'Interrupt (Esc)',
+  'aiSpeak.handsFree.unheard': 'That was not understood. Say it again, a little louder.',
 };

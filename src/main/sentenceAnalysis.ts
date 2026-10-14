@@ -28,6 +28,8 @@ import {
 } from '../shared/sentenceAnalysisPrefs';
 import type { AnalysisSnapshot } from '../shared/analysisSnapshot';
 import { callAiProvider } from './aiProviderClient';
+import { AiRequestRegistry, aiStreamRequestId, aiStreamSink } from './aiStreamRelay';
+import { LOCAL_JSON_GRAMMAR } from './aiLocalStructured';
 import { getAiProviderHealth } from './providerRuntime';
 import { getConfiguredAiEngine, getConfiguredAiProvider } from './mining';
 import type { AiCloudFeatureId } from '../shared/aiSetup';
@@ -186,6 +188,11 @@ export interface AnalyzeSentenceOptions {
    * call behaves as it always has (the Reading Lens and the in-app callers).
    */
   feature?: AiCloudFeatureId;
+  /**
+   * The reply as it streams in (`aiStreamRelay.ts`, docs/AI_AUDIT.md F9). A preview
+   * only: the analysis is parsed and cached from the whole reply either way.
+   */
+  onTextChunk?: (text: string) => void;
 }
 
 function cloudModel(providerId: AiProviderId): string {
@@ -270,8 +277,9 @@ export async function analyzeSentence(
           maxTokens: Math.min(8192, Math.max(2048, analysisItemCount(sentence) * 450)),
           timeoutMs: 120_000,
           // The reply can only be a JSON object; the sentence above stays for a backend without grammars.
-          jsonGrammar: { kind: 'json' },
+          jsonGrammar: LOCAL_JSON_GRAMMAR,
           ...(options.signal ? { signal: options.signal } : {}),
+          ...(options.onTextChunk ? { onTextChunk: options.onTextChunk } : {}),
         },
       );
     } else {
@@ -281,6 +289,7 @@ export async function analyzeSentence(
         timeoutMs: 60_000,
         ...(options.signal ? { signal: options.signal } : {}),
         ...(options.feature ? { feature: options.feature } : {}),
+        ...(options.onTextChunk ? { onTextChunk: options.onTextChunk } : {}),
       });
     }
     if (options.signal?.aborted) return { ok: false, code: 'cancelled', prefs };
@@ -319,8 +328,24 @@ export function broadcastSnapshot(snapshot: AnalysisSnapshot): void {
   }
 }
 
+/** In-app analyses in flight, by the renderer's request id (`sentence:analyzeCancel`). */
+const analyzeRequests = new AiRequestRegistry();
+
 export function registerSentenceAnalysisIpc(): void {
-  ipcMain.handle('sentence:analyze', (_e, req: SentenceAnalyzeRequest) => analyzeSentence(req));
+  // A request with an id streams back to the window that asked and can be
+  // cancelled by it; one without (an older caller) runs as it always has.
+  ipcMain.handle('sentence:analyze', async (e, req: SentenceAnalyzeRequest) => {
+    const requestId = aiStreamRequestId(req);
+    if (!requestId) return analyzeSentence(req);
+    const controller = analyzeRequests.begin(requestId, e.sender.id);
+    const onTextChunk = aiStreamSink(e.sender, requestId);
+    try {
+      return await analyzeSentence(req, { signal: controller.signal, ...(onTextChunk ? { onTextChunk } : {}) });
+    } finally {
+      analyzeRequests.end(requestId, controller);
+    }
+  });
+  ipcMain.handle('sentence:analyzeCancel', (e, requestId: unknown): boolean => analyzeRequests.cancel(requestId, e.sender.id));
   ipcMain.handle('sentence:getPrefs', (): SentenceAnalysisPrefs => readAnalysisPrefs());
   ipcMain.handle(
     'sentence:setPrefs',

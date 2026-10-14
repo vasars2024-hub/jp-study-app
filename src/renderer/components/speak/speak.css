@@ -440,3 +440,246 @@
     fill: Highlight;
   }
 }
+
+/* ---- the conversation partner, round 3: a streaming reply and hands-free voice ---- */
+.speak-turn.is-drafting .speak-bubble {
+  border-style: dashed;
+}
+
+.speak-turn.is-drafting .ai-stream-draft {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.speak-handsfree {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The microphone level: a bar whose fill follows --speak-level (0..1). Never the
+   only signal — the status line beside it says what the loop is doing. */
+.speak-vad-level {
+  position: relative;
+  flex: 0 0 72px;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel, transparent);
+}
+
+.speak-vad-level::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--speak-level, 0));
+  background: var(--accent, currentColor);
+  transition: transform 60ms linear;
+}
+
+.speak-handsfree.is-hearing .speak-vad-level::after {
+  background: var(--success, var(--accent, currentColor));
+}
+
+.speak-handsfree.is-transcribing .speak-vad-level,
+.speak-handsfree.is-waiting .speak-vad-level {
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speak-vad-level::after {
+    transition: none;
+  }
+}
+
+/* ---- Aero: Windows 7 glass — a Messenger-style conversation window ---- */
+:root[data-materials='aero'] .speak-panel {
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.3) 46%, rgba(214, 234, 252, 0.34) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    0 3px 14px rgba(0, 40, 90, 0.16);
+}
+
+:root[data-materials='aero'] .speak-title {
+  font-family: 'Segoe UI', 'Meiryo', sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  color: #1e3f66;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.95), 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+:root[data-materials='aero'] .speak-label {
+  color: #2d5b8c;
+  opacity: 1;
+}
+
+:root[data-materials='aero'] .speak-bubble {
+  border: 1px solid rgba(160, 196, 230, 0.8);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 247, 255, 0.78));
+  box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0, 50, 110, 0.12);
+}
+
+:root[data-materials='aero'] .speak-turn.is-user .speak-bubble {
+  border-color: rgba(92, 168, 222, 0.9);
+  background: linear-gradient(180deg, rgba(226, 244, 255, 0.95), rgba(186, 224, 250, 0.82));
+}
+
+:root[data-materials='aero'] .speak-who {
+  color: #3a6a9a;
+  opacity: 1;
+}
+
+:root[data-materials='aero'] .speak-correction,
+:root[data-materials='aero'] .speak-edit,
+:root[data-materials='aero'] .speak-facts {
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255, 252, 232, 0.9), rgba(255, 246, 204, 0.72));
+  border-color: rgba(222, 196, 120, 0.8);
+}
+
+:root[data-materials='aero'] .speak-composer textarea {
+  border: 1px solid #a9c4e0;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: inset 0 1px 2px rgba(0, 40, 90, 0.12);
+}
+
+:root[data-materials='aero'] .speak-composer textarea:focus-visible {
+  border-color: #3d95dc;
+  box-shadow: inset 0 1px 2px rgba(0, 40, 90, 0.12), 0 0 0 2px rgba(80, 160, 230, 0.35);
+  outline: none;
+}
+
+/* The Windows 7 progress bar: green, glossy, with the highlight across its top half. */
+:root[data-materials='aero'] .speak-vad-level {
+  height: 10px;
+  border: 1px solid #b0b0b0;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #f3f3f3, #dcdcdc);
+}
+
+:root[data-materials='aero'] .speak-vad-level::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(0, 0, 0, 0) 51%),
+    linear-gradient(180deg, #5ee35e, #12a812);
+}
+
+:root[data-materials='aero'] .speak-handsfree.is-speaking .speak-vad-level::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(0, 0, 0, 0) 51%),
+    linear-gradient(180deg, #7cc4ff, #2a7fd4);
+}
+
+/* ---- Wired: a Navi terminal session — hard edges, a scanline wash, a prompt per speaker ---- */
+:root[data-materials='wired'] .speak-panel {
+  border: 1px solid color-mix(in srgb, var(--wired-cyan, #6df1ff) 45%, transparent);
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(109, 241, 255, 0.035) 0 1px, transparent 1px 3px),
+    var(--panel-2, rgba(4, 10, 14, 0.82));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 18px rgba(109, 241, 255, 0.08);
+}
+
+:root[data-materials='wired'] .speak-title,
+:root[data-materials='wired'] .speak-label,
+:root[data-materials='wired'] .speak-who,
+:root[data-materials='wired'] .speak-meta,
+:root[data-materials='wired'] .speak-field > span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+}
+
+:root[data-materials='wired'] .speak-title {
+  text-transform: uppercase;
+  color: var(--wired-cyan, var(--accent, currentColor));
+  text-shadow: 0 0 6px rgba(109, 241, 255, 0.45);
+}
+
+:root[data-materials='wired'] .speak-title::before {
+  content: '> ';
+  opacity: 0.7;
+}
+
+:root[data-materials='wired'] .speak-bubble,
+:root[data-materials='wired'] .speak-correction,
+:root[data-materials='wired'] .speak-edit,
+:root[data-materials='wired'] .speak-facts,
+:root[data-materials='wired'] .speak-composer textarea {
+  border-radius: 0;
+}
+
+:root[data-materials='wired'] .speak-bubble {
+  border: 0;
+  border-inline-start: 2px solid var(--wired-cyan, var(--accent, currentColor));
+  background: color-mix(in srgb, var(--wired-cyan, #6df1ff) 5%, transparent);
+}
+
+:root[data-materials='wired'] .speak-turn.is-user .speak-bubble {
+  border-inline-start-color: var(--wired-amber, var(--accent, currentColor));
+  background: color-mix(in srgb, var(--wired-amber, #ffb13b) 5%, transparent);
+}
+
+:root[data-materials='wired'] .speak-who {
+  text-transform: uppercase;
+  font-size: 10px;
+  color: var(--wired-cyan, var(--accent, currentColor));
+  opacity: 0.9;
+}
+
+:root[data-materials='wired'] .speak-turn.is-user .speak-who {
+  color: var(--wired-amber, var(--accent, currentColor));
+}
+
+/* Who is on the line, as a terminal shows it: incoming and outgoing. */
+:root[data-materials='wired'] .speak-turn.is-partner .speak-who::before {
+  content: '\00AB  ';
+}
+
+:root[data-materials='wired'] .speak-turn.is-user .speak-who::before {
+  content: '\00BB  ';
+}
+
+:root[data-materials='wired'] .speak-composer textarea {
+  font-family: inherit;
+  border: 1px solid color-mix(in srgb, var(--wired-cyan, #6df1ff) 40%, transparent);
+  background: rgba(0, 0, 0, 0.45);
+  caret-color: var(--wired-cyan, currentColor);
+}
+
+/* The level as a segmented signal meter. */
+:root[data-materials='wired'] .speak-vad-level {
+  border-radius: 0;
+  border-color: color-mix(in srgb, var(--wired-cyan, #6df1ff) 50%, transparent);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-materials='wired'] .speak-vad-level::after {
+  background: repeating-linear-gradient(90deg, var(--wired-cyan, #6df1ff) 0 5px, transparent 5px 7px);
+}
+
+:root[data-materials='wired'] .speak-handsfree.is-speaking .speak-vad-level::after {
+  background: repeating-linear-gradient(90deg, var(--wired-amber, #ffb13b) 0 5px, transparent 5px 7px);
+}
+
+:root[data-materials='wired'] .speak-handsfree .speak-note {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+
+@media (forced-colors: active) {
+  .speak-vad-level::after {
+    background: Highlight;
+  }
+}

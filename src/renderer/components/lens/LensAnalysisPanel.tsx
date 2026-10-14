@@ -11,6 +11,9 @@ import { analysisCommandForKey, isTextEntryTarget } from '../../../shared/analys
 import type { SentenceAnalysisResult } from '../../../shared/sentenceAnalysisCore';
 import { openAiSettings } from '../../aiSetupClient';
 import { aiErrorKey, isAiErrorCode } from '../../../shared/aiErrorCodes';
+import { AiStreamDraft, aiStreamPreviewText, subscribeAiStream } from '../ai/aiStream';
+
+let lensAnalyzeCounter = 0;
 
 /**
  * The Reading Lens' AI panel — what a scan opens when the mode toggle is on
@@ -41,7 +44,10 @@ const PANEL_W = 460;
 const MARGIN = 12;
 
 type State =
-  | { kind: 'loading' }
+  /** `draft`: the analysis as it streams in (sentence:analyze, docs/AI_AUDIT.md F9). */
+  | { kind: 'loading'; draft?: string }
+  /** Cancelled: what had streamed in stays, with Re-analyze. */
+  | { kind: 'stopped'; draft: string }
   | { kind: 'ready'; result: SentenceAnalysisResult }
   | { kind: 'error'; message: string; needsKey: boolean; needsLocalModel: boolean; aiOff?: boolean };
 
@@ -54,6 +60,7 @@ export default function LensAnalysisPanel({ text, region, onLookup, onClose }: P
   // Guards against a stale response landing after the reader moved to another
   // line — the panel stays mounted across sentence changes.
   const reqRef = useRef(0);
+  const activeRequest = useRef<string | null>(null);
 
   const result = state.kind === 'ready' ? state.result : null;
   const actions = useAnalysisActions({
@@ -74,15 +81,23 @@ export default function LensAnalysisPanel({ text, region, onLookup, onClose }: P
     refreshNext.current = false;
     setState({ kind: 'loading' });
     let alive = true;
+    lensAnalyzeCounter += 1;
+    const requestId = `lens-${Date.now().toString(36)}-${lensAnalyzeCounter}`;
+    activeRequest.current = requestId;
+    const unsubscribe = subscribeAiStream(requestId, (raw) => {
+      if (alive && id === reqRef.current) setState({ kind: 'loading', draft: aiStreamPreviewText(raw) });
+    });
     void (async () => {
       try {
         const res = await window.api.sentenceAnalyze({
           text,
           lang: studyLang,
           explainIn: uiLang,
+          requestId,
           ...(refresh ? { refresh: true } : {}),
         });
         if (!alive || id !== reqRef.current) return;
+        activeRequest.current = null;
         if (res.ok && res.result) setState({ kind: 'ready', result: res.result });
         else {
           setState({
@@ -104,12 +119,30 @@ export default function LensAnalysisPanel({ text, region, onLookup, onClose }: P
           needsKey: false,
           needsLocalModel: false,
         });
+      } finally {
+        unsubscribe();
       }
     })();
     return () => {
       alive = false;
+      unsubscribe();
+      // Another line, or the panel closing: the analysis still running is not wanted.
+      if (activeRequest.current === requestId) {
+        activeRequest.current = null;
+        void window.api.sentenceAnalyzeCancel?.(requestId)?.catch(() => undefined);
+      }
     };
   }, [text, studyLang, uiLang, attempt, t]);
+
+  /** Stops the analysis being written; what had arrived stays on screen. */
+  const cancel = useCallback(() => {
+    const requestId = activeRequest.current;
+    if (!requestId) return;
+    activeRequest.current = null;
+    reqRef.current += 1;
+    void window.api.sentenceAnalyzeCancel?.(requestId)?.catch(() => undefined);
+    setState((current) => ({ kind: 'stopped', draft: current.kind === 'loading' ? current.draft ?? '' : '' }));
+  }, []);
 
   const reanalyze = useCallback(() => {
     refreshNext.current = true;
@@ -209,6 +242,28 @@ export default function LensAnalysisPanel({ text, region, onLookup, onClose }: P
               {text}
             </div>
             <div className="lens-analysis-spinner">{t('lens.ai.analyzing')}</div>
+            {state.draft && <AiStreamDraft text={state.draft} state="drafting" lang={uiLang} />}
+            <div className="lens-analysis-error-actions">
+              <button type="button" onClick={cancel}>
+                {t('aiStudy.stream.stop')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {state.kind === 'stopped' && (
+          <div className="lens-analysis-loading">
+            <div className="lens-analysis-source" lang={studyLang}>
+              {text}
+            </div>
+            {state.draft
+              ? <AiStreamDraft text={state.draft} state="stopped" lang={uiLang} />
+              : <p>{t(aiErrorKey('cancelled'))}</p>}
+            <div className="lens-analysis-error-actions">
+              <button type="button" onClick={reanalyze}>
+                {t('lens.ai.reanalyze')}
+              </button>
+            </div>
           </div>
         )}
 

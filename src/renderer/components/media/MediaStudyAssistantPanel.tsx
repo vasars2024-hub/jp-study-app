@@ -11,6 +11,9 @@ import { AiSetupPrompt } from '../ai/AiSetupPrompt';
 import { useAiReadiness } from '../../aiSetupClient';
 import { aiErrorKey, isAiErrorCode } from '../../../shared/aiErrorCodes';
 import { useStudyLanguage } from '../../useStudyLanguage';
+import { AiStreamDraft, aiStreamPreviewText, subscribeAiStream } from '../ai/aiStream';
+
+let assistCounter = 0;
 
 type Translate = (key: string, vars?: TVars) => string;
 
@@ -108,14 +111,38 @@ export default function MediaStudyAssistantPanel({
   // (the line moved on, or another mode was asked) is dropped. It used to land
   // under the NEXT line, and "Save to notebook" then saved the wrong analysis.
   const runRef = useRef(0);
+  /** The answer as it streams in; after a Cancel, as far as it got (`media-study:cancel`). */
+  const [draft, setDraft] = useState('');
+  const [stopped, setStopped] = useState(false);
+  const activeRequest = useRef<string | null>(null);
+
+  const stopActive = (): void => {
+    const requestId = activeRequest.current;
+    activeRequest.current = null;
+    if (requestId) void window.api.mediaStudyCancel?.(requestId)?.catch(() => undefined);
+  };
 
   useEffect(() => {
     runRef.current += 1;
+    // The line moved on: an answer still being written for the old one is not wanted.
+    stopActive();
     setAnswer(null);
     setError('');
     setStatus('');
     setBusy(false);
+    setDraft('');
+    setStopped(false);
   }, [lineKey]);
+
+  useEffect(() => () => stopActive(), []);
+
+  const cancel = (): void => {
+    if (!activeRequest.current) return;
+    runRef.current += 1;
+    stopActive();
+    setBusy(false);
+    setStopped(true);
+  };
 
   const run = async (nextMode: MediaStudyAssistantMode): Promise<void> => {
     if (!sentence.trim()) return;
@@ -130,8 +157,17 @@ export default function MediaStudyAssistantPanel({
     setBusy(true);
     setError('');
     setStatus('');
+    setDraft('');
+    setStopped(false);
+    assistCounter += 1;
+    const requestId = `msa-${Date.now().toString(36)}-${assistCounter}`;
+    activeRequest.current = requestId;
+    const unsubscribe = subscribeAiStream(requestId, (raw) => {
+      if (ticket === runRef.current) setDraft(aiStreamPreviewText(raw));
+    });
     try {
       const response = await window.api.mediaStudyAssist({
+        requestId,
         mode: nextMode,
         text: askedSentence,
         context: mediaTitle,
@@ -142,6 +178,12 @@ export default function MediaStudyAssistantPanel({
         ...(refresh ? { refresh: true } : {}),
       });
       if (ticket !== runRef.current) return;
+      activeRequest.current = null;
+      if (response.code === 'cancelled') {
+        setStopped(true);
+        return;
+      }
+      setDraft('');
       if (!response.ok || !response.result) {
         if (response.needsKey) {
           setNeedsKey(true);
@@ -157,7 +199,11 @@ export default function MediaStudyAssistantPanel({
       if (ticket !== runRef.current) return;
       setError(t(aiErrorKey('ipc-failed')));
     } finally {
-      if (ticket === runRef.current) setBusy(false);
+      unsubscribe();
+      if (ticket === runRef.current) {
+        activeRequest.current = null;
+        setBusy(false);
+      }
     }
   };
 
@@ -196,7 +242,13 @@ export default function MediaStudyAssistantPanel({
           </button>
         ))}
       </div>
-      {busy && <p className="muted" role="status">{t('mediaAssistant.busy')}</p>}
+      {busy && (
+        <div className="media-study-assistant-actions">
+          <p className="muted" role="status">{t('mediaAssistant.busy')}</p>
+          <button type="button" onClick={cancel}>{t('aiStudy.stream.stop')}</button>
+        </div>
+      )}
+      {(busy || stopped) && <AiStreamDraft text={draft} state={stopped ? 'stopped' : 'drafting'} lang={uiLang} />}
       {error && <p className="media-error" role="alert">{error}</p>}
       {result && (
         <div className="media-study-assistant-result">

@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, BrowserWindow } from 'electron';
+import { app, dialog, ipcMain, BrowserWindow, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
@@ -41,6 +41,8 @@ import { failedAiEnrichmentResult } from '../shared/aiCardStudioRetry';
 import { buildEpubDeckExport } from '../shared/epubDeck';
 import { z } from 'zod';
 import { callAiProviderJson } from './aiProviderClient';
+import { aiStreamRequestId, aiStreamReset, aiStreamSink } from './aiStreamRelay';
+import { LOCAL_JSON_GRAMMAR } from './aiLocalStructured';
 import { parseAiReplyWith } from './aiStructuredOutput';
 import { assertAiFeatureAllowed } from './aiFeatureGate';
 import { aiErrorMessageKey } from '../shared/aiConnectionTest';
@@ -1502,7 +1504,24 @@ async function preflightCardGeneration(
   return { engine, providerId, apiKey: '' };
 }
 
-async function enrichWithAi(req: AiEnrichmentRequest, signal?: AbortSignal): Promise<AiEnrichmentResult> {
+/**
+ * Card Studio's reply preview (docs/AI_AUDIT.md F9): each provider call streams
+ * to the window that started the run, under the run's request id. `begin` marks
+ * the start of a new reply (one per word, one per invent batch).
+ */
+interface GenerationStream {
+  begin(): void;
+  onTextChunk: (text: string) => void;
+}
+
+function generationStream(sender: WebContents | undefined, raw: unknown): GenerationStream | undefined {
+  const requestId = aiStreamRequestId(raw);
+  const onTextChunk = aiStreamSink(sender, requestId);
+  if (!onTextChunk) return undefined;
+  return { begin: () => aiStreamReset(sender, requestId), onTextChunk };
+}
+
+async function enrichWithAi(req: AiEnrichmentRequest, signal?: AbortSignal, stream?: GenerationStream): Promise<AiEnrichmentResult> {
   const config = readMiningConfig();
   const { engine, providerId, apiKey } = await preflightCardGeneration(req.providerId, config);
   const provider = providerById(providerId);
@@ -1534,12 +1553,20 @@ async function enrichWithAi(req: AiEnrichmentRequest, signal?: AbortSignal): Pro
     targetLang: profile.targetLang,
     sampleTerm: req,
   });
+  stream?.begin();
   const parsed = asPartialEnrichment(
     engine === 'local-qwen'
       ? parseAiReplyWith(
           await (await import('./translate')).runLocalQwenPrompt(
             `${prompt}\n\nRespond with a single JSON object only — no markdown fences.`,
-            { maxTokens: 2048, timeoutMs: 120_000, ...(signal ? { signal } : {}) },
+            {
+              maxTokens: 2048,
+              timeoutMs: 120_000,
+              // Constrained decoding: the 1.7B model can only answer with a JSON object.
+              jsonGrammar: LOCAL_JSON_GRAMMAR,
+              ...(signal ? { signal } : {}),
+              ...(stream ? { onTextChunk: stream.onTextChunk } : {}),
+            },
           ),
           AI_ENRICHMENT_SHAPE,
           'Local Qwen',
@@ -1548,6 +1575,7 @@ async function enrichWithAi(req: AiEnrichmentRequest, signal?: AbortSignal): Pro
           feature: 'cardGen',
           context: provider.label,
           ...(signal ? { signal } : {}),
+          ...(stream ? { onTextChunk: stream.onTextChunk } : {}),
         }),
   );
   const text = JSON.stringify(parsed);
@@ -1672,7 +1700,11 @@ async function buildEnrichmentResult(
   };
 }
 
-async function generateDeckWithAi(req: AiDeckGenerationRequest, signal?: AbortSignal): Promise<AiEnrichmentResult[]> {
+async function generateDeckWithAi(
+  req: AiDeckGenerationRequest,
+  signal?: AbortSignal,
+  stream?: GenerationStream,
+): Promise<AiEnrichmentResult[]> {
   const config = readMiningConfig();
   const { engine, providerId, apiKey } = await preflightCardGeneration(req.providerId, config);
   const provider = providerById(providerId);
@@ -1742,7 +1774,7 @@ async function generateDeckWithAi(req: AiDeckGenerationRequest, signal?: AbortSi
             backLang: langOptions.backLang,
             reverse: langOptions.reverse,
             backGlossLangs: langOptions.backGlossLangs,
-          }, signal),
+          }, signal, stream),
         );
       } catch (error) {
         firstError ??= error;
@@ -1810,6 +1842,7 @@ async function generateDeckWithAi(req: AiDeckGenerationRequest, signal?: AbortSi
         inventBatch:
           inventBatches > 1 ? { index: batchIndex + 1, total: inventBatches } : undefined,
       });
+      stream?.begin();
       const parsed = engine === 'local-qwen'
         ? parseAiReplyWith(
             await (await import('./translate')).runLocalQwenPrompt(
@@ -1817,7 +1850,9 @@ async function generateDeckWithAi(req: AiDeckGenerationRequest, signal?: AbortSi
               {
                 maxTokens: Math.min(8192, Math.max(2048, chunkCount * 450)),
                 timeoutMs: 180_000,
+                jsonGrammar: LOCAL_JSON_GRAMMAR,
                 ...(signal ? { signal } : {}),
+                ...(stream ? { onTextChunk: stream.onTextChunk } : {}),
               },
             ),
             AI_ENRICHMENT_BATCH_SHAPE,
@@ -1828,6 +1863,7 @@ async function generateDeckWithAi(req: AiDeckGenerationRequest, signal?: AbortSi
             feature: 'cardGen',
             context: provider.label,
             ...(signal ? { signal } : {}),
+            ...(stream ? { onTextChunk: stream.onTextChunk } : {}),
           });
       const chunkItems = parsed.items.map(asPartialEnrichment);
       if (!chunkItems.length) {
@@ -2519,9 +2555,11 @@ export function registerMiningIpc(): void {
       return { ok: true, ...next };
     },
   );
-  bind('ai:enrichCard', (_e, req: AiEnrichmentRequest) => withGenerationSignal((signal) => enrichWithAi(req, signal)));
-  bind('ai:generateDeck', (_e, req: AiDeckGenerationRequest) =>
-    withGenerationSignal((signal) => generateDeckWithAi(req, signal)));
+  // A request with an id streams each reply back to the window that started it.
+  bind('ai:enrichCard', (e: IpcMainInvokeEvent, req: AiEnrichmentRequest) =>
+    withGenerationSignal((signal) => enrichWithAi(req, signal, generationStream(e.sender, req))));
+  bind('ai:generateDeck', (e: IpcMainInvokeEvent, req: AiDeckGenerationRequest) =>
+    withGenerationSignal((signal) => generateDeckWithAi(req, signal, generationStream(e.sender, req))));
   // Stops every Card Studio run in flight: the HTTP request (or the offline
   // model's prompt) is aborted, not merely ignored when it returns.
   bind('ai:cancelGenerate', () => {

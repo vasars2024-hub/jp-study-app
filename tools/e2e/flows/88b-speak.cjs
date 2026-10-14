@@ -16,6 +16,9 @@
  *     on the device (the default) they are NOT in the prompt sent to the server.
  *  5. With study data allowed to leave the device (Agent settings), the next conversation's
  *     prompt names them.
+ *  6. The replies are asked for as a stream (the partner's line is drafted as it arrives),
+ *     and voice input offers a hands-free mode beside push-to-talk (the microphone itself
+ *     is not opened here: OWNER O6 checks a real one).
  *
  * The profile is left as a run without the preset would have it: AI on, no provider
  * configured, the speaking helpers' cloud opt-ins off, the Agent's study-data setting and
@@ -145,6 +148,26 @@ module.exports = {
       const sent = ai.prompts('conversationPartner').pop() || '';
       result.check('with study data allowed, the prompt asks the partner to bring 改札 back', /earlier conversations[^\n]*改札/.test(sent), sent.slice(0, 400));
       await ctx.shot('recall');
+
+      // --- 6. streamed replies; the hands-free voice mode ----------------------------------------
+      const streamedHits = ai.hits.filter((h) => h.feature === 'conversationPartner' && h.status === 200);
+      result.check('every conversation reply was asked for as a stream', streamedHits.length > 0 && streamedHits.every((h) => h.stream === true), streamedHits.map((h) => h.stream));
+      const handsFree = await ev(`(() => {
+        const s = document.querySelector('${PANEL} select[data-speak-voice-mode]');
+        if (!s) return null;
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'handsFree');
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      })()`);
+      const startBtn = handsFree && await poll(ctx, `__e2e.byText('${PANEL} .speak-composer button', 'Start hands-free') ? true : null`, 5000);
+      result.check('voice input offers hands-free beside push-to-talk', Boolean(startBtn));
+      await ev(`(() => {
+        const s = document.querySelector('${PANEL} select[data-speak-voice-mode]');
+        if (!s) return false;
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'push');
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      })()`);
       result.note(`fake AI requests: ${JSON.stringify(ai.hits.filter((h) => h.feature === 'conversationPartner').map((h) => h.status))}`);
     } finally {
       await ev(`(() => {

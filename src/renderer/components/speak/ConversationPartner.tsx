@@ -27,9 +27,16 @@
  * - "Send what I say": voice input goes straight out (a hands-free loop with
  *   "Read replies aloud"); off by default, so the transcript is reviewed first.
  *
+ * Round 3 (W2-A):
+ * - The partner's reply streams in as it is written (`aiStream.tsx`); Cancel keeps
+ *   what had arrived, and the turn keeps its Retry.
+ * - Voice input is push-to-talk or HANDS-FREE (`useHandsFree.ts`): the microphone
+ *   listens, the pause after the learner speaks sends it, the reply is read
+ *   aloud, and talking over it — or Esc — interrupts the partner.
+ *
  * Shared by the Study OS view and Blanc's panel; lazy-loaded by both.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   CONVERSATION_LEVELS,
   CONVERSATION_MESSAGE_MAX,
@@ -59,8 +66,10 @@ import { getStudyLang } from '../../studyEnvironment';
 import { speak, ttsAvailable } from '../../tts';
 import { writeLocalStorageJson } from '../../localStorageWrite';
 import { AiStudyStatus, AiSuggestionBadge, useAiStudyRequest } from '../ai/aiStudyRequest';
+import { AiStreamDraft } from '../ai/aiStream';
 import { knownWordSample } from '../flashcards/aiExampleCheck';
 import { StudyDiff, WhisperInstallPrompt } from './SpeakParts';
+import { useHandsFree, type HandsFreePhase } from './useHandsFree';
 import {
   chineseRuby,
   displayTokensFor,
@@ -72,6 +81,7 @@ import {
 import './speak.css';
 
 const PREFS_KEY = 'jp-study.conversation.prefs.v1';
+const REPLY_PREVIEW = { keys: ['reply'] } as const;
 const KNOWN_SAMPLE = 60;
 const SOURCE_TITLE = 'Conversation partner';
 
@@ -80,11 +90,23 @@ interface ChatPrefs {
   correct: boolean;
   autoSpeak: boolean;
   scripted: boolean;
-  /** Voice input is sent as soon as it is transcribed (the hands-free loop). */
+  /** Voice input is sent as soon as it is transcribed (push-to-talk). */
   voiceSend: boolean;
+  /** Push-to-talk, or the hands-free loop (voice activity, read aloud, interrupt). */
+  voiceMode: 'push' | 'handsFree';
 }
 
-const DEFAULT_PREFS: ChatPrefs = { furigana: true, correct: true, autoSpeak: false, scripted: false, voiceSend: false };
+const DEFAULT_PREFS: ChatPrefs = { furigana: true, correct: true, autoSpeak: false, scripted: false, voiceSend: false, voiceMode: 'push' };
+
+/** What the hands-free status line says in each phase. */
+const HANDS_FREE_PHASE_KEYS: Record<Exclude<HandsFreePhase, 'off'>, string> = {
+  starting: 'aiSpeak.handsFree.starting',
+  listening: 'aiSpeak.handsFree.listening',
+  hearing: 'aiSpeak.handsFree.hearing',
+  transcribing: 'aiSpeak.handsFree.transcribing',
+  waiting: 'aiSpeak.handsFree.waiting',
+  speaking: 'aiSpeak.handsFree.speaking',
+};
 
 function loadPrefs(): ChatPrefs {
   try {
@@ -96,6 +118,7 @@ function loadPrefs(): ChatPrefs {
       autoSpeak: raw.autoSpeak === true,
       scripted: raw.scripted === true,
       voiceSend: raw.voiceSend === true,
+      voiceMode: raw.voiceMode === 'handsFree' ? 'handsFree' : 'push',
     };
   } catch {
     return DEFAULT_PREFS;
@@ -124,7 +147,8 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
   const [drillDone, setDrillDone] = useState(false);
   const [voice, setVoice] = useState<VoiceState>({ kind: 'idle' });
   const [lastMeta, setLastMeta] = useState<{ knownSampleSent: boolean } | null>(null);
-  const request = useAiStudyRequest<ConversationReplyResult>();
+  // The draft is the partner's line only: the translation and the correction come with the whole reply.
+  const request = useAiStudyRequest<ConversationReplyResult>(REPLY_PREVIEW);
   const recording = useRef<MicRecording | null>(null);
   const voiceAbort = useRef<AbortController | null>(null);
   const loaded = useRef(false);
@@ -134,10 +158,19 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
   const rubyLang = studyLang === 'ja' || studyLang === 'zh';
   const busy = request.state.status === 'running';
 
+  // The hands-free loop sends what it heard through `send` (defined below, reached by ref).
+  const sendRef = useRef<(text: string) => Promise<string | null>>(async () => null);
+  const handsFree = useHandsFree({
+    studyLang,
+    readAloud: ttsAvailable(),
+    onTranscript: (text) => sendRef.current(text),
+  });
+  const handsFreeOn = handsFree.phase !== 'off';
+
   // The latest state for callbacks that outlive a render (the voice recorder's
   // auto-stop, a reply arriving after other edits).
-  const latest = useRef({ conv, prefs, scripted, busy });
-  latest.current = { conv, prefs, scripted, busy };
+  const latest = useRef({ conv, prefs, scripted, busy, handsFreeOn });
+  latest.current = { conv, prefs, scripted, busy, handsFreeOn };
 
   useEffect(() => {
     let alive = true;
@@ -214,14 +247,16 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
 
   const update = (next: StoredConversation): void => setConv({ ...next, turns: capConversationTurns(next.turns) });
 
-  const appendDrill = (base: StoredConversation): void => {
+  /** The next scripted line (also what hands-free reads aloud), or null when the drill is done. */
+  const appendDrill = (base: StoredConversation): string | null => {
     const line = nextDrillLine(base.scenario, studyLang, base.turns);
     if (!line) {
       setDrillDone(true);
       update(base);
-      return;
+      return null;
     }
     update({ ...base, turns: [...base.turns, { role: 'partner', text: line, scripted: true, at: Date.now() }] });
+    return line;
   };
 
   /**
@@ -230,7 +265,12 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
    * the conversation holds when it arrives; a failure or Cancel leaves the
    * learner's turn unanswered, which is what Retry answers.
    */
-  const ask = async (base: StoredConversation, history: readonly StoredConversationTurn[], message: string, at: number): Promise<void> => {
+  const ask = async (
+    base: StoredConversation,
+    history: readonly StoredConversationTurn[],
+    message: string,
+    at: number,
+  ): Promise<string | null> => {
     const { prefs: currentPrefs } = latest.current;
     const result = await request.run((requestId) => window.api.aiSpeakConversation({
       requestId,
@@ -248,7 +288,7 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
       // An opening is always asked afresh: the cached one is the same line every time.
       ...(message ? {} : { refresh: true }),
     }));
-    if (!result) return;
+    if (!result) return null;
     setLastMeta({ knownSampleSent: result.knownSampleSent });
     setConv((current) => {
       const turns = current.turns.map((turn) => (
@@ -257,14 +297,17 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
       turns.push({ role: 'partner', text: result.reply, translation: result.translation, at: Math.max(Date.now(), at + 1) });
       return { ...current, turns: capConversationTurns(turns) };
     });
-    if (latest.current.prefs.autoSpeak) speak(result.reply, studyLang);
+    // Hands-free reads the reply itself, and listens for an interruption while it does.
+    if (latest.current.prefs.autoSpeak && !latest.current.handsFreeOn) speak(result.reply, studyLang);
+    return result.reply;
   };
 
-  const send = async (override?: string): Promise<void> => {
+  /** Sends the composer's text (or `override`); resolves with the partner's reply, or null. */
+  const send = async (override?: string): Promise<string | null> => {
     const { conv: current, scripted: isScripted, busy: isBusy } = latest.current;
-    if (isBusy) return;
+    if (isBusy) return null;
     const text = (override ?? input).trim().slice(0, CONVERSATION_MESSAGE_MAX);
-    if (!text && current.turns.length) return;
+    if (!text && current.turns.length) return null;
     setNotice('');
     setSelected(null);
     const prior = current.turns;
@@ -275,14 +318,12 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
     const started: StoredConversation = opening ? { ...current, ...(recall.length ? { recall } : { recall: undefined }) } : current;
     const base: StoredConversation = text ? { ...started, turns: [...prior, { role: 'user', text, at }] } : started;
     if (override === undefined) setInput('');
-    if (isScripted) {
-      appendDrill(base);
-      return;
-    }
+    if (isScripted) return appendDrill(base);
     update(base);
     latest.current = { ...latest.current, conv: base };
-    await ask(base, prior, text, at);
+    return ask(base, prior, text, at);
   };
+  sendRef.current = (text) => send(text);
 
   const retry = async (): Promise<void> => {
     const { conv: current, busy: isBusy } = latest.current;
@@ -377,6 +418,13 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
     setVoice({ kind: 'idle' });
   };
 
+  const setVoiceMode = (voiceMode: ChatPrefs['voiceMode']): void => {
+    // Leaving hands-free closes the microphone; leaving push-to-talk drops a take in progress.
+    if (voiceMode === 'push') handsFree.stop();
+    else cancelVoice();
+    setPrefs({ ...prefs, voiceMode });
+  };
+
   const setScenario = (scenario: ConversationScenario): void => {
     setDrillDone(false);
     update({ ...conv, scenario });
@@ -446,10 +494,23 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
             <input type="checkbox" checked={prefs.scripted} onChange={(event) => setPrefs({ ...prefs, scripted: event.currentTarget.checked })} />
             <span>{t('aiSpeak.chat.scriptedToggle')}</span>
           </label>
-          <label className="speak-check">
-            <input type="checkbox" checked={prefs.voiceSend} onChange={(event) => setPrefs({ ...prefs, voiceSend: event.currentTarget.checked })} />
-            <span>{t('aiSpeak.chat.voiceSend')}</span>
+          <label className="speak-field">
+            <span>{t('aiSpeak.voiceMode.label')}</span>
+            <select
+              value={prefs.voiceMode}
+              data-speak-voice-mode=""
+              onChange={(event) => setVoiceMode(event.currentTarget.value === 'handsFree' ? 'handsFree' : 'push')}
+            >
+              <option value="push">{t('aiSpeak.voiceMode.push')}</option>
+              <option value="handsFree">{t('aiSpeak.voiceMode.handsFree')}</option>
+            </select>
           </label>
+          {prefs.voiceMode === 'push' && (
+            <label className="speak-check">
+              <input type="checkbox" checked={prefs.voiceSend} onChange={(event) => setPrefs({ ...prefs, voiceSend: event.currentTarget.checked })} />
+              <span>{t('aiSpeak.chat.voiceSend')}</span>
+            </label>
+          )}
         </div>
         <p className="speak-note" role="status">
           {scripted ? t('aiSpeak.chat.scriptedMode') : t('aiSpeak.chat.aiMode')}
@@ -498,11 +559,27 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
             )}
           </li>
         ))}
+        {/* The partner's line as it is being written; it becomes a turn when the whole reply has arrived. */}
+        {!scripted && request.state.status === 'running' && request.state.draft && (
+          <li className="speak-turn is-partner is-drafting" data-conversation-draft="">
+            <span className="speak-who">{t('aiSpeak.chat.partner')}</span>
+            <div className="speak-bubble">
+              <AiStreamDraft text={request.state.draft} state="drafting" lang={studyLang} />
+            </div>
+          </li>
+        )}
       </ol>
 
       {notice && <p className="speak-note" role="status">{notice}</p>}
       {drillDone && <p className="speak-note" role="status">{t('aiSpeak.chat.drillDone')}</p>}
-      {!scripted && <AiStudyStatus state={request.state} onCancel={request.cancel} busyKey="aiSpeak.chat.thinking" />}
+      {!scripted && (
+        <AiStudyStatus
+          state={request.state.status === 'running' ? { status: 'running' } : request.state}
+          onCancel={request.cancel}
+          busyKey="aiSpeak.chat.thinking"
+          lang={studyLang}
+        />
+      )}
       {!scripted && pending && (
         <div className="speak-actions" data-conversation-retry="">
           <p className="speak-note" role="status">{t('aiSpeak.chat.unanswered')}</p>
@@ -553,7 +630,17 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
             <button type="submit" className="btn primary speak-btn" disabled={busy || !input.trim()}>
               {t('aiSpeak.chat.send')}
             </button>
-            {voice.kind === 'recording' ? (
+            {prefs.voiceMode === 'handsFree' ? (
+              <button
+                type="button"
+                className={`btn speak-btn${handsFreeOn ? ' is-active' : ''}`}
+                aria-pressed={handsFreeOn}
+                disabled={handsFree.phase === 'starting'}
+                onClick={() => (handsFreeOn ? handsFree.stop() : void handsFree.start())}
+              >
+                {t(handsFreeOn ? 'aiSpeak.handsFree.stop' : 'aiSpeak.handsFree.start')}
+              </button>
+            ) : voice.kind === 'recording' ? (
               <button type="button" className="btn speak-btn" onClick={() => void stopVoice()}>{t('aiSpeak.voice.stop')}</button>
             ) : (
               <button type="button" className="btn speak-btn" disabled={voice.kind === 'transcribing'} onClick={() => void startVoice()}>
@@ -578,6 +665,28 @@ export default function ConversationPartner({ compact = false }: { compact?: boo
       {voice.kind === 'failed' && <p className="speak-error" role="alert">{t('aiSpeak.voice.failed')}</p>}
       {voice.kind === 'needs-model' && (
         <WhisperInstallPrompt tier={voice.tier} sizeBytes={voice.sizeBytes} onInstalled={() => setVoice({ kind: 'idle' })} />
+      )}
+      {handsFreeOn && handsFree.phase !== 'off' && (
+        <div className={`speak-handsfree is-${handsFree.phase}`} data-speak-handsfree={handsFree.phase}>
+          <span
+            className="speak-vad-level"
+            aria-hidden="true"
+            style={{ '--speak-level': handsFree.level.toFixed(2) } as CSSProperties}
+          />
+          <span className="speak-note" role="status">{t(HANDS_FREE_PHASE_KEYS[handsFree.phase])}</span>
+          {handsFree.phase === 'speaking' && (
+            <button type="button" className="btn small speak-btn" onClick={handsFree.interrupt}>
+              {t('aiSpeak.handsFree.interrupt')}
+            </button>
+          )}
+        </div>
+      )}
+      {handsFree.problem?.kind === 'mic' && <p className="speak-error" role="alert">{t('aiSpeak.voice.failed')}</p>}
+      {handsFree.problem?.kind === 'unheard' && handsFreeOn && (
+        <p className="speak-note" role="status">{t('aiSpeak.handsFree.unheard')}</p>
+      )}
+      {handsFree.problem?.kind === 'needs-model' && (
+        <WhisperInstallPrompt tier={handsFree.problem.tier} sizeBytes={handsFree.problem.sizeBytes} onInstalled={handsFree.clearProblem} />
       )}
     </section>
   );

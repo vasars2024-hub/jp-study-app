@@ -18,6 +18,10 @@
  *     card's accepted answers change only when "Accept … as correct" is clicked.
  *  5. The pop-up dictionary (a real click in a book): "Explain in context" marks the sense
  *     the fake picked; when the call fails, the first sense is marked "most common".
+ *  1b. Streaming (docs/AI_AUDIT.md F9): the explanation was asked for as a stream; with a
+ *     slow model (a flow-owned fake that sends the first half and holds the rest) the first
+ *     half appears on screen as prose — never JSON — while the reply is still arriving, and
+ *     Cancel stops the request (the model sees the hang-up) and keeps that partial text.
  *  6. "Use AI features" off (Settings > AI): every one of these entries is hidden, and what
  *     works without AI still does — Again reschedules, Write grades, the saved memory aid
  *     and example stay on the card, "is:leech" finds the leech, the pop-up lists the senses.
@@ -27,6 +31,10 @@
  */
 const { installHelpers, poll, pollAsync, clickText, ensureDictionaryReady, DECK } = require('./_lib.cjs');
 const fixtures = require('../fixtures.cjs');
+const { startSlowAiStream } = require('./_aiStreamFake.cjs');
+
+/** What the slow fake streams before it holds: a why-wrong reply cut mid-explanation. */
+const SLOW_PARTIAL = 'E2E slow stream: the first half of the answer';
 
 const DECK_NAME = 'E2E AI';
 const SOURCE = 'import-e2e-ai::E2E AI';
@@ -165,6 +173,44 @@ module.exports = {
       result.check('one request reached the fake, as whyWrong', ai.count('whyWrong') === whyBefore + 1, { before: whyBefore, after: ai.count('whyWrong') });
       result.check('a flip-card Again offers no "Accept as correct" (nothing was typed)', Boolean(why) && why.accept === false, why);
       await ctx.shot('why-wrong');
+
+      // --- 1b. Streaming: chunks on screen as prose, Cancel keeps the partial text ---------
+      const whyHit = ai.hits.filter((h) => h.feature === 'whyWrong').pop();
+      result.check('the explanation was asked for as a stream', Boolean(whyHit) && whyHit.stream === true, whyHit);
+      const slow = await startSlowAiStream({ model: ai.model });
+      try {
+        slow.prefix = `{"confusion":"similar-word","explanation":"${SLOW_PARTIAL}`;
+        await ev(`(() => {
+          window.__e2eStream = [];
+          window.__e2eStreamOff = window.api.onAiStreamChunk((c) => window.__e2eStream.push(c));
+          return true;
+        })()`);
+        await ev(`window.api.aiSetupUpdate({ compatBaseUrl: ${JSON.stringify(slow.base)} }).then(() => true)`, { await: true });
+        await ev(`__e2e.click(__e2e.byText('.flash-review-shell .ai-study-why .ai-study-actions button', 'Ask again'))`);
+        const drafting = await poll(ctx, `(() => { const d = document.querySelector('.flash-review-shell .ai-study-why [data-ai-stream="drafting"]'); return d && d.innerText.includes(${JSON.stringify(SLOW_PARTIAL)}) ? d.innerText : null; })()`, 20000);
+        result.check('while the reply is still arriving, its first half is on screen', Boolean(drafting), drafting);
+        result.check('the draft is prose, never the raw JSON', Boolean(drafting) && !/[{}]|"explanation"|similar-word/.test(drafting), drafting);
+        const chunks = await ev(`(window.__e2eStream || []).length`);
+        result.check('streamed chunks reached the window, tagged with the request id', chunks > 0 && (await ev(`window.__e2eStream.every((c) => typeof c.requestId === 'string' && c.requestId.length > 0)`)), chunks);
+        await ctx.shot('stream-drafting');
+        await ev(`__e2e.click(__e2e.byText('.flash-review-shell .ai-study-why .ai-study-busy button', 'Cancel'))`);
+        const stopped = await poll(ctx, `(() => { const d = document.querySelector('.flash-review-shell .ai-study-why [data-ai-stream="stopped"]'); return d ? d.innerText : null; })()`, 10000);
+        result.check('Cancel keeps the partial text, marked as stopped', Boolean(stopped) && stopped.includes(SLOW_PARTIAL) && /stopped/i.test(stopped), stopped);
+        let hungUp = false;
+        for (let i = 0; i < 40 && !hungUp; i++) {
+          hungUp = slow.hits.some((h) => h.aborted);
+          if (!hungUp) await ctx.sleep(250);
+        }
+        result.check('Cancel stopped the request itself (the model saw the hang-up)', hungUp, slow.hits);
+        await ctx.sleep(500);
+        const still = await ev(`document.querySelector('.flash-review-shell .ai-study-why [data-ai-stream="stopped"]')?.innerText ?? null`);
+        result.check('the partial text is still there after the request ended', Boolean(still) && still.includes(SLOW_PARTIAL), still);
+        await ctx.shot('stream-stopped');
+      } finally {
+        await ev(`(() => { try { window.__e2eStreamOff?.(); } catch {} return true; })()`).catch(() => undefined);
+        await ev(`window.api.aiSetupUpdate({ compatBaseUrl: ${JSON.stringify(ai.base)} }).then(() => true)`, { await: true }).catch(() => undefined);
+        await slow.close();
+      }
 
       // --- 2. Example sentences on the answer side -----------------------------------------
       const exWord = await current();

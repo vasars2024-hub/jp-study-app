@@ -733,9 +733,12 @@ const api = {
       grounding: import('./shared/lexiconExplainPrompt').LexiconExplainGrounding;
       policy: import('./shared/agentWorkspace').AgentProviderPolicy;
       refresh?: boolean;
+      /** Streams the reply under this id (`onAiStreamChunk`); `dictExplainCancel` stops it. */
+      requestId?: string;
     },
   ): Promise<import('./main/dictionary/explainRun').LexiconExplainResult> =>
     ipcRenderer.invoke('dict:explain', request),
+  dictExplainCancel: (requestId: string): Promise<boolean> => ipcRenderer.invoke('dict:explainCancel', requestId),
   /** Forget this word's explanations across every prose language, model and version. */
   dictExplanationClear: (
     identity: import('./shared/lexiconExplanations').LexiconExplanationIdentity,
@@ -1939,9 +1942,10 @@ const api = {
     ipcRenderer.invoke('translate:ensureReady'),
   // Cloud-LLM linguistic analysis of a completed translation (needs an API key)
   translateAnalyze: (
-    req: import('./shared/translateAnalysisCore').TranslateAnalyzeRequest,
+    req: import('./shared/translateAnalysisCore').TranslateAnalyzeRequest & { requestId?: string },
   ): Promise<import('./shared/translateAnalysisCore').TranslateAnalyzeResponse> =>
     ipcRenderer.invoke('translate:analyze', req),
+  translateAnalyzeCancel: (requestId: string): Promise<boolean> => ipcRenderer.invoke('translate:analyzeCancel', requestId),
   // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
   extractVideoClip: (
     req: import('./shared/videoClip').VideoClipRequest,
@@ -1986,9 +1990,10 @@ const api = {
   },
   // Cloud-LLM whole-sentence annotation — AI OCR mode (needs an API key)
   sentenceAnalyze: (
-    req: import('./shared/sentenceAnalysisCore').SentenceAnalyzeRequest,
+    req: import('./shared/sentenceAnalysisCore').SentenceAnalyzeRequest & { requestId?: string },
   ): Promise<import('./main/sentenceAnalysis').SentenceAnalyzeResponse> =>
     ipcRenderer.invoke('sentence:analyze', req),
+  sentenceAnalyzeCancel: (requestId: string): Promise<boolean> => ipcRenderer.invoke('sentence:analyzeCancel', requestId),
   sentenceGetPrefs: (): Promise<import('./shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs> =>
     ipcRenderer.invoke('sentence:getPrefs'),
   sentenceSetPrefs: (
@@ -3045,9 +3050,9 @@ const api = {
     reverse: boolean;
     backGlossLangs: AiMiningLanguage[];
   }> => ipcRenderer.invoke('ai:setLanguageOptions', payload),
-  aiEnrichCard: (req: AiEnrichmentRequest): Promise<AiEnrichmentResult> =>
+  aiEnrichCard: (req: AiEnrichmentRequest & { requestId?: string }): Promise<AiEnrichmentResult> =>
     ipcRenderer.invoke('ai:enrichCard', req),
-  aiGenerateDeck: (req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]> =>
+  aiGenerateDeck: (req: AiDeckGenerationRequest & { requestId?: string }): Promise<AiEnrichmentResult[]> =>
     ipcRenderer.invoke('ai:generateDeck', req),
   /** Aborts every AI Card Studio run in flight (the HTTP request or the offline prompt). */
   aiCancelGenerate: (): Promise<{ ok: true; cancelled: number }> => ipcRenderer.invoke('ai:cancelGenerate'),
@@ -3061,8 +3066,20 @@ const api = {
   aiSaveCsv: (csv: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
     ipcRenderer.invoke('ai:saveCsv', csv),
   mediaStudyAssist: (
-    req: import('./shared/mediaStudyAssistant').MediaStudyAssistantRequest,
+    req: import('./shared/mediaStudyAssistant').MediaStudyAssistantRequest & { requestId?: string },
   ): Promise<import('./main/mediaStudyAssistant').MediaStudyAssistResponse> => ipcRenderer.invoke('media-study:assist', req),
+  mediaStudyCancel: (requestId: string): Promise<boolean> => ipcRenderer.invoke('media-study:cancel', requestId),
+  /**
+   * The AI replies streaming back to this window (main/aiStreamRelay.ts): Explain,
+   * the analyses, the study and speaking helpers, Card Studio and the media
+   * assistant, each tagged with the request id the renderer gave it. A preview
+   * only — the invoke's own result is the reply that counts.
+   */
+  onAiStreamChunk: (cb: (chunk: import('./main/aiStreamRelay').AiStreamChunk) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, chunk: import('./main/aiStreamRelay').AiStreamChunk) => cb(chunk);
+    ipcRenderer.on('ai:streamChunk', handler);
+    return () => ipcRenderer.removeListener('ai:streamChunk', handler);
+  },
   // The optional AI study helpers (main/aiStudyAssist.ts). Each takes an optional
   // `requestId` that `aiStudyCancel` aborts.
   aiStudyWhyWrong: (

@@ -50,4 +50,18 @@ export const AI_SPEAK2_UI_JA: Catalog = {
   'aiSpeak.journal.streakToday': { other: '日記の連続記録: {count} 日（最高: {best} 日）。今日の分は完了です。' },
   'aiSpeak.journal.streakOpen': { other: '日記の連続記録: {count} 日（最高: {best} 日）。今日の分を書いて記録を続けましょう。' },
   'aiSpeak.journal.streakNone': '日記を完成させる（すべての単語、十分な文の数）と連続記録が始まります。',
+  // ---- the conversation partner: hands-free voice (W2-A) ----
+  'aiSpeak.voiceMode.label': '音声入力',
+  'aiSpeak.voiceMode.push': '押して話す',
+  'aiSpeak.voiceMode.handsFree': 'ハンズフリー',
+  'aiSpeak.handsFree.start': 'ハンズフリーを開始',
+  'aiSpeak.handsFree.stop': 'ハンズフリーを停止',
+  'aiSpeak.handsFree.starting': 'マイクを開いています…',
+  'aiSpeak.handsFree.listening': '聞いています。準備ができたら話してください。少し間を置くと送信します。',
+  'aiSpeak.handsFree.hearing': '聞き取り中…',
+  'aiSpeak.handsFree.transcribing': 'このパソコンの音声モデルで文字にしています…',
+  'aiSpeak.handsFree.waiting': '相手が返事を考えています…',
+  'aiSpeak.handsFree.speaking': '相手が話しています。話しかけるか Esc で割り込めます。',
+  'aiSpeak.handsFree.interrupt': '割り込む（Esc）',
+  'aiSpeak.handsFree.unheard': '聞き取れませんでした。もう少し大きな声でもう一度どうぞ。',
 };

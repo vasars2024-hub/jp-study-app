@@ -11,6 +11,9 @@ import { AiSetupPrompt } from './ai/AiSetupPrompt';
 import { useAiReadiness } from '../aiSetupClient';
 import { translateProviderAvailability, useTranslateProviders } from '../translateProviderClient';
 import { useT } from '../i18n';
+import { AiStreamDraft, aiStreamPreviewText, subscribeAiStream } from './ai/aiStream';
+
+let analyzeCounter = 0;
 
 // Orchestrates the linguistic-analysis panels under the Translate view.
 // The Japanese particle breakdown is fully offline (kuromoji); formality,
@@ -56,6 +59,10 @@ export default function SentenceAnalysisPanel({
   const [refreshNonce, setRefreshNonce] = useState(0);
   const reqRef = useRef(0);
   const refreshRef = useRef(false);
+  /** The analysis as it streams in, and the id that cancels it (`translate:analyzeCancel`). */
+  const [draft, setDraft] = useState('');
+  const [stopped, setStopped] = useState(false);
+  const activeRequest = useRef<string | null>(null);
 
   // Offline particle path: tokenize the Japanese side as soon as it exists.
   useEffect(() => {
@@ -85,6 +92,8 @@ export default function SentenceAnalysisPanel({
     setError('');
     setNeedsConsent(false);
     setLoading(false);
+    setDraft('');
+    setStopped(false);
     if (!translatedText.trim() || !sourceText.trim()) return;
     if (jaInvolved && tokens === null) return;
     if (!cloudAnalysis) return;
@@ -93,6 +102,12 @@ export default function SentenceAnalysisPanel({
       return;
     }
     let alive = true;
+    analyzeCounter += 1;
+    const requestId = `tra-${Date.now().toString(36)}-${analyzeCounter}`;
+    activeRequest.current = requestId;
+    const unsubscribe = subscribeAiStream(requestId, (raw) => {
+      if (alive && id === reqRef.current) setDraft(aiStreamPreviewText(raw));
+    });
     void (async () => {
       try {
         setLoading(true);
@@ -106,10 +121,18 @@ export default function SentenceAnalysisPanel({
           target,
           jaParticleTokens,
           explainIn: uiLang,
+          requestId,
           ...(refresh ? { refresh: true } : {}),
         });
         if (!alive || id !== reqRef.current) return;
+        activeRequest.current = null;
         setLoading(false);
+        if (res.code === 'cancelled') {
+          // Cancel keeps what had streamed in; Re-analyze asks again.
+          setStopped(true);
+          return;
+        }
+        setDraft('');
         if (res.ok && res.result) {
           setResult(res.result);
           setPartial(Boolean(res.partial));
@@ -121,13 +144,32 @@ export default function SentenceAnalysisPanel({
       } catch {
         if (!alive || id !== reqRef.current) return;
         setLoading(false);
+        setDraft('');
         setError(t(aiErrorKey('ipc-failed')));
+      } finally {
+        unsubscribe();
       }
     })();
     return () => {
       alive = false;
+      unsubscribe();
+      // A newer sentence (or leaving the view) makes this analysis irrelevant: stop it.
+      if (activeRequest.current === requestId) {
+        activeRequest.current = null;
+        void window.api.translateAnalyzeCancel?.(requestId)?.catch(() => undefined);
+      }
     };
   }, [sourceText, translatedText, source, target, tokens, jaInvolved, cloudAnalysis, consented, uiLang, refreshNonce, t]);
+
+  const cancel = useCallback(() => {
+    const requestId = activeRequest.current;
+    if (!requestId) return;
+    activeRequest.current = null;
+    reqRef.current += 1;
+    void window.api.translateAnalyzeCancel?.(requestId)?.catch(() => undefined);
+    setLoading(false);
+    setStopped(true);
+  }, []);
 
   const reanalyze = useCallback(() => {
     refreshRef.current = true;
@@ -166,7 +208,13 @@ export default function SentenceAnalysisPanel({
         <div className="tr-analysis-loading">
           <span className="media-gen-dot" />
           <span className="muted">{t('sentenceAnalysis.analyzing')}</span>
+          <button type="button" className="btn small tr-analysis-cancel" onClick={cancel}>
+            {t('aiStudy.stream.stop')}
+          </button>
         </div>
+      )}
+      {(loading || stopped) && (
+        <AiStreamDraft text={draft} state={stopped ? 'stopped' : 'drafting'} lang={uiLang} />
       )}
       {error && <p className="tr-analysis-error muted">{t('sentenceAnalysis.unavailable', { error })}</p>}
       {result?.formality && <FormalityToggle variants={result.formality} lang={target} />}
@@ -175,7 +223,7 @@ export default function SentenceAnalysisPanel({
         <MeasureWordGuide measureWords={result.measureWords} aspectNotes={result.aspectNotes} />
       )}
       {partial && <p className="tr-analysis-error muted">{t('aiFix.analysis.partial')}</p>}
-      {(result || error) && !loading && (
+      {(result || error || stopped) && !loading && (
         <button type="button" className="btn small tr-analysis-retry" onClick={reanalyze}>
           {t('lens.ai.reanalyze')}
         </button>

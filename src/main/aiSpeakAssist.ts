@@ -66,7 +66,7 @@ import {
   type WritingCorrectionResult,
 } from '../shared/aiWritingCorrection';
 import { getConfiguredAiEngine } from './mining';
-import { runAiStudyFeature, type AiStudyDeps, type AiStudyFeatureSpec } from './aiStudyAssist';
+import { aiStudyStreamDeps, runAiStudyFeature, type AiStudyDeps, type AiStudyFeatureSpec } from './aiStudyAssist';
 
 // ---- the reply shapes ------------------------------------------------------------------
 
@@ -209,8 +209,10 @@ export function gradeJournalEntry(input: unknown, deps: AiStudyDeps = {}): Promi
 
 /** Cancel is the study helpers' own `aiStudy:cancel`: one runner, one map of requests in flight. */
 export function registerAiSpeakAssistIpc(): void {
-  ipcMain.handle('aiSpeak:shadowing', (_event, input: unknown) => explainShadowing(input));
-  ipcMain.handle('aiSpeak:conversation', (_event, input: unknown) => replyAsConversationPartner(input));
-  ipcMain.handle('aiSpeak:correct', (_event, input: unknown) => correctWriting(input));
-  ipcMain.handle('aiSpeak:journal', (_event, input: unknown) => gradeJournalEntry(input));
+  // Every reply streams back to the window that asked (a preview: the partner's
+  // line appears as it is written; what is kept is the validated whole reply).
+  ipcMain.handle('aiSpeak:shadowing', (event, input: unknown) => explainShadowing(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiSpeak:conversation', (event, input: unknown) => replyAsConversationPartner(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiSpeak:correct', (event, input: unknown) => correctWriting(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiSpeak:journal', (event, input: unknown) => gradeJournalEntry(input, aiStudyStreamDeps(event, input)));
 }
