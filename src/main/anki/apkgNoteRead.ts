@@ -12,6 +12,12 @@
 // local SRS), its first cited audio and image (stored as managed media) — and
 // counts everything it could not keep, so the renderer can say exactly what
 // did not come across.
+//
+// And the two things an Anki user's history is made of beyond the schedule:
+// each first card's review log (`revlog`), which the renderer merges into the
+// local review log so Statistics, the optimiser and the memory replay see the
+// years of answers behind an imported card, and the FSRS parameters of the
+// deck options those cards were studied under, which Settings offers to adopt.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,10 +34,14 @@ import {
 import {
   ankiScheduleToLocalSrs,
   notesToCards,
+  pickAnkiFsrsWeights,
   type AnkiCardSchedule,
+  type AnkiRevlogRow,
   type ApkgCardsResult,
+  type ApkgFsrsSettings,
   type RawNote,
 } from '../../shared/apkgCards';
+import { decodeDeckConfigFsrs, decodeNormalDeckKind, type AnkiDeckConfigFsrs } from './ankiProtoConfig';
 import { COMPRESSED_HELP, getSql, readCollection, readMediaManifest } from './apkgCollection';
 import { MINED_MEDIA_EXTENSIONS, writeMinedMediaBytes } from '../minedMediaStore';
 
@@ -149,6 +159,136 @@ function num(value: unknown): number {
 }
 
 /**
+ * The review log of the given cards, oldest first per card. A collection
+ * without a `revlog` table (hand-built, or a stripped shared deck) has no
+ * history, which is an answer, not an error.
+ */
+function readRevlog(db: Database, cardIds: ReadonlySet<number>): Map<number, AnkiRevlogRow[]> {
+  const out = new Map<number, AnkiRevlogRow[]>();
+  if (!cardIds.size) return out;
+  let rows: unknown[][] = [];
+  try {
+    rows = db.exec('SELECT id, cid, ease, ivl, lastIvl, factor, time, type FROM revlog ORDER BY id')[0]?.values ?? [];
+  } catch {
+    return out;
+  }
+  for (const r of rows) {
+    const cid = num(r[1]);
+    if (!cardIds.has(cid)) continue;
+    const row: AnkiRevlogRow = {
+      id: num(r[0]),
+      ease: num(r[2]),
+      ivl: num(r[3]),
+      lastIvl: num(r[4]),
+      factor: num(r[5]),
+      time: num(r[6]),
+      type: num(r[7]),
+    };
+    const list = out.get(cid);
+    if (list) list.push(row);
+    else out.set(cid, [row]);
+  }
+  return out;
+}
+
+/** Every options preset in the collection, by id: schema 18's table, else schema 11's JSON. */
+function readDeckConfigs(db: Database): Map<number, AnkiDeckConfigFsrs & { name?: string }> {
+  const out = new Map<number, AnkiDeckConfigFsrs & { name?: string }>();
+  try {
+    for (const row of db.exec('SELECT id, name, config FROM deck_config')[0]?.values ?? []) {
+      const decoded = decodeDeckConfigFsrs(row[2]);
+      if (decoded) out.set(num(row[0]), { ...decoded, ...(typeof row[1] === 'string' && row[1] ? { name: row[1] } : {}) });
+    }
+    if (out.size) return out;
+  } catch {
+    /* no schema-18 table — try the legacy JSON */
+  }
+  try {
+    const raw = db.exec('SELECT dconf FROM col LIMIT 1')[0]?.values?.[0]?.[0];
+    if (typeof raw !== 'string' || !raw.trim()) return out;
+    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>;
+    // A value that is not a number (a NaN written out as null) is not a parameter: NaN, refused later.
+    const floats = (value: unknown): number[] => (Array.isArray(value) ? value.map((v) => (typeof v === 'number' ? v : Number.NaN)) : []);
+    for (const [id, conf] of Object.entries(parsed)) {
+      const retention = Number(conf?.desiredRetention);
+      const maximum = Number((conf?.rev as { maxIvl?: unknown } | undefined)?.maxIvl);
+      out.set(Number(id), {
+        // Anki's schema-11 names (`DeckConfSchema11`): `fsrsWeights` is FSRS-4.5's.
+        params6: floats(conf?.fsrsParams6),
+        params5: floats(conf?.fsrsParams5),
+        ...(Number.isFinite(retention) && retention > 0 ? { desiredRetention: retention } : {}),
+        ...(Number.isFinite(maximum) && maximum > 0 ? { maximumReviewInterval: Math.floor(maximum) } : {}),
+        ...(typeof conf?.name === 'string' && conf.name ? { name: conf.name } : {}),
+      });
+    }
+  } catch {
+    /* leave the map empty */
+  }
+  return out;
+}
+
+/** Deck id -> its options preset id and per-deck retention override, from either schema. */
+function readDeckConfigIds(db: Database): Map<number, { configId: number; desiredRetention?: number }> {
+  const out = new Map<number, { configId: number; desiredRetention?: number }>();
+  try {
+    for (const row of db.exec('SELECT id, kind FROM decks')[0]?.values ?? []) {
+      const kind = decodeNormalDeckKind(row[1]);
+      if (kind) out.set(num(row[0]), kind);
+    }
+    if (out.size) return out;
+  } catch {
+    /* no schema-18 decks table — try the legacy JSON */
+  }
+  try {
+    const raw = db.exec('SELECT decks FROM col LIMIT 1')[0]?.values?.[0]?.[0];
+    if (typeof raw !== 'string' || !raw.trim()) return out;
+    const parsed = JSON.parse(raw) as Record<string, { conf?: unknown; dyn?: unknown }>;
+    for (const [id, deck] of Object.entries(parsed)) {
+      const conf = Number(deck?.conf);
+      if (!deck?.dyn && Number.isFinite(conf)) out.set(Number(id), { configId: conf });
+    }
+  } catch {
+    /* leave the map empty */
+  }
+  return out;
+}
+
+/**
+ * The FSRS parameters the imported cards were studied under: the options
+ * preset of the deck holding most of them, when Anki had parameters for it (a
+ * preset never optimised, or a collection on SM-2, has none and yields
+ * nothing). Never throws: a collection this cannot read simply has no
+ * parameters to offer.
+ */
+function readFsrsSettings(
+  db: Database,
+  deckCounts: ReadonlyMap<number, number>,
+  deckNames: ReadonlyMap<string, string>,
+): ApkgFsrsSettings | undefined {
+  try {
+    const top = [...deckCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (!top) return undefined;
+    const deck = readDeckConfigIds(db).get(top[0]);
+    const configs = readDeckConfigs(db);
+    const config = configs.get(deck?.configId ?? 1);
+    if (!config) return undefined;
+    const weights = pickAnkiFsrsWeights(config.params6, config.params5);
+    if (!weights) return undefined;
+    const retention = deck?.desiredRetention ?? config.desiredRetention;
+    const deckName = deckNames.get(String(top[0]));
+    return {
+      weights,
+      ...(retention !== undefined && retention >= 0.5 && retention < 1 ? { desiredRetention: Math.round(retention * 1000) / 1000 } : {}),
+      ...(config.maximumReviewInterval ? { maximumIntervalDays: config.maximumReviewInterval } : {}),
+      ...(config.name ? { presetName: config.name } : {}),
+      ...(deckName ? { deckName } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Whole notes — expression, reading, meaning, sentence, deck, tags, media refs
  * and the first card's schedule. The deck and schedule come from the note's
  * first card (by card id), which matches how Anki's browser files a note.
@@ -161,7 +301,7 @@ export function readCards(db: Database, nowMs = Date.now()): ApkgCardsResult {
   let rows: unknown[][] = [];
   let withSchedule = true;
   const scheduleQuery = (columns: string) => db.exec(`
-      SELECT n.mid, n.flds, n.tags, c.did, c.type, c.queue, c.due, c.ivl, c.factor, c.reps, c.lapses${columns}
+      SELECT n.mid, n.flds, n.tags, c.did, c.type, c.queue, c.due, c.ivl, c.factor, c.reps, c.lapses, c.id${columns}
       FROM notes n
       LEFT JOIN cards c ON c.id = (SELECT MIN(c2.id) FROM cards c2 WHERE c2.nid = n.id)
     `);
@@ -181,6 +321,16 @@ export function readCards(db: Database, nowMs = Date.now()): ApkgCardsResult {
     rows = res[0]?.values ?? [];
   }
 
+  const firstCardIds = new Set<number>();
+  const deckCounts = new Map<number, number>();
+  if (withSchedule) {
+    for (const r of rows) {
+      if (r[11] != null) firstCardIds.add(num(r[11]));
+      if (r[3] != null) deckCounts.set(num(r[3]), (deckCounts.get(num(r[3])) ?? 0) + 1);
+    }
+  }
+  const revlog = readRevlog(db, firstCardIds);
+
   const notes: RawNote[] = rows.map((r) => {
     const schedule: AnkiCardSchedule | undefined =
       withSchedule && r[4] != null
@@ -192,15 +342,19 @@ export function readCards(db: Database, nowMs = Date.now()): ApkgCardsResult {
             factor: num(r[8]),
             reps: num(r[9]),
             lapses: num(r[10]),
-            ...(typeof r[11] === 'string' && r[11] ? { data: r[11] } : {}),
+            ...(typeof r[12] === 'string' && r[12] ? { data: r[12] } : {}),
           }
         : undefined;
+    const ankiCardId = withSchedule && r[11] != null ? num(r[11]) : undefined;
+    const history = ankiCardId !== undefined ? revlog.get(ankiCardId) : undefined;
     return {
       mid: String(r[0]),
       flds: String(r[1] ?? ''),
       tags: typeof r[2] === 'string' ? r[2] : undefined,
       deck: withSchedule && r[3] != null ? deckNames.get(String(r[3])) : undefined,
       ...(schedule ? { schedule } : {}),
+      ...(ankiCardId !== undefined ? { ankiCardId } : {}),
+      ...(history?.length ? { history } : {}),
     };
   });
 
@@ -216,8 +370,10 @@ export function readCards(db: Database, nowMs = Date.now()): ApkgCardsResult {
       report.scheduledCards += 1;
     }
     delete card.schedule;
+    report.historyReviews += card.history?.filter((row) => row.ease >= 1 && row.ease <= 4 && row.type < 4).length ?? 0;
   }
-  return { ok: true, cards, noteCount, report };
+  const fsrs = withSchedule ? readFsrsSettings(db, deckCounts, deckNames) : undefined;
+  return { ok: true, cards, noteCount, report, ...(fsrs ? { fsrs } : {}) };
 }
 
 const ZSTD_MAGIC = [0x28, 0xb5, 0x2f, 0xfd];

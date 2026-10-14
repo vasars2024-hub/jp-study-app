@@ -29,8 +29,7 @@ import {
   synthesizeWithSupertonic,
 } from './flashcardTtsHost';
 import { writeLocalDeckApkgOffMain } from './anki/localDeckApkgHost';
-import type { LocalDeckApkgRequest } from '../shared/localDeckApkg';
-import { isLocalSrsState } from '../shared/localSrs';
+import { sanitizeLocalDeckApkgSchedules, type LocalDeckApkgRequest } from '../shared/localDeckApkg';
 import { pickCardAiExtras } from '../shared/cardAiExtras';
 import { cardAiExtrasLabels } from '../shared/cardAiExtrasHtml';
 import { mt } from './i18n';
@@ -262,19 +261,18 @@ export interface DeckExportResult {
   packageVerified?: boolean;
   /** Cards the package carries with their review schedule (the rest import as new). */
   scheduled?: number;
+  /** Past answers the package carries in its review log. */
+  reviews?: number;
   error?: string;
 }
 
-/** Per-row schedules from the renderer: anything that is not a valid local SRS state exports as new. */
+/**
+ * Per-row schedules from the renderer: anything that is not a valid local SRS
+ * state exports as new, and a review history keeps only well-formed answers
+ * (`shared/localDeckApkg.ts`).
+ */
 function sanitizeExportSchedules(value: unknown): LocalDeckApkgRequest['schedules'] {
-  if (!Array.isArray(value)) return undefined;
-  return value.map((entry) => {
-    if (!entry || typeof entry !== 'object') return null;
-    const raw = entry as { srs?: unknown; suspended?: unknown };
-    const srs = isLocalSrsState(raw.srs) ? raw.srs : undefined;
-    const suspended = raw.suspended === true;
-    return srs || suspended ? { ...(srs ? { srs } : {}), ...(suspended ? { suspended } : {}) } : null;
-  });
+  return sanitizeLocalDeckApkgSchedules(value);
 }
 
 /**
@@ -337,6 +335,7 @@ export async function exportDeckWithAudio(
   let packagePath: string | undefined;
   let packageVerified = false;
   let scheduled = 0;
+  let reviews = 0;
   if (rows && rows.length > 1) {
     packagePath = path.join(directory, safeName.replace(/\.[^.]+$/, '') + '.apkg');
     try {
@@ -353,6 +352,7 @@ export async function exportDeckWithAudio(
       });
       packageVerified = true;
       scheduled = packaged.scheduled ?? 0;
+      reviews = packaged.reviews ?? 0;
     } catch (error) {
       return {
         ok: false,
@@ -363,7 +363,16 @@ export async function exportDeckWithAudio(
       };
     }
   }
-  return { ok: true, directory, written, failed, packagePath, packageVerified, ...(scheduled ? { scheduled } : {}) };
+  return {
+    ok: true,
+    directory,
+    written,
+    failed,
+    packagePath,
+    packageVerified,
+    ...(scheduled ? { scheduled } : {}),
+    ...(reviews ? { reviews } : {}),
+  };
 }
 
 /** A spawn failure that carries which classification the caller should report. */

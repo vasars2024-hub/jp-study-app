@@ -316,6 +316,19 @@ describe('Anki owns scheduling', () => {
     // The local schedule was not touched: Anki's state is display-only (rule 1).
     expect(loadDeck().find((c) => c.id === kept.id)?.srs).toBeUndefined();
   });
+
+  it('sends the user\'s study-day start hour, so main dates Anki\'s due days on study days', async () => {
+    setAnkiOwnsScheduling(true);
+    linkedCard('猫', 101);
+    localStorage.setItem('jp-flashcard-scheduling-v1', JSON.stringify({ dayStartHour: 6 }));
+    const requests: unknown[] = [];
+    (window as unknown as { api: { ankiPullSchedule: unknown } }).api.ankiPullSchedule = async (request: { noteIds: number[] }) => {
+      requests.push(request);
+      return pullReply(request.noteIds);
+    };
+    await syncAnkiNow({ force: true });
+    expect(requests).toEqual([expect.objectContaining({ noteIds: [101], dayStartHour: 6 })]);
+  });
 });
 
 describe('cards created on another machine', () => {

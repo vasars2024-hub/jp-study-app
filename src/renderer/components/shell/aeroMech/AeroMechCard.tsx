@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DeckFlashcard } from '../../../flashcardDeck';
 import type { LocalSrsRating } from '../../../../shared/localSrs';
 import { previewSchedule } from '../../../../shared/flashcardScheduling';
-import { loadSchedulingConfig } from '../../../flashcardScheduling';
+import { schedulingConfigForCard } from '../../../flashcardScheduling';
 import { srsIntervalLabel } from '../../../srsIntervalLabel';
 import { useT } from '../../../i18n';
 
@@ -39,7 +39,7 @@ export default function AeroMechCard({ card, mode, onGrade, onSkip }: AeroMechCa
   }, [card.id, mode]);
 
   const ratings = mode === 'learn' ? LEARN_RATINGS : RATINGS;
-  const preview = useMemo(() => previewSchedule(card.srs, loadSchedulingConfig()), [card.id, card.srs]);
+  const preview = useMemo(() => previewSchedule(card.srs, schedulingConfigForCard({ folder: card.folder })), [card.id, card.srs, card.folder]);
   // `lang`, not `t`: the labels only change when the language does.
   const intervals = useMemo(() => {
     const out = {} as Record<LocalSrsRating, string>;

@@ -6,10 +6,21 @@
 // freezes the UI thread.
 
 import { getTokenizer, tokenizeSync } from './tokenizer';
-import { deckLabel, emptyApkgImportReport, type ApkgImportReport } from '../shared/apkgCards';
+import {
+  ankiRevlogToReviewEntries,
+  deckLabel,
+  emptyApkgImportReport,
+  type ApkgCard,
+  type ApkgFsrsSettings,
+  type ApkgImportReport,
+} from '../shared/apkgCards';
+import { fsrsVersionOf, type FsrsVersion } from '../shared/fsrs';
+import type { ReviewLogEntry } from '../shared/reviewLog';
 import { deckBookId, legacyDeckBookId } from '../shared/deckImport';
 import { guessLevelSlot, type LevelSlot } from '../shared/levelScale';
 import { upsertImportedDeck, type DeckFlashcard } from './flashcardDeck';
+import { saveSchedulingConfig } from './flashcardScheduling';
+import { mergeReviewLogRows } from './reviewLog';
 import { enrichNewCards } from './flashcardAutoEnrich';
 import { flushLevelListsPersistence, getSlotList, upsertSlotList, type LevelList } from './levelLists';
 import { getStudyLang } from './studyEnvironment';
@@ -42,6 +53,47 @@ export interface ApkgCardImportResult {
   deckName?: string;
   fileName?: string;
   error?: string;
+  /** Past answers from Anki's review log written into Gum's (new ones only). */
+  historyAdded?: number;
+  /** Ids of those review-log rows, so an undo of the import can take them back out. */
+  historyIds?: string[];
+  /** The package's answers that could not be written (the review log was unavailable). */
+  historyFailed?: number;
+  /** The FSRS version of the parameters found in the deck's options, now offered in Settings. */
+  fsrsVersion?: FsrsVersion;
+}
+
+/**
+ * Every imported card's Anki answers as review-log rows, for the Gum card each
+ * note landed on (`entryIds`, aligned with `cards`).
+ */
+export function apkgHistoryRows(cards: readonly ApkgCard[], entryIds: readonly string[]): ReviewLogEntry[] {
+  const rows: ReviewLogEntry[] = [];
+  cards.forEach((card, index) => {
+    const cardId = entryIds[index];
+    if (!cardId || card.ankiCardId === undefined || !card.history?.length) return;
+    for (const row of ankiRevlogToReviewEntries(card.history, card.ankiCardId, cardId, card.word)) rows.push(row);
+  });
+  return rows;
+}
+
+/**
+ * Keep the deck options' FSRS parameters where Settings can offer them. They
+ * are stored, never applied: adopting them (for all cards or as a preset) is
+ * the user's choice, so an import cannot move a single interval by itself.
+ */
+export function rememberApkgFsrsSettings(fsrs: ApkgFsrsSettings, fileName: string | undefined, now = Date.now()): void {
+  saveSchedulingConfig({
+    ankiFsrsImport: {
+      weights: [...fsrs.weights],
+      importedAt: now,
+      ...(fsrs.desiredRetention !== undefined ? { desiredRetention: fsrs.desiredRetention } : {}),
+      ...(fsrs.maximumIntervalDays !== undefined ? { maximumIntervalDays: fsrs.maximumIntervalDays } : {}),
+      ...(fsrs.presetName ? { presetName: fsrs.presetName } : {}),
+      ...(fsrs.deckName ? { deckName: fsrs.deckName } : {}),
+      ...(fileName ? { fileName } : {}),
+    },
+  });
 }
 
 /**
@@ -57,6 +109,11 @@ export interface ApkgCardImportResult {
  * deck is an UPSERT (`upsertImportedDeck`): cards already imported keep their
  * id and their local review progress. It used to append a second copy of
  * every card, contrary to what this comment then claimed.
+ *
+ * Each card's Anki review log is merged into the local one
+ * (`mergeReviewLogRows`: once, deduplicated, never counted as today's study),
+ * and the FSRS parameters of the deck's options preset are kept for Settings
+ * to offer.
  */
 export async function importApkgCards(
   filePath?: string,
@@ -110,6 +167,22 @@ export async function importApkgCards(
   // run reports rather than quietly narrating a prefix of the deck.
   void enrichNewCards(result.added);
 
+  // The history: the cards are in the deck now, so every answer has a card id.
+  const historyRows = apkgHistoryRows(cards, result.entryIds);
+  let historyAdded = 0;
+  let historyIds: string[] = [];
+  let historyFailed = 0;
+  if (historyRows.length) {
+    try {
+      const merged = await mergeReviewLogRows(historyRows);
+      historyAdded = merged.added;
+      historyIds = merged.ids;
+    } catch {
+      historyFailed = historyRows.length;
+    }
+  }
+  if (res.fsrs) rememberApkgFsrsSettings(res.fsrs, res.fileName);
+
   return {
     ok: true,
     added: result.added,
@@ -119,21 +192,32 @@ export async function importApkgCards(
     noteCount: res.noteCount,
     deckName,
     fileName: res.fileName,
+    ...(historyAdded ? { historyAdded, historyIds } : {}),
+    ...(historyFailed ? { historyFailed } : {}),
+    ...(res.fsrs ? { fsrsVersion: fsrsVersionOf(res.fsrs.weights) } : {}),
   };
 }
 
 /**
  * One sentence per thing the import could not keep, so nothing is dropped
- * silently. Empty when everything came across. The review LOG (Anki's history
- * of past answers) is never imported, only each card's current schedule, and
- * that is said whenever a schedule was carried.
+ * silently, and one for each kind of history that did come across. Empty when
+ * there is nothing to say.
  */
-export function apkgImportNotice(result: Pick<ApkgCardImportResult, 'report' | 'updated'>): string {
+export function apkgImportNotice(
+  result: Pick<ApkgCardImportResult, 'report' | 'updated' | 'historyAdded' | 'historyFailed' | 'fsrsVersion'>,
+): string {
   const r = result.report;
   if (!r) return '';
   const parts: string[] = [];
   if (result.updated) parts.push(t('apkgImport.notice.updated', { count: result.updated }));
-  if (r.scheduledCards) parts.push(t('apkgImport.notice.scheduled', { count: r.scheduledCards }));
+  // The schedule sentence that says the package carried no review history is
+  // only true when it did not.
+  if (r.scheduledCards && r.historyReviews) parts.push(t('srs5.import.scheduled', { count: r.scheduledCards }));
+  else if (r.scheduledCards) parts.push(t('apkgImport.notice.scheduled', { count: r.scheduledCards }));
+  if (result.historyAdded) parts.push(t('srs5.import.history', { count: result.historyAdded }));
+  else if (r.historyReviews && !result.historyFailed) parts.push(t('srs5.import.historyKnown', { count: r.historyReviews }));
+  if (result.historyFailed) parts.push(t('srs5.import.historyFailed', { count: result.historyFailed }));
+  if (result.fsrsVersion) parts.push(t('srs5.import.fsrsParams', { version: result.fsrsVersion }));
   if (r.emptyNotes) parts.push(t('apkgImport.notice.empty', { count: r.emptyNotes }));
   if (r.duplicateNotes) parts.push(t('apkgImport.notice.duplicates', { count: r.duplicateNotes }));
   if (r.extraFieldNotes) parts.push(t('apkgImport.notice.extraFields', { count: r.extraFieldNotes }));

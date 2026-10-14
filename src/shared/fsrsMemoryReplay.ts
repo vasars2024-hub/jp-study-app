@@ -29,6 +29,12 @@
  * review had, which is what Anki does with a truncated revlog. A card with no
  * history at all but an SM-2 schedule gets the same estimate from its current
  * ease and interval — never a restart as a new card.
+ *
+ * Both FSRS versions replay through the same code: the weights decide (see
+ * `fsrs.ts`), so an FSRS-6 preset's cards are rebuilt with its fitted decay and
+ * same-day term, and the interval of a rescheduled card is read off that
+ * preset's own forgetting curve. With presets, each card is replayed under the
+ * preset of its deck folder (`configForCard`).
  */
 import {
   DEFAULT_FSRS_WEIGHTS,
@@ -136,6 +142,8 @@ export interface ReplayCard {
   id: string;
   suspended?: boolean;
   srs?: LocalSrsState | null;
+  /** The deck folder, which decides the card's preset when `configForCard` is given. */
+  folder?: string;
 }
 
 export interface FsrsReplayConfig extends StudyDayOptions {
@@ -187,14 +195,14 @@ function sameMemory(a: { stability?: number; difficulty?: number }, b: FsrsMemor
  * it. `rescheduleDue` false is the memory-only conversion; true also moves
  * review cards' due dates to `last review day + new interval`.
  */
-export function planFsrsReplay(
-  cards: readonly ReplayCard[],
+export function planFsrsReplay<C extends ReplayCard>(
+  cards: readonly C[],
   log: readonly ReplayLogRow[],
-  config: FsrsReplayConfig,
+  shared: FsrsReplayConfig,
   now: number,
   rescheduleDue: boolean,
+  configForCard?: (card: C) => FsrsReplayConfig,
 ): FsrsReplayPlan {
-  const weights = config.weights ?? DEFAULT_FSRS_WEIGHTS;
   const byCard = new Map<string, ReplayLogRow[]>();
   for (const row of log) {
     if (!row.cardId) continue;
@@ -209,10 +217,12 @@ export function planFsrsReplay(
   let sumBefore = 0;
   let sumAfter = 0;
   let reviewCards = 0;
-  const day = { dayStartHour: config.dayStartHour, utcOffsetMinutes: config.utcOffsetMinutes };
+  const day = { dayStartHour: shared.dayStartHour, utcOffsetMinutes: shared.utcOffsetMinutes };
   for (const card of cards) {
     const srs = card.srs;
     if (card.suspended || !srs) continue;
+    const config = configForCard?.(card) ?? shared;
+    const weights = config.weights ?? DEFAULT_FSRS_WEIGHTS;
     plan.considered += 1;
     if (srs.dueAt <= now) plan.dueBefore += 1;
     let memory: FsrsMemory | null = null;
@@ -240,7 +250,7 @@ export function planFsrsReplay(
     let intervalDays = srs.intervalDays;
     let dueAt = srs.dueAt;
     if (rescheduleDue && !inSteps) {
-      const raw = fsrsInterval(memory.stability, config.desiredRetention);
+      const raw = fsrsInterval(memory.stability, config.desiredRetention, weights);
       intervalDays = Math.min(config.maximumIntervalDays, Math.max(1, Math.round(raw)));
       dueAt = startOfStudyDayIndex(studyDayIndex(srs.lastReviewedAt, day) + intervalDays, day);
     }

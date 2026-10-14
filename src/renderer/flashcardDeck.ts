@@ -50,16 +50,20 @@ import type { FlashcardReviewMode } from '../shared/flashcardReview';
 import { localDueForecast, type LocalDueForecast } from '../shared/reviewForecast';
 import {
   adaptStateForAlgorithm,
+  effectiveFsrsWeights,
   isLeechLapse,
   migrateSrsState,
   resetSrsState,
   scheduleReview,
+  schedulingConfigForFolder,
   type ScheduleOptions,
+  type SchedulingConfig,
 } from '../shared/flashcardScheduling';
-import { loadSchedulingConfig } from './flashcardScheduling';
+import { loadSchedulingConfig, schedulingConfigForCard } from './flashcardScheduling';
 import {
   applyFsrsReplayEntry,
   planFsrsReplay,
+  type FsrsReplayConfig,
   type FsrsReplayPlan,
   type ReplayLogRow,
 } from '../shared/fsrsMemoryReplay';
@@ -2047,7 +2051,9 @@ export function reviewDeckCard(
   const index = deckCardIndex(store.cards, id);
   if (index < 0) return store.cards;
   const previous = store.cards[index];
-  const config = loadSchedulingConfig();
+  // The card's deck folder decides its preset (retention, steps, FSRS version
+  // and parameters, leech rule); folders without one use the shared settings.
+  const config = schedulingConfigForCard(previous);
   // Fuzz is seeded from the card id; the load map is only built when the user
   // asked for reviews to be spread.
   const options: ScheduleOptions = config.fuzz
@@ -2224,14 +2230,10 @@ export function convertDeckSchedule(
   if (switched.length) {
     // SM-2 -> FSRS: each card gets the memory its review history implies (or
     // the SM-2 estimate Anki uses when there is none), never a restart as a
-    // new card. Due dates stay where they are: the queue does not move.
+    // new card. Due dates stay where they are: the queue does not move. Each
+    // card is replayed under its own preset's FSRS parameters.
     const config = loadSchedulingConfig();
-    const plan = planFsrsReplay(switched, options.log ?? [], {
-      weights: config.fsrsWeights,
-      desiredRetention: config.desiredRetention,
-      maximumIntervalDays: config.maximumIntervalDays,
-      dayStartHour: config.dayStartHour,
-    }, options.now ?? Date.now(), false);
+    const plan = planFsrsReplay(switched, options.log ?? [], replayConfig(config), options.now ?? Date.now(), false, (card) => replayConfig(schedulingConfigForFolder(config, card.folder)));
     const byId = new Map(plan.entries.map((entry) => [entry.id, entry]));
     store.cards = store.cards.map((card) => {
       const entry = byId.get(card.id);
@@ -2256,12 +2258,18 @@ export function previewFsrsReplay(
   now = Date.now(),
 ): FsrsReplayPlan {
   const config = loadSchedulingConfig();
-  return planFsrsReplay(loadDeck(), log, {
-    weights: config.fsrsWeights,
+  return planFsrsReplay(loadDeck(), log, replayConfig(config), now, rescheduleDue,
+    (card) => replayConfig(schedulingConfigForFolder(config, card.folder)));
+}
+
+/** The replay's view of one preset: the weights it runs, its retention and ceiling. */
+function replayConfig(config: SchedulingConfig): FsrsReplayConfig {
+  return {
+    weights: effectiveFsrsWeights(config),
     desiredRetention: config.desiredRetention,
     maximumIntervalDays: config.maximumIntervalDays,
     dayStartHour: config.dayStartHour,
-  }, now, rescheduleDue);
+  };
 }
 
 /**
@@ -2406,7 +2414,7 @@ export function replaceImportedDeck(
 }
 
 import { legacyDeckBookId, type ImportDeckEntry } from '../shared/deckImport';
-import { planDeckUpsert, type DeckUpsertGroup } from '../shared/deckUpsert';
+import { deckUpsertKey, inDeckGroup, planDeckUpsert, type DeckUpsertGroup } from '../shared/deckUpsert';
 
 export interface DeckUpsertOptions {
   /** Delete group cards the file no longer has. The UI confirms this first. */
@@ -2422,6 +2430,12 @@ export interface DeckUpsertResult {
   removed: number;
   /** Group cards the file does not have (kept unless `removeMissing`). */
   missing: number;
+  /**
+   * For each entry, in order, the id of the card it landed on: the matched
+   * card's (an update keeps the id) or the new card's. What an import needs
+   * to attach anything else it carried, such as review history, to the cards.
+   */
+  entryIds: string[];
 }
 
 /** What `upsertImportedDeck` would do, without writing. */
@@ -2451,7 +2465,18 @@ export function upsertImportedDeck(
   options: DeckUpsertOptions = {},
 ): DeckUpsertResult {
   const store = readStore();
-  const plan = planDeckUpsert(store.cards, { bookId, legacy: options.legacy }, entries);
+  const group: DeckUpsertGroup = { bookId, legacy: options.legacy };
+  const plan = planDeckUpsert(store.cards, group, entries);
+  // The plan's own matching, replayed for ids: one queue per key over the
+  // group's cards in deck order, so the nth entry with a word gets the nth card.
+  const queues = new Map<string, string[]>();
+  for (const card of store.cards) {
+    if (!inDeckGroup(card, group)) continue;
+    const key = deckUpsertKey(card);
+    const queue = queues.get(key);
+    if (queue) queue.push(card.id);
+    else queues.set(key, [card.id]);
+  }
   const replaced = new Map(plan.updated.map((c) => [c.id, c]));
   const removedIds = options.removeMissing ? new Set(plan.missing.map((c) => c.id)) : new Set<string>();
   const now = Date.now();
@@ -2472,12 +2497,15 @@ export function upsertImportedDeck(
   ];
   if (restoring) for (const card of created) createdWhileRestoring.add(card.id);
   if (created.length || replaced.size || removedIds.size) writeStore(store);
+  let nextCreated = 0;
+  const entryIds = entries.map((entry) => queues.get(deckUpsertKey(entry))?.shift() ?? created[nextCreated++]?.id ?? '');
   return {
     added: created,
     updated: plan.updated.length,
     unchanged: plan.unchanged.length,
     removed: removedIds.size,
     missing: plan.missing.length,
+    entryIds,
   };
 }
 
@@ -2490,7 +2518,7 @@ export function importDeckFromEntries(
   entries: ImportDeckEntry[],
   options: Omit<DeckUpsertOptions, 'legacy'> = {},
 ): DeckUpsertResult {
-  if (!entries.length) return { added: [], updated: 0, unchanged: 0, removed: 0, missing: 0 };
+  if (!entries.length) return { added: [], updated: 0, unchanged: 0, removed: 0, missing: 0, entryIds: [] };
   const bookId = entries[0].bookId;
   const bookTitle = entries[0].bookTitle;
   return upsertImportedDeck(bookId, entries, {
@@ -2705,13 +2733,17 @@ function tallyDueCard(
 /** Lapses at which a card counts as a leech (Anki's default threshold). */
 export const LEECH_LAPSE_THRESHOLD = 8;
 
-/** The user's leech threshold (Settings), defaulting to Anki's eight. */
-export function leechThreshold(): number {
-  return loadSchedulingConfig().leechThreshold;
+/**
+ * The user's leech threshold (Settings), defaulting to Anki's eight — or, given
+ * a deck folder, the threshold of the preset that folder uses.
+ */
+export function leechThreshold(folder?: string | null): number {
+  return folder ? schedulingConfigForCard({ folder }).leechThreshold : loadSchedulingConfig().leechThreshold;
 }
 
-export function isLeechCard(card: Pick<DeckFlashcard, 'srs'>): boolean {
-  return (card.srs?.lapses ?? 0) >= leechThreshold();
+/** Whether a card has lapsed often enough to be a leech under its own preset. */
+export function isLeechCard(card: Pick<DeckFlashcard, 'srs'> & { folder?: string }): boolean {
+  return (card.srs?.lapses ?? 0) >= leechThreshold(card.folder);
 }
 
 /** What the find box holds while it is narrowed to leeches. */
@@ -2804,8 +2836,18 @@ export function searchDeckCards(cards: DeckFlashcard[], query: string): DeckFlas
   const q = query.normalize('NFKC').trim().toLowerCase();
   if (!q) return cards;
   if (q === LEECH_QUERY) {
-    const threshold = leechThreshold();
-    return cards.filter((card) => (card.srs?.lapses ?? 0) >= threshold);
+    // Each card against its own preset's threshold; one lookup per folder.
+    const thresholds = new Map<string, number>();
+    const thresholdOf = (folder: string | undefined): number => {
+      const key = folder ?? '';
+      let threshold = thresholds.get(key);
+      if (threshold === undefined) {
+        threshold = leechThreshold(folder);
+        thresholds.set(key, threshold);
+      }
+      return threshold;
+    };
+    return cards.filter((card) => (card.srs?.lapses ?? 0) >= thresholdOf(card.folder));
   }
   if (q === SUSPENDED_QUERY) return cards.filter((card) => card.suspended === true);
   const dated = DECK_DATE_QUERY.exec(q);

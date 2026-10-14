@@ -1,26 +1,31 @@
 /**
- * FSRS-5 parameter optimisation from the user's own review log.
+ * FSRS-5 and FSRS-6 parameter optimisation from the user's own review log.
  *
- * `fsrs.ts` ships FSRS-5's population defaults. This fits the nineteen weights
- * to one person's history the way the reference optimiser (fsrs-rs, the one
- * Anki runs) does, in two stages:
+ * `fsrs.ts` ships each version's population defaults. This fits the nineteen
+ * (FSRS-5) or twenty-one (FSRS-6) weights to one person's history the way the
+ * reference optimiser (fsrs-rs, the one Anki runs) does, in two stages:
  *
  * 1. **Pretrain the initial stabilities** (w0..w3). For every card whose first
  *    long-term review followed its first rating directly, the first rating and
  *    the recall outcome after `t` days are a sample of `R(t, S0)`. Each
  *    rating's `S0` is the one-dimensional maximum-likelihood fit, with a mild
  *    pull toward the default so a rating seen five times cannot run away.
- * 2. **Fit the rest by gradient descent** (w4..w18): replay every card's whole
- *    history through the FSRS-5 equations, predict recall at each review a day
- *    or more after the previous one, and minimise binary cross-entropy against
- *    what actually happened. Gradients are exact — forward-mode automatic
- *    differentiation over all nineteen weights, not finite differences — and
+ * 2. **Fit the rest by gradient descent** (w4 onward): replay every card's
+ *    whole history through the FSRS equations, predict recall at each review a
+ *    day or more after the previous one, and minimise binary cross-entropy
+ *    against what actually happened. Gradients are exact — forward-mode
+ *    automatic differentiation over every weight, not finite differences — and
  *    the update is Adam (lr 0.04, cosine-annealed, 5 epochs, batches of ~512
- *    reviews), projected onto the FSRS-5 bounds after every step, with an L2
- *    penalty toward the starting weights scaled by fsrs-rs's per-weight
- *    standard deviations. Same-day reviews feed the short-term weights
- *    (w17, w18) through the state they produce but are not themselves scored,
- *    exactly as in the reference.
+ *    reviews), projected onto the version's bounds after every step, with an L2
+ *    penalty toward the starting weights scaled by per-weight standard
+ *    deviations. Same-day reviews feed the short-term weights (w17, w18, and
+ *    FSRS-6's w19) through the state they produce but are not themselves
+ *    scored, exactly as in the reference. Under FSRS-6 the decay w20 is
+ *    trained too: it shapes every predicted recall, so its gradient comes
+ *    exactly through the forgetting curve itself.
+ *
+ * Which version is fitted is the start vector's: nineteen weights fit FSRS-5,
+ * twenty-one fit FSRS-6 (`fsrsVersionOf` in `fsrs.ts`).
  *
  * Deterministic: batches are shuffled by a seeded generator and nothing reads
  * the clock, so the same log always yields the same weights. A fit is only
@@ -39,15 +44,17 @@
  */
 import {
   DEFAULT_FSRS_WEIGHTS,
+  FSRS6_MIN_STABILITY,
   FSRS_DECAY,
   FSRS_FACTOR,
-  FSRS_WEIGHT_BOUNDS,
+  FSRS_MIN_STABILITY,
+  fsrsRetrievability,
+  fsrsVersionOf,
+  fsrsWeightBounds,
   type FsrsGrade,
 } from './fsrs';
 import type { LocalSrsRating } from './localSrs';
 import { DEFAULT_DAY_START_HOUR, studyDayIndex } from './studyDay';
-
-const P = 19;
 
 /** One graded review as the log stores it. */
 export interface FsrsLogRow {
@@ -148,16 +155,18 @@ export function countScoredReviews(sequences: readonly FsrsTrainingSequence[]): 
 
 interface Dual {
   v: number;
-  /** d v / d w_i for the nineteen weights; `null` for a constant. */
+  /** d v / d w_i for every weight (19 or 21); `null` for a constant. */
   g: number[] | null;
 }
 
 const constant = (v: number): Dual => ({ v, g: null });
 
 function lin(ka: number, a: number[] | null, kb: number, b: number[] | null): number[] | null {
-  if (!a && !b) return null;
-  const out = new Array<number>(P);
-  for (let i = 0; i < P; i += 1) out[i] = (a ? ka * a[i] : 0) + (b ? kb * b[i] : 0);
+  const shape = a ?? b;
+  if (!shape) return null;
+  const n = shape.length;
+  const out = new Array<number>(n);
+  for (let i = 0; i < n; i += 1) out[i] = (a ? ka * a[i] : 0) + (b ? kb * b[i] : 0);
   return out;
 }
 
@@ -189,31 +198,44 @@ const minD = (a: Dual, b: Dual): Dual => (a.v <= b.v ? a : b);
 
 function weightDuals(w: readonly number[]): Dual[] {
   return w.map((v, i) => {
-    const g = new Array<number>(P).fill(0);
+    const g = new Array<number>(w.length).fill(0);
     g[i] = 1;
     return { v, g };
   });
 }
 
-// ----- the FSRS-5 model over duals -------------------------------------------------
+// ----- the FSRS model over duals ---------------------------------------------------
 
 interface DualState {
   s: Dual;
   d: Dual;
 }
 
-const S_MIN = 0.01;
 const S_MAX = 36_500;
+const LN_09 = Math.log(0.9);
+
+/** FSRS-6 is the twenty-one-weight model; its stability floor is fsrs-rs's 0.001. */
+const isV6 = (W: readonly Dual[]): boolean => W.length === 21;
+const sMin = (W: readonly Dual[]): number => (isV6(W) ? FSRS6_MIN_STABILITY : FSRS_MIN_STABILITY);
 
 function initialState(W: Dual[], grade: FsrsGrade): DualState {
   return {
-    s: clampD(W[grade - 1], S_MIN, S_MAX),
+    s: clampD(W[grade - 1], sMin(W), S_MAX),
     d: clampD(addK(sub(W[4], exp(scale(W[5], grade - 1))), 1), 1, 10),
   };
 }
 
-function retrievability(s: Dual, days: number): Dual {
-  return powK(addK(scale(div(constant(days), s), FSRS_FACTOR), 1), FSRS_DECAY);
+/**
+ * Predicted recall after `days`. FSRS-5's curve is fixed; FSRS-6's decay is
+ * w20, so both the exponent and the factor that keeps R(S, S) = 0.9 depend on
+ * it and carry its gradient.
+ */
+function retrievability(W: Dual[], s: Dual, days: number): Dual {
+  if (!isV6(W)) return powK(addK(scale(div(constant(days), s), FSRS_FACTOR), 1), FSRS_DECAY);
+  const decay = scale(W[20], -1);
+  // factor = 0.9^(1/decay) - 1 = e^(ln 0.9 / decay) - 1
+  const factor = addK(exp(scale(div(constant(1), decay), LN_09)), -1);
+  return pow(addK(mul(div(constant(days), s), factor), 1), decay);
 }
 
 function nextDifficulty(W: Dual[], d: Dual, grade: FsrsGrade): Dual {
@@ -229,7 +251,13 @@ function step(W: Dual[], state: DualState, review: FsrsTrainingReview, r: Dual |
   const d = nextDifficulty(W, state.d, grade);
   let s: Dual;
   if (review.deltaDays < 1 || !r) {
-    s = mul(state.s, exp(mul(W[17], addK(W[18], grade - 3))));
+    let growth = exp(mul(W[17], addK(W[18], grade - 3)));
+    if (isV6(W)) {
+      // FSRS-6: S^-w19, and a Good or Easy step never lowers stability.
+      growth = mul(growth, pow(state.s, scale(W[19], -1)));
+      if (grade >= 3 && growth.v < 1) growth = constant(1);
+    }
+    s = mul(state.s, growth);
   } else if (grade === 1) {
     const lapsed = mul(
       mul(mul(W[11], pow(state.d, scale(W[12], -1))), addK(pow(addK(state.s, 1), W[13]), -1)),
@@ -246,7 +274,7 @@ function step(W: Dual[], state: DualState, review: FsrsTrainingReview, r: Dual |
     if (grade === 4) factor = mul(factor, W[16]);
     s = mul(state.s, addK(factor, 1));
   }
-  return { s: clampD(s, S_MIN, S_MAX), d };
+  return { s: clampD(s, sMin(W), S_MAX), d };
 }
 
 const EPS = 1e-7;
@@ -269,7 +297,7 @@ function replay(
     const review = seq[i];
     let r: Dual | null = null;
     if (review.deltaDays >= 1) {
-      r = retrievability(state.s, review.deltaDays);
+      r = retrievability(W, state.s, review.deltaDays);
     }
     // A held-out evaluation replays the whole history (the state needs it) but
     // scores only the held-out reviews.
@@ -281,7 +309,7 @@ function replay(
       n += 1;
       if (grad && r.g) {
         const coef = -y / p + (1 - y) / (1 - p);
-        for (let k = 0; k < P; k += 1) grad[k] += coef * r.g[k];
+        for (let k = 0; k < grad.length; k += 1) grad[k] += coef * r.g[k];
       }
     }
     state = step(W, state, review, r);
@@ -321,15 +349,15 @@ export function evaluateFsrsWeights(
 
 /**
  * Mean log-loss over the scored reviews and its exact gradient with respect to
- * all nineteen weights. What stage 2 descends; exported so the derivative can
- * be checked against finite differences.
+ * every weight (nineteen or twenty-one). What stage 2 descends; exported so the
+ * derivative can be checked against finite differences.
  */
 export function fsrsLossGradient(
   weights: readonly number[],
   sequences: readonly FsrsTrainingSequence[],
 ): { loss: number; gradient: number[]; reviews: number } {
   const W = weightDuals(weights);
-  const grad = new Array<number>(P).fill(0);
+  const grad = new Array<number>(weights.length).fill(0);
   let loss = 0;
   let n = 0;
   for (const seq of sequences) {
@@ -349,8 +377,9 @@ function bce(p: number, y: number): number {
   return -(y * Math.log(q) + (1 - y) * Math.log(1 - q));
 }
 
-function recallAt(stability: number, days: number): number {
-  return (1 + FSRS_FACTOR * (days / stability)) ** FSRS_DECAY;
+/** Recall on the start weights' own curve (stage 1 does not refit FSRS-6's decay). */
+function recallAt(stability: number, days: number, weights: readonly number[]): number {
+  return fsrsRetrievability(stability, days, weights);
 }
 
 /** Minimum samples of a first rating before its S0 is fitted rather than kept. */
@@ -368,6 +397,7 @@ export function pretrainInitialStability(
     if (seq.length < 2 || seq[1].deltaDays < 1) continue;
     samples[seq[0].grade - 1].push({ t: seq[1].deltaDays, y: seq[1].grade > 1 ? 1 : 0 });
   }
+  const bounds = fsrsWeightBounds(fsrsVersionOf(start));
   const fitted = start.slice(0, 4);
   for (let g = 0; g < 4; g += 1) {
     const data = samples[g];
@@ -376,12 +406,12 @@ export function pretrainInitialStability(
     const objective = (logS: number): number => {
       const s = Math.exp(logS);
       let total = 0;
-      for (const { t, y } of data) total += bce(recallAt(s, t), y);
+      for (const { t, y } of data) total += bce(recallAt(s, t, start), y);
       return total + (logS - prior) ** 2;
     };
-    // Golden-section search on ln S over the FSRS-5 bound.
-    let lo = Math.log(FSRS_WEIGHT_BOUNDS[g][0]);
-    let hi = Math.log(FSRS_WEIGHT_BOUNDS[g][1]);
+    // Golden-section search on ln S over the version's bound.
+    let lo = Math.log(bounds[g][0]);
+    let hi = Math.log(bounds[g][1]);
     const phi = (Math.sqrt(5) - 1) / 2;
     let a = hi - phi * (hi - lo);
     let b = lo + phi * (hi - lo);
@@ -409,7 +439,7 @@ export function pretrainInitialStability(
   for (let g = 1; g < 4; g += 1) {
     if (fitted[g] <= fitted[g - 1]) fitted[g] = fitted[g - 1] * 1.05;
   }
-  return fitted.map((v, g) => Math.min(FSRS_WEIGHT_BOUNDS[g][1], Math.max(FSRS_WEIGHT_BOUNDS[g][0], v)));
+  return fitted.map((v, g) => Math.min(bounds[g][1], Math.max(bounds[g][0], v)));
 }
 
 // ----- stage 2: gradient descent ----------------------------------------------------
@@ -419,6 +449,13 @@ const WEIGHT_STD: readonly number[] = [
   6.61, 9.52, 17.69, 27.74, 0.55, 0.28, 0.67, 0.12, 0.4, 0.18,
   0.34, 0.27, 0.08, 0.14, 0.57, 0.25, 1.03, 0.27, 0.39,
 ];
+
+/**
+ * FSRS-6: the same deviations for the nineteen shared weights, and for w19 and
+ * the decay w20 a quarter of their bound range (0.2 and 0.175), so the pull
+ * toward the start is no stronger on the new terms than on the old ones.
+ */
+const WEIGHT_STD_V6: readonly number[] = [...WEIGHT_STD, 0.2, 0.175];
 
 /** Weights stage 2 moves. The initial stabilities belong to stage 1. */
 const TRAINABLE_FROM = 4;
@@ -465,13 +502,14 @@ function mulberry32(seed: number): () => number {
 }
 
 function project(w: number[]): number[] {
-  return w.map((v, i) => Math.min(FSRS_WEIGHT_BOUNDS[i][1], Math.max(FSRS_WEIGHT_BOUNDS[i][0], v)));
+  const bounds = fsrsWeightBounds(fsrsVersionOf(w));
+  return w.map((v, i) => Math.min(bounds[i][1], Math.max(bounds[i][0], v)));
 }
 
 /**
- * Fit FSRS-5 weights to `sequences`. Synchronous and bounded (a handful of
- * passes over the log); a caller with a very large log should run it off the
- * interaction path.
+ * Fit FSRS weights to `sequences` — FSRS-5 or FSRS-6, whichever `start` is.
+ * Synchronous and bounded (a handful of passes over the log); a caller with a
+ * very large log should run it off the interaction path.
  */
 export function optimizeFsrsWeights(
   sequences: readonly FsrsTrainingSequence[],
@@ -499,6 +537,8 @@ export function optimizeFsrsWeights(
   const order = usable.map((_, i) => i);
   const batchesPerEpoch = Math.max(1, Math.ceil(total / batchSize));
   const totalSteps = epochs * batchesPerEpoch;
+  const P = start.length;
+  const std = P === WEIGHT_STD_V6.length ? WEIGHT_STD_V6 : WEIGHT_STD;
   const m = new Array<number>(P).fill(0);
   const v = new Array<number>(P).fill(0);
   const beta1 = 0.9;
@@ -525,7 +565,7 @@ export function optimizeFsrsWeights(
       t += 1;
       const lr = baseLr * 0.5 * (1 + Math.cos(Math.PI * Math.min(1, (t - 1) / Math.max(1, totalSteps))));
       for (let k = TRAINABLE_FROM; k < P; k += 1) {
-        const penalty = (2 * gamma * (w[k] - anchor[k])) / (WEIGHT_STD[k] * WEIGHT_STD[k] * total);
+        const penalty = (2 * gamma * (w[k] - anchor[k])) / (std[k] * std[k] * total);
         const gk = grad[k] / n + penalty;
         m[k] = beta1 * m[k] + (1 - beta1) * gk;
         v[k] = beta2 * v[k] + (1 - beta2) * gk * gk;
@@ -623,7 +663,11 @@ export function splitHeldOut(sequences: readonly FsrsTrainingSequence[]): {
 }
 
 export interface FsrsHoldoutOptions extends OptimizeOptions, Omit<SequenceOptions, 'holdoutFrom'> {
-  /** The weights in use now: what a fit has to beat. Defaults to FSRS-5's. */
+  /**
+   * The weights in use now: what a fit has to beat. Defaults to FSRS-5's. It
+   * may be the other version than `start` (an FSRS-5 fit judged against a
+   * first FSRS-6 fit): both predict the same held-out reviews.
+   */
   current?: readonly number[];
   holdoutFraction?: number;
 }

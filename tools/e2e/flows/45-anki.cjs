@@ -9,7 +9,11 @@
  *    (deck + note type created on the way), and the Gum cards carry the note ids;
  *  - review in Gum with "Send my Gum reviews to Anki" on: the linked cards are graded
  *    through the real review UI, "Sync now" pushes them, and the fake receives the
- *    answers — one per note, with the Gum ease, in the order they were given.
+ *    answers — one per note, with the Gum ease, in the order they were given;
+ *  - with Anki owning scheduling, "Sync now" mirrors Anki's schedule, and a card Anki
+ *    has due tomorrow is dated at the start of tomorrow's STUDY day: the study day is
+ *    set to start an hour from now, so "now" is still in yesterday's study day and a
+ *    midnight anchor would be a whole day off.
  */
 const { installHelpers, poll, ensureDictionaryReady } = require('./_lib.cjs');
 
@@ -202,5 +206,52 @@ module.exports = {
     const waiting = await poll(ctx, `(() => { const dd = [...document.querySelectorAll('.anki-sync-facts dd')].map((d) => d.textContent); return dd.length ? dd : null; })()`, 5000);
     result.note(`sync facts after the push: ${JSON.stringify(waiting)}`);
     await ctx.shot('synced');
+
+    // --- the mirror: Anki's due days on the user's study day ---------------------------
+    // The answered cards are due on Anki's day 501 (the fake's "today" is 500). The study
+    // day starts at the next whole hour, so right now it is still yesterday's study day.
+    const hour = (new Date().getHours() + 1) % 24;
+    const studyBase = new Date();
+    studyBase.setHours(0, 0, 0, 0);
+    if (new Date().getHours() < hour) studyBase.setDate(studyBase.getDate() - 1);
+    const expectedDue = new Date(studyBase.getFullYear(), studyBase.getMonth(), studyBase.getDate() + 1, hour).getTime();
+    await ev(`(() => {
+      const key = 'jp-flashcard-scheduling-v1';
+      const cur = JSON.parse(localStorage.getItem(key) || '{}');
+      localStorage.setItem(key, JSON.stringify({ ...cur, dayStartHour: ${hour} }));
+      localStorage.setItem('jp-anki-owns-scheduling', '1');
+      window.dispatchEvent(new CustomEvent('jp-anki-owns-scheduling-changed', { detail: true }));
+      return true;
+    })()`);
+    const pullsBefore = fake.calls.filter((c) => c.action === 'cardsInfo').length;
+    await ev(`__e2e.clickText('.anki-sync-status button', 'Sync now')`);
+    const mirrorJs = `(async () => {
+      const db = await new Promise((res, rej) => { const q = indexedDB.open('jp-study-db'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+      const v = await new Promise((res) => { const r = db.transaction('kv').objectStore('kv').get('anki-schedule-mirror-v1'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+      db.close();
+      const m = typeof v === 'string' ? JSON.parse(v) : v;
+      return m ? Object.values(m).filter((e) => e && typeof e.dueAt === 'number').map((e) => ({ noteId: e.noteId, dueAt: e.dueAt, state: e.state })) : [];
+    })()`;
+    let mirrored = [];
+    for (const until = Date.now() + 20000; Date.now() < until;) {
+      mirrored = (await ev(mirrorJs, { await: true })) ?? [];
+      if (mirrored.length >= wanted.length) break;
+      await ctx.sleep(300);
+    }
+    result.check('with Anki owning scheduling, "Sync now" mirrors Anki\'s schedule for the linked cards',
+      mirrored.length >= wanted.length && fake.calls.filter((c) => c.action === 'cardsInfo').length > pullsBefore, { mirrored, wanted });
+    const mirroredDue = mirrored.filter((m) => wanted.some((w) => w.noteId === m.noteId));
+    result.check(`a card due tomorrow in Anki is dated at ${hour}:00 of the next study day, not at midnight`,
+      mirroredDue.length > 0 && mirroredDue.every((m) => m.dueAt === expectedDue),
+      { expectedDue: new Date(expectedDue).toString(), got: mirroredDue.map((m) => new Date(m.dueAt).toString()), hour });
+    // Back to Gum owning scheduling and the default 4 am day for the flows after this one.
+    await ev(`(() => {
+      const key = 'jp-flashcard-scheduling-v1';
+      const cur = JSON.parse(localStorage.getItem(key) || '{}');
+      localStorage.setItem(key, JSON.stringify({ ...cur, dayStartHour: 4 }));
+      localStorage.setItem('jp-anki-owns-scheduling', '0');
+      window.dispatchEvent(new CustomEvent('jp-anki-owns-scheduling-changed', { detail: false }));
+      return true;
+    })()`);
   },
 };

@@ -77,6 +77,9 @@ export default function DeckAudioExport() {
                 && ` ${t('flash.deckExport.failed', { count: outcome.failed })}`}
               {(outcome.scheduled ?? 0) > 0
                 && ` ${t('anki3.export.scheduled', { count: outcome.scheduled ?? 0 })}`}
+              {/* Each scheduled card's past answers ride along as Anki's review log. */}
+              {(outcome.reviews ?? 0) > 0
+                && ` ${t('srs5.export.reviews', { count: outcome.reviews ?? 0 })}`}
             </>
           ) : (
             t('flash.deckExport.error')

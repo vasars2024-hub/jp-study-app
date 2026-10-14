@@ -20,7 +20,9 @@ import {
   type MiningValues,
   type AnkiLinkStatus,
 } from '../../../shared/anki';
+import { ankiManualExample } from '../../../shared/ankiManualExamples';
 import { DEFAULT_CARD_CSS } from '../../../shared/kinomotoCard';
+import { studyLangTag } from '../../../shared/studyLang';
 import type { StudyProfile } from '../../../shared/profiles';
 import type { AnkiStatus } from '../../../shared/types';
 import AnkiCardPreview, { type MappingPreviewState } from '../AnkiCardPreview';
@@ -29,6 +31,7 @@ import FieldMappingEditor from '../FieldMappingEditor';
 import NoteCssEditor from '../NoteCssEditor';
 import { getActiveProfile, onProfileChanged, updateProfile } from '../../profileState';
 import { useT } from '../../i18n';
+import { useStudyLanguage } from '../../useStudyLanguage';
 
 export type Msg = { kind: 'ok' | 'err'; text: string };
 
@@ -436,6 +439,19 @@ export function AnkiNoteCss({ state }: { state: AnkiConfigState }) {
 export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
   const { t } = useT();
   const { deck, model, usingTemplates, preview, addMsg, adding } = state;
+  // The examples follow the language this profile's cards are in (and the
+  // Chinese script the learner reads), never a fixed Japanese word.
+  const { script } = useStudyLanguage();
+  const lang = state.active.targetLang;
+  const example = ankiManualExample(lang, script);
+  const contentLang = studyLangTag(lang, script);
+  // The gloss and the translation are in the learner's language: the UI's.
+  const gloss = { ja: t('srs5.ankiForm.meaning.ja'), zh: t('srs5.ankiForm.meaning.zh'), ru: t('srs5.ankiForm.meaning.ru') }[lang];
+  const translation = {
+    ja: t('srs5.ankiForm.translation.ja'),
+    zh: t('srs5.ankiForm.translation.zh'),
+    ru: t('srs5.ankiForm.translation.ru'),
+  }[lang];
 
   return (
     <form className="anki-manual-form" onSubmit={state.addCard}>
@@ -445,8 +461,8 @@ export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
         <input
           value={state.term}
           onChange={(e) => state.setTerm(e.target.value)}
-          placeholder="例えば 勉強"
-          lang="ja"
+          placeholder={t('srs5.ankiForm.example', { word: example.term })}
+          lang={contentLang}
         />
       </div>
       <div className="anki-selects">
@@ -455,8 +471,8 @@ export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
           <input
             value={state.reading}
             onChange={(e) => state.setReading(e.target.value)}
-            placeholder="べんきょう"
-            lang="ja"
+            placeholder={example.reading}
+            lang={contentLang}
           />
         </label>
         <label>
@@ -464,7 +480,7 @@ export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
           <input
             value={state.translation}
             onChange={(e) => state.setTranslation(e.target.value)}
-            placeholder="учёба"
+            placeholder={translation}
           />
         </label>
       </div>
@@ -473,7 +489,7 @@ export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
         <textarea
           value={state.meaning}
           onChange={(e) => state.setMeaning(e.target.value)}
-          placeholder="study; diligence"
+          placeholder={gloss}
         />
       </div>
       <div className="field-row">
@@ -481,8 +497,8 @@ export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
         <textarea
           value={state.sentence}
           onChange={(e) => state.setSentence(e.target.value)}
-          placeholder="毎日日本語を勉強します。"
-          lang="ja"
+          placeholder={example.sentence}
+          lang={contentLang}
         />
       </div>
 

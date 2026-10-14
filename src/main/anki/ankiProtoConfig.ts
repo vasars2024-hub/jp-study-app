@@ -89,12 +89,12 @@ export function decodeWireFields(bytes: Uint8Array): WireField[] | null {
       i += size;
     } else if (wire === WIRE_I64) {
       if (i + 8 > bytes.length) return null;
+      out.push({ field, wire, bytes: bytes.subarray(i, i + 8) });
       i += 8;
-      out.push({ field, wire });
     } else if (wire === WIRE_I32) {
       if (i + 4 > bytes.length) return null;
+      out.push({ field, wire, bytes: bytes.subarray(i, i + 4) });
       i += 4;
-      out.push({ field, wire });
     } else {
       // Wire types 3 and 4 are the deprecated groups; Anki emits neither.
       return null;
@@ -342,6 +342,90 @@ export function decodeFieldConfig(value: unknown): AnkiFieldConfig | null {
     // A font size is a small positive number; anything else is not one.
     size: size != null && size > 0n && size < 1000n ? Number(size) : undefined,
   };
+}
+
+// ----- deck options (FSRS parameters) ----------------------------------------
+
+/** A float32 as Anki stored it, printed back at float32 precision (0.212, not 0.21199999749660492). */
+function float32At(bytes: Uint8Array, offset: number): number {
+  const value = new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getFloat32(0, true);
+  return Number.isFinite(value) ? Number(value.toPrecision(7)) : Number.NaN;
+}
+
+/**
+ * A `repeated float`: packed (one length-delimited run of float32s, how proto3
+ * writes it) or, as a decoder must also accept, one fixed32 field per value.
+ */
+function repeatedFloat(fields: WireField[], field: number): number[] {
+  const out: number[] = [];
+  for (const f of fields) {
+    if (f.field !== field || !f.bytes) continue;
+    if (f.wire === WIRE_LEN) {
+      if (f.bytes.length % 4 !== 0) return [];
+      for (let k = 0; k < f.bytes.length; k += 4) out.push(float32At(f.bytes, k));
+    } else if (f.wire === WIRE_I32) {
+      out.push(float32At(f.bytes, 0));
+    }
+  }
+  return out;
+}
+
+function singleFloat(fields: WireField[], field: number): number | undefined {
+  const hit = fields.find((f) => f.field === field && f.wire === WIRE_I32 && f.bytes);
+  return hit?.bytes ? float32At(hit.bytes, 0) : undefined;
+}
+
+/** The FSRS half of one Anki deck options preset. */
+export interface AnkiDeckConfigFsrs {
+  /** FSRS-6's twenty-one parameters, when the preset was optimised by Anki 25.02+. */
+  params6: number[];
+  /** FSRS-5's nineteen, when it has them. */
+  params5: number[];
+  desiredRetention?: number;
+  maximumReviewInterval?: number;
+}
+
+/**
+ * Decode `deck_config.config` (`DeckConfig.Config` in Anki's
+ * `proto/anki/deck_config.proto`): `fsrs_params_5` = 5, `fsrs_params_6` = 6
+ * (both `repeated float`), `maximum_review_interval` = 16 (uint32) and
+ * `desired_retention` = 37 (float). Field 3, `fsrs_params_4`, is FSRS-4.5 and
+ * not read: nothing here runs it. `null` when the blob does not decode.
+ */
+export function decodeDeckConfigFsrs(value: unknown): AnkiDeckConfigFsrs | null {
+  const bytes = asBytes(value);
+  if (!bytes) return null;
+  const fields = decodeWireFields(bytes);
+  if (!fields) return null;
+  const maximum = fields.find((f) => f.field === 16 && f.wire === WIRE_VARINT)?.varint;
+  return {
+    params6: repeatedFloat(fields, 6),
+    params5: repeatedFloat(fields, 5),
+    desiredRetention: singleFloat(fields, 37),
+    maximumReviewInterval: maximum !== undefined && maximum > 0n && maximum < 100_000n ? Number(maximum) : undefined,
+  };
+}
+
+/**
+ * The options preset a normal deck uses, from `decks.kind`: a `KindContainer`
+ * whose `normal` (1) is a `Deck.Normal` with `config_id` = 1, and from Anki
+ * 23.10 a per-deck `desired_retention` override = 10. `null` for a filtered
+ * deck or a blob that does not decode.
+ */
+export function decodeNormalDeckKind(value: unknown): { configId: number; desiredRetention?: number } | null {
+  const bytes = asBytes(value);
+  if (!bytes) return null;
+  const outer = decodeWireFields(bytes);
+  const normal = outer?.find((f) => f.field === 1 && f.wire === WIRE_LEN)?.bytes;
+  if (!normal) return null;
+  const inner = decodeWireFields(normal);
+  if (!inner) return null;
+  const id = inner.find((f) => f.field === 1 && f.wire === WIRE_VARINT)?.varint;
+  // config_id 0 is proto3's absent value; Anki's Default preset is id 1.
+  const configId = id === undefined ? 1 : Number(id);
+  if (!Number.isSafeInteger(configId)) return null;
+  const retention = singleFloat(inner, 10);
+  return { configId, ...(retention !== undefined ? { desiredRetention: retention } : {}) };
 }
 
 // ----- the media manifest ----------------------------------------------------

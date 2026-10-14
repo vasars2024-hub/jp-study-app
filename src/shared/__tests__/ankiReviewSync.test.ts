@@ -8,6 +8,8 @@ import {
   ankiEaseForRating,
   ankiSyncBackoffMs,
   ankiSyncErrorAction,
+  ankiDayToDueAt,
+  ankiMirrorDueByDate,
   ankiMirrorFromCard,
   classifyAnkiSyncError,
   countAnkiMirrorsDue,
@@ -164,14 +166,14 @@ describe('rule 9: which card of a note is answered', () => {
 });
 
 describe('pull: Anki state as a mirror', () => {
-  const dayStart = new Date(NOW);
-  dayStart.setHours(0, 0, 0, 0);
-  const ctx = { todayDay: 500, dayStartMs: dayStart.getTime(), isDue: false, now: NOW };
+  // Local noon: the study day (4 am start) is the calendar day.
+  const noon = new Date(2026, 9, 14, 12, 0, 0).getTime();
+  const ctx = { todayDay: 500, isDue: false, now: noon, dayStartHour: 4 };
 
-  it('anchors a review card day number against Anki\'s today', () => {
+  it('anchors a review card day number against Anki\'s today, at the start of the study day', () => {
     const mirror = ankiMirrorFromCard({ cardId: 1, note: 11, type: 2, queue: 2, due: 503, interval: 9, factor: 2500, reps: 4, lapses: 1 }, ctx);
     expect(mirror).toMatchObject({ noteId: 11, state: 'review', intervalDays: 9, ease: 2.5, reps: 4, lapses: 1, isDue: false });
-    expect(mirror.dueAt).toBe(ctx.dayStartMs + 3 * DAY);
+    expect(mirror.dueAt).toBe(new Date(2026, 9, 17, 4, 0, 0).getTime());
   });
 
   it('reads a learning card due as Unix seconds and leaves a new card undated', () => {
@@ -185,12 +187,68 @@ describe('pull: Anki state as a mirror', () => {
     expect(ankiMirrorFromCard({ cardId: 4, type: 2, queue: 2, due: 503 }, { ...ctx, todayDay: null }).dueAt).toBeUndefined();
   });
 
+  it('is due by date only once its study day has begun (no areDue)', () => {
+    const today = ankiMirrorFromCard({ cardId: 9, type: 2, queue: 2, due: 500 }, ctx);
+    const tomorrow = ankiMirrorFromCard({ cardId: 10, type: 2, queue: 2, due: 501 }, ctx);
+    const step = ankiMirrorFromCard({ cardId: 11, type: 1, queue: 1, due: Math.floor(noon / 1000) + 600 }, ctx);
+    const suspended = ankiMirrorFromCard({ cardId: 12, type: 2, queue: -1, due: 499 }, ctx);
+    expect(ankiMirrorDueByDate(today, noon)).toBe(true);
+    // The old midnight anchor plus "a day minus a millisecond" called this due all day today.
+    expect(ankiMirrorDueByDate(tomorrow, noon)).toBe(false);
+    expect(ankiMirrorDueByDate(step, noon)).toBe(false);
+    expect(ankiMirrorDueByDate(step, noon + 600_000)).toBe(true);
+    expect(ankiMirrorDueByDate(suspended, noon)).toBe(false);
+  });
+
   it('names suspended and buried cards, and counts the mirror', () => {
     const suspended = ankiMirrorFromCard({ cardId: 5, type: 2, queue: -1, due: 400 }, ctx);
     const buried = ankiMirrorFromCard({ cardId: 6, type: 2, queue: -3, due: 400 }, ctx);
     const due = ankiMirrorFromCard({ cardId: 8, type: 2, queue: 2, due: 499 }, { ...ctx, isDue: true });
     expect([suspended.state, buried.state]).toEqual(['suspended', 'buried']);
     expect(countAnkiMirrorsDue([suspended, buried, due])).toEqual({ due: 1, suspended: 1, total: 3 });
+  });
+});
+
+describe('pull: Anki due days are study days, not calendar days (00:00-04:00)', () => {
+  const at = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute, 0).getTime();
+  const fourAm = (day: number) => at(day, 4);
+
+  it('between midnight and 4 am, "today" is still the study day that began yesterday at 4', () => {
+    // Anki's today (day 500) at 00:00, 01:30, 03:59 on Oct 15 is the Oct 14 study day.
+    for (const now of [at(15, 0), at(15, 1, 30), at(15, 3, 59)]) {
+      expect(ankiDayToDueAt(500, 500, now, 4)).toBe(fourAm(14));
+      expect(ankiDayToDueAt(501, 500, now, 4)).toBe(fourAm(15));
+      expect(ankiDayToDueAt(499, 500, now, 4)).toBe(fourAm(13));
+    }
+  });
+
+  it('from 4 am the study day is the calendar day', () => {
+    for (const now of [at(15, 4), at(15, 12), at(15, 23, 59)]) {
+      expect(ankiDayToDueAt(500, 500, now, 4)).toBe(fourAm(15));
+      expect(ankiDayToDueAt(503, 500, now, 4)).toBe(fourAm(18));
+    }
+  });
+
+  it('a card due tomorrow is not due at 02:00 tonight, and is due from 04:00 tomorrow', () => {
+    const now = at(15, 2);
+    const mirror = ankiMirrorFromCard({ cardId: 1, type: 2, queue: 2, due: 501 }, { todayDay: 500, isDue: false, now, dayStartHour: 4 });
+    expect(mirror.dueAt).toBe(fourAm(15));
+    expect(ankiMirrorDueByDate(mirror, now)).toBe(false);
+    expect(ankiMirrorDueByDate(mirror, at(15, 3, 59))).toBe(false);
+    expect(ankiMirrorDueByDate(mirror, fourAm(15))).toBe(true);
+  });
+
+  it('honours the user\'s own start hour, and the 4 am default when none is sent', () => {
+    expect(ankiDayToDueAt(501, 500, at(15, 5), 6)).toBe(at(15, 6));
+    expect(ankiDayToDueAt(501, 500, at(15, 7), 6)).toBe(at(16, 6));
+    expect(ankiDayToDueAt(500, 500, at(15, 1), 0)).toBe(at(15, 0));
+    expect(ankiDayToDueAt(501, 500, at(15, 2))).toBe(fourAm(15));
+  });
+
+  it('stays at the start hour across a daylight-saving change', () => {
+    // Wherever the clocks change in late March, every due day still starts at 04:00 local.
+    const now = new Date(2026, 2, 27, 12).getTime();
+    for (let d = 0; d < 5; d += 1) expect(new Date(ankiDayToDueAt(500 + d, 500, now, 4)).getHours()).toBe(4);
   });
 });
 

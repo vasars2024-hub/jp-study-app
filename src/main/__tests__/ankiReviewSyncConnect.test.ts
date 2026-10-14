@@ -173,14 +173,14 @@ describe('pull: Anki state for display while Anki owns scheduling', () => {
     const overdue = fake.addNote({ modelName: 'Gum', fields: { Term: '鳥' }, cards: [reviewCard({ due: 498 })] });
     const gone = fake.addNote({ modelName: 'Gum', fields: { Term: '犬' } });
     fake.deleteNote(gone.noteId);
-    const now = Date.now();
-    const dayStart = new Date(now);
-    dayStart.setHours(0, 0, 0, 0);
+    // 02:30 local: still yesterday's study day under the 4 am start.
+    const now = new Date(2026, 9, 15, 2, 30).getTime();
 
-    const result = await pullAnkiSchedule([review.noteId, overdue.noteId, gone.noteId], 'User 1', now);
+    const result = await pullAnkiSchedule([review.noteId, overdue.noteId, gone.noteId], 'User 1', now, 4);
     expect(result.ok).toBe(true);
     const byNote = new Map(result.entries.map((entry) => [entry.noteId, entry.mirror]));
-    expect(byNote.get(review.noteId)).toMatchObject({ state: 'review', intervalDays: 9, isDue: false, dueAt: dayStart.getTime() + 3 * DAY });
+    // Day 503 is three study days after the Oct 14 one: due from 04:00 on Oct 17.
+    expect(byNote.get(review.noteId)).toMatchObject({ state: 'review', intervalDays: 9, isDue: false, dueAt: new Date(2026, 9, 17, 4).getTime() });
     expect(byNote.get(overdue.noteId)).toMatchObject({ isDue: true });
     expect(byNote.get(gone.noteId)).toBeNull();
     expect(fake.count('answerCards')).toBe(0);

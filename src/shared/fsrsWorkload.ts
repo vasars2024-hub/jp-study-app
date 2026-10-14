@@ -65,13 +65,13 @@ export function simulateRetentionWorkload(
     reviews += 1;
     let day = 0;
     for (;;) {
-      const interval = Math.min(ceiling, Math.max(1, Math.round(fsrsInterval(memory.stability, retention))));
+      const interval = Math.min(ceiling, Math.max(1, Math.round(fsrsInterval(memory.stability, retention, weights))));
       const span = Math.min(interval, horizon - day);
-      for (let d = 1; d <= span; d += 1) recall += fsrsRetrievability(memory.stability, d);
+      for (let d = 1; d <= span; d += 1) recall += fsrsRetrievability(memory.stability, d, weights);
       if (day + interval > horizon) break;
       day += interval;
       reviews += 1;
-      const r = fsrsRetrievability(memory.stability, interval);
+      const r = fsrsRetrievability(memory.stability, interval, weights);
       if (random() < r) {
         memory = fsrsReview(memory, 3, interval, weights);
       } else {
@@ -98,11 +98,12 @@ export function dailyReviewRate(
   stabilities: readonly number[],
   retention: number,
   maximumIntervalDays = 36_500,
+  weights: readonly number[] = DEFAULT_FSRS_WEIGHTS,
 ): number {
   let rate = 0;
   for (const s of stabilities) {
     if (!Number.isFinite(s) || s <= 0) continue;
-    rate += 1 / Math.min(maximumIntervalDays, Math.max(1, fsrsInterval(s, retention)));
+    rate += 1 / Math.min(maximumIntervalDays, Math.max(1, fsrsInterval(s, retention, weights)));
   }
   return rate;
 }

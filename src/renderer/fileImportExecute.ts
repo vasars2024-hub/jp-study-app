@@ -26,8 +26,8 @@
 import type { DropTargetId } from '../shared/fileRouting';
 import type { SubtitleAttachRefusal } from '../shared/subtitleDiscoveryIpc';
 import type { MediaItem } from '../shared/types';
-import { apkgImportNotice, importApkgCards, importApkgToLevel } from './apkgImport';
 import { removeDeckCards } from './flashcardDeck';
+import { removeMergedReviewLogRows } from './reviewLog';
 import { flushLevelListsPersistence, removeLevelList, upsertSlotList, type LevelList } from './levelLists';
 import type { LevelSlotId } from '../shared/levelScale';
 
@@ -48,6 +48,8 @@ export interface ImportReceipt {
   previousWallpaper?: string | null;
   /** Flashcards created by an .apkg card import, for exact removal on undo. */
   deckCardIds?: string[];
+  /** Review-log rows the .apkg import merged in (Anki's history), removed with it. */
+  reviewLogIds?: string[];
   /** Level-check drop: the slot it filled and the list it replaced, for undo. */
   levelSlot?: { slot: LevelSlotId; previous?: LevelList; createdId?: string };
   /** What the import could not bring across, for the success message. */
@@ -164,6 +166,8 @@ export async function executeImport(
     case 'anki-level': {
       // The Level page's own upload flow, then the meter. This used to call
       // `importApkg` and throw the words away, reporting success.
+      // The .apkg reader is loaded on the drop, not at boot (`studyOsBootGraph`).
+      const { importApkgToLevel } = await import('./apkgImport');
       const res = await importApkgToLevel(subject.path, subject.name);
       if (!res.ok || !res.slot) {
         return refuse(res.error === 'level-slot-unknown' ? IMPORT_REFUSE_LEVEL_UNKNOWN : IMPORT_REFUSE_FAILED);
@@ -177,6 +181,7 @@ export async function executeImport(
       };
     }
     case 'anki-cards': {
+      const { apkgImportNotice, importApkgCards } = await import('./apkgImport');
       const res = await importApkgCards(subject.path);
       if (!res.ok) throw new Error(res.error ?? 'apkg-card-import-failed');
       hooks.onOpenSection?.('flashcards');
@@ -189,6 +194,7 @@ export async function executeImport(
         libraryIds: [],
         mediaIds: [],
         deckCardIds: (res.added ?? []).map((c) => c.id),
+        ...(res.historyIds?.length ? { reviewLogIds: res.historyIds } : {}),
         ...(notice ? { notice } : {}),
       };
     }
@@ -248,6 +254,7 @@ export async function undoImports(receipts: readonly ImportReceipt[]): Promise<v
         await window.api.setWallpaperFromPath(receipt.previousWallpaper);
       }
       if (receipt.deckCardIds?.length) removeDeckCards(receipt.deckCardIds);
+      if (receipt.reviewLogIds?.length) await removeMergedReviewLogRows(receipt.reviewLogIds);
       if (receipt.levelSlot) {
         const { previous, createdId } = receipt.levelSlot;
         if (previous?.slot) upsertSlotList(previous.slot, previous.label, previous.kind, previous.words);

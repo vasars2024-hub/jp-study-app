@@ -54,6 +54,7 @@ import {
   type AnkiSyncUnlinkedCard,
 } from './ankiSyncState';
 import { loadDeck, updateDeckCard, type DeckFlashcard } from './flashcardDeck';
+import { studyDayStartHour } from './flashcardScheduling';
 import { onReviewLogEntry } from './reviewLog';
 import { kvGet, kvUpdate } from './storage/db';
 import { flushAnkiMineQueue, pendingAnkiCards } from './studyMining';
@@ -363,7 +364,16 @@ async function pullMirror(report: AnkiSyncRunReport, state: AnkiSyncSnapshot, no
     await updateAnkiSyncState((s) => ({ ...s, lastPullAt: now }));
     return null;
   }
-  const result = await pull({ noteIds, ...(state.boundProfile ? { expectedProfile: state.boundProfile } : {}) });
+  // The study day's start hour rides along: main dates Anki's due days at the
+  // start of the user's study day (4 am by default), not at midnight. Built as
+  // a value rather than a literal so the extra field passes the preload's
+  // declared request shape unchanged (main reads and validates it).
+  const request = {
+    noteIds,
+    ...(state.boundProfile ? { expectedProfile: state.boundProfile } : {}),
+    dayStartHour: studyDayStartHour(),
+  };
+  const result = await pull(request);
   if (!result.ok) {
     report.error = result.error;
     return result.errorKind ?? 'api';

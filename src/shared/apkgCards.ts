@@ -17,7 +17,9 @@
  */
 
 import { pickExpressionOrd, splitFields, stripFieldHtml, type AnkiModel, type AnkiModels } from './apkgParse';
-import { isLocalSrsState, LOCAL_SRS_DEFAULT_EASE, LOCAL_SRS_MIN_EASE, type LocalSrsState } from './localSrs';
+import { clampFsrsWeights, FSRS5_WEIGHT_COUNT, FSRS6_WEIGHT_COUNT, isValidFsrsWeights } from './fsrs';
+import { isLocalSrsState, LOCAL_SRS_DEFAULT_EASE, LOCAL_SRS_MIN_EASE, type LocalSrsRating, type LocalSrsState } from './localSrs';
+import { REVIEW_ANSWER_CAP_MS, type ReviewLogEntry } from './reviewLog';
 
 /**
  * Field-name synonyms per role.
@@ -55,6 +57,39 @@ export interface ApkgCard {
   imagePath?: string;
   /** Local SRS state converted from `schedule`, set by main. */
   srs?: LocalSrsState;
+  /** The first card's Anki card id, which keys its review history. */
+  ankiCardId?: number;
+  /** The first card's review history from Anki's `revlog`, oldest first. */
+  history?: AnkiRevlogRow[];
+}
+
+/**
+ * One row of Anki's `revlog` table, as much of it as the review log keeps.
+ * `id` is the answer's epoch milliseconds (Anki's primary key). `ivl` and
+ * `lastIvl` are days when positive and seconds when negative (a learning
+ * step). `type`: 0 learn, 1 review, 2 relearn, 3 filtered deck, 4 manual
+ * (a reschedule or a "Forget", with no answer), 5 rescheduled by FSRS.
+ */
+export interface AnkiRevlogRow {
+  id: number;
+  ease: number;
+  ivl: number;
+  lastIvl: number;
+  factor: number;
+  time: number;
+  type: number;
+}
+
+/** What an Anki package's deck options say about FSRS for the imported cards. */
+export interface ApkgFsrsSettings {
+  /** FSRS-6 (21) or FSRS-5 (19) parameters, inside their bounds. */
+  weights: number[];
+  desiredRetention?: number;
+  maximumIntervalDays?: number;
+  /** The options preset's name in Anki. */
+  presetName?: string;
+  /** The deck most of the imported cards are in. */
+  deckName?: string;
 }
 
 /**
@@ -79,6 +114,8 @@ export interface ApkgImportReport {
   mediaSkipped: number;
   /** The package's media could not be read at all (unknown manifest format). */
   mediaUnreadable: boolean;
+  /** Past answers (Anki `revlog` rows) carried with the imported cards. */
+  historyReviews: number;
 }
 
 export function emptyApkgImportReport(): ApkgImportReport {
@@ -91,6 +128,7 @@ export function emptyApkgImportReport(): ApkgImportReport {
     mediaMissing: 0,
     mediaSkipped: 0,
     mediaUnreadable: false,
+    historyReviews: 0,
   };
 }
 
@@ -102,6 +140,8 @@ export interface ApkgCardsResult {
   fileName?: string;
   error?: string;
   report?: ApkgImportReport;
+  /** The FSRS parameters of the deck options the cards were studied under, when Anki had fitted some. */
+  fsrs?: ApkgFsrsSettings;
 }
 
 /**
@@ -132,6 +172,9 @@ export interface RawNote {
   tags?: string;
   deck?: string;
   schedule?: AnkiCardSchedule;
+  /** The first card's Anki id and its `revlog` rows, oldest first. */
+  ankiCardId?: number;
+  history?: AnkiRevlogRow[];
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -140,10 +183,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * An Anki card's schedule as a local SRS state, or `undefined` for a card that
  * was never studied (the local scheduler introduces it like any new card).
  *
- * Only the CURRENT schedule is carried: interval, ease, repetitions, lapses
- * and when it is next due. Anki's review log (every past answer) is not.
- * `lastReviewedAt` is derived as due minus interval, which is exact for a card
- * answered on time and the best available estimate otherwise.
+ * This is the CURRENT schedule: interval, ease, repetitions, lapses and when it
+ * is next due. Every past answer travels separately, as the card's `history`
+ * (`ankiRevlogToReviewEntries`). `lastReviewedAt` is derived as due minus
+ * interval, which is exact for a card answered on time and the best available
+ * estimate otherwise.
  */
 export function ankiScheduleToLocalSrs(
   schedule: AnkiCardSchedule | undefined,
@@ -387,10 +431,141 @@ export function notesToCards(notes: readonly RawNote[], models: AnkiModels): {
       ...(media.audio.length ? { audioRefs: media.audio } : {}),
       ...(media.images.length ? { imageRefs: media.images } : {}),
       ...(note.schedule ? { schedule: note.schedule } : {}),
+      ...(note.ankiCardId !== undefined ? { ankiCardId: note.ankiCardId } : {}),
+      ...(note.history?.length ? { history: note.history } : {}),
     });
   }
 
   return { cards, noteCount: notes.length, report };
+}
+
+// ----- review history, both ways ---------------------------------------------
+
+const EASE_RATING: Record<number, LocalSrsRating> = { 1: 'again', 2: 'hard', 3: 'good', 4: 'easy' };
+const RATING_EASE: Record<LocalSrsRating, number> = { again: 1, hard: 2, good: 3, easy: 4 };
+
+/** Anki revlog kinds. */
+const REVLOG_LEARN = 0;
+const REVLOG_REVIEW = 1;
+const REVLOG_RELEARN = 2;
+const REVLOG_MANUAL = 4;
+
+/** The stable review-log id of one imported Anki answer: re-importing the deck finds the same ids. */
+export function ankiReviewEntryId(ankiCardId: number, revlogId: number): string {
+  return `anki-${ankiCardId}-${revlogId}`;
+}
+
+/**
+ * One card's Anki history as review-log rows for the Gum card `cardId`.
+ *
+ * Only answers come across: a manual row (a reschedule, a "Forget", ease 0) is
+ * not a review, but a Forget (manual with interval 0) does mean the next
+ * learning answer starts the card over, which is what `isNew` records for the
+ * optimiser and the memory replay. The first answer is `isNew` only when it is
+ * a learning answer: a history whose start Anki pruned is not a first review.
+ */
+export function ankiRevlogToReviewEntries(
+  history: readonly AnkiRevlogRow[],
+  ankiCardId: number,
+  cardId: string,
+  word?: string,
+): ReviewLogEntry[] {
+  const rows = [...history].filter((row) => Number.isFinite(row.id) && row.id > 0).sort((a, b) => a.id - b.id);
+  const out: ReviewLogEntry[] = [];
+  let startsOver = true;
+  for (const row of rows) {
+    if (row.type >= REVLOG_MANUAL) {
+      if (row.type === REVLOG_MANUAL && row.ivl === 0) startsOver = true;
+      continue;
+    }
+    const rating = EASE_RATING[row.ease];
+    if (!rating) continue;
+    const isNew = startsOver && row.type === REVLOG_LEARN;
+    startsOver = false;
+    out.push({
+      id: ankiReviewEntryId(ankiCardId, row.id),
+      at: row.id,
+      mode: 'review',
+      cardId,
+      ...(word ? { word: word.slice(0, 120) } : {}),
+      rating,
+      correct: rating !== 'again',
+      prevIntervalDays: row.lastIvl > 0 ? row.lastIvl : 0,
+      intervalDays: row.ivl > 0 ? row.ivl : 0,
+      ...(isNew ? { isNew: true } : {}),
+      ...(row.time > 0 ? { durationMs: Math.min(REVIEW_ANSWER_CAP_MS, Math.round(row.time)) } : {}),
+    });
+  }
+  return out;
+}
+
+/** The review-log fields an export writes into Anki's `revlog`. */
+export type ExportableReview = Pick<ReviewLogEntry, 'at' | 'rating' | 'prevIntervalDays' | 'intervalDays' | 'isNew' | 'durationMs'>;
+
+/**
+ * One card's Gum review history as Anki `revlog` rows. `id` here is the
+ * answer's time; the writer keeps ids unique across the package.
+ *
+ * The kind is read off the history: a first review is a learning answer, an
+ * answer to a card with a day interval is a review (a lapse included, as Anki
+ * logs it), and a same-day answer after the card has graduated is relearning.
+ * A later first review means the schedule was reset, which Anki records as a
+ * manual "Forget" row just before it — written here too, so the reset survives
+ * a round trip. `factor` (the ease in permille) goes on review answers; Gum
+ * keeps no past ease, so the card's current one stands in. Step intervals
+ * (minutes) are not kept by the log and are written as 0.
+ */
+export function reviewEntriesToAnkiRevlog(
+  rows: readonly ExportableReview[],
+  factor: number,
+): AnkiRevlogRow[] {
+  const sorted = rows
+    .filter((row) => row.rating !== undefined && RATING_EASE[row.rating] !== undefined && Number.isFinite(row.at) && row.at > 0)
+    .sort((a, b) => a.at - b.at);
+  const out: AnkiRevlogRow[] = [];
+  let graduated = false;
+  sorted.forEach((row, index) => {
+    const prev = Math.max(0, Math.round(row.prevIntervalDays ?? 0));
+    const next = Math.max(0, Math.round(row.intervalDays ?? 0));
+    if (row.isNew && index > 0) {
+      out.push({ id: row.at - 1, ease: 0, ivl: 0, lastIvl: prev, factor: 0, time: 0, type: REVLOG_MANUAL });
+      graduated = false;
+    }
+    const type = row.isNew ? REVLOG_LEARN : prev >= 1 ? REVLOG_REVIEW : graduated ? REVLOG_RELEARN : REVLOG_LEARN;
+    out.push({
+      id: row.at,
+      ease: RATING_EASE[row.rating as LocalSrsRating],
+      ivl: next,
+      lastIvl: row.isNew ? 0 : prev,
+      factor: type === REVLOG_REVIEW ? Math.max(0, Math.round(factor)) : 0,
+      time: Math.max(0, Math.min(REVIEW_ANSWER_CAP_MS, Math.round(row.durationMs ?? 0))),
+      type,
+    });
+    if (next >= 1) graduated = true;
+  });
+  return out;
+}
+
+/** How far outside a bound a stored float32 may sit and still be that bound (rounding, not data). */
+const BOUND_SLACK = 1e-5;
+
+/**
+ * The FSRS parameters a deck options preset carries, as weights this app can
+ * run: FSRS-6's twenty-one when the preset has them, else FSRS-5's nineteen.
+ * Anki clamps parameters with the same bounds, so a value a float32 rounding
+ * outside one is projected back in; a vector of the wrong length, with a value
+ * that is not finite or that is really out of range, is not a parameter set
+ * this app can trust, and yields null.
+ */
+export function pickAnkiFsrsWeights(params6: readonly number[], params5: readonly number[]): number[] | null {
+  const candidates: Array<[readonly number[], number]> = [[params6, FSRS6_WEIGHT_COUNT], [params5, FSRS5_WEIGHT_COUNT]];
+  for (const [params, count] of candidates) {
+    if (params.length !== count || !params.every(Number.isFinite)) continue;
+    const weights = clampFsrsWeights(params);
+    const drift = weights.every((w, i) => Math.abs(w - params[i]) <= BOUND_SLACK * Math.max(1, Math.abs(w)));
+    if (drift && isValidFsrsWeights(weights)) return weights;
+  }
+  return null;
 }
 
 /**

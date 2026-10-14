@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import AdmZip from 'adm-zip';
 import { ANKI_FIELD_SEP } from '../../shared/ankiDraft';
 import type { LocalDeckApkgRequest } from '../../shared/localDeckApkg';
-import { localSrsToAnkiSchedule } from '../../shared/apkgCards';
+import { localSrsToAnkiSchedule, reviewEntriesToAnkiRevlog } from '../../shared/apkgCards';
 import { cardAiExtrasHtml } from '../../shared/cardAiExtrasHtml';
 import { getSql } from './apkgCollection';
 
@@ -20,8 +20,15 @@ function checksum(value: string): number {
   return Number.parseInt(crypto.createHash('sha1').update(value).digest('hex').slice(0, 8), 16);
 }
 
-/** Author a legacy-compatible Anki package and verify the archive before returning. */
-export async function writeLocalDeckApkg(request: LocalDeckApkgRequest): Promise<{ notes: number; media: number; scheduled: number }> {
+/**
+ * Author a legacy-compatible Anki package and verify the archive before returning.
+ *
+ * A scheduled card's past answers, when the request carries them, become its
+ * `revlog` rows: Anki's statistics, its FSRS optimiser and its "reschedule
+ * from history" then see the card's real history rather than a card that was
+ * apparently never answered. `reviews` counts the answers written.
+ */
+export async function writeLocalDeckApkg(request: LocalDeckApkgRequest): Promise<{ notes: number; media: number; scheduled: number; reviews: number }> {
   const headers = request.rows[0] ?? [];
   const rows = request.rows.slice(1);
   if (!headers.length || !rows.length) throw new Error('The local deck has no cards to package.');
@@ -83,6 +90,16 @@ export async function writeLocalDeckApkg(request: LocalDeckApkgRequest): Promise
       JSON.stringify({ [modelId]: model }), JSON.stringify({ [deckId]: deck }), '{}', '{}',
     ]);
     let scheduled = 0;
+    let reviews = 0;
+    // revlog ids are epoch ms and the table's primary key: two answers in the
+    // same millisecond (two cards graded by one keypress) get consecutive ids.
+    const revlogIds = new Set<number>();
+    const uniqueRevlogId = (at: number): number => {
+      let id = Math.max(1, Math.floor(at));
+      while (revlogIds.has(id)) id += 1;
+      revlogIds.add(id);
+      return id;
+    };
     rows.forEach((row, index) => {
       const values = headers.map((name, field) => {
         // The saved extras: markup this writer builds from the validated card
@@ -107,6 +124,12 @@ export async function writeLocalDeckApkg(request: LocalDeckApkgRequest): Promise
           cardId, noteId, deckId, 0, nowSec, 0, schedule.type, schedule.queue, schedule.due, schedule.ivl,
           schedule.factor, schedule.reps, schedule.lapses, 0, 0, 0, 0, schedule.data ?? '',
         ]);
+        for (const entry of reviewEntriesToAnkiRevlog(plan?.history ?? [], schedule.factor)) {
+          db.run('INSERT INTO revlog VALUES (?,?,?,?,?,?,?,?,?)', [
+            uniqueRevlogId(entry.id), cardId, 0, entry.ease, entry.ivl, entry.lastIvl, entry.factor, entry.time, entry.type,
+          ]);
+          if (entry.ease > 0) reviews += 1;
+        }
       } else {
         db.run('INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
           cardId, noteId, deckId, 0, nowSec, 0, 0, plan?.suspended ? -1 : 0, index + 1, 0, 0, 0, 0, 0, 0, 0, 0, '',
@@ -128,7 +151,7 @@ export async function writeLocalDeckApkg(request: LocalDeckApkgRequest): Promise
     zip.writeZip(request.outputPath);
     const check = new AdmZip(request.outputPath);
     if (!check.getEntry('collection.anki2') || !check.getEntry('media')) throw new Error('The written Anki package failed read-back.');
-    return { notes: rows.length, media: request.media.length, scheduled };
+    return { notes: rows.length, media: request.media.length, scheduled, reviews };
   } catch (error) {
     try { fs.rmSync(request.outputPath, { force: true }); } catch { /* best effort */ }
     throw error;

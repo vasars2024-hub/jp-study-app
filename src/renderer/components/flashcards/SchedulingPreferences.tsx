@@ -15,17 +15,43 @@
  * - The forecast is read from stored due dates, never derived from interval
  *   lengths, and unscheduled cards are shown as due rather than quietly
  *   excluded — the panel must agree with the button the user is about to press.
+ *
+ * Presets (Anki's deck option presets): the per-deck settings — retention, the
+ * maximum interval, steps, the leech rule, the FSRS version and parameters —
+ * belong to the preset being edited, chosen at the top; deck folders are
+ * assigned to presets below it. With no presets this is the panel it always
+ * was, editing the Default preset. The optimiser fits the edited preset on its
+ * own folders' reviews, as Anki's does.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
-  MAX_LEARN_AHEAD_MINUTES,
+  DEFAULT_PRESET_ID,
   MAX_LOCAL_RETENTION,
+  MAX_LEARN_AHEAD_MINUTES,
+  MAX_SCHEDULING_PRESETS,
   MIN_LOCAL_RETENTION,
+  effectiveFsrsWeights,
+  findSchedulingPreset,
+  personalFsrsWeightsInUse,
+  presetIdForFolder,
+  schedulingConfigForPreset,
+  withFolderPreset,
+  withNewPreset,
+  withoutPreset,
+  withPresetName,
+  withPresetSettings,
   type LeechAction,
+  type PresetSettings,
   type SchedulingConfig,
 } from '../../../shared/flashcardScheduling';
 import type { FsrsReplayPlan } from '../../../shared/fsrsMemoryReplay';
-import { DEFAULT_FSRS_WEIGHTS } from '../../../shared/fsrs';
+import {
+  FSRS5_WEIGHT_COUNT,
+  FSRS6_WEIGHT_COUNT,
+  defaultFsrsWeights,
+  fsrsVersionOf,
+  type FsrsVersion,
+} from '../../../shared/fsrs';
 import type { FsrsHoldoutResult } from '../../../shared/fsrsOptimizer';
 import { dailyReviewRate, simulateRetentionWorkload } from '../../../shared/fsrsWorkload';
 import {
@@ -41,12 +67,13 @@ import {
   applyFsrsReplay,
   convertDeckSchedule,
   loadDeck,
+  loadDeckFolders,
   onDeckChanged,
   previewFsrsReplay,
   resetDeckSchedule,
   type SchedulingSweepReport,
 } from '../../flashcardDeck';
-import { loadSchedulingConfig, saveSchedulingConfig } from '../../flashcardScheduling';
+import { loadSchedulingConfig, replaceSchedulingConfig, saveSchedulingConfig } from '../../flashcardScheduling';
 import { FsrsOptimizerCancelled, runFsrsOptimizer, type FsrsOptimizerJob } from '../../fsrsOptimizerAsync';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
@@ -59,6 +86,18 @@ const ALGORITHMS: Array<{ key: LocalSrsAlgorithm; label: string; about: string }
 
 const FORECAST_DAYS = 7;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+
+/** The settings that belong to a preset; everything else is shared by all of them. */
+const PRESET_KEYS: ReadonlyArray<keyof PresetSettings> = [
+  'desiredRetention',
+  'maximumIntervalDays',
+  'learningStepsMinutes',
+  'relearningStepsMinutes',
+  'leechThreshold',
+  'leechAction',
+  'fsrsVersion',
+  'fsrsWeights',
+];
 
 /** One optimiser run: `cancelled` is set by Cancel even before the worker job exists. */
 interface OptimizerRun {
@@ -79,15 +118,29 @@ export default function SchedulingPreferencesPanel() {
     const format = new Intl.DateTimeFormat(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' });
     return (hour: number): string => format.format(new Date(2000, 0, 1, hour));
   }, [lang]);
+  const formats = useMemo(() => ({
+    date: new Intl.DateTimeFormat(LANG_TAGS[lang], { dateStyle: 'medium' }),
+    weight: new Intl.NumberFormat(LANG_TAGS[lang], { maximumFractionDigits: 4 }),
+    list: new Intl.ListFormat(LANG_TAGS[lang], { type: 'conjunction' }),
+  }), [lang]);
   const [config, setConfig] = useState<SchedulingConfig>(loadSchedulingConfig);
   const [cards, setCards] = useState(loadDeck);
   const [report, setReport] = useState<{ kind: 'convert' | 'reset'; data: SchedulingSweepReport } | null>(null);
   /** Reset is destructive with no undo, so it takes two presses. */
   const [confirmingReset, setConfirmingReset] = useState(false);
+  /** The preset whose settings the controls below show and change. */
+  const [presetId, setPresetId] = useState<string>(DEFAULT_PRESET_ID);
+  const preset = findSchedulingPreset(config, presetId);
+  const editingId = preset ? preset.id : DEFAULT_PRESET_ID;
+  const view = useMemo(() => schedulingConfigForPreset(config, editingId), [config, editingId]);
+  const [presetName, setPresetName] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /** A short line about the last preset or Anki-parameter action. */
+  const [presetNote, setPresetNote] = useState<string | null>(null);
   const reviewPrefs = useReviewSessionPrefs();
   /** The step fields as typed; committed on blur, refused (not trimmed) when they do not parse. */
-  const [learningText, setLearningText] = useState(() => formatStepList(config.learningStepsMinutes));
-  const [relearningText, setRelearningText] = useState(() => formatStepList(config.relearningStepsMinutes));
+  const [learningText, setLearningText] = useState(() => formatStepList(view.learningStepsMinutes));
+  const [relearningText, setRelearningText] = useState(() => formatStepList(view.relearningStepsMinutes));
   const [stepsError, setStepsError] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   /** Share of the fit done, 0..1, while `optimizing`. */
@@ -113,46 +166,152 @@ export default function SchedulingPreferencesPanel() {
   // Leaving the panel stops a fit nobody is waiting for.
   useEffect(() => () => { cancelRun(run.current); run.current = null; }, []);
 
+  // Another preset on screen: its own steps and name in the text fields, and no
+  // result or confirmation that belonged to the one before.
+  useEffect(() => {
+    const shown = schedulingConfigForPreset(loadSchedulingConfig(), editingId);
+    setLearningText(formatStepList(shown.learningStepsMinutes));
+    setRelearningText(formatStepList(shown.relearningStepsMinutes));
+    setStepsError(false);
+    setPresetName(findSchedulingPreset(loadSchedulingConfig(), editingId)?.name ?? '');
+    setConfirmingDelete(false);
+    setFit(null);
+    setFailure(null);
+  }, [editingId]);
+
   const forecast = useMemo(() => localDueForecast(cards, FORECAST_DAYS), [cards]);
   const scheduled = useMemo(
     () => cards.filter((card) => card.srs !== undefined).length,
     [cards],
   );
+  const folders = useMemo(() => {
+    const names = new Set(loadDeckFolders());
+    for (const card of cards) if (card.folder) names.add(card.folder);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [cards]);
+  /** The cards the edited preset schedules (every card while there are no presets). */
+  const presetCards = useMemo(
+    () => (config.presets.length ? cards.filter((card) => presetIdForFolder(config, card.folder) === editingId) : cards),
+    [cards, config, editingId],
+  );
+  const weights = useMemo(() => effectiveFsrsWeights(view), [view]);
 
   /**
    * What the retention setting costs: a year of a new card simulated at this
-   * retention and at 90%, and the deck's own FSRS cards' daily rate today.
+   * retention and at 90%, and the preset's own FSRS cards' daily rate today.
    */
   const workload = useMemo(() => {
     if (config.algorithm !== 'fsrs') return null;
-    const weights = config.fsrsWeights ?? DEFAULT_FSRS_WEIGHTS;
-    const options = { weights, maximumIntervalDays: config.maximumIntervalDays };
-    const here = simulateRetentionWorkload(config.desiredRetention, options);
+    const options = { weights, maximumIntervalDays: view.maximumIntervalDays };
+    const here = simulateRetentionWorkload(view.desiredRetention, options);
     const base = simulateRetentionWorkload(0.9, options);
     return {
       perCard: here.reviewsPerCard,
       recall: here.averageRecall,
       ratio: base.reviewsPerCard > 0 ? here.reviewsPerCard / base.reviewsPerCard : 1,
     };
-  }, [config.algorithm, config.desiredRetention, config.fsrsWeights, config.maximumIntervalDays]);
+  }, [config.algorithm, view.desiredRetention, view.maximumIntervalDays, weights]);
   const fsrsStabilities = useMemo(
-    () => cards
+    () => presetCards
       .filter((card) => !card.suspended && card.srs?.algorithm === 'fsrs' && typeof card.srs.stability === 'number')
       .map((card) => card.srs?.stability ?? 0),
-    [cards],
+    [presetCards],
   );
   const dailyRate = useMemo(
-    () => dailyReviewRate(fsrsStabilities, config.desiredRetention, config.maximumIntervalDays),
-    [fsrsStabilities, config.desiredRetention, config.maximumIntervalDays],
+    () => dailyReviewRate(fsrsStabilities, view.desiredRetention, view.maximumIntervalDays, weights),
+    [fsrsStabilities, view.desiredRetention, view.maximumIntervalDays, weights],
   );
 
-  function update(next: Partial<SchedulingConfig>): void {
-    setConfig(saveSchedulingConfig(next));
+  function applyConfig(next: SchedulingConfig): void {
+    setConfig(next);
     setReport(null);
     setConfirmingReset(false);
     // A plan made under other parameters is not what Apply would now mean.
     setReplayPlan(null);
     setReplayResult(null);
+  }
+
+  /**
+   * Save a change: a preset's settings go to the preset being edited (the top
+   * level for the Default preset), the shared ones to the top level.
+   */
+  function update(next: Partial<SchedulingConfig>): void {
+    const shared: Partial<SchedulingConfig> = { ...next };
+    const own: Partial<PresetSettings> = {};
+    for (const key of PRESET_KEYS) {
+      if (!(key in next)) continue;
+      (own as Record<string, unknown>)[key] = next[key];
+      delete shared[key];
+    }
+    let saved = Object.keys(shared).length ? saveSchedulingConfig(shared) : loadSchedulingConfig();
+    if (Object.keys(own).length) saved = replaceSchedulingConfig(withPresetSettings(saved, editingId, own));
+    applyConfig(saved);
+  }
+
+  function addPreset(): void {
+    const made = withNewPreset(loadSchedulingConfig(), t('srs5.preset.newName', { n: config.presets.length + 1 }), editingId);
+    if (!made) return;
+    applyConfig(replaceSchedulingConfig(made.config));
+    setPresetId(made.id);
+    setPresetNote(null);
+  }
+
+  function deletePreset(): void {
+    if (!preset) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    applyConfig(replaceSchedulingConfig(withoutPreset(loadSchedulingConfig(), preset.id)));
+    setPresetNote(t('srs5.preset.deleted', { name: preset.name }));
+    setPresetId(DEFAULT_PRESET_ID);
+  }
+
+  function commitPresetName(): void {
+    if (!preset) return;
+    if (!presetName.trim()) {
+      setPresetName(preset.name);
+      return;
+    }
+    applyConfig(replaceSchedulingConfig(withPresetName(loadSchedulingConfig(), preset.id, presetName)));
+  }
+
+  function assignFolder(folder: string, id: string): void {
+    applyConfig(replaceSchedulingConfig(withFolderPreset(loadSchedulingConfig(), folder, id)));
+  }
+
+  const presetLabel = (id: string): string => findSchedulingPreset(config, id)?.name ?? t('srs5.preset.default');
+  const usedBy = folders.filter((folder) => presetIdForFolder(config, folder) === editingId);
+
+  /** The imported Anki parameters, as the settings a preset takes from them. */
+  const ankiImport = config.ankiFsrsImport;
+  function ankiSettings(): Partial<PresetSettings> {
+    if (!ankiImport) return {};
+    const retention = ankiImport.desiredRetention;
+    return {
+      fsrsVersion: fsrsVersionOf(ankiImport.weights),
+      fsrsWeights: [...ankiImport.weights],
+      ...(retention !== undefined ? { desiredRetention: Math.min(MAX_LOCAL_RETENTION, Math.max(MIN_LOCAL_RETENTION, retention)) } : {}),
+      ...(ankiImport.maximumIntervalDays ? { maximumIntervalDays: ankiImport.maximumIntervalDays } : {}),
+    };
+  }
+
+  function useAnkiHere(): void {
+    if (!ankiImport) return;
+    update(ankiSettings());
+    setFit(null);
+    setPresetNote(t('srs5.anki.applied', { name: presetLabel(editingId) }));
+  }
+
+  function ankiAsPreset(): void {
+    if (!ankiImport) return;
+    const source = ankiImport.presetName ?? ankiImport.deckName;
+    const name = source ? t('srs5.anki.presetName', { name: source }) : t('srs5.anki.presetNameBare');
+    const made = withNewPreset(loadSchedulingConfig(), name, editingId, Date.now(), ankiSettings());
+    if (!made) return;
+    applyConfig(replaceSchedulingConfig(made.config));
+    setPresetId(made.id);
+    setPresetNote(t('srs5.anki.applied', { name }));
   }
 
   /** Preview rebuilding every card's FSRS memory from the whole review log. */
@@ -197,7 +356,8 @@ export default function SchedulingPreferencesPanel() {
    * stays responsive, with progress and a Cancel. The worker trains only on
    * real reviews (game and practice rows are left out), fits on the earlier
    * ~80% of them and offers new parameters only when they predict the latest
-   * ~20% better than the parameters in use.
+   * ~20% better than the parameters in use. With presets, only the edited
+   * preset's cards train it, and the fit is for its FSRS version.
    */
   async function optimize(): Promise<void> {
     cancelRun(run.current);
@@ -211,13 +371,15 @@ export default function SchedulingPreferencesPanel() {
       // The whole history, archived rows included: a card's reviews must reach
       // back to its first to train. Days are the user's study days (local
       // calendar, DST-safe), the rule the scheduler applies the weights with.
-      const entries = await loadFullReviewLog();
+      const all = await loadFullReviewLog();
+      const ids = config.presets.length ? new Set(presetCards.map((card) => card.id)) : null;
+      const entries = ids ? all.filter((entry) => entry.cardId && ids.has(entry.cardId)) : all;
       // Cancelled (or the panel closed) while the log was being read: no worker at all.
       if (current.cancelled) throw new FsrsOptimizerCancelled();
       current.job = runFsrsOptimizer(entries, {
         dayStartHour: config.dayStartHour,
-        start: DEFAULT_FSRS_WEIGHTS,
-        current: config.fsrsWeights ?? DEFAULT_FSRS_WEIGHTS,
+        start: defaultFsrsWeights(view.fsrsVersion),
+        current: weights,
       }, setProgress);
       const result = await current.job.result;
       if (run.current === current) setFit(result);
@@ -268,6 +430,16 @@ export default function SchedulingPreferencesPanel() {
     refresh();
   }
 
+  /** What the optimiser section says about the parameters in use for the edited preset. */
+  const stored = view.fsrsWeights;
+  const parametersLine = view.fsrsVersion === 6 && stored?.length === FSRS5_WEIGHT_COUNT
+    ? t('srs5.fsrs.carried')
+    : view.fsrsVersion === 5 && stored?.length === FSRS6_WEIGHT_COUNT
+      ? t('srs5.fsrs.idleV6')
+      : personalFsrsWeightsInUse(view)
+        ? t('srs2.optimizer.personal')
+        : view.fsrsVersion === 6 ? t('srs5.optimizer.defaults6') : t('srs2.optimizer.defaults');
+
   return (
     <fieldset className="auto-reading-options">
       <legend>{t('flash.schedule.title')}</legend>
@@ -286,17 +458,118 @@ export default function SchedulingPreferencesPanel() {
         </label>
       ))}
 
+      <div className="srs5-presets">
+        <p className="flash-write-progress">{t('srs5.preset.title')}</p>
+        <p className="muted" id="srs5-preset-help">{t('srs5.preset.lead')}</p>
+        <label className="auto-reading-options__cap">
+          {t('srs5.preset.label')}
+          <select
+            value={editingId}
+            aria-describedby="srs5-preset-help"
+            onChange={(event) => { setPresetId(event.currentTarget.value); setPresetNote(null); }}
+          >
+            <option value={DEFAULT_PRESET_ID}>{t('srs5.preset.default')}</option>
+            {config.presets.map((entry) => (
+              <option key={entry.id} value={entry.id}>{entry.name}</option>
+            ))}
+          </select>
+        </label>
+        {preset && (
+          <label className="auto-reading-options__cap">
+            {t('srs5.preset.name')}
+            <input
+              type="text"
+              value={presetName}
+              maxLength={60}
+              onChange={(event) => setPresetName(event.currentTarget.value)}
+              onBlur={commitPresetName}
+            />
+          </label>
+        )}
+        <div className="flash-match-actions">
+          <button
+            type="button"
+            className="btn"
+            onClick={addPreset}
+            disabled={config.presets.length >= MAX_SCHEDULING_PRESETS}
+            aria-describedby={config.presets.length >= MAX_SCHEDULING_PRESETS ? 'srs5-preset-limit' : undefined}
+          >
+            {t('srs5.preset.add')}
+          </button>
+          {preset && (
+            <button type="button" className="btn" onClick={deletePreset}>
+              {confirmingDelete ? t('srs5.preset.deleteConfirm', { name: preset.name }) : t('srs5.preset.delete')}
+            </button>
+          )}
+        </div>
+        {config.presets.length >= MAX_SCHEDULING_PRESETS && (
+          <p className="muted" id="srs5-preset-limit">{t('srs5.preset.limit', { max: MAX_SCHEDULING_PRESETS })}</p>
+        )}
+        {confirmingDelete && preset && (
+          <p className="auto-reading-options__report" aria-live="polite">{t('srs5.preset.deleteWarning')}</p>
+        )}
+        {presetNote && <p className="auto-reading-options__report" aria-live="polite">{presetNote}</p>}
+        <p className="muted">
+          {usedBy.length
+            ? t('srs5.preset.usedBy', { count: usedBy.length, names: formats.list.format(usedBy) })
+            : t('srs5.preset.usedByNone')}
+        </p>
+        {folders.length > 0 ? (
+          <>
+            <p className="flash-write-progress">{t('srs5.preset.foldersTitle')}</p>
+            {folders.map((folder) => (
+              <label key={folder} className="auto-reading-options__cap srs5-preset-folder">
+                {folder}
+                <select
+                  value={presetIdForFolder(config, folder)}
+                  aria-label={t('srs5.preset.folderAria', { folder })}
+                  onChange={(event) => assignFolder(folder, event.currentTarget.value)}
+                >
+                  <option value={DEFAULT_PRESET_ID}>{t('srs5.preset.default')}</option>
+                  {config.presets.map((entry) => (
+                    <option key={entry.id} value={entry.id}>{entry.name}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </>
+        ) : (
+          <p className="muted">{t('srs5.preset.foldersNone')}</p>
+        )}
+      </div>
+
       {config.algorithm === 'fsrs' && (
         <label className="auto-reading-options__cap">
-          {t('flash.schedule.retention', { percent: Math.round(config.desiredRetention * 100) })}
+          {t('flash.schedule.retention', { percent: Math.round(view.desiredRetention * 100) })}
           <input
             type="range"
             min={Math.round(MIN_LOCAL_RETENTION * 100)}
             max={Math.round(MAX_LOCAL_RETENTION * 100)}
-            value={Math.round(config.desiredRetention * 100)}
+            value={Math.round(view.desiredRetention * 100)}
             onChange={setRetention}
           />
         </label>
+      )}
+
+      {config.algorithm === 'fsrs' && (
+        <>
+          <label className="auto-reading-options__cap">
+            {t('srs5.fsrs.version')}
+            <select
+              value={view.fsrsVersion}
+              aria-describedby="srs5-fsrs-version-help"
+              onChange={(event) => {
+                const version: FsrsVersion = Number(event.currentTarget.value) === 6 ? 6 : 5;
+                update({ fsrsVersion: version });
+                setFit(null);
+              }}
+            >
+              <option value={5}>{t('srs5.fsrs.v5')}</option>
+              <option value={6}>{t('srs5.fsrs.v6')}</option>
+            </select>
+          </label>
+          <p className="muted" id="srs5-fsrs-version-help">{t('srs5.fsrs.versionHint')}</p>
+        </>
       )}
 
       {config.algorithm === 'fsrs' && workload && (
@@ -319,9 +592,7 @@ export default function SchedulingPreferencesPanel() {
 
       {config.algorithm === 'fsrs' && (
         <div className="srs2-optimizer">
-          <p className="muted">
-            {config.fsrsWeights ? t('srs2.optimizer.personal') : t('srs2.optimizer.defaults')}
-          </p>
+          <p className="muted">{parametersLine}</p>
           <div className="flash-match-actions">
             <button type="button" className="btn" onClick={() => void optimize()} disabled={optimizing}>
               {optimizing ? t('srs2.optimizer.running') : t('srs2.optimizer.run')}
@@ -331,7 +602,7 @@ export default function SchedulingPreferencesPanel() {
                 {t('srs3.optimizer.cancel')}
               </button>
             )}
-            {config.fsrsWeights && !optimizing && (
+            {view.fsrsWeights && !optimizing && (
               <button type="button" className="btn" onClick={() => { update({ fsrsWeights: undefined }); setFit(null); }}>
                 {t('srs2.optimizer.useDefaults')}
               </button>
@@ -381,7 +652,10 @@ export default function SchedulingPreferencesPanel() {
                   <button
                     type="button"
                     className="btn primary"
-                    onClick={() => { update({ fsrsWeights: fit.weights }); setFit(null); }}
+                    onClick={() => {
+                      update({ fsrsWeights: fit.weights, fsrsVersion: fsrsVersionOf(fit.weights) });
+                      setFit(null);
+                    }}
                   >
                     {t('srs2.optimizer.apply')}
                   </button>
@@ -400,6 +674,48 @@ export default function SchedulingPreferencesPanel() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {ankiImport && (
+        <div className="srs5-anki-import">
+          <p className="flash-write-progress">{t('srs5.anki.title')}</p>
+          <p className="muted">{t('srs5.anki.lead')}</p>
+          <ul className="srs5-anki-facts">
+            <li>{t('srs5.anki.version', { version: fsrsVersionOf(ankiImport.weights), count: ankiImport.weights.length })}</li>
+            {ankiImport.deckName && <li>{t('srs5.anki.deck', { name: ankiImport.deckName })}</li>}
+            {ankiImport.presetName && <li>{t('srs5.anki.preset', { name: ankiImport.presetName })}</li>}
+            {ankiImport.fileName && <li>{t('srs5.anki.file', { name: ankiImport.fileName })}</li>}
+            {ankiImport.desiredRetention !== undefined && (
+              <li>{t('srs5.anki.retention', { percent: Math.round(ankiImport.desiredRetention * 100) })}</li>
+            )}
+            {ankiImport.maximumIntervalDays !== undefined && (
+              <li>{t('srs5.anki.maximum', { count: ankiImport.maximumIntervalDays })}</li>
+            )}
+            {ankiImport.importedAt > 0 && (
+              <li>{t('srs5.anki.when', { date: formats.date.format(new Date(ankiImport.importedAt)) })}</li>
+            )}
+          </ul>
+          <p className="muted srs5-anki-values">
+            {t('srs5.anki.values', { values: ankiImport.weights.map((w) => formats.weight.format(w)).join(' · ') })}
+          </p>
+          {config.algorithm !== 'fsrs' && <p className="muted">{t('srs5.anki.needsFsrs')}</p>}
+          <div className="flash-match-actions">
+            <button type="button" className="btn" onClick={useAnkiHere}>
+              {t('srs5.anki.useHere', { name: presetLabel(editingId) })}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={ankiAsPreset}
+              disabled={config.presets.length >= MAX_SCHEDULING_PRESETS}
+            >
+              {t('srs5.anki.asPreset')}
+            </button>
+            <button type="button" className="btn" onClick={() => { update({ ankiFsrsImport: undefined }); setPresetNote(null); }}>
+              {t('srs5.anki.dismiss')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -472,7 +788,7 @@ export default function SchedulingPreferencesPanel() {
           type="number"
           min={1}
           max={36500}
-          value={config.maximumIntervalDays}
+          value={view.maximumIntervalDays}
           onChange={setMaximum}
         />
       </label>
@@ -547,14 +863,14 @@ export default function SchedulingPreferencesPanel() {
           type="number"
           min={2}
           max={99}
-          value={config.leechThreshold}
+          value={view.leechThreshold}
           onChange={(event) => update({ leechThreshold: Number(event.currentTarget.value) })}
         />
       </label>
       <label className="auto-reading-options__cap">
         {t('srs2.leech.action')}
         <select
-          value={config.leechAction}
+          value={view.leechAction}
           onChange={(event) => update({ leechAction: event.currentTarget.value as LeechAction })}
         >
           <option value="tag">{t('srs2.leech.actionTag')}</option>

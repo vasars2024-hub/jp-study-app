@@ -19,6 +19,7 @@ import {
   ANKI_SYNC_MIN_API_VERSION,
   ANKI_SYNC_PULL_BATCH,
   ANKI_SYNC_PUSH_BATCH,
+  ankiMirrorDueByDate,
   ankiMirrorFromCard,
   classifyAnkiSyncError,
   compareAnkiAnswers,
@@ -48,7 +49,6 @@ import { noteAnkiActiveProfile } from './mediaUpload';
 import { getModelFieldNames } from './modelFields';
 
 const CHUNK = 500;
-const DAY_MS = 24 * 60 * 60 * 1000;
 /** Terms per OR-query when looking for notes to link. */
 const LINK_QUERY_TERMS = 25;
 
@@ -249,10 +249,17 @@ async function resolveAnkiToday(): Promise<number | null> {
   return null;
 }
 
+/**
+ * Anki's schedule for linked notes, for display. `dayStartHour` is the hour the
+ * user's study day starts (Gum's setting, sent by the renderer; main has no
+ * copy of it): a review card's due day becomes a date at the start of that
+ * study day, never at local midnight.
+ */
 export async function pullAnkiSchedule(
   noteIds: readonly number[],
   expectedProfile?: string,
   now = Date.now(),
+  dayStartHour?: number,
 ): Promise<AnkiSchedulePullResult> {
   const wanted = noteIds.slice(0, ANKI_SYNC_PULL_BATCH);
   if (!wanted.length) return { ok: true, entries: [] };
@@ -279,8 +286,6 @@ export async function pullAnkiSchedule(
       // An add-on without `areDue`: fall back to the due date below.
     }
     const todayDay = await resolveAnkiToday();
-    const dayStart = new Date(now);
-    dayStart.setHours(0, 0, 0, 0);
     const entries: AnkiSchedulePullEntry[] = [];
     for (const noteId of wanted) {
       if (missing.has(noteId)) {
@@ -291,13 +296,11 @@ export async function pullAnkiSchedule(
       if (!card) continue;
       const mirror = ankiMirrorFromCard(card, {
         todayDay,
-        dayStartMs: dayStart.getTime(),
         isDue: due.get(card.cardId) ?? false,
         now,
+        dayStartHour,
       });
-      if (!due.has(card.cardId) && mirror.dueAt !== undefined && mirror.state !== 'suspended') {
-        mirror.isDue = mirror.dueAt <= now + (mirror.state === 'learning' || mirror.state === 'relearning' ? 0 : DAY_MS - 1);
-      }
+      if (!due.has(card.cardId)) mirror.isDue = ankiMirrorDueByDate(mirror, now);
       entries.push({ noteId, mirror });
     }
     return { ok: true, entries, ...(guard.profile !== undefined ? { profile: guard.profile } : {}) };
@@ -502,8 +505,10 @@ export function registerAnkiReviewSyncIpc(): void {
     return pushAnkiReviewAnswers(sanitizePushItems(p.items), optionalProfile(p.expectedProfile));
   });
   ipcMain.handle('anki:pullSchedule', (_e, payload: unknown) => {
-    const p = (payload && typeof payload === 'object' ? payload : {}) as { noteIds?: unknown; expectedProfile?: unknown };
-    return pullAnkiSchedule(positiveIds(p.noteIds).slice(0, ANKI_SYNC_PULL_BATCH), optionalProfile(p.expectedProfile));
+    const p = (payload && typeof payload === 'object' ? payload : {}) as { noteIds?: unknown; expectedProfile?: unknown; dayStartHour?: unknown };
+    // An hour 0..23 or nothing (then the 4 am default): `normalizeDayStartHour` downstream.
+    const hour = typeof p.dayStartHour === 'number' && Number.isInteger(p.dayStartHour) ? p.dayStartHour : undefined;
+    return pullAnkiSchedule(positiveIds(p.noteIds).slice(0, ANKI_SYNC_PULL_BATCH), optionalProfile(p.expectedProfile), Date.now(), hour);
   });
   ipcMain.handle('anki:findNoteLinks', (_e, payload: unknown) => {
     const p = (payload && typeof payload === 'object' ? payload : {}) as { requests?: unknown; expectedProfile?: unknown };

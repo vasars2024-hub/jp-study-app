@@ -74,6 +74,7 @@
 
 import { ANKI_COLLECTION_UNAVAILABLE_MSG, ANKI_UNREACHABLE_MSG } from './anki';
 import type { LocalSrsRating } from './localSrs';
+import { normalizeDayStartHour, startOfStudyDayIndex, studyDayIndex } from './studyDay';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -372,22 +373,45 @@ export function ankiMirrorState(row: Pick<AnkiSyncCardRow, 'queue' | 'type'>): A
   return 'new';
 }
 
+export interface AnkiMirrorContext {
+  /** Anki's own day number for today, or null when it could not be anchored. */
+  todayDay: number | null;
+  isDue: boolean;
+  now: number;
+  /**
+   * The hour a study day starts (Gum's Settings → Scheduling, 4 am by default,
+   * which is also Anki's default "next day starts at"). A day number is a STUDY
+   * day: at 02:00 Anki's "today" is still yesterday's date, and a card due
+   * tomorrow is due from 04:00 tomorrow, not from midnight.
+   */
+  dayStartHour?: number;
+}
+
+/**
+ * When a card due on Anki day `due` becomes due, given Anki's `todayDay`: the
+ * START of the study day that many days after the one containing `now`, on the
+ * local calendar (so a daylight-saving change is still one day).
+ */
+export function ankiDayToDueAt(due: number, todayDay: number, now: number, dayStartHour?: number): number {
+  const hour = normalizeDayStartHour(dayStartHour);
+  return startOfStudyDayIndex(studyDayIndex(now, hour) + (due - todayDay), hour);
+}
+
 /**
  * One `cardsInfo` row as a mirror entry. Anki's `due` is a Unix time (seconds)
  * for intraday learning cards and a day number for review / day-learning ones;
  * a day number becomes a date only against `todayDay` (Anki's own day number
- * for today, anchored by the caller), else `dueAt` is left out rather than guessed.
+ * for today, anchored by the caller), else `dueAt` is left out rather than
+ * guessed. A dated day number is due from the start of its study day
+ * (`ankiDayToDueAt`), as Anki shows it.
  */
-export function ankiMirrorFromCard(
-  row: AnkiSyncCardRow,
-  context: { todayDay: number | null; dayStartMs: number; isDue: boolean; now: number },
-): AnkiScheduleMirror {
+export function ankiMirrorFromCard(row: AnkiSyncCardRow, context: AnkiMirrorContext): AnkiScheduleMirror {
   const state = ankiMirrorState(row);
   const due = typeof row.due === 'number' && Number.isFinite(row.due) ? row.due : undefined;
   let dueAt: number | undefined;
   if (due !== undefined && row.type !== 0) {
     if (due > 1_000_000_000) dueAt = due * 1000;
-    else if (context.todayDay !== null) dueAt = context.dayStartMs + (due - context.todayDay) * DAY_MS;
+    else if (context.todayDay !== null) dueAt = ankiDayToDueAt(due, context.todayDay, context.now, context.dayStartHour);
   }
   const factor = typeof row.factor === 'number' && row.factor > 0 ? row.factor / 1000 : undefined;
   return {
@@ -403,6 +427,18 @@ export function ankiMirrorFromCard(
     ...(row.deckName ? { deckName: row.deckName } : {}),
     syncedAt: context.now,
   };
+}
+
+/**
+ * Whether a mirrored card is due by its date alone, for an AnkiConnect without
+ * `areDue`. Every dated card is due once its `dueAt` has passed: an intraday
+ * step at its minute, a day card from the start of its study day. (This used
+ * to add a day minus a millisecond to day cards anchored at midnight, which
+ * called a card due tomorrow due all day today.)
+ */
+export function ankiMirrorDueByDate(mirror: Pick<AnkiScheduleMirror, 'dueAt' | 'state'>, now: number): boolean {
+  if (mirror.dueAt === undefined || mirror.state === 'suspended' || mirror.state === 'buried') return false;
+  return mirror.dueAt <= now;
 }
 
 export interface AnkiSchedulePullEntry {

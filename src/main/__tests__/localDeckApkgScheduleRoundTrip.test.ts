@@ -9,7 +9,9 @@ import os from 'node:os';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
 import { afterAll, describe, expect, it } from 'vitest';
+import { ankiRevlogToReviewEntries, type ExportableReview } from '../../shared/apkgCards';
 import { buildDeckMediaExport, type DeckMediaExportCard } from '../../shared/deckMediaExport';
+import { sanitizeLocalDeckApkgSchedules } from '../../shared/localDeckApkg';
 import type { LocalSrsState } from '../../shared/localSrs';
 import { getSql } from '../anki/apkgCollection';
 import { readApkgCardsFile } from '../anki/apkgNoteRead';
@@ -75,7 +77,7 @@ describe('.apkg export keeps schedule and media through the app\'s own importer'
       media: built.media.map((item) => ({ fileName: item.fileName, filePath: item.sourcePath as string })),
       schedules: built.schedules,
     });
-    expect(written).toEqual({ notes: 4, media: 2, scheduled: 3 });
+    expect(written).toEqual({ notes: 4, media: 2, scheduled: 3, reviews: 0 });
 
     // The raw columns Anki reads: review queue, suspension, FSRS memory in `data`.
     const SQL = await getSql();
@@ -109,6 +111,64 @@ describe('.apkg export keeps schedule and media through the app\'s own importer'
 
     expect(must(byWord.get('鳥')).srs).toMatchObject({ intervalDays: 12 });
     expect(must(byWord.get('魚')).srs).toBeUndefined();
+  }, 30_000);
+
+  it('round-trips each card\'s review history through revlog, resets included', async () => {
+    const h = (at: number, rating: ExportableReview['rating'], prev: number, next: number, extra: Partial<ExportableReview> = {}): ExportableReview => (
+      { at, rating, prevIntervalDays: prev, intervalDays: next, durationMs: 4_000, ...extra }
+    );
+    const T = NOW - 60 * DAY;
+    const nekoHistory: ExportableReview[] = [
+      h(T, 'again', 0, 0, { isNew: true }),
+      h(T + 600_000, 'good', 0, 1),
+      h(T + 1 * DAY, 'good', 1, 3),
+      h(T + 4 * DAY, 'again', 3, 0),
+      h(T + 4 * DAY + 600_000, 'good', 0, 1),
+      // The schedule was reset, and the card learned again.
+      h(T + 10 * DAY, 'easy', 0, 4, { isNew: true }),
+      h(T + 14 * DAY, 'hard', 4, 6),
+    ];
+    // Same millisecond as one of the cat's answers: revlog ids must stay unique.
+    const inuHistory: ExportableReview[] = [h(T + 1 * DAY, 'good', 0, 2, { isNew: true }), h(T + 3 * DAY, 'good', 2, 6)];
+    const schedules = sanitizeLocalDeckApkgSchedules([
+      { srs: srs({ ease: 2.3 }), history: nekoHistory },
+      { srs: srs({ algorithm: 'fsrs', stability: 7, difficulty: 5 }), history: [...inuHistory, { at: -5, rating: 'good' }, { at: T, rating: 'meh' }] },
+      { history: inuHistory }, // no schedule: a new card carries no history
+    ]);
+    expect(schedules?.[1]?.history).toHaveLength(2);
+    expect(schedules?.[2]).toBeNull();
+
+    const outputPath = path.join(root, 'history.apkg');
+    const written = await writeLocalDeckApkg({
+      kind: 'write', id: 'history', outputPath, deckName: 'History', nowMs: NOW, media: [],
+      rows: [['Expression', 'Meaning'], ['猫', 'cat'], ['犬', 'dog'], ['鳥', 'bird']],
+      schedules,
+    });
+    expect(written).toMatchObject({ notes: 3, scheduled: 2, reviews: 9 });
+
+    // What Anki reads: ids unique, kinds learn/review/relearn, the reset as a manual row.
+    const SQL = await getSql();
+    const db = new SQL.Database(new AdmZip(outputPath).getEntry('collection.anki2')?.getData() ?? Buffer.alloc(0));
+    const raw = db.exec('SELECT r.id, c.id, r.ease, r.ivl, r.lastIvl, r.factor, r.time, r.type FROM revlog r JOIN cards c ON c.id = r.cid ORDER BY r.cid, r.id')[0].values;
+    db.close();
+    const nekoRows = raw.slice(0, 8);
+    expect(nekoRows.map((row) => [row[2], row[7]])).toEqual([
+      [1, 0], [3, 0], [3, 1], [1, 1], [3, 2], [0, 4], [4, 0], [2, 1],
+    ]);
+    expect(nekoRows[2].slice(3, 7)).toEqual([3, 1, 2300, 4000]);
+    expect(new Set(raw.map((row) => row[0])).size).toBe(raw.length);
+
+    // And back through the app's own reader: the same answers, the same firsts.
+    const read = await readApkgCardsFile(outputPath, { nowMs: NOW });
+    expect(read.report?.historyReviews).toBe(9);
+    const neko = must(read.cards?.find((card) => card.word === '猫'));
+    const back = ankiRevlogToReviewEntries(must(neko.history), must(neko.ankiCardId), 'neko', '猫');
+    expect(back.map((row) => ({
+      at: row.at, rating: row.rating, prevIntervalDays: row.prevIntervalDays, intervalDays: row.intervalDays, isNew: row.isNew, durationMs: row.durationMs,
+    }))).toEqual(nekoHistory.map((row) => ({ ...row, isNew: row.isNew })));
+    const inu = must(read.cards?.find((card) => card.word === '犬'));
+    expect(ankiRevlogToReviewEntries(must(inu.history), must(inu.ankiCardId), 'inu').map((row) => row.rating)).toEqual(['good', 'good']);
+    expect(read.cards?.find((card) => card.word === '鳥')?.history).toBeUndefined();
   }, 30_000);
 
   it('without schedules every card is new, exactly as before', async () => {

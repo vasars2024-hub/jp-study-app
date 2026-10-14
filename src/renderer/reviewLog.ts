@@ -261,6 +261,127 @@ export function removeReviewLogEntry(entry: ReviewLogEntry): void {
   notifyEntryListeners('removed', entry);
 }
 
+export interface ReviewLogMergeResult {
+  /** Rows written. */
+  added: number;
+  /** Rows already in the log (same id, or the same card answered at the same moment). */
+  duplicates: number;
+  /** Rows that are not review-log rows at all. */
+  invalid: number;
+  /** Ids of the rows written, for an undo of the import. */
+  ids: string[];
+}
+
+/** Rows per IndexedDB batch while merging: one transaction per chunk, not one per row. */
+const MERGE_CHUNK = 5_000;
+
+/**
+ * Run `work` after every queued write, in order with them. The caller sees a
+ * failure; the chain does not, so one failed batch never stops later appends
+ * from being written.
+ */
+function queueWrite(work: () => Promise<void>): Promise<void> {
+  const run = writeChain.then(work);
+  writeChain = run.catch((error) => {
+    console.error('[review-log] IndexedDB write failed:', error);
+  });
+  return run;
+}
+
+/**
+ * Merge a batch of history from elsewhere (an Anki package's review log) into
+ * the log, once.
+ *
+ * Not `appendReviewLog` in a loop, on purpose: these answers were not given
+ * today, so they are not counted into today's statistics, and they must not
+ * reach the row listeners — the Anki review sync would otherwise queue a
+ * year of Anki's own answers to be sent back to Anki.
+ *
+ * Deduplicated against EVERYTHING already kept, the archive included: by row
+ * id (an imported Anki answer's id is derived from its revlog id, so importing
+ * the same deck twice adds nothing), and by card and moment (the same answer
+ * that came back through an export and a re-import under another id). Rows
+ * older than the live window go where old rows belong: the archive pass runs
+ * after the merge, exactly as it does for a log that outgrew its window.
+ */
+export async function mergeReviewLogRows(rows: readonly unknown[]): Promise<ReviewLogMergeResult> {
+  const result: ReviewLogMergeResult = { added: 0, duplicates: 0, invalid: 0, ids: [] };
+  const incoming: ReviewLogEntry[] = [];
+  for (const row of rows) {
+    const entry = normalizeReviewLogEntry(row);
+    if (entry) incoming.push(entry);
+    else result.invalid += 1;
+  }
+  if (!incoming.length) return result;
+  const existing = await loadFullReviewLog();
+  const ids = new Set(existing.map((entry) => entry.id));
+  const moment = (entry: ReviewLogEntry): string => `${entry.cardId ?? ''}\u0000${entry.at}`;
+  const moments = new Set(existing.filter((entry) => entry.cardId).map(moment));
+  const fresh: ReviewLogEntry[] = [];
+  for (const entry of incoming) {
+    if (ids.has(entry.id) || (entry.cardId && moments.has(moment(entry)))) {
+      result.duplicates += 1;
+      continue;
+    }
+    ids.add(entry.id);
+    if (entry.cardId) moments.add(moment(entry));
+    fresh.push(entry);
+  }
+  if (!fresh.length) return result;
+
+  await queueWrite(async () => {
+    for (let i = 0; i < fresh.length; i += MERGE_CHUNK) {
+      await kvBatch(fresh.slice(i, i + MERGE_CHUNK).map((entry) => ({
+        type: 'put' as const,
+        key: `${REVIEW_LOG_ROW_PREFIX}${entry.id}`,
+        value: entry,
+      })));
+    }
+  });
+  // A load racing the write may have read the store before these rows: once
+  // it lands, the window's copy takes them in (the merge dedupes by id, and
+  // keeps only the live window, exactly as a load does).
+  if (!cache && loading) await loading.catch(() => undefined);
+  if (cache) cache = mergeNormalizedReviewLog([...cache, ...fresh]);
+  result.added = fresh.length;
+  result.ids = fresh.map((entry) => entry.id);
+  if (existing.length + fresh.length > REVIEW_LOG_LIMIT) await pruneReviewLog().catch(() => 0);
+  emit();
+  return result;
+}
+
+/**
+ * Take back rows a merge wrote (the undo of an import), wherever they are now:
+ * live rows are deleted; rows the archive pass moved are filtered out of their
+ * chunk. Nothing is counted out of the day's statistics, because the merge
+ * never counted them in.
+ */
+export async function removeMergedReviewLogRows(ids: readonly string[]): Promise<number> {
+  if (!ids.length) return 0;
+  const drop = new Set(ids);
+  let removed = 0;
+  await queueWrite(async () => {
+    const live = await kvScanPrefix(REVIEW_LOG_ROW_PREFIX);
+    const deletes = live
+      .filter(([key]) => drop.has(key.slice(REVIEW_LOG_ROW_PREFIX.length)))
+      .map(([key]) => ({ type: 'delete' as const, key }));
+    removed += deletes.length;
+    const archivePuts: Array<{ type: 'put'; key: string; value: unknown }> = [];
+    for (const [key, value] of await kvScanPrefix(REVIEW_LOG_ARCHIVE_PREFIX)) {
+      const entries = normalizeReviewLogArchiveChunk(value);
+      const kept = entries.filter((entry) => !drop.has(entry.id));
+      if (kept.length === entries.length) continue;
+      removed += entries.length - kept.length;
+      archivePuts.push({ type: 'put', key, value: { version: 1, entries: kept } });
+    }
+    if (deletes.length || archivePuts.length) await kvBatch([...deletes, ...archivePuts]);
+  });
+  ownRows = ownRows.filter((row) => !drop.has(row.id));
+  if (cache) cache = cache.filter((row) => !drop.has(row.id));
+  if (removed) emit();
+  return removed;
+}
+
 /**
  * Row-level hook: who needs the answer itself, not just "the log changed" —
  * the Anki review sync queues each graded answer and drops it again on undo.

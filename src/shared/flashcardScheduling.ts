@@ -30,16 +30,27 @@
  * over WHOLE study days; and a review card is due from the start of its due
  * day, so it can be reviewed any time that day, exactly as in Anki. The
  * optimiser trains on the same day rule, so a fit means what it was fitted on.
+ *
+ * FSRS-5 or FSRS-6 is a setting (`fsrsVersion`), FSRS-5 for every config
+ * written before FSRS-6 existed, so an upgrade moves no interval. Presets are
+ * Anki's deck option presets: a named set of the per-deck settings (retention,
+ * maximum interval, steps, leech rule, FSRS version and parameters) that deck
+ * folders are assigned to. The top-level fields are the Default preset, which
+ * every folder without an assignment uses — again, exactly what it used before
+ * presets existed. `schedulingConfigForFolder` is the one resolution.
  */
 import {
-  DEFAULT_FSRS_WEIGHTS,
+  defaultFsrsWeights,
   fsrsInterval,
   fsrsMemoryFromSm2,
   fsrsReview,
   fsrsShortTermReview,
+  fsrsVersionOf,
   isValidFsrsWeights,
+  upgradeFsrsWeights,
   type FsrsGrade,
   type FsrsMemory,
+  type FsrsVersion,
 } from './fsrs';
 import {
   DEFAULT_RELEARNING_STEPS,
@@ -96,8 +107,28 @@ export interface SchedulingConfig {
   /** Lapses at which a card becomes a leech (and again every half of it after). */
   leechThreshold: number;
   leechAction: LeechAction;
-  /** FSRS: a personal fit from `fsrsOptimizer.ts`. Absent means the FSRS-5 defaults. */
+  /**
+   * FSRS: a personal fit from `fsrsOptimizer.ts`, or parameters adopted from
+   * an Anki import. Nineteen weights are FSRS-5's, twenty-one FSRS-6's. Absent
+   * means the defaults of `fsrsVersion`.
+   */
   fsrsWeights?: number[];
+  /**
+   * FSRS-5 or FSRS-6. 5 for every config written before FSRS-6 was offered, so
+   * nobody's intervals change until they choose 6. See `effectiveFsrsWeights`
+   * for how a stored fit of the other version is treated.
+   */
+  fsrsVersion: FsrsVersion;
+  /** Named presets of the per-deck settings (Anki's deck option presets). */
+  presets: SchedulingPreset[];
+  /** Deck folder name → preset id. A folder without an entry uses the Default preset (the fields above). */
+  folderPresets: Record<string, string>;
+  /**
+   * FSRS parameters read from the deck options of an imported Anki package.
+   * Shown in Settings and adopted only when the user asks; never applied by
+   * the import itself.
+   */
+  ankiFsrsImport?: AnkiFsrsImport;
   /**
    * Hour (0-23, local) at which a new study day starts: Anki's "next day
    * starts at". Decides same-day reviews, whole elapsed days, due days, the
@@ -112,9 +143,51 @@ export interface SchedulingConfig {
   learnAheadMinutes: number;
 }
 
+/**
+ * One named preset: the settings Anki keeps per deck options preset. The
+ * algorithm, fuzz, the day start and the learn-ahead limit stay collection-wide,
+ * as they are in Anki.
+ */
+export interface SchedulingPreset {
+  id: string;
+  name: string;
+  desiredRetention: number;
+  maximumIntervalDays: number;
+  learningStepsMinutes: number[];
+  relearningStepsMinutes: number[];
+  leechThreshold: number;
+  leechAction: LeechAction;
+  fsrsVersion: FsrsVersion;
+  fsrsWeights?: number[];
+}
+
+/** The fields a preset overrides; everything else comes from the top level. */
+export type PresetSettings = Omit<SchedulingPreset, 'id' | 'name'>;
+
+/** What an Anki package's deck options said about FSRS. */
+export interface AnkiFsrsImport {
+  /** Nineteen (FSRS-5) or twenty-one (FSRS-6) weights, inside their bounds. */
+  weights: number[];
+  /** The preset's (or the deck's own) desired retention, when it had one. */
+  desiredRetention?: number;
+  /** The preset's maximum interval in days, when it had one. */
+  maximumIntervalDays?: number;
+  /** Anki's name for the preset, e.g. "Default" or "Japanese". */
+  presetName?: string;
+  /** The Anki deck the imported cards came from. */
+  deckName?: string;
+  /** The package's file name. */
+  fileName?: string;
+  importedAt: number;
+}
+
 export const DEFAULT_LOCAL_LEECH_THRESHOLD = 8;
 export const DEFAULT_LEARN_AHEAD_MINUTES = 20;
 export const MAX_LEARN_AHEAD_MINUTES = 1440;
+/** More presets than this is a list nobody can assign from. */
+export const MAX_SCHEDULING_PRESETS = 24;
+/** The id the Default preset (the top-level settings) answers to. */
+export const DEFAULT_PRESET_ID = 'default';
 
 export const DEFAULT_SCHEDULING_CONFIG: SchedulingConfig = {
   // SM-2, because it is what every existing deck is already scheduled by.
@@ -128,46 +201,287 @@ export const DEFAULT_SCHEDULING_CONFIG: SchedulingConfig = {
   leechAction: 'tag',
   dayStartHour: DEFAULT_DAY_START_HOUR,
   learnAheadMinutes: DEFAULT_LEARN_AHEAD_MINUTES,
+  fsrsVersion: 5,
+  presets: [],
+  folderPresets: {},
 };
 
 export const MIN_LOCAL_RETENTION = 0.7;
 export const MAX_LOCAL_RETENTION = 0.97;
 
+function normalizeRetention(value: unknown, fallback: number): number {
+  const retention = Number(value);
+  return value !== null && value !== undefined && Number.isFinite(retention)
+    ? Math.min(MAX_LOCAL_RETENTION, Math.max(MIN_LOCAL_RETENTION, retention))
+    : fallback;
+}
+
+function normalizeMaximum(value: unknown, fallback: number): number {
+  const maximum = Number(value);
+  return Number.isFinite(maximum) && maximum >= 1 ? Math.min(MAX_INTERVAL_CEILING, Math.floor(maximum)) : fallback;
+}
+
+function normalizeLeech(value: unknown, fallback: number): number {
+  const leech = Number(value);
+  return Number.isFinite(leech) && leech >= 2 ? Math.min(99, Math.floor(leech)) : fallback;
+}
+
+function normalizeVersion(value: unknown): FsrsVersion {
+  return value === 6 ? 6 : 5;
+}
+
+/** The settings a preset carries, read from anything and filled from `base`. */
+function normalizePresetSettings(value: Partial<PresetSettings> | null | undefined, base: PresetSettings): PresetSettings {
+  const settings: PresetSettings = {
+    desiredRetention: normalizeRetention(value?.desiredRetention, base.desiredRetention),
+    maximumIntervalDays: normalizeMaximum(value?.maximumIntervalDays, base.maximumIntervalDays),
+    learningStepsMinutes: normalizeSteps(value?.learningStepsMinutes, base.learningStepsMinutes),
+    relearningStepsMinutes: normalizeSteps(value?.relearningStepsMinutes, base.relearningStepsMinutes),
+    leechThreshold: normalizeLeech(value?.leechThreshold, base.leechThreshold),
+    leechAction: value?.leechAction === 'suspend' ? 'suspend' : value?.leechAction === 'tag' ? 'tag' : base.leechAction,
+    fsrsVersion: value?.fsrsVersion === undefined ? base.fsrsVersion : normalizeVersion(value.fsrsVersion),
+  };
+  if (isValidFsrsWeights(value?.fsrsWeights)) settings.fsrsWeights = [...(value?.fsrsWeights ?? [])];
+  return settings;
+}
+
+/** The Default preset's settings: the top level of a config. */
+export function defaultPresetSettings(config: SchedulingConfig): PresetSettings {
+  const settings: PresetSettings = {
+    desiredRetention: config.desiredRetention,
+    maximumIntervalDays: config.maximumIntervalDays,
+    learningStepsMinutes: [...config.learningStepsMinutes],
+    relearningStepsMinutes: [...config.relearningStepsMinutes],
+    leechThreshold: config.leechThreshold,
+    leechAction: config.leechAction,
+    fsrsVersion: config.fsrsVersion,
+  };
+  if (config.fsrsWeights) settings.fsrsWeights = [...config.fsrsWeights];
+  return settings;
+}
+
+const PRESET_ID = /^[A-Za-z0-9_-]{1,40}$/;
+
+export function normalizeSchedulingPreset(value: unknown, base: PresetSettings): SchedulingPreset | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Partial<SchedulingPreset>;
+  if (typeof raw.id !== 'string' || !PRESET_ID.test(raw.id) || raw.id === DEFAULT_PRESET_ID) return null;
+  const name = typeof raw.name === 'string' ? raw.name.trim().slice(0, 60) : '';
+  if (!name) return null;
+  return { id: raw.id, name, ...normalizePresetSettings(raw, base) };
+}
+
+function normalizeAnkiFsrsImport(value: unknown): AnkiFsrsImport | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const raw = value as Partial<AnkiFsrsImport>;
+  if (!isValidFsrsWeights(raw.weights)) return undefined;
+  const at = Number(raw.importedAt);
+  const out: AnkiFsrsImport = { weights: [...raw.weights], importedAt: Number.isFinite(at) && at > 0 ? at : 0 };
+  if (raw.desiredRetention !== undefined) {
+    const retention = Number(raw.desiredRetention);
+    if (Number.isFinite(retention) && retention >= 0.5 && retention <= 0.999) out.desiredRetention = retention;
+  }
+  const maximum = normalizeMaximum(raw.maximumIntervalDays, 0);
+  if (maximum) out.maximumIntervalDays = maximum;
+  for (const key of ['presetName', 'deckName', 'fileName'] as const) {
+    const text = raw[key];
+    if (typeof text === 'string' && text.trim()) out[key] = text.trim().slice(0, 200);
+  }
+  return out;
+}
+
 export function normalizeSchedulingConfig(
   value?: Partial<SchedulingConfig> | null,
 ): SchedulingConfig {
-  const retention = Number(value?.desiredRetention);
-  const maximum = Number(value?.maximumIntervalDays);
-  const leech = Number(value?.leechThreshold);
   const learnAhead = value?.learnAheadMinutes === undefined || value?.learnAheadMinutes === null
     ? Number.NaN
     : Number(value.learnAheadMinutes);
   const config: SchedulingConfig = {
     algorithm: value?.algorithm === 'fsrs' ? 'fsrs' : 'sm2',
-    desiredRetention: Number.isFinite(retention)
-      ? Math.min(MAX_LOCAL_RETENTION, Math.max(MIN_LOCAL_RETENTION, retention))
-      : DEFAULT_SCHEDULING_CONFIG.desiredRetention,
-    maximumIntervalDays: Number.isFinite(maximum) && maximum >= 1
-      ? Math.min(MAX_INTERVAL_CEILING, Math.floor(maximum))
-      : DEFAULT_SCHEDULING_CONFIG.maximumIntervalDays,
+    desiredRetention: normalizeRetention(value?.desiredRetention, DEFAULT_SCHEDULING_CONFIG.desiredRetention),
+    maximumIntervalDays: normalizeMaximum(value?.maximumIntervalDays, DEFAULT_SCHEDULING_CONFIG.maximumIntervalDays),
     learningStepsMinutes: normalizeSteps(value?.learningStepsMinutes, DEFAULT_SCHEDULING_CONFIG.learningStepsMinutes),
     relearningStepsMinutes: normalizeSteps(
       value?.relearningStepsMinutes,
       DEFAULT_SCHEDULING_CONFIG.relearningStepsMinutes,
     ),
     fuzz: value?.fuzz === true,
-    leechThreshold: Number.isFinite(leech) && leech >= 2
-      ? Math.min(99, Math.floor(leech))
-      : DEFAULT_LOCAL_LEECH_THRESHOLD,
+    leechThreshold: normalizeLeech(value?.leechThreshold, DEFAULT_LOCAL_LEECH_THRESHOLD),
     leechAction: value?.leechAction === 'suspend' ? 'suspend' : 'tag',
     dayStartHour: normalizeDayStartHour(value?.dayStartHour),
     learnAheadMinutes: Number.isFinite(learnAhead) && learnAhead >= 0
       ? Math.min(MAX_LEARN_AHEAD_MINUTES, Math.round(learnAhead))
       : DEFAULT_LEARN_AHEAD_MINUTES,
+    fsrsVersion: normalizeVersion(value?.fsrsVersion),
+    presets: [],
+    folderPresets: {},
   };
   const weights = value?.fsrsWeights;
   if (isValidFsrsWeights(weights)) config.fsrsWeights = [...weights];
+
+  const base = defaultPresetSettings(config);
+  const seen = new Set<string>();
+  const rawPresets: unknown[] = Array.isArray(value?.presets) ? value?.presets ?? [] : [];
+  for (const raw of rawPresets) {
+    const preset = normalizeSchedulingPreset(raw, base);
+    if (!preset || seen.has(preset.id)) continue;
+    seen.add(preset.id);
+    config.presets.push(preset);
+    if (config.presets.length >= MAX_SCHEDULING_PRESETS) break;
+  }
+  const folders = value?.folderPresets;
+  if (folders && typeof folders === 'object' && !Array.isArray(folders)) {
+    for (const [folder, id] of Object.entries(folders)) {
+      // An assignment to a preset that is gone is the Default preset: dropped.
+      if (typeof id === 'string' && seen.has(id) && folder.trim()) config.folderPresets[folder] = id;
+    }
+  }
+  const imported = normalizeAnkiFsrsImport(value?.ankiFsrsImport);
+  if (imported) config.ankiFsrsImport = imported;
   return config;
+}
+
+/**
+ * The weights the scheduler runs for these settings.
+ *
+ * - FSRS-6 with a stored FSRS-6 fit: that fit.
+ * - FSRS-6 with a stored FSRS-5 fit: the fit carried over unchanged
+ *   (`upgradeFsrsWeights`, w19 = 0 and decay 0.5), as Anki does, so turning
+ *   FSRS-6 on keeps a personal fit's intervals until the user optimises again.
+ * - FSRS-5 with a stored FSRS-6 fit: FSRS-5 cannot run FSRS-6 weights, so the
+ *   FSRS-5 defaults run (the fit stays stored for a switch back).
+ * - Nothing stored: the version's published defaults.
+ */
+export function effectiveFsrsWeights(
+  settings: Pick<SchedulingConfig, 'fsrsVersion' | 'fsrsWeights'>,
+): readonly number[] {
+  const stored = settings.fsrsWeights;
+  if (settings.fsrsVersion === 6) return stored ? upgradeFsrsWeights(stored) : defaultFsrsWeights(6);
+  return stored && fsrsVersionOf(stored) === 5 ? stored : defaultFsrsWeights(5);
+}
+
+/** Whether the stored fit is what runs (false: the defaults run, see `effectiveFsrsWeights`). */
+export function personalFsrsWeightsInUse(settings: Pick<SchedulingConfig, 'fsrsVersion' | 'fsrsWeights'>): boolean {
+  const stored = settings.fsrsWeights;
+  if (!stored) return false;
+  return settings.fsrsVersion === 6 || fsrsVersionOf(stored) === 5;
+}
+
+/** The preset `id` names, or null for the Default preset or an id that no longer exists. */
+export function findSchedulingPreset(config: SchedulingConfig, id: string | null | undefined): SchedulingPreset | null {
+  if (!id || id === DEFAULT_PRESET_ID) return null;
+  return config.presets.find((preset) => preset.id === id) ?? null;
+}
+
+/** The settings of one preset (the Default preset's when `id` is not one). */
+export function presetSettings(config: SchedulingConfig, id: string | null | undefined): PresetSettings {
+  const preset = findSchedulingPreset(config, id);
+  if (!preset) return defaultPresetSettings(config);
+  const { id: _id, name: _name, ...settings } = preset;
+  return settings;
+}
+
+/** A whole config with one preset's settings in place of the Default preset's. */
+export function schedulingConfigForPreset(config: SchedulingConfig, id: string | null | undefined): SchedulingConfig {
+  const preset = findSchedulingPreset(config, id);
+  if (!preset) return config;
+  const resolved: SchedulingConfig = {
+    ...config,
+    desiredRetention: preset.desiredRetention,
+    maximumIntervalDays: preset.maximumIntervalDays,
+    learningStepsMinutes: preset.learningStepsMinutes,
+    relearningStepsMinutes: preset.relearningStepsMinutes,
+    leechThreshold: preset.leechThreshold,
+    leechAction: preset.leechAction,
+    fsrsVersion: preset.fsrsVersion,
+  };
+  if (preset.fsrsWeights) resolved.fsrsWeights = preset.fsrsWeights;
+  else delete resolved.fsrsWeights;
+  return resolved;
+}
+
+/** The preset a deck folder is assigned to, or `DEFAULT_PRESET_ID`. */
+export function presetIdForFolder(config: SchedulingConfig, folder: string | null | undefined): string {
+  if (!folder) return DEFAULT_PRESET_ID;
+  const id = config.folderPresets[folder];
+  return id && findSchedulingPreset(config, id) ? id : DEFAULT_PRESET_ID;
+}
+
+/** The config a card in `folder` is scheduled with: its folder's preset over the shared settings. */
+export function schedulingConfigForFolder(config: SchedulingConfig, folder: string | null | undefined): SchedulingConfig {
+  return schedulingConfigForPreset(config, presetIdForFolder(config, folder));
+}
+
+/**
+ * `config` with one preset's settings changed (the top level for the Default
+ * preset). Returns the config unchanged for an id that is not a preset.
+ */
+export function withPresetSettings(
+  config: SchedulingConfig,
+  id: string | null | undefined,
+  patch: Partial<PresetSettings>,
+): SchedulingConfig {
+  const preset = findSchedulingPreset(config, id);
+  if (!preset) {
+    const next: SchedulingConfig = { ...config, ...patch };
+    if ('fsrsWeights' in patch && patch.fsrsWeights === undefined) delete next.fsrsWeights;
+    return normalizeSchedulingConfig(next);
+  }
+  const updated: SchedulingPreset = { ...preset, ...patch };
+  if ('fsrsWeights' in patch && patch.fsrsWeights === undefined) delete updated.fsrsWeights;
+  return normalizeSchedulingConfig({
+    ...config,
+    presets: config.presets.map((p) => (p.id === preset.id ? updated : p)),
+  });
+}
+
+/**
+ * Add a preset copied from `fromId`'s settings (the Default preset's by
+ * default), named `name`. Returns the config and the new id, or null at the
+ * preset limit.
+ */
+export function withNewPreset(
+  config: SchedulingConfig,
+  name: string,
+  fromId: string = DEFAULT_PRESET_ID,
+  idSeed = Date.now(),
+  overrides: Partial<PresetSettings> = {},
+): { config: SchedulingConfig; id: string } | null {
+  if (config.presets.length >= MAX_SCHEDULING_PRESETS) return null;
+  const taken = new Set(config.presets.map((p) => p.id));
+  let n = 0;
+  let id = `p${idSeed.toString(36)}`;
+  while (taken.has(id)) id = `p${idSeed.toString(36)}-${(n += 1)}`;
+  const label = name.trim().slice(0, 60) || id;
+  const settings: PresetSettings = { ...presetSettings(config, fromId), ...overrides };
+  if ('fsrsWeights' in overrides && overrides.fsrsWeights === undefined) delete settings.fsrsWeights;
+  const next = normalizeSchedulingConfig({ ...config, presets: [...config.presets, { id, name: label, ...settings }] });
+  return next.presets.some((p) => p.id === id) ? { config: next, id } : null;
+}
+
+/** Remove a preset; folders assigned to it go back to the Default preset. */
+export function withoutPreset(config: SchedulingConfig, id: string): SchedulingConfig {
+  const folderPresets: Record<string, string> = {};
+  for (const [folder, assigned] of Object.entries(config.folderPresets)) if (assigned !== id) folderPresets[folder] = assigned;
+  return normalizeSchedulingConfig({ ...config, presets: config.presets.filter((p) => p.id !== id), folderPresets });
+}
+
+/** Rename a preset (an empty name is refused: the config comes back unchanged). */
+export function withPresetName(config: SchedulingConfig, id: string, name: string): SchedulingConfig {
+  const label = name.trim().slice(0, 60);
+  if (!label) return config;
+  return normalizeSchedulingConfig({
+    ...config,
+    presets: config.presets.map((p) => (p.id === id ? { ...p, name: label } : p)),
+  });
+}
+
+/** Assign a folder to a preset (`DEFAULT_PRESET_ID` removes the assignment). */
+export function withFolderPreset(config: SchedulingConfig, folder: string, id: string): SchedulingConfig {
+  const folderPresets = { ...config.folderPresets };
+  if (id === DEFAULT_PRESET_ID || !findSchedulingPreset(config, id)) delete folderPresets[folder];
+  else folderPresets[folder] = id;
+  return normalizeSchedulingConfig({ ...config, folderPresets });
 }
 
 /** Which scheduler wrote a state. Version-1 states predate the choice. */
@@ -412,8 +726,8 @@ function scheduleSm2(
 }
 
 /** Interval in whole days for a stability, inside the user's ceiling. */
-function fsrsDays(stability: number, config: SchedulingConfig): number {
-  const raw = fsrsInterval(stability, config.desiredRetention);
+function fsrsDays(stability: number, config: SchedulingConfig, weights: readonly number[]): number {
+  const raw = fsrsInterval(stability, config.desiredRetention, weights);
   return Math.min(config.maximumIntervalDays, Math.max(1, Math.round(raw)));
 }
 
@@ -448,7 +762,7 @@ function orderedFsrsDays(
   config: SchedulingConfig,
   graduating: boolean,
 ): number {
-  const days = (grade: FsrsGrade) => fsrsDays(nextFsrsMemory(prior, grade, elapsed, weights).stability, config);
+  const days = (grade: FsrsGrade) => fsrsDays(nextFsrsMemory(prior, grade, elapsed, weights).stability, config, weights);
   const rawGood = days(3);
   const hard = graduating ? 0 : Math.min(days(2), rawGood);
   if (rating === 'hard') return graduating ? days(2) : hard;
@@ -463,7 +777,7 @@ function scheduleFsrs(
   config: SchedulingConfig,
   now: number,
 ): LocalSrsState {
-  const weights = config.fsrsWeights ?? DEFAULT_FSRS_WEIGHTS;
+  const weights = effectiveFsrsWeights(config);
   const grade = GRADES[rating];
   const prior = memoryOf(previous, weights);
   const elapsed = elapsedStudyDays(previous, now, config);
@@ -502,7 +816,7 @@ function scheduleFsrs(
       };
     }
     const days = rating === 'again'
-      ? fsrsDays(memory.stability, config)
+      ? fsrsDays(memory.stability, config, weights)
       : orderedFsrsDays(outcome.easy ? 'easy' : rating, prior, elapsed, weights, config, true);
     return reviewState(previous?.lapses ?? 0, (previous?.repetitions ?? 0) + 1, days);
   }
@@ -512,7 +826,7 @@ function scheduleFsrs(
     // Again (no learning steps) is not one: Anki leaves its lapse count at 0.
     const lapses = (previous?.lapses ?? 0) + (isReviewState(previous) ? 1 : 0);
     const steps = config.relearningStepsMinutes;
-    if (steps.length === 0) return reviewState(lapses, 0, fsrsDays(memory.stability, config));
+    if (steps.length === 0) return reviewState(lapses, 0, fsrsDays(memory.stability, config, weights));
     return {
       ...common,
       dueAt: now + Math.round(steps[0] * MINUTE_MS),

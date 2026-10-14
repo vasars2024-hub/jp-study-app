@@ -13,6 +13,7 @@
 import {
   DEFAULT_SCHEDULING_CONFIG,
   normalizeSchedulingConfig,
+  schedulingConfigForFolder,
   type SchedulingConfig,
 } from '../shared/flashcardScheduling';
 import { setStudyDayStartHour } from '../shared/studyDay';
@@ -53,12 +54,35 @@ export function studyDayStartHour(): number {
 
 export function saveSchedulingConfig(next: Partial<SchedulingConfig>): SchedulingConfig {
   const normalized = normalizeSchedulingConfig({ ...loadSchedulingConfig(), ...next });
-  // `fsrsWeights: undefined` in `next` is how a caller clears a personal fit.
+  // `fsrsWeights: undefined` in `next` is how a caller clears a personal fit,
+  // and `ankiFsrsImport: undefined` how it dismisses imported Anki parameters.
   if ('fsrsWeights' in next && next.fsrsWeights === undefined) delete normalized.fsrsWeights;
+  if ('ankiFsrsImport' in next && next.ankiFsrsImport === undefined) delete normalized.ankiFsrsImport;
+  return writeSchedulingConfig(normalized);
+}
+
+/**
+ * Store a whole config, as the preset helpers in `shared/flashcardScheduling`
+ * return it (they build the next config from the current one).
+ */
+export function replaceSchedulingConfig(next: SchedulingConfig): SchedulingConfig {
+  return writeSchedulingConfig(normalizeSchedulingConfig(next));
+}
+
+function writeSchedulingConfig(normalized: SchedulingConfig): SchedulingConfig {
   // A refused write is reported (toast + log) by the guarded writer; the
   // session still gets the setting.
   writeLocalStorage(CONFIG_KEY, JSON.stringify(normalized));
   memo = null;
   setStudyDayStartHour(normalized.dayStartHour);
   return normalized;
+}
+
+/**
+ * The settings one card is scheduled with: its deck folder's preset over the
+ * shared ones. Every review of a deck card goes through this, so a preset
+ * cannot be a label that the scheduler ignores.
+ */
+export function schedulingConfigForCard(card: { folder?: string | null }): SchedulingConfig {
+  return schedulingConfigForFolder(loadSchedulingConfig(), card.folder);
 }

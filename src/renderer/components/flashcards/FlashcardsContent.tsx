@@ -61,6 +61,7 @@ import {
   filterDeckByBook,
   filterDeckByBooks,
   groupDeckByBook,
+  findDeckCard,
   isLeechCard,
   leechThreshold,
   LEECH_QUERY,
@@ -98,7 +99,7 @@ import { previewScheduleDelays } from '../../../shared/flashcardScheduling';
 import { isInSteps } from '../../../shared/learningSteps';
 import { nextSessionCardId, nextStepWait, requeueStepCard } from '../../../shared/reviewSessionQueue';
 import { useDueClock } from '../../useDueClock';
-import { loadSchedulingConfig } from '../../flashcardScheduling';
+import { loadSchedulingConfig, schedulingConfigForCard } from '../../flashcardScheduling';
 import { useReviewSessionPrefs } from '../../reviewSessionPrefs';
 import ReviewAnswerTimer from './ReviewAnswerTimer';
 import {
@@ -1836,7 +1837,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   // the button labels move when the algorithm setting does. Delays, not
   // intervals: a learning step reads as its minutes, not as a zero-day interval.
   const nextIntervals = reviewSource === 'epub'
-    ? previewScheduleDelays(current.srs, loadSchedulingConfig())
+    ? previewScheduleDelays(current.srs, schedulingConfigForCard({ folder: findDeckCard(current.id)?.folder }))
     : null;
   const stepPhase = isInSteps(current.srs) ? current.srs?.phase : undefined;
   const nextAgainInterval = nextIntervals ? nextIntervals.again : null;
@@ -1970,7 +1971,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
           {state.audioError && <span className="flash-audio-error" role="status">{state.audioError}</span>}
           {state.leechNote && (
             <span className="flash-audio-error" role="status">
-              {t('flash.leechNotice', { word: state.leechNote, n: leechThreshold() })}
+              {t('flash.leechNotice', { word: state.leechNote, n: leechThreshold(findDeckCard(state.leechCardId)?.folder) })}
               {state.leechSuspended && <>{' '}{t('srs2.leech.suspendedNote')}</>}
               {' '}
               {state.leechSuspended && (

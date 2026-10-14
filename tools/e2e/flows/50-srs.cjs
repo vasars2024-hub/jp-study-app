@@ -10,12 +10,20 @@
  *  - the FSRS optimizer worker runs on a synthetic 1,200-row log: progress shows; Cancel
  *    pressed while the log is still loading starts no worker; Cancel mid-fit terminates
  *    the worker (its final reply is withheld until then, so the race is gone) and a late
- *    reply is ignored; a further run finishes with the held-out decision.
+ *    reply is ignored; a further run finishes with the held-out decision;
+ *  - review history round-trips through .apkg: "Export deck and audio" writes every
+ *    scheduled card's graded answers as Anki `revlog` rows (read back here with sql.js),
+ *    and the app's own .apkg reader brings the same answers back;
+ *  - FSRS-6 and presets: the version is chosen in the panel and the next review obeys
+ *    it (a new card's first Good gets FSRS-6's initial stability); a preset is made,
+ *    renamed and deleted (two presses) through the panel.
  *
  * Time: same-day steps are minutes and lapses need days, so the page clock is moved with
  * a Date.now offset (`__e2eClock`) — the scheduler reads Date.now for every grade. Nothing
  * else about the review is simulated.
  */
+const fs = require('node:fs');
+const path = require('node:path');
 const { installHelpers, poll } = require('./_lib.cjs');
 
 const WORDS = [
@@ -339,5 +347,115 @@ module.exports = {
     result.note(`optimizer decision: ${String(decision).replace(/\s+/g, ' ').slice(0, 300)}`);
     await ctx.shot('optimizer');
     await ev(`(window.__e2eClock && (window.__e2eClock.offset = 0), true)`);
+
+    // --- review history through .apkg -----------------------------------------------
+    const kvRows = (prefix) => `(async () => {
+      const db = await new Promise((res, rej) => { const q = indexedDB.open('jp-study-db'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+      const rows = await new Promise((res) => { const out = []; const r = db.transaction('kv').objectStore('kv').openCursor(); r.onsuccess = () => { const c = r.result; if (!c) return res(out); if (String(c.key).startsWith(${JSON.stringify(prefix)})) out.push(c.value); c.continue(); }; r.onerror = () => res(out); });
+      db.close();
+      return rows;
+    })()`;
+    const deckCards = await ev(`(() => { const d = JSON.parse(localStorage.getItem('jp-flashcard-deck') || '{"cards":[]}'); return (d.cards || d).map((c) => ({ id: c.id, word: c.word, scheduled: !!c.srs })); })()`);
+    const scheduledIds = new Set((deckCards ?? []).filter((c) => c.scheduled).map((c) => c.id));
+    const gumRows = ((await ev(kvRows('review-log-row:'), { await: true })) ?? [])
+      .filter((row) => row && row.mode === 'review' && !row.source && row.rating && scheduledIds.has(row.cardId));
+    result.check('the SRS session left graded answers in the review log', gumRows.length >= 5, gumRows.length);
+    const exportClicked = await ev(`__e2e.clickText('button', 'Export deck and audio')`);
+    const exported = await poll(ctx, `(() => { const r = [...document.querySelectorAll('.auto-reading-options__report')].map((x) => x.textContent).find((t) => /^Exported \\d+ cards/.test(t || '')); return r || null; })()`, 60000, 250);
+    result.check('"Export deck and audio" writes the package and says it carries the review history',
+      Boolean(exportClicked) && Boolean(exported) && /past answers? go(es)? with them/.test(exported), exported);
+    const exportsDir = path.join(ctx.profile, 'exports');
+    const latest = fs.existsSync(exportsDir)
+      ? fs.readdirSync(exportsDir).filter((d) => d.startsWith('deck-')).sort().pop()
+      : null;
+    const pkg = latest ? path.join(exportsDir, latest, 'deck.apkg') : null;
+    let revlog = [];
+    if (pkg && fs.existsSync(pkg)) {
+      const AdmZip = require('adm-zip');
+      const initSqlJs = require('sql.js');
+      const SQL = await initSqlJs({ wasmBinary: fs.readFileSync(require.resolve('sql.js/dist/sql-wasm.wasm')) });
+      const db = new SQL.Database(new AdmZip(pkg).getEntry('collection.anki2').getData());
+      revlog = (db.exec('SELECT id, cid, ease, type FROM revlog ORDER BY cid, id')[0]?.values ?? []).map(([id, cid, ease, type]) => ({ id, cid, ease, type }));
+      db.close();
+    }
+    const answers = revlog.filter((r) => r.ease >= 1 && r.ease <= 4);
+    const kinds = new Set(answers.map((r) => r.type));
+    result.check('the package\'s revlog holds every graded answer of the scheduled cards (learn and review kinds)',
+      answers.length === gumRows.length && kinds.has(0) && kinds.has(1),
+      { pkg, revlog: answers.length, gumRows: gumRows.length, kinds: [...kinds] });
+    const reread = pkg ? await ev(`window.api.importApkgCards(${JSON.stringify(pkg)})`, { await: true }) : null;
+    // Per Anki card: the answers the reader returns are exactly the package's, in order.
+    // The importer folds a note with the same word and reading as an earlier one (this run
+    // both mines 窓 from the dictionary and pastes it here); the folded note's answers are
+    // not read twice, and the report says a note was folded.
+    const answersOf = (cid) => answers.filter((r) => r.cid === cid).map((r) => `${r.id}:${r.ease}`).join(',');
+    const perCard = (reread?.cards ?? []).filter((c) => c.history?.length).map((c) => ({
+      word: c.word,
+      same: c.history.filter((r) => r.ease >= 1 && r.ease <= 4 && r.type < 4).map((r) => `${r.id}:${r.ease}`).join(',') === answersOf(c.ankiCardId),
+    }));
+    const readBack = reread?.report?.historyReviews ?? 0;
+    const folded = reread?.report?.duplicateNotes ?? 0;
+    result.check('the app\'s own .apkg reader brings each card\'s answers back exactly, in order',
+      Boolean(reread?.ok) && perCard.length > 0 && perCard.every((c) => c.same)
+        && (readBack === answers.length || (folded > 0 && readBack < answers.length)),
+      { ok: reread?.ok, historyReviews: readBack, inPackage: answers.length, foldedDuplicateNotes: folded, perCard });
+
+    // --- FSRS-6 and presets ----------------------------------------------------------
+    await ev(`(() => { const d = document.querySelector('details.flash-deck-prefs'); if (d) { d.open = true; d.scrollIntoView(); } return true; })()`);
+    const versionSelect = `document.querySelector('select[aria-describedby="srs5-fsrs-version-help"]')`;
+    const hasVersion = await poll(ctx, `!!${versionSelect}`, 10000);
+    await ev(`(() => { const s = ${versionSelect}; s.value = '6'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+    const v6 = await poll(ctx, `JSON.parse(localStorage.getItem('jp-flashcard-scheduling-v1') || '{}').fsrsVersion === 6 ? true : null`, 5000);
+    result.check('FSRS-6 is chosen in the scheduling panel and saved', Boolean(hasVersion) && Boolean(v6));
+    await ctx.shot('fsrs6');
+
+    // A new card's first Good under FSRS-6: FSRS-6's initial stability (w2 = 2.3065).
+    await ev(`(() => {
+      const name = document.querySelector('.deck-import-panel input[type=text]');
+      __e2e.fill(name, 'E2E FSRS6');
+      const area = document.querySelector('.deck-import-paste');
+      const dt = new DataTransfer();
+      dt.setData('text/plain', '星\\tほし\\tstar');
+      area.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+      return true;
+    })()`);
+    const pasted = await poll(ctx, `(() => { const t = document.querySelector('.deck-import-status.ok')?.textContent || ''; return /\\b1\\b/.test(t) ? t : null; })()`, 10000);
+    const startNew = await poll(ctx, `__e2e.byText('button', /^Start review \\(\\d+\\)$/)?.textContent ?? null`, 10000);
+    const faces = [];
+    let star = null;
+    if (startNew) {
+      await ev(`__e2e.click(__e2e.byText('button', /^Start review \\(\\d+\\)$/))`);
+      await poll(ctx, `!!document.querySelector('.flash-review-shell .flash-card')`, 10000);
+      for (let i = 0; i < 20; i++) {
+        const now = await current();
+        faces.push(now);
+        if (!now) break;
+        if (now === 'star' || now === '星') {
+          await grade('good');
+          break;
+        }
+        await grade('easy');
+      }
+      await ev(`(__e2e.clickText('.flash-review-shell button', 'Exit'), true)`);
+      await poll(ctx, `!document.querySelector('.flash-review-shell')`, 5000);
+      // The whole-deck copy in localStorage is written after the card's own durable write.
+      star = await poll(ctx, `(() => { const d = JSON.parse(localStorage.getItem('jp-flashcard-deck') || '{"cards":[]}'); return (d.cards || d).find((c) => c.word === '星')?.srs ?? null; })()`, 15000);
+    }
+    result.check('under FSRS-6 a new card\'s first Good gets FSRS-6\'s initial stability (2.3065, FSRS-5 would give 3.173)',
+      Boolean(star) && Math.abs((star?.stability ?? 0) - 2.3065) < 1e-6, { star, pasted, startNew, faces });
+
+    await ev(`(() => { const d = document.querySelector('details.flash-deck-prefs'); if (d) { d.open = true; d.scrollIntoView(); } return true; })()`);
+    await ev(`__e2e.clickText('.srs5-presets button', 'New preset')`);
+    const preset = await poll(ctx, `(() => { const c = JSON.parse(localStorage.getItem('jp-flashcard-scheduling-v1') || '{}'); return c.presets && c.presets.length === 1 ? c.presets[0] : null; })()`, 5000);
+    const editing = await ev(`document.querySelector('select[aria-describedby="srs5-preset-help"]')?.value ?? null`);
+    await ev(`(() => { const i = [...document.querySelectorAll('.srs5-presets input[type=text]')][0]; if (!i) return false; __e2e.fill(i, 'Kanji'); i.dispatchEvent(new FocusEvent('focusout', { bubbles: true })); return true; })()`);
+    const renamed = await poll(ctx, `(() => { const c = JSON.parse(localStorage.getItem('jp-flashcard-scheduling-v1') || '{}'); return c.presets?.[0]?.name === 'Kanji' ? true : null; })()`, 5000);
+    result.check('a preset is made in the panel, edited there, and renamed', Boolean(preset) && editing === preset?.id && Boolean(renamed), { preset, editing, renamed });
+    await ctx.shot('preset');
+    await ev(`__e2e.clickText('.srs5-presets button', 'Delete preset')`);
+    const stillThere = await ev(`JSON.parse(localStorage.getItem('jp-flashcard-scheduling-v1') || '{}').presets?.length ?? 0`);
+    await ev(`(() => { const b = [...document.querySelectorAll('.srs5-presets button')].find((x) => /Kanji/.test(x.textContent || '')); if (b) b.click(); return !!b; })()`);
+    const gone = await poll(ctx, `(JSON.parse(localStorage.getItem('jp-flashcard-scheduling-v1') || '{}').presets ?? []).length === 0 ? true : null`, 5000);
+    result.check('deleting a preset takes two presses', stillThere === 1 && Boolean(gone), { stillThere, gone });
   },
 };
