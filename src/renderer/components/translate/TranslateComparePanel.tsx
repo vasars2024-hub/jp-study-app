@@ -204,7 +204,7 @@ export function TranslateComparePanel({ id, state }: { id: string; state: Transl
                   {row.cached ? (
                     <span className="muted" title={t('xlate2.result.cachedHint')}>{t('xlate2.result.cached')}</span>
                   ) : row.ms !== undefined && (
-                    <span className="muted">{t('xlate2.compare.time', { seconds: (row.ms / 1000).toFixed(1) })}</span>
+                    <span className="muted">{t('xlate2.compare.time', { seconds: Math.round(row.ms / 100) / 10 })}</span>
                   )}
                 </div>
                 {row.status === 'busy' && <p className="muted" role="status">{t('xlate2.compare.working')}</p>}
