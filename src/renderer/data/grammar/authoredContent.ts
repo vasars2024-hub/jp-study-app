@@ -24,6 +24,7 @@ import { AUTHORED_N4 } from './authored/n4';
 import { AUTHORED_N3 } from './authored/n3';
 import { AUTHORED_N2 } from './authored/n2';
 import { AUTHORED_N1 } from './authored/n1';
+import { AUTHORED_HSK_IMPORT } from './authored/hsk-import';
 
 export interface AuthoredGrammarContent {
   /** How the pattern is formed, e.g. `V-て形 + もらえると ありがたい`. */
@@ -133,6 +134,40 @@ export function applyAuthoredContent(list: readonly GrammarPoint[]): GrammarPoin
       provenance: {
         ...p.provenance,
         source: AUTHORED_CONTENT_SOURCE,
+        // Authored against the pattern, not reviewed by a second person.
+        verification: 'partial',
+      },
+    };
+  });
+}
+
+/** Provenance label for an imported HSK record the content pass filled in. */
+export const HSK_CONTENT_SOURCE = 'authored:hsk-content-pass';
+
+export { AUTHORED_HSK_IMPORT };
+
+/**
+ * Lay authored content over the imported HSK list (`hsk-import.ts`).
+ *
+ * Kept apart from `applyAuthoredContent` because the two overlays answer for
+ * different sources: AUTHORED_CONTENT is keyed by Japanese supplement ids and
+ * its tests hold it to that. The record keeps its level, title and imported
+ * tags — those are still the list's claims — and gains a structure, an
+ * explanation, examples and, where the list's gloss was wrong, a corrected one.
+ */
+export function applyAuthoredHskImport(list: readonly GrammarPoint[]): GrammarPoint[] {
+  return list.map((p) => {
+    const content = AUTHORED_HSK_IMPORT[p.id];
+    if (!content) return p;
+    return {
+      ...p,
+      meaning: content.meaning ?? p.meaning,
+      structure: content.structure,
+      explanation: content.explanation,
+      examples: content.examples.map((ex) => ({ ...ex })),
+      provenance: {
+        ...p.provenance,
+        source: HSK_CONTENT_SOURCE,
         // Authored against the pattern, not reviewed by a second person.
         verification: 'partial',
       },

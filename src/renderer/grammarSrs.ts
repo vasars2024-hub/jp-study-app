@@ -8,9 +8,11 @@
  * user's SM-2 / FSRS choice and interval ceiling) rather than a second opinion.
  *
  * What feeds it:
- *   - a grammar practice-test answer on a point that is due or not yet
- *     scheduled (right → Good, wrong → Again); answers on a point that is not
- *     due are practice only (`recordTestAnswer`);
+ *   - a grammar practice-test answer on a point that is scheduled and due
+ *     (right → Good, wrong → Again); answers on a point that is not due are
+ *     practice only, and a point that is not scheduled at all joins only when
+ *     the learner accepts the end-of-test offer (`recordTestAnswer`,
+ *     `enrolTestedGrammarPoints`);
  *   - the recently-missed points from session history, which enter as due now;
  *   - ratings given on the Review tab itself.
  *
@@ -122,11 +124,23 @@ export function isGrammarPointDueOrUnscheduled(state: GrammarSrsState, id: strin
   return !current || current.dueAt <= now;
 }
 
+/** Scheduled, and due at `now`. */
+export function isGrammarPointDue(state: GrammarSrsState, id: string, now = Date.now()): boolean {
+  const current = state[id];
+  return !!current && current.dueAt <= now;
+}
+
 /**
  * A practice-test answer as a schedule step, but only for a point the schedule
- * is asking about (due) or does not know yet (unscheduled). An answer on a
- * point that is not due is practice only: writing every answer used to push a
- * brand-new point to an 8-day interval after three Goods inside one sitting.
+ * is asking about (scheduled and due). An answer on a point that is not due is
+ * practice only: writing every answer used to push a brand-new point to an
+ * 8-day interval after three Goods inside one sitting.
+ *
+ * A point with no schedule is practice only too. A test used to enrol every
+ * unscheduled point it asked about, so filtering the explorer to N1 and taking
+ * a 20-question test quietly put 20 N1 points into the learner's reviews. Those
+ * points are now offered at the end of the test (`enrolTestedGrammarPoints`)
+ * and join only when the learner accepts.
  * Returns `state` itself when nothing is written.
  */
 export function recordTestAnswer(
@@ -136,8 +150,48 @@ export function recordTestAnswer(
   config: SchedulingConfig = loadSchedulingConfig(),
   now = Date.now(),
 ): GrammarSrsState {
-  if (!id || !isGrammarPointDueOrUnscheduled(state, id, now)) return state;
+  if (!id || !isGrammarPointDue(state, id, now)) return state;
   return reviewGrammarPoint(state, id, rating, config, now);
+}
+
+/**
+ * The points a finished test asked about that have no schedule, each with the
+ * rating of its first answer in the test: the honest recall, before a repeat of
+ * the same point inside the sitting could flatter it. In question order.
+ */
+export function unscheduledTestedPoints(
+  state: GrammarSrsState,
+  answers: ReadonlyArray<{ id: string; rating: LocalSrsRating }>,
+): Array<{ id: string; rating: LocalSrsRating }> {
+  const seen = new Set<string>();
+  const out: Array<{ id: string; rating: LocalSrsRating }> = [];
+  for (const { id, rating } of answers) {
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    if (!state[id]) out.push({ id, rating });
+  }
+  return out;
+}
+
+/**
+ * The end-of-test offer, accepted: schedule each tested point that is still
+ * unscheduled, taking its test answer as its first review (so a point answered
+ * right is not asked again a minute later, and one answered wrong starts in
+ * relearning). A point that gained a schedule meanwhile — enrolled from the
+ * Review tab while the dialog was open — keeps it.
+ */
+export function enrolTestedGrammarPoints(
+  state: GrammarSrsState,
+  tested: ReadonlyArray<{ id: string; rating: LocalSrsRating }>,
+  config: SchedulingConfig = loadSchedulingConfig(),
+  now = Date.now(),
+): Record<string, LocalSrsState> {
+  let next: Record<string, LocalSrsState> = { ...state };
+  for (const { id, rating } of tested) {
+    if (!id || next[id]) continue;
+    next = reviewGrammarPoint(next, id, rating, config, now);
+  }
+  return next;
 }
 
 /**

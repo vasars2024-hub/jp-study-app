@@ -13,16 +13,20 @@
  *
  * The practice test also wrote every answer into the schedule, due or not, so
  * three Goods inside one sitting pushed a new point out to an 8-day interval.
+ * And it enrolled every unscheduled point it asked about (G13); those now wait
+ * for the learner to accept the end-of-test offer.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   enrolGrammarPoints,
+  enrolTestedGrammarPoints,
   isUnreviewedGrammarState,
   recordTestAnswer,
   restoreGrammarPoint,
   reviewGrammarPoint,
   schedulerPrior,
   seedMissed,
+  unscheduledTestedPoints,
 } from '../grammarSrs';
 import {
   DEFAULT_SCHEDULING_CONFIG,
@@ -136,14 +140,24 @@ describe('grammar review follows the flashcard scheduler through steps', () => {
 });
 
 describe('practice-test answers and the schedule', () => {
-  it('writes only for a point that is due or unscheduled', () => {
-    let s: Record<string, LocalSrsState> | Readonly<Record<string, LocalSrsState>> = {};
-    // Three Goods within minutes on a new point.
+  it('writes only for a scheduled point that is due', () => {
+    let s: Record<string, LocalSrsState> | Readonly<Record<string, LocalSrsState>> = enrolGrammarPoints({}, ['p'], T0);
+    // Three Goods within minutes on an enrolled point.
     for (let i = 0; i < 3; i += 1) s = recordTestAnswer(s, 'p', 'good', DEFAULT_SCHEDULING_CONFIG, T0 + i * MIN);
     // Before the fix: interval 8 days after three answers.
     expect(s.p.intervalDays).toBe(1);
     expect(s.p.repetitions).toBe(1);
     expect(s.p.lastReviewedAt).toBe(T0);
+  });
+
+  it('never enrols a point that has no schedule (G13)', () => {
+    const empty: Readonly<Record<string, LocalSrsState>> = {};
+    expect(recordTestAnswer(empty, 'new', 'good', DEFAULT_SCHEDULING_CONFIG, T0)).toBe(empty);
+    expect(recordTestAnswer(empty, 'new', 'again', DEFAULT_SCHEDULING_CONFIG, T0)).toBe(empty);
+    const other = reviewGrammarPoint({}, 'old', 'good', DEFAULT_SCHEDULING_CONFIG, T0);
+    const after = recordTestAnswer(other, 'new', 'good', DEFAULT_SCHEDULING_CONFIG, other.old.dueAt);
+    expect(after).toBe(other);
+    expect(Object.keys(after)).toEqual(['old']);
   });
 
   it('returns the same state object when the answer is practice only', () => {
@@ -159,6 +173,41 @@ describe('practice-test answers and the schedule', () => {
     // Enrolled (due now) points are written too.
     const enrolled = enrolGrammarPoints({}, ['q'], T0);
     expect(recordTestAnswer(enrolled, 'q', 'good', DEFAULT_SCHEDULING_CONFIG, T0).q.repetitions).toBe(1);
+  });
+});
+
+describe('the end-of-test enrolment offer', () => {
+  it('lists each unscheduled tested point once, with its first answer, in question order', () => {
+    const state = reviewGrammarPoint({}, 'known', 'good', DEFAULT_SCHEDULING_CONFIG, T0);
+    const offer = unscheduledTestedPoints(state, [
+      { id: 'b', rating: 'again' },
+      { id: 'known', rating: 'good' },
+      { id: 'a', rating: 'good' },
+      { id: 'b', rating: 'good' },
+    ]);
+    expect(offer).toEqual([
+      { id: 'b', rating: 'again' },
+      { id: 'a', rating: 'good' },
+    ]);
+    expect(unscheduledTestedPoints(state, [{ id: 'known', rating: 'again' }])).toEqual([]);
+  });
+
+  it('accepting schedules them from their test answer; a point scheduled meanwhile keeps its own', () => {
+    const meanwhile = enrolGrammarPoints({}, ['a'], T0);
+    const next = enrolTestedGrammarPoints(
+      meanwhile,
+      [
+        { id: 'a', rating: 'again' },
+        { id: 'b', rating: 'good' },
+        { id: 'c', rating: 'again' },
+      ],
+      DEFAULT_SCHEDULING_CONFIG,
+      T0,
+    );
+    expect(next.a).toEqual(meanwhile.a);
+    expect(next.b).toEqual(scheduleReview(undefined, 'good', DEFAULT_SCHEDULING_CONFIG, T0));
+    expect(next.c).toEqual(scheduleReview(undefined, 'again', DEFAULT_SCHEDULING_CONFIG, T0));
+    expect(Object.keys(next).sort()).toEqual(['a', 'b', 'c']);
   });
 });
 

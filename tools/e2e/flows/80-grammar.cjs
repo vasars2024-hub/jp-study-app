@@ -9,6 +9,7 @@
 const { installHelpers, poll } = require('./_lib.cjs');
 
 const KEY = 'jp-grammar-srs-v1';
+const SESSION_OPTIONS_KEY = 'jp-grammarx-session-options-v1';
 
 module.exports = {
   id: 'grammar',
@@ -88,5 +89,74 @@ module.exports = {
     result.check("Calendar's today line counts what is owed today", Boolean(day) && day.includes(String(afterReview.dueToday)), { day, expected: afterReview.dueToday });
     await ctx.shot('calendar');
     result.note(`prompt order: ${seen.join(' → ')}; ids ${ids.slice(0, 2).join(', ')}`);
+
+    // --- Practice test: no enrolment until the learner accepts (G13) ---------------
+    const srsKeys = () => ev(`Object.keys(JSON.parse(localStorage.getItem(${JSON.stringify(KEY)}) || '{}')).sort()`);
+    await ev(`localStorage.setItem(${JSON.stringify(SESSION_OPTIONS_KEY)}, JSON.stringify({ count: 3, direction: 'recognition', types: ['flip'], mastered: 'include', newRatio: 1 }))`);
+    await ev(`__e2e.open('grammar')`);
+    await poll(ctx, `!!__e2e.byText('.gram-mode-btn', 'Practice')`, 15000);
+    await ev(`__e2e.click(__e2e.byText('.gram-mode-btn', 'Practice'))`);
+    await poll(ctx, `!!__e2e.byText('.gx-practice-toolbar button', 'Grammar Test')`, 15000);
+    const keysBeforeTest = await srsKeys();
+    await ev(`__e2e.clickText('.gx-practice-toolbar button', 'Grammar Test')`);
+    await poll(ctx, `!!document.querySelector('.gx-test-overlay')`, 5000);
+    await ev(`__e2e.clickText('.gx-test-setup button', 'Start')`);
+    for (let i = 0; i < 3; i += 1) {
+      const step = await poll(ctx, `document.querySelector('.gx-test-done') ? 'done' : (__e2e.byText('.gx-test-card button', 'Reveal meaning') ? 'reveal' : null)`, 5000);
+      if (step === 'done') break;
+      await ev(`__e2e.clickText('.gx-test-card button', 'Reveal meaning')`);
+      await poll(ctx, `!!document.querySelector('.gx-grade-good')`, 3000);
+      await ev(`__e2e.click(document.querySelector('.gx-grade-good'))`);
+    }
+    const done = await poll(ctx, `!!document.querySelector('.gx-test-done')`, 5000);
+    result.check('the practice test runs to its results screen', done);
+    const keysAfterTest = await srsKeys();
+    result.check('a finished practice test has scheduled no new point', JSON.stringify(keysAfterTest) === JSON.stringify(keysBeforeTest), { before: keysBeforeTest.length, after: keysAfterTest.length });
+    const offer = await ev(`document.querySelector('.gx-test-enrol-add')?.textContent ?? null`);
+    const offered = Number((offer ?? '').match(/\d+/)?.[0] ?? 0);
+    result.check('the results offer "Add N new points to reviews"', offered > 0 && /Add \d+ new points? to reviews/.test(offer), offer);
+    await ev(`__e2e.click(document.querySelector('.gx-test-enrol-add'))`);
+    const enrolledAfter = await poll(ctx, `(() => { const n = Object.keys(JSON.parse(localStorage.getItem(${JSON.stringify(KEY)}) || '{}')).length; return n > ${keysBeforeTest.length} ? n : null; })()`, 3000);
+    result.check('accepting the offer schedules exactly those points', enrolledAfter === keysBeforeTest.length + offered, { before: keysBeforeTest.length, offered, after: enrolledAfter });
+    const enrolNote = await ev(`document.querySelector('.gx-test-enrol-done')?.textContent ?? null`);
+    result.check('the dialog confirms what it added', Boolean(enrolNote) && enrolNote.includes(String(offered)), enrolNote);
+    await ctx.shot('test-enrol-offer');
+    await ev(`__e2e.key('Escape', {}, document.querySelector('.gx-test-overlay'))`);
+    await poll(ctx, `!document.querySelector('.gx-test-overlay')`, 3000);
+
+    // --- A new N5 point, and example audio (G11, G12) -----------------------------
+    await ev(`__e2e.click(__e2e.byText('.gram-mode-btn', 'Grammar points'))`);
+    await poll(ctx, `!!document.querySelector('.gram-search')`, 10000);
+    await ev(`__e2e.fill('.gram-search', 'をください')`);
+    const findRow = `[...document.querySelectorAll('.gram-x-row')].find((x) => x.querySelector('.gram-x-title')?.textContent === '〜をください')`;
+    const row = await poll(ctx, `(() => { const r = ${findRow}; return r ? r.textContent : null; })()`, 10000);
+    result.check('the new N5 point 〜をください is in the explorer', Boolean(row) && row.includes('N5'), row);
+    await ev(`__e2e.click(${findRow}.querySelector('.gram-x-row-main'))`);
+    const detail = await poll(ctx, `(() => { const c = document.querySelector('.gram-card'); return c && c.querySelector('h2')?.textContent === '〜をください' ? { examples: c.querySelectorAll('.gram-examples li').length, buttons: c.querySelectorAll('.gram-examples li .gram-ex-audio').length } : null; })()`, 5000);
+    result.check('its detail shows examples, each with a speaker button', Boolean(detail) && detail.examples >= 3 && detail.buttons === detail.examples, detail);
+
+    // Record every state the first speaker passes through, then press it.
+    await ev(`(() => {
+      const b = document.querySelector('.gram-card .gram-examples li .gram-ex-audio');
+      window.__gramAudioStates = [b.dataset.audioState];
+      new MutationObserver(() => window.__gramAudioStates.push(b.dataset.audioState)).observe(b, { attributes: true, attributeFilter: ['data-audio-state'] });
+      return __e2e.click(b);
+    })()`);
+    const audio = await poll(ctx, `(() => { const s = window.__gramAudioStates; return s.includes('playing') || s.includes('error') ? { states: s, alert: document.querySelector('.gram-card .gram-ex-audio-error')?.textContent ?? null } : null; })()`, 90000);
+    result.check('pressing it starts synthesis (loading state)', Boolean(audio) && audio.states.includes('loading'), audio);
+    result.check(
+      'the example reaches the playing state, or names the missing voice in words',
+      Boolean(audio) && (audio.states.includes('playing') || (audio.states.includes('error') && /voice|synthesizer|read aloud/i.test(audio.alert ?? ''))),
+      audio,
+    );
+    if (audio && audio.states.includes('playing')) {
+      // A second press stops it (or it already ended on its own).
+      await ev(`(() => { const b = document.querySelector('.gram-card .gram-examples li .gram-ex-audio'); return b.dataset.audioState === 'playing' ? __e2e.click(b) : true; })()`);
+      const stopped = await poll(ctx, `document.querySelector('.gram-card .gram-examples li .gram-ex-audio')?.dataset.audioState === 'idle' || null`, 5000);
+      result.check('a second press stops the example', Boolean(stopped));
+    } else {
+      result.note(`example audio did not play on this machine: ${audio?.alert ?? 'no state'}`);
+    }
+    await ctx.shot('example-audio');
   },
 };

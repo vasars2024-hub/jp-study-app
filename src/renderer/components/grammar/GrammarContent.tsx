@@ -32,6 +32,8 @@ import { useT } from '../../i18n';
 import { contentLangOf } from '../../studyEnvironment';
 import { normalizeStudyLang } from '../../../shared/studyLang';
 import ContentImportDialog from '../ContentImportDialog';
+import GrammarExampleAudio from './GrammarExampleAudio';
+import { useGrammarUi } from './grammarUiStrings';
 import {
   EXAMPLE_TEMPLATE_CSV,
   EXAMPLE_TEMPLATE_JSON,
@@ -137,6 +139,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
   const [examples, setExamples] = useState<ExampleSentence[]>([]);
   const [exError, setExError] = useState('');
   const { t } = useT();
+  const { gt, lang: uiLang } = useGrammarUi();
   // Sentences the learner imported or kept for this point.
   const ownExamples = useUserExamples(point.id);
   const [importOpen, setImportOpen] = useState(false);
@@ -277,6 +280,11 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
         </button>
       </header>
       <p className="gram-gloss">{point.meaning}</p>
+      {uiLang !== 'en' && (
+        <p className="gram-content-lang" title={gt('grammarUi.contentLangHint')}>
+          {gt('grammarUi.contentLang')}
+        </p>
+      )}
 
       {/* A point with no content of its own can ask the optional AI for an
           explanation; the reference's own (empty) blocks stay hidden as before. */}
@@ -328,6 +336,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
                   </span>
                 )}
                 <span className="gram-ex-en">{ex.en}</span>
+                <GrammarExampleAudio text={ex.jp} lang={point.lang} />
               </li>
             ))}
           </ul>
@@ -346,6 +355,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
                   </span>
                 )}
                 {ex.en && <span className="gram-ex-en">{ex.en}</span>}
+                <GrammarExampleAudio text={ex.jp} lang={point.lang} />
                 <span className="gram-ex-own-row">
                   <span className="gram-ex-own-tag">
                     {ex.generated ? t('aiTutor.examples.generatedTag') : t('grammar.examples.own.tag')}

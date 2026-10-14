@@ -57,6 +57,8 @@ import { useT } from '../../i18n';
 import { contentLangOf, getStudyLang, onStudyLangChanged } from '../../studyEnvironment';
 import { Button } from '../ui';
 import { srsIntervalLabel } from '../../srsIntervalLabel';
+import GrammarExampleAudio from './GrammarExampleAudio';
+import { useGrammarUi } from './grammarUiStrings';
 import './grammarReview2.css';
 
 const RATINGS: Array<{ rating: LocalSrsRating; key: string; grade: AnswerGrade }> = [
@@ -119,6 +121,7 @@ function ClozeSentence({ cloze, revealed, lang }: { cloze: GrammarCloze; reveale
 
 export default function GrammarReviewPanel() {
   const { t, lang } = useT();
+  const { gt } = useGrammarUi();
   const [srs, setSrs] = useState(() => loadGrammarSrs());
   const [collections, setCollections] = useState(() => loadCollections());
   const [familiarity, setFamiliarity] = useState(() => loadFamiliarity());
@@ -399,6 +402,17 @@ export default function GrammarReviewPanel() {
                 </p>
               )}
               {kind !== 'production' && <p className="gram-gloss">{current.meaning}</p>}
+              {lang !== 'en' && (
+                <p className="gram-content-lang" title={gt('grammarUi.contentLangHint')}>
+                  {gt('grammarUi.contentLang')}
+                </p>
+              )}
+              {/* The whole sentence, read aloud once the blank is no longer a secret. */}
+              {kind !== 'recognition' && cloze?.sentence && (
+                <p className="gx-review-listen">
+                  <GrammarExampleAudio text={cloze.sentence} lang={pointLang} />
+                </p>
+              )}
               {!structureCopiesTitle(current) && (
                 <p className="gram-structure" lang={contentLangOf(current.lang)}>
                   {current.structure}
@@ -413,6 +427,7 @@ export default function GrammarReviewPanel() {
                         {ex.jp}
                       </span>
                       <span className="gram-ex-en">{ex.en}</span>
+                      <GrammarExampleAudio text={ex.jp} lang={current.lang} />
                     </li>
                   ))}
                 </ul>

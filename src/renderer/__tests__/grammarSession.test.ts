@@ -104,6 +104,21 @@ describe('cloze eligibility is under-inclusive on purpose', () => {
     expect(clozeFor(noHit)).toBeNull();
     expect(canBuild(noHit, 'cloze')).toBe(false);
   });
+
+  it('prefers a sentence that uses the pattern once, and never prints the answer beside the gap', () => {
+    const repeatsFirst = point({
+      id: 'r',
+      lang: 'zh',
+      title: '有的',
+      examples: [
+        { jp: '有的学生喜欢运动，有的学生喜欢看书。', en: 'Some like sport, some like reading.' },
+        { jp: '有的人不喜欢吃辣的。', en: 'Some people do not like spicy food.' },
+      ],
+    });
+    expect(clozeFor(repeatsFirst)?.blanked).toBe('＿＿＿人不喜欢吃辣的。');
+    const onlyRepeats = point({ ...repeatsFirst, examples: [repeatsFirst.examples[0]] });
+    expect(clozeFor(onlyRepeats)?.blanked).toBe('＿＿＿学生喜欢运动，＿＿＿学生喜欢看书。');
+  });
 });
 
 describe('direction gates the question types', () => {

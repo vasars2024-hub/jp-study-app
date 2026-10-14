@@ -191,12 +191,21 @@ export interface ClozeMaterial {
 export function clozeFor(p: NormalizedGrammarPoint): ClozeMaterial | null {
   const core = clozeCore(p.title);
   if (!core) return null;
+  // Prefer a sentence that uses the pattern once. One that repeats it (有的…有的,
+  // 愈…愈) is still usable, but every occurrence is blanked: blanking only the
+  // first printed the answer right beside the gap.
+  let repeated: { sentence: string } | null = null;
   for (const ex of p.examples) {
     const sentence = ex.jp?.trim();
     if (!sentence || !sentence.includes(core)) continue;
-    return { core, sentence, blanked: sentence.replace(core, '＿＿＿') };
+    const blanked = sentence.split(core).join('＿＿＿');
+    if (!blanked.includes(core) && sentence.indexOf(core) === sentence.lastIndexOf(core)) {
+      return { core, sentence, blanked };
+    }
+    repeated ??= { sentence };
   }
-  return null;
+  if (!repeated) return null;
+  return { core, sentence: repeated.sentence, blanked: repeated.sentence.split(core).join('＿＿＿') };
 }
 
 // ---- question construction -------------------------------------------------

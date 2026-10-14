@@ -13,6 +13,12 @@
  * Familiarity is persisted **per answer**, not at the end. Discarding a
  * half-finished session's results was the original defect, and closing the
  * modal early is the most likely way to hit it.
+ *
+ * The review schedule is the exception that waits. A test only moves the
+ * schedule of points that are already in it and due; points it asked about
+ * that have no schedule are offered at the end ("Add N new points to
+ * reviews") and join only if the learner accepts. A test is practice, and the
+ * pool is whatever the explorer happened to be filtered to.
  */
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -22,11 +28,15 @@ import { createDeckFolder } from '../../flashcardDeck';
 import { mineGrammarPoints } from '../../studyMiningRoutes';
 import { appendReviewLog } from '../../reviewLog';
 import {
+  enrolTestedGrammarPoints,
   loadGrammarSrs,
   ratingForTestAnswer,
   recordTestAnswer,
   saveGrammarSrs,
+  unscheduledTestedPoints,
 } from '../../grammarSrs';
+import type { LocalSrsRating } from '../../../shared/localSrs';
+import { useGrammarUi } from './grammarUiStrings';
 import { useT } from '../../i18n';
 import { trapTab } from '../ui/focusTrap';
 import { LANG_TAGS } from '../../../shared/i18n/core';
@@ -123,6 +133,12 @@ export default function GrammarTestModal({
   const [familiarity, setFamiliarity] = useState<FamiliarityState>(() => loadFamiliarity());
   const [history, setHistory] = useState(() => loadSessionHistory());
   const [practiceOpen, setPracticeOpen] = useState(false);
+  const { gt } = useGrammarUi();
+  /** Every answer of this sitting, in order, for the end-of-test enrolment offer. */
+  const [answered, setAnswered] = useState<Array<{ id: string; rating: LocalSrsRating }>>([]);
+  /** Tested points with no schedule, offered at the end; null until the test finishes. */
+  const [offer, setOffer] = useState<Array<{ id: string; rating: LocalSrsRating }> | null>(null);
+  const [enrolled, setEnrolled] = useState<number | null>(null);
 
   const maxAvailable = pool.length;
   const question: SessionQuestion | null = plan?.questions[index] ?? null;
@@ -159,12 +175,20 @@ export default function GrammarTestModal({
     setPicked(null);
     setMissed([]);
     setCorrectCount(0);
+    setAnswered([]);
+    setOffer(null);
+    setEnrolled(null);
     setPhase(built.questions.length ? 'play' : 'setup');
     if (!built.questions.length) setPlan(built);
   }, [pool, familiarity, options]);
 
   const finish = useCallback(
-    (correct: number, missedPoints: NormalizedGrammarPoint[], delivered: number) => {
+    (
+      correct: number,
+      missedPoints: NormalizedGrammarPoint[],
+      delivered: number,
+      answers: ReadonlyArray<{ id: string; rating: LocalSrsRating }>,
+    ) => {
       const record: SessionRecord = {
         at: Date.now(),
         requested: plan?.requested ?? 0,
@@ -178,6 +202,9 @@ export default function GrammarTestModal({
       const next = appendSession(history, record);
       setHistory(next);
       saveSessionHistory(next);
+      // Read the schedule now, not at test start: a point enrolled from the
+      // Review tab meanwhile is no longer new.
+      setOffer(unscheduledTestedPoints(loadGrammarSrs(), answers));
       setPhase('done');
     },
     [history, options.direction, options.mastered, options.types, plan?.requested],
@@ -198,11 +225,15 @@ export default function GrammarTestModal({
       appendReviewLog({ mode: 'grammar', grammarId: question.id, word: point?.title, correct: wasCorrect });
       // And one schedule step, so a tested point comes back on the Review tab
       // when the flashcard scheduler says it should, but only when the point is
-      // due or not scheduled yet. Answering a point that is not due is practice:
-      // three Goods inside one sitting used to push a new point out to 8 days.
+      // scheduled and due. Answering a point that is not due is practice: three
+      // Goods inside one sitting used to push a new point out to 8 days. A point
+      // with no schedule waits for the end-of-test offer.
+      const rating = ratingForTestAnswer(grade);
       const srsBefore = loadGrammarSrs();
-      const srsAfter = recordTestAnswer(srsBefore, question.id, ratingForTestAnswer(grade));
+      const srsAfter = recordTestAnswer(srsBefore, question.id, rating);
       if (srsAfter !== srsBefore) saveGrammarSrs(srsAfter);
+      const nextAnswered = [...answered, { id: question.id, rating }];
+      setAnswered(nextAnswered);
 
       const nextCorrect = correctCount + (wasCorrect ? 1 : 0);
       const nextMissed =
@@ -213,7 +244,7 @@ export default function GrammarTestModal({
       setMissed(nextMissed);
 
       if (index + 1 >= plan.questions.length) {
-        finish(nextCorrect, nextMissed, plan.questions.length);
+        finish(nextCorrect, nextMissed, plan.questions.length, nextAnswered);
         return;
       }
       setIndex((i) => i + 1);
@@ -221,7 +252,7 @@ export default function GrammarTestModal({
       setPicked(null);
       setPracticeOpen(false);
     },
-    [question, plan, pool, familiarity, correctCount, missed, index, finish],
+    [question, plan, pool, familiarity, correctCount, missed, index, finish, answered],
   );
 
   const choose = useCallback(
@@ -231,6 +262,16 @@ export default function GrammarTestModal({
     },
     [picked],
   );
+
+  /** The learner accepted the offer: schedule the tested points that are still new. */
+  function enrolOffered(): void {
+    if (!offer?.length) return;
+    const before = loadGrammarSrs();
+    const after = enrolTestedGrammarPoints(before, offer);
+    const added = offer.filter(({ id }) => !before[id] && after[id]).length;
+    if (added) saveGrammarSrs(after);
+    setEnrolled(added);
+  }
 
   function addMissedToDeck(): void {
     if (!missed.length) return;
@@ -543,6 +584,19 @@ export default function GrammarTestModal({
                   types: plan.unusableTypes.map((x) => t(TYPE_KEY[x])).join(', '),
                 })}
               </p>
+            ) : null}
+
+            {enrolled !== null ? (
+              <p className="gx-test-enrol-done" role="status">
+                {gt('grammarUi.test.offerDone', { count: enrolled })}
+              </p>
+            ) : offer && offer.length > 0 ? (
+              <div className="gx-test-enrol">
+                <p className="muted">{gt('grammarUi.test.offerHint', { count: offer.length })}</p>
+                <button type="button" className="btn primary gx-test-enrol-add" onClick={enrolOffered}>
+                  {gt('grammarUi.test.offerAdd', { count: offer.length })}
+                </button>
+              </div>
             ) : null}
 
             <section className="gx-test-history">

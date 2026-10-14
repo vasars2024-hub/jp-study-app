@@ -22,7 +22,8 @@ import { RU_CEFR } from './ru-cefr';
 import { HSK_STARTER } from './hsk-starter';
 import { writeLocalStorageJson } from '../../localStorageWrite';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
-import { AUTHORED_CONTENT_SOURCE, applyAuthoredContent } from './authoredContent';
+import { AUTHORED_CONTENT_SOURCE, applyAuthoredContent, applyAuthoredHskImport } from './authoredContent';
+import { grammarTitleKey } from './titleKey';
 
 // `GrammarFunctionId` is exported by both: it is *defined* in ./functions and
 // re-exported by ./types. eslint-plugin-import flags that as a duplicate export
@@ -37,6 +38,7 @@ export {
   AUTHORED_CONTENT,
   TAG_CORRECTIONS,
   applyAuthoredContent,
+  applyAuthoredHskImport,
   authoringProgress,
   grammarAuthoringQueue,
   shadowedSupplementIds,
@@ -135,11 +137,12 @@ const HSK_AUTHORED: ModuleProvenance = {
  * published syllabus, about a quarter of the original rows were vocabulary
  * rather than grammar, and several carried a wrong gloss or wrong pinyin.
  *
- * The records also have no examples, so `verificationFor` lowers each one to
- * 'missing' regardless of this ceiling — they answer level and category
- * queries but never reach "Ready to study". That is the accurate reading of a
- * pattern with a gloss and nothing else, and it is the same bar every other
- * example-less record in the corpus is held to.
+ * The list itself carried no examples. The v1 content pass
+ * (`authored/hsk-import.ts`, applied by `applyAuthoredHskImport`) wrote a
+ * structure, an explanation and two examples for every record that had no twin
+ * elsewhere in the corpus; the rest borrow their twin's examples (`withTwinExamples`).
+ * A record that somehow has none is still lowered to 'missing' by
+ * `verificationFor` — the same bar every other example-less record is held to.
  */
 const HSK_IMPORTED: ModuleProvenance = {
   source: 'imported:hsk-list',
@@ -164,25 +167,63 @@ const RU_AUTHORED: ModuleProvenance = {
   verification: 'verified',
 };
 
-/** All grammar points (JA JLPT + ZH HSK + RU CEFR), normalized with provenance. */
-export const GRAMMAR: NormalizedGrammarPoint[] = [
-  ...normalizeGrammarList(N5, CORE),
-  ...normalizeGrammarList(N4, CORE),
-  ...normalizeGrammarList(withImportedExamples(applyAuthoredContent(N4_SUPPLEMENT)), supplement('n4')),
-  ...normalizeGrammarList(N3, CORE),
-  ...normalizeGrammarList(withImportedExamples(applyAuthoredContent(N3_SUPPLEMENT)), supplement('n3')),
-  ...normalizeGrammarList(N2, CORE),
-  ...normalizeGrammarList(N2_EXTRA, CORE),
-  ...normalizeGrammarList(withImportedExamples(applyAuthoredContent(N2_SUPPLEMENT)), supplement('n2')),
-  ...normalizeGrammarList(N1, CORE),
-  ...normalizeGrammarList(N1_EXTRA, CORE),
-  ...normalizeGrammarList(withImportedExamples(applyAuthoredContent(N1_SUPPLEMENT)), supplement('n1')),
-  ...normalizeGrammarList(HSK, HSK_SEED),
-  ...normalizeGrammarList(HSK_EXTRA, HSK_AUTHORED),
-  ...normalizeGrammarList(HSK_IMPORT, HSK_IMPORTED),
-  ...normalizeGrammarList(HSK_STARTER, HSK_STARTER_AUTHORED),
-  ...normalizeGrammarList(RU_CEFR, RU_AUTHORED),
+/** Every module in corpus order, with its content overlays applied, before normalization. */
+const MODULES: Array<[GrammarPoint[], ModuleProvenance]> = [
+  [N5, CORE],
+  [N4, CORE],
+  [withImportedExamples(applyAuthoredContent(N4_SUPPLEMENT)), supplement('n4')],
+  [N3, CORE],
+  [withImportedExamples(applyAuthoredContent(N3_SUPPLEMENT)), supplement('n3')],
+  [N2, CORE],
+  [N2_EXTRA, CORE],
+  [withImportedExamples(applyAuthoredContent(N2_SUPPLEMENT)), supplement('n2')],
+  [N1, CORE],
+  [N1_EXTRA, CORE],
+  [withImportedExamples(applyAuthoredContent(N1_SUPPLEMENT)), supplement('n1')],
+  [HSK, HSK_SEED],
+  [HSK_EXTRA, HSK_AUTHORED],
+  [applyAuthoredHskImport(HSK_IMPORT), HSK_IMPORTED],
+  [HSK_STARTER, HSK_STARTER_AUTHORED],
+  [RU_CEFR, RU_AUTHORED],
 ];
+
+/**
+ * Give a record with no examples the examples of its twin: another record of
+ * the same pattern (same `grammarTitleKey`) that has some, the first in corpus
+ * order.
+ *
+ * Every Japanese record still without examples after the overlays above is a
+ * supplement copy of a pattern the corpus already teaches (334 of them), and so
+ * are 47 imported HSK records. `dedupeGrammarByTitle` hides those copies behind
+ * their twin in the explorer, but they are still records: Review, the
+ * highlighter, the agent and search can all reach one by id, and a pattern
+ * reached that way showed an empty example list for a pattern the app has
+ * examples for. The sentences are copied with their `source`/`sourceId`, so a
+ * borrowed Tatoeba sentence keeps its attribution. Runs before normalization,
+ * so `verificationFor` sees the examples like any others.
+ */
+function withTwinExamples(modules: ReadonlyArray<[GrammarPoint[], ModuleProvenance]>): Array<[GrammarPoint[], ModuleProvenance]> {
+  const donors = new Map<string, GrammarPoint['examples']>();
+  for (const [list] of modules) {
+    for (const p of list) {
+      const key = grammarTitleKey(p.lang ?? 'ja', p.title);
+      if (p.examples?.length && !donors.has(key)) donors.set(key, p.examples);
+    }
+  }
+  return modules.map(([list, provenance]) => [
+    list.map((p) => {
+      if (p.examples?.length) return p;
+      const donated = donors.get(grammarTitleKey(p.lang ?? 'ja', p.title));
+      return donated ? { ...p, examples: donated.map((ex) => ({ ...ex })) } : p;
+    }),
+    provenance,
+  ]);
+}
+
+/** All grammar points (JA JLPT + ZH HSK + RU CEFR), normalized with provenance. */
+export const GRAMMAR: NormalizedGrammarPoint[] = withTwinExamples(MODULES).flatMap(([list, provenance]) =>
+  normalizeGrammarList(list, provenance),
+);
 
 /*
  * Grammar lists the learner imported (CSV / TSV / JSON, any study language —
