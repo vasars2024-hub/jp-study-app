@@ -28,10 +28,12 @@ import { sx, sx3, sxn, sxNumber, sxs } from '../strings';
 import { useScraperPort } from '../data/scraperPort';
 import { getActiveScraperSettings } from '../../../scraperSettingsStore';
 import { SCRAPER_POSTER, scraperArtwork } from '../artwork';
+import { useDownloadNoticeGate } from '../../common/DownloadNotice';
 import {
   imageKindText,
   localizeScraperMessage,
   logLevelText,
+  qbitSendReasonText,
   scraperErrorText,
   streamHealthText,
   tr,
@@ -457,6 +459,8 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
   const [resolution, setResolution] = useState('all');
   const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
   const [sending, setSending] = useState(false);
+  // The first send to qBittorrent on an install waits for the torrent notice.
+  const torrentNotice = useDownloadNoticeGate('torrent');
   const resolutions = useMemo(
     () => sortedResolutions(torrents.map((torrent) => torrent.resolution)),
     [torrents],
@@ -495,7 +499,7 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
       );
       const reasons = report.details
         .filter((detail) => detail.outcome !== 'sent' && detail.reason)
-        .map((detail) => detail.reason);
+        .map((detail) => qbitSendReasonText(detail));
       const summary = sx3('result.sendSummary', report.sent, report.skipped, report.failed);
       setNotice({
         text: reasons.length ? `${summary} ${[...new Set(reasons)].join(' ')}` : summary,
@@ -511,6 +515,7 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
 
   return (
     <div className="scr-panel scr-result-workspace">
+      {torrentNotice.element}
       <div className="scr-tile-row">
         <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.torrents.releases')}</span><span className="scr-tile-value">{torrents.length}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.torrents.totalSeeders')}</span><span className="scr-tile-value">{sxNumber(torrents.reduce((sum, torrent) => sum + torrent.seeders, 0))}</span></div>
@@ -542,7 +547,7 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
         <Button
           size="sm"
           variant="primary"
-          onClick={() => void queueSelected()}
+          onClick={() => torrentNotice.gate(() => void queueSelected())}
           disabled={!selected.size || sending}
         >
           {sx(sending ? 'result.sending' : 'result.sendSelected')}

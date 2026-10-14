@@ -9,10 +9,16 @@
  * a real ≥2 MiB video with a `.ja.srt` beside it — and the app's own completion poller
  * imports them into the library. Nothing leaves 127.0.0.1: magnets carry no trackers and
  * the catalogue (a public API) is never asked, because a site rule answers the URL.
+ *
+ * v1 additions: the first scrape waits for the one-time torrent notice
+ * (components/common/DownloadNotice.tsx), which is acknowledged once and never shown
+ * again; a Dashboard series card selects that run on the Results page; and the Plugins
+ * page (never built, hidden for v1, plan D4) cannot be reached.
  */
 const { installHelpers, poll, pollAsync } = require('./_lib.cjs');
 
 const CREDENTIAL_REF = 'e2e-qbit';
+const NOTICE_KEY = 'gum-download-notice-v1';
 
 module.exports = {
   id: 'scraper',
@@ -54,6 +60,8 @@ module.exports = {
     const active = doc.profiles.find((p) => p.id === doc.activeProfileId) ?? doc.profiles[0];
     active.settings = s;
     await ev(`(localStorage.setItem('jp-scraper-settings-v1', ${JSON.stringify(JSON.stringify(doc))}), true)`);
+    // A first use, whatever ran before this flow.
+    await ev(`(localStorage.removeItem(${JSON.stringify(NOTICE_KEY)}), true)`);
     const cred = await ev(`window.api.scraperSetCredential(${JSON.stringify(CREDENTIAL_REF)}, ${JSON.stringify(world.qbitPassword)})`, { await: true });
     result.check('the fake qBittorrent password is stored in the credential vault', cred?.ok !== false, cred);
 
@@ -70,6 +78,15 @@ module.exports = {
       await ctx.sleep(200);
       const started = await ev(`__e2e.clickText('button', 'Start Scraping')`);
       if (!started) jobVia = 'ui (no start button)';
+      // --- the first-use torrent notice: shown before the first scrape, nothing runs yet --
+      const notice = await poll(ctx, `(() => { const d = document.querySelector('[role="dialog"] [data-download-notice="torrent"]'); return d ? d.innerText : null; })()`, 8000);
+      result.check('the first scrape waits for the torrent notice (IP visibility, legality)', Boolean(notice) && /IP address/.test(notice) && /legal/.test(notice), notice);
+      const jobsBeforeAck = await ev(`window.api.scraperListJobs().then((l) => (l || []).length)`, { await: true });
+      await ctx.shot('download-notice');
+      const acked = await ev(`__e2e.click('[data-download-notice-ack="torrent"]')`);
+      const stored = await poll(ctx, `(() => { try { return JSON.parse(localStorage.getItem(${JSON.stringify(NOTICE_KEY)}) || '{}').torrent || null; } catch { return null; } })()`, 5000);
+      const gone = await poll(ctx, `!document.querySelector('[data-download-notice]')`, 5000);
+      result.check('"I understand" is remembered and closes the notice; no job ran before it', Boolean(acked) && Boolean(stored) && Boolean(gone) && jobsBeforeAck === 0, { acked, stored, jobsBeforeAck });
     } else {
       jobVia = 'api';
     }
@@ -89,6 +106,33 @@ module.exports = {
     result.check(`the site rule scrapes all four episodes across both pages (${jobVia})`, Boolean(scraped) && EPISODES.every((e) => scraped.some((x) => String(x.title).includes(e.title))), { jobId, scraped });
     result.check('the scrape read robots.txt and followed the next-page link', site.hits.some((h) => h.startsWith('GET /robots.txt')) && site.hits.some((h) => h.includes('page=2')), site.hits);
     await ctx.shot('scraped');
+
+    // --- Dashboard -> Results: a series card selects that run on the Results page ---------
+    if (jobId) {
+      const summary = await ev(`window.api.scraperListJobs().then((l) => (l || []).find((x) => x.id === ${JSON.stringify(jobId)}) || null)`, { await: true });
+      const title = summary?.titleEn ?? '';
+      await ev(`(window.dispatchEvent(new CustomEvent('scraper:navigate', { detail: { page: 'dashboard' } })), true)`);
+      const card = await poll(ctx, `(() => { const c = [...document.querySelectorAll('.scr-dashboard-series-card')].find((x) => x.innerText.includes(${JSON.stringify(title)})); return c ? (c.click(), true) : null; })()`, 10000);
+      const inspector = await poll(ctx, `(() => { const s = document.querySelector('.scr-results-inspector'); return s ? s.getAttribute('aria-label') : null; })()`, 10000);
+      result.check('a Dashboard series card opens Results with that run selected', Boolean(card) && Boolean(inspector) && inspector.includes(title), { title, card, inspector });
+    }
+
+    // --- the notice is not shown again: the Torrent Manager searches straight away -------
+    await ev(`(window.dispatchEvent(new CustomEvent('scraper:navigate', { detail: { page: 'torrents' } })), true)`);
+    await poll(ctx, `!!document.querySelector('.scr-page--torrents')`, 8000);
+    await ctx.sleep(800);
+    const noticeAgain = await ev(`!!document.querySelector('[data-download-notice]')`);
+    result.check('the acknowledged notice is not shown again', noticeAgain === false, { noticeAgain });
+
+    // --- the Plugins page is not part of v1 ------------------------------------------------
+    await ev(`(window.dispatchEvent(new CustomEvent('scraper:navigate', { detail: { page: 'plugins' } })), true)`);
+    await ctx.sleep(500);
+    const plugins = await ev(`(() => {
+      const rail = [...document.querySelectorAll('.scr-rail-label')].map((b) => b.innerText.trim());
+      const text = document.body.innerText;
+      return { railItems: rail.length, railHasPlugins: rail.includes('Plugins'), pageShown: /Install from file|Permission audit|Update center/.test(text), title: document.querySelector('.scr-page-title')?.innerText ?? '' };
+    })()`);
+    result.check('the Plugins page is unreachable (no rail entry; navigating to it shows no plugin page)', plugins && plugins.railItems > 5 && !plugins.railHasPlugins && !plugins.pageShown, plugins);
 
     // --- the index search, then the send to qBittorrent ------------------------------------
     const rows = await ev(`window.api.scraperSearchTorrents({ query: { text: ${JSON.stringify(SHOW)} }, indexers: [${JSON.stringify(indexEntry)}], torrents: ${JSON.stringify(s.torrents)}, timeoutMs: 8000 })`, { await: true });

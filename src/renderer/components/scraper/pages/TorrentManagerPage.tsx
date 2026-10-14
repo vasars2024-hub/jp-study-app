@@ -30,6 +30,8 @@ import {
 import TransferRemoveConfirm from '../TransferRemoveConfirm';
 import { errorText, qbitActionNotice, qbitListFailureKey, type ActionNotice } from '../data/qbitActions';
 import { t } from '../../../i18n';
+import { qbitSendOutcomeText, qbitSendReasonText } from '../localize';
+import { isDownloadNoticeAcknowledged, useDownloadNoticeGate } from '../../common/DownloadNotice';
 import type { ScraperQbitTorrentAction } from '../../../../shared/scraperIpc';
 import { engineReason, firstReason, type ReasonCheck } from '../disabledReason';
 import {
@@ -195,8 +197,19 @@ export default function TorrentManagerPage() {
   // could otherwise land after the one for "frieren" and overwrite it.
   const searchSeq = useRef(0);
   const firstSearch = useRef(true);
+  // The torrent notice comes before the first index search, the first send and
+  // the first .torrent upload on an install; after "I understand" it is gone.
+  const torrentNotice = useDownloadNoticeGate('torrent');
+  const { gate: gateTorrentNotice } = torrentNotice;
 
-  const search = useCallback(async () => {
+  const searchRef = useRef<() => Promise<void>>(async () => undefined);
+  const search = useCallback(async (): Promise<void> => {
+    if (!isDownloadNoticeAcknowledged('torrent')) {
+      // Asked, not searched: the search runs once the notice is accepted, and
+      // "Not now" leaves the table empty rather than querying anyway.
+      gateTorrentNotice(() => void searchRef.current());
+      return;
+    }
     const requestId = ++searchSeq.current;
     // No reachable index, no request. Main would refuse it into `[]` anyway; not
     // asking keeps the empty table and the reason beside it from disagreeing
@@ -211,7 +224,8 @@ export default function TorrentManagerPage() {
       resolution: resolution || undefined,
     });
     if (requestId === searchSeq.current) setResults(rows);
-  }, [port, query, minSeeders, resolution, reachableIndexers.length]);
+  }, [port, query, minSeeders, resolution, reachableIndexers.length, gateTorrentNotice]);
+  searchRef.current = search;
 
   // The first search runs at once (the page opens with results); later ones
   // wait until typing pauses, so one keystroke is not one indexer request.
@@ -305,7 +319,8 @@ export default function TorrentManagerPage() {
     }
   };
 
-  const send = async () => {
+  const send = () => gateTorrentNotice(() => void sendNow());
+  const sendNow = async () => {
     const rows = results.filter((r) => selected.has(r.id));
     if (!rows.length) return;
     // A free-text search knows no catalogue ids, but the handoff still tags the
@@ -440,6 +455,7 @@ export default function TorrentManagerPage() {
 
   return (
     <div className="scr-page scr-page--torrents">
+      {torrentNotice.element}
       <header className="scr-page-head">
         <div>
           <h1 className="scr-page-title">
@@ -521,7 +537,7 @@ export default function TorrentManagerPage() {
               size="sm"
               disabled={addingFiles || !qbit.enabled}
               title={!qbit.enabled ? t('scr2.torrentFile.disabled') : addingFiles ? sx('why.busy') : undefined}
-              onClick={() => torrentFileInput.current?.click()}
+              onClick={() => gateTorrentNotice(() => torrentFileInput.current?.click())}
             >
               {addingFiles ? t('scr2.torrentFile.adding') : t('scr2.torrentFile.choose')}
             </Button>
@@ -541,7 +557,7 @@ export default function TorrentManagerPage() {
               <span>{t('scr2.torrentFile.result', { sent: fileReport.sent, skipped: fileReport.skipped, failed: fileReport.failed })}</span>
               {fileReport.details.filter((d) => d.outcome !== 'sent').map((d, i) => (
                 <span key={`${d.name}-${i}`} className="scr-muted">
-                  {d.name}: {d.reasonCode ? t(`scr2.${d.reasonCode}`) : d.reason}
+                  {d.name}: {qbitSendReasonText(d)}
                 </span>
               ))}
             </div>
@@ -721,7 +737,7 @@ export default function TorrentManagerPage() {
               variant="primary"
               disabled={!!whyClearSelection}
               title={whyClearSelection}
-              onClick={() => void send()}
+              onClick={send}
             >
               {sxn('torrent.send', selected.size)}
             </Button>
@@ -788,10 +804,10 @@ export default function TorrentManagerPage() {
               {sendReport.details.slice(0, 6).map((detail) => (
                 <li key={detail.name}>
                   <Pill tone={detail.outcome === 'sent' ? 'good' : detail.outcome === 'skipped' ? 'warn' : 'bad'}>
-                    {detail.outcome}
+                    {qbitSendOutcomeText(detail.outcome)}
                   </Pill>
                   <span className="scr-t-plain">{detail.name}</span>
-                  {detail.reason && <span className="scr-muted">{detail.reason}</span>}
+                  {detail.reason && <span className="scr-muted">{qbitSendReasonText(detail)}</span>}
                 </li>
               ))}
             </ul>

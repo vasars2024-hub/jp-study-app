@@ -25,3 +25,15 @@ export function useScraper(): ScraperController {
 export function useScraperFocusId(): string | null {
   return useContext(ScraperContext)?.focusSettingId ?? null;
 }
+
+/**
+ * Whether the build-status readouts (the coloured dots on pages, cards, the
+ * rail and the settings drawer, and the Dashboard's Build Status panel) are
+ * shown. They describe how far each surface has been verified, which is for
+ * whoever is developing the scraper, so they follow "Advanced / developer
+ * tools" and stay off for everyone else. Non-throwing for the same reason as
+ * `useScraperFocusId`: a page mounted without the shell shows no dots.
+ */
+export function useScraperDeveloperView(): boolean {
+  return useContext(ScraperContext)?.advancedMode ?? false;
+}

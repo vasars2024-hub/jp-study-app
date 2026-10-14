@@ -21,6 +21,7 @@ import { scraperRequest } from './http';
 import { scraperLog } from './logBus';
 import { fallbackChain } from '../../shared/scraperSourceOrder';
 import { releaseEpisodeRange } from '../../shared/releaseEpisodeNumber';
+import { parseResolution } from '../../shared/scraperResolution';
 
 /** Trackers attached to a magnet when the feed does not carry its own. */
 export const DEFAULT_TRACKERS = [
@@ -64,14 +65,15 @@ export function parseReleaseGroup(name: string): string {
   return trailing ? trailing[1].trim() : '';
 }
 
-export function parseResolution(name: string): string {
-  const explicit = /\b(\d{3,4})[pP]\b/.exec(name ?? '');
-  if (explicit) return `${explicit[1]}p`;
-  const dimensions = /\b\d{3,4}\s*[xX×]\s*(\d{3,4})\b/.exec(name ?? '');
-  if (dimensions) return `${dimensions[1]}p`;
-  if (/\b(4k|uhd)\b/i.test(name ?? '')) return '2160p';
-  return '';
+/** `torrents.verifyInfoHash`: a v1 (SHA-1, 40 hex) or v2 (SHA-256, 64 hex) info hash. */
+export function isWellFormedInfoHash(hash: string): boolean {
+  return /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(hash);
 }
+
+// `parseResolution` moved to shared/scraperResolution.ts so the engine can read
+// a resolution out of a site-rule row without depending on this module; it is
+// re-exported here for existing callers.
+export { parseResolution };
 
 /**
  * Whether one torrent covers a range of episodes rather than a single one.
@@ -271,6 +273,10 @@ export function applyTorrentPreferences(
     ) {
       return false;
     }
+    // A listing whose hash is not a well-formed v1 (40 hex) or v2 (64 hex) info
+    // hash would become a magnet link qBittorrent refuses. A row with no hash at
+    // all is kept: there is nothing to verify, and it cannot be sent anyway.
+    if (settings.verifyInfoHash && row.infoHash && !isWellFormedInfoHash(row.infoHash)) return false;
     if (settings.requireSubtitles && row.subtitleLanguages.length === 0) return false;
     if (settings.subtitleLanguages.length && settings.requireSubtitles) {
       const wanted = settings.subtitleLanguages;

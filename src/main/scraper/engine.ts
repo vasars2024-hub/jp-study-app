@@ -29,6 +29,7 @@ import type {
   ScrapeResult,
   ScrapeStage,
   ScrapeStageTiming,
+  ScraperJobErrorCode,
   SubtitleAvailability,
   TorrentRow,
 } from '../../shared/scraperResults';
@@ -66,6 +67,7 @@ import { isScraperAbortError, scraperRequest } from './http';
 import { scraperLog, scraperLogsFor } from './logBus';
 import { runWithScraperRuntime, scraperRuntimeFor } from './runtime';
 import { searchTorrents } from './torrents';
+import { parseResolution } from '../../shared/scraperResolution';
 import { resolveSeanimeStreams } from './seanimeSources';
 import { enabledSourcesOfKind, metadataProviderOrder } from '../../shared/scraperSourceOrder';
 import { releaseCoversEpisode } from '../../shared/malDownload';
@@ -112,6 +114,9 @@ export interface JobFailed {
   /** The target as the user typed it — the only name a failed run ever has. */
   target: string;
   message: string;
+  /** Set when the failure has a translatable code (`ScraperJobError`). */
+  code?: ScraperJobErrorCode;
+  vars?: Record<string, string | number>;
   settings: ScraperSettings;
 }
 
@@ -139,6 +144,25 @@ export function activeJobCount(): number {
 }
 
 class Cancelled extends Error {}
+
+/**
+ * A run failure the UI can name in its own language.
+ *
+ * `message` stays English: it is what the log, the history file and anyone
+ * filing a bug read. The job's error event carries `code` and `vars` beside it,
+ * and the renderer shows `scraperFix.ui.err.<code>` — main's sentence never
+ * reaches a ja/zh/ru screen.
+ */
+export class ScraperJobError extends Error {
+  constructor(
+    readonly code: ScraperJobErrorCode,
+    readonly vars: Record<string, string | number>,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ScraperJobError';
+  }
+}
 
 // ------------------------------------------------------------------ target ---
 
@@ -348,9 +372,6 @@ export function buildRuleRows(
   seriesId: string,
 ): EpisodeRow[] {
   const processing = settings.episodeProcessing;
-  const preferredResolution = processing.resolutionPriority[0]
-    ? `${processing.resolutionPriority[0]}p`
-    : '';
 
   let rows = extraction.rows.map((row): EpisodeRow => {
     // A row the rule could not number falls back to its document position, so
@@ -366,7 +387,10 @@ export function buildRuleRows(
       titleJa: '',
       kind: 'episode',
       audio: audioLabel(processing.audioPreference),
-      resolution: preferredResolution,
+      // What the page itself says ("1080p" in the title or the link), else
+      // blank. It used to print the profile's first resolution preference,
+      // which described the user, not the episode.
+      resolution: parseResolution(`${row.title} ${row.link}`),
       sourceId: `site-rule:${rule.id}`,
       sourceLabel: rule.host,
       sizeBytes: 0,
@@ -417,9 +441,6 @@ export function buildEpisodeRows(
   const label = providerLabel(work);
   const processing = settings.episodeProcessing;
   const metadata = settings.metadata;
-  const preferredResolution = processing.resolutionPriority[0]
-    ? `${processing.resolutionPriority[0]}p`
-    : '';
 
   let rows = episodes.map((episode): EpisodeRow => {
     const matching = releases.filter(
@@ -439,7 +460,10 @@ export function buildEpisodeRows(
       titleJa: metadata.alsoStoreNativeTitle ? episode.titleJa : '',
       kind: episode.recap ? 'recap' : 'episode',
       audio: audioLabel(processing.audioPreference),
-      resolution: best?.resolution || preferredResolution,
+      // The matched release's own resolution, or blank when no release covers
+      // this episode. Never the profile's preference: that is a wish, and the
+      // column is read as a fact about the file.
+      resolution: best?.resolution ?? '',
       sourceId: best ? 'index' : 'catalogue',
       sourceLabel: best?.tracker ?? label,
       // Only a matched release knows a size; the catalogue never does.
@@ -521,6 +545,34 @@ export function validateRows(
 }
 
 
+function validationAbort(failures: number): ScraperJobError {
+  return new ScraperJobError(
+    'validationFailed',
+    { count: failures },
+    `${failures} episode(s) failed validation.`,
+  );
+}
+
+/**
+ * `validation.verifyEpisodeCount`: whether a finished series' episode list is
+ * as long as its catalogue says. Null when there is nothing to compare: the
+ * check is off, the catalogue gives no total, or the show is still airing (an
+ * airing show's total counts episodes that do not exist yet).
+ *
+ * Compared before the recap/filler filters, against the list the catalogue
+ * itself returned: a profile that drops recaps should not fail its own check.
+ */
+export function episodeCountShortfall(
+  work: Pick<CatalogueWork, 'episodeCount' | 'status'>,
+  listed: number,
+  settings: ScraperSettings,
+): { found: number; expected: number } | null {
+  if (!settings.validation.verifyEpisodeCount) return null;
+  const expected = work.episodeCount;
+  if (!(expected > 0) || !/finished/i.test(work.status)) return null;
+  return listed < expected ? { found: listed, expected } : null;
+}
+
 // ------------------------------------------------------------------- runner ---
 
 type StageFn = (next: ScrapeStage) => void;
@@ -565,15 +617,27 @@ function emitRows(
 function markStage(job: Job, next: ScrapeStage): void {
   const now = Date.now();
   if (job.stageStartedAt > 0 && next !== job.stage) {
-    job.timings.push({ stage: job.stage, ms: Math.max(0, now - job.stageStartedAt) });
+    recordTiming(job, { stage: job.stage, ms: Math.max(0, now - job.stageStartedAt) });
     job.stageStartedAt = now;
+  }
+}
+
+/**
+ * Keeps one stage's measured duration, and with `developer.verboseTimings` on
+ * also writes it to the log as the stage closes, so a slow run can be read
+ * while it is still running and not only from History afterwards.
+ */
+function recordTiming(job: Job, timing: ScrapeStageTiming): void {
+  job.timings.push(timing);
+  if (job.input.settings.developer?.verboseTimings) {
+    scraperLog('info', 'engine', `Stage ${timing.stage} took ${timing.ms} ms.`, { correlationId: job.id });
   }
 }
 
 /** Closes the timeline at the moment the summary is written. */
 function closeStageTimings(job: Job): ScrapeStageTiming[] {
   if (job.stageStartedAt > 0) {
-    job.timings.push({ stage: job.stage, ms: Math.max(0, Date.now() - job.stageStartedAt) });
+    recordTiming(job, { stage: job.stage, ms: Math.max(0, Date.now() - job.stageStartedAt) });
     job.stageStartedAt = -1;
   }
   return [...job.timings];
@@ -705,7 +769,11 @@ async function runWithSiteRule(
     signal: job.controller.signal,
   });
   if (response.status >= 400) {
-    throw new Error(`${request.targetUrl} answered ${response.status}.`);
+    throw new ScraperJobError(
+      'httpStatus',
+      { target: request.targetUrl, status: response.status },
+      `${request.targetUrl} answered ${response.status}.`,
+    );
   }
 
   stage('parsing');
@@ -718,9 +786,16 @@ async function runWithSiteRule(
     request.targetUrl,
     { ignoreHiddenElements: settings.extraction.ignoreHiddenElements },
   );
-  if (extraction.error) throw new Error(extraction.error);
+  if (extraction.error) {
+    // The detail is a CSS parser's English; the code says which rule to fix.
+    throw new ScraperJobError('ruleInvalid', { host: rule.host }, extraction.error);
+  }
   if (!extraction.rows.length) {
-    throw new Error(`The rule for ${rule.host} matched nothing on ${request.targetUrl}.`);
+    throw new ScraperJobError(
+      'ruleNoMatch',
+      { host: rule.host, url: request.targetUrl },
+      `The rule for ${rule.host} matched nothing on ${request.targetUrl}.`,
+    );
   }
   for (const item of extraction.checks) {
     scraperLog(item.ok ? 'debug' : 'warn', 'engine', `${item.label}: ${item.detail}`, {
@@ -738,7 +813,7 @@ async function runWithSiteRule(
   const validated = validateRows(parsed, settings);
   job.rows = validated.rows;
   if (settings.validation.onFailure === 'abort' && validated.failures > 0) {
-    throw new Error(`${validated.failures} episode(s) failed validation.`);
+    throw validationAbort(validated.failures);
   }
 
   const title = cleanPageTitle(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(response.body)?.[1] ?? '')
@@ -806,6 +881,27 @@ async function runWithSiteRule(
   onFinished?.({ summary, result: job.result, settings });
 }
 
+/**
+ * The enabled torrent indexes, best first, minus (with `sources.skipUnhealthy`
+ * on) any whose last Source Manager test got no answer at all. Only 'offline'
+ * is skipped: 'blocked' (a key or a challenge) and 'degraded' are still worth
+ * asking, and an index that was never tested ('unknown') is always tried.
+ */
+export function runnableIndexers(settings: ScraperSettings, correlationId: string) {
+  const enabled = enabledSourcesOfKind(settings.sources, 'torrent');
+  if (!settings.sources.skipUnhealthy) return enabled;
+  const skipped = enabled.filter((entry) => entry.health === 'offline');
+  if (skipped.length) {
+    scraperLog(
+      'info',
+      'engine',
+      `Skipping ${skipped.map((entry) => entry.label || entry.id).join(', ')}: offline at the last test.`,
+      { correlationId },
+    );
+  }
+  return enabled.filter((entry) => entry.health !== 'offline');
+}
+
 async function run(job: Job, emit: JobEmitter): Promise<void> {
   const { settings, request } = job.input;
   const correlationId = job.id;
@@ -829,13 +925,15 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
   }
 
   if (request.contentType && request.contentType !== 'anime') {
-    throw new Error(
-      `${request.contentType} acquisition is not connected to a catalogue provider yet.`,
+    throw new ScraperJobError(
+      'contentType',
+      { type: request.contentType },
+      `Only anime can be scraped; this is a ${request.contentType} title.`,
     );
   }
 
   const query = await resolveQuery(request.targetUrl, correlationId, job.controller.signal);
-  if (!query) throw new Error('There is nothing to search for.');
+  if (!query) throw new ScraperJobError('nothingToSearch', {}, 'There is nothing to search for.');
   // The Source Manager's metadata order when it lists a catalogue, the
   // metadata group's own order otherwise — see `metadataProviderOrder`.
   const candidates = await searchCatalogue(
@@ -844,7 +942,9 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
     5,
     metadataProviderOrder(settings),
   );
-  if (!candidates.length) throw new Error(`Nothing in the catalogue matches "${query}".`);
+  if (!candidates.length) {
+    throw new ScraperJobError('noCatalogueMatch', { query }, `Nothing in the catalogue matches "${query}".`);
+  }
   const chosen = candidates[0];
   scraperLog('info', 'engine', `Matched "${chosen.titleEn || chosen.titleRomaji}".`, {
     correlationId,
@@ -875,7 +975,7 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
   let releases: TorrentRow[] = [];
   // Priority order, so a release two indexes both list is credited to the
   // higher one, and a failed index can hand over to its fallbacks.
-  const indexers = enabledSourcesOfKind(settings.sources, 'torrent');
+  const indexers = runnableIndexers(settings, correlationId);
   if (settings.sources.mode !== 'streaming' && indexers.length) {
     releases = await searchTorrents({
       query: { text: detail.titleRomaji || detail.titleEn },
@@ -924,7 +1024,15 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
   const validated = validateRows(parsed, settings);
   job.rows = validated.rows;
   if (settings.validation.onFailure === 'abort' && validated.failures > 0) {
-    throw new Error(`${validated.failures} episode(s) failed validation.`);
+    throw validationAbort(validated.failures);
+  }
+  const shortfall = episodeCountShortfall(detail, episodes.length, settings);
+  if (shortfall) {
+    const sentence = `Episode list is short: ${shortfall.found} of ${shortfall.expected}.`;
+    scraperLog('warn', 'engine', sentence, { correlationId });
+    if (settings.validation.onFailure === 'abort') {
+      throw new ScraperJobError('episodeCountShort', shortfall, sentence);
+    }
   }
   scraperLog(
     validated.failures ? 'warn' : 'info',
@@ -955,6 +1063,7 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
       incompleteEpisodePage
         ? `Partial episode list: page ${incompleteEpisodePage} of the catalogue failed to load.`
         : '',
+      shortfall ? `Episode list is short: ${shortfall.found} of ${shortfall.expected}.` : '',
       settings.episodeProcessing.detectMissingNumbers
         ? missingEpisodesNote(missingEpisodeNumbers(job.rows))
         : '',
@@ -1052,16 +1161,18 @@ export function startScrape(input: ScraperStartInput, emit: JobEmitter): string 
           return;
         }
         const message = error instanceof Error ? error.message : String(error);
+        const coded = error instanceof ScraperJobError ? { code: error.code, vars: error.vars } : {};
         job.stage = 'failed';
         scraperLog('error', 'engine', `Job ${id} failed: ${message}`, { correlationId: id });
         emit(id, { kind: 'stage', stage: 'failed' });
-        emit(id, { kind: 'error', message });
+        emit(id, { kind: 'error', message, ...coded });
         // A cancelled run returns above: the user already knows, and telling
         // them their own click failed is the notification everyone turns off.
         onFailed?.({
           jobId: id,
           target: input.request.targetUrl,
           message,
+          ...coded,
           settings: input.settings,
         });
       });

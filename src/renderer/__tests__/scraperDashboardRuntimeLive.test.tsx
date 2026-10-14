@@ -143,3 +143,19 @@ describe('Scraper Dashboard — the Runtime card reports the shell\'s live sampl
     expect(Object.keys(EMPTY_SNAPSHOT)).not.toContain('stats');
   });
 });
+
+describe('Scraper Dashboard — developer readouts stay behind developer tools (v1)', () => {
+  it('hides the Build Status panel and every build-status dot from a learner', async () => {
+    const host = await render({ memoryMb: 845, cpuPercent: 6, activeJobs: 0 }, false);
+    expect(host.querySelector('[data-scr-card="build-status"]')).toBeNull();
+    expect(host.querySelector('.scr-dot')).toBeNull();
+    // The rest of the page is there: the gate hid the readout, not the dashboard.
+    expect(host.querySelector('[data-scr-card="recent-scrapes"]')).not.toBeNull();
+  });
+
+  it('shows both with "Advanced / developer tools" on', async () => {
+    const host = await render({ memoryMb: 845, cpuPercent: 6, activeJobs: 0 }, true);
+    expect(host.querySelector('[data-scr-card="build-status"]')).not.toBeNull();
+    expect(host.querySelector('.scr-dot')).not.toBeNull();
+  });
+});

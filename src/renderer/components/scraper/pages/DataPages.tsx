@@ -18,7 +18,7 @@ import { formatDuration } from '../../../stats';
 import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
 import { distinctEpisodes } from '../data/dashboardData';
 import { sx, sxn, sxNumber, sxs, sxss, type ScraperTextKey } from '../strings';
-import { episodeStatusText, localizeScraperJobNote, tr } from '../localize';
+import { episodeStatusText, localizeScraperJobNote, localizeScraperProvider, tr } from '../localize';
 import { firstReason } from '../disabledReason';
 import TransferRemoveConfirm from '../TransferRemoveConfirm';
 import { errorText, qbitActionNotice, qbitListFailureKey } from '../data/qbitActions';
@@ -334,7 +334,7 @@ export function ResultsPage() {
                 </span>
               </div>
               <div className="scr-chip-row">
-                <Pill tone="outline">{series.provider}</Pill>
+                <Pill tone="outline">{localizeScraperProvider(series.provider)}</Pill>
                 <Pill tone={withJapanese ? 'good' : 'warn'}>{sxn('results.jaCount', withJapanese)}</Pill>
                 {warned > 0 && <Pill tone="warn">{sxn('results.warnCount', warned)}</Pill>}
                 {failed > 0 && <Pill tone="bad">{sxn('results.failCount', failed)}</Pill>}
@@ -363,7 +363,7 @@ export function ResultsPage() {
             <span>
               <b>{selected.series.titleEn}</b>
               <small>{selected.series.titleJa}</small>
-              <em>{selected.series.provider}</em>
+              <em>{localizeScraperProvider(selected.series.provider)}</em>
             </span>
           </div>
           <div className="scr-results-inspector-body">
@@ -1088,7 +1088,7 @@ export function HistoryPage() {
                       <span className="scr-t-ja">{job.titleJa}</span>
                     </span>
                   </div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-plain">{job.provider}</span></div>
+                  <div role="gridcell" className="scr-td"><span className="scr-t-plain">{localizeScraperProvider(job.provider)}</span></div>
                   <div role="gridcell" className="scr-td"><Pill tone="outline">{job.profile}</Pill></div>
                   <div role="gridcell" className="scr-td"><span className="scr-t-num">{sxNumber(job.found)}</span></div>
                   <div role="gridcell" className="scr-td">

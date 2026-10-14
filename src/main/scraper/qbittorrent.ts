@@ -980,6 +980,35 @@ export function magnetInfoHash(magnet: string): string {
   return infoHashFromMagnet(magnet ?? '');
 }
 
+type SendReason = Pick<QbitSendReport['details'][number], 'reason' | 'reasonCode' | 'reasonVars'>;
+
+/**
+ * The reasons a send report can carry, each with the code the renderer
+ * translates (`scraperFix.send.<code>`, or `scraperFix.qbit.<code>` for a
+ * login/transport failure). `reason` stays English for the log.
+ */
+const SEND_REASON = {
+  notEnabled: { reason: 'qBittorrent is not enabled.', reasonCode: 'qbit.disabled' },
+  noMagnet: { reason: 'No magnet link.', reasonCode: 'send.noMagnet' },
+  noSeeders: { reason: 'No seeders.', reasonCode: 'send.noSeeders' },
+  notAccepted: { reason: 'qBittorrent did not accept this link.', reasonCode: 'send.notAccepted' },
+  already: { reason: 'Already in qBittorrent.', reasonCode: 'send.already' },
+} satisfies Record<string, SendReason>;
+
+/** A non-200 (or a `200 Fails.`) answer to `torrents/add`. */
+function answeredReason(status: number, body: string): SendReason {
+  return { reason: addFailureReason(status, body), reasonCode: 'send.answered', reasonVars: { status } };
+}
+
+/** A login or transport failure before the add was ever made. */
+function loginFailureReason(error: LoginResult): SendReason {
+  return {
+    reason: error.message,
+    reasonCode: error.messageCode ? `qbit.${error.messageCode}` : 'send.failed',
+    ...(error.messageVars ? { reasonVars: error.messageVars } : {}),
+  };
+}
+
 /**
  * Turn a `200` add response into a per-row outcome.
  *
@@ -1005,11 +1034,12 @@ export function settleAddedRows(
     const reason =
       `qBittorrent accepted ${outcome.successCount} of ${rows.length} links and refused `
       + `${outcome.failureCount}, without naming which.`;
-    return rows.map((row) => ({ name: row.name, outcome: 'failed' as const, reason }));
+    const reasonVars = { accepted: outcome.successCount, total: rows.length, refused: outcome.failureCount };
+    return rows.map((row) => ({ name: row.name, outcome: 'failed' as const, reason, reasonCode: 'send.partial', reasonVars }));
   }
   const refused = new Set(unmatched);
   return rows.map((row) => (refused.has(row)
-    ? { name: row.name, outcome: 'failed' as const, reason: 'qBittorrent did not accept this link.' }
+    ? { name: row.name, outcome: 'failed' as const, ...SEND_REASON.notAccepted }
     : sent(row)));
 }
 
@@ -1038,7 +1068,7 @@ export async function qbitSend(rawInput: ScraperQbitSendInput): Promise<QbitSend
       sent: 0,
       skipped: 0,
       failed: rows.length,
-      details: rows.map((row) => ({ name: row.name, outcome: 'failed' as const, reason })),
+      details: rows.map((row) => ({ name: row.name, outcome: 'failed' as const, reason, reasonCode: 'send.failed' })),
     };
   }
 }
@@ -1057,7 +1087,7 @@ async function sendToQbit(
       details: rows.map((row) => ({
         name: row.name,
         outcome: 'failed' as const,
-        reason: 'qBittorrent is not enabled.',
+        ...SEND_REASON.notEnabled,
       })),
     };
   }
@@ -1067,9 +1097,9 @@ async function sendToQbit(
   const sendable: TorrentRow[] = [];
   for (const row of rows) {
     if (!row.magnet) {
-      details.push({ name: row.name, outcome: 'skipped', reason: 'No magnet link.' });
+      details.push({ name: row.name, outcome: 'skipped', ...SEND_REASON.noMagnet });
     } else if (row.seeders === 0) {
-      details.push({ name: row.name, outcome: 'skipped', reason: 'No seeders.' });
+      details.push({ name: row.name, outcome: 'skipped', ...SEND_REASON.noSeeders });
     } else {
       sendable.push(row);
     }
@@ -1097,22 +1127,22 @@ async function sendToQbit(
       body: form.toString(),
     });
     if ('error' in response) {
-      const reason = response.error.message;
-      for (const row of groupRows) details.push({ name: row.name, outcome: 'failed', reason });
-      scraperLog('error', 'qbit', `Send failed: ${reason}`);
+      const why = loginFailureReason(response.error);
+      for (const row of groupRows) details.push({ name: row.name, outcome: 'failed', ...why });
+      scraperLog('error', 'qbit', `Send failed: ${why.reason}`);
     } else if (response.status === 200 && !parseAddOutcome(response.body) && isLegacyAddRefusal(response.body)) {
       // qBittorrent 4.x's `200 Fails.`: nothing in this request was added.
       const already = await presentHashes(input).catch(() => new Set<string>());
-      const generic = addFailureReason(response.status, response.body);
+      const generic = answeredReason(response.status, response.body);
       for (const row of groupRows) {
         const hash = magnetInfoHash(row.magnet);
         details.push({
           name: row.name,
           outcome: 'failed',
-          reason: hash && already.has(hash) ? 'Already in qBittorrent.' : generic,
+          ...(hash && already.has(hash) ? SEND_REASON.already : generic),
         });
       }
-      scraperLog('error', 'qbit', `Send failed: ${generic}`);
+      scraperLog('error', 'qbit', `Send failed: ${generic.reason}`);
     } else if (response.status === 200) {
       const settled = settleAddedRows(groupRows, parseAddOutcome(response.body));
       details.push(...settled);
@@ -1127,15 +1157,12 @@ async function sendToQbit(
       // leaves the user with a number. The one cause the app can establish itself
       // is the common one: the torrent is already in the transfer list.
       const already = response.status === 409 ? await presentHashes(input) : new Set<string>();
-      const generic = addFailureReason(response.status, response.body);
+      const generic = answeredReason(response.status, response.body);
       for (const row of groupRows) {
         const hash = magnetInfoHash(row.magnet);
-        const reason = hash && already.has(hash)
-          ? 'Already in qBittorrent.'
-          : generic;
-        details.push({ name: row.name, outcome: 'failed', reason });
+        details.push({ name: row.name, outcome: 'failed', ...(hash && already.has(hash) ? SEND_REASON.already : generic) });
       }
-      scraperLog('error', 'qbit', `Send failed: ${generic}`);
+      scraperLog('error', 'qbit', `Send failed: ${generic.reason}`);
     }
   }
 
@@ -1203,7 +1230,7 @@ export async function qbitAddTorrentFiles(rawInput: ScraperQbitTorrentFileInput)
     infoHashes,
   });
   if (!input.config.enabled) {
-    for (const p of parsed) details.push({ name: p.info.name, outcome: 'failed', reason: 'qBittorrent is not enabled.' });
+    for (const p of parsed) details.push({ name: p.info.name, outcome: 'failed', ...SEND_REASON.notEnabled });
     return report([]);
   }
   if (!parsed.length) return report([]);
@@ -1244,13 +1271,14 @@ export async function qbitAddTorrentFiles(rawInput: ScraperQbitTorrentFileInput)
   });
   const accepted: TorrentRow[] = [];
   if ('error' in response) {
-    for (const row of rows) details.push({ name: row.name, outcome: 'failed', reason: response.error.message });
+    const why = loginFailureReason(response.error);
+    for (const row of rows) details.push({ name: row.name, outcome: 'failed', ...why });
     scraperLog('error', 'qbit', `Adding .torrent files failed: ${response.error.message}`);
   } else if (response.status === 200 && !(parseAddOutcome(response.body)) && isLegacyAddRefusal(response.body)) {
     const already = await presentHashes(input).catch(() => new Set<string>());
-    const generic = addFailureReason(response.status, response.body);
+    const generic = answeredReason(response.status, response.body);
     for (const row of rows) {
-      details.push({ name: row.name, outcome: 'failed', reason: already.has(row.infoHash) ? 'Already in qBittorrent.' : generic });
+      details.push({ name: row.name, outcome: 'failed', ...(already.has(row.infoHash) ? SEND_REASON.already : generic) });
     }
   } else if (response.status === 200) {
     const settled = settleAddedRows(rows, parseAddOutcome(response.body));
@@ -1261,11 +1289,11 @@ export async function qbitAddTorrentFiles(rawInput: ScraperQbitTorrentFileInput)
     scraperLog('info', 'qbit', `Added ${accepted.length} of ${rows.length} .torrent file(s) to qBittorrent.`);
   } else {
     const already = response.status === 409 ? await presentHashes(input).catch(() => new Set<string>()) : new Set<string>();
-    const generic = addFailureReason(response.status, response.body);
+    const generic = answeredReason(response.status, response.body);
     for (const row of rows) {
-      details.push({ name: row.name, outcome: 'failed', reason: already.has(row.infoHash) ? 'Already in qBittorrent.' : generic });
+      details.push({ name: row.name, outcome: 'failed', ...(already.has(row.infoHash) ? SEND_REASON.already : generic) });
     }
-    scraperLog('error', 'qbit', `Adding .torrent files failed: ${generic}`);
+    scraperLog('error', 'qbit', `Adding .torrent files failed: ${generic.reason}`);
   }
   if (ingest && accepted.length) {
     emitAcquisitionHandoff({

@@ -1004,6 +1004,8 @@ describe('qbitSend', () => {
     expect(report.skipped).toBe(2);
     expect(report.details.map((d) => d.reason)).toEqual(['No seeders.', 'No magnet link.']);
     expect(addBodies).toHaveLength(0);
+    // Coded beside the English, so the Torrent Manager says it in the UI language.
+    expect(report.details.map((d) => d.reasonCode)).toEqual(['send.noSeeders', 'send.noMagnet']);
   });
 
   it('fails every row when qBittorrent is unreachable', async () => {
@@ -1106,6 +1108,7 @@ describe('qbitSend', () => {
     });
     expect(report.failed).toBe(1);
     expect(report.details[0].reason).toBe('Already in qBittorrent.');
+    expect(report.details[0].reasonCode).toBe('send.already');
   });
 
   it('keeps the bare 409 for a row qBittorrent is not already holding', async () => {

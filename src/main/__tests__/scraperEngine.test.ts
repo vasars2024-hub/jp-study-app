@@ -74,6 +74,8 @@ vi.mock('../scraper/seanimeSources', () => ({
 const {
   buildEpisodeRows,
   cancelScrape,
+  episodeCountShortfall,
+  runnableIndexers,
   cleanPageTitle,
   isSiteNameOnly,
   slugFromUrl,
@@ -573,7 +575,10 @@ describe('a scrape run', () => {
       if (!events.some((event) => event.kind === 'error')) throw new Error('not finished');
     });
     const error = events.find((event) => event.kind === 'error');
-    expect(error?.kind === 'error' && error.message).toMatch(/manga acquisition/i);
+    expect(error?.kind === 'error' && error.message).toMatch(/only anime/i);
+    // Coded, so the renderer and the notification say it in the UI language.
+    expect(error?.kind === 'error' && error.code).toBe('contentType');
+    expect(error?.kind === 'error' && error.vars).toEqual({ type: 'manga' });
     expect(catalogue.searchCalls).toBe(0);
   });
 
@@ -612,5 +617,120 @@ describe('a scrape run', () => {
     );
     expect(events.some((e) => e.kind === 'done')).toBe(false);
     expect(jobResult(jobId)).toBeNull();
+  });
+});
+
+describe('v1: settings that used to be inert now act', () => {
+  const index = (id: string, health: 'ok' | 'offline' | 'blocked' | 'unknown') => ({
+    id,
+    label: id,
+    host: `${id}.test`,
+    kind: 'torrent' as const,
+    enabled: true,
+    priority: 1,
+    fallbackIds: [],
+    verifiedSiteId: '',
+    requiresAuth: false,
+    supportsSubtitles: true,
+    health,
+    lastCheckedAt: null,
+    notes: '',
+  });
+
+  it('Skip Offline Sources leaves out only an index that was offline at its last test', () => {
+    const settings = settingsWith((s) => {
+      s.sources.entries = [index('up', 'ok'), index('down', 'offline'), index('walled', 'blocked'), index('new', 'unknown')];
+      s.sources.order = ['up', 'down', 'walled', 'new'];
+      s.sources.skipUnhealthy = true;
+    });
+    expect(runnableIndexers(settings, 'test').map((e) => e.id)).toEqual(['up', 'walled', 'new']);
+    settings.sources.skipUnhealthy = false;
+    expect(runnableIndexers(settings, 'test').map((e) => e.id)).toEqual(['up', 'down', 'walled', 'new']);
+  });
+
+  it('a run with every index offline does not ask the index at all', async () => {
+    await runJob(settingsWith((s) => {
+      s.sources.mode = 'both';
+      s.sources.entries = [index('down', 'offline')];
+      s.sources.skipUnhealthy = true;
+    }));
+    expect(torrents.calls).toBe(0);
+  });
+
+  it('Verify Episode Count compares a finished series against its catalogue total', () => {
+    const on = settingsWith((s) => {
+      s.validation.verifyEpisodeCount = true;
+    });
+    expect(episodeCountShortfall(work({ episodeCount: 28, status: 'Finished Airing' }), 3, on)).toEqual({ found: 3, expected: 28 });
+    expect(episodeCountShortfall(work({ episodeCount: 28, status: 'FINISHED' }), 28, on)).toBeNull();
+    // An airing show's total counts episodes that do not exist yet.
+    expect(episodeCountShortfall(work({ episodeCount: 28, status: 'Currently Airing' }), 3, on)).toBeNull();
+    expect(episodeCountShortfall(work({ episodeCount: 0, status: 'Finished Airing' }), 3, on)).toBeNull();
+    const off = settingsWith((s) => {
+      s.validation.verifyEpisodeCount = false;
+    });
+    expect(episodeCountShortfall(work({ episodeCount: 28, status: 'Finished Airing' }), 3, off)).toBeNull();
+  });
+
+  it('a short list is noted under warn, and fails the run with a code under abort', async () => {
+    // The fixture series is finished with 28 episodes; the catalogue lists 3.
+    const warned = await runJob(settingsWith((s) => {
+      s.validation.verifyEpisodeCount = true;
+      s.validation.onFailure = 'warn';
+    }));
+    expect(jobSummaries().find((summary) => summary.id === warned.jobId)?.note)
+      .toContain('Episode list is short: 3 of 28.');
+    const aborted = await runJob(settingsWith((s) => {
+      s.validation.verifyEpisodeCount = true;
+      s.validation.onFailure = 'abort';
+    }));
+    const error = aborted.events.find((e) => e.kind === 'error');
+    expect(error?.kind === 'error' && error.code).toBe('episodeCountShort');
+    expect(error?.kind === 'error' && error.vars).toEqual({ found: 3, expected: 28 });
+  });
+
+  it('Verbose Timings writes each stage duration to the job log, and only when on', async () => {
+    const quiet = await runJob(settingsWith());
+    expect(jobResult(quiet.jobId)?.logs.some((line) => /^Stage \w+ took \d+ ms\.$/.test(line.message))).toBe(false);
+    const verbose = await runJob(settingsWith((s) => {
+      s.developer.verboseTimings = true;
+      s.logging.level = 'debug';
+    }));
+    const lines = verbose.events
+      .filter((e): e is Extract<ScrapeJobEvent, { kind: 'log' }> => e.kind === 'log')
+      .map((e) => e.line.message);
+    const stageLines = [...(jobResult(verbose.jobId)?.logs ?? []).map((l) => l.message), ...lines]
+      .filter((m) => /^Stage \w+ took \d+ ms\.$/.test(m));
+    expect(stageLines.some((m) => m.startsWith('Stage searching took'))).toBe(true);
+  });
+
+  it('coded failures carry their code beside the English message', async () => {
+    catalogue.works = [];
+    const { events } = await runJob(settingsWith());
+    const error = events.find((e) => e.kind === 'error');
+    expect(error?.kind === 'error' && error.code).toBe('noCatalogueMatch');
+    expect(error?.kind === 'error' && error.vars).toEqual({ query: 'frieren' });
+  });
+});
+
+describe('the Resolution column reports the release, never the preference', () => {
+  it('is the matched release’s resolution', () => {
+    const rows = buildEpisodeRows(work(), catalogue.episodes, settingsWith(), [release({ resolution: '720p' })]);
+    expect(rows[0].resolution).toBe('720p');
+  });
+
+  it('is blank when no release covers the episode, whatever the profile prefers', () => {
+    const rows = buildEpisodeRows(
+      work(),
+      catalogue.episodes,
+      settingsWith((s) => {
+        s.episodeProcessing.resolutionPriority = [1080, 720];
+      }),
+      [release({ resolution: '1080p' })],
+    );
+    // Episode 1 is covered by the release; 2 and 3 are not.
+    expect(rows[0].resolution).toBe('1080p');
+    expect(rows[1].resolution).toBe('');
+    expect(rows[2].resolution).toBe('');
   });
 });

@@ -5,13 +5,9 @@ describe('Scraper Scheduler and Notifications settings truthfulness', () => {
   const schedulerFields = SCRAPER_FIELDS.filter((field) => field.group === 'scheduler');
   const notificationFields = SCRAPER_FIELDS.filter((field) => field.group === 'notifications');
 
-  it('marks the unavailable metered-network signal as the only inert scheduler field', () => {
+  it('offers only scheduler controls that act (the metered-network one was removed for v1)', () => {
     expect(
-      schedulerFields.filter((field) => field.inert).map((field) => field.path),
-    ).toEqual(['scheduler.requireUnmeteredNetwork']);
-
-    expect(
-      schedulerFields.filter((field) => !field.inert).map((field) => [field.path, field.toPath]),
+      schedulerFields.map((field) => [field.path, field.toPath]),
     ).toEqual([
       ['scheduler.enabled', undefined],
       ['scheduler.entries', undefined],
@@ -31,7 +27,6 @@ describe('Scraper Scheduler and Notifications settings truthfulness', () => {
   });
 
   it('keeps all eight notification controls active', () => {
-    expect(notificationFields.some((field) => field.inert)).toBe(false);
     expect(notificationFields.map((field) => field.path)).toEqual([
       'notifications.channel',
       'notifications.onComplete',

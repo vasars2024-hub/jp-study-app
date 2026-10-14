@@ -17,7 +17,6 @@ import {
   SCRAPER_IMAGE_FORMATS,
   SCRAPER_LOG_CHANNELS,
   SCRAPER_LOG_LEVELS,
-  SCRAPER_MERGE_STRATEGIES,
   SCRAPER_MISSED_RUN_POLICIES,
   SCRAPER_NOTIFY_CHANNELS,
   SCRAPER_TITLE_LANGUAGES,
@@ -29,7 +28,6 @@ import {
   SCRAPER_QBIT_AUTH_MODES,
   SCRAPER_QBIT_LAYOUTS,
   SCRAPER_SOURCE_MODES,
-  SCRAPER_TORRENT_PROTOCOLS,
 } from '../../../../shared/scraperSourceSettings';
 // The Columns hint names the real vocabulary rather than restating it, so the
 // two cannot drift the way a hand-copied list would.
@@ -95,17 +93,6 @@ export interface ScraperFieldDef {
   advanced?: boolean;
   /** Extra search terms, deliberately literal English. */
   keywords?: string[];
-  /**
-   * This field persists but nothing reads it yet.
-   *
-   * The drawer renders a visible marker for it. A control that edits a stored
-   * value while changing no behaviour is the defect the audit called F5 — the
-   * value really is saved, so the settings document is not lying; the *screen*
-   * was, by presenting the control exactly like the ones that work. Marking it
-   * is not a substitute for wiring it, but an unmarked inert control is
-   * indistinguishable from a broken one, and a user cannot tell which.
-   */
-  inert?: boolean;
   /**
    * Render only while another field in the same document holds this value.
    *
@@ -229,8 +216,9 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
 
   // ------------------------------------------------------------ anti-bot ---
   { path: 'session.consistentFingerprint', group: 'antibot', kind: 'toggle', label: 'Consistent Fingerprint', hint: 'Reuse one plausible browser identity instead of varying it per request.' },
+  // Session Label was removed for v1: it was copied into session state that
+  // nothing reads.
   { path: 'session.persistAuthenticatedSession', group: 'antibot', kind: 'toggle', label: 'Persist Signed-In Session', hint: 'Keeps approved cookies so a challenge is not repeated on every page.' },
-  { path: 'session.sessionLabel', group: 'antibot', kind: 'text', label: 'Session Label', placeholder: 'e.g. StreamSB — main account' },
   { path: 'safety.respectRobotsTxt', group: 'antibot', kind: 'toggle', label: 'Respect robots.txt' },
   { path: 'safety.crawlDelayMs', group: 'antibot', kind: 'number', label: 'Crawl Delay', min: 0, max: 60_000, step: 100, unit: 'ms' },
   { path: 'safety.maxRequestsPerMinute', group: 'antibot', kind: 'number', label: 'Max Requests / Minute', min: 1, max: 600 },
@@ -239,11 +227,9 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'safety.allowPrivateNetwork', group: 'antibot', kind: 'toggle', label: 'Allow Private Network', hint: 'Lets crawls, source probes and the HTTP Inspector reach localhost and LAN addresses. Off refuses them; qBittorrent and Seanime are never affected.' },
 
   // ---------------------------------------------------------- extraction ---
-  { path: 'extraction.cssSelectors', group: 'extraction', kind: 'tags', label: 'CSS Selectors', hint: 'Tried in order; the first that matches wins.' },
-  { path: 'extraction.xpathSelectors', group: 'extraction', kind: 'tags', label: 'XPath Selectors', advanced: true },
-  { path: 'extraction.regexPattern', group: 'extraction', kind: 'text', label: 'Regex Pattern', placeholder: 'Episode\\s*(\\d+)', advanced: true },
-  { path: 'extraction.regexFlags', group: 'extraction', kind: 'text', label: 'Regex Flags', placeholder: 'gi', advanced: true },
-  { path: 'extraction.attribute', group: 'extraction', kind: 'select', label: 'Attribute', options: opts(['text', 'href', 'src', 'data-src', 'title'], { text: 'Visible text' }) },
+  // v1: CSS/XPath selectors, regex pattern/flags and attribute were removed. They
+  // configured a generic "point it at any page" extractor this backend does not
+  // have (extractionRules.ts says why); per-site extraction is the Site Rules page.
   { path: 'extraction.ignoreHiddenElements', group: 'extraction', kind: 'toggle', label: 'Ignore Hidden Elements', hint: 'Skips templates and duplicate mobile layouts.' },
   { path: 'extraction.cleanText', group: 'extraction', kind: 'toggle', label: 'Clean Text' },
   { path: 'extraction.decodeHtmlEntities', group: 'extraction', kind: 'toggle', label: 'Decode HTML Entities' },
@@ -269,13 +255,12 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'sources.stopAfterFirstSuccess', group: 'sources', kind: 'toggle', label: 'Stop After First Success', hint: 'Off means every enabled source is tried, even after one works.' },
   { path: 'sources.maxFallbackDepth', group: 'sources', kind: 'number', label: 'Max Fallback Depth', min: 0, max: 10, hint: 'How many hops a failed source may take through its fallbacks, and through theirs. 0 turns fallbacks off.' },
   { path: 'sources.perSourceTimeoutMs', group: 'sources', kind: 'number', label: 'Per-Source Timeout', min: 1_000, max: 300_000, step: 1_000, unit: 'ms' },
-  { path: 'sources.skipUnhealthy', group: 'sources', kind: 'toggle', label: 'Skip Unhealthy Sources', hint: 'Stored for a future pre-filter. Health is probed and shown in Source Manager, but a run still tries every enabled source and lets it fail.', inert: true },
+  { path: 'sources.skipUnhealthy', group: 'sources', kind: 'toggle', label: 'Skip Offline Sources', hint: 'A torrent index whose last test in Source Manager got no answer is left out of a run. Test it again to bring it back.' },
   { path: 'sources.requireSubtitleAvailability', group: 'sources', kind: 'toggle', label: 'Require Subtitles', hint: 'Only accept a source that actually offers your subtitle languages.' },
   { path: 'sources.entries', group: 'sources', kind: 'counted', label: 'Sources', action: 'sources' },
 
   // ------------------------------------------------------------- torrent ---
   { path: 'torrents.enabled', group: 'torrent', kind: 'toggle', label: 'Enable Torrent Sources' },
-  { path: 'torrents.protocols', group: 'torrent', kind: 'select', label: 'Protocols', options: opts(SCRAPER_TORRENT_PROTOCOLS, { magnet: 'Magnet links', 'torrent-file': '.torrent files', both: 'Both' }), hint: 'Stored for a future protocol filter. A result is taken in whichever form the indexer offers it, whatever this says.', inert: true },
   { path: 'torrents.minSeeders', group: 'torrent', kind: 'number', label: 'Minimum Seeders', min: 0, max: 100_000 },
   { path: 'torrents.maxSizeMb', group: 'torrent', kind: 'number', label: 'Maximum Size', min: 0, max: 1_048_576, step: 100, unit: 'MB', hint: '0 means no limit.' },
   { path: 'torrents.preferredReleaseGroups', group: 'torrent', kind: 'tags', label: 'Preferred Release Groups', hint: 'Ordered. Ranked above anything not listed.' },
@@ -285,7 +270,7 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'torrents.resolutionPriority', group: 'torrent', kind: 'tags', label: 'Resolution Priority' },
   { path: 'torrents.preferBatches', group: 'torrent', kind: 'toggle', label: 'Prefer Batch Releases' },
   { path: 'torrents.dedupeByInfoHash', group: 'torrent', kind: 'toggle', label: 'De-duplicate by Info Hash' },
-  { path: 'torrents.verifyInfoHash', group: 'torrent', kind: 'toggle', label: 'Verify Info Hash', hint: 'Stored for a future integrity check. De-duplicate by Info Hash above does compare hashes; nothing yet re-verifies one against the fetched data.', inert: true },
+  { path: 'torrents.verifyInfoHash', group: 'torrent', kind: 'toggle', label: 'Verify Info Hash', hint: 'Drops a result whose info hash is malformed, so a garbled listing never becomes a magnet link qBittorrent cannot add.' },
   { path: 'torrents.extraTrackers', group: 'torrent', kind: 'counted', label: 'Extra Trackers', action: 'trackers', advanced: true },
 
   // --------------------------------------------------------- qbittorrent ---
@@ -319,17 +304,19 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'images.downloadThumbnails', group: 'images', kind: 'toggle', label: 'Download Thumbnails' },
   { path: 'images.downloadPosters', group: 'images', kind: 'toggle', label: 'Download Posters' },
   { path: 'images.downloadBanners', group: 'images', kind: 'toggle', label: 'Download Banners' },
-  { path: 'images.minWidth', toPath: 'images.minHeight', group: 'images', kind: 'range', label: 'Minimum Size', min: 0, max: 7_680, step: 10, unit: 'px', hint: 'Stored for a future downloader. Catalogue providers currently expose URLs without measured pixel dimensions.', inert: true },
+  // v1: Minimum Size, Skip Duplicates by Hash and Naming Template were removed.
+  // They were marked inert because the scraper keeps artwork URLs and never
+  // downloads image bytes, so there was nothing for them to act on.
   { path: 'images.preferredFormat', group: 'images', kind: 'select', label: 'Preferred Format', options: opts(SCRAPER_IMAGE_FORMATS, { original: 'Keep original', webp: 'WebP', jpg: 'JPEG', png: 'PNG' }) },
   { path: 'images.maxPerEntry', group: 'images', kind: 'number', label: 'Max Images Per Entry', min: 0, max: 200 },
-  { path: 'images.skipDuplicatesByHash', group: 'images', kind: 'toggle', label: 'Skip Duplicates by Hash', hint: 'Stored for a future downloader. No image bytes are downloaded or hashed by the scraper yet.', inert: true },
-  { path: 'images.namingTemplate', group: 'images', kind: 'text', label: 'Naming Template', hint: 'Stored for a future downloader. The current scraper returns image URLs and does not write artwork files.', advanced: true, inert: true },
 
   // ------------------------------------------------------------ metadata ---
   { path: 'metadata.providerOrder', group: 'metadata', kind: 'tags', label: 'Provider Order', hint: 'Ordered. The first provider with a value wins. Used only when the Source Manager lists no catalogue source; when it does, its order is the one tried.' },
   { path: 'metadata.titleLanguage', group: 'metadata', kind: 'select', label: 'Title Language', options: opts(SCRAPER_TITLE_LANGUAGES, { romaji: 'Romaji', english: 'English', native: 'Japanese' }) },
   { path: 'metadata.alsoStoreNativeTitle', group: 'metadata', kind: 'toggle', label: 'Also Store Japanese Title', hint: 'Shown as the second line under each result.' },
-  { path: 'metadata.mergeStrategy', group: 'metadata', kind: 'select', label: 'Merge Strategy', options: opts(SCRAPER_MERGE_STRATEGIES, { 'first-wins': 'First provider wins', 'prefer-complete': 'Prefer the most complete', manual: 'Ask me' }), hint: 'Stored for a future multi-provider merge. The search returns as soon as one provider answers, so only ever one record exists and there is nothing to merge.', inert: true },
+  // v1: Merge Strategy (one provider answers, so there is never a second record
+  // to merge) and Fetch Staff and Cast (neither endpoint returns staff) were
+  // removed rather than left marked inert.
   // 2026-08-12: these four were labelled "Fetch". They do not decide what is
   // requested — the AniList query document and the Jikan URL are fixed, and both
   // ask for the full record every time. The toggles run in `toSeriesMetadata`
@@ -343,7 +330,6 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'metadata.fetchAirDates', group: 'metadata', kind: 'toggle', label: 'Store Air Dates', keywords: ['fetch'] },
   { path: 'metadata.fetchRatings', group: 'metadata', kind: 'toggle', label: 'Store Ratings', keywords: ['fetch'] },
   { path: 'metadata.requestScope', group: 'metadata', kind: 'note', label: 'What is requested', hint: 'Each provider is asked for its whole record in a single request, and there is no way to ask it for less. The four toggles above decide what is kept from that answer: turning one off empties the field and drops it from the provenance record, but it does not make the request smaller or keep the provider from seeing what was searched for.', keywords: ['fetch', 'request', 'network', 'privacy', 'bandwidth'] },
-  { path: 'metadata.fetchStaff', group: 'metadata', kind: 'toggle', label: 'Fetch Staff and Cast', advanced: true, hint: 'Stored for a future staff lookup. Neither catalogue endpoint returns staff or cast, and the studio credit is a separate field that is kept whatever this is set to.', inert: true },
   { path: 'metadata.cacheHours', group: 'metadata', kind: 'number', label: 'Metadata Cache', min: 0, max: 8_760, unit: 'h' },
 
   // --------------------------------------------------------------- cache ---
@@ -356,15 +342,12 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
 
   // --------------------------------------------------------- performance ---
   // maxParallelJobs gates job admission and batchSize sets the progress
-  // cadence; the other five have no consumer to wire them to. Re-derived per
-  // field 2026-08-04 — see the `inert` flag's own note.
+  // cadence. Five more fields (parallel downloads, memory budget, CPU ceiling,
+  // browser-context reuse, next-page prefetch) were shown here marked inert;
+  // nothing in the scraper can act on them, so v1 removed the controls. The
+  // values stay in the settings model so stored documents keep parsing.
   { path: 'performance.maxParallelJobs', group: 'performance', kind: 'number', label: 'Parallel Jobs', min: 1, max: 16 },
-  { path: 'performance.maxParallelDownloads', group: 'performance', kind: 'number', label: 'Parallel Downloads', min: 1, max: 32, hint: 'Stored for a future download pool. Parallel Jobs above is the limit that acts; downloads inherit it rather than having their own.', inert: true },
-  { path: 'performance.memoryBudgetMb', group: 'performance', kind: 'number', label: 'Memory Budget', min: 128, max: 32_768, step: 128, unit: 'MB', hint: 'Stored for a future memory ceiling. Nothing measures or caps the scraper’s memory, so raising or lowering this changes nothing.', inert: true },
-  { path: 'performance.cpuThrottlePercent', group: 'performance', kind: 'number', label: 'CPU Ceiling', min: 10, max: 100, unit: '%', hint: 'Stored for a future CPU cap. No work is throttled against it; Parallel Jobs is the only thing that bounds load today.', inert: true },
   { path: 'performance.batchSize', group: 'performance', kind: 'number', label: 'Batch Size', min: 1, max: 500 },
-  { path: 'performance.reuseBrowserContext', group: 'performance', kind: 'toggle', label: 'Reuse Browser Context', hint: 'Stored for a future headless browser. Fetching is done over plain HTTP, so there is no browser context to reuse or discard.', inert: true },
-  { path: 'performance.prefetchNextPage', group: 'performance', kind: 'toggle', label: 'Prefetch Next Page', hint: 'Stored for a future look-ahead. Paged listings are fetched one page at a time, on demand, whatever this is set to.', inert: true },
 
   // ------------------------------------------------------------- logging ---
   // 2026-08-05: was nine fields, EVERY one inert. Five act now, read by
@@ -387,10 +370,11 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
 
   // ---------------------------------------------------------- validation ---
   { path: 'validation.requirePlayableStream', group: 'validation', kind: 'toggle', label: 'Require a Playable Stream' },
-  { path: 'validation.verifyEpisodeCount', group: 'validation', kind: 'toggle', label: 'Verify Episode Count', hint: 'Stored for a future cross-check against the catalogue episode total. Nothing compares the two yet, so On Failure below never fires for this reason.', inert: true },
+  { path: 'validation.verifyEpisodeCount', group: 'validation', kind: 'toggle', label: 'Verify Episode Count', hint: 'For a finished series, checks that the episode list is as long as the catalogue says. A short list counts as a failure for On Failure below.' },
+  // "Reject Duplicate Files" was removed for v1: downloaded files are never hashed,
+  // and duplicate releases are already dropped by info hash under Torrents.
   { path: 'validation.verifySubtitlePresence', group: 'validation', kind: 'toggle', label: 'Verify Subtitles Present' },
   { path: 'validation.rejectPlaceholderTitles', group: 'validation', kind: 'toggle', label: 'Reject Placeholder Titles' },
-  { path: 'validation.rejectDuplicateHashes', group: 'validation', kind: 'toggle', label: 'Reject Duplicate Files', hint: 'Stored for a future content-hash check. Torrent results are already de-duplicated by info hash under Torrents; downloaded files are not hashed.', inert: true },
   { path: 'validation.minEpisodeDurationSec', group: 'validation', kind: 'number', label: 'Minimum Episode Length', min: 0, max: 86_400, unit: 's' },
   { path: 'validation.maxTitleLength', group: 'validation', kind: 'number', label: 'Maximum Title Length', min: 16, max: 512 },
   { path: 'validation.onFailure', group: 'validation', kind: 'select', label: 'On Failure', options: opts(SCRAPER_VALIDATION_FAILURE_MODES, { warn: 'Warn and keep', skip: 'Skip the item', abort: 'Abort the job' }) },
@@ -421,7 +405,8 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'scheduler.missedRunPolicy', group: 'scheduler', kind: 'select', label: 'Missed Runs', options: opts(SCRAPER_MISSED_RUN_POLICIES, { skip: 'Skip them', 'run-once': 'Run once on return', 'run-all': 'Run once after downtime (legacy)' }) },
   { path: 'scheduler.quietHoursStart', toPath: 'scheduler.quietHoursEnd', group: 'scheduler', kind: 'range', label: 'Quiet Hours', hint: 'Leave empty to disable. 24-hour clock.' },
   { path: 'scheduler.requireExternalPower', group: 'scheduler', kind: 'toggle', label: 'Only on External Power' },
-  { path: 'scheduler.requireUnmeteredNetwork', group: 'scheduler', kind: 'toggle', label: 'Only on an Unmetered Network', hint: 'Stored for a future network-cost signal. Electron does not currently expose whether the active Windows connection is metered.', inert: true },
+  // "Only on an Unmetered Network" was removed for v1: Electron exposes no
+  // metered-connection signal, so the control could never act.
 
   // ------------------------------------------------------- notifications ---
   { path: 'notifications.channel', group: 'notifications', kind: 'select', label: 'Deliver Via', options: opts(SCRAPER_NOTIFY_CHANNELS, { toast: 'In-app', system: 'System notifications', both: 'Both', none: 'Nothing' }) },
@@ -434,21 +419,16 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'notifications.digestMinutes', group: 'notifications', kind: 'number', label: 'Group Into a Digest', min: 0, max: 1_440, unit: 'min', hint: '0 delivers each event as it happens.' },
 
   // ----------------------------------------------------------- developer ---
-  { path: 'developer.mockMode', group: 'developer', kind: 'toggle', label: 'Sample Data Mode', hint: 'On, because there is no scraping backend yet. Every figure you see is illustrative.' },
-  // The four below are the diagnostics half of this group and none of them is read.
-  // They are marked rather than removed: they name real, wanted capabilities, and a
-  // control that vanishes is as confusing as one that lies. Unlock Script Console and
-  // Sample Data Mode around them DO act, which is why they carry no marker.
-  { path: 'developer.showRawHtml', group: 'developer', kind: 'toggle', label: 'Show Raw HTML', hint: 'Stored for a future raw-response view. The HTTP Inspector page shows request and response metadata; no surface renders the fetched document.', inert: true },
-  { path: 'developer.showSelectorOverlay', group: 'developer', kind: 'toggle', label: 'Selector Overlay', hint: 'Stored for a future in-page overlay. The Selector Tester matches against an editable HTML fixture rather than a live page, so there is nothing to overlay yet.', inert: true },
-  { path: 'developer.recordNetworkTrace', group: 'developer', kind: 'toggle', label: 'Record Network Trace', hint: 'Stored for a future HAR capture. The Logging group writes scraper log lines; no request/response trace is recorded whatever this is set to.', inert: true },
-  { path: 'developer.verboseTimings', group: 'developer', kind: 'toggle', label: 'Verbose Timings', hint: 'Stored for a future per-stage timing breakdown. Job duration is recorded either way; the per-stage split does not exist yet.', inert: true },
+  { path: 'developer.mockMode', group: 'developer', kind: 'toggle', label: 'Sample Data Mode', hint: 'Shows built-in sample data instead of asking the scraper. Nothing is fetched while it is on, and every figure is illustrative.' },
+  // v1: raw HTML, selector overlay and network trace were shown here marked inert
+  // and are removed (no surface can show them). Verbose Timings is wired: the engine
+  // logs each stage's duration as it closes.
+  { path: 'developer.verboseTimings', group: 'developer', kind: 'toggle', label: 'Verbose Timings', hint: 'Writes how long each stage of a run took to the log as the stage ends. History shows the per-stage split either way.' },
   // The old hint read "Scripts run against live pages", which was never true and
   // is now emphatically not: the console evaluates nothing. This toggle gates
   // the fixed allow-list of read-only inspection commands in ToolPages.tsx's
   // ScriptConsolePage, which is the whole of what that page can do.
   { path: 'developer.allowScriptConsole', group: 'developer', kind: 'toggle', label: 'Unlock Script Console', hint: 'Lets the Script Console run its allow-listed, read-only inspection commands. Nothing you type is executed.', keywords: ['console', 'inspect', 'diagnostics'] },
-  { path: 'developer.pluginIds', group: 'developer', kind: 'tags', label: 'Enabled Plugins', advanced: true },
 ];
 
 /** Reads a dotted path out of a settings object. */

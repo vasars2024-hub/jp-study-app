@@ -392,22 +392,12 @@ export default function FieldRow({
 
   return (
     <div
-      className={`scr-field${highlight ? ' is-highlight' : ''}${field.inert ? ' is-inert' : ''}`}
+      className={`scr-field${highlight ? ' is-highlight' : ''}`}
       data-field-path={field.path}
-      data-inert={field.inert ? 'true' : undefined}
     >
       <div className="scr-field-label">
         <label htmlFor={undefined}>
           {field.label}
-          {/* A control that saves a value but changes no behaviour looked
-              exactly like one that works — audit F5. The badge is the only
-              thing on the row that can tell those apart, so it sits with the
-              label rather than in a tooltip. */}
-          {field.inert && (
-            <span className="scr-field-inert" title={sx('set.inertHint')}>
-              {sx('set.inert')}
-            </span>
-          )}
         </label>
         {field.hint && <p className="scr-field-hint">{field.hint}</p>}
       </div>

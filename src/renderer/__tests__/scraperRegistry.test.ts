@@ -44,6 +44,15 @@ describe('scraper rail', () => {
     }
   });
 
+  it('ships no Plugins page in v1: no rail entry, no route id, no search hit (plan D4)', () => {
+    expect(SCRAPER_NAV.map((p) => p.id)).not.toContain('plugins');
+    expect(SCRAPER_PAGE_IDS as readonly string[]).not.toContain('plugins');
+    expect(SCRAPER_REGISTRY.some((entry) => entry.id === 'plugins' || (entry.pageId as string) === 'plugins')).toBe(false);
+    expect(searchScraper('plugin').some((hit) => (hit.pageId as string) === 'plugins')).toBe(false);
+    expect(Object.keys(SHARED_EN).filter((key) => key.startsWith('scraperMgmt.plugins.') || key === 'scrApp.nav.plugins'))
+      .toEqual([]);
+  });
+
   it('finds a page by id', () => {
     expect(scraperPageMeta('torrents')?.labelKey).toBe('nav.torrents');
     expect(scraperPageMeta('nope' as never)).toBeUndefined();

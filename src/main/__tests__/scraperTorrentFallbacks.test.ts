@@ -30,10 +30,11 @@ vi.mock('../scraper/http', () => ({
 
 const { searchTorrents } = await import('../scraper/torrents');
 
+/** Each short `hash` is padded to a well-formed 40-hex info hash (Verify Info Hash is on by default). */
 function feed(items: { name: string; hash: string; seeders: number }[]): string {
   return `<?xml version="1.0"?><rss xmlns:nyaa="https://nyaa.si/xmlns/nyaa"><channel>${items.map((item) => `
     <item><title>${item.name}</title><guid>${item.hash}</guid>
-      <nyaa:seeders>${item.seeders}</nyaa:seeders><nyaa:infoHash>${item.hash}</nyaa:infoHash>
+      <nyaa:seeders>${item.seeders}</nyaa:seeders><nyaa:infoHash>${item.hash.padEnd(40, '0')}</nyaa:infoHash>
       <nyaa:size>1 GiB</nyaa:size></item>`).join('')}</channel></rss>`;
 }
 

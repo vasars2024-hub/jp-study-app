@@ -22,6 +22,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TorrentManagerPage from '../components/scraper/pages/TorrentManagerPage';
+import { acknowledgeDownloadNotice } from '../components/common/DownloadNotice';
 import { ScraperProvider } from '../components/scraper/ScraperContext';
 import { ScraperPortProvider } from '../components/scraper/data/scraperPort';
 import { SCRAPER_SETTINGS_STORAGE_KEY } from '../scraperSettingsStore';
@@ -141,6 +142,8 @@ beforeEach(() => {
   document.body.appendChild(host);
   searchCalls = 0;
   localStorage.clear();
+  // These tests are about the page after first use; the first-use notice has its own test.
+  acknowledgeDownloadNotice('torrent');
   // The mirror's VirtualList observes its host and jsdom ships no
   // ResizeObserver. `(): void => undefined` rather than `{}` because
   // `no-empty-function` is an ERROR in this config.

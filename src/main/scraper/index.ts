@@ -88,6 +88,7 @@ import {
   runSeanimeAcquisitionAction,
 } from './seanimeAcquisition';
 import { SCRAPER_LOG_MESSAGE } from '../../shared/scraperLogMessages';
+import { mt } from '../i18n';
 
 /**
  * Methods with a real implementation behind them. Anything absent falls back to
@@ -404,9 +405,12 @@ export function registerScraperIpc(): void {
       }
     })();
   });
-  setJobFailedHook(({ jobId, target, message, settings }) => {
+  setJobFailedHook(({ jobId, target, message, code, vars, settings }) => {
+    // A coded failure is told in the UI language (the key the renderer shows
+    // too); an uncoded one keeps main's own sentence.
+    const reason = code ? mt(`scraperFix.ui.err.${code}`, vars) : message;
     notifyScraper('error', settings.notifications, {
-      subject: `${target} — ${message}`,
+      subject: `${target} — ${reason}`,
       count: 0,
       correlationId: jobId,
     });

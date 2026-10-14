@@ -21,6 +21,7 @@ import {
 } from '../../../shared/scraperSettings';
 import { SCRAPER_LOG_MESSAGE } from '../../../shared/scraperLogMessages';
 import { ipcErrorText } from '../../../shared/ipcErrorText';
+import type { QbitSendReport } from '../../../shared/scraperResults';
 
 /** `t()` under a name that does not collide with the `t` loop variables in these pages. */
 export function tr(key: string, vars?: TVars): string {
@@ -122,6 +123,9 @@ const ENGINE_ERRORS: ReadonlyArray<readonly [RegExp, (m: RegExpExecArray) => str
   [/^There is nothing to search for\.$/, () => t('scraperFix.ui.err.nothingToSearch')],
   [/^Nothing in the catalogue matches "(.*)"\.$/, (m) => t('scraperFix.ui.err.noCatalogueMatch', { query: m[1] })],
   [/^(\S+) acquisition is not connected to a catalogue provider yet\.$/, (m) => t('scraperFix.ui.err.contentType', { type: m[1] })],
+  // The current sentence; the one above is kept for history written by older builds.
+  [/^Only anime can be scraped; this is a (\S+) title\.$/, (m) => t('scraperFix.ui.err.contentType', { type: m[1] })],
+  [/^Episode list is short: (\d+) of (\d+)\.$/, (m) => t('scraperFix.ui.err.episodeCountShort', { found: m[1], expected: m[2] })],
   [/^Seanime auto-downloader is disabled\.$/, () => t('scraperFix.ui.err.autoDownloaderOff')],
 ];
 
@@ -150,8 +154,18 @@ function localizePageFailures(list: string): string {
   return t('scr2.note.pagesFailed', { list: joined });
 }
 
+const NOTE_PARTIAL = /Partial episode list: page (\d+) of the catalogue failed to load\./;
+const NOTE_SHORT = /Episode list is short: (\d+) of (\d+)\./;
+const NOTE_INDEX = /(\d+) index result\(s\)\./;
+const NOTE_STREAMS = /(\d+) playable stream\(s\)\./;
+
 export function localizeScraperJobNote(note: string): string {
   let text = note.replace(NOTE_RULE_CHECKS, () => t('scraperFix.ui.note.ruleChecks'));
+  text = text.replace(NOTE_PARTIAL, (_all, page: string) => t('scraperFix.ui.note.partialList', { page }));
+  text = text.replace(NOTE_SHORT, (_all, found: string, expected: string) =>
+    t('scraperFix.ui.err.episodeCountShort', { found, expected }));
+  text = text.replace(NOTE_INDEX, (_all, n: string) => t('scraperFix.ui.note.indexResults', { count: Number(n) }));
+  text = text.replace(NOTE_STREAMS, (_all, n: string) => t('scraperFix.ui.note.streams', { count: Number(n) }));
   text = text.replace(NOTE_PAGES, (_all, list: string) => localizePageFailures(list));
   text = text.replace(NOTE_MISSING, (_all, list: string, more?: string) =>
     more
@@ -160,15 +174,80 @@ export function localizeScraperJobNote(note: string): string {
   return text;
 }
 
+/** `t()` that falls back to `english` when the key is unknown to this build. */
+function tOr(key: string, english: string, vars?: TVars): string {
+  const text = t(key, vars);
+  return text === key ? english : text;
+}
+
+type SendDetail = QbitSendReport['details'][number];
+
+function isCodedFailure(value: unknown): value is { message: string; code: string; vars?: TVars } {
+  return typeof value === 'object' && value !== null
+    && typeof (value as { code?: unknown }).code === 'string'
+    && typeof (value as { message?: unknown }).message === 'string';
+}
+
+/** "Sent" / "Skipped" / "Failed" for one row of a qBittorrent send report. */
+export function qbitSendOutcomeText(outcome: SendDetail['outcome']): string {
+  return t(`scraperFix.send.outcome.${outcome}`);
+}
+
+/**
+ * Why one row of a send report was not sent, in the UI language. Main writes an
+ * English `reason` for its log and a `reasonCode` beside it: `torrentFile.*`
+ * (a .torrent file that did not parse), `send.*` (the add itself) or `qbit.*`
+ * (a login or transport failure, the same codes as the connection test). A
+ * report without a code, from an older main, keeps its English.
+ */
+export function qbitSendReasonText(detail: Pick<SendDetail, 'reason' | 'reasonCode' | 'reasonVars'>): string {
+  const code = detail.reasonCode ?? '';
+  const vars = detail.reasonVars;
+  if (code.startsWith('torrentFile.')) return tOr(`scr2.torrentFile.${code.slice('torrentFile.'.length)}`, detail.reason, vars);
+  if (code.startsWith('send.')) return tOr(`scraperFix.send.${code.slice('send.'.length)}`, detail.reason, vars);
+  if (code.startsWith('qbit.')) return tOr(`scraperFix.qbit.${code.slice('qbit.'.length)}`, detail.reason, vars);
+  return detail.reason;
+}
+
+/**
+ * A validation note on an episode row (`EpisodeRow.statusNote`). The engine
+ * joins fixed English sentences (`validateRows`); each is translated in place.
+ */
+const ROW_PROBLEMS: ReadonlyArray<readonly [string, string]> = [
+  ['Placeholder title.', 'scraperFix.ui.problem.placeholderTitle'],
+  ['Title is longer than the limit.', 'scraperFix.ui.problem.titleTooLong'],
+  ['Shorter than the minimum episode duration.', 'scraperFix.ui.problem.tooShort'],
+  ['No subtitles found.', 'scraperFix.ui.problem.noSubtitles'],
+  ['No playable link.', 'scraperFix.ui.problem.noLink'],
+];
+
+export function localizeScraperRowNote(note: string): string {
+  let text = note;
+  for (const [english, key] of ROW_PROBLEMS) text = text.split(english).join(t(key));
+  return text;
+}
+
+const SITE_RULE_PROVIDER = /^Site rule · (.+)$/;
+
+/** A job's provider label. Catalogue names are names; the site-rule label is a sentence. */
+export function localizeScraperProvider(provider: string): string {
+  const rule = SITE_RULE_PROVIDER.exec(provider);
+  return rule ? t('scraperFix.ui.provider.siteRule', { host: rule[1] }) : provider;
+}
+
 /**
  * Any scraper failure as one line a user can read: Electron's
  * "Error invoking remote method '...': Error: " wrapper is stripped first (it
  * names an IPC channel, which nobody can act on), then known engine sentences
- * are translated. A job's `error` event carries a plain string and goes through
- * the same path.
+ * are translated. A job's `error` event goes through the same path, coded or not.
  */
 export function scraperErrorText(error: unknown): string {
   if (error === null || error === undefined || error === '') return t('scraperFix.ui.err.unknown');
+  // A job's coded `error` event (`ScraperJobError` in main): shown from its key,
+  // so main's English sentence never reaches the screen.
+  if (isCodedFailure(error)) {
+    return tOr(`scraperFix.ui.err.${error.code}`, scraperErrorText(error.message), error.vars);
+  }
   const text = ipcErrorText(error);
   for (const [pattern, render] of ENGINE_ERRORS) {
     const match = pattern.exec(text);

@@ -49,3 +49,47 @@ describe('coded scraper messages from main', () => {
     }
   });
 });
+
+describe('v1: scraper text main writes in English reaches the screen translated', () => {
+  it('names every send-report reason code main can write, in all four languages', async () => {
+    const qbitSource = (await import('node:fs')).readFileSync(
+      (await import('node:path')).join(__dirname, '..', '..', 'main', 'scraper', 'qbittorrent.ts'),
+      'utf8',
+    );
+    const codes = [...qbitSource.matchAll(/reasonCode: '(send\.[a-zA-Z]+)'/g)].map((m) => m[1]);
+    expect(codes.length).toBeGreaterThanOrEqual(7);
+    for (const code of new Set(codes)) {
+      const key = `scraperFix.${code}`;
+      for (const catalog of [SCRAPER_FIX_EN, SCRAPER_FIX_JA, SCRAPER_FIX_ZH, SCRAPER_FIX_RU]) {
+        expect(catalog[key], key).toBeTruthy();
+      }
+    }
+  });
+
+  it('has a key for every job failure code the engine throws', async () => {
+    const engine = (await import('node:fs')).readFileSync(
+      (await import('node:path')).join(__dirname, '..', '..', 'main', 'scraper', 'engine.ts'),
+      'utf8',
+    );
+    const codes = [...engine.matchAll(/new ScraperJobError\(\s*'([a-zA-Z]+)'/g)].map((m) => m[1]);
+    codes.push('validationFailed');
+    expect(codes.length).toBeGreaterThanOrEqual(7);
+    for (const code of codes) {
+      for (const catalog of [SCRAPER_FIX_EN, SCRAPER_FIX_JA, SCRAPER_FIX_ZH, SCRAPER_FIX_RU]) {
+        expect(catalog[`scraperFix.ui.err.${code}`], code).toBeTruthy();
+      }
+    }
+  });
+
+  it('no ja/zh/ru value among the new keys is left in English', () => {
+    const fresh = Object.keys(SCRAPER_FIX_EN).filter((key) =>
+      key.startsWith('scraperFix.send.') || key.startsWith('scraperFix.ui.problem.')
+      || key.startsWith('scraperFix.ui.subs.') || key.startsWith('scraperFix.ui.note.'));
+    expect(fresh.length).toBeGreaterThan(15);
+    for (const key of fresh) {
+      for (const catalog of [SCRAPER_FIX_JA, SCRAPER_FIX_ZH, SCRAPER_FIX_RU]) {
+        expect(JSON.stringify(catalog[key]), key).not.toBe(JSON.stringify(SCRAPER_FIX_EN[key]));
+      }
+    }
+  });
+});

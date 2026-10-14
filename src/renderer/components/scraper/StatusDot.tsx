@@ -1,9 +1,10 @@
-// Build-status indicator. Red / yellow / green, but never colour alone:
+// Build-status indicator, shown only with "Advanced / developer tools" on. Red / yellow / green, but never colour alone:
 // the glyph differs per state (hollow ring / half-filled / solid + tick) so
 // the meaning survives greyscale, colour-blindness and a themed accent.
 
 import { statusOf, type FeatureStatus } from './featureStatus';
 import { sx } from './strings';
+import { useScraperDeveloperView } from './ScraperContext';
 
 const LABEL: Record<FeatureStatus, 'build.shell' | 'build.untested' | 'build.ready'> = {
   shell: 'build.shell',
@@ -39,6 +40,9 @@ export default function StatusDot({
   showLabel?: boolean;
   className?: string;
 }) {
+  // A developer readout: hidden unless "Advanced / developer tools" is on.
+  const developerView = useScraperDeveloperView();
+  if (!developerView) return null;
   const resolved: FeatureStatus = status ?? statusOf(id ?? '');
   const label = statusLabel(resolved);
   const hint = statusHint(resolved);

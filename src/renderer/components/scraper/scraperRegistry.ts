@@ -114,14 +114,6 @@ export const SCRAPER_REGISTRY: ScraperRegistryEntry[] = [
     group: 'Scraper',
   },
   {
-    id: 'plugins',
-    titleKey: 'nav.plugins',
-    descKey: 'nav.plugins.desc',
-    keywords: ['plugin', 'adapter', 'extension', 'provider', 'permissions'],
-    pageId: 'plugins',
-    group: 'Scraper',
-  },
-  {
     id: 'results',
     titleKey: 'nav.results',
     descKey: 'nav.results.desc',

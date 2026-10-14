@@ -1,7 +1,8 @@
 // The small badges in the table's Type / Language / Resolution columns, and
 // the subtitle-availability indicator beside them.
 
-import { bestSubtitle, type SubtitleAvailability } from '../../../../shared/scraperResults';
+import type { SubtitleAvailability } from '../../../../shared/scraperResults';
+import { tr } from '../localize';
 
 export function Pill({
   children,
@@ -33,18 +34,22 @@ export function SubtitleBadge({
 }) {
   if (!subtitles.length) {
     return (
-      <Pill tone="bad" title="No subtitles found for this episode.">
-        none
+      <Pill tone="bad" title={tr('scraperFix.ui.subs.noneTitle')}>
+        {tr('scraperFix.ui.subs.none')}
       </Pill>
     );
   }
 
-  const best = bestSubtitle(subtitles, languagePriority);
-  const preferred = languagePriority[0];
+  const preferred = languagePriority[0] ?? '';
   const hasPreferred = subtitles.some((s) => s.language === preferred);
   const languages = subtitles.map((s) => s.language.toUpperCase()).join(', ');
+  // Language and container codes ("JA ASS") are codes, not words; only the
+  // "(embedded)" qualifier and the sentence around them are translated.
   const detail = subtitles
-    .map((s) => `${s.language.toUpperCase()} ${s.format.toUpperCase()}${s.embedded ? ' (embedded)' : ''}`)
+    .map((s) => {
+      const track = `${s.language.toUpperCase()} ${s.format.toUpperCase()}`;
+      return s.embedded ? tr('scraperFix.ui.subs.embedded', { track }) : track;
+    })
     .join(' · ');
 
   return (
@@ -53,11 +58,10 @@ export function SubtitleBadge({
       title={
         hasPreferred
           ? detail
-          : `${detail} — nothing in your preferred language (${preferred.toUpperCase()}).`
+          : tr('scraperFix.ui.subs.notPreferred', { detail, lang: preferred.toUpperCase() })
       }
     >
       {languages}
-      {best && subtitles.length > 1 ? '' : ''}
     </Pill>
   );
 }

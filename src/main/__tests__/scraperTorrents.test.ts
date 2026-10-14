@@ -260,6 +260,25 @@ describe('applyTorrentPreferences', () => {
     expect(out.filter((r) => r.infoHash === '')).toHaveLength(1);
   });
 
+  it('Verify Info Hash drops a malformed hash, keeps good and hashless rows, and does nothing when off', () => {
+    const mixed = [
+      ...rows,
+      { ...rows[0], id: 'garbled', infoHash: 'not-a-hash' },
+      { ...rows[0], id: 'short', infoHash: 'aa11bb22' },
+      { ...rows[0], id: 'v2', infoHash: 'ab'.repeat(32) },
+      { ...rows[0], id: 'none', infoHash: '' },
+    ];
+    const on = applyTorrentPreferences(mixed, settings({ minSeeders: 0, dedupeByInfoHash: false, verifyInfoHash: true }), { text: '' });
+    const ids = on.map((r) => r.id);
+    expect(ids).not.toContain('garbled');
+    expect(ids).not.toContain('short');
+    expect(ids).toContain('v2');
+    expect(ids).toContain('none');
+    expect(ids).toEqual(expect.arrayContaining(rows.map((r) => r.id)));
+    const off = applyTorrentPreferences(mixed, settings({ minSeeders: 0, dedupeByInfoHash: false, verifyInfoHash: false }), { text: '' });
+    expect(off.map((r) => r.id)).toEqual(expect.arrayContaining(['garbled', 'short']));
+  });
+
   it('requires a subtitle language when the profile asks for one', () => {
     const out = applyTorrentPreferences(
       rows,

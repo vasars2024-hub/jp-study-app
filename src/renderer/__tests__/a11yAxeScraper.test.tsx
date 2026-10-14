@@ -17,7 +17,7 @@ import DiscoverPage from '../components/scraper/pages/DiscoverPage';
 import SourceManagerPage from '../components/scraper/pages/SourceManagerPage';
 import TorrentManagerPage from '../components/scraper/pages/TorrentManagerPage';
 import { DownloadsPage, ExportsPage, HistoryPage, ResultsPage } from '../components/scraper/pages/DataPages';
-import { PluginsPage, ProfilesPage, ScheduledPage, SiteRulesPage } from '../components/scraper/pages/ManagementPages';
+import { ProfilesPage, ScheduledPage, SiteRulesPage } from '../components/scraper/pages/ManagementPages';
 import {
   HttpInspectorPage,
   RegexTesterPage,
@@ -39,7 +39,6 @@ const PAGES: ReadonlyArray<readonly [string, ComponentType]> = [
   ['profiles', ProfilesPage],
   ['scheduled', ScheduledPage],
   ['site-rules', SiteRulesPage],
-  ['plugins', PluginsPage],
   ['results', ResultsPage],
   ['downloads', DownloadsPage],
   ['exports', ExportsPage],

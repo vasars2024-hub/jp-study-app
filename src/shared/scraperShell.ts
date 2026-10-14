@@ -22,7 +22,6 @@ export type ScraperPageId =
   | 'profiles'
   | 'scheduled'
   | 'site-rules'
-  | 'plugins'
   | 'results'
   | 'downloads'
   | 'exports'
@@ -41,7 +40,6 @@ export const SCRAPER_PAGE_IDS: ScraperPageId[] = [
   'profiles',
   'scheduled',
   'site-rules',
-  'plugins',
   'results',
   'downloads',
   'exports',

@@ -115,7 +115,8 @@ function createScrapeRunTracker(port: ScraperPort): ScrapeRunTracker {
           break;
         case 'error':
           patchRun({ stage: 'failed' });
-          set({ error: event.message });
+          // Coded failures keep their code so the page can say it in the UI language.
+          set({ error: event.code ? { message: event.message, code: event.code, vars: event.vars } : event.message });
           publishJobStatus({ active: false });
           break;
       }

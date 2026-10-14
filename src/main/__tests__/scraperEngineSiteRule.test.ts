@@ -297,6 +297,27 @@ describe('buildRuleRows', () => {
     );
     expect(rows.map((row) => row.number)).toEqual([1, 3]);
   });
+
+  it('reads the resolution off the page, and leaves it blank rather than echo the preference', () => {
+    const prefers = settings();
+    prefers.episodeProcessing.resolutionPriority = [1080];
+    const rows = buildRuleRows(
+      {
+        rows: [
+          { index: 1, number: 1, title: 'Episode 1 [720p]', link: 'https://x/1', rawLink: '/1' },
+          { index: 2, number: 2, title: 'Episode 2', link: 'https://x/ep2-2160p', rawLink: '/ep2-2160p' },
+          { index: 3, number: 3, title: 'Episode 3', link: 'https://x/3', rawLink: '/3' },
+        ],
+        checks: [],
+        ok: true,
+        error: '',
+      },
+      rule(),
+      prefers,
+      'series-1',
+    );
+    expect(rows.map((row) => row.resolution)).toEqual(['720p', '2160p', '']);
+  });
 });
 
 // Regression: the series id used the search-query slug, so a real Wikipedia URL

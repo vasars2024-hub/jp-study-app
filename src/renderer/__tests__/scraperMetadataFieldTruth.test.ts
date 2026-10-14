@@ -6,9 +6,9 @@ import { SCRAPER_FIELDS } from '../components/scraper/settings/fields';
 describe('Scraper Metadata settings truthfulness', () => {
   const metadataFields = SCRAPER_FIELDS.filter((field) => field.group === 'metadata');
 
-  it('keeps the eight runtime-backed controls active', () => {
+  it('offers exactly the eight runtime-backed controls', () => {
     expect(
-      metadataFields.filter((field) => field.kind !== 'note' && !field.inert).map((field) => field.path),
+      metadataFields.filter((field) => field.kind !== 'note').map((field) => field.path),
     ).toEqual([
       'metadata.providerOrder',
       'metadata.titleLanguage',
@@ -21,15 +21,14 @@ describe('Scraper Metadata settings truthfulness', () => {
     ]);
   });
 
-  it('marks the two controls with no consumer as inert', () => {
+  it('does not offer the two controls with no consumer (removed for v1)', () => {
     // `mergeStrategy`: `searchCatalogue` returns on the first provider that
     // answers, so a second record never exists. `fetchStaff`: neither endpoint
     // returns staff or cast, and `toSeriesMetadata` deliberately does not read
     // it rather than gating the unrelated studio credit on it.
-    expect(metadataFields.filter((field) => field.inert).map((field) => field.path)).toEqual([
-      'metadata.mergeStrategy',
-      'metadata.fetchStaff',
-    ]);
+    const paths = metadataFields.map((field) => field.path);
+    expect(paths).not.toContain('metadata.mergeStrategy');
+    expect(paths).not.toContain('metadata.fetchStaff');
   });
 
   it('does not call a projection toggle a fetch', () => {

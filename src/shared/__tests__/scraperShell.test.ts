@@ -66,7 +66,7 @@ describe('scraper shell state', () => {
         'exports',
         'downloads',
         'results',
-        'plugins',
+        'downloads',
         'profiles',
         'sources',
         'torrents',
@@ -96,6 +96,12 @@ describe('scraper shell state', () => {
     );
   });
 
+  it('drops the Plugins page, which v1 does not ship, from a stored state', () => {
+    const { value } = normalizeScraperShellState({ page: 'plugins', recentPages: ['plugins', 'history'] });
+    expect(value.page).toBe(DEFAULT_SCRAPER_SHELL_STATE.page);
+    expect(value.recentPages).toEqual(['history']);
+  });
+
   describe('pushRecentScraperPage', () => {
     it('moves a revisited page to the front instead of duplicating it', () => {
       expect(pushRecentScraperPage(['history', 'exports'], 'exports')).toEqual([
@@ -114,12 +120,12 @@ describe('scraper shell state', () => {
         'torrents',
         'profiles',
         'scheduled',
-        'plugins',
+        'site-rules',
       ] as const) {
         recent = pushRecentScraperPage(recent, page);
       }
       expect(recent).toHaveLength(8);
-      expect(recent[0]).toBe('plugins');
+      expect(recent[0]).toBe('site-rules');
       expect(recent).not.toContain('dashboard');
     });
   });

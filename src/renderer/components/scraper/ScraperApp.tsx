@@ -38,7 +38,6 @@ import SourceManagerPage from './pages/SourceManagerPage';
 import TorrentManagerPage from './pages/TorrentManagerPage';
 import { DownloadsPage, ExportsPage, HistoryPage, ResultsPage } from './pages/DataPages';
 import {
-  PluginsPage,
   ProfilesPage,
   ScheduledPage,
   SiteRulesPage,
@@ -372,8 +371,6 @@ export default function ScraperApp() {
         return <ScheduledPage />;
       case 'site-rules':
         return <SiteRulesPage />;
-      case 'plugins':
-        return <PluginsPage />;
       case 'results':
         return <ResultsPage />;
       case 'downloads':

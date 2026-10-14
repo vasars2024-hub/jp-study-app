@@ -77,8 +77,6 @@ const TEXT = {
   'nav.scheduled.desc': 'Recurring scrapes and update checks',
   'nav.siteRules': 'Site Rules',
   'nav.siteRules.desc': 'Per-site extraction rules and overrides',
-  'nav.plugins': 'Plugins',
-  'nav.plugins.desc': 'Provider adapters and their permissions',
   'nav.results': 'Results',
   'nav.results.desc': 'Everything scraped so far, grouped by series',
   'nav.downloads': 'Downloads',
@@ -114,7 +112,7 @@ const TEXT = {
   'build.untested': 'Built, untested',
   'build.ready': 'Tested and working',
   'build.shellHint': 'The screen exists and is populated with sample data. Nothing behind it works yet.',
-  'build.untestedHint': 'Implemented, but not yet verified end to end.',
+  'build.untestedHint': 'Implemented and tested, but not verified end to end.',
   'build.readyHint': 'Implemented and verified.',
   'build.legend': 'Legend',
   'build.filterAll': 'All',
@@ -513,8 +511,6 @@ const TEXT = {
   // Why the runner is not firing anything right now. One per `heldBy` value in
   // shared/scraperCron.ts; 'nothing-due' reads as Armed because from the user's
   // side an armed scheduler with no slot due is not being held by anything.
-  'set.inert': 'Not wired',
-  'set.inertHint': 'This setting is saved, but nothing reads it yet — changing it will not change how the scraper behaves.',
   'sched.held.armed': 'Armed',
   'sched.held.disabled': 'Scheduler off',
   'sched.held.quietHours': 'Held — quiet hours',

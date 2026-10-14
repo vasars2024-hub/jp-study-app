@@ -261,12 +261,33 @@ export interface ScrapePageFailure {
   detail?: string;
 }
 
+/**
+ * Why a scrape job failed, as a code the renderer maps to `scraperFix.ui.err.<code>`.
+ * A failure without one (a transport error, an unexpected throw) keeps its message.
+ */
+export type ScraperJobErrorCode =
+  | 'httpStatus'
+  | 'ruleNoMatch'
+  | 'ruleInvalid'
+  | 'validationFailed'
+  | 'nothingToSearch'
+  | 'noCatalogueMatch'
+  | 'contentType'
+  | 'episodeCountShort';
+
 export type ScrapeJobEvent =
   | { kind: 'stage'; stage: ScrapeStage }
   | { kind: 'progress'; done: number; total: number; etaSec: number }
   | { kind: 'log'; line: LogLine }
   | { kind: 'row'; row: EpisodeRow }
-  | { kind: 'error'; message: string }
+  | {
+      kind: 'error';
+      /** English, for the log and for older readers. The UI shows `code` when there is one. */
+      message: string;
+      /** Language-neutral failure code (`ScraperJobErrorCode`); the renderer translates it. */
+      code?: ScraperJobErrorCode;
+      vars?: Record<string, string | number>;
+    }
   | { kind: 'done'; summary: ScrapeJobSummary };
 
 export interface ScrapeRequest {
@@ -402,8 +423,13 @@ export interface QbitSendReport {
     name: string;
     outcome: 'sent' | 'skipped' | 'failed';
     reason: string;
-    /** Language-neutral code for `reason` where one exists (`torrentFile.<problem>`); the renderer translates it. */
+    /**
+     * Language-neutral code for `reason`; the renderer translates it
+     * (`qbitSendReasonText`). `torrentFile.<problem>`, `send.<why>`, or
+     * `qbit.<QbitMessageCode>` for a login/transport failure. `reason` stays English.
+     */
     reasonCode?: string;
+    reasonVars?: Record<string, string | number>;
   }[];
 }
 

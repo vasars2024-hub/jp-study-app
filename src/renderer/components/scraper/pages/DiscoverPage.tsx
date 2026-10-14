@@ -28,6 +28,7 @@ import { scraperErrorText } from '../localize';
 import { scraperArtwork } from '../artwork';
 import { discoveryCandidateId } from '../../../../shared/mediaDiscovery';
 import AiringSchedulePanel from './AiringSchedulePanel';
+import { useDownloadNoticeGate } from '../../common/DownloadNotice';
 
 /** How many shortlisted titles the shelf shows before the count pill takes over. */
 const SHELF_LIMIT = 3;
@@ -38,6 +39,8 @@ export default function DiscoverPage() {
   const state = useDiscovery();
   const selected = state.selected;
   const [notice, setNotice] = useState('');
+  // Queueing a scrape is the scraper's first use too; the notice comes first.
+  const torrentNotice = useDownloadNoticeGate('torrent');
   const selectedIsPlanned = selected
     ? state.shortlistIds.has(discoveryCandidateId(selected.candidate))
     : false;
@@ -81,6 +84,7 @@ export default function DiscoverPage() {
 
   return (
     <div className="scr-page scr-page--discover">
+      {torrentNotice.element}
       <header className="scr-page-head">
         <div>
           <h1 className="scr-page-title">
@@ -115,7 +119,7 @@ export default function DiscoverPage() {
             variant="primary"
             disabled={!selected}
             leftIcon={<Icon name="sparkle" size={14} />}
-            onClick={() => void queue('scrape')}
+            onClick={() => torrentNotice.gate(() => void queue('scrape'))}
           >
             {sx('discover.queueScrape')}
           </Button>

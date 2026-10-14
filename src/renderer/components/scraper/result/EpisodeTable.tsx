@@ -11,7 +11,7 @@ import Icon from '../../Icons';
 import { scraperArtwork } from '../artwork';
 import { Pill, SubtitleBadge } from './Pill';
 import { columnLabel, gridTemplate, minTrackWidth, type ScraperColumn } from './columns';
-import { episodeKindText, episodeStatusText, tr } from '../localize';
+import { episodeKindText, episodeStatusText, localizeScraperRowNote, tr } from '../localize';
 import { formatBytes } from '../../../../shared/assetRegistry';
 import { formatDuration } from '../../../stats';
 import type { EpisodeRow } from '../../../../shared/scraperResults';
@@ -73,7 +73,7 @@ function cellContent(
       return (
         <Pill
           tone={row.status === 'ok' ? 'good' : row.status === 'warning' ? 'warn' : 'bad'}
-          title={row.statusNote || undefined}
+          title={row.statusNote ? localizeScraperRowNote(row.statusNote) : undefined}
         >
           {episodeStatusText(row.status)}
         </Pill>

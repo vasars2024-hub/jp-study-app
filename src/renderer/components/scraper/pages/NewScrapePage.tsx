@@ -47,6 +47,7 @@ import {
 } from '../../../scraperSettingsStore';
 import { formatBytes } from '../../../../shared/assetRegistry';
 import { scraperArtwork } from '../artwork';
+import { useDownloadNoticeGate } from '../../common/DownloadNotice';
 
 /** One key per stage, so a new stage is a compile error here rather than an untranslated label. */
 const STAGE_LABEL_KEY = {
@@ -132,7 +133,10 @@ export default function NewScrapePage() {
     startMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
   }, [startOpen]);
 
-  const start = useCallback(async () => {
+  // The first scrape on an install waits for the torrent notice (who can see
+  // your IP, whose laws apply); after "I understand" it never shows again.
+  const torrentNotice = useDownloadNoticeGate('torrent');
+  const runScrape = useCallback(async () => {
     setSelected(new Set());
     setPreviewRow(null);
     setActionNotice('');
@@ -145,6 +149,12 @@ export default function NewScrapePage() {
       profileId: current.activeProfileId,
     });
   }, [ctl.targetUrl, tracker]);
+  const { gate: gateTorrentNotice } = torrentNotice;
+  const start = useCallback(async () => {
+    gateTorrentNotice(() => {
+      void runScrape();
+    });
+  }, [gateTorrentNotice, runScrape]);
 
   const cancel = useCallback(() => tracker.cancel(), [tracker]);
 
@@ -265,6 +275,7 @@ export default function NewScrapePage() {
 
   return (
     <div className="scr-page scr-page--scrape">
+      {torrentNotice.element}
       <header className="scr-page-head">
         <div>
           <h1 className="scr-page-title">

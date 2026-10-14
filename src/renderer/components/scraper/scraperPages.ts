@@ -72,13 +72,10 @@ export const SCRAPER_NAV: ScraperNavPage[] = [
     icon: 'file-text',
     group: 'Scraper',
   },
-  {
-    id: 'plugins',
-    labelKey: 'nav.plugins',
-    descKey: 'nav.plugins.desc',
-    icon: 'widgets',
-    group: 'Scraper',
-  },
+  // 'plugins' sat here until v1. The page drew adapter cards, switches and an
+  // update centre for a plugin system the engine never loads, so every control
+  // on it was disabled under a "not ready yet" banner. A placeholder is not a
+  // feature: the page, its route and its strings are gone (plan D4).
 
   // ---- Data ----
   {

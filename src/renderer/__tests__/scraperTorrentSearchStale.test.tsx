@@ -10,6 +10,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TorrentManagerPage from '../components/scraper/pages/TorrentManagerPage';
+import { acknowledgeDownloadNotice } from '../components/common/DownloadNotice';
 import { ScraperProvider } from '../components/scraper/ScraperContext';
 import { ScraperPortProvider, type ScraperPort, type TorrentQuery } from '../components/scraper/data/scraperPort';
 import { SCRAPER_SETTINGS_STORAGE_KEY } from '../scraperSettingsStore';
@@ -109,6 +110,8 @@ beforeEach(() => {
   document.body.appendChild(host);
   calls = [];
   localStorage.clear();
+  // These tests are about the page after first use; the first-use notice has its own test.
+  acknowledgeDownloadNotice('torrent');
   const noop = (): void => undefined;
   (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
     observe = noop;

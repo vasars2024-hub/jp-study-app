@@ -111,8 +111,8 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // titled, linked and numbered) and consumed by the engine, which is covered
   // end to end against a local server in scraperEngineSiteRule.test.ts.
   'page.site-rules': 'ready',
-  // Verified live: manifests read off disk, including a deliberately broken one.
-  'page.plugins': 'ready',
+  // 'page.plugins' was removed for v1 with the page itself (plan D4): it drew a
+  // plugin system the engine never loads.
   // Verified live: the library lists stored job results. Re-verified 2026-07-29
   // at the Phase 4 gate, which is where the per-job id bug surfaced — repeat
   // runs of one series read "500% catalogue coverage · 140 / 28". Fixed in
@@ -346,17 +346,13 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // all seven switches off and on. The enabled run skipped a hidden template,
   // decoded entities, removed zero-width text, normalized episode titles,
   // detected seasons 2/3 and OVA/Special kinds, and removed the repeated S2E1.
-  // The five generic-extractor fields above remain explicitly inert.
+  // v1: the five generic-extractor fields were removed from the drawer.
   'set.extraction': 'ready',
   // providerOrder picks which catalogue is asked first; titleLanguage,
   // alsoStoreNativeTitle, fetchSynopsis/Genres/Ratings/AirDates shape the result;
-  // cacheHours is the metadata cache's own lifetime. Inert: mergeStrategy (only
-  // one provider ever answers) and fetchStaff (nothing here fetches staff).
-  //
-  // 2026-08-12: both inert fields now carry `inert: true` in fields.ts, so the
-  // drawer marks them. They were documented as inert here since the group was
-  // first censused while still rendering exactly like the wired controls — the
-  // F5 defect, in the one group whose own comment already named it.
+  // cacheHours is the metadata cache's own lifetime. mergeStrategy (only one
+  // provider ever answers) and fetchStaff (nothing here fetches staff) were
+  // inert and were removed from the drawer for v1.
   //
   // The four projection toggles were also relabelled "Fetch X" -> "Store X".
   // They never governed the request: `searchAnilist` sends a fixed GraphQL
@@ -424,10 +420,9 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   //
   // Two things this dot deliberately does not claim.
   //
-  // `session.sessionLabel` is **inert** — the one control here that does nothing.
-  // `sessionStateFrom` copies it to `ScraperSessionState.label` and nothing reads
-  // that field; session.ts calling it "only for the log line" describes a log
-  // line that does not exist.
+  // `session.sessionLabel` was inert — `sessionStateFrom` copies it to
+  // `ScraperSessionState.label` and nothing reads that field — so v1 removed the
+  // control from the drawer.
   //
   // Pacing does not reach redirect hops, and that is measured rather than
   // inferred: a four-hop 302 chain ran 1-2ms apart under `crawlDelayMs: 2000`.
@@ -441,18 +436,17 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   'set.antibot': 'ready',
   // The three Download switches decide whether the run collects that image at
   // all, which is what causes the only fetch there is; maxPerEntry caps the list
-  // and preferredFormat picks among published variants. Inert, and named as such
-  // in `imageSet.ts`: minWidth/minHeight (a catalogue publishes a URL, not a
-  // pixel size), skipDuplicatesByHash (there are no bytes to hash) and
-  // namingTemplate (it names files nothing writes).
+  // and preferredFormat picks among published variants. minWidth/minHeight,
+  // skipDuplicatesByHash and namingTemplate had nothing to act on (see
+  // `imageSet.ts`) and were removed from the drawer for v1.
   'set.images': 'untested',
   // Deterministic acceptance 2026-08-12: enabled/entries, quiet hours,
   // concurrency, skip-if-running, missed-run coalescing and external-power
   // holds all reach `main/scraper/scheduler.ts`; records survive a runner
   // restart, terminal events release slots, and manual schedule starts enter
   // the notification lane. Cron arithmetic is shared with the Scheduled Tasks
-  // screen. `requireUnmeteredNetwork` is the one inert field and is marked as
-  // such in the drawer because Electron exposes no metered-network signal.
+  // screen. `requireUnmeteredNetwork` was removed from the drawer for v1:
+  // Electron exposes no metered-network signal for it to read.
   // The legacy `run-all` value is truthfully labelled as the coalesced
   // run-once behavior the runtime has always provided.
   'set.scheduler': 'ready',

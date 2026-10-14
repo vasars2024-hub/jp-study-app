@@ -13,6 +13,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SCRAPER_SHELL_STATE } from '../../shared/scraperShell';
 import NewScrapePage from '../components/scraper/pages/NewScrapePage';
+import { acknowledgeDownloadNotice } from '../components/common/DownloadNotice';
 import { ScraperProvider } from '../components/scraper/ScraperContext';
 import { ScraperPortProvider, type ScraperPort } from '../components/scraper/data/scraperPort';
 import { scrapeRunTrackerFor } from '../components/scraper/data/scrapeRunTracker';
@@ -123,6 +124,8 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.appendChild(host);
   localStorage.clear();
+  // These tests are about the page after first use; the first-use notice has its own test.
+  acknowledgeDownloadNotice('torrent');
   const noop = (): void => undefined;
   (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
     observe = noop;

@@ -1,5 +1,5 @@
 // Dashboard — what is running, what ran, how the sources are holding up, and
-// (importantly, while this app is mostly a shell) what is actually built.
+// (with developer tools on) what is actually built and verified.
 
 import { useEffect, useMemo, useState } from 'react';
 import Icon from '../../Icons';
@@ -35,7 +35,8 @@ import {
 import type { ScrapeJobSummary, SourceStatus } from '../../../../shared/scraperResults';
 import { sx, sx2, sxn, sxNumber, sxs } from '../strings';
 import { SCRAPER_POSTER, scraperArtwork } from '../artwork';
-import { scraperErrorText, sourceKindText, tr, unitMs } from '../localize';
+import { librarySeriesId } from '../data/resultLibrary';
+import { localizeScraperProvider, scraperErrorText, sourceKindText, tr, unitMs } from '../localize';
 
 const HEALTH_LABEL: Record<SourceStatus['health'], 'health.ok' | 'health.degraded' | 'health.blocked' | 'health.offline' | 'health.unknown'> = {
   ok: 'health.ok',
@@ -341,7 +342,9 @@ export default function DashboardPage() {
                 type="button"
                 className="scr-dashboard-series-card"
                 key={entry.seriesId}
-                onClick={() => ctl.openResultSeries(entry.seriesId)}
+                // The Results library keys each entry by RUN (`librarySeriesId`),
+                // not by series, so the bare series id selected nothing there.
+                onClick={() => ctl.openResultSeries(librarySeriesId(entry.jobId, entry.seriesId))}
               >
                 {/* The catalogue publishes no artwork on a job summary, so this
                     stays a generated placeholder — it is decoration, and it is
@@ -351,7 +354,7 @@ export default function DashboardPage() {
                 <span className="scr-dashboard-series-copy">
                   <strong>{entry.titleEn}</strong>
                   <small>{entry.titleJa}</small>
-                  <span>{sxn('common.episodes', entry.episodes)} · {entry.provider}</span>
+                  <span>{sxn('common.episodes', entry.episodes)} · {localizeScraperProvider(entry.provider)}</span>
                 </span>
               </button>
             ))}
@@ -381,7 +384,7 @@ export default function DashboardPage() {
                 <span className="scr-job-sub">{activeJob.titleJa}</span>
               </div>
               <div className="scr-job-meta">
-                <span>{activeJob.provider}</span>
+                <span>{localizeScraperProvider(activeJob.provider)}</span>
                 <span>{sxs('dash.jobStage', sx(`job.${activeJob.stage}` as Parameters<typeof sx>[0]))}</span>
                 {/* A summary carries `found` but no target, so there is no
                     done/total to show and no honest ETA — the old card printed
@@ -463,7 +466,7 @@ export default function DashboardPage() {
                       <span className="scr-list-title">{job.titleEn}</span>
                       <span className="scr-list-sub">{job.titleJa}</span>
                     </span>
-                    <span className="scr-list-cell">{job.provider}</span>
+                    <span className="scr-list-cell">{localizeScraperProvider(job.provider)}</span>
                     <span className="scr-list-cell">{sxn('common.episodes', job.found)}</span>
                     <span className="scr-list-cell">{formatDuration(job.durationSec)}</span>
                     <span className="scr-list-cell scr-muted">{formatAgeMinutes(job.ageMinutes)}</span>
@@ -567,7 +570,9 @@ export default function DashboardPage() {
           </Button>
         </ScrCard>
 
-        <BuildStatusPanel />
+        {/* What is built and verified is a developer readout, not something a
+            learner can act on: behind "Advanced / developer tools". */}
+        {ctl.advancedMode && <BuildStatusPanel />}
       </div>
     </div>
   );
