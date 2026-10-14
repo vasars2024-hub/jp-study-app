@@ -16,9 +16,11 @@ import { loadGrammarSrs, onGrammarSrsChanged } from '../../grammarSrs';
 import './grammarReview2.css';
 
 /**
- * Grammar points due on one Calendar day (`YYYY-MM-DD`), for the day view's "Due"
- * section: today counts everything owed today, a later day what first falls due
- * on it. Renders nothing for a day with none.
+ * Grammar points due on one STUDY day (`YYYY-MM-DD`), for the Calendar day view's
+ * "Due" section: today counts everything owed today, a later day what first falls
+ * due on it. Renders nothing for a day with none. The Calendar passes its cell's
+ * study day (`calendarCell`), so between midnight and the day-start hour today's
+ * cell asks for the study day still running, as Review does.
  *
  * Today's number is the Calendar's convention (the cards' line counts the same
  * way: overdue plus what falls due later today), so it can be larger than what

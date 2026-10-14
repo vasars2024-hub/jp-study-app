@@ -42,7 +42,9 @@ module.exports = {
     const counts = (label) => ev(`(() => {
       const s = JSON.parse(localStorage.getItem(${JSON.stringify(KEY)}) || '{}');
       const now = Date.now();
-      const end = new Date(); end.setHours(24, 0, 0, 0);
+      // The end of the current study day (4 am by default), as the Calendar counts it: between
+      // midnight and 4 am "today" still runs to 4 am, not to the next midnight.
+      const end = new Date(); end.setHours(4, 0, 0, 0); if (end.getTime() <= now) end.setDate(end.getDate() + 1);
       const states = Object.values(s);
       return { label: ${JSON.stringify(label)}, dueNow: states.filter((x) => x.dueAt <= now).length, dueToday: states.filter((x) => x.dueAt < end.getTime()).length, summary: document.querySelector('.gx-review-summary')?.textContent ?? null };
     })()`);

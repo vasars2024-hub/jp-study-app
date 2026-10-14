@@ -62,11 +62,16 @@ import { loadDesktopPrefs, onDesktopPrefsChanged } from '../../desktopPrefs';
 import { useT } from '../../i18n';
 import { formatDuration, getMediaActivityByDay, getStreakRestDates, getStudyDaysByKey, onStatsChanged } from '../../stats';
 import { deckDueForecast, loadDeck, onDeckChanged } from '../../flashcardDeck';
-import { calendarStudyDay, dueByDate, gameAnswersByDay } from '../../../shared/studyActivityHeatmap';
+import { dueByDate, gameAnswersByDay } from '../../../shared/studyActivityHeatmap';
 import { studyDayKey } from '../../../shared/studyDay';
 import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
 import { exportCalendarIcsFile } from '../../calendarIcs';
-import { heatLevelsFor } from '../../../shared/calendarDayDetail';
+import {
+  byCalendarCell,
+  calendarCellStudyDay,
+  heatLevelsFor,
+  streakDatesByCalendarCell,
+} from '../../../shared/calendarDayDetail';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { writeLocalStorage } from '../../localStorageWrite';
 import { mediaActivitySummary } from './calendarMediaActivity';
@@ -1120,16 +1125,22 @@ function MonthGrid({ state }: { state: CalendarState }) {
   const [statsVersion, setStatsVersion] = useState(0);
   useEffect(() => onStatsChanged(() => setStatsVersion((v) => v + 1)), []);
   const restDates = useMemo(() => getStreakRestDates(), [monthCells, statsVersion]);
-  // Video study per day (watch time, lines mined / studied in the player): one read per change.
-  const mediaByDay = useMemo(() => getMediaActivityByDay(), [statsVersion]);
-  // Study minutes and reviews per past day; reviews due per coming day, from the deck's own
-  // schedule (six weeks covers every day a month grid can show).
-  const studyByDay = useMemo(() => getStudyDaysByKey(), [statsVersion]);
-  const [deckVersion, setDeckVersion] = useState(0);
-  useEffect(() => onDeckChanged(() => setDeckVersion((v) => v + 1)), []);
   // The STUDY day, not the calendar date: due counts are filed by study day, so they
   // move at the day-start hour (4 am), not at midnight.
   const studyTodayKey = studyDayKey(today.getTime());
+  // Study figures are filed by study day; cells are calendar dates. `calendarCell` (shared/
+  // calendarDayDetail.ts) is the one rule between them: from midnight to the day-start hour
+  // today's cell shows the study day still running and the cell before it shows events only.
+  // This key changes whenever that mapping does, at midnight and at the day-start hour.
+  const cellClock = `${toKey(today)}|${studyTodayKey}`;
+  // Video study per day (watch time, lines mined / studied in the player): one read per change.
+  const mediaByDay = useMemo(() => byCalendarCell(getMediaActivityByDay(), new Date()), [statsVersion, cellClock]);
+  // Study minutes and reviews per past day; reviews due per coming day, from the deck's own
+  // schedule (six weeks covers every day a month grid can show). Keyed by STUDY day:
+  // `calendarCellStudyDay` reads it per cell.
+  const studyByDay = useMemo(() => getStudyDaysByKey(), [statsVersion]);
+  const [deckVersion, setDeckVersion] = useState(0);
+  useEffect(() => onDeckChanged(() => setDeckVersion((v) => v + 1)), []);
   const dueByDay = useMemo(
     () => dueByDate(deckDueForecast(loadDeck(), CALENDAR_DUE_DAYS), new Date()),
     // `deckVersion` and `studyTodayKey` are the change signals.
@@ -1148,6 +1159,7 @@ function MonthGrid({ state }: { state: CalendarState }) {
   }, [currentKey]);
   // The current streak's days, and (when switched on) each day shaded by how much was studied.
   const streakMarks = useStreakMarkers(statsVersion);
+  const streakCells = useMemo(() => streakDatesByCalendarCell(streakMarks.streak, new Date()), [streakMarks, cellClock]);
   // Game answers count as study in the year view's shading; the month grid used to leave
   // them out, so a games-only day was blank here and shaded there. Read only while shading.
   const [games, setGames] = useState<Readonly<Record<string, number>>>({});
@@ -1166,8 +1178,12 @@ function MonthGrid({ state }: { state: CalendarState }) {
     };
   }, [state.heatmap, logVersion]);
   const heat = useMemo(
-    () => (state.heatmap ? heatLevelsFor(keys, studyByDay, games) : null),
-    [state.heatmap, keys, studyByDay, games],
+    () => {
+      if (!state.heatmap) return null;
+      const now = new Date();
+      return heatLevelsFor(keys, byCalendarCell(studyByDay, now), byCalendarCell(games, now));
+    },
+    [state.heatmap, keys, studyByDay, games, cellClock],
   );
   const drop = useDayDropTarget(state.moveOccurrence);
 
@@ -1238,10 +1254,10 @@ function MonthGrid({ state }: { state: CalendarState }) {
             const isToday = key === toKey(today);
             const dayEvents = occsByDay.get(key) ?? [];
             const isRest = restDates.has(key);
-            const inStreak = !isRest && streakMarks.streak.has(key);
+            const inStreak = !isRest && streakCells.has(key);
             const heatLevel = heat?.[key];
             const media = mediaActivitySummary(mediaByDay[key], t, lang, formatDuration);
-            const study = calendarStudyDay(key, studyByDay[key], dueByDay, today);
+            const study = calendarCellStudyDay(key, studyByDay, dueByDay, today);
             const studyDone = study && (study.minutes > 0 || study.reviews > 0) ? study : null;
             const studyLong = [
               studyDone ? t('studyLoop2.calendar.studyLong', { minutes: studyDone.minutes, reviews: studyDone.reviews }) : '',
@@ -1318,7 +1334,8 @@ function DayMediaNote({ dayKey }: { dayKey: string }) {
   const { t, lang } = useT();
   const [statsVersion, setStatsVersion] = useState(0);
   useEffect(() => onStatsChanged(() => setStatsVersion((v) => v + 1)), []);
-  const activity = useMemo(() => getMediaActivityByDay()[dayKey], [dayKey, statsVersion]);
+  // By Calendar cell, as the month grid reads it (`calendarCell`).
+  const activity = useMemo(() => byCalendarCell(getMediaActivityByDay(), new Date())[dayKey], [dayKey, statsVersion]);
   const summary = mediaActivitySummary(activity, t, lang, formatDuration);
   if (!summary) return null;
   return (

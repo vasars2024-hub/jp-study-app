@@ -81,6 +81,10 @@ export function CalendarDayPanel({ dateKey }: { dateKey: string }) {
     [dateKey, locale],
   );
   const history = detail.kind !== 'future';
+  // The study day the figures are filed under: the calendar date, except on today's cell
+  // between midnight and the day-start hour, where it is the study day still running
+  // (`calendarCell` in shared/calendarDayDetail.ts). Deck and grammar links use it.
+  const studyKey = detail.studyKey ?? dateKey;
 
   const exportDay = async (mode: 'copy' | 'save'): Promise<void> => {
     const text = `${formatCalendarDaySummary(detail, t, dateLabel)}\n`;
@@ -132,7 +136,8 @@ export function CalendarDayPanel({ dateKey }: { dateKey: string }) {
         {detail.streak === 'rest' && <span className="cal-day-badge is-rest">{t('cal2.day.restDay')}</span>}
       </header>
 
-      {detail.empty && (
+      {/* No study key: the cell before today, whose study day today's cell shows (events only). */}
+      {detail.empty && detail.studyKey !== null && (
         <p className="muted cal-day-empty">
           {detail.kind === 'future' ? t('cal2.day.nothingDue') : t('cal2.day.nothing')}
         </p>
@@ -154,12 +159,12 @@ export function CalendarDayPanel({ dateKey }: { dateKey: string }) {
           )}
           <div className="cal-day-actions">
             {detail.reviews.count > 0 && (
-              <button type="button" className="btn small" onClick={() => openDeckForDay(dateKey, 'reviewed')}>
+              <button type="button" className="btn small" onClick={() => openDeckForDay(studyKey, 'reviewed')}>
                 {t('cal2.day.showReviewed')}
               </button>
             )}
             {detail.addedCards > 0 && (
-              <button type="button" className="btn small" onClick={() => openDeckForDay(dateKey, 'added')}>
+              <button type="button" className="btn small" onClick={() => openDeckForDay(studyKey, 'added')}>
                 {t('cal2.day.showAdded', { count: detail.addedCards })}
               </button>
             )}
@@ -272,7 +277,7 @@ export function CalendarDayPanel({ dateKey }: { dateKey: string }) {
         <DaySection title={t('cal2.day.section.due')}>
           <p>{detail.due > 0 ? t('cal2.day.due', { count: detail.due }) : t('cal2.day.noneDue')}</p>
           {/* gram2: the grammar review queue for this day, beside the cards'. */}
-          <GrammarDueDayLine dateKey={dateKey} isToday={detail.kind === 'today'} />
+          <GrammarDueDayLine dateKey={studyKey} isToday={detail.kind === 'today'} />
           <div className="cal-day-actions">
             {detail.kind === 'today' && detail.due > 0 && (
               <button type="button" className="btn small primary" onClick={openTodaysReviews}>

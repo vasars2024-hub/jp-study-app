@@ -11,8 +11,8 @@
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
-import { yearHeatmap } from '../../../shared/calendarDayDetail';
-import { addLocalDays, gameAnswersByDay, localDayKey } from '../../../shared/studyActivityHeatmap';
+import { byCalendarCell, yearHeatmap } from '../../../shared/calendarDayDetail';
+import { addLocalDays, gameAnswersByDay, localDayKey, studyTodayKey } from '../../../shared/studyActivityHeatmap';
 import { getStudyDaysByKey, onStatsChanged } from '../../stats';
 import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
 import type { WeekStartDay } from '../../calendar';
@@ -58,13 +58,19 @@ export function CalendarYearGrid({ state }: { state: YearGridState }) {
   const [statsVersion, setStatsVersion] = useState(0);
   useEffect(() => onStatsChanged(() => setStatsVersion((v) => v + 1)), []);
   const games = useGameAnswers();
+  const todayKey = localDayKey(state.today);
+  // Changes at midnight and at the day-start hour, when `calendarCell` re-files today.
+  const cellClock = `${todayKey}|${studyTodayKey(state.today)}`;
   const months = useMemo(
-    () => yearHeatmap(year, getStudyDaysByKey(), games, state.weekStart),
+    () => {
+      // Shaded by Calendar cell, as the month grid and the day panel read it (`calendarCell`).
+      const now = new Date();
+      return yearHeatmap(year, byCalendarCell(getStudyDaysByKey(), now), byCalendarCell(games, now), state.weekStart);
+    },
     // `statsVersion` is the stats store's change signal.
-    [year, games, state.weekStart, statsVersion],
+    [year, games, state.weekStart, statsVersion, cellClock],
   );
   const locale = LANG_TAGS[lang];
-  const todayKey = localDayKey(state.today);
   const fallback = state.cursor.getFullYear() === year ? localDayKey(state.cursor) : `${year}-01-01`;
   const active = state.selectedDay && state.selectedDay.startsWith(`${year}-`) ? state.selectedDay : fallback;
 

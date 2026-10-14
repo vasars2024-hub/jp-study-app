@@ -17,6 +17,7 @@ import type { ReviewLogEntry } from './reviewLog';
 import {
   addLocalDays,
   daysFromToday,
+  calendarStudyDay,
   heatmapLevel,
   localDayKey,
   studyActivityScore,
@@ -25,7 +26,7 @@ import {
   type HeatmapLevel,
   type StudyDayRaw,
 } from './studyActivityHeatmap';
-import { shiftStudyDayKey, studyDayKey } from './studyDay';
+import { shiftStudyDayKey, studyDayIndexOfKey, studyDayKey } from './studyDay';
 
 /** A day's stats entry as `renderer/stats.ts` hands it over (every field optional on disk). */
 export interface StudyDayActivity extends StudyDayRaw {
@@ -86,6 +87,8 @@ export interface CalendarDayShow {
 export interface CalendarDayDetail {
   dateKey: string;
   kind: CalendarDayKind;
+  /** The study day whose figures the cell shows (`calendarCell`); null for none. */
+  studyKey: string | null;
   /** Graded flashcard reviews. `accuracy` is passed / total, or null with none. */
   reviews: { count: number; passed: number; accuracy: number | null; newCards: number };
   /** Learn / Test / Write / grammar answers (not reviews, not games). */
@@ -112,8 +115,10 @@ export interface CalendarDayDetail {
 }
 
 export interface CalendarDayDetailInput {
+  /** The CALENDAR date of the cell (`calendarCell` says which study day it shows). */
   dateKey: string;
   now: Date;
+  /** The stats entry of the cell's study day (`calendarCell(dateKey, now).studyKey`). */
   day?: StudyDayActivity | null;
   /** Review-log rows; only the ones on `dateKey` are read. */
   reviewLog?: readonly ReviewLogEntry[];
@@ -139,17 +144,91 @@ function onDay(at: number, dateKey: string): boolean {
   return Number.isFinite(at) && studyDayKey(at) === dateKey;
 }
 
-/** The day kind relative to the study day `now` is on. */
+/** The kind of a STUDY day key relative to the study day `now` is on. */
 export function calendarDayKind(dateKey: string, now: Date): CalendarDayKind {
   const offset = daysFromToday(dateKey, now);
   return offset < 0 ? 'past' : offset === 0 ? 'today' : 'future';
 }
 
+/** What a Calendar cell (a CALENDAR date) is, and which study day's figures it shows. */
+export interface CalendarCell {
+  kind: CalendarDayKind;
+  /** The study day filed under this cell, or null when the cell shows events only. */
+  studyKey: string | null;
+}
+
+/**
+ * The one rule mapping Calendar cells (calendar dates) onto study days (`studyDay.ts`).
+ *
+ * Events belong to their calendar date, and the learner's "today" is the calendar date: the
+ * grid highlights it, opens on it, and the Today button goes there. Study figures are filed
+ * by STUDY day, which starts at the day-start hour (4 am by default). From midnight to that
+ * hour the two differ — at 00:30 on Oct 14 the study day is still Oct 13 — so:
+ *
+ * - the calendar date's cell (Oct 14) is 'today' and shows the CURRENT study day (Oct 13's
+ *   key): reviews and minutes done tonight, what is due by its end, the Review button;
+ * - the cell before it (Oct 13), whose study day that is, is 'past' and shows events only,
+ *   so the same figures are never shown twice under two kinds;
+ * - the study day that starts at the day-start hour (Oct 14's key) has no cell until then:
+ *   its cards become "due today" at 4 am, exactly when the Review queue offers them.
+ *
+ * Outside that window (and always with a midnight day start) every cell shows its own key.
+ */
+export function calendarCell(dateKey: string, now: Date): CalendarCell {
+  const calendarToday = localDayKey(now);
+  const studyToday = studyTodayKey(now);
+  const offset = studyDayIndexOfKey(dateKey) - studyDayIndexOfKey(calendarToday);
+  if (offset === 0) return { kind: 'today', studyKey: studyToday };
+  if (offset > 0) return { kind: 'future', studyKey: dateKey };
+  return { kind: 'past', studyKey: dateKey === studyToday ? null : dateKey };
+}
+
+/**
+ * A study-day-keyed record (stats days, game answers, media activity) re-filed by Calendar
+ * cell per `calendarCell`: between midnight and the day-start hour the current study day's
+ * entry moves to the calendar date and leaves the cell before it. Otherwise the same object.
+ */
+export function byCalendarCell<T>(byStudyDay: Readonly<Record<string, T>>, now: Date): Record<string, T> {
+  const calendarToday = localDayKey(now);
+  const studyToday = studyTodayKey(now);
+  if (calendarToday === studyToday) return byStudyDay as Record<string, T>;
+  const out: Record<string, T> = { ...byStudyDay };
+  delete out[studyToday];
+  delete out[calendarToday];
+  if (byStudyDay[studyToday] !== undefined) out[calendarToday] = byStudyDay[studyToday];
+  return out;
+}
+
+/**
+ * Streak dates for the grid's markers: a streak that includes the current study day also
+ * marks the calendar date (both cells read as studied; a gap would read as a broken streak).
+ */
+export function streakDatesByCalendarCell(dates: ReadonlySet<string>, now: Date): ReadonlySet<string> {
+  const calendarToday = localDayKey(now);
+  const studyToday = studyTodayKey(now);
+  if (calendarToday === studyToday || !dates.has(studyToday)) return dates;
+  return new Set([...dates, calendarToday]);
+}
+
+/** `calendarStudyDay` for a Calendar cell: the month grid's "12 min · 30 rev · 5 due" line. */
+export function calendarCellStudyDay(
+  dateKey: string,
+  days: Readonly<Record<string, StudyDayRaw | undefined>>,
+  due: Readonly<Record<string, number>>,
+  now: Date,
+): { minutes: number; reviews: number; due: number } | null {
+  const { studyKey } = calendarCell(dateKey, now);
+  return studyKey ? calendarStudyDay(studyKey, days[studyKey], due, now) : null;
+}
+
 export function buildCalendarDayDetail(input: CalendarDayDetailInput): CalendarDayDetail {
-  const { dateKey, now } = input;
-  const kind = calendarDayKind(dateKey, now);
-  // The future has no history; a past day has nothing due that today's schedule can know.
-  const history = kind !== 'future';
+  const { dateKey: cellKey, now } = input;
+  const { kind, studyKey } = calendarCell(cellKey, now);
+  // Every study fact below is read under the cell's study day (see `calendarCell`).
+  const dateKey = studyKey ?? cellKey;
+  // The future has no history; a past day has nothing due that today's schedule can know;
+  // a cell whose study day is shown on today's cell has neither.
+  const history = kind !== 'future' && studyKey !== null;
   const day = history ? input.day ?? null : null;
 
   // Reviews: the log knows new cards and exact accuracy; the stats entry is the fallback for
@@ -215,12 +294,13 @@ export function buildCalendarDayDetail(input: CalendarDayDetailInput): CalendarD
     ? (input.games ?? []).filter((game) => onDay(game.createdAt, dateKey)).sort((a, b) => b.createdAt - a.createdAt)
     : [];
   const addedCards = history ? (input.deck ?? []).filter((card) => onDay(card.addedAt, dateKey)).length : 0;
-  const due = kind === 'past' ? 0 : Math.round(count(input.dueByDay?.[dateKey]));
+  const due = kind === 'past' || !studyKey ? 0 : Math.round(count(input.dueByDay?.[studyKey]));
   const streak = input.restDates?.has(dateKey) ? 'rest' : input.streakDates?.has(dateKey) ? 'streak' : null;
 
   const detail: CalendarDayDetail = {
-    dateKey,
+    dateKey: cellKey,
     kind,
+    studyKey,
     reviews: {
       count: reviewCount,
       passed: reviewPassed,

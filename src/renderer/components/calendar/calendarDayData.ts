@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   buildCalendarDayDetail,
+  calendarCell,
   streakRunDates,
   type CalendarDayDetail,
   type DayGameResult,
@@ -106,10 +107,13 @@ export function useCalendarDayDetail(dateKey: string): CalendarDayDetail {
     const deck = loadDeck();
     const horizon = Math.min(FORECAST_HORIZON_DAYS, Math.max(42, daysFromToday(dateKey, now) + 1));
     const restDates = getStreakRestDates();
+    // The cell's study day: between midnight and the day-start hour, today's cell shows the
+    // study day still running (`calendarCell`).
+    const { studyKey } = calendarCell(dateKey, now);
     return buildCalendarDayDetail({
       dateKey,
       now,
-      day: getStudyDayActivity(dateKey),
+      day: studyKey ? getStudyDayActivity(studyKey) : null,
       reviewLog,
       deck,
       games: recentGames(),
@@ -134,18 +138,21 @@ export function monthDayDetails(
   const restDates = getStreakRestDates();
   const streakDates = new Set(streakRunDates(getActiveStudyDates(), restDates, now));
   const dueByDay = dueByDate(deckDueForecast(deck, 42, now.getTime()), now);
-  return dateKeys.map((dateKey) => buildCalendarDayDetail({
-    dateKey,
-    now,
-    day: getStudyDayActivity(dateKey),
-    reviewLog,
-    deck,
-    games,
-    scenes,
-    dueByDay,
-    streakDates,
-    restDates,
-  }));
+  return dateKeys.map((dateKey) => {
+    const { studyKey } = calendarCell(dateKey, now);
+    return buildCalendarDayDetail({
+      dateKey,
+      now,
+      day: studyKey ? getStudyDayActivity(studyKey) : null,
+      reviewLog,
+      deck,
+      games,
+      scenes,
+      dueByDay,
+      streakDates,
+      restDates,
+    });
+  });
 }
 
 /** The current streak's dates and the rest days in it, for the month grid's markers. */
