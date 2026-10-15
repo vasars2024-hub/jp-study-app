@@ -334,14 +334,14 @@ function linkFromEntry(entry: JitenPlanEntry | null, candidate: NovelCandidate |
  * ("Could not reach … (network error)", "Jiten 503: …"), so they are reduced
  * to a code here and the detail stays in the log.
  */
-export function jitenErrorText(error: unknown, t: (key: string, vars?: Record<string, string | number>) => string): string {
+export function jitenErrorText(error: unknown, nt: (key: string, vars?: Record<string, string | number>) => string): string {
   const message = error instanceof Error ? error.message : String(error ?? '');
   const status = /\bJiten (\d{3})\b/.exec(message);
-  if (status) return t('novelReaderUi.novels.jitenHttp', { status: status[1] });
+  if (status) return nt('novelReaderUi.novels.jitenHttp', { status: status[1] });
   if (/network error|could not reach|fetch failed|net::ERR_|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN/i.test(message)) {
-    return t('novelReaderUi.novels.jitenNetwork');
+    return nt('novelReaderUi.novels.jitenNetwork');
   }
-  return t('novelReaderUi.novels.jitenFailed');
+  return nt('novelReaderUi.novels.jitenFailed');
 }
 
 export function useNovels() {

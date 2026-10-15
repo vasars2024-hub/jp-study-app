@@ -40,8 +40,13 @@ describe('"no analytics SDK and no crash-report upload"', () => {
     expect(deps.filter((d) => banned.test(d))).toEqual([]);
   });
 
-  it('Electron\'s crash reporter is never started, and nothing beacons', () => {
-    expect(grep(/crashReporter\s*\.\s*start\s*\(/)).toEqual([]);
+  it('Electron\'s crash reporter only keeps dumps on this PC (opt-in), and nothing beacons', () => {
+    // The opt-in "Keep crash reports on this PC" switch is the one caller, and it never uploads.
+    expect(grep(/crashReporter\s*\.\s*start\s*\(/)).toEqual(['src/main/crashRecovery.ts']);
+    const starts = read('src/main/crashRecovery.ts').match(/crashReporter\s*\.\s*start\s*\([^)]*\)/g) ?? [];
+    expect(starts.length).toBeGreaterThan(0);
+    for (const call of starts) expect(call).toMatch(/uploadToServer:\s*false/);
+    expect(privacy).toContain('Crash reports are off by default');
     expect(grep(/navigator\.sendBeacon\s*\(/)).toEqual([]);
   });
 });

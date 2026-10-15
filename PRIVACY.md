@@ -9,6 +9,7 @@ Gum does go online for some things: to download dictionaries and updates, and to
 - Your flashcards, review history, statistics, known words, notes, calendar, books, manga, videos, music, mined sentences, snip pictures and their history, recordings and settings. They are stored in your Gum profile folder (Electron's user-data folder) and the app's local browser storage.
 - Backups are local zip files. They leave your API keys and passwords out.
 - The diagnostic log is written to your profile folder only, with keys and tokens removed. Gum never uploads it; you attach it to a bug report yourself if you want to.
+- Crash reports are off by default. If you turn on "Keep crash reports on this PC" in Settings › Diagnostics, a crash writes a crash dump to the Crashpad folder in your profile. Gum never uploads it. "Save problem report…" puts the log and any dumps in a zip you save yourself, with keys, tokens and your home folder path removed.
 - Built-in dictionary lookups, the Japanese tokenizer, offline translation, Tesseract OCR and the local AI model (when you download it) all run on your computer.
 
 ## The one count Gum can send about you (opt-in)
