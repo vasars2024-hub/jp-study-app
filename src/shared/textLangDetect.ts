@@ -54,7 +54,33 @@ export const JAPANESE_ONLY_HAN = new Set([...(
   + '聴脳臭舗芸茎荘薫蔵蛍衛衝装褒覇覚観訳証読謡譲豊賛贈践躍転軽輪辞逓遅遥郷酔醸釈鉄鉱鋳錬録鎮関閲陥険隠隣隷雑霊靖頻顕騒験髄髪闘鶏麦黙齢'
 )].filter((ch) => !SIMPLIFIED_ONLY_HAN.has(ch) && !SHARED_WITH_CHINESE.includes(ch)));
 
-export type TextLangEvidence = 'kana' | 'cyrillic' | 'simplified' | 'japanese' | 'han' | 'latin' | 'none';
+/**
+ * Chinese grammar words that Japanese does not write on their own: in kana-less
+ * text they mean a Chinese sentence (这种等待，本质上是一种拖延 read by a Japanese
+ * recogniser as 滋神等待·本上是一釉把延 still carries 是 and 把). Words Japanese
+ * uses inside common compounds (了 in 完了, 就 in 就職, 都, 在, 被, 着, 他) are left out.
+ */
+const CHINESE_FUNCTION_HAN = new Set([...'是很把呢吧啊哪您她它咱嘛啦呀怎什哦']);
+/** Punctuation only Chinese writes: the full-width comma and semicolon, and curly quotes. */
+const CHINESE_PUNCTUATION = new Set([...'，；“”']);
+/** Punctuation only Japanese writes: corner brackets. */
+const JAPANESE_PUNCTUATION = new Set([...'「」『』']);
+/**
+ * A Japanese sentence this long almost always carries kana (particles, okurigana);
+ * kana-less Han text of this length is a Chinese sentence or a long proper name.
+ */
+const KANALESS_SENTENCE_HAN = 8;
+
+export type TextLangEvidence =
+  | 'kana'
+  | 'cyrillic'
+  | 'simplified'
+  | 'japanese'
+  | 'chinese-grammar'
+  | 'no-kana'
+  | 'han'
+  | 'latin'
+  | 'none';
 
 export interface TextLangGuess {
   lang: StudyLang;
@@ -78,6 +104,9 @@ export function detectStudyLangOfText(
   let simplified = 0;
   let japanese = 0;
   let latin = 0;
+  let chineseWords = 0;
+  let chinesePunct = 0;
+  let japanesePunct = 0;
   for (const ch of String(text ?? '')) {
     if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(ch) && ch !== 'ー') kana += 1;
     else if (/\p{Script=Cyrillic}/u.test(ch)) cyrillic += 1;
@@ -85,7 +114,10 @@ export function detectStudyLangOfText(
       han += 1;
       if (SIMPLIFIED_ONLY_HAN.has(ch)) simplified += 1;
       else if (JAPANESE_ONLY_HAN.has(ch)) japanese += 1;
+      if (CHINESE_FUNCTION_HAN.has(ch)) chineseWords += 1;
     } else if (/\p{Script=Latin}/u.test(ch)) latin += 1;
+    else if (CHINESE_PUNCTUATION.has(ch)) chinesePunct += 1;
+    else if (JAPANESE_PUNCTUATION.has(ch)) japanesePunct += 1;
   }
   const cjk = kana + han;
   if (cyrillic > cjk && cyrillic > 0) return { lang: 'ru', evidence: 'cyrillic' };
@@ -94,6 +126,12 @@ export function detectStudyLangOfText(
   if (han > 0) {
     if (simplified > japanese) return { lang: 'zh', evidence: 'simplified' };
     if (japanese > simplified) return { lang: 'ja', evidence: 'japanese' };
+    // Nothing in the characters' forms: weigh grammar words and punctuation only
+    // one of the two writes, then a sentence-length run with no kana at all.
+    const zhGrammar = chineseWords + chinesePunct;
+    if (zhGrammar > japanesePunct) return { lang: 'zh', evidence: 'chinese-grammar' };
+    if (japanesePunct > zhGrammar) return { lang: 'ja', evidence: 'japanese' };
+    if (kana === 0 && han >= KANALESS_SENTENCE_HAN) return { lang: 'zh', evidence: 'no-kana' };
     const readsHan = (lang: StudyLang): boolean => lang === 'ja' || lang === 'zh';
     const lang = readsHan(active) ? active : candidates.find(readsHan) ?? 'ja';
     return { lang, evidence: 'han' };

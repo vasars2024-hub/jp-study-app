@@ -53,6 +53,28 @@ describe('the language of a snip\'s text', () => {
     expect(detectStudyLangOfText('学校', 'ru', ['ru']).lang).toBe('ja');
   });
 
+  it('Han only, no telling forms: Chinese grammar words and punctuation say Chinese (the owner\'s second snip)', () => {
+    // 这种等待，本质上是一种拖延。 as the Japanese recogniser read it: no Simplified-only
+    // form survived, but 是 and 把 did.
+    expect(detectStudyLangOfText('滋神等待·本上是一釉把延', 'ja')).toEqual({ lang: 'zh', evidence: 'chinese-grammar' });
+    // Traditional Chinese has no Simplified-only forms at all; its comma and 是 still tell.
+    expect(detectStudyLangOfText('這種等待，本質上是一種拖延。', 'ja').lang).toBe('zh');
+    expect(detectStudyLangOfText('你好吗？我很好。', 'ja').lang).toBe('zh');
+  });
+
+  it('a sentence-length run with no kana is Chinese; short kanji words still follow the learner', () => {
+    expect(detectStudyLangOfText('本質上一種拖延等待時間長久', 'ja')).toEqual({ lang: 'zh', evidence: 'no-kana' });
+    expect(detectStudyLangOfText('東京大学', 'ja')).toEqual({ lang: 'ja', evidence: 'han' });
+    expect(detectStudyLangOfText('一石二鳥', 'ja').lang).toBe('ja');
+  });
+
+  it('Japanese corner brackets and compounds Japanese writes stay Japanese', () => {
+    expect(detectStudyLangOfText('「東京」', 'zh')).toEqual({ lang: 'ja', evidence: 'japanese' });
+    expect(detectStudyLangOfText('完了', 'ja').lang).toBe('ja');
+    expect(detectStudyLangOfText('就職活動', 'ja').lang).toBe('ja');
+    expect(detectStudyLangOfText('彼は学生です。', 'zh').lang).toBe('ja');
+  });
+
   it('one stray kana in Chinese is an OCR slip, not Japanese', () => {
     expect(detectStudyLangOfText('这是我们的书の过去', 'ja').lang).toBe('zh');
   });
