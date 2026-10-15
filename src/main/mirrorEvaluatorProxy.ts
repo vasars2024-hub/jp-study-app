@@ -30,6 +30,7 @@ import { AiProviderRuntimeError } from './providerRuntime';
 import { assertAiFeatureAllowed } from './aiFeatureGate';
 import { callAiProviderJson } from './aiProviderClient';
 import { parseAiReplyWith } from './aiStructuredOutput';
+import { LOCAL_JSON_GRAMMAR } from './aiLocalStructured';
 
 const TIMEOUT_MS = 60_000;
 /** A chat-completion answer is a few KB; anything this large is not one. */
@@ -108,7 +109,12 @@ async function defaultAppAiDeps(): Promise<MirrorAppAiDeps> {
     engine: () => (mining.getConfiguredAiEngine() === 'local-qwen' ? 'local-qwen' : 'cloud'),
     provider: () => mining.getConfiguredAiProvider(),
     callCloud: callAiProviderJson,
-    runLocal: async (prompt) => (await import('./translate')).runLocalQwenPrompt(prompt, { maxTokens: 1536, timeoutMs: 120_000 }),
+    // The grade is one JSON object (`MIRROR_EVALUATION_SHAPE`): decode under the JSON grammar (W1-A).
+    runLocal: async (prompt) => (await import('./translate')).runLocalQwenPrompt(prompt, {
+      maxTokens: 1536,
+      timeoutMs: 120_000,
+      jsonGrammar: LOCAL_JSON_GRAMMAR,
+    }),
   };
 }
 

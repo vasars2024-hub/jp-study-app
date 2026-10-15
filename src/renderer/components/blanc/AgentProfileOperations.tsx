@@ -17,6 +17,7 @@ import {
   availableAgentToolOperationIds,
   createCentralAgentToolRegistry,
 } from '../../agentToolRegistry';
+import { agentCapabilityOperationLabelKey } from '../../agentCapabilityDirectory';
 import { useT } from '../../i18n';
 
 /**
@@ -184,11 +185,15 @@ export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }
         <div key={tool} role="group" aria-labelledby={`agent-operations-${tool}`}>
           <p className="blanc-note" id={`agent-operations-${tool}`}>{t(TOOL_GROUP_KEYS[tool])}</p>
           <div className="blanc-form-grid">
-            {operations.map((definition) => (
+            {operations.map((definition) => {
+              const reason = unavailableReasons.get(definition.id);
+              return (
               <label
                 key={definition.id}
                 className="blanc-check"
-                title={unavailableReasons.get(definition.id) ?? definition.id}
+                // Why it cannot be enabled, in words (the Capability directory's sentence); an
+                // operation that can be enabled needs no tooltip, and never shows its raw id.
+                title={reason ? t(`agent.capabilities.reason.${reason}`) : undefined}
               >
                 <input
                   type="checkbox"
@@ -198,7 +203,7 @@ export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }
                   onChange={() => toggle(definition.id)}
                 />
                 <span>
-                  {definition.label}
+                  {t(agentCapabilityOperationLabelKey(definition.id))}
                   {' '}
                   <span className="blanc-note">
                     ({t(agentPermissionLabelKey(definition.minimumPermission))})
@@ -208,7 +213,8 @@ export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }
                   ) : null}
                 </span>
               </label>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}

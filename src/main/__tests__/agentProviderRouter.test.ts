@@ -671,3 +671,16 @@ describe('workflow-preset modes', () => {
     expect(result.provider.historyMessageIds).toHaveLength(AGENT_HISTORY_TURN_CEILING);
   });
 });
+
+describe('the local path decodes JSON under the grammar when the caller parses JSON (W4-B)', () => {
+  it('Explain (jsonReply) gets the JSON grammar; a chat reply stays raw prose', async () => {
+    const local = vi.spyOn(translate, 'runLocalQwenPrompt').mockResolvedValue('{"summary":"ok"}');
+    await runAgentProviderPrompt(policy(), 'Explain 猫 as JSON.', { jsonReply: true });
+    expect(local.mock.calls[0][1]).toMatchObject({ jsonGrammar: { kind: 'json' } });
+    expect(local.mock.calls[0][1]?.raw).toBeUndefined();
+
+    await runAgentProviderPrompt(policy(), 'Chat about 猫.');
+    expect(local.mock.calls[1][1]).toMatchObject({ raw: true });
+    expect(local.mock.calls[1][1]?.jsonGrammar).toBeUndefined();
+  });
+});

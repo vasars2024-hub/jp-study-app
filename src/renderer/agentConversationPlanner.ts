@@ -1,6 +1,7 @@
 import type { AgentConversation } from '../shared/agentWorkspace';
 import type { AiProviderId } from '../shared/aiProviders';
-import type { LocalAgentPlanFailureCode } from '../shared/localAgentRuntime';
+import type { LocalAgentPlanFailureCode, LocalAgentToolResult } from '../shared/localAgentRuntime';
+import { MAX_AGENT_LOOP_ROUNDS } from '../shared/localAgentPrompt';
 import {
   cancelAgentQueueItem,
   enqueueAgentTask,
@@ -70,6 +71,12 @@ export type AgentConversationPlanResult =
       planner?: 'local' | 'cloud' | 'recipe';
       /** How long planning took, for the composer's latency line. */
       elapsedMs?: number;
+      /**
+       * The tool-result loop: this plan's round (1-based), and whether the planner will plan
+       * again from what its steps return once the task has completed.
+       */
+      round?: number;
+      continues?: boolean;
     }
   | {
       ok: false;
@@ -106,6 +113,8 @@ export type AgentConversationRunResult =
       task: AgentTask;
       stepId: string;
       events: AgentExecutionEvent[];
+      /** The next round's plan, when this step completed a task the planner is waiting on. */
+      followUp?: AgentConversationPlanResult;
     }
   | {
       ok: false;
@@ -124,9 +133,58 @@ interface QuarantinedAgentPlan {
 
 const quarantinedAgentPlans = new Map<string, QuarantinedAgentPlan>();
 
-/** Tests only: forget every quarantined plan (the session-scoped map above). */
+/**
+ * A plan whose planner asked to see its steps' results (`continues`), keyed by its task id: what
+ * the next round needs to re-plan once that task has completed. Session-scoped on purpose — a
+ * loop does not resume itself after a restart; the user asks again.
+ */
+interface AgentLoopState {
+  conversationId: string;
+  objective: string;
+  /** The round the waiting task was planned in. */
+  round: number;
+  /** Results of the rounds before it, oldest first. */
+  results: LocalAgentToolResult[];
+  target?: 'local' | AiProviderId;
+  cloudProviderId?: AiProviderId;
+}
+
+const waitingAgentLoops = new Map<string, AgentLoopState>();
+/** Stops per conversation, so a round being planned when Stop was pressed is dropped. */
+const agentLoopStops = new Map<string, number>();
+
+/** Tests only: forget every quarantined plan and every waiting loop (the session-scoped maps above). */
 export function resetAgentConversationPlannerForTests(): void {
   quarantinedAgentPlans.clear();
+  waitingAgentLoops.clear();
+  agentLoopStops.clear();
+}
+
+/**
+ * Stop: the conversation's waiting loops end here, so no later round is planned, and a round
+ * already being planned is dropped when it returns. Cancel on any of the conversation's plans
+ * calls it; the plans already queued stay where the user can see them.
+ */
+export function stopAgentConversationLoops(conversationId: string): void {
+  agentLoopStops.set(conversationId, (agentLoopStops.get(conversationId) ?? 0) + 1);
+  for (const [taskId, state] of waitingAgentLoops) {
+    if (state.conversationId === conversationId) waitingAgentLoops.delete(taskId);
+  }
+}
+
+/** True while a plan of this conversation will be followed by another round. */
+export function isAgentConversationLoopWaiting(conversationId: string, taskId: string): boolean {
+  return waitingAgentLoops.get(taskId)?.conversationId === conversationId;
+}
+
+/** What a completed task's steps returned, in the shape the planner reads. */
+function toolResultsOf(task: AgentTask): LocalAgentToolResult[] {
+  return task.steps.map((step) => ({
+    operation: step.request.operation,
+    ...(step.label ? { label: step.label } : {}),
+    ok: step.status === 'completed',
+    ...(step.status === 'completed' && step.result !== undefined ? { output: step.result } : {}),
+  }));
 }
 
 function queueItemSnapshot(item: AgentTaskQueue['items'][number]): string {
@@ -281,6 +339,8 @@ async function planStudyRecipe(
 function planFailureFromResponse(code: LocalAgentPlanFailureCode | undefined): AgentConversationPlanFailureCode {
   switch (code) {
     case 'agent-disabled': return 'planner-disabled';
+    case 'invalid-request':
+    case 'objective-too-long': return 'invalid-objective';
     case 'model-missing': return 'model-missing';
     case 'ai-off': return 'ai-off';
     case 'cloud-key-missing': return 'cloud-key-missing';
@@ -387,7 +447,7 @@ export async function createAgentConversationPlan(
     };
   }
 
-  return enqueueConversationPlan(
+  const queued = await enqueueConversationPlan(
     conversation,
     disclosedContext,
     response.task,
@@ -398,11 +458,109 @@ export async function createAgentConversationPlan(
       elapsedMs: typeof response.elapsedMs === 'number' ? response.elapsedMs : Date.now() - startedAt,
     },
   );
+  return withLoopState(queued, response.continues === true, {
+    conversationId: conversation.id,
+    objective,
+    round: 1,
+    results: [],
+    ...(options.target ? { target: options.target } : {}),
+    ...(options.cloudProviderId ? { cloudProviderId: options.cloudProviderId } : {}),
+  });
+}
+
+/** Remembers a queued plan the planner will continue from, and says so on the result. */
+function withLoopState(
+  queued: AgentConversationPlanResult,
+  continues: boolean,
+  state: AgentLoopState,
+): AgentConversationPlanResult {
+  if (!queued.ok) return queued;
+  const waiting = continues && state.round < MAX_AGENT_LOOP_ROUNDS;
+  if (waiting) waitingAgentLoops.set(queued.taskId, state);
+  return { ...queued, round: state.round, ...(waiting ? { continues: true } : {}) };
+}
+
+/**
+ * The tool-result loop's next round: plan → run → feed the results back → plan again.
+ *
+ * Called once the waiting task has COMPLETED. A paused, cancelled or failed task never gets
+ * here, and Cancel on any of the conversation's plans clears the loop (`stopAgentConversationLoops`),
+ * so Stop always holds. The results travel to main, which gates each one for a cloud planner
+ * (`toolOutputForPlanner`); the new plan goes through the same queue as every other — each step
+ * still runs only on the user's Run/Confirm, under the profile and permission read live, and its
+ * Undo is the operation log's as before. At most `MAX_AGENT_LOOP_ROUNDS` plans per request.
+ */
+async function planNextAgentLoopRound(
+  taskId: string,
+  task: AgentTask,
+  t: AgentToolRegistryTranslate,
+): Promise<AgentConversationPlanResult | null> {
+  const state = waitingAgentLoops.get(taskId);
+  if (!state || task.status !== 'completed') return null;
+  waitingAgentLoops.delete(taskId);
+  const round = state.round + 1;
+  if (round > MAX_AGENT_LOOP_ROUNDS) return null;
+  const settings = loadLocalAgentSettings();
+  if (!settings.enabled || settings.backend === 'disabled') return { ok: false, code: 'planner-disabled' };
+  const plan = window.api?.localAgentPlan;
+  if (typeof plan !== 'function') return { ok: false, code: 'planner-unavailable' };
+  let authority: ReturnType<typeof readAgentStepApprovalContext>;
+  let profile: ReturnType<typeof getActiveAgentProfile>;
+  try {
+    authority = readAgentStepApprovalContext(t);
+    profile = getActiveAgentProfile(loadLocalAgentProfiles());
+  } catch {
+    return { ok: false, code: 'store-failed' };
+  }
+  const results = [...state.results, ...toolResultsOf(task)];
+  const startedAt = Date.now();
+  const stopsAtStart = agentLoopStops.get(state.conversationId) ?? 0;
+  let response: Awaited<ReturnType<typeof plan>>;
+  try {
+    response = await plan({
+      objective: state.objective,
+      settings,
+      profile,
+      availableOperations: authority.allowedOperations,
+      memories: [],
+      applicationState: {},
+      toolResults: results,
+      round,
+      ...(state.target ? { target: state.target } : {}),
+      ...(state.cloudProviderId ? { cloudProviderId: state.cloudProviderId } : {}),
+    });
+  } catch {
+    return { ok: false, code: 'planner-unavailable' };
+  }
+  if (!response.ok) return { ok: false, code: planFailureFromResponse(response.code) };
+  // Stopped while the model was thinking: a Cancel in the meantime ended the loop, so the plan
+  // it was making is dropped rather than queued.
+  if ((agentLoopStops.get(state.conversationId) ?? 0) !== stopsAtStart) return null;
+  // Nothing left to do: the planner's summary of the results is the loop's answer.
+  if (!response.task) {
+    return {
+      ok: false,
+      code: 'no-approved-actions',
+      ...(response.summary ? { summary: response.summary.slice(0, 500) } : {}),
+    };
+  }
+  const queued = await enqueueConversationPlan(
+    { id: state.conversationId },
+    [],
+    response.task,
+    response.summary || response.task.objective,
+    {
+      ...(response.modelFileName ? { modelFileName: response.modelFileName } : {}),
+      ...(response.planner ? { planner: response.planner } : {}),
+      elapsedMs: typeof response.elapsedMs === 'number' ? response.elapsedMs : Date.now() - startedAt,
+    },
+  );
+  return withLoopState(queued, response.continues === true, { ...state, round, results });
 }
 
 /** Queue a planned task under its conversation, durably — one path for model and recipe plans. */
 async function enqueueConversationPlan(
-  conversation: AgentConversation,
+  conversation: Pick<AgentConversation, 'id'>,
   disclosedContext: ReturnType<typeof agentConversationPlanContext>,
   task: AgentTask,
   summary: string,
@@ -481,6 +639,8 @@ export async function updateAgentConversationPlanQueue(
       : action === 'resume'
         ? resumeAgentQueueItem(queue, taskId, now)
         : cancelAgentQueueItem(queue, taskId, now);
+    // Cancel is also Stop for the tool-result loop: no later round is planned for this request.
+    if (action === 'cancel') stopAgentConversationLoops(conversationId);
     nextForReceipt = next;
     const receipt = await saveLocalAgentTaskQueueDurably(next);
     if (!receipt.ok) {
@@ -629,11 +789,22 @@ export async function runAgentConversationPlan(
     };
   }
   quarantinedAgentPlans.delete(taskId);
+  // The step that completes a task the planner is waiting on starts the next round. Awaited, so
+  // the control stays busy while the model plans and the follow-up is in the queue when it frees.
+  let followUp: AgentConversationPlanResult | null = null;
+  if (result.task.status === 'completed' && waitingAgentLoops.has(taskId)) {
+    try {
+      followUp = await planNextAgentLoopRound(taskId, result.task, t);
+    } catch {
+      followUp = { ok: false, code: 'planner-unavailable' };
+    }
+  }
   return {
     ok: true,
-    queue: result.queue,
+    queue: followUp?.ok ? followUp.queue : result.queue,
     task: result.task,
     stepId: step.id,
     events: result.events,
+    ...(followUp ? { followUp } : {}),
   };
 }

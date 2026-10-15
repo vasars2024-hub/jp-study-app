@@ -28,6 +28,7 @@ import {
 import { isLocalModelMissingError } from './localModelFiles';
 import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled, assertAiFeatureAllowed } from './aiFeatureGate';
 import { runLocalQwenPrompt } from './translate';
+import { LOCAL_JSON_GRAMMAR } from './aiLocalStructured';
 
 export interface AgentProviderExecutionOptions {
   /** The conversation's workflow preset. Absent or `ask` sends the prompt unchanged. */
@@ -49,6 +50,12 @@ export interface AgentProviderExecutionOptions {
   feature?: AiCloudFeatureId;
   onTextChunk?: (text: string) => void;
   onCloudEvent?: (event: AiProviderRuntimeEvent) => void;
+  /**
+   * The caller parses the reply as one JSON object (Explain). On the local model the reply is
+   * then decoded under the JSON grammar (W1-A) instead of as free prose; a chat reply leaves it
+   * unset and stays raw text.
+   */
+  jsonReply?: boolean;
 }
 
 export interface AgentProviderHistoryMessage {
@@ -345,8 +352,10 @@ async function runLocal(
       onTextChunk: stream,
       // A chat reply is prose. Without this the shared JSON extractor cut any
       // answer containing a code block, an object or a list down to that
-      // fragment, and the fragment was what the conversation saved.
-      raw: true,
+      // fragment, and the fragment was what the conversation saved. A caller
+      // that parses JSON (Explain) asks for the grammar instead, so the small
+      // model can only answer with an object.
+      ...(options.jsonReply ? { jsonGrammar: LOCAL_JSON_GRAMMAR } : { raw: true }),
       // The Agent's own model setting. It used to be ignored here: local chat
       // always ran on the translation model whatever the user had picked.
       ...(model ? { modelFileName: model } : {}),

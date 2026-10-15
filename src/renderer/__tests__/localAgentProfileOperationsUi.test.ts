@@ -185,15 +185,20 @@ describe('the editor renders the allow-list, not a count of it', () => {
     // has. An editor disabled for `builtIn: true` would reproduce it exactly.
     await mountEditor();
     const lookup = container?.querySelector<HTMLInputElement>('input[data-operation="dictionary.lookup"]');
-    // Grammar explanation has an adapter now (the study coach); the declaration still held
-    // back is the review-scheduling one whose false-success stub was removed.
+    // Grammar explanation has an adapter now (the study coach), and so does review scheduling.
     const grammar = container?.querySelector<HTMLInputElement>('input[data-operation="dictionary.explain-grammar"]');
     const schedule = container?.querySelector<HTMLInputElement>('input[data-operation="flashcard.schedule-reviews"]');
     expect(lookup?.disabled).toBe(false);
     expect(grammar?.disabled).toBe(false);
-    expect(schedule?.disabled).toBe(true);
-    expect(schedule?.checked).toBe(false);
-    expect(schedule?.closest('label')?.getAttribute('title')).toBe('false-success-stub-removed');
+    expect(schedule?.disabled).toBe(false);
+    // No label carries a raw operation id (or a reason code) as its tooltip: an operation that
+    // can be enabled has none, and its visible name is the translated one.
+    const titles = [...(container?.querySelectorAll('label.blanc-check') ?? [])]
+      .map((label) => label.getAttribute('title'))
+      .filter((title): title is string => title !== null);
+    expect(titles).toEqual([]);
+    expect(schedule?.closest('label')?.textContent).toContain('Schedule reviews');
+    expect(schedule?.closest('label')?.textContent).not.toContain('flashcard.schedule-reviews');
   });
 });
 

@@ -2,8 +2,12 @@ import { ipcMain } from 'electron';
 import path from 'node:path';
 import {
   buildLocalAgentSystemPrompt,
+  localAgentPlanGrammar,
+  MAX_AGENT_LOOP_ROUNDS,
   parseLocalAgentModelPlan,
   selectLocalAgentApprovedOperations,
+  type LocalAgentPromptToolResult,
+  type ParsedLocalAgentPlan,
 } from '../shared/localAgentPrompt';
 import { AGENT_TOOL_OPERATIONS, type AgentToolOperationId } from '../shared/localAgent';
 import {
@@ -12,7 +16,7 @@ import {
   type LocalAgentSettings,
 } from '../shared/localAgentSettings';
 import { effectiveAgentPermission } from '../shared/localAgentProfiles';
-import { operationsForPlanner } from '../shared/agentCloudStudyDataGate';
+import { operationsForPlanner, toolOutputForPlanner } from '../shared/agentCloudStudyDataGate';
 import { AI_PROVIDERS, type AiProviderId } from '../shared/aiProviders';
 import type {
   LocalAgentPlanFailureCode,
@@ -21,7 +25,12 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
-import { acquireLlamaSession, isLlamaSessionLost, type LlamaSessionHandle } from './llamaHost';
+import {
+  acquireLlamaSession,
+  isLlamaSessionLost,
+  type LlamaJsonGrammar,
+  type LlamaSessionHandle,
+} from './llamaHost';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentImageStagingIpc } from './agentImageStaging';
 import { registerAgentCardBatchStagingIpc } from './agentCardBatchStaging';
@@ -79,14 +88,85 @@ let loadPromise: Promise<LoadedAgentRuntime> | null = null;
 let inferenceChain: Promise<unknown> = Promise.resolve();
 let activeInferenceCount = 0;
 let lastError = '';
+let lastErrorCode: LocalAgentPlanFailureCode | null = null;
 let idleUnloadTimer: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * A refusal with the code the renderer translates. The message stays English diagnostic text for
+ * the log and the tests; no surface shows it (F3: codes mapped to keys, never `e.message`).
+ */
+class AgentPlanError extends Error {
+  constructor(readonly code: LocalAgentPlanFailureCode, message: string) {
+    super(message);
+    this.name = 'AgentPlanError';
+  }
+}
+
+function failureCodeOf(error: unknown): LocalAgentPlanFailureCode {
+  return error instanceof AgentPlanError ? error.code : 'planner-failed';
+}
+
+function recordFailure(error: unknown, fallback: string): void {
+  lastError = error instanceof Error ? error.message : fallback;
+  lastErrorCode = failureCodeOf(error);
+}
+
+function clearFailure(): void {
+  lastError = '';
+  lastErrorCode = null;
+}
+
 function cleanObjective(value: unknown): string {
-  if (typeof value !== 'string') throw new Error('A request is required.');
+  if (typeof value !== 'string') throw new AgentPlanError('invalid-request', 'A request is required.');
   const objective = value.trim();
-  if (!objective) throw new Error('A request is required.');
-  if (objective.length > 500) throw new Error('The request is too long.');
+  if (!objective) throw new AgentPlanError('invalid-request', 'A request is required.');
+  if (objective.length > 500) throw new AgentPlanError('objective-too-long', 'The request is too long.');
   return objective;
+}
+
+/** Validation of the model's reply; every way it can be wrong is one code to the user. */
+function parsePlan(...args: Parameters<typeof parseLocalAgentModelPlan>): ParsedLocalAgentPlan {
+  try {
+    return parseLocalAgentModelPlan(...args);
+  } catch (error) {
+    throw new AgentPlanError('plan-invalid', error instanceof Error ? error.message : 'The plan is invalid.');
+  }
+}
+
+/** The loop's round, bounded: a renderer cannot buy itself a fifth plan by sending round 0. */
+function loopRound(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(1, Math.min(MAX_AGENT_LOOP_ROUNDS, Math.floor(value)))
+    : 1;
+}
+
+/**
+ * The earlier rounds' tool results, as the planner of THIS request may read them. A cloud planner
+ * gets a study-data tool's output only after the user allowed sharing (`toolOutputForPlanner`);
+ * anything malformed is dropped rather than guessed at.
+ */
+function toolResultsForPlanner(
+  value: unknown,
+  planner: 'local' | 'cloud',
+  share: unknown,
+): LocalAgentPromptToolResult[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): LocalAgentPromptToolResult[] => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const raw = entry as Record<string, unknown>;
+    if (typeof raw.operation !== 'string' || !AGENT_OPERATION_IDS.has(raw.operation as AgentToolOperationId)) return [];
+    return [{
+      operation: raw.operation,
+      ...(typeof raw.label === 'string' && raw.label ? { label: raw.label } : {}),
+      ok: raw.ok === true,
+      output: toolOutputForPlanner(raw.operation, raw.output, planner, share),
+    }];
+  }).slice(-24);
+}
+
+/** `continue` means nothing on the last round, or for a plan with no steps to wait for. */
+function planContinues(parsed: ParsedLocalAgentPlan, round: number): boolean {
+  return parsed.continues && Boolean(parsed.task) && round < MAX_AGENT_LOOP_ROUNDS;
 }
 
 /**
@@ -211,11 +291,16 @@ async function countPromptTokens(session: LlamaSessionHandle, prompt: string): P
  * the system prompt and the objective — the agent would plan confidently against text it could no
  * longer see. The failure is now explicit and names the setting that fixes it.
  */
-async function promptWithTimeout(current: LoadedAgentRuntime, prompt: string): Promise<string> {
+async function promptWithTimeout(
+  current: LoadedAgentRuntime,
+  prompt: string,
+  grammar?: LlamaJsonGrammar,
+): Promise<string> {
   const promptTokens = await countPromptTokens(current.session, prompt);
   const room = current.contextSize - promptTokens - CHAT_TEMPLATE_RESERVE_TOKENS;
   if (room < MIN_USABLE_OUTPUT_TOKENS) {
-    throw new Error(
+    throw new AgentPlanError(
+      'context-overflow',
       `This request does not fit the local agent's context: the prompt alone is about ` +
         `${promptTokens} of the ${current.contextSize} tokens available. Raise the context size in ` +
         `Settings, or shorten the request and the context attached to it.`,
@@ -231,6 +316,8 @@ async function promptWithTimeout(current: LoadedAgentRuntime, prompt: string): P
     return await current.session.prompt(prompt, {
       maxTokens: Math.min(PLAN_MAX_OUTPUT_TOKENS, room),
       signal: controller.signal,
+      // Constrained decoding (W1-A): the reply can only be a plan naming approved operations.
+      ...(grammar ? { grammar } : {}),
     });
   } catch (err) {
     // Reachable only since the handle stopped resolving aborted generations with their partial
@@ -238,7 +325,7 @@ async function promptWithTimeout(current: LoadedAgentRuntime, prompt: string): P
     // saying so — the truncated plan went to `parseLocalAgentModelPlan` and failed there instead.
     // `lastError` is surfaced verbatim to the user, so it names the deadline rather than the abort.
     if (timedOut && err instanceof Error && err.name === 'AbortError') {
-      throw new Error(`The local agent timed out after ${Math.round(PLAN_TIMEOUT_MS / 1000)}s.`);
+      throw new AgentPlanError('timeout', `The local agent timed out after ${Math.round(PLAN_TIMEOUT_MS / 1000)}s.`);
     }
     throw err;
   } finally {
@@ -284,6 +371,7 @@ async function planWithCloud(
   request: LocalAgentPlanRequest,
   startedAt: number,
 ): Promise<LocalAgentPlanResponse> {
+  const round = loopRound(request.round);
   // The Agent's cloud opt-in covers its planner too: a scheduled automation
   // that falls back to the cloud must not bypass it.
   if (!aiCloudAllowedFor('agentChat')) {
@@ -307,6 +395,9 @@ async function planWithCloud(
     ),
     memories: sendPrivate ? memoriesInAgentScope(settings, request.memories) : [],
     applicationState: settings.privacyMode || !sendPrivate ? {} : request.applicationState,
+    round,
+    // The same gate as the operations above, for what those operations returned.
+    toolResults: toolResultsForPlanner(request.toolResults, 'cloud', settings.agentCloudShareStudyData),
   };
   const approvedOperations = selectLocalAgentApprovedOperations(promptContext);
   const system = buildLocalAgentSystemPrompt(promptContext);
@@ -322,7 +413,7 @@ async function planWithCloud(
       timeoutMs: PLAN_TIMEOUT_MS,
       retryAttempts: 1,
     });
-    const parsed = parseLocalAgentModelPlan(
+    const parsed = parsePlan(
       result.text,
       `agent-${startedAt}`,
       objective,
@@ -330,21 +421,23 @@ async function planWithCloud(
       startedAt,
       approvedOperations,
     );
-    lastError = '';
+    clearFailure();
     return {
       ok: true,
       summary: parsed.summary,
       task: parsed.task,
       planner: 'cloud',
       elapsedMs: Date.now() - startedAt,
+      ...(planContinues(parsed, round) ? { continues: true } : {}),
     };
   } catch (error) {
-    lastError = error instanceof Error ? error.message : 'The cloud planner failed.';
+    recordFailure(error, 'The cloud planner failed.');
     if (error instanceof AiProviderRuntimeError) {
-      if (error.code === 'missing-credential') return refusal('cloud-key-missing', lastError, startedAt);
-      if (error.code === 'spend-budget') return refusal('spend-budget', lastError, startedAt);
+      if (error.code === 'missing-credential') lastErrorCode = 'cloud-key-missing';
+      else if (error.code === 'spend-budget') lastErrorCode = 'spend-budget';
+      else if (error.code === 'timeout') lastErrorCode = 'timeout';
     }
-    return refusal('planner-failed', lastError, startedAt);
+    return refusal(lastErrorCode ?? 'planner-failed', lastError, startedAt);
   } finally {
     activeInferenceCount = Math.max(0, activeInferenceCount - 1);
   }
@@ -354,6 +447,7 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
   const startedAt = Date.now();
   const objective = cleanObjective(request.objective);
   const settings = normalizeLocalAgentSettings(request.settings);
+  const round = loopRound(request.round);
   // Before anything else: the switch covers scheduled automations, which plan with no window open.
   if (!aiFeaturesEnabled()) return refusal('ai-off', AI_FEATURES_OFF_MESSAGE, startedAt);
   if (!settings.enabled || settings.backend === 'disabled') {
@@ -391,12 +485,14 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
         // the central Agent's planner and Blanc's separate shell both reach.
         memories: memoriesInAgentScope(settings, request.memories),
         applicationState: settings.privacyMode ? {} : request.applicationState,
+        round,
+        toolResults: toolResultsForPlanner(request.toolResults, 'local', settings.agentCloudShareStudyData),
       };
       const approvedOperations = selectLocalAgentApprovedOperations(promptContext);
       const system = buildLocalAgentSystemPrompt(promptContext);
       const prompt = `${system}\n\nUser request:\n${objective}`;
-      const response = await promptWithTimeout(current, prompt);
-      return parseLocalAgentModelPlan(
+      const response = await promptWithTimeout(current, prompt, localAgentPlanGrammar(approvedOperations));
+      return parsePlan(
         response,
         `agent-${startedAt}`,
         objective,
@@ -405,7 +501,7 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
         approvedOperations,
       );
     });
-    lastError = '';
+    clearFailure();
     return {
       ok: true,
       summary: loaded.summary,
@@ -413,9 +509,10 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
       modelFileName: path.basename(modelPath),
       planner: 'local',
       elapsedMs: Date.now() - startedAt,
+      ...(planContinues(loaded, round) ? { continues: true } : {}),
     };
   } catch (error) {
-    lastError = error instanceof Error ? error.message : 'The local model failed.';
+    recordFailure(error, 'The local model failed.');
     throw error;
   } finally {
     activeInferenceCount = Math.max(0, activeInferenceCount - 1);
@@ -432,6 +529,7 @@ function runtimeStatus(): LocalAgentRuntimeStatus {
       contextSize: runtime.contextSize,
     } : {}),
     ...(lastError ? { lastError } : {}),
+    ...(lastErrorCode ? { lastErrorCode } : {}),
   };
 }
 
@@ -439,13 +537,13 @@ export function registerLocalAgentIpc(): void {
   ipcMain.handle('localAgent:plan', async (_event, raw: unknown): Promise<LocalAgentPlanResponse> => {
     try {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-        throw new Error('Invalid local agent request.');
+        throw new AgentPlanError('invalid-request', 'Invalid local agent request.');
       }
       return await plan(raw as LocalAgentPlanRequest);
     } catch (error) {
       return {
         ok: false,
-        code: 'planner-failed',
+        code: failureCodeOf(error),
         error: error instanceof Error ? error.message : 'The local agent could not create a plan.',
       };
     }

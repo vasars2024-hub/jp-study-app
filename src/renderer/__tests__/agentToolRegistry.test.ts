@@ -32,20 +32,13 @@ describe('central Agent tool registry', () => {
     expect(matrix.filter((entry) => entry.available).map((entry) => entry.definition.id).sort())
       .toEqual(Object.keys(handlers).sort());
     expect(availableAgentToolOperationIds(handlers))
-      .toHaveLength(AGENT_TOOL_OPERATIONS.length - 1);
+      .toHaveLength(AGENT_TOOL_OPERATIONS.length);
   });
 
-  it('does not advertise the queue stub as scheduling, and installs the grammar analysis', () => {
+  it('installs review scheduling and the grammar analysis', () => {
     const handlers = createCentralAgentToolRegistry(t);
-    const matrix = agentToolCapabilityMatrix(handlers);
-    const unavailable = Object.fromEntries(matrix
-      .filter(unavailableCapability)
-      .map((entry) => [entry.definition.id, entry.reason]));
-
-    expect(unavailable).toMatchObject({
-      'flashcard.schedule-reviews': 'false-success-stub-removed',
-    });
-    expect(handlers['flashcard.schedule-reviews']).toBeUndefined();
+    // A real adapter now (`agentScheduleReviews`), with its own Undo; see agentScheduleReviews.test.ts.
+    expect(handlers['flashcard.schedule-reviews']).toBeTypeOf('function');
     // The study coach answers these from the grammar library (`studyCoachAgentHandlers.ts`).
     expect(handlers['dictionary.explain-grammar']).toBeTypeOf('function');
     expect(handlers['dictionary.analyze-sentence']).toBeTypeOf('function');
@@ -57,11 +50,9 @@ describe('central Agent tool registry', () => {
       .map((entry) => entry.definition.id)
       .sort();
 
-    // The one remaining entry is unavailable by a decision, not by a missing
-    // adapter: its false-success stub was removed.
-    expect(unavailable).toEqual([
-      'flashcard.schedule-reviews',
-    ]);
+    // Nothing is declared without an adapter any more: review scheduling, the last
+    // entry, has one.
+    expect(unavailable).toEqual([]);
     expect(new Set(agentToolCapabilityMatrix(createCentralAgentToolRegistry(t))
       .filter(unavailableCapability)
       .map((entry) => entry.reason)))

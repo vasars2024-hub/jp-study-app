@@ -20,9 +20,11 @@ import {
   retryAgentConversationPlanSave,
   runAgentConversationPlan,
   updateAgentConversationPlanQueue,
+  type AgentConversationPlanResult,
   type AgentConversationRunAction,
   type AgentConversationQueueAction,
 } from '../../agentConversationPlanner';
+import { MAX_AGENT_LOOP_ROUNDS } from '../../../shared/localAgentPrompt';
 
 const VISIBLE_PLAN_LIMIT = 8;
 const VALUE_PREVIEW_LIMIT = 240;
@@ -37,6 +39,20 @@ function valuePreview(value: unknown): string {
   } catch {
     return '';
   }
+}
+
+/** The tool-result loop's line under the queue title, for the round the last step started. */
+function agentLoopNote(
+  followUp: AgentConversationPlanResult,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (followUp.ok) {
+    return t('aiAgent.loop.planned', { round: followUp.round ?? 2, max: MAX_AGENT_LOOP_ROUNDS });
+  }
+  if (followUp.code === 'no-approved-actions') {
+    return followUp.summary ? t('aiAgent.loop.doneSummary', { summary: followUp.summary }) : t('aiAgent.loop.done');
+  }
+  return t(`agent.plan.error.${followUp.code}`);
 }
 
 export function AgentConversationPlanQueue({
@@ -63,6 +79,8 @@ export function AgentConversationPlanQueue({
 }) {
   const { t } = useT();
   const [runningTaskIds, setRunningTaskIds] = useState<ReadonlySet<string>>(new Set());
+  /** What the tool-result loop did after the last step: planned the next round, or finished. */
+  const [loopNote, setLoopNote] = useState<string | null>(null);
   const [, setQuarantineRevision] = useState(0);
   const [now, setNow] = useState(Date.now);
   const items = (queue?.items ?? [])
@@ -78,6 +96,7 @@ export function AgentConversationPlanQueue({
 
   const act = async (taskId: string, action: AgentConversationQueueAction): Promise<void> => {
     const result = await updateAgentConversationPlanQueue(conversationId, taskId, action);
+    if (action === 'cancel' && result.ok) setLoopNote(null);
     onTimeline?.(agentPlanControlTimelineProjection(
       conversationId,
       taskId,
@@ -93,6 +112,7 @@ export function AgentConversationPlanQueue({
     setRunningTaskIds((current) => new Set(current).add(taskId));
     try {
       const result = await runAgentConversationPlan(conversationId, taskId, action, t);
+      if (result.ok && result.followUp) setLoopNote(agentLoopNote(result.followUp, t));
       for (const event of result.events ?? []) {
         onTimeline?.(agentExecutionTimelineProjection(conversationId, event));
       }
@@ -238,6 +258,7 @@ export function AgentConversationPlanQueue({
   return (
     <section className="agent-plan-queue" aria-label={t('agent.plan.queue.title')}>
       <h3 className="agent-subheading">{t('agent.plan.queue.title')}</h3>
+      {loopNote ? <p className="agent-plan-loop-status" role="status">{loopNote}</p> : null}
       {queue === null ? (
         <p className="agent-plan-empty">{t('agent.plan.queue.loading')}</p>
       ) : items.length === 0 ? (

@@ -20,6 +20,7 @@ import {
   loadDeck,
   loadDeckFolders,
   removeDeckCards,
+  setDeckCardsDueAt,
   updateDeckCard,
   type DeckFlashcard,
 } from './flashcardDeck';
@@ -74,8 +75,7 @@ export type AgentToolRegistryTranslate = (key: string, vars?: TVars) => string;
 
 export type AgentToolUnavailableReason =
   | 'adapter-not-implemented'
-  | 'dedicated-analysis-required'
-  | 'false-success-stub-removed';
+  | 'dedicated-analysis-required';
 
 export type AgentToolCapability =
   | { definition: AgentToolOperationDefinition; available: true }
@@ -85,9 +85,12 @@ export type AgentToolCapability =
       reason: AgentToolUnavailableReason;
     };
 
-const UNAVAILABLE: Readonly<Partial<Record<AgentToolOperationId, AgentToolUnavailableReason>>> = {
-  'flashcard.schedule-reviews': 'false-success-stub-removed',
-};
+/**
+ * Declared operations with no adapter in this build, and why. Empty since
+ * `flashcard.schedule-reviews` got its adapter (`agentScheduleReviews`); a new declaration
+ * without one must be classified here, or `agentToolCapabilityMatrix` throws.
+ */
+const UNAVAILABLE: Readonly<Partial<Record<AgentToolOperationId, AgentToolUnavailableReason>>> = {};
 
 function textArgument(
   t: AgentToolRegistryTranslate,
@@ -554,6 +557,91 @@ function agentRescheduleEvent(
   };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** One call moves at most this many reviews, so its Undo record stays a bounded size. */
+const SCHEDULE_REVIEWS_LIMIT = 300;
+
+function boundedInteger(value: unknown, min: number, max: number, fallback: number): number {
+  const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.round(number))) : fallback;
+}
+
+interface ReviewMove {
+  id: string;
+  /** Where the card was due before the move: what Undo puts back. */
+  dueAt: number;
+  /** Where the move put it: Undo refuses unless the card is still exactly there. */
+  expect: number;
+}
+
+function readReviewMoves(value: unknown): ReviewMove[] | null {
+  if (!Array.isArray(value) || !value.length || value.length > SCHEDULE_REVIEWS_LIMIT) return null;
+  const moves: ReviewMove[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return null;
+    const move = raw as Record<string, unknown>;
+    if (typeof move.id !== 'string' || !Number.isFinite(move.dueAt) || !Number.isFinite(move.expect)) return null;
+    moves.push({ id: move.id, dueAt: move.dueAt as number, expect: move.expect as number });
+  }
+  return moves;
+}
+
+/**
+ * `flashcard.schedule-reviews`: snooze the reviews due now by `days`, or keep `keep` of the most
+ * overdue and snooze the rest (a limit for today), optionally in one folder. Only scheduled cards
+ * the queue would show now are moved — never a new card, a suspended one, or one Anki schedules —
+ * and only their due time changes. The result carries its own way back (`undo`), which
+ * `agentExecutionRecord` turns into an Undo of the same operation; that Undo refuses, changing
+ * nothing, if any of the cards was reviewed or moved since.
+ */
+function agentScheduleReviews(
+  t: AgentToolRegistryTranslate,
+  arguments_: Readonly<Record<string, unknown>>,
+  now = Date.now(),
+): Record<string, unknown> {
+  if (arguments_.undo && typeof arguments_.undo === 'object' && !Array.isArray(arguments_.undo)) {
+    const undo = arguments_.undo as Record<string, unknown>;
+    const moves = undo.kind === 'restore' ? readReviewMoves(undo.cards) : null;
+    if (!moves) throw new Error(t('blanc.agent.error.needsArgument', { name: 'undo' }));
+    const live = new Map(loadDeck().map((card) => [card.id, card]));
+    // Every card is checked before the first one moves: all of them go back, or none do.
+    for (const move of moves) {
+      if (live.get(move.id)?.srs?.dueAt !== move.expect) throw changedSince(t, 'aiAgent.reviews.changedSince');
+    }
+    const restored = setDeckCardsDueAt(moves.map((move) => ({ id: move.id, dueAt: move.dueAt })));
+    return { restored: restored.length, ids: restored };
+  }
+  const days = boundedInteger(arguments_.days, 1, 30, 1);
+  const keep = boundedInteger(arguments_.keep, 0, 10_000, 0);
+  const folder = typeof arguments_.folder === 'string' && arguments_.folder.trim()
+    ? arguments_.folder.trim().slice(0, 120)
+    : null;
+  const deck = loadDeck();
+  // A folder exists when it was created (even empty) or when a card sits in it.
+  if (folder && !loadDeckFolders().includes(folder) && !deck.some((card) => card.folder === folder)) {
+    throw new Error(t('aiAgent.reviews.folderNotFound', { folder }));
+  }
+  const due = dueDeckCards(deck, now)
+    .filter((card) => card.srs && Number.isFinite(card.srs.dueAt) && (!folder || card.folder === folder))
+    // Most overdue first: those are the ones a daily limit keeps.
+    .sort((a, b) => (a.srs?.dueAt ?? 0) - (b.srs?.dueAt ?? 0));
+  const postponed = due.slice(keep, keep + SCHEDULE_REVIEWS_LIMIT);
+  const dueAt = now + days * DAY_MS;
+  const moves: ReviewMove[] = postponed.map((card) => ({ id: card.id, dueAt: card.srs?.dueAt ?? now, expect: dueAt }));
+  const moved = new Set(setDeckCardsDueAt(moves.map((move) => ({ id: move.id, dueAt: move.expect }))));
+  const done = moves.filter((move) => moved.has(move.id));
+  return {
+    due: due.length,
+    kept: Math.min(keep, due.length),
+    postponed: done.length,
+    days,
+    ...(folder ? { folder } : {}),
+    ...(due.length - keep > SCHEDULE_REVIEWS_LIMIT ? { leftDue: due.length - keep - SCHEDULE_REVIEWS_LIMIT } : {}),
+    ids: done.map((move) => move.id),
+    ...(done.length ? { undo: { kind: 'restore', cards: done } } : {}),
+  };
+}
+
 /** Compact, read-only study statistics for the agent (no per-book titles beyond the top five). */
 function agentStatsSummary(): Record<string, unknown> {
   const summary = getSummary();
@@ -699,6 +787,7 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
       if (!loadDeck().some((card) => card.id === id)) throw new Error(t('blanc.agent.error.cardNotFound'));
       return { cards: updateDeckCard(id, patch).length, modified: id, fields: Object.keys(patch) };
     },
+    'flashcard.schedule-reviews': (arguments_) => agentScheduleReviews(t, arguments_),
     'flashcard.delete-deck': (arguments_) => (
       deleteDeckFolder(textArgument(t, arguments_, 'name'))
     ),

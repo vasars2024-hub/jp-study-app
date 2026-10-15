@@ -173,13 +173,16 @@ import {
   AGENT_CONVERSATION_PLAN_CONTEXT_LIMIT,
   agentConversationPlanContext,
   createAgentConversationPlan,
+  isAgentConversationLoopWaiting,
   isAgentConversationPlanQuarantined,
   resetAgentConversationPlannerForTests,
+  stopAgentConversationLoops,
   retryAgentConversationPlanSave,
   runAgentConversationPlan,
   updateAgentConversationPlanQueue,
 } from '../agentConversationPlanner';
 import { AgentConversationPlanQueue } from '../components/agent/AgentConversationPlanQueue';
+import { MAX_AGENT_LOOP_ROUNDS } from '../../shared/localAgentPrompt';
 
 const t = (key: string): string => key;
 const queueItems = (): AgentQueueItem[] => harness.queue.items as AgentQueueItem[];
@@ -807,5 +810,121 @@ describe('Agent conversation plan queue surface', () => {
       callId: 'call-cards',
       entityIds: ['card-7'],
     }));
+  });
+});
+
+describe('the tool-result loop (W4-B)', () => {
+  function lookupTask(id: string) {
+    return createAgentTask(id, 'Teach me 猫', [{
+      id: `${id}-step-1`,
+      label: 'Look up 猫',
+      request: { callId: `${id}-call-1`, operation: 'dictionary.lookup', arguments: { term: '猫' } },
+    }], 10);
+  }
+
+  function plannerReplying(replies: Array<Record<string, unknown>>) {
+    const calls: Array<Record<string, unknown>> = [];
+    (window as unknown as { api: Record<string, unknown> }).api = {
+      localAgentPlan: vi.fn(async (request: Record<string, unknown>) => {
+        calls.push(request);
+        return replies.shift() ?? { ok: true, summary: 'Nothing else to do.', task: null };
+      }),
+    };
+    return calls;
+  }
+
+  beforeEach(() => {
+    harness.handlers = { 'dictionary.lookup': () => ({ term: '猫', meaning: 'cat-LOOP-RESULT' }) };
+  });
+
+  it('plans, runs the step, feeds its result back and plans the next round', async () => {
+    const calls = plannerReplying([
+      { ok: true, summary: 'Look it up first.', task: lookupTask('agent-r1'), planner: 'local', continues: true },
+      { ok: true, summary: 'Now the follow-up.', task: lookupTask('agent-r2'), planner: 'local' },
+    ]);
+    const created = await createAgentConversationPlan(conversation('chat-1', 0), 'Teach me 猫', t, { recipes: false });
+    expect(created).toMatchObject({ ok: true, taskId: 'agent-r1', round: 1, continues: true });
+    expect(isAgentConversationLoopWaiting('chat-1', 'agent-r1')).toBe(true);
+
+    const run = await runAgentConversationPlan('chat-1', 'agent-r1', 'run-next', t);
+    expect(run.ok).toBe(true);
+    expect(run.ok && run.followUp).toMatchObject({ ok: true, taskId: 'agent-r2', round: 2 });
+    expect(calls[1]).toMatchObject({
+      objective: 'Teach me 猫',
+      round: 2,
+      toolResults: [{ operation: 'dictionary.lookup', label: 'Look up 猫', ok: true, output: { term: '猫', meaning: 'cat-LOOP-RESULT' } }],
+    });
+    // The next round's plan is an ordinary queued plan of the same conversation.
+    expect(queueItems().find((item) => item.id === 'agent-r2')).toMatchObject({
+      status: 'queued',
+      origin: { conversationId: 'chat-1' },
+    });
+
+    // Round 2 did not ask to continue: completing it plans nothing more.
+    const run2 = await runAgentConversationPlan('chat-1', 'agent-r2', 'run-next', t);
+    expect(run2.ok && run2.followUp).toBeFalsy();
+    expect(calls).toHaveLength(2);
+  });
+
+  it('ends with the planner\'s summary when nothing is left to do', async () => {
+    plannerReplying([
+      { ok: true, summary: 'Look it up first.', task: lookupTask('agent-s1'), planner: 'local', continues: true },
+      { ok: true, summary: '猫 means cat.', task: null, planner: 'local' },
+    ]);
+    await createAgentConversationPlan(conversation('chat-1', 0), 'Teach me 猫', t, { recipes: false });
+    const run = await runAgentConversationPlan('chat-1', 'agent-s1', 'run-next', t);
+    expect(run.ok && run.followUp).toEqual({ ok: false, code: 'no-approved-actions', summary: '猫 means cat.' });
+  });
+
+  it('Cancel is Stop: a cancelled loop plans no further round, even one already being planned', async () => {
+    plannerReplying([
+      { ok: true, summary: 'Look it up first.', task: lookupTask('agent-c1'), planner: 'local', continues: true },
+    ]);
+    await createAgentConversationPlan(conversation('chat-1', 0), 'Teach me 猫', t, { recipes: false });
+    expect((await updateAgentConversationPlanQueue('chat-1', 'agent-c1', 'cancel')).ok).toBe(true);
+    expect(isAgentConversationLoopWaiting('chat-1', 'agent-c1')).toBe(false);
+
+    // In flight: Stop pressed while the model plans round 2 drops that plan.
+    let release: (value: unknown) => void = () => undefined;
+    const pending = new Promise((resolve) => { release = resolve; });
+    let call = 0;
+    (window as unknown as { api: Record<string, unknown> }).api = {
+      localAgentPlan: vi.fn(async () => {
+        call += 1;
+        if (call === 1) return { ok: true, summary: 'First.', task: lookupTask('agent-c2'), planner: 'local', continues: true };
+        await pending;
+        return { ok: true, summary: 'Second.', task: lookupTask('agent-c3'), planner: 'local' };
+      }),
+    };
+    await createAgentConversationPlan(conversation('chat-1', 0), 'Teach me 猫', t, { recipes: false });
+    const running = runAgentConversationPlan('chat-1', 'agent-c2', 'run-next', t);
+    await vi.waitFor(() => expect(call).toBe(2));
+    stopAgentConversationLoops('chat-1');
+    release(null);
+    const run = await running;
+    expect(run.ok && run.followUp).toBeFalsy();
+    expect(queueItems().some((item) => item.id === 'agent-c3')).toBe(false);
+  });
+
+  it(`stops after ${MAX_AGENT_LOOP_ROUNDS} rounds even if the planner keeps asking`, async () => {
+    let round = 0;
+    const calls: Array<Record<string, unknown>> = [];
+    (window as unknown as { api: Record<string, unknown> }).api = {
+      localAgentPlan: vi.fn(async (request: Record<string, unknown>) => {
+        calls.push(request);
+        round += 1;
+        return { ok: true, summary: `Round ${round}.`, task: lookupTask(`agent-m${round}`), planner: 'local', continues: true };
+      }),
+    };
+    const created = await createAgentConversationPlan(conversation('chat-1', 0), 'Teach me 猫', t, { recipes: false });
+    expect(created.ok).toBe(true);
+    for (let index = 1; index <= MAX_AGENT_LOOP_ROUNDS; index += 1) {
+      const run = await runAgentConversationPlan('chat-1', `agent-m${index}`, 'run-next', t);
+      expect(run.ok).toBe(true);
+      if (index < MAX_AGENT_LOOP_ROUNDS) expect(run.ok && run.followUp).toMatchObject({ ok: true, round: index + 1 });
+      else expect(run.ok && run.followUp).toBeFalsy();
+    }
+    expect(calls).toHaveLength(MAX_AGENT_LOOP_ROUNDS);
+    expect(calls.map((request) => request.round ?? 1)).toEqual([1, 2, 3, 4]);
   });
 });

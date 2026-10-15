@@ -19,8 +19,7 @@ export type AgentCapabilityAvailabilityReason =
   | 'profile-operation-disabled'
   | 'permission-insufficient'
   | 'adapter-not-implemented'
-  | 'dedicated-analysis-required'
-  | 'false-success-stub-removed';
+  | 'dedicated-analysis-required';
 
 export interface AgentCapabilityDirectoryRow {
   id: AgentToolOperationId;

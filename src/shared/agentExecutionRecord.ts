@@ -137,6 +137,18 @@ export const AGENT_OPERATION_RECORD_CONTRACTS: Readonly<
       return [{ id, date, undo }];
     },
   },
+  // Snoozed reviews are undoable: the adapter returns each card's previous due time and the
+  // one it set; the inverse puts them all back, or refuses if any card was reviewed since.
+  'flashcard.schedule-reviews': {
+    claim: 'updated',
+    entityType: 'flashcard',
+    entityIds: propertyIds('ids'),
+    inverseArguments: (result) => {
+      const undo = record(record(result)?.undo);
+      if (!undo || undo.kind !== 'restore' || !Array.isArray(undo.cards) || !undo.cards.length) return null;
+      return [{ undo }];
+    },
+  },
   'media.add-item': {
     claim: 'created',
     entityType: 'media-item',

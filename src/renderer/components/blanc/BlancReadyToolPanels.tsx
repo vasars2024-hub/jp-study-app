@@ -88,6 +88,7 @@ import {
 import { AgentProfileOperationsEditor, agentPermissionLabelKey } from './AgentProfileOperations';
 import { AgentAutomationEditor } from '../agent/AgentAutomationEditor';
 import { localizeAgentStepError } from '../agent/agentExecutionTargets';
+import { agentPlanFailureKey } from '../../agentPlanFailureKeys';
 
 // No Study OS stylesheet here: every panel in this file renders Blanc's own
 // classes (`blanc-*`), so it does not need `studyos-compat.css` (~500 KB). It
@@ -395,7 +396,7 @@ export function LocalAgentPanel() {
           : [],
       });
       if (!response.ok) {
-        setStatus(response.error ?? t('blanc.agent.status.planFailed'));
+        setStatus(t(agentPlanFailureKey(response.code)));
         return;
       }
       setSummary(response.summary ?? t('blanc.agent.status.planReady'));
@@ -765,7 +766,7 @@ export function LocalAgentPanel() {
           {t('blanc.agent.runtime.label')}: {runtimeStatus.loaded ? t('blanc.agent.runtime.loaded') : t('blanc.agent.runtime.notLoaded')}
           {runtimeStatus.busy ? ` · ${t('blanc.agent.runtime.working')}` : ''}
           {runtimeStatus.contextSize ? ` · ${t('blanc.agent.runtime.context', { size: runtimeStatus.contextSize })}` : ''}
-          {runtimeStatus.lastError ? ` · ${runtimeStatus.lastError}` : ''}
+          {runtimeStatus.lastErrorCode ? ` · ${t(agentPlanFailureKey(runtimeStatus.lastErrorCode))}` : ''}
         </p>
         <p className="blanc-note">
           {t('blanc.agent.modelsFound', {

@@ -16,7 +16,45 @@ export interface LocalAgentPromptContext {
   availableOperations?: readonly AgentToolOperationId[];
   memories?: readonly AgentMemoryEntry[];
   applicationState?: Readonly<Record<string, unknown>>;
+  /**
+   * The tool-result loop. `round` is 1-based; from round 1 on the planner may ask to see what its
+   * steps return (`"continue": true`), and from round 2 on `toolResults` holds what the earlier
+   * rounds' steps returned, already gated for the planner that will read them.
+   */
+  round?: number;
+  toolResults?: readonly LocalAgentPromptToolResult[];
 }
+
+/** One earlier step's outcome, as the planner reads it. */
+export interface LocalAgentPromptToolResult {
+  operation: string;
+  label?: string;
+  ok: boolean;
+  output?: unknown;
+}
+
+/**
+ * Plan, run, read the results, plan again — at most this many plans per request. Small on
+ * purpose: every round is a full model call, and every step of every round still waits for the
+ * user's approval in the queue.
+ */
+export const MAX_AGENT_LOOP_ROUNDS = 4;
+/** What one tool output may add to the next prompt; a list of 3,000 cards is not a result. */
+const MAX_TOOL_OUTPUT_CHARACTERS = 2_000;
+/** The most recent results the next plan sees. */
+const MAX_TOOL_RESULTS = 12;
+
+/**
+ * Argument documentation kept here rather than in `localAgent.ts`'s `ARGUMENT_HINTS`, which is
+ * on the startup path of every window: only the planner prompt reads these.
+ */
+const PROMPT_ARGUMENT_HINTS: Partial<Record<AgentToolOperationId, Readonly<Record<string, string>>>> = {
+  'flashcard.schedule-reviews': {
+    days: 'Postpone the reviews due now by this many days, 1 to 30. Default 1.',
+    keep: 'Keep this many of the most overdue reviews due today and postpone only the rest (a daily limit for today). Default 0: postpone them all.',
+    folder: 'Only reviews in this deck folder (from flashcard.list-decks). Default: every folder.',
+  },
+};
 
 const MAX_PROMPT_CONTEXT_CHARACTERS = 16_000;
 const MAX_MODEL_RESPONSE_CHARACTERS = 128_000;
@@ -69,7 +107,9 @@ export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): s
     ...(definition.requiredArguments.length
       ? { requiredArguments: definition.requiredArguments }
       : {}),
-    ...(definition.argumentHints ? { optionalArguments: definition.argumentHints } : {}),
+    ...(definition.argumentHints ?? PROMPT_ARGUMENT_HINTS[definition.id]
+      ? { optionalArguments: definition.argumentHints ?? PROMPT_ARGUMENT_HINTS[definition.id] }
+      : {}),
     }));
   const promptContext = boundedJson({
     memories: context.memories ?? [],
@@ -79,6 +119,14 @@ export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): s
   // "what should I study?" picks it far more reliably than one left to infer it from labels.
   const routes = STUDY_ROUTES.filter(([operation]) => approved.has(operation))
     .map(([operation, request]) => `- ${request} -> ${operation}`);
+  const round = Math.max(1, Math.min(MAX_AGENT_LOOP_ROUNDS, Math.floor(context.round ?? 1)));
+  const finalRound = round >= MAX_AGENT_LOOP_ROUNDS;
+  const results = (context.toolResults ?? []).slice(-MAX_TOOL_RESULTS).map((result) => ({
+    operation: result.operation,
+    ...(result.label ? { label: result.label.slice(0, 200) } : {}),
+    ok: result.ok,
+    output: boundedJson(result.output ?? null, MAX_TOOL_OUTPUT_CHARACTERS),
+  }));
   return [
     'You are the offline planning model for Gum, a language study app (Japanese, Chinese and Russian).',
     'Return a concise plan, not hidden chain-of-thought. Never claim an action already happened.',
@@ -87,7 +135,14 @@ export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): s
     'Sensitive operations will be confirmed by the controller. Never invent confirmation.',
     'If the request cannot be completed with approved operations, return an empty steps array and explain why in summary.',
     'Return JSON only in this exact shape:',
-    '{"summary":"short user-visible plan summary","steps":[{"label":"user-visible step","operation":"approved.operation","arguments":{}}]}',
+    '{"summary":"short user-visible plan summary","steps":[{"label":"user-visible step","operation":"approved.operation","arguments":{}}],"continue":false}',
+    finalRound
+      ? 'This is the last planning round: "continue" must be false.'
+      : 'Set "continue" to true only when the next steps depend on what these steps return: then plan only the steps that read, and you will be shown their results to plan the rest. Otherwise set it to false.',
+    ...(results.length ? [
+      `Planning round ${round} of ${MAX_AGENT_LOOP_ROUNDS}. These steps already ran, and returned:\n${boundedJson(results, MAX_PROMPT_CONTEXT_CHARACTERS)}`,
+      'Plan only what is still needed. Do not repeat a step that already succeeded. If nothing is left to do, return an empty steps array and summarize the results for the user.',
+    ] : []),
     `Configured permission: ${context.permission}`,
     ...(context.profile ? [
       `Assistant profile: ${context.profile.name} (${context.profile.role})`,
@@ -119,11 +174,14 @@ interface RawModelStep {
 interface RawModelPlan {
   summary?: unknown;
   steps?: unknown;
+  continue?: unknown;
 }
 
 export interface ParsedLocalAgentPlan {
   summary: string;
   task: AgentTask | null;
+  /** The planner asked to see these steps' results before planning the rest (never with no steps). */
+  continues: boolean;
 }
 
 /**
@@ -211,7 +269,7 @@ export function parseLocalAgentModelPlan(
   const summary = typeof raw.summary === 'string' ? raw.summary.trim().slice(0, 500) : '';
   if (!summary) throw new Error('The local model plan needs a summary.');
   if (!Array.isArray(raw.steps)) throw new Error('The local model plan needs a steps array.');
-  if (!raw.steps.length) return { summary, task: null };
+  if (!raw.steps.length) return { summary, task: null, continues: false };
   const steps = raw.steps.map((rawStep, index) => {
     if (!rawStep || typeof rawStep !== 'object' || Array.isArray(rawStep)) {
       throw new Error(`Local model step ${index + 1} is invalid.`);
@@ -274,5 +332,41 @@ export function parseLocalAgentModelPlan(
   return {
     summary,
     task: createAgentTask(taskId, objective, steps, now),
+    continues: raw.continue === true,
+  };
+}
+
+/**
+ * The plan's shape as a JSON-schema grammar for the local model (W1-A, `LlamaJsonGrammar`): the
+ * reply can only be a plan, and a step can only name an operation on the approved list. With
+ * nothing approved there is no operation to enumerate, so any JSON object is the constraint and
+ * the parser's refusal stays the check. A backend that cannot build the schema drops it and
+ * decodes freely; the prompt's own shape sentence and `parseLocalAgentModelPlan` still hold then.
+ */
+export function localAgentPlanGrammar(
+  approvedOperations: readonly string[],
+): { kind: 'json' } | { kind: 'json-schema'; schema: Record<string, unknown> } {
+  if (!approvedOperations.length) return { kind: 'json' };
+  return {
+    kind: 'json-schema',
+    schema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' },
+        steps: {
+          type: 'array',
+          maxItems: 8,
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              operation: { enum: [...approvedOperations] },
+              arguments: { type: 'object', additionalProperties: true },
+            },
+          },
+        },
+        continue: { type: 'boolean' },
+      },
+    },
   };
 }

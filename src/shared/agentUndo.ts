@@ -34,15 +34,17 @@ export const AGENT_UNDO_SUPPORTED_OPERATIONS: ReadonlySet<AgentToolOperationId> 
   'flashcard.delete-deck',
   'calendar.delete-event',
   'media.delete-item',
-  // The one RESTORING inverse: a calendar move put back. It does not remove, so its check
-  // after running is the adapter's own (it refuses when the event moved since), not
-  // "no id survives".
+  // The RESTORING inverses: a calendar move put back, and snoozed reviews put back. They do
+  // not remove, so their check after running is the adapter's own (it refuses when the event
+  // or a card moved since), not "no id survives".
   'calendar.reschedule-event',
+  'flashcard.schedule-reviews',
 ]);
 
 /** Inverses that put something back rather than remove what was created. */
 export const AGENT_UNDO_RESTORING_OPERATIONS: ReadonlySet<AgentToolOperationId> = new Set([
   'calendar.reschedule-event',
+  'flashcard.schedule-reviews',
 ]);
 
 /**

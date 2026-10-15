@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildLocalAgentSystemPrompt,
+  localAgentPlanGrammar,
+  MAX_AGENT_LOOP_ROUNDS,
   parseLocalAgentModelPlan,
   selectLocalAgentApprovedOperations,
 } from '../localAgentPrompt';
@@ -132,6 +134,7 @@ describe('local agent model boundary', () => {
     )).toEqual({
       summary: 'No approved tool can do that.',
       task: null,
+      continues: false,
     });
   });
 
@@ -212,5 +215,49 @@ describe('local agent model boundary', () => {
         arguments: {},
       }],
     }), 'task-1', 'Run code', 'full-automation')).toThrow('unavailable operation');
+  });
+});
+
+describe('the tool-result loop and the plan grammar (W4-B)', () => {
+  it('reads "continue" only as a literal true, and only for a plan with steps', () => {
+    const steps = [{ label: 'List decks', operation: 'flashcard.list-decks', arguments: {} }];
+    const parse = (raw: unknown) => parseLocalAgentModelPlan(JSON.stringify(raw), 't', 'o', 'read-only');
+    expect(parse({ summary: 's', steps, continue: true }).continues).toBe(true);
+    expect(parse({ summary: 's', steps, continue: 'true' }).continues).toBe(false);
+    expect(parse({ summary: 's', steps }).continues).toBe(false);
+    expect(parse({ summary: 's', steps: [], continue: true }).continues).toBe(false);
+  });
+
+  it('shows the earlier rounds\' results, bounded, and closes the loop on the last round', () => {
+    const round2 = buildLocalAgentSystemPrompt({
+      permission: 'read-only',
+      round: 2,
+      toolResults: [{ operation: 'flashcard.list-decks', ok: true, output: { folders: ['N5'], filler: 'x'.repeat(10_000) } }],
+    });
+    expect(round2).toContain(`Planning round 2 of ${MAX_AGENT_LOOP_ROUNDS}`);
+    expect(round2).toContain('N5');
+    expect(round2).toContain('[context truncated]');
+    expect(round2.length).toBeLessThan(40_000);
+    expect(round2).toContain('Set "continue" to true only when');
+
+    const last = buildLocalAgentSystemPrompt({ permission: 'read-only', round: MAX_AGENT_LOOP_ROUNDS });
+    expect(last).toContain('This is the last planning round: "continue" must be false.');
+    expect(buildLocalAgentSystemPrompt({ permission: 'read-only' })).not.toContain('Planning round');
+  });
+
+  it('constrains the local reply to a plan naming only approved operations', () => {
+    const grammar = localAgentPlanGrammar(['flashcard.list-decks', 'calendar.list']);
+    expect(grammar.kind).toBe('json-schema');
+    const schema = (grammar as { schema: Record<string, any> }).schema;
+    expect(schema.properties.steps.items.properties.operation.enum).toEqual(['flashcard.list-decks', 'calendar.list']);
+    expect(Object.keys(schema.properties)).toEqual(['summary', 'steps', 'continue']);
+    // Nothing approved: no operation to enumerate, so any JSON object, and the parser refuses.
+    expect(localAgentPlanGrammar([])).toEqual({ kind: 'json' });
+  });
+
+  it('documents schedule-reviews arguments for the planner', () => {
+    const prompt = buildLocalAgentSystemPrompt({ permission: 'limited-actions', availableOperations: ['flashcard.schedule-reviews'] });
+    expect(prompt).toContain('Postpone the reviews due now by this many days');
+    expect(prompt).toContain('a daily limit for today');
   });
 });

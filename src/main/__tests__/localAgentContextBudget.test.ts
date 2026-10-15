@@ -144,6 +144,8 @@ describe("the local agent's plan budget respects the configured context size", (
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/does not fit the local agent's context/i);
     expect(result.error).toMatch(/Raise the context size in Settings/i);
+    // What a surface shows is the code, translated; the sentence above is diagnostic text.
+    expect((result as { code?: string }).code).toBe('context-overflow');
     // The distinguishing assertion: a context shift is invisible precisely because the call goes
     // through and returns text, so "it failed" is only half the contract — nothing was generated.
     expect(registry.promptCalls).toHaveLength(0);
@@ -155,6 +157,7 @@ describe("the local agent's plan budget respects the configured context size", (
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe('The request is too long.');
+    expect((result as { code?: string }).code).toBe('objective-too-long');
     expect(registry.promptCalls).toHaveLength(0);
   });
 });

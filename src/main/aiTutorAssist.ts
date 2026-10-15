@@ -126,7 +126,7 @@ import {
   type BlancSummaryRequest,
   type BlancSummaryResult,
 } from '../shared/aiBlancTutor';
-import { runAiStudyFeature, type AiStudyDeps, type AiStudyFeatureSpec } from './aiStudyAssist';
+import { aiStudyStreamDeps, runAiStudyFeature, type AiStudyDeps, type AiStudyFeatureSpec } from './aiStudyAssist';
 
 // ---- the reply shapes ------------------------------------------------------------
 // Lenient where an omission is harmless (no nuance is ''), strict where it is not
@@ -435,15 +435,15 @@ export function summarizeForBlanc(input: unknown, deps: AiStudyDeps = {}): Promi
 
 /** Cancel is the study helpers' own `aiStudy:cancel`: one runner, one map of requests in flight. */
 export function registerAiTutorAssistIpc(): void {
-  ipcMain.handle('aiTutor:grammarExplain', (_event, input: unknown) => explainGrammarPoint(input));
-  ipcMain.handle('aiTutor:grammarExamples', (_event, input: unknown) => generateGrammarExamples(input));
-  ipcMain.handle('aiTutor:grammarProduction', (_event, input: unknown) => gradeGrammarProduction(input));
-  ipcMain.handle('aiTutor:grammarSightings', (_event, input: unknown) => checkGrammarSightings(input));
-  ipcMain.handle('aiTutor:statsCoach', (_event, input: unknown) => explainStudyStats(input));
-  ipcMain.handle('aiTutor:goalSuggest', (_event, input: unknown) => suggestDailyGoal(input));
-  ipcMain.handle('aiTutor:eventParse', (_event, input: unknown) => parseCalendarEventText(input));
-  ipcMain.handle('aiTutor:placementQuiz', (_event, input: unknown) => makePlacementQuiz(input));
-  ipcMain.handle('aiTutor:settingsHelp', (_event, input: unknown) => answerSettingsWithModel(input));
-  ipcMain.handle('aiTutor:blancMistake', (_event, input: unknown) => explainBlancMistake(input));
-  ipcMain.handle('aiTutor:blancSummary', (_event, input: unknown) => summarizeForBlanc(input));
+  ipcMain.handle('aiTutor:grammarExplain', (event, input: unknown) => explainGrammarPoint(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:grammarExamples', (event, input: unknown) => generateGrammarExamples(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:grammarProduction', (event, input: unknown) => gradeGrammarProduction(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:grammarSightings', (event, input: unknown) => checkGrammarSightings(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:statsCoach', (event, input: unknown) => explainStudyStats(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:goalSuggest', (event, input: unknown) => suggestDailyGoal(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:eventParse', (event, input: unknown) => parseCalendarEventText(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:placementQuiz', (event, input: unknown) => makePlacementQuiz(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:settingsHelp', (event, input: unknown) => answerSettingsWithModel(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:blancMistake', (event, input: unknown) => explainBlancMistake(input, aiStudyStreamDeps(event, input)));
+  ipcMain.handle('aiTutor:blancSummary', (event, input: unknown) => summarizeForBlanc(input, aiStudyStreamDeps(event, input)));
 }

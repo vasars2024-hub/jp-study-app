@@ -19,6 +19,22 @@ export interface LocalAgentPlanRequest {
    */
   target?: 'local' | AiProviderId;
   cloudProviderId?: AiProviderId;
+  /**
+   * The tool-result loop: what the steps of the earlier rounds returned, oldest first, so the
+   * planner can plan the next steps from real output. Main gates each output for a cloud planner
+   * (`toolOutputForPlanner`) and bounds its size; the renderer sends it as the steps recorded it.
+   */
+  toolResults?: readonly LocalAgentToolResult[];
+  /** Which round of the loop this plan is, 1-based. Absent means the first. */
+  round?: number;
+}
+
+/** One step's outcome, fed back to the planner by the tool-result loop. */
+export interface LocalAgentToolResult {
+  operation: AgentToolOperationId;
+  label?: string;
+  ok: boolean;
+  output?: unknown;
 }
 
 /**
@@ -33,6 +49,14 @@ export type LocalAgentPlanFailureCode =
   | 'cloud-key-missing'
   | 'spend-budget'
   | 'cloud-disabled'
+  /** The request is longer than the 500 characters a plan takes. */
+  | 'objective-too-long'
+  /** The prompt leaves no room for a plan in the configured context size. */
+  | 'context-overflow'
+  /** The model did not finish within the planner's deadline. */
+  | 'timeout'
+  /** The model answered with something that is not a valid plan. */
+  | 'plan-invalid'
   | 'planner-failed';
 
 export interface LocalAgentPlanResponse {
@@ -45,6 +69,11 @@ export interface LocalAgentPlanResponse {
   code?: LocalAgentPlanFailureCode;
   /** Which planner produced the plan, so the surface can disclose a cloud one. */
   planner?: 'local' | 'cloud';
+  /**
+   * The planner wants to see what these steps return before it plans the rest: the renderer
+   * re-plans with their output once the task has completed (at most `MAX_AGENT_LOOP_ROUNDS`).
+   */
+  continues?: boolean;
 }
 
 export interface LocalAgentRuntimeStatus {
@@ -52,7 +81,9 @@ export interface LocalAgentRuntimeStatus {
   busy: boolean;
   modelFileName?: string;
   contextSize?: number;
+  /** English diagnostic text, which may name a local path; the UI shows `lastErrorCode` instead. */
   lastError?: string;
+  lastErrorCode?: LocalAgentPlanFailureCode;
 }
 
 export interface LocalAgentModelInfo {

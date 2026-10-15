@@ -16,6 +16,7 @@ import {
 import {
   agentToolCapabilityMatrix,
   createCentralAgentToolRegistry,
+  type AgentToolCapability,
 } from '../agentToolRegistry';
 import { AgentCapabilityDirectory } from '../components/agent/AgentCapabilityDirectory';
 
@@ -82,8 +83,8 @@ describe('Agent capability directory authority projection', () => {
       reason: 'available',
     });
     expect(rows.find((row) => row.id === 'flashcard.schedule-reviews')).toMatchObject({
-      available: false,
-      reason: 'false-success-stub-removed',
+      available: true,
+      reason: 'available',
     });
   });
 
@@ -110,11 +111,9 @@ describe('Agent capability directory authority projection', () => {
     );
 
     expect(rows.find((row) => row.id === 'dictionary.lookup')?.reason).toBe('agent-disabled');
-    // Adapter truth still outranks the global switch. `anime.search` used to be
-    // the example here and now has an adapter; these two do not, and their
-    // reasons are decisions rather than missing code.
+    // Every declaration has an adapter now, so the switch is the reason everywhere.
     expect(rows.find((row) => row.id === 'flashcard.schedule-reviews')?.reason)
-      .toBe('false-success-stub-removed');
+      .toBe('agent-disabled');
     expect(rows.find((row) => row.id === 'dictionary.explain-grammar')?.reason)
       .toBe('agent-disabled');
   });
@@ -129,7 +128,6 @@ describe('Agent capability directory authority projection', () => {
       'agent.capabilities.reason.permission-insufficient',
       'agent.capabilities.reason.adapter-not-implemented',
       'agent.capabilities.reason.dedicated-analysis-required',
-      'agent.capabilities.reason.false-success-stub-removed',
       'agent.capabilities.confirmation.none',
       'agent.capabilities.confirmation.delete-data',
       'agent.capabilities.confirmation.external-connection',
@@ -149,9 +147,12 @@ describe('Agent capability directory authority projection', () => {
   });
 
   it('renders an accessible localized status directory from supplied authority snapshots', () => {
+    // One row held back, as a build without an adapter would declare it.
     const selectedCapabilities = capabilities().filter(({ definition }) => (
       definition.id === 'dictionary.lookup' || definition.id === 'flashcard.schedule-reviews'
-    ));
+    )).map((entry): AgentToolCapability => (entry.definition.id === 'flashcard.schedule-reviews'
+      ? { definition: entry.definition, available: false as const, reason: 'adapter-not-implemented' as const }
+      : entry));
     const html = renderToStaticMarkup(createElement(AgentCapabilityDirectory, {
       capabilities: selectedCapabilities,
       settings,
@@ -163,7 +164,7 @@ describe('Agent capability directory authority projection', () => {
     expect(html).toContain('Active profile: Test profile');
     expect(html).toContain('Look up a word');
     expect(html).toContain('Ready with current settings');
-    expect(html).toContain(String(CATALOGS.en['agent.capabilities.reason.false-success-stub-removed']));
+    expect(html).toContain(String(CATALOGS.en['agent.capabilities.reason.adapter-not-implemented']));
     expect(html).toContain('<code>dictionary.lookup</code>');
     expect(html).not.toContain('agent.capabilities.');
   });

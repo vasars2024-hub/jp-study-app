@@ -1704,6 +1704,24 @@ export function dueDeckCardNow(id: string, now = Date.now()): boolean {
   return true;
 }
 
+/** Move scheduled cards' `dueAt` only, in one write (the Agent's review snooze and its Undo). */
+export function setDeckCardsDueAt(moves: ReadonlyArray<{ id: string; dueAt: number }>): string[] {
+  const want = new Map(moves.map((m) => [m.id, m.dueAt]));
+  const store = readStore();
+  const changed: DeckFlashcard[] = [];
+  const before: DeckFlashcard[] = [];
+  store.cards = store.cards.map((c) => {
+    const dueAt = want.get(c.id);
+    if (!c.srs || !Number.isFinite(dueAt) || c.srs.dueAt === dueAt) return c;
+    const next = { ...c, srs: { ...c.srs, dueAt: dueAt as number } };
+    changed.push(next);
+    before.push(c);
+    return next;
+  });
+  if (changed.length) writeChangedCards(store, changed, before);
+  return changed.map((c) => c.id);
+}
+
 /**
  * The known-word key a review may speak for, or null.
  *

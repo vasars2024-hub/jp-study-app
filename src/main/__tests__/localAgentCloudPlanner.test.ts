@@ -113,7 +113,8 @@ describe('Agent planning without a local model', () => {
     }))));
 
     const result = await plan({ cloudProviderId: 'gemini-2.5-flash' });
-    expect(result).toMatchObject({ ok: false, code: 'planner-failed' });
+    // A refused step is a plan the Agent cannot run: one code, which the renderer translates.
+    expect(result).toMatchObject({ ok: false, code: 'plan-invalid' });
   });
 
   it('keeps memories out of the cloud request while sensitive context is excluded', async () => {
@@ -205,5 +206,80 @@ describe('Agent planning without a local model', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(geminiReply(`Here is the plan:\n${PLAN}\nHope that helps.`)));
     const result = await plan({ cloudProviderId: 'gemini-2.5-flash' });
     expect(result).toMatchObject({ ok: true, planner: 'cloud', summary: 'List your decks.' });
+  });
+});
+
+describe('the tool-result loop and coded refusals (W4-B)', () => {
+  const CONTINUING = JSON.stringify({
+    summary: 'First list the decks, then decide.',
+    steps: [{ label: 'List decks', operation: 'flashcard.list-decks', arguments: {} }],
+    continue: true,
+  });
+
+  function systemOf(fetchMock: ReturnType<typeof vi.fn>): string {
+    return JSON.stringify(JSON.parse(String(fetchMock.mock.calls[0][1].body)).systemInstruction);
+  }
+
+  it('says the planner will continue from the results, and feeds them back on the next round', async () => {
+    const first = vi.fn().mockResolvedValue(geminiReply(CONTINUING));
+    vi.stubGlobal('fetch', first);
+    const round1 = await plan({ cloudProviderId: 'gemini-2.5-flash' });
+    expect(round1).toMatchObject({ ok: true, continues: true });
+    expect(systemOf(first)).toMatch(/continue.{0,4} to true only when the next steps depend/);
+
+    const second = vi.fn().mockResolvedValue(geminiReply(PLAN));
+    vi.stubGlobal('fetch', second);
+    const round2 = await plan({
+      cloudProviderId: 'gemini-2.5-flash',
+      round: 2,
+      toolResults: [{ operation: 'flashcard.list-decks', label: 'List decks', ok: true, output: { folders: ['N5-LOOP-DECK'] } }],
+    });
+    expect(round2).toMatchObject({ ok: true });
+    expect(round2.continues).toBeUndefined();
+    const system = systemOf(second);
+    expect(system).toContain('Planning round 2 of 4');
+    expect(system).toContain('N5-LOOP-DECK');
+  });
+
+  it('never continues past the last round, whatever the model says', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(geminiReply(CONTINUING)));
+    const last = await plan({ cloudProviderId: 'gemini-2.5-flash', round: 4 });
+    expect(last).toMatchObject({ ok: true });
+    expect(last.continues).toBeUndefined();
+    // A renderer cannot buy a fifth round by sending a larger or nonsense number either.
+    const beyond = await plan({ cloudProviderId: 'gemini-2.5-flash', round: 99 });
+    expect(beyond.continues).toBeUndefined();
+  });
+
+  it('withholds a study-data tool output from the cloud planner until sharing is allowed', async () => {
+    const results = [
+      { operation: 'study.stats-summary', ok: true, output: { streak: 'SECRET-STREAK-77' } },
+      { operation: 'flashcard.list-decks', ok: true, output: { folders: ['PUBLIC-DECK'] } },
+    ];
+    const local = vi.fn().mockResolvedValue(geminiReply(PLAN));
+    vi.stubGlobal('fetch', local);
+    await plan({ cloudProviderId: 'gemini-2.5-flash', round: 2, toolResults: results });
+    expect(systemOf(local)).not.toContain('SECRET-STREAK-77');
+    expect(systemOf(local)).toContain('Withheld');
+    expect(systemOf(local)).toContain('PUBLIC-DECK');
+
+    const allowed = vi.fn().mockResolvedValue(geminiReply(PLAN));
+    vi.stubGlobal('fetch', allowed);
+    await plan({
+      cloudProviderId: 'gemini-2.5-flash',
+      round: 2,
+      toolResults: results,
+      settings: { enabled: true, backend: 'local-gguf', permission: 'read-only', agentCloudShareStudyData: 'allow' },
+    });
+    expect(systemOf(allowed)).toContain('SECRET-STREAK-77');
+  });
+
+  it('returns a code for every refusal, and the status line carries it', async () => {
+    expect(await plan({ objective: 'x'.repeat(600) })).toMatchObject({ ok: false, code: 'objective-too-long' });
+    expect(await plan({ objective: '   ' })).toMatchObject({ ok: false, code: 'invalid-request' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(geminiReply('not a plan at all')));
+    expect(await plan({ cloudProviderId: 'gemini-2.5-flash' })).toMatchObject({ ok: false, code: 'plan-invalid' });
+    const status = await registry.handlers.get('localAgent:status')?.(null) as Record<string, unknown>;
+    expect(status.lastErrorCode).toBe('plan-invalid');
   });
 });

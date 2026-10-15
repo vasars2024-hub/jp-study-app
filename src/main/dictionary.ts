@@ -1703,7 +1703,8 @@ export function registerDictionaryIpc(): void {
             store: (target, input) => writeStoredExplanationToDb(target, input),
             runProvider: async (target, prompt, options) => {
               const { runAgentProviderPrompt } = await import('./agentProviderRouter');
-              return runAgentProviderPrompt(target, prompt, options);
+              // Explain parses one JSON object: on the local model, decode under the grammar.
+              return runAgentProviderPrompt(target, prompt, { ...options, jsonReply: true });
             },
           },
           {

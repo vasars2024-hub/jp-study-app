@@ -316,3 +316,13 @@ describe('cancel', () => {
     expect((await summarizeForBlanc({ kind: 'kanji', subject: '水', answerLang: 'en' }, cloudDeps(call))).cached).toBe(false);
   });
 });
+
+describe('the tutor handlers stream (W2-A follow-up, W4-B)', () => {
+  it('every aiTutor channel hands its reply to the window that asked, tagged with the request id', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'aiTutorAssist.ts'), 'utf8');
+    // Two separate needles, so the architecture audit does not read this test as a handler.
+    const channels = source.split('\n').filter((line) => line.includes('ipcMain.handle') && line.includes('aiTutor:'));
+    expect(channels.length).toBeGreaterThanOrEqual(11);
+    for (const line of channels) expect(line).toContain('aiStudyStreamDeps(event, input)');
+  });
+});

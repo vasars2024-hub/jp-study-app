@@ -29,6 +29,7 @@ export const AGENT_INVERSE_OPERATIONS: Readonly<
   'settings.apply-css': 'settings.reset-css',
   // A move is undone by the same operation, aimed back (see `inverseArguments`).
   'calendar.reschedule-event': 'calendar.reschedule-event',
+  'flashcard.schedule-reviews': 'flashcard.schedule-reviews',
 };
 
 /** The reverse operation, or `null` when the forward one cannot be undone. */

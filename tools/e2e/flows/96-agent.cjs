@@ -23,7 +23,15 @@
  *          wiped), and the fake sees the request hang up;
  *        · a free-form plan from the cloud planner: the fake proposes a yearly reminder on
  *          the 2nd Tuesday (the calendar tool's new repeat options), the plan runs, the event
- *          is stored with exactly that rule, and Undo removes it.
+ *          is stored with exactly that rule, and Undo removes it;
+ *        · the tool-result loop, against a flow-owned planner fake (_agentLoopFake.cjs):
+ *          round 1 reads the calendar and asks to continue, running it plans round 2 FROM
+ *          the fed-back calendar.list output (the fake only proposes the reminder when the
+ *          seeded event is in its prompt), round 2 runs, and no third round is planned;
+ *        · a reply that is not a plan is refused with the translated message, and main
+ *          returns the code (plan-invalid) on the reply and on the runtime status;
+ *        · flashcard.schedule-reviews (no longer "unavailable"): two due reviews are snoozed
+ *          three days under the Automation profile, and Undo puts them back.
  *   6. Offline: with the network taken away (CDP, so `navigator.onLine` flips) a cloud target
  *      shows the offline note, and a send reports the offline message at once instead of
  *      waiting on main.
@@ -40,6 +48,15 @@ const {
   FAKE_AI_AGENT_REPLY,
   FAKE_AI_AGENT_PARTIAL,
 } = require('../world.cjs');
+const {
+  startAgentLoopFake,
+  AGENT_LOOP_MARK,
+  AGENT_SNOOZE_MARK,
+  AGENT_BADPLAN_MARK,
+  AGENT_LOOP_SEED,
+  AGENT_LOOP_REMINDER,
+  AGENT_SNOOZE_FOLDER,
+} = require('./_agentLoopFake.cjs');
 
 const CALENDAR_KEY = 'jp-calendar-events';
 const SETTINGS_KEY = 'jp-study-local-agent-settings-v1';
@@ -72,7 +89,7 @@ const selectTarget = (value) => `(() => {
 
 module.exports = {
   id: 'agent',
-  title: 'Agent: no-key state, plan queue + confirm, Undo that undoes (and refuses an edited event), fake-provider chat, Stop keeps text, cloud plan with a yearly repeat, offline preflight',
+  title: 'Agent: no-key state, plan queue + confirm, Undo that undoes (and refuses an edited event), fake-provider chat, Stop keeps text, cloud plan with a yearly repeat, two-round tool-result loop, coded plan refusal, review snooze + Undo, offline preflight',
   /** Opt-in world: the fake OpenAI-compatible server, for the chat, Stop and planner steps. */
   world: { ai: true },
   async run(ctx) {
@@ -278,6 +295,128 @@ module.exports = {
       const reminderGone = await poll(ctx, `(() => { const n = JSON.parse(localStorage.getItem('${CALENDAR_KEY}') || '[]'); return n.some((x) => x.title === 'E2E yearly JLPT reminder') ? null : { left: n.length }; })()`, 10000);
       result.check('Undo removes the reminder the plan made', Boolean(reminderUndo) && reminderGone?.left === beforeReminder, { reminderUndo, after: reminderGone, before: beforeReminder });
       await ctx.shot('fake-plan');
+
+      // d) The tool-result loop, against a flow-owned planner fake that answers round 2 from
+      //    the results the app fed back (W4-B). Same "local server" provider, another port.
+      const loopFake = await startAgentLoopFake({ model: ai.model });
+      try {
+        const pointed = await ev(`(async () => {
+          await window.api.aiSetupUpdate({ compatBaseUrl: ${JSON.stringify(loopFake.base)}, compatModel: ${JSON.stringify(ai.model)} });
+          return (await window.api.aiSetupStatus()).compatBaseUrl;
+        })()`, { await: true }).catch((err) => String(err));
+        result.check('the Agent planner is aimed at the loop fake', pointed === loopFake.base, pointed);
+        const today = new Date();
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        await ev(`(() => {
+          const list = JSON.parse(localStorage.getItem('${CALENDAR_KEY}') || '[]');
+          list.push({ id: 'e2e-loop-seed', title: ${JSON.stringify(AGENT_LOOP_SEED)}, date: ${JSON.stringify(todayKey)}, allDay: true, color: '#4a90d9', category: 'study', reminder: 'none', recurrence: 'none', createdAt: Date.now() });
+          localStorage.setItem('${CALENDAR_KEY}', JSON.stringify(list));
+          window.dispatchEvent(new CustomEvent('calendar-events-changed'));
+          return true;
+        })()`);
+
+        await ev(`__e2e.fill(document.querySelector('form.agent-composer textarea'), ${JSON.stringify(`Remind me about what is on my calendar ${AGENT_LOOP_MARK}`)})`);
+        await poll(ctx, `(() => { const b = document.querySelector('form.agent-composer .agent-plan-create'); return b && !b.disabled ? true : null; })()`, 10000);
+        await ev(`__e2e.click(document.querySelector('form.agent-composer .agent-plan-create'))`);
+        const round1 = await poll(ctx, `(() => { const i = document.querySelector('.agent-plan-queue .agent-plan-item'); return i && /Remind me about what is on my calendar/.test(i.innerText) && /queued/.test(i.className) ? { steps: i.querySelectorAll('.agent-plan-step').length } : null; })()`, 30000);
+        result.check('round 1 of the loop is queued: one read step (calendar.list)', round1?.steps === 1 && loopFake.hits.some((h) => h.mark === 'loop' && h.round === 1), { round1, hits: loopFake.hits });
+
+        await runPrimary();
+        const looped = await poll(ctx, `(() => {
+          const note = document.querySelector('.agent-plan-queue .agent-plan-loop-status')?.innerText || '';
+          const items = [...document.querySelectorAll('.agent-plan-queue .agent-plan-item')];
+          const next = items[0];
+          return /round 2 of 4/i.test(note) && next && /queued/.test(next.className) && items.length >= 2
+            ? { note, steps: next.querySelectorAll('.agent-plan-step').length }
+            : null;
+        })()`, 30000);
+        const round2 = loopFake.hits.find((h) => h.mark === 'loop' && h.round === 2);
+        result.check('running the read step plans round 2 from its result: the planner saw the calendar.list output and the next plan is queued',
+          Boolean(looped) && looped.steps === 1 && round2?.sawSeed === true, { looped, hits: loopFake.hits });
+        await ctx.shot('loop-round-2');
+
+        await runPrimary();
+        const reminderMade = await poll(ctx, `(() => JSON.parse(localStorage.getItem('${CALENDAR_KEY}') || '[]').find((e) => e.title === ${JSON.stringify(AGENT_LOOP_REMINDER)}) || null)()`, 20000);
+        result.check('round 2 runs: the reminder named after what round 1 read is in the Calendar', reminderMade?.category === 'reminder', reminderMade);
+        const thirdRound = loopFake.hits.filter((h) => h.mark === 'loop').length;
+        result.check('the loop ends when the planner stops asking (two planning rounds, no third)', thirdRound === 2, loopFake.hits);
+
+        // e) A coded refusal: prose instead of a plan reaches the user as a translated
+        //    sentence, never as main's English diagnostic, and main reports the code.
+        await ev(`__e2e.fill(document.querySelector('form.agent-composer textarea'), ${JSON.stringify(`Make a plan ${AGENT_BADPLAN_MARK}`)})`);
+        await poll(ctx, `(() => { const b = document.querySelector('form.agent-composer .agent-plan-create'); return b && !b.disabled ? true : null; })()`, 10000);
+        await ev(`__e2e.click(document.querySelector('form.agent-composer .agent-plan-create'))`);
+        const refusedText = await poll(ctx, `document.querySelector('.agent-plan-notice[role=alert]')?.innerText || null`, 30000);
+        result.check('a reply that is not a plan is refused with the translated planner message, not the English diagnostic',
+          /could not make a plan/i.test(refusedText ?? '') && !/invalid plan JSON|local model/i.test(refusedText ?? ''), refusedText);
+        const coded = await ev(`(async () => {
+          const settings = JSON.parse(localStorage.getItem('${SETTINGS_KEY}') || '{}');
+          const r = await window.api.localAgentPlan({ objective: ${JSON.stringify(`Make a plan ${AGENT_BADPLAN_MARK}`)}, settings, target: 'openai-compatible' });
+          const s = await window.api.localAgentStatus();
+          return { ok: r.ok, code: r.code, lastErrorCode: s.lastErrorCode };
+        })()`, { await: true }).catch((err) => ({ error: String(err) }));
+        result.check('main returns the refusal as a code (plan-invalid) and the runtime status carries it',
+          coded?.ok === false && coded.code === 'plan-invalid' && coded.lastErrorCode === 'plan-invalid', coded);
+
+        // f) flashcard.schedule-reviews: real now (it was always disabled). Two scheduled
+        //    reviews in a folder of their own are due; the plan snoozes them and Undo puts
+        //    them back. The Automation profile is the built-in that enables it.
+        const seededDue = Date.now() - 2 * 24 * 60 * 60 * 1000;
+        await ev(`(() => {
+          const raw = localStorage.getItem('jp-flashcard-deck');
+          const parsed = raw ? JSON.parse(raw) : { cards: [] };
+          const store = Array.isArray(parsed) ? { cards: parsed } : parsed;
+          const srs = { version: 2, algorithm: 'sm2', dueAt: ${seededDue}, intervalDays: 3, ease: 2.5, repetitions: 2, lapses: 0, lastReviewedAt: ${seededDue} - 3 * 86400000, lastRating: 'good' };
+          store.cards = [...(store.cards || []).filter((c) => c.folder !== ${JSON.stringify(AGENT_SNOOZE_FOLDER)}),
+            { id: 'e2e-snooze-1', word: '待つ', reading: 'まつ', meaning: 'to wait', folder: ${JSON.stringify(AGENT_SNOOZE_FOLDER)}, addedAt: ${seededDue}, srs },
+            { id: 'e2e-snooze-2', word: '休む', reading: 'やすむ', meaning: 'to rest', folder: ${JSON.stringify(AGENT_SNOOZE_FOLDER)}, addedAt: ${seededDue}, srs }];
+          store.savedAt = Date.now();
+          localStorage.setItem('jp-flashcard-deck', JSON.stringify(store));
+          return true;
+        })()`);
+        const profileSelect = `document.querySelector('[data-testid="agent-governance-profile"]')`;
+        const setProfile = (id) => ev(`(() => { const s = ${profileSelect}; if (!s) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, ${JSON.stringify(id)}); s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()`);
+        const automation = await setProfile('automation-assistant');
+        await ev(`__e2e.fill(document.querySelector('form.agent-composer textarea'), ${JSON.stringify(`Snooze my due reviews ${AGENT_SNOOZE_MARK}`)})`);
+        await poll(ctx, `(() => { const b = document.querySelector('form.agent-composer .agent-plan-create'); return b && !b.disabled ? true : null; })()`, 10000);
+        await ev(`__e2e.click(document.querySelector('form.agent-composer .agent-plan-create'))`);
+        const snoozePlan = await poll(ctx, `(() => { const i = document.querySelector('.agent-plan-queue .agent-plan-item'); return i && /Snooze my due reviews/.test(i.innerText) && /queued/.test(i.className) ? i.innerText.replace(/\\s+/g, ' ').slice(0, 300) : null; })()`, 30000);
+        result.check('a schedule-reviews plan is queued (the operation is offered, not "unavailable")', automation === 'automation-assistant' && Boolean(snoozePlan), { automation, snoozePlan });
+        await runPrimary();
+        const dueOf = `(() => { const raw = localStorage.getItem('jp-flashcard-deck'); const d = raw ? JSON.parse(raw) : { cards: [] }; const cards = Array.isArray(d) ? d : d.cards || []; return cards.filter((c) => c.folder === ${JSON.stringify(AGENT_SNOOZE_FOLDER)}).map((c) => c.srs && c.srs.dueAt); })()`;
+        const snoozed = await poll(ctx, `(() => { const due = ${dueOf}; return due.length === 2 && due.every((t) => t > Date.now() + 2 * 86400000) ? due : null; })()`, 20000);
+        const snoozeStep = await ev(`document.querySelector('.agent-plan-queue .agent-plan-item')?.innerText.replace(/\\s+/g, ' ').slice(0, 400) || ''`);
+        result.check('the snooze runs: both due reviews move three days out', Boolean(snoozed), { snoozed, snoozeStep });
+        const snoozeUndo = await poll(ctx, `!!document.querySelector('.agent-plan-queue .agent-plan-item .agent-plan-undo-button') || null`, 5000);
+        if (snoozeUndo) {
+          await ev(`__e2e.click(document.querySelector('.agent-plan-queue .agent-plan-item .agent-plan-undo-button'))`);
+          await poll(ctx, `!!document.querySelector('[role=dialog]') || null`, 5000);
+          await ev(`(() => { const d = [...document.querySelectorAll('[role=dialog]')].pop(); const b = d && [...d.querySelectorAll('button')].pop(); if (b) b.click(); return !!b; })()`);
+        }
+        const restored = await poll(ctx, `(() => { const due = ${dueOf}; return due.length === 2 && due.every((t) => t === ${seededDue}) ? due : null; })()`, 10000);
+        result.check('Undo puts the snoozed reviews back where they were due', Boolean(snoozeUndo) && Boolean(restored), { snoozeUndo, restored });
+        await ctx.shot('snooze-undone');
+        await setProfile('study-tutor');
+      } finally {
+        await loopFake.close();
+        await ev(`(() => {
+          const raw = localStorage.getItem('jp-flashcard-deck');
+          if (!raw) return true;
+          const parsed = JSON.parse(raw);
+          const store = Array.isArray(parsed) ? { cards: parsed } : parsed;
+          store.cards = (store.cards || []).filter((c) => c.folder !== ${JSON.stringify(AGENT_SNOOZE_FOLDER)});
+          store.savedAt = Date.now();
+          localStorage.setItem('jp-flashcard-deck', JSON.stringify(store));
+          return true;
+        })()`).catch(() => null);
+        // This section's events and cards go; the Calendar check at the end counts on it.
+        await ev(`(() => {
+          const list = JSON.parse(localStorage.getItem('${CALENDAR_KEY}') || '[]').filter((e) => e.id !== 'e2e-loop-seed' && e.title !== ${JSON.stringify(AGENT_LOOP_REMINDER)});
+          localStorage.setItem('${CALENDAR_KEY}', JSON.stringify(list));
+          window.dispatchEvent(new CustomEvent('calendar-events-changed'));
+          return true;
+        })()`).catch(() => null);
+      }
     }
 
     // --- 6. Offline: the note, and an immediate offline message on send -----------------
