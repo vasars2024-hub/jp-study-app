@@ -26,6 +26,7 @@ import BookOcrPanel from '../components/library/BookOcrPanel';
 import { bookOcrViewOf } from '../../shared/bookOcrIpc';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
 import { fetchReadableArticle, articleBodyHtml } from '../wikiArticle';
+import { articleImportErrorText } from '../articleImportError';
 import { getActiveProfile } from '../profileState';
 import { enrichLibraryInBackground, mergeScoredItems, needsLevelEnrich } from '../inboxEnrich';
 import { forgetBookFileKeys } from '../bookProfiles';
@@ -615,14 +616,15 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   /**
    * Fetch a page, extract the readable article and save it as an EPUB book.
    * Shared by the URL import dialog and the random-Wikipedia game.
-   * Returns the updated library, or an error message string.
+   * Returns the updated library, or a translated error message string
+   * (coded, never the fetch's English reason).
    */
-  async function importArticle(u: string): Promise<LibraryItem[] | string> {
+  async function importArticle(u: string, source: 'page' | 'wiki' = 'page'): Promise<LibraryItem[] | string> {
     let art: Awaited<ReturnType<typeof fetchReadableArticle>>;
     try {
       art = await fetchReadableArticle(u);
     } catch (err) {
-      return err instanceof Error ? err.message : String(err);
+      return articleImportErrorText(err, source);
     }
     const next = await window.api.importGenerated({
       title: art.title,
@@ -647,6 +649,8 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       }
       setImportOpen(false);
       setWebUrl('');
+    } catch (err) {
+      setWebErr(await articleImportErrorText(err));
     } finally {
       setWebBusy(false);
     }
@@ -658,7 +662,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     setWikiErr('');
     try {
       const { url } = await randomWikiArticle(WIKI_CATEGORIES[wikiCat]?.wikiCategory ?? null);
-      const res = await importArticle(url);
+      const res = await importArticle(url, 'wiki');
       if (typeof res === 'string') {
         setWikiErr(res);
         return;
@@ -668,7 +672,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       const book = res.find((i) => i.sourcePath === url) ?? res[0];
       if (book) onOpen(book);
     } catch (err) {
-      setWikiErr(err instanceof Error ? err.message : String(err));
+      setWikiErr(await articleImportErrorText(err, 'wiki'));
     } finally {
       setWikiBusy(false);
     }

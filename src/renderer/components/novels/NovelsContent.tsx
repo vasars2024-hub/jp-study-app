@@ -53,6 +53,7 @@ import {
 } from '../../data/novels';
 import { setHandoffJson } from '../../pendingHandoff';
 import { useT } from '../../i18n';
+import { useNovelReaderUi } from '../../novelReaderUiStrings';
 import { formatNumber } from '../../stats';
 
 type TypeFilter = 'All' | 'Novel' | 'WebNovel' | 'Local';
@@ -328,13 +329,30 @@ function linkFromEntry(entry: JitenPlanEntry | null, candidate: NovelCandidate |
   return entry?.sourceLinks.length ? entry.sourceLinks : candidate?.sourceLinks ?? [];
 }
 
+/**
+ * A failed Jiten call, as a translated line. Main's reasons are English (F3)
+ * ("Could not reach … (network error)", "Jiten 503: …"), so they are reduced
+ * to a code here and the detail stays in the log.
+ */
+export function jitenErrorText(error: unknown, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const status = /\bJiten (\d{3})\b/.exec(message);
+  if (status) return t('novelReaderUi.novels.jitenHttp', { status: status[1] });
+  if (/network error|could not reach|fetch failed|net::ERR_|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN/i.test(message)) {
+    return t('novelReaderUi.novels.jitenNetwork');
+  }
+  return t('novelReaderUi.novels.jitenFailed');
+}
+
 export function useNovels() {
   // The status banner is the workbench's only channel for "what just happened",
   // and every message in it was an English literal — so a Japanese, Chinese or
   // Russian user got English the moment anything succeeded or refused. The
   // `error.message` cases stay untranslated on purpose: those are the source's
-  // own words, not ours.
+  // own words, not ours — except Jiten's, whose reasons main writes in English
+  // (`jitenErrorText`).
   const { t } = useT();
+  const { nt } = useNovelReaderUi();
   const [query, setQuery] = useState('');
   const [type, setType] = useState<TypeFilter>('All');
   const [diff, setDiff] = useState<DiffFilter>('All');
@@ -394,12 +412,13 @@ export function useNovels() {
         setJitenDecks(result.decks);
         if (!result.decks.length) setStatus(t('novels.msg.noJitenMatch'));
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : String(error));
+        console.warn('[novels] Jiten search failed', error);
+        setStatus(jitenErrorText(error, nt));
       } finally {
         setLoadingJiten(false);
       }
     },
-    [genre, query, sort, type],
+    [genre, nt, query, sort, t, type],
   );
 
   const refreshNovels = useCallback(async () => {
@@ -645,7 +664,8 @@ export function useNovels() {
       setShowSources(false);
       void refreshJiten();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      console.warn('[novels] saving Jiten sources failed', error);
+      setStatus(nt('novelReaderUi.novels.sourcesFailed'));
     } finally {
       setBusy(false);
     }

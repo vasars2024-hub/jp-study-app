@@ -65,7 +65,9 @@ describe('NovelReader single-chapter translate reports the model load', () => {
   });
 
   it('surfaces the load failure reason rather than a downstream throw', () => {
-    expect(body).toMatch(/ready\.error \|\| t\('epub\.translate\.failed'\)/);
+    // As main's code (`errorKey`), never its English `error` text (F3).
+    expect(body).toMatch(/\.errorKey \|\| 'epub\.translate\.failed'\)/);
+    expect(body).not.toMatch(/ready\.error \|\|/);
   });
 
   /**

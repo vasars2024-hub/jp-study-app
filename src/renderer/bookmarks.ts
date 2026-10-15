@@ -6,8 +6,17 @@ import { IDB_KEYS, mirrorToIdb } from './storage/storage';
 import { kvGet } from './storage/db';
 
 export interface Bookmark {
-  /** epub.js CFI — a precise pointer to a spot in the book. */
+  /**
+   * Where the mark points. For the novel reader: `p:<part>:<fraction>`. With
+   * `anchor: 'char'` the fraction is a CHARACTER fraction (novelTextAnchor.ts),
+   * so the mark lands on the same text at any font size, margin or window size.
+   * Without it, it is an older mark whose fraction was geometric (how far through
+   * the part's laid-out pages); the reader resolves such a mark the first time it
+   * is opened and rewrites it as a character mark (`replaceBookmark`).
+   */
   cfi: string;
+  /** 'char' when `cfi`'s fraction is a character position (see above). */
+  anchor?: 'char';
   /** A short human label (a snippet of the text, or a percentage). */
   label: string;
   /** 0..1 progress through the book, for sorting + display. */
@@ -91,6 +100,22 @@ export function addBookmark(itemId: string, bm: Bookmark): Bookmark[] {
   const next = [...list, bm].sort((a, b) => a.percent - b.percent);
   save(itemId, next);
   return next;
+}
+
+/**
+ * Swap the mark stored under `oldCfi` for `next` (a resolved older mark), keeping
+ * its name and creation time. A no-op when the mark is gone; when `next.cfi`
+ * is already another mark the old one is simply dropped.
+ */
+export function replaceBookmark(itemId: string, oldCfi: string, next: Bookmark): Bookmark[] {
+  const list = loadBookmarks(itemId);
+  const at = list.findIndex((b) => b.cfi === oldCfi);
+  if (at < 0) return list;
+  const rest = list.filter((b) => b.cfi !== oldCfi);
+  const merged = rest.some((b) => b.cfi === next.cfi) ? rest : [...rest, next];
+  const sorted = merged.sort((a, b) => a.percent - b.percent);
+  save(itemId, sorted);
+  return sorted;
 }
 
 export function removeBookmark(itemId: string, cfi: string): Bookmark[] {

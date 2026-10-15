@@ -48,7 +48,7 @@ import {
   THEMES,
   type ReaderSettings,
 } from '../readerSettings';
-import { addBookmark, loadBookmarks, removeBookmark, type Bookmark } from '../bookmarks';
+import { addBookmark, loadBookmarks, removeBookmark, replaceBookmark, type Bookmark } from '../bookmarks';
 import { getSummary, onStatsChanged, recordReading } from '../stats';
 import { activeReadingSeconds, creditReadingProgress, READING_IDLE_MS } from '../readingCredit';
 import { chapterCharsRemaining, estimateReadingMinutes } from '../../shared/readingTime';
@@ -56,7 +56,9 @@ import { isReaderInteraction } from '../readerActivity';
 import { BOOK_OPEN_AT_EVENT, bookLocation, takeBookOpenAt, type BookPosition } from '../bookRoundTrip';
 import {
   ANCHOR_SLACK_PX,
+  anchorChars,
   charFractionAt,
+  charFractionOfElementId,
   distanceOfCharFraction,
   liveCharDistance,
   pageOfDistance,
@@ -64,6 +66,8 @@ import {
   type CharDistance,
 } from '../novelTextAnchor';
 import ReaderSpeedReadout from '../components/reading/ReaderSpeedReadout';
+import { partTextOf, rangeOfChars, searchParts, SEARCH_MAX_HITS, type SearchHit } from '../novelSearch';
+import './novelSearch.css';
 import { readerNotesMarkdown } from '../../shared/readerNotesExport';
 import { scrollIntoViewReliably } from '../utils/reliableScroll';
 import { loadEpub, type LoadedEpub } from '../epubLoader';
@@ -109,6 +113,8 @@ import {
   resolveWikiUrl,
   type WikiNavEntry,
 } from '../wikiArticle';
+import { articleImportErrorText } from '../articleImportError';
+import { useNovelReaderUi } from '../novelReaderUiStrings';
 import { getActiveProfile } from '../profileState';
 import { studyContentLang } from '../studyEnvironment';
 import {
@@ -330,6 +336,7 @@ export default function NovelReader({ item, onClose }: Props) {
   const [pageRangeFrom, setPageRangeFrom] = useState(1);
   const [pageRangeTo, setPageRangeTo] = useState(1);
   const { t, lang } = useT();
+  const { nt } = useNovelReaderUi();
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => loadBookmarks(item.id));
   const [part, setPart] = useState(0);
@@ -525,6 +532,9 @@ export default function NovelReader({ item, onClose }: Props) {
     [loaded, translateMode, translatedChapters],
   );
 
+  const chapterHtmlRef = useRef(chapterHtml);
+  chapterHtmlRef.current = chapterHtml;
+
   const translateChapter = useCallback(async (index: number): Promise<number | 'cancelled'> => {
     const chapter = loaded?.chapters[index];
     if (!chapter) return 0;
@@ -600,7 +610,7 @@ export default function NovelReader({ item, onClose }: Props) {
         setTranslateStatus(t('epub.translate.status.loadingModel'));
         const ready = await window.api.translateEnsureReady();
         if (!ready.ok) {
-          setTranslateStatus(ready.error || t('epub.translate.failed'));
+          setTranslateStatus(t((ready as { errorKey?: string }).errorKey || 'epub.translate.failed'));
           return;
         }
       }
@@ -653,7 +663,7 @@ export default function NovelReader({ item, onClose }: Props) {
       );
       if (!cancelBookTranslateRef.current && translateMode === 'original') setTranslateMode('bilingual');
     } catch (err) {
-      setTranslateStatus(err instanceof Error ? err.message : t('epub.translate.failed'));
+      setTranslateStatus(t('epub.translate.failed'));
     } finally {
       offModel();
       setTranslateBusy(false);
@@ -688,7 +698,7 @@ export default function NovelReader({ item, onClose }: Props) {
         setTranslateStatus(t('epub.translate.status.loadingModel'));
         const ready = await window.api.translateEnsureReady();
         if (!ready.ok) {
-          setTranslateStatus(ready.error || t('epub.translate.failed'));
+          setTranslateStatus(t((ready as { errorKey?: string }).errorKey || 'epub.translate.failed'));
           return;
         }
         setTranslateStatus(t('epub.translate.status.current'));
@@ -705,7 +715,7 @@ export default function NovelReader({ item, onClose }: Props) {
       );
       if (translateMode === 'original') setTranslateMode('bilingual');
     } catch (err) {
-      setTranslateStatus(err instanceof Error ? err.message : t('epub.translate.failed'));
+      setTranslateStatus(t('epub.translate.failed'));
     } finally {
       offModel();
       setTranslateBusy(false);
@@ -1159,10 +1169,12 @@ export default function NovelReader({ item, onClose }: Props) {
 
   useEffect(() => {
     if (!autoTranslate || !loaded || translatedChapters[part]) return;
+    // Main's reasons are English (F3): show the coded line, keep the detail in the log.
     void translateChapter(part).catch((err) => {
-      setTranslateStatus(err instanceof Error ? err.message : 'Automatic translation failed');
+      console.warn('[novel] automatic translation failed', err);
+      setTranslateStatus(nt('novelReaderUi.translate.autoFailed'));
     });
-  }, [autoTranslate, loaded, part, translateChapter, translatedChapters]);
+  }, [autoTranslate, loaded, nt, part, translateChapter, translatedChapters]);
 
   // ----- word-knowledge highlighting -----
   const [hlTick, setHlTick] = useState(0);
@@ -1521,8 +1533,38 @@ export default function NovelReader({ item, onClose }: Props) {
     [setOffsetPx, globalFor, updateGlobal, saveNow],
   );
 
+  /**
+   * Paged mode, same part: turn to the page that holds the character a
+   * character fraction names. False when the page has no measurable text.
+   */
+  const landPagedChar = useCallback(
+    (frac: number): boolean => {
+      const d = distanceOfTextFrac(partRef.current, frac);
+      if (d === null) return false;
+      const pages = pageCountRef.current;
+      const p = pageOfDistance(d, stepRef.current, pages);
+      pageRef.current = p;
+      setPage(p);
+      setOffsetPx(p * stepRef.current, false);
+      localFracRef.current = pages > 1 ? p / (pages - 1) : 0;
+      const g = globalFor(partRef.current, localFracRef.current);
+      updateGlobal(g);
+      setProgress(g);
+      saveNow(g, localFracRef.current);
+      return true;
+    },
+    [distanceOfTextFrac, setOffsetPx, globalFor, updateGlobal, saveNow],
+  );
+
+  /**
+   * Go to part `piRaw` at fraction `lf`. With `char`, `lf` is a CHARACTER
+   * fraction (novelTextAnchor.ts): the landing brings that character to the
+   * reading start (scroll) or turns to the page holding it (paged), whatever
+   * the font size, margins or window size. Without it, `lf` is geometric (how
+   * far through the part's laid-out extent), which only older bookmarks use.
+   */
   const goTo = useCallback(
-    (piRaw: number, lf: number) => {
+    (piRaw: number, lf: number, char = false) => {
       const book = loadedRef.current;
       if (!book) return;
       const last = book.chapters.length - 1;
@@ -1533,10 +1575,11 @@ export default function NovelReader({ item, onClose }: Props) {
 
       if (layoutRef.current.paged) {
         if (pi === partRef.current) {
-          applyLocal(lf);
+          if (!char || !landPagedChar(lf)) applyLocal(lf);
           return;
         }
         pendingPosRef.current = lf;
+        pendingCharRef.current = char ? { pi, frac: lf } : null;
         partRef.current = pi;
         setPart(pi);
         return;
@@ -1548,13 +1591,17 @@ export default function NovelReader({ item, onClose }: Props) {
       if (pi < w.start || pi > w.end) {
         // Jump outside the mounted window: rebuild it around the destination.
         anchorRef.current = null;
-        pendingTargetRef.current = { pi, lf };
+        pendingTargetRef.current = { pi, lf, char };
         partGeomRef.current = null;
         setWin({ start: Math.max(0, pi - 2), end: Math.min(last, pi + 3) });
       } else {
         const pe = partEl(pi);
         if (pe) {
-          const off = Math.min(Math.max(startOffset(pe) + lf * extentOf(pe), 0), axisMax());
+          const charDist = char ? distanceOfTextFrac(pi, lf) : null;
+          const off =
+            charDist !== null
+              ? scrollOffsetForDistance(charDist)
+              : Math.min(Math.max(startOffset(pe) + lf * extentOf(pe), 0), axisMax());
           setOffsetPx(off);
           localFracRef.current = lf;
           const g = globalFor(pi, lf);
@@ -1564,15 +1611,58 @@ export default function NovelReader({ item, onClose }: Props) {
         }
       }
     },
-    [applyLocal, partEl, startOffset, extentOf, axisMax, setOffsetPx, globalFor, updateGlobal, saveNow],
+    [
+      applyLocal,
+      landPagedChar,
+      distanceOfTextFrac,
+      scrollOffsetForDistance,
+      partEl,
+      startOffset,
+      extentOf,
+      axisMax,
+      setOffsetPx,
+      globalFor,
+      updateGlobal,
+      saveNow,
+    ],
   );
 
+  /**
+   * The slider: a fraction of the whole book's characters (`weights` are part
+   * character counts), so the part fraction it maps to is a character one too.
+   */
   const seekGlobal = useCallback(
     (f: number) => {
       const { pi, lf } = mapGlobal(f);
-      goTo(pi, lf);
+      goTo(pi, lf, true);
     },
     [mapGlobal, goTo],
+  );
+
+  /**
+   * A table-of-contents entry: the start of its part, or — when it points at a
+   * heading inside the part — that heading's first character, found in the
+   * part's text (not its layout), so it lands right at any font size.
+   */
+  const jumpToToc = useCallback(
+    (tocIndex: number) => {
+      const book = loadedRef.current;
+      const entry = book?.toc[tocIndex];
+      if (!book || !entry) return;
+      let frac: number | null = null;
+      if (entry.anchor) {
+        try {
+          const html = chapterHtmlRef.current[entry.chapterIndex]?.__html ?? '';
+          const doc = new DOMParser().parseFromString(`<!doctype html><body>${html}</body>`, 'text/html');
+          frac = charFractionOfElementId(doc.body, entry.anchor);
+        } catch {
+          frac = null;
+        }
+      }
+      if (frac !== null && frac > 0) goTo(entry.chapterIndex, frac, true);
+      else goTo(entry.chapterIndex, 0);
+    },
+    [goTo],
   );
 
   // ----- wheel -----
@@ -1759,6 +1849,12 @@ export default function NovelReader({ item, onClose }: Props) {
       }),
     ];
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'f') {
+        if (e.defaultPrevented) return;
+        e.preventDefault();
+        openSearchRef.current();
+        return;
+      }
       if (e.key === 'Escape') {
         // Something closer to the focus already handled it (a popup, a sheet).
         if (e.defaultPrevented) return;
@@ -1784,6 +1880,14 @@ export default function NovelReader({ item, onClose }: Props) {
         onClose();
         return;
       }
+      // Typing in a field (the search box): Backspace and the arrows edit text.
+      const target = e.target as HTMLElement | null;
+      const textField =
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable ||
+        (target?.tagName === 'INPUT' &&
+          !['checkbox', 'radio', 'range', 'button'].includes((target as HTMLInputElement).type));
+      if (textField) return;
       if (
         (linkViewRef.current || canLinkBackRef.current) &&
         (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowLeft'))
@@ -2140,7 +2244,7 @@ export default function NovelReader({ item, onClose }: Props) {
       if (linkBusyRef.current) return;
       linkBusyRef.current = true;
       setLinkBusy(true);
-      setLinkStatus('Importing page as EPUB…');
+      setLinkStatus(nt('novelReaderUi.link.importing'));
       setPopup(null);
       try {
         const art = await fetchReadableArticle(url);
@@ -2169,19 +2273,20 @@ export default function NovelReader({ item, onClose }: Props) {
         setLinkView({ url: art.url, title: art.title, bodyHtml });
         setTitle(art.title);
         const saved = next.find((i) => i.sourcePath === art.url) ?? next[0];
-        setLinkStatus(saved ? `Saved to library: ${art.title}` : `Saved: ${art.title}`);
+        setLinkStatus(nt('novelReaderUi.link.saved', { title: saved?.title || art.title }));
         window.setTimeout(() => setLinkStatus(''), 4000);
       } catch (err) {
         console.error(err);
-        setLinkStatus(err instanceof Error ? err.message : 'Import failed');
         void window.api.openExternal(url);
+        const reason = await articleImportErrorText(err);
+        setLinkStatus(nt('novelReaderUi.link.openedInBrowser', { reason }));
         window.setTimeout(() => setLinkStatus(''), 5000);
       } finally {
         linkBusyRef.current = false;
         setLinkBusy(false);
       }
     },
-    [item.title],
+    [item.title, nt],
   );
 
   /** Intercept hyperlinks in EPUB / article HTML so the app window never leaves. */
@@ -2799,48 +2904,220 @@ export default function NovelReader({ item, onClose }: Props) {
   const wkClass = settings.wordHighlight ? 'wk-on' : 'wk-off';
 
   // ----- bookmarks -----
-  const addCurrent = useCallback(() => {
-    const lf = localFracRef.current;
+  /**
+   * A bookmark is the character at the reading start (novelTextAnchor.ts), the
+   * same anchor the saved position uses, so it lands on the same text after a
+   * font, margin or window change. Its label is the text from that character.
+   */
+  const bookmarkHere = useCallback((): Bookmark => {
+    const pi = partRef.current;
     const g = curGlobalRef.current;
+    const charFrac = textFracNow();
     let snippet = '';
     try {
-      const el = scrollerRef.current;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        const caret = document.caretRangeFromPoint?.(r.left + r.width / 2, r.top + r.height / 2);
-        snippet = (caret?.startContainer?.textContent ?? '').replace(/\s+/g, '').slice(0, 30);
+      const root = anchorRoot(pi);
+      if (root && charFrac !== null) {
+        const chars = anchorChars(root);
+        const at = Math.min(chars.length, Math.round(charFrac * chars.length));
+        snippet = chars
+          .slice(at, at + 30)
+          .map((c) => c.node.data.slice(c.offset, c.offset + c.length))
+          .join('');
+      }
+      if (!snippet) {
+        const el = scrollerRef.current;
+        if (el) {
+          const r = el.getBoundingClientRect();
+          const caret = document.caretRangeFromPoint?.(r.left + r.width / 2, r.top + r.height / 2);
+          snippet = (caret?.startContainer?.textContent ?? '').replace(/\s+/g, '').slice(0, 30);
+        }
       }
     } catch {
       /* fall back to % */
     }
     const label = snippet || `${Math.round(g * 100)}%`;
-    setBookmarks(
-      addBookmark(item.id, {
-        cfi: `p:${partRef.current}:${lf.toFixed(4)}`,
-        label,
-        percent: g,
-        createdAt: Date.now(),
-      }),
-    );
-  }, [item.id]);
+    // No measurable text (an image page): the page fraction is all there is.
+    return charFrac !== null
+      ? { cfi: `p:${pi}:${charFrac.toFixed(6)}`, anchor: 'char', label, percent: g, createdAt: Date.now() }
+      : { cfi: `p:${pi}:${localFracRef.current.toFixed(4)}`, label, percent: g, createdAt: Date.now() };
+  }, [anchorRoot, textFracNow]);
+
+  const addCurrent = useCallback(() => {
+    setBookmarks(addBookmark(item.id, bookmarkHere()));
+  }, [item.id, bookmarkHere]);
+
+  /**
+   * An older (geometric) mark, once its landing has settled: re-take it as a
+   * character mark at the same spot, under its old name, so it stops drifting.
+   */
+  const migrateTimerRef = useRef(0);
+  const migrateBookmark = useCallback(
+    (old: Bookmark, part: number) => {
+      window.clearTimeout(migrateTimerRef.current);
+      let tries = 0;
+      const attempt = (): void => {
+        tries++;
+        const settled = partRef.current === part && !pendingTargetRef.current && !pendingCharRef.current;
+        const here = settled ? bookmarkHere() : null;
+        if (here?.anchor === 'char') {
+          setBookmarks(replaceBookmark(item.id, old.cfi, { ...here, label: old.label, createdAt: old.createdAt }));
+          return;
+        }
+        if (tries < 8) migrateTimerRef.current = window.setTimeout(attempt, 250);
+      };
+      migrateTimerRef.current = window.setTimeout(attempt, 250);
+    },
+    [item.id, bookmarkHere],
+  );
+  useEffect(() => () => window.clearTimeout(migrateTimerRef.current), []);
 
   const jumpTo = useCallback(
     (cfi: string) => {
       setBookmarksOpen(false);
       const t = parseLoc(cfi);
       if (t) {
-        goTo(t.part, t.frac);
+        const mark = bookmarks.find((b) => b.cfi === cfi);
+        const char = mark?.anchor === 'char';
+        goTo(t.part, t.frac, char);
+        if (mark && !char) migrateBookmark(mark, t.part);
         return;
       }
       const f = Number(cfi);
       if (Number.isFinite(f)) seekGlobal(Math.min(1, Math.max(0, f)));
     },
-    [goTo, seekGlobal],
+    [bookmarks, goTo, migrateBookmark, seekGlobal],
   );
   const removeAt = useCallback(
     (cfi: string) => setBookmarks(removeBookmark(item.id, cfi)),
     [item.id],
   );
+
+  // ----- in-book search (novelSearch.ts) -----
+  // Hits are character anchors, so a jump uses the same landing as a
+  // bookmark: the page holding the match (paged) or the match at the reading
+  // start (scroll), in vertical and horizontal text alike. The match is marked
+  // with the CSS Custom Highlight API, which leaves the book's DOM untouched
+  // (the word highlighter and the anchors both walk that DOM).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchIgnoreWidth, setSearchIgnoreWidth] = useState(true);
+  const [searchRun, setSearchRun] = useState<{ hits: SearchHit[]; capped: boolean }>({ hits: [], capped: false });
+  const [searchCur, setSearchCur] = useState(-1);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchTexts = useMemo(() => {
+    if (!searchOpen) return null;
+    const parser = new DOMParser();
+    return chapterHtml.map((h) => partTextOf(h.__html, parser));
+  }, [searchOpen, chapterHtml]);
+
+  useEffect(() => {
+    if (!searchTexts) return;
+    const id = window.setTimeout(() => {
+      setSearchRun(searchParts(searchTexts, searchQuery, { ignoreWidth: searchIgnoreWidth }));
+      setSearchCur(-1);
+    }, 200);
+    return () => window.clearTimeout(id);
+  }, [searchTexts, searchQuery, searchIgnoreWidth]);
+
+  /** Mark every hit in the rendered parts; true when `cur` (if any) could be marked. */
+  const paintSearch = useCallback(
+    (hits: readonly SearchHit[], cur: SearchHit | null): boolean => {
+      const registry = (globalThis as { CSS?: { highlights?: Map<string, unknown> } }).CSS?.highlights;
+      const HighlightCtor = (globalThis as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight;
+      if (!registry || !HighlightCtor) return true;
+      const others: Range[] = [];
+      let current: Range | null = null;
+      const byPart = new Map<number, SearchHit[]>();
+      for (const h of hits) {
+        const list = byPart.get(h.part);
+        if (list) list.push(h);
+        else byPart.set(h.part, [h]);
+      }
+      for (const [pi, list] of byPart) {
+        // Paged: only the current part is on the page.
+        if (layoutRef.current.paged && pi !== partRef.current) continue;
+        const root = anchorRoot(pi);
+        if (!root) continue;
+        const chars = anchorChars(root);
+        for (const h of list) {
+          const range = rangeOfChars(chars, h.index, h.length);
+          if (!range) continue;
+          if (h === cur) current = range;
+          else others.push(range);
+        }
+      }
+      registry.set('novel-search', new HighlightCtor(...others));
+      if (current) registry.set('novel-search-current', new HighlightCtor(current));
+      else registry.delete('novel-search-current');
+      return !cur || current !== null;
+    },
+    [anchorRoot],
+  );
+  const clearSearchPaint = useCallback(() => {
+    const registry = (globalThis as { CSS?: { highlights?: Map<string, unknown> } }).CSS?.highlights;
+    registry?.delete('novel-search');
+    registry?.delete('novel-search-current');
+  }, []);
+
+  // Repaint when the rendered text changes (page turn, window, highlighter pass).
+  useEffect(() => {
+    if (!searchOpen) {
+      clearSearchPaint();
+      return;
+    }
+    paintSearch(searchRun.hits, searchRun.hits[searchCur] ?? null);
+  }, [searchOpen, searchRun, searchCur, part, page, win, hlTick, paintSearch, clearSearchPaint]);
+  useEffect(() => clearSearchPaint, [clearSearchPaint]);
+
+  const searchPaintTimerRef = useRef(0);
+  const goToHit = useCallback(
+    (index: number) => {
+      const hit = searchRun.hits[index];
+      if (!hit) return;
+      setSearchCur(index);
+      goTo(hit.part, hit.frac, true);
+      // A jump into another part lands after a layout pass: mark it once it is there.
+      window.clearTimeout(searchPaintTimerRef.current);
+      let tries = 0;
+      const attempt = (): void => {
+        tries++;
+        const settled = partRef.current === hit.part && !pendingTargetRef.current && !pendingCharRef.current;
+        if (settled && paintSearch(searchRun.hits, hit)) return;
+        if (tries < 10) searchPaintTimerRef.current = window.setTimeout(attempt, 120);
+      };
+      searchPaintTimerRef.current = window.setTimeout(attempt, 60);
+    },
+    [searchRun, goTo, paintSearch],
+  );
+  useEffect(() => () => window.clearTimeout(searchPaintTimerRef.current), []);
+
+  /** Next/previous hit; from no current hit, the first one at or after the reading position. */
+  const stepSearch = useCallback(
+    (dir: 1 | -1) => {
+      const hits = searchRun.hits;
+      if (!hits.length) return;
+      let next: number;
+      if (searchCur >= 0) next = (searchCur + dir + hits.length) % hits.length;
+      else {
+        const pi = partRef.current;
+        const here = textFracNow() ?? 0;
+        const after = hits.findIndex((h) => h.part > pi || (h.part === pi && h.frac >= here));
+        next = dir > 0 ? (after < 0 ? 0 : after) : after <= 0 ? hits.length - 1 : after - 1;
+      }
+      goToHit(next);
+    },
+    [searchRun, searchCur, goToHit, textFracNow],
+  );
+
+  const openSearch = useCallback(() => {
+    setSearchOpen(true);
+    window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 0);
+  }, []);
+  const openSearchRef = useRef(openSearch);
+  openSearchRef.current = openSearch;
 
   /** Bookmarks and highlights as Markdown on the clipboard (`shared/readerNotesExport`). */
   const copyReaderNotes = useCallback(async () => {
@@ -2872,7 +3149,8 @@ export default function NovelReader({ item, onClose }: Props) {
       const target = parseLoc(detail.loc);
       if (!target || target.part >= book.chapters.length) return;
       event.preventDefault();
-      goTo(target.part, target.frac);
+      // A stored position's fraction is a character one (novelTextAnchor.ts).
+      goTo(target.part, target.frac, true);
     };
     window.addEventListener(BOOK_OPEN_AT_EVENT, onOpenAt);
     return () => window.removeEventListener(BOOK_OPEN_AT_EVENT, onOpenAt);
@@ -2886,6 +3164,8 @@ export default function NovelReader({ item, onClose }: Props) {
       `.novel-content a { color: ${theme.link} !important; }`,
       `.novel-content img, .novel-content svg, .novel-content image { max-height: ${imgCap}; }`,
       '.novel-content ::selection { background: #6c7bff; color: #fff; }',
+      '::highlight(novel-search) { background-color: rgba(255, 196, 0, 0.35); }',
+      '::highlight(novel-search-current) { background-color: #ff9632; color: #111; }',
     ].join('\n');
   }, [settings, theme.link, size.h]);
 
@@ -3089,6 +3369,7 @@ export default function NovelReader({ item, onClose }: Props) {
    * So the canvas places tools and leaves the column to the reader.
    */
   const openToolIds = [
+    searchOpen ? 'search' : null,
     bookmarksOpen ? 'bookmarks' : null,
     translateOpen ? 'translate' : null,
     settingsOpen ? 'reader-settings' : null,
@@ -3113,6 +3394,102 @@ export default function NovelReader({ item, onClose }: Props) {
   const toolOrder = toolOrderRef.current;
 
   const readingTools: ReadingCanvasTool[] = [];
+  if (searchOpen) {
+    const hits = searchRun.hits;
+    readingTools.push({
+      id: 'search',
+      label: nt('novelReaderUi.search.aria'),
+      minWidth: 220,
+      preferredWidth: 280,
+      onClose: () => setSearchOpen(false),
+      content: (
+        <div className="ns-panel">
+          <div className="ns-form" role="search">
+            <input
+              ref={searchInputRef}
+              type="search"
+              className="ns-input"
+              value={searchQuery}
+              placeholder={nt('novelReaderUi.search.placeholder')}
+              aria-label={nt('novelReaderUi.search.aria')}
+              lang={bookContentLang}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  stepSearch(e.shiftKey ? -1 : 1);
+                } else if (e.key === 'Escape') {
+                  // Close the search, not the book.
+                  e.preventDefault();
+                  setSearchOpen(false);
+                }
+              }}
+            />
+            <div className="ns-nav">
+              <button
+                type="button"
+                className="btn small"
+                title={nt('novelReaderUi.search.prev')}
+                aria-label={nt('novelReaderUi.search.prev')}
+                disabled={!hits.length}
+                onClick={() => stepSearch(-1)}
+              >
+                <span aria-hidden="true">{'\u25B2'}</span>
+              </button>
+              <button
+                type="button"
+                className="btn small"
+                title={nt('novelReaderUi.search.next')}
+                aria-label={nt('novelReaderUi.search.next')}
+                disabled={!hits.length}
+                onClick={() => stepSearch(1)}
+              >
+                <span aria-hidden="true">{'\u25BC'}</span>
+              </button>
+              <span className="ns-count muted" role="status" aria-live="polite">
+                {searchQuery.trim()
+                  ? hits.length
+                    ? nt('novelReaderUi.search.count', { current: searchCur + 1, total: hits.length })
+                    : nt('novelReaderUi.search.none')
+                  : ''}
+              </span>
+            </div>
+            <label className="ns-opt" title={nt('novelReaderUi.search.ignoreWidthTitle')}>
+              <input
+                type="checkbox"
+                checked={searchIgnoreWidth}
+                onChange={(e) => setSearchIgnoreWidth(e.target.checked)}
+              />
+              {nt('novelReaderUi.search.ignoreWidth')}
+            </label>
+          </div>
+          {searchRun.capped && <div className="bm-empty">{nt('novelReaderUi.search.capped', { max: SEARCH_MAX_HITS })}</div>}
+          {hits.length > 0 && (
+            <ul className="bm-list ns-list" aria-label={nt('novelReaderUi.search.results')}>
+              {hits.map((h, i) => (
+                <li key={`${h.part}:${h.index}`} className={`bm-row${i === searchCur ? ' ns-current' : ''}`}>
+                  <button
+                    type="button"
+                    className="bm-jump ns-hit"
+                    aria-current={i === searchCur ? 'true' : undefined}
+                    title={nt('novelReaderUi.search.chapter', { n: h.part + 1 })}
+                    onClick={() => goToHit(i)}
+                  >
+                    <span className="bm-pct">{Math.round(globalFor(h.part, h.frac) * 100)}%</span>
+                    <span className="bm-label" lang={bookContentLang}>
+                      {h.before}
+                      <mark>{h.match}</mark>
+                      {h.after}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ),
+    });
+  }
   if (bookmarksOpen) {
     readingTools.push({
       id: 'bookmarks',
@@ -3134,7 +3511,7 @@ export default function NovelReader({ item, onClose }: Props) {
           >
             {t('read2.novel.exportNotes')}
           </button>
-          <button className="btn small primary" onClick={addCurrent}>
+          <button className="btn small primary" data-bm-add onClick={addCurrent}>
             {t('novel.tool.addBookmark')}
           </button>
         </>
@@ -3400,9 +3777,22 @@ export default function NovelReader({ item, onClose }: Props) {
           </button>
             </>
           )}
+          {/* Not a `.settings-anchor`: search docks as a canvas tool, no popover to anchor. */}
+          <button
+            type="button"
+            className={`btn ns-toggle ${searchOpen ? 'active' : ''}`}
+            data-reader-tool="search"
+            title={nt('novelReaderUi.search.open')}
+            aria-label={nt('novelReaderUi.search.aria')}
+            aria-pressed={searchOpen}
+            onClick={() => (searchOpen ? setSearchOpen(false) : openSearch())}
+          >
+            <Icon name="search" size={14} />
+          </button>
           <div className="settings-anchor">
             <button
               className={`btn ${bookmarksOpen ? 'active' : ''}`}
+              data-reader-tool="bookmarks"
               title={t('novel.tool.bookmarks')}
               aria-label={t('novel.tool.bookmarks')}
               aria-pressed={bookmarksOpen}
@@ -3734,13 +4124,13 @@ export default function NovelReader({ item, onClose }: Props) {
           value=""
           title={t('novel.reader.jumpToChapter')}
           aria-label={t('novel.reader.jumpToChapter')}
-          onChange={(e) => e.target.value !== '' && goTo(Number(e.target.value), 0)}
+          onChange={(e) => e.target.value !== '' && jumpToToc(Number(e.target.value))}
         >
           <option value="" disabled>
             {t(loaded?.toc.length ? 'novel.reader.jumpToChapterEllipsis' : 'novel.reader.chapters')}
           </option>
           {loaded?.toc.map((t, i) => (
-            <option key={i} value={t.chapterIndex}>
+            <option key={i} value={i}>
               {'　'.repeat(t.depth)}
               {t.label}
             </option>

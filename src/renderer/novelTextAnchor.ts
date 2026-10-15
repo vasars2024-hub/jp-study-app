@@ -182,6 +182,13 @@ export function liveCharDistance(
   const range = scroller.ownerDocument.createRange();
   // No layout engine (jsdom): no character geometry, so callers fall back.
   if (typeof range.getBoundingClientRect !== 'function') return () => null;
+  // Client rects are in zoomed (visual) px while `offsetPx` and the page step
+  // are layout px: under a UI zoom (the shell scales the app) the two differ,
+  // and an unscaled distance put a page-2 character on page 1. Rect size over
+  // layout size is that zoom along the reading axis.
+  const zoom = mode === 'horizontal-scroll'
+    ? scaleOf(view.height, scroller.offsetHeight)
+    : scaleOf(view.width, scroller.offsetWidth);
   return (pos) => {
     try {
       range.setStart(pos.node, pos.offset);
@@ -193,6 +200,42 @@ export function liveCharDistance(
     if (!r.width && !r.height) return null;
     const rel =
       mode === 'vertical' ? view.right - r.right : mode === 'horizontal-scroll' ? r.top - view.top : r.left - view.left;
-    return offsetPx + rel;
+    return offsetPx + rel / zoom;
   };
+}
+
+function scaleOf(visual: number, layout: number): number {
+  const s = layout > 0 ? visual / layout : 1;
+  return Number.isFinite(s) && s > 0.05 ? s : 1;
+}
+
+/**
+ * The character fraction at which the element with `id` begins inside `root`
+ * (a part's text, laid out or parsed), or null when no such element exists.
+ * A table-of-contents entry that points into the middle of a part lands on
+ * its heading's first character this way, at any font size.
+ */
+export function charFractionOfElementId(root: Element, id: string): number | null {
+  if (!id) return null;
+  let target: Element | null = null;
+  for (const el of Array.from(root.querySelectorAll('[id]'))) {
+    if (el.id === id) {
+      target = el;
+      break;
+    }
+  }
+  if (!target) return null;
+  const chars = anchorChars(root);
+  if (!chars.length) return null;
+  let lo = 0;
+  let hi = chars.length;
+  // Characters before the element: compareDocumentPosition is monotonic in document order.
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const node = chars[mid].node;
+    const before = !target.contains(node) && (target.compareDocumentPosition(node) & 2) /* PRECEDING */ !== 0;
+    if (before) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo >= chars.length ? 1 : lo / chars.length;
 }

@@ -1,0 +1,52 @@
+/* In-book search panel (NovelReader, novelSearch.ts). The result rows reuse the
+   bookmark list's classes (.bm-list/.bm-row/.bm-jump), so every theme that
+   styles bookmarks styles these too; only the form and the match mark are new. */
+.ns-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.ns-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ns-input {
+  width: 100%;
+  min-height: 28px;
+  box-sizing: border-box;
+}
+.ns-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ns-nav .btn {
+  min-width: 28px;
+  min-height: 28px;
+}
+.ns-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.ns-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  min-height: 24px;
+}
+.ns-hit .bm-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ns-hit mark {
+  background: rgba(255, 196, 0, 0.45);
+  color: inherit;
+  border-radius: 2px;
+}
+.ns-current .bm-jump {
+  border-color: var(--accent-2);
+}

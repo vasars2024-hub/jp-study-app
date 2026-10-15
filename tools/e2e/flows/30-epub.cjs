@@ -4,6 +4,11 @@
  * EPUB: a generated book with publisher CSS for vertical writing, ruby and 縦中横 is
  * imported, opened, checked through computed styles, a word is mined from the page with a
  * real (CDP) click, and the card it makes reopens the book ("Open in book").
+ *
+ * Then the same book in horizontal columns (writing mode forced horizontal, paginated):
+ * open, TOC jump, page, bookmark, in-book search (Ctrl+F), reopen at the same place, and
+ * the bookmark landing on the same text after a font-size change. In-book search is also
+ * checked once in vertical pages.
  */
 const { installHelpers, poll, clickText, ensureDictionaryReady } = require('./_lib.cjs');
 const fixtures = require('../fixtures.cjs');
@@ -13,7 +18,7 @@ const MINED = '台所';
 
 module.exports = {
   id: 'epub',
-  title: 'EPUB vertical writing + mining',
+  title: 'EPUB vertical writing + mining, horizontal columns, bookmarks and search',
   async run(ctx) {
     const { eval: ev, result } = ctx;
     await installHelpers(ctx);
@@ -116,8 +121,25 @@ module.exports = {
       await poll(ctx, `!document.querySelector('.novel-content')`, 10000);
       await ctx.sleep(400);
     };
+    /** Ctrl+F, type `term`, Enter: the search lands on the paragraph `id` and marks the match. */
+    const searchFor = async (term, id) => {
+      await ev(`__e2e.key('f', { ctrlKey: true, code: 'KeyF' }, window)`);
+      const panel = await poll(ctx, `document.activeElement && document.activeElement.classList.contains('ns-input') ? true : null`, 5000);
+      await ev(`__e2e.fill(document.querySelector('.ns-input'), ${JSON.stringify(term)})`);
+      const hits = await poll(ctx, `(() => { const n = document.querySelectorAll('.ns-list .ns-hit').length; return n ? n : null; })()`, 8000);
+      await ev(`__e2e.key('Enter', { code: 'Enter' }, document.querySelector('.ns-input'))`);
+      const landed = await poll(ctx, `(() => { const v = ${visible}; return v && v.ids.includes(${JSON.stringify(id)}) ? v : null; })()`, 8000);
+      const marked = await poll(ctx, `(() => { const h = globalThis.CSS && CSS.highlights && CSS.highlights.get('novel-search-current'); if (!h) return null; const r = [...h][0]; return r ? r.toString() : null; })()`, 5000);
+      const count = await ev(`document.querySelector('.ns-count')?.textContent ?? null`);
+      // Escape closes the search, not the book.
+      await ev(`__e2e.key('Escape', { code: 'Escape' }, document.querySelector('.ns-input'))`);
+      const closed = await poll(ctx, `!document.querySelector('.ns-input') && !!document.querySelector('.novel-content')`, 5000);
+      return { panel: Boolean(panel), hits, landed: Boolean(landed), marked, count, closed: Boolean(closed) };
+    };
+    const bookId = async () => ev(`window.api.listLibrary().then((l) => (l.find((i) => i.title === ${JSON.stringify(TITLE)})?.id ?? null))`, { await: true });
     const savedFont = await ev(`(() => { try { return JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) || '{}').fontSize ?? null; } catch { return null; } })()`);
     const savedFlow = await ev(`(() => { try { return JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) || '{}').flow ?? null; } catch { return null; } })()`);
+    const savedWriting = await ev(`(() => { try { return JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)}) || '{}').writingMode ?? null; } catch { return null; } })()`);
     try {
       result.check('the book reopens from the shelf', await openFromShelf());
       const start = await ev(visible);
@@ -145,6 +167,9 @@ module.exports = {
       const larger = await ev(visible);
       result.check('reopened at the same text after a font-size change', Boolean(anchor) && Boolean(larger?.ids?.includes(anchor)), { anchor, larger });
       await ctx.shot('reopen-larger-font');
+      const vSearch = await searchFor('第18段落', 'q18');
+      result.check('vertical pages: Ctrl+F finds the text and turns to its page', vSearch.panel && vSearch.hits === 1 && vSearch.landed, vSearch);
+      result.check('vertical pages: the match is marked and Escape closes only the search', vSearch.marked === '第18段落' && vSearch.closed, vSearch);
       await closeBook();
 
       // The same in Scroll flow: scroll part-way, close, change the font, reopen.
@@ -175,9 +200,66 @@ module.exports = {
       result.check('Scroll flow: reopened at the same text after a font-size change', Boolean(sAnchor) && Boolean(sAfter?.ids?.includes(sAnchor)) && !sAfter.ids.includes('p1'), { sAnchor, sAfter });
       await ctx.shot('reopen-scrolled-larger-font');
       await closeBook();
+
+      // ----- Horizontal columns: the same book, writing mode forced horizontal, paginated -----
+      await setSettings({ flow: 'paginated', writingMode: 'horizontal', fontSize: savedFont ?? 100 });
+      result.check('horizontal: the book opens', await openFromShelf());
+      const hMode = await ev(`(() => {
+        const c = document.querySelector('.novel-content');
+        const sc = document.querySelector('.novel-scroller');
+        return c && sc ? { writingMode: getComputedStyle(c).writingMode, paged: sc.getAttribute('data-paged') === 'true', pages: Number(sc.getAttribute('data-paged-pages') || 0) } : null;
+      })()`);
+      result.check('horizontal: horizontal-tb text laid out in more than one column page', Boolean(hMode && hMode.writingMode === 'horizontal-tb' && hMode.paged && hMode.pages >= 2), hMode);
+      // The chapter list: back to the start of the book.
+      await ev(`(() => { const s = document.querySelector('.chapter-select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '0'); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+      const atStart = await poll(ctx, `(() => { const v = ${visible}; return v && v.ids.includes('p1') ? v : null; })()`, 8000);
+      result.check('horizontal: the chapter list jumps to the start of the chapter', Boolean(atStart), atStart);
+      await ctx.shot('horizontal-start');
+      const hFlips = Math.max(1, Math.min(2, (hMode?.pages ?? 2) - 1));
+      for (let i = 0; i < hFlips; i++) {
+        await ev(`(document.querySelector('[data-paged-control="next"]')?.click(), true)`);
+        await ctx.sleep(300);
+      }
+      const hPaged = await poll(ctx, `(() => { const v = ${visible}; return v && v.ids.length && !v.ids.includes('p1') ? v : null; })()`, 8000);
+      const hAnchor = hPaged?.ids?.[0] ?? null;
+      result.check('horizontal: Next turns to a later column page', Boolean(hAnchor), hPaged);
+
+      // Bookmark this page: stored as a character anchor, not a page fraction.
+      await ev(`__e2e.click(document.querySelector('[data-reader-tool="bookmarks"]'))`);
+      await poll(ctx, `!!document.querySelector('[data-bm-add]')`, 5000);
+      await ev(`__e2e.click(document.querySelector('[data-bm-add]'))`);
+      const id = await bookId();
+      const marks = await poll(ctx, `(() => { try { const l = JSON.parse(localStorage.getItem(${JSON.stringify('jp-bookmarks-')} + ${JSON.stringify(id)}) || '[]'); return l.length ? l : null; } catch { return null; } })()`, 5000);
+      result.check('horizontal: the bookmark is a character anchor', Array.isArray(marks) && marks.length === 1 && marks[0].anchor === 'char' && /^p:0:0\.\d{6}$/.test(marks[0].cfi), marks);
+      await ev(`__e2e.click(document.querySelector('[data-reader-tool="bookmarks"]'))`);
+      await ctx.shot('horizontal-bookmarked');
+
+      // In-book search in horizontal columns.
+      const hSearch = await searchFor('第20段落', 'q20');
+      result.check('horizontal: Ctrl+F finds the text and turns to its column page', hSearch.panel && hSearch.hits === 1 && hSearch.landed, hSearch);
+      result.check('horizontal: the match is marked and Escape closes only the search', hSearch.marked === '第20段落' && hSearch.closed, hSearch);
+      await ctx.shot('horizontal-search');
+      await ctx.sleep(600); // the position save after the jump
+      await closeBook();
+
+      result.check('horizontal: the book reopens', await openFromShelf());
+      const hReopen = await ev(visible);
+      result.check('horizontal: reopened at the searched text', Boolean(hReopen?.ids?.includes('q20')), hReopen);
+      await closeBook();
+
+      // A larger font: the bookmark still lands on the text it was taken at.
+      await setSettings({ fontSize: Math.round((savedFont ?? 100) * 1.4) });
+      result.check('horizontal: the book reopens with a larger font', await openFromShelf());
+      await ev(`__e2e.click(document.querySelector('[data-reader-tool="bookmarks"]'))`);
+      await poll(ctx, `!!document.querySelector('.bm-list .bm-jump')`, 5000);
+      await ev(`__e2e.click(document.querySelector('.bm-list .bm-jump'))`);
+      const hJump = await poll(ctx, `(() => { const v = ${visible}; return v && v.ids.includes(${JSON.stringify(hAnchor)}) ? v : null; })()`, 8000);
+      result.check('horizontal: the bookmark lands on the same text after a font-size change', Boolean(hAnchor) && Boolean(hJump), { hAnchor, hJump: hJump ?? (await ev(visible)) });
+      await ctx.shot('horizontal-bookmark-larger-font');
+      await closeBook();
     } finally {
       // Leave the reader settings as later flows expect them.
-      await ev(`(() => { const k = ${JSON.stringify(SETTINGS_KEY)}; let s = {}; try { s = JSON.parse(localStorage.getItem(k) || '{}'); } catch {} if (${JSON.stringify(savedFlow)} === null) delete s.flow; else s.flow = ${JSON.stringify(savedFlow)}; if (${JSON.stringify(savedFont)} === null) delete s.fontSize; else s.fontSize = ${JSON.stringify(savedFont)}; localStorage.setItem(k, JSON.stringify(s)); return true; })()`);
+      await ev(`(() => { const k = ${JSON.stringify(SETTINGS_KEY)}; let s = {}; try { s = JSON.parse(localStorage.getItem(k) || '{}'); } catch {} if (${JSON.stringify(savedFlow)} === null) delete s.flow; else s.flow = ${JSON.stringify(savedFlow)}; if (${JSON.stringify(savedFont)} === null) delete s.fontSize; else s.fontSize = ${JSON.stringify(savedFont)}; if (${JSON.stringify(savedWriting)} === null) delete s.writingMode; else s.writingMode = ${JSON.stringify(savedWriting)}; localStorage.setItem(k, JSON.stringify(s)); return true; })()`);
     }
   },
 };
