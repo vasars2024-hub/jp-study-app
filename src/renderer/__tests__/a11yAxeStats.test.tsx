@@ -15,6 +15,8 @@ const log: { rows: ReviewLogEntry[] } = { rows: [] };
 vi.mock('../reviewLog', async (importOriginal) => ({
   ...await importOriginal<typeof import('../reviewLog')>(),
   loadReviewLog: () => Promise.resolve(log.rows),
+  // Insights read long ranges through the archive-aware reader (G9).
+  loadReviewLogSince: (since: number) => Promise.resolve(log.rows.filter((row) => row.at >= since)),
   onReviewLogChanged: () => () => undefined,
 }));
 vi.mock('../ankiSync', () => ({ syncKnowledgeFromAnki: vi.fn() }));

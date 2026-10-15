@@ -25,6 +25,14 @@ module.exports = {
   title: 'Scraper: fixture site -> fake qBittorrent -> library import',
   async run(ctx) {
     const { eval: ev, result, world } = ctx;
+    const goTo = async (page, selector, timeoutMs) => {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        await ev(`(window.dispatchEvent(new CustomEvent('scraper:navigate', { detail: { page: ${JSON.stringify(page)} } })), true)`);
+        if (await poll(ctx, `!!document.querySelector(${JSON.stringify(selector)})`, 1500)) return true;
+      }
+      return null;
+    };
     if (!world) {
       result.skip('no fixture site / fake qBittorrent in this process (run it through npm run e2e or --serve)');
       return;
@@ -69,9 +77,9 @@ module.exports = {
     site.reset();
     const target = `${site.base}/shows/gum-test-show`;
     await ev(`__e2e.open('scraper')`);
-    await ctx.sleep(500);
-    await ev(`(window.dispatchEvent(new CustomEvent('scraper:navigate', { detail: { page: 'new-scrape' } })), true)`);
-    const input = await poll(ctx, `!!document.querySelector('#scr-target')`, 15000);
+    // The Scraper app mounts lazily; under a long run it can still be loading when the first
+    // navigate event fires, and that event is lost. Re-send it until the page answers.
+    const input = await goTo('new-scrape', '#scr-target', 20000);
     let jobVia = 'ui';
     if (input) {
       await ev(`__e2e.fill('#scr-target', ${JSON.stringify(target)})`);
@@ -111,15 +119,14 @@ module.exports = {
     if (jobId) {
       const summary = await ev(`window.api.scraperListJobs().then((l) => (l || []).find((x) => x.id === ${JSON.stringify(jobId)}) || null)`, { await: true });
       const title = summary?.titleEn ?? '';
-      await ev(`(window.dispatchEvent(new CustomEvent('scraper:navigate', { detail: { page: 'dashboard' } })), true)`);
+      await goTo('dashboard', '.scr-dashboard-series-card', 10000);
       const card = await poll(ctx, `(() => { const c = [...document.querySelectorAll('.scr-dashboard-series-card')].find((x) => x.innerText.includes(${JSON.stringify(title)})); return c ? (c.click(), true) : null; })()`, 10000);
       const inspector = await poll(ctx, `(() => { const s = document.querySelector('.scr-results-inspector'); return s ? s.getAttribute('aria-label') : null; })()`, 10000);
       result.check('a Dashboard series card opens Results with that run selected', Boolean(card) && Boolean(inspector) && inspector.includes(title), { title, card, inspector });
     }
 
     // --- the notice is not shown again: the Torrent Manager searches straight away -------
-    await ev(`(window.dispatchEvent(new CustomEvent('scraper:navigate', { detail: { page: 'torrents' } })), true)`);
-    await poll(ctx, `!!document.querySelector('.scr-page--torrents')`, 8000);
+    await goTo('torrents', '.scr-page--torrents', 8000);
     await ctx.sleep(800);
     const noticeAgain = await ev(`!!document.querySelector('[data-download-notice]')`);
     result.check('the acknowledged notice is not shown again', noticeAgain === false, { noticeAgain });
