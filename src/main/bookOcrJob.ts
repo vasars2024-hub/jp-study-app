@@ -11,7 +11,7 @@
  */
 
 import { BrowserWindow, ipcMain, nativeImage } from 'electron';
-import { ocrAuto } from './ocrAuto';
+import { readOcrSurface } from './ocrSurface';
 import { buildBookEpub } from './bookEpub';
 import { attachGeneratedEpub, getLibraryItem, itemDir, listItemPagePaths } from './library';
 import { rasterizePdf } from './pdfRasterize';
@@ -59,10 +59,10 @@ export function bookOcrRunning(itemId: string): boolean {
  * take; the intermediate NativeImage also normalises the assorted formats an
  * archive can contain (png/jpg/webp/bmp) into one decoder path.
  */
-function pageDataUrl(file: string): string | null {
+function pageImage(file: string): Electron.NativeImage | null {
   const img = nativeImage.createFromPath(file);
   if (img.isEmpty()) return null;
-  return img.toDataURL();
+  return img;
 }
 
 export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
@@ -123,16 +123,15 @@ export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
         return { ok: false, error: 'cancelled' };
       }
 
-      const dataUrl = pageDataUrl(files[i]);
+      const image = pageImage(files[i]);
       let lines: BookLine[] = [];
-      if (dataUrl) {
+      if (image) {
         try {
-          const result = await ocrAuto(dataUrl, {
-            engine,
-            langHint: lang,
-            forceLang: lang,
-            quality: req.quality ?? 'heavy',
+          const result = await readOcrSurface(image, {
+            langs: [lang], purpose: 'book', orientation: 'auto',
+            budgetMs: req.quality === 'fast' ? 8_000 : 20_000,
           });
+          if (!result.ok && result.error !== 'empty') throw new Error(result.error ?? 'ocr-failed');
           lines = result.lines.map((l) => ({ text: l.text, confidence: l.confidence }));
         } catch (err) {
           // A page the engines cannot read becomes an empty page rather than

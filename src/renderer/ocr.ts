@@ -141,6 +141,16 @@ export async function runOcr(
   lang: OcrLang,
   onProgress?: (p: number) => void,
 ): Promise<string> {
+  if (typeof window !== 'undefined' && window.api?.mangaOcrRecognizeImage) {
+    try {
+      const text = await window.api.mangaOcrRecognizeImage(dataUrl);
+      if (text.trim()) { onProgress?.(1); return text; }
+    } catch {
+      // No installed reader: the bundled Japanese worker remains usable offline.
+    }
+    const { getStudyLang } = await import('./studyEnvironment');
+    if (!tesseractReads(getStudyLang())) throw new Error('no-engine');
+  }
   const { data } = await recognizeOnWorker(lang, onProgress, (worker) => worker.recognize(dataUrl));
   return cleanJapanese(data.text);
 }

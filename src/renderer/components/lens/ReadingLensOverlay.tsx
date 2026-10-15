@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { OcrCharacterFixes } from '../OcrCharacterFixes';
+import { ocrUnsureOf, withOcrLineCandidates } from '../../../shared/ocrSurfaceCorrections';
+import type { OcrUnsureChar } from '../../../shared/ocrRouterTypes';
 import LensReaderPanel from './LensReaderPanel';
 import { pickLensWordAt } from './lensWordAt';
 import LensAnalysisPanel from './LensAnalysisPanel';
@@ -467,7 +470,8 @@ export default function ReadingLensOverlay() {
     sourceRef.current = { title: init.sourceTitle, app: init.sourceApp };
     cursorPointRef.current = init.mode === 'cursor' && init.region && init.point ? init.point : null;
     if (init.mode === 'clipboard') {
-      const capture = normalizeReadingLensCapture(init.capture);
+      const normalizedCapture = normalizeReadingLensCapture(init.capture);
+      const capture = normalizedCapture ? withOcrLineCandidates(normalizedCapture, init.capture?.lines ?? []) : null;
       if (!capture) {
         setState({
           kind: 'error',
@@ -666,7 +670,7 @@ export default function ReadingLensOverlay() {
           // branch keeps main's `clipboard` label for the same reason — the
           // text came from the clipboard, not from whatever is parked here.
           const target = captureTargetRef.current;
-          const capture = normalizeReadingLensCapture({
+          const normalizedCapture = normalizeReadingLensCapture({
             source: 'screen',
             sourceLabel: target?.sourceLabel,
             sourceRef: target?.sourceRef,
@@ -677,6 +681,7 @@ export default function ReadingLensOverlay() {
             lines: res.lines,
             screenshotDataUrl: res.screenshotDataUrl,
           });
+          const capture = normalizedCapture ? withOcrLineCandidates(normalizedCapture, res.lines) : null;
           // The losing engine's read, when main carried one back. It goes
           // through the same normalizer as the primary — a read offered as a
           // swap has to be a capture in its own right, or mining, correction
@@ -1283,7 +1288,7 @@ export default function ReadingLensOverlay() {
     const result = correctReadingLensLine(state.capture, lineIndex, nextText);
     if (!result.ok) return false;
 
-    const correctedCapture = result.capture;
+    const correctedCapture = withOcrLineCandidates(result.capture, state.capture.lines);
     setState({
       ...state,
       capture: correctedCapture,
@@ -1473,6 +1478,7 @@ export default function ReadingLensOverlay() {
                   confidenceLevel={confidenceLevel}
                   style={lineStyle}
                   label={t('lens.edit.lineLabel', { index: i + 1 })}
+                  unsure={ocrUnsureOf(state.capture.lines[i])}
                   autoFocus={i === 0}
                   onCommit={(nextText) => correctLine(i, nextText)}
                 />
@@ -1955,6 +1961,7 @@ export function LensLineEditor({
   style,
   label,
   autoFocus = false,
+  unsure,
   onCommit,
 }: {
   text: string;
@@ -1963,6 +1970,7 @@ export function LensLineEditor({
   style: { left: number; top: number; minWidth: number; minHeight: number; fontSize: number };
   label: string;
   autoFocus?: boolean;
+  unsure?: OcrUnsureChar[];
   onCommit: (text: string) => boolean;
 }) {
   const [draft, setDraft] = useState(text);
@@ -1977,27 +1985,33 @@ export function LensLineEditor({
   };
 
   return (
-    <input
-      type="text"
-      className={`lens-line lens-line-editor lens-interactive lens-confidence-${confidenceLevel} ${vertical ? 'lens-line-v' : ''}`}
-      style={style}
-      value={draft}
-      aria-label={label}
-      title={label}
-      lang="ja"
-      spellCheck={false}
-      autoFocus={autoFocus}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          setDraft(text);
-          event.currentTarget.blur();
-        } else if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-          event.preventDefault();
-          event.currentTarget.blur();
-        }
-      }}
-    />
+    <>
+      <input
+        type="text"
+        className={`lens-line lens-line-editor lens-interactive lens-confidence-${confidenceLevel} ${vertical ? 'lens-line-v' : ''}`}
+        style={style}
+        value={draft}
+        aria-label={label}
+        title={label}
+        lang="ja"
+        spellCheck={false}
+        autoFocus={autoFocus}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            setDraft(text);
+            event.currentTarget.blur();
+          } else if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+        }}
+      />
+      <div className="lens-interactive" style={{ position: 'absolute', left: style.left, top: style.top + style.minHeight + 4, zIndex: 2 }}>
+        <OcrCharacterFixes text={draft} unsure={unsure} label={label}
+          onChange={(next) => { if (onCommit(next)) setDraft(next); }} />
+      </div>
+    </>
   );
 }

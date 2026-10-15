@@ -1142,6 +1142,19 @@ describe('watch region', () => {
     expect(await h.ipc.handlers.get('lens:watchText')!({}, { text: '次の行' })).toBe(false);
   });
 
+  it('routes the initial VN selection and subsequent watch reads with the VN purpose', async () => {
+    const m = await booted();
+    m.startLensWatch('visual-novel');
+    await h.ipc.handlers.get('lens:ocr')!({}, REGION);
+    expect(ocrCalls.at(-1)?.[2]).toMatchObject({ purpose: 'vn', langs: ['ja'] });
+    await h.ipc.handlers.get('lens:watchStart')!({}, REGION);
+    await h.ipc.handlers.get('lens:ocr')!({}, REGION);
+    expect(ocrCalls.at(-1)?.[2]).toMatchObject({ purpose: 'vn', langs: ['ja'] });
+    m.stopLensWatch('visual-novel');
+    await scan(REGION);
+    expect(ocrCalls.at(-1)?.[2]).toMatchObject({ purpose: 'lens', langs: ['ja'] });
+  });
+
   it("a capture session never stops a watch the reader started", async () => {
     const m = await booted();
     await scan(REGION);

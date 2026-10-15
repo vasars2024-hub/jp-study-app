@@ -169,6 +169,7 @@ describe('manga reading reaches Statistics and the Reading Garden', () => {
       assetsList: async () => ({ assets: [], statuses: [] }),
       mangaOcrLoadCache: async (_id: string, url: string) => (url === PAGES[0] ? page : null),
       mangaOcrLoadTranslateCache: async () => null,
+      mangaOcrScanPage: async () => null,
       setProgress: async () => undefined,
     });
     const now = vi.spyOn(Date, 'now');

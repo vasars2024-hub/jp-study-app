@@ -226,12 +226,17 @@ function emptyResult(lang: OcrLangId, over: Partial<OcrRouterResult>): OcrRouter
   return { ok: false, text: '', lines: [], engine: 'none', engines: [], lang, unsure: [], ...over };
 }
 
+export interface OcrRouterRead extends OcrRouterResult {
+  /** A complete other read, retained for surfaces with an engine-swap control. */
+  alternate?: { engine: OcrEngineId; lang: string; text: string; lines: EngineLine[] };
+}
+
 /** Read `image` (see the module comment for the policy and the result). */
 export async function recognizeWithRouter(
   image: RouterImage,
   opts: OcrRouterOptions,
   deps: RouterDeps = defaultRouterDeps(),
-): Promise<OcrRouterResult> {
+): Promise<OcrRouterRead> {
   const langs = [...new Set(opts.langs)];
   const active = langs[0] ?? 'ja';
   const deadline = deps.now() + (opts.budgetMs ?? OCR_BUDGET_MS[opts.purpose]);
@@ -298,6 +303,7 @@ export async function recognizeWithRouter(
   const glyph = median(primary.lines.map((l) => (l.vertical ? l.box[2] - l.box[0] : l.box[3] - l.box[1])));
   const pad = Math.max(2, Math.round(glyph * 0.15));
   const lines: OcrRouterLine[] = [];
+  const alternateReads = new Map<OcrEngineId, EngineLine[]>([[primary.provider.id, primary.lines]]);
   const engines = new Set<OcrEngineId>([primary.provider.id]);
   for (const line of primary.lines) {
     let chars = line.chars && line.chars.length === [...line.text].length ? line.chars : undefined;
@@ -325,6 +331,9 @@ export async function recognizeWithRouter(
           if (other?.text.trim()) {
             candidates.push({ engine: provider.id, text: other.text.trim(), confidence: other.confidence, ...(other.chars ? { chars: other.chars } : {}) });
             engines.add(provider.id);
+            const otherLines = alternateReads.get(provider.id) ?? [];
+            otherLines[lines.length] = { ...other, box: line.box, vertical: line.vertical };
+            alternateReads.set(provider.id, otherLines);
           }
         } catch (err) {
           console.warn(`[ocrRouter] ${provider.id} line re-read failed`, err);
@@ -345,6 +354,11 @@ export async function recognizeWithRouter(
   const counts = new Map<OcrEngineId, number>();
   for (const l of lines) counts.set(l.engine, (counts.get(l.engine) ?? 0) + [...l.text].length);
   const engine = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? primary.provider.id;
+  const alternate = [...alternateReads.entries()].flatMap(([id, readLines]) => {
+    if (id === engine || readLines.length !== lines.length || Array.from({ length: lines.length }, (_, i) => !readLines[i]).some(Boolean)) return [];
+    const ownText = readLines.map((line) => line.text).join('\n').trim();
+    return ownText && ownText !== text ? [{ engine: id, lang, text: ownText, lines: readLines }] : [];
+  })[0];
   return {
     ok: Boolean(text),
     text,
@@ -354,10 +368,29 @@ export async function recognizeWithRouter(
     engines: [...engines],
     lang,
     unsure: unsureCharsOf(lines),
+    ...(alternate ? { alternate } : {}),
     ...(missing ? { missing } : {}),
     ...(timedOut ? { timedOut } : {}),
     ...(!text ? { error: 'empty' as const } : {}),
   };
+}
+
+/** Read an already detected line without re-entering a provider's page detector. */
+export function recognizeLineWithRouter(
+  image: RouterImage,
+  opts: OcrRouterOptions,
+  deps: RouterDeps = defaultRouterDeps(),
+): Promise<OcrRouterRead> {
+  return recognizeWithRouter(image, opts, {
+    ...deps,
+    providers: deps.providers.filter((p) => p.readLine).map((p) => ({
+      ...p,
+      async readPage(crop, lang, orientation) {
+        const line = await p.readLine!(crop, lang, { vertical: orientation.vertical ?? crop.height > crop.width });
+        return line ? [{ ...line, box: [0, 0, crop.width, crop.height] as [number, number, number, number] }] : [];
+      },
+    })),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -469,7 +502,7 @@ export function mangaProvider(): OcrProvider {
     available: () => mangaOcrAvailable(),
     async readPage(image) {
       const read = await recognizeMangaOcrRegionsDataUrl(image.dataUrl());
-      return read.lines.map((l) => ({ text: l.text, box: l.box, vertical: l.vertical, confidence: l.confidence }));
+      return read.lines.map((l) => ({ text: l.text, box: l.box, vertical: l.vertical, confidence: l.confidence, chars: l.chars }));
     },
     async readLine(image) {
       const read = await recognizeMangaCropDataUrl(image.dataUrl(), { topK: 4 });

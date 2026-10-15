@@ -3,6 +3,8 @@ import type { MokuroBlock, MokuroBlockKind, MokuroPage } from '../../../shared/m
 import { blockContext } from '../../../shared/mokuroTypes';
 import { useT } from '../../i18n';
 import { getZoomFactor } from '../../appZoom';
+import { OcrCharacterFixes } from '../OcrCharacterFixes';
+import { ocrUnsureOf } from '../../../shared/ocrSurfaceCorrections';
 
 interface Props {
   page: MokuroPage;
@@ -156,6 +158,9 @@ export default function RegionEditorModal({
           </button>
         </div>
 
+        <OcrCharacterFixes text={draft} unsure={ocrUnsureOf(block, block.lines.join('\n'))}
+          label={t('manga.regionEditor.corrected')} disabled={busy}
+          onChange={(next) => { setDraft(next); onSaveLines(next.split('\n').map((line) => line.trim()).filter(Boolean)); }} />
         <div className="sp-seg region-editor-orientation">
           <button
             className={`sp-seg-btn ${block.vertical ? 'active' : ''}`}

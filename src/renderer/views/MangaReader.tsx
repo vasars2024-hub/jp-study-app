@@ -35,7 +35,7 @@ import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import Icon from '../components/Icons';
-import { mangaOcrErrorKey, ocrFailureKey, runOcr, tesseractReads, type OcrLang } from '../ocr';
+import { mangaOcrErrorKey, ocrFailureKey, runOcr, type OcrLang } from '../ocr';
 import { STUDY_LANG_NAME_KEY, studyLangOfText } from '../../shared/studyLang';
 import {
   cropPageImage,
@@ -481,13 +481,6 @@ export default function MangaReader({ item, onClose }: Props) {
       setOcrText('');
       setOcrIsFallback(true);
       setMokuroPage(null);
-      // The bundled fallback engine reads Japanese only; on a Chinese or Russian
-      // page it would print Japanese that is not there. Say so instead.
-      if (!tesseractReads(getStudyLang())) {
-        setOcrError(t('manga.ocr.fallbackJapaneseOnly', { lang: t(STUDY_LANG_NAME_KEY[getStudyLang()]) }));
-        setOcrStatus('error');
-        return;
-      }
       try {
         const dataUrl = await window.api.readMangaPage(url);
         if (!dataUrl) throw new Error(t('manga.ocr.readFailed'));
@@ -497,7 +490,9 @@ export default function MangaReader({ item, onClose }: Props) {
         if (!text.trim()) setOcrError(t('manga.ocr.noText'));
       } catch (err) {
         console.error(err);
-        setOcrError(t(ocrFailureKey(err)));
+        setOcrError(err instanceof Error && err.message === 'no-engine'
+          ? t('manga.ocr.fallbackJapaneseOnly', { lang: t(STUDY_LANG_NAME_KEY[getStudyLang()]) })
+          : t(ocrFailureKey(err)));
         setOcrStatus('error');
       }
     },

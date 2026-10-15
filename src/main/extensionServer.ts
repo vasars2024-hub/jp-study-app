@@ -7,7 +7,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage, shell, nativeImage } from 'electron';
 import {
   EXTENSION_PORT,
   INBOX_FOLDER,
@@ -63,9 +63,10 @@ import {
   getChromeExtensionFolder,
   readInstalledExtensionVersion,
 } from './extensionInstall';
-import { mangaOcrAvailable, recognizeMangaOcrRegionsDataUrl } from './mangaOcr';
+import { mangaOcrAvailable } from './mangaOcr';
 import { installedPaddleLangs, paddleOcrAvailable, type PaddleLang } from './paddleOcr';
-import { ocrAuto } from './ocrAuto';
+import { readOcrSurface } from './ocrSurface';
+import { mt } from './i18n';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
 import { getMainStudyLang } from './studyLanguage';
@@ -2495,76 +2496,24 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         return;
       }
 
-      // A page category of 'manga' still pins the engine — the site is known to
-      // be manga, which is better evidence than anything derived from one crop.
-      // Everything else goes through ocrAuto, which starts on the general engine
-      // and only falls back to manga-ocr when the general read looks like the
-      // tategaki failure described in shared/ocrRouting.ts. That keeps printed
-      // web text away from manga-ocr, which hallucinates on it.
-      if (body.category === 'manga') {
-        if (!mangaOcrAvailable()) {
-          json(res, 503, {
-            ok: false,
-            available: false,
-            engine: 'manga-ocr',
-            error:
-              'Manga OCR models are not installed — open Settings → Models & dictionaries and download the manga-ocr pack.',
-          });
-          return;
-        }
-        const manga = await recognizeMangaOcrRegionsDataUrl(dataUrl);
-        json(res, 200, {
-          ok: true,
-          text: manga.text,
-          lines: manga.lines,
-          lang: 'ja',
-          engine: 'manga-ocr',
-          available: true,
-        });
-        return;
-      }
-
-      const langHint = asPaddleLang(body.langHint);
-      // Always nudge ja+zh+ru downloads so auto language pick has every head.
-      // Cheap when already installed (startDownload no-ops / marks requested).
+      const langHint = asPaddleLang(body.langHint) ?? getMainStudyLang();
       void ensureWebOcrModels(langHint);
-      if (!paddleOcrAvailable()) {
-        json(res, 503, {
-          ok: false,
-          available: false,
-          downloading: true,
-          engine: 'web',
-          error: 'Downloading web OCR models — try again in a moment.',
-        });
-        return;
-      }
-      // Hinted language still missing: refuse with downloading rather than
-      // OCR with the wrong script head (looks like confident garbage).
-      if (langHint && !installedPaddleLangs().includes(langHint)) {
-        json(res, 503, {
-          ok: false,
-          available: false,
-          downloading: true,
-          engine: 'web',
-          lang: langHint,
-          error: `Downloading ${langHint.toUpperCase()} web OCR — try again in a moment.`,
-        });
-        return;
-      }
-
-      const result = await ocrAuto(dataUrl, { engine: 'auto', langHint });
-      json(res, 200, {
-        ok: true,
-        text: result.text,
-        lines: result.lines,
-        lang: result.lang,
-        engine: result.engine === 'manga' ? 'manga-ocr' : 'web',
-        available: true,
+      const result = await readOcrSurface(nativeImage.createFromDataURL(dataUrl), {
+        langs: [...new Set([langHint, ...installedPaddleLangs(), ...(mangaOcrAvailable() ? ['ja'] : [])])],
+        purpose: body.category === 'manga' ? 'manga' : 'lens', orientation: 'auto',
+      });
+      const available = result.error !== 'no-engine';
+      json(res, available ? 200 : 503, {
+        ...result,
+        ...(result.error ? { errorCode: result.error, error: mt(available ? 'lens.error.generic' : 'lens.error.web') } : {}),
+        engine: result.engine === 'manga' ? 'manga-ocr' : result.engine,
+        available,
+        ...(!available ? { downloading: true } : {}),
       });
     } catch (err) {
       json(res, 400, {
         ok: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: mt('lens.error.generic'),
         available: paddleOcrAvailable() || mangaOcrAvailable(),
       });
     }

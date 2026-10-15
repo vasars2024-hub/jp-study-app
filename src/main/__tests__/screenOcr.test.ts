@@ -67,7 +67,7 @@ const h = vi.hoisted(() => {
     sourcesThrow: null as Error | null,
     sources: null as unknown[] | null,
   };
-  const engines = { paddle: true, manga: true };
+  const engines = { paddle: true, manga: true, langs: null as string[] | null };
   /** The download manager: per-asset state, and what `startDownload` was asked for. */
   const downloads = {
     states: {} as Record<string, string>,
@@ -106,6 +106,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../paddleOcr', () => ({
   paddleOcrAvailable: () => h.engines.paddle,
+  installedPaddleLangs: () => h.engines.paddle ? h.engines.langs ?? [h.study.lang] : [],
   paddleAssetsForLang: (lang: string) => [`paddle-ocr-${lang}`, `paddle-ocr-${lang}-keys`, 'paddle-ocr-det'],
 }));
 vi.mock('../downloads', () => ({
@@ -125,11 +126,13 @@ vi.mock('../downloads', () => ({
   },
 }));
 vi.mock('../mangaOcr', () => ({ mangaOcrAvailable: () => h.engines.manga }));
-vi.mock('../ocrAuto', () => ({
-  ocrAuto: async (dataUrl: string) => {
+vi.mock('../ocrSurface', () => ({
+  readOcrSurface: async (image: { toDataURL(): string }) => {
+    const dataUrl = image.toDataURL();
     h.ocr.calls.push(dataUrl);
     if (h.ocr.throws) throw h.ocr.throws;
-    return h.ocr.impl ? h.ocr.impl(dataUrl) : { engine: 'web', lang: 'ja', lines: [], text: '', mangaConsidered: false };
+    const read = (h.ocr.impl ? await h.ocr.impl(dataUrl) : { engine: 'web', lang: 'ja', lines: [], text: '' }) as AutoOcrResult;
+    return { ok: true, engines: [read.engine], unsure: [], ...read };
   },
 }));
 
@@ -179,6 +182,7 @@ beforeEach(() => {
   ocr.impl = null;
   ocr.throws = null;
   engines.paddle = true;
+  engines.langs = null;
   engines.manga = true;
   downloads.states = {};
   downloads.started = [];
@@ -448,6 +452,7 @@ describe('ocrRegion — engine availability', () => {
 
   it('starts the Japanese web pack when it is missing, and only then says downloading', async () => {
     engines.paddle = false;
+    engines.manga = false;
     const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
     expect(res).toMatchObject({
       ok: false,
@@ -464,6 +469,7 @@ describe('ocrRegion — engine availability', () => {
 
   it('offers the model before trying to capture, so a capture problem cannot hide it', async () => {
     engines.paddle = false;
+    engines.manga = false;
     state.sources = [
       { display_id: '', thumbnail: state.thumbnail },
       { display_id: '', thumbnail: state.thumbnail },
@@ -476,6 +482,7 @@ describe('ocrRegion — engine availability', () => {
 
   it('does not start a second download while one is already running', async () => {
     engines.paddle = false;
+    engines.manga = false;
     downloads.states = { 'paddle-ocr-ja': 'downloading' };
     const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
     expect(res.downloading).toBe(true);
@@ -484,11 +491,20 @@ describe('ocrRegion — engine availability', () => {
 
   it('does not claim a download when the start was refused, and says why', async () => {
     engines.paddle = false;
+    engines.manga = false;
     const error = { key: 'assetError.diskSpace', vars: { name: 'Web OCR' } };
     downloads.startResult = { ok: false, error };
     const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
     expect(res.downloading).toBe(false);
     expect(res.missingAssets?.error).toEqual(error);
+  });
+
+  it('offers the requested language pack when only another language is installed', async () => {
+    h.study.lang = 'zh';
+    engines.langs = ['ja'];
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    expect(res).toMatchObject({ available: false, missingAssets: { startIds: ['paddle-ocr-zh'] } });
+    expect(ocr.calls).toHaveLength(0);
   });
 
   it('offers the manga install without starting a 550 MB download on its own', async () => {
@@ -501,6 +517,7 @@ describe('ocrRegion — engine availability', () => {
 
   it('still runs manga when only the general engine is missing', async () => {
     engines.paddle = false;
+    engines.manga = true;
     ocr.impl = () => result([line([0, 0, 10, 10])], 'manga');
     const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1, { engine: 'manga' });
     expect(res.ok).toBe(true);
@@ -883,6 +900,7 @@ describe('ocrRegion — progress and cancel', () => {
 describe('ocrRegion — fallback image while the web model is missing', () => {
   it('hands a Japanese learner the lossless crop beside the install offer', async () => {
     engines.paddle = false;
+    engines.manga = false;
     state.sources = [{ display_id: '2', thumbnail: fakeImage(2560, 1440) }];
     const res = await ocrRegion({ x: 10, y: 10, width: 300, height: 100 }, 2, { includeScreenshot: true });
     expect(res).toMatchObject({ ok: false, available: false, error: 'web-models-missing', downloading: true });
@@ -895,6 +913,7 @@ describe('ocrRegion — fallback image while the web model is missing', () => {
 
   it('bounds a whole-screen fallback image and scales its mapping with it', async () => {
     engines.paddle = false;
+    engines.manga = false;
     state.thumbnail = fakeImage(3840, 2160);
     displays.splice(0, 1, { id: 1, bounds: { x: 0, y: 0, width: 3840, height: 2160 }, scaleFactor: 1 });
     const res = await ocrRegion({ x: 0, y: 0, width: 3840, height: 2160 }, 1);
@@ -904,6 +923,7 @@ describe('ocrRegion — fallback image while the web model is missing', () => {
 
   it('offers no fallback outside Japanese, whose data is the only one bundled', async () => {
     engines.paddle = false;
+    engines.manga = false;
     h.study.lang = 'zh';
     const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
     expect(res.error).toBe('web-models-missing');
@@ -913,6 +933,7 @@ describe('ocrRegion — fallback image while the web model is missing', () => {
 
   it('keeps the offer alone when the capture itself fails', async () => {
     engines.paddle = false;
+    engines.manga = false;
     state.sourcesThrow = new Error('permission denied');
     const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
     expect(res).toMatchObject({ available: false, error: 'web-models-missing' });

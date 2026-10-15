@@ -56,6 +56,18 @@ describe('Reading Lens editable OCR line', () => {
     expect(input.getAttribute('aria-label')).toBe('Edit OCR line 2');
   });
 
+  it('one-click alternatives commit the repaired line immediately', async () => {
+    const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    const onCommit = vi.fn(() => true);
+    await act(async () => root?.render(<LensLineEditor text="𠮷後" vertical={false} confidenceLevel="low"
+      style={{ left: 0, top: 0, minWidth: 90, minHeight: 24, fontSize: 16 }} label="Edit OCR line 1"
+      unsure={[{ at: 1, ch: '後', p: 0.4, alts: ['竜'] }]} onCommit={onCommit} />));
+    await act(async () => host.querySelector<HTMLButtonElement>('.ocr-character-fixes button')?.click());
+    expect(onCommit).toHaveBeenCalledWith('𠮷竜');
+    expect(host.querySelector<HTMLInputElement>('input')?.value).toBe('𠮷竜');
+    expect(host.querySelector('.ocr-character-fixes')).toBeNull();
+  });
+
   it('restores the source line when the correction boundary rejects a draft', async () => {
     const host = document.createElement('div');
     document.body.append(host);

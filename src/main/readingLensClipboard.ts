@@ -1,3 +1,4 @@
+import { withOcrLineCandidates } from '../shared/ocrSurfaceCorrections';
 import { createHash } from 'node:crypto';
 import {
   normalizeReadingLensCapture,
@@ -20,7 +21,7 @@ export function createReadingLensClipboardCapture(
   language = 'ja',
   // A picture on the clipboard, already OCR'd: which engine read it, and the
   // bounded picture itself (the card a word is mined into can carry it).
-  image?: { engine?: string; screenshotDataUrl?: string },
+  image?: { engine?: string; screenshotDataUrl?: string; lines?: Array<{ text: string }> },
 ): ReadingLensCapture | null {
   const capture = normalizeReadingLensCapture(
     {
@@ -30,6 +31,7 @@ export function createReadingLensClipboardCapture(
       language,
       engine: image?.engine || 'none',
       text: value,
+      lines: image?.lines,
       ...(image?.screenshotDataUrl ? { screenshotDataUrl: image.screenshotDataUrl } : {}),
     },
     now,
@@ -37,7 +39,7 @@ export function createReadingLensClipboardCapture(
   if (!capture) return null;
 
   const hash = createHash('sha256').update(capture.text, 'utf8').digest('hex');
-  return normalizeReadingLensCapture(
+  const normalized = normalizeReadingLensCapture(
     {
       ...capture,
       captureId: 'reading-lens:clipboard:' + hash,
@@ -45,4 +47,5 @@ export function createReadingLensClipboardCapture(
     },
     now,
   );
+  return normalized && image?.lines ? withOcrLineCandidates(normalized, image.lines) : normalized;
 }

@@ -678,6 +678,7 @@ async function openClipboard(source?: ForegroundInfo | null): Promise<void> {
     ? createReadingLensClipboardCapture(read.text, Date.now(), read.lang || getMainStudyLang(), {
       engine: read.engine,
       screenshotDataUrl: read.screenshotDataUrl,
+      lines: read.lines,
     })
     : null;
   openLens('clipboard', { source: from, capture, clipboardImageFailed: !capture });
@@ -905,6 +906,8 @@ export function registerReadingLensIpc(): void {
     try {
       return await ocrRegion(rect, lensDisplayId, {
         engine: r.engine ?? 'auto',
+        purpose: (activeWatch?.origin ?? pendingWatchOrigin) === 'visual-novel' ? 'vn' : 'lens',
+        langs: [getMainStudyLang()],
         includeScreenshot: r.includeScreenshot === true,
         signal: controller.signal,
         onStage,

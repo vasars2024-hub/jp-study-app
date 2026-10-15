@@ -66,7 +66,10 @@ import {
 } from '../shared/mangaTextDetect';
 import { getMainStudyLang } from './studyLanguage';
 import { MangaScanCancelled, createMangaScanQueue, type MangaScanPriority } from './mangaScanQueue';
-import { recognizePaddleOcrDataUrl } from './paddleOcr';
+import { readOcrSurface } from './ocrSurface';
+import { mangaStepsToChars } from './ocrRouter';
+import { ocrUnsureOf } from '../shared/ocrSurfaceCorrections';
+import type { OcrChar, OcrUnsureChar } from '../shared/ocrRouterTypes';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
 import {
   summarizeTranslateFailure,
@@ -1001,6 +1004,7 @@ async function detectRegions(
 
 /** Decoded text plus how confident the decoder was, 0-1. */
 interface MangaCropRead {
+  unsure?: OcrUnsureChar[];
   text: string;
   confidence: number;
 }
@@ -1102,17 +1106,21 @@ async function recognizeCrop(
   srcW: number,
   srcH: number,
   box: MokuroBox,
-  points: Array<{ x: number; y: number }>,
+  _points: Array<{ x: number; y: number }>,
 ): Promise<MangaCropRead> {
-  const lang = getMainStudyLang();
-  if (lang !== 'ja') {
-    const read = await recognizePaddleOcrDataUrl(cropRegionDataUrl(rgba, srcW, srcH, box), { forceLang: lang });
-    const confidence = read.lines.length
-      ? read.lines.reduce((sum, line) => sum + line.confidence, 0) / read.lines.length
-      : 0;
-    return { text: read.lines.map((line) => line.text).join(lang === 'ru' ? ' ' : ''), confidence };
-  }
-  return recognizeCropJapanese(rgba, srcW, srcH, box, points);
+  return readRoutedMangaCrop(cropRegionDataUrl(rgba, srcW, srcH, box), box[3] - box[1] > box[2] - box[0], getMainStudyLang() === 'ja');
+}
+
+async function readRoutedMangaCrop(dataUrl: string, vertical: boolean, line = true): Promise<MangaCropRecognition & { unsure: OcrUnsureChar[] }> {
+  const read = await readOcrSurface(nativeImage.createFromDataURL(dataUrl), {
+    langs: [getMainStudyLang()], purpose: 'manga', line,
+    orientation: vertical ? 'vertical' : 'horizontal',
+  });
+  if (!read.ok && read.error !== 'empty') throw new Error(read.error ?? 'ocr-failed');
+  const chars = read.lines.flatMap((line) => line.chars ?? []);
+  const steps = chars.map((char) => ({ token: char.ch, prob: char.p, candidates: [{ token: char.ch, prob: char.p }, ...char.alts.map((alt) => ({ token: alt.ch, prob: alt.p }))] }));
+  return { text: read.text, rawText: read.text, confidence: read.confidence ?? 0, truncated: false, unsure: read.unsure,
+    ...(chars.map((char) => char.ch).join('') === read.text ? { steps } : {}) };
 }
 
 async function recognizeCropJapanese(
@@ -1301,7 +1309,7 @@ export async function loadMangaOcrCache(itemId: string, mediaUrl: string): Promi
   const p = cachePath(itemId, resolved.stem);
   try {
     const raw = await readJson<unknown>(p, null);
-    const page = parseMokuroPage(raw);
+    const page = parseCachedMangaPage(raw);
     const corrections = await readCorrections(itemId, resolved.stem);
     return applyCorrections(page, corrections);
   } catch {
@@ -1385,10 +1393,16 @@ export async function refreshMangaOcrMeta(
   return meta;
 }
 
+function parseCachedMangaPage(raw: unknown): MokuroPage {
+  const page = parseMokuroPage(raw);
+  const blocks = (raw as { blocks: unknown[] }).blocks;
+  return { ...page, blocks: page.blocks.map((block, i) => ({ ...block, unsure: ocrUnsureOf(blocks[i], block.lines.join('\n')) })) };
+}
+
 /** Read the on-disk cache file as literally persisted (no corrections applied). */
 async function readRawCachePage(itemId: string, stem: string): Promise<MokuroPage | null> {
   try {
-    return parseMokuroPage(await readJson<unknown>(cachePath(itemId, stem), null));
+    return parseCachedMangaPage(await readJson<unknown>(cachePath(itemId, stem), null));
   } catch {
     return null;
   }
@@ -1426,17 +1440,24 @@ async function recognizeRegion(
   width: number,
   height: number,
   region: DetectedRegion,
-): Promise<{ lines: string[]; confidence: number }> {
+): Promise<{ lines: string[]; confidence: number; unsure?: OcrUnsureChar[] }> {
   if (region.lines?.length && getMainStudyLang() === 'ja') {
     const read = await readBlockLines(rgba, width, height, region, 0);
-    return { lines: read.lines.map((l) => l.text), confidence: read.confidence };
+    let offset = 0;
+    const unsure = read.lines.flatMap((line) => {
+      const fixes = (line.unsure ?? []).map((fix) => ({ ...fix, at: fix.at + offset }));
+      offset += [...line.text].length + 1;
+      return fixes;
+    });
+    return { lines: read.lines.map((l) => l.text), confidence: read.confidence, unsure };
   }
   const read = await recognizeCrop(rgba, width, height, region.box, region.points);
-  return { lines: read.text ? [read.text] : [], confidence: read.confidence };
+  return { lines: read.text ? [read.text] : [], confidence: read.confidence, unsure: read.unsure };
 }
 
 /** One line of a block as `readMangaTextBlock` returns it. */
 export interface MangaBlockLineRead extends MangaCropRecognition {
+  unsure?: OcrUnsureChar[];
   /** The line's crop on the page (the line box plus a small margin). */
   box: MokuroBox;
 }
@@ -1447,13 +1468,16 @@ async function readBlockLines(
   height: number,
   region: DetectedRegion,
   topK: number,
+  providerOnly = false,
 ): Promise<{ lines: MangaBlockLineRead[]; confidence: number }> {
   const lines: MangaBlockLineRead[] = [];
   let weighted = 0;
   let chars = 0;
   for (const line of region.lines ?? []) {
     const crop = lineCropBox(line, width, height);
-    const read = await recognizeCropJapanese(rgba, width, height, crop, boxPoints(crop), topK);
+    const read: MangaCropRecognition & { unsure?: OcrUnsureChar[] } = providerOnly
+      ? await recognizeCropJapanese(rgba, width, height, crop, boxPoints(crop), topK)
+      : await readRoutedMangaCrop(cropRegionDataUrl(rgba, width, height, crop), region.vertical ?? true);
     const text = read.text.trim();
     if (!text) continue;
     lines.push({ ...read, text, box: crop });
@@ -1498,7 +1522,7 @@ export async function readMangaTextBlock(
   await ensureModels();
   const topK = Math.max(0, Math.floor(opts.topK ?? 0));
   if (region.lines?.length) return readBlockLines(rgba, width, height, region, topK);
-  const read = await recognizeCropJapanese(rgba, width, height, region.box, region.points, topK);
+  const read = await readRoutedMangaCrop(cropRegionDataUrl(rgba, width, height, region.box), region.vertical ?? true);
   const text = read.text.trim();
   return text
     ? { lines: [{ ...read, text, box: region.box }], confidence: read.confidence }
@@ -1746,6 +1770,7 @@ export async function scanMangaPage(
     // How sure the decoder was about this region's text. Starts at 1 so a
     // reused cached read or a user correction is treated as certain.
     let readConfidence = 1;
+    let unsure: OcrUnsureChar[] = [];
     let lines: string[];
     let rawLines: string[];
     if (correction?.lines) {
@@ -1773,6 +1798,7 @@ export async function scanMangaPage(
         const read = await recognizeRegion(rgba, width, height, region);
         rawLines = read.lines;
         readConfidence = read.confidence;
+        unsure = read.unsure ?? [];
       } catch (err) {
         console.error('[mangaOcr] region failed', regionId, err);
         rawLines = [];
@@ -1815,6 +1841,7 @@ export async function scanMangaPage(
       // whether the text was read correctly and always looked high.
       // A user-corrected region is taken as certain.
       confidence: correction?.lines ? 1 : readConfidence * confidenceScale,
+      ...(!correction?.lines && !junk ? { unsure } : {}),
       kind,
       ...(correction?.order !== undefined ? { order: correction.order } : null),
     });
@@ -1892,10 +1919,12 @@ export async function rescanMangaOcrRegion(req: MangaOcrRegionRescanRequest): Pr
   const { width, height, rgba } = loadPageImage(full);
   let text = '';
   let confidence = 0;
+  let unsure: OcrUnsureChar[] = [];
   try {
     const read = await recognizeBox(rgba, width, height, block.box);
     text = read.text;
     confidence = read.confidence;
+    unsure = read.unsure ?? [];
   } catch (err) {
     console.error('[mangaOcr] region rescan failed', req.regionId, err);
   }
@@ -1903,7 +1932,7 @@ export async function rescanMangaOcrRegion(req: MangaOcrRegionRescanRequest): Pr
   const patchedRaw: MokuroPage = {
     ...raw,
     blocks: raw.blocks.map((b) =>
-      b.regionId === req.regionId ? { ...b, rawLines, confidence } : b,
+      b.regionId === req.regionId ? { ...b, rawLines, confidence, unsure } : b,
     ),
   };
   await writeCache(req.itemId, stem, patchedRaw);
@@ -1933,10 +1962,12 @@ export async function mergeMangaOcrRegions(req: MangaOcrMergeRequest): Promise<M
   const { width, height, rgba } = loadPageImage(full);
   let text = '';
   let confidence = 0;
+  let unsure: OcrUnsureChar[] = [];
   try {
     const read = await recognizeBox(rgba, width, height, box);
     text = read.text;
     confidence = read.confidence;
+    unsure = read.unsure ?? [];
   } catch (err) {
     console.error('[mangaOcr] region merge failed', idA, idB, err);
   }
@@ -1950,6 +1981,7 @@ export async function mergeMangaOcrRegions(req: MangaOcrMergeRequest): Promise<M
     // From the combined re-read, not the two old halves: the merged crop was
     // decoded fresh, so the old scores describe text that no longer exists.
     confidence,
+    ...(unsure.length ? { unsure } : {}),
     kind: a.kind ?? b.kind,
   };
   const remaining = raw.blocks.filter((blk) => blk.regionId !== idA && blk.regionId !== idB);
@@ -2022,6 +2054,7 @@ export async function splitMangaOcrRegion(req: MangaOcrSplitRequest): Promise<Mo
     rawLines: read.text ? [read.text] : [],
     regionId: regionIdFromBox(box, stem),
     confidence: read.confidence,
+    ...(read.unsure?.length ? { unsure: read.unsure } : {}),
     kind: block.kind,
   });
   const remaining = raw.blocks.filter((b) => b.regionId !== req.regionId);
@@ -2078,10 +2111,12 @@ export async function addMangaOcrRegion(req: MangaOcrAddRegionRequest): Promise<
 
   let text = '';
   let readConfidence = 0;
+  let unsure: OcrUnsureChar[] = [];
   try {
     const read = await recognizeBox(rgba, width, height, box);
     text = read.text;
     readConfidence = read.confidence;
+    unsure = read.unsure ?? [];
   } catch (err) {
     console.error('[mangaOcr] add-region OCR failed', regionId, err);
   }
@@ -2094,6 +2129,7 @@ export async function addMangaOcrRegion(req: MangaOcrAddRegionRequest): Promise<
     rawLines: [...lines],
     regionId,
     confidence: readConfidence * confidenceScale,
+    ...(unsure.length ? { unsure } : {}),
     kind,
   };
 
@@ -2186,7 +2222,7 @@ export async function recognizeMangaOcrDataUrl(dataUrl: string): Promise<string>
   if (!decoded) return '';
   const { rgba, width, height } = decoded;
   const region = wholeImageRegion(width, height);
-  return (await recognizeCrop(rgba, width, height, region.box, region.points)).text;
+  return (await recognizeCropJapanese(rgba, width, height, region.box, region.points)).text;
 }
 
 export interface MangaOcrRegionLine {
@@ -2195,6 +2231,7 @@ export interface MangaOcrRegionLine {
   box: [number, number, number, number];
   vertical: boolean;
   confidence: number;
+  chars?: OcrChar[];
 }
 
 /**
@@ -2228,9 +2265,13 @@ export async function recognizeMangaOcrRegionsDataUrl(
 
   const lines: MangaOcrRegionLine[] = [];
   for (const region of regions) {
-    const read = await recognizeRegion(rgba, width, height, region);
+    // Raw provider path: never enter the router from a provider's page read.
+    const read = region.lines?.length
+      ? await readBlockLines(rgba, width, height, region, 4, true)
+      : await recognizeCropJapanese(rgba, width, height, region.box, region.points, 4).then((line) => ({ lines: [{ ...line, box: region.box }], confidence: line.confidence }));
+    const chars = read.lines.flatMap((line) => mangaStepsToChars(line.text, line.steps) ?? []);
     // One entry per bubble: its lines, in reading order, make one text.
-    const text = read.lines.join('').trim();
+    const text = read.lines.map((line) => line.text).join('').trim();
     if (!text) continue;
     const [x0, y0, x1, y1] = region.box;
     lines.push({
@@ -2238,6 +2279,7 @@ export async function recognizeMangaOcrRegionsDataUrl(
       box: [x0, y0, x1, y1],
       vertical: region.vertical ?? y1 - y0 > x1 - x0,
       confidence: read.confidence,
+      ...(chars.map((char) => char.ch).join('') === text ? { chars } : {}),
     });
   }
   // detectRegions already returns regions in manga reading order.
@@ -2577,7 +2619,11 @@ export function registerMangaOcrIpc(): void {
     if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
       throw new Error('Invalid image data.');
     }
-    return recognizeMangaOcrDataUrl(dataUrl);
+    const read = await readOcrSurface(nativeImage.createFromDataURL(dataUrl), {
+      langs: [getMainStudyLang()], purpose: 'manga', orientation: 'auto',
+    });
+    if (!read.ok && read.error !== 'empty') throw new Error(read.error ?? 'ocr-failed');
+    return read.text;
   });
 
   // A hand-drawn character in a study language: manga-ocr reads Japanese, the
@@ -2588,8 +2634,9 @@ export function registerMangaOcrIpc(): void {
       throw new Error('Invalid image data.');
     }
     const glyphLang = lang === 'zh' || lang === 'ru' ? lang : 'ja';
-    if (glyphLang === 'ja' && mangaOcrAvailable()) return recognizeMangaOcrDataUrl(dataUrl);
-    const read = await recognizePaddleOcrDataUrl(dataUrl, { forceLang: glyphLang });
+    const read = await readOcrSurface(nativeImage.createFromDataURL(dataUrl), {
+      langs: [glyphLang], purpose: 'lens', line: true, orientation: 'auto',
+    });
     return read.text;
   });
 
@@ -2788,3 +2835,5 @@ export function registerMangaOcrIpc(): void {
     return refreshMangaOcrMeta(itemId, { targetLang: lang });
   });
 }
+
+export const __mangaOcrRoutingTestables = { recognizeCrop, recognizeRegion, readBlockLines, parseCachedMangaPage };

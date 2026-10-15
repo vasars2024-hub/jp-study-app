@@ -18,7 +18,7 @@ const h = vi.hoisted(() => ({
   installed: new Set<string>(),
   /** Per-page OCR behaviour, by page index. */
   pages: [] as Array<{ text?: string; throws?: string }>,
-  ocrCalls: [] as Array<{ engine?: string; forceLang?: string }>,
+  ocrCalls: [] as Array<{ purpose: string; langs: readonly string[] }>,
   attached: [] as string[],
   broadcasts: [] as Array<Record<string, unknown>>,
   /** What the library holds for the item beyond its id/title/kind. */
@@ -41,14 +41,16 @@ vi.mock('electron', () => ({
 
 vi.mock('../downloads', () => ({ isInstalled: (id: string) => h.installed.has(id) }));
 
-vi.mock('../ocrAuto', () => ({
-  ocrAuto: async (dataUrl: string, opts: { engine?: string; forceLang?: string }) => {
-    h.ocrCalls.push({ engine: opts.engine, forceLang: opts.forceLang });
+vi.mock('../ocrSurface', () => ({
+  readOcrSurface: async (image: { toDataURL(): string }, opts: { purpose: string; langs: readonly string[] }) => {
+    const dataUrl = image.toDataURL();
+    h.ocrCalls.push({ purpose: opts.purpose, langs: opts.langs });
     const index = Number(/page-(\d+)/.exec(dataUrl)?.[1] ?? 0);
     const page = h.pages[index] ?? {};
     if (page.throws) throw new Error(page.throws);
     const text = page.text ?? '';
     return {
+      ok: true,
       engine: 'web',
       lang: 'ja',
       lines: text ? [{ text, box: [0, 0, 1, 1], vertical: true, confidence: 0.95 }] : [],
@@ -118,7 +120,7 @@ describe('runBookOcr — no engine installed', () => {
     h.pages = [{ text: '今天天气很好' }, { text: '我们去公园' }];
     const res = await runBookOcr({ itemId: 'z1', lang: 'zh' });
     expect(res.ok).toBe(true);
-    expect(h.ocrCalls.map((c) => [c.engine, c.forceLang])).toEqual([['auto', 'zh'], ['auto', 'zh']]);
+    expect(h.ocrCalls).toEqual([{ purpose: 'book', langs: ['zh'] }, { purpose: 'book', langs: ['zh'] }]);
     h.installed = new Set(MANGA);
     expect((await runBookOcr({ itemId: 'z2', lang: 'ru' })).error).toBe('models-missing');
   });
@@ -128,7 +130,7 @@ describe('runBookOcr — no engine installed', () => {
     h.pages = [{ text: 'あいう' }, { text: 'えお' }];
     const res = await runBookOcr({ itemId: 'm3' });
     expect(res.ok).toBe(true);
-    expect(h.ocrCalls.map((c) => c.engine)).toEqual(['manga', 'manga']);
+    expect(h.ocrCalls.map((c) => c.purpose)).toEqual(['book', 'book']);
   });
 });
 
@@ -168,7 +170,7 @@ describe('runBookOcr — success', () => {
     h.pages = [{}, { text: '一' }, { text: '二' }, {}, { text: '三' }];
     const res = await runBookOcr({ itemId: 'm6' });
     expect(res).toMatchObject({ ok: true, itemId: 'm6', pages: 5 });
-    expect(h.ocrCalls.map((c) => c.engine)).toEqual(['auto', 'auto', 'auto', 'auto', 'auto']);
+    expect(h.ocrCalls.map((c) => c.purpose)).toEqual(['book', 'book', 'book', 'book', 'book']);
     expect(h.attached).toEqual(['m6']);
     expect(h.broadcasts.at(-1)).toMatchObject({ phase: 'done' });
   });
@@ -197,7 +199,7 @@ describe("runBookOcr — the book's language comes from the library item", () =>
     h.pages = [{ text: '今天天气很好' }, { text: '我们去公园' }];
     const res = await runBookOcr({ itemId: 'z3', bilingual: true, targetLang: 'en' });
     expect(res.ok).toBe(true);
-    expect(h.ocrCalls.map((c) => [c.engine, c.forceLang])).toEqual([['auto', 'zh'], ['auto', 'zh']]);
+    expect(h.ocrCalls).toEqual([{ purpose: 'book', langs: ['zh'] }, { purpose: 'book', langs: ['zh'] }]);
     expect(h.translateCalls).toEqual([{ source: 'zh', target: 'en' }, { source: 'zh', target: 'en' }]);
   });
 
@@ -206,7 +208,7 @@ describe("runBookOcr — the book's language comes from the library item", () =>
     h.item = { kind: 'book', levelMeta: { lang: 'zh', knownRatio: 0.4, levelEstimate: 4 } };
     h.pages = [{ text: '一' }];
     expect((await runBookOcr({ itemId: 'z4' })).ok).toBe(true);
-    expect(h.ocrCalls.map((c) => c.forceLang)).toEqual(['zh']);
+    expect(h.ocrCalls.map((c) => c.langs[0])).toEqual(['zh']);
   });
 
   it('reads a Japanese chapter as Japanese on a Chinese profile', async () => {
@@ -215,7 +217,7 @@ describe("runBookOcr — the book's language comes from the library item", () =>
     h.item = { readingSource: { kind: 'seanime-manga-chapter', language: 'ja' } };
     h.pages = [{ text: 'あいう' }];
     expect((await runBookOcr({ itemId: 'j1' })).ok).toBe(true);
-    expect(h.ocrCalls.map((c) => c.forceLang)).toEqual(['ja']);
+    expect(h.ocrCalls.map((c) => c.langs[0])).toEqual(['ja']);
   });
 
   it('falls back to the study language when the item says nothing usable', async () => {
@@ -224,7 +226,7 @@ describe("runBookOcr — the book's language comes from the library item", () =>
     h.item = { levelMeta: { lang: 'unknown', knownRatio: 0, levelEstimate: null } };
     h.pages = [{ text: '一' }];
     expect((await runBookOcr({ itemId: 'u1' })).ok).toBe(true);
-    expect(h.ocrCalls.map((c) => c.forceLang)).toEqual(['zh']);
+    expect(h.ocrCalls.map((c) => c.langs[0])).toEqual(['zh']);
   });
 
   it("the request's language still wins over the item's", async () => {
@@ -232,6 +234,6 @@ describe("runBookOcr — the book's language comes from the library item", () =>
     h.item = { levelMeta: { lang: 'zh', knownRatio: 0, levelEstimate: null } };
     h.pages = [{ text: 'あ' }];
     expect((await runBookOcr({ itemId: 'r1', lang: 'ja' })).ok).toBe(true);
-    expect(h.ocrCalls.map((c) => c.forceLang)).toEqual(['ja']);
+    expect(h.ocrCalls.map((c) => c.langs[0])).toEqual(['ja']);
   });
 });

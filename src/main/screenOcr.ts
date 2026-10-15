@@ -14,12 +14,14 @@
 
 import { desktopCapturer, screen } from 'electron';
 import crypto from 'node:crypto';
-import { paddleAssetsForLang, paddleOcrAvailable, type PaddleLang } from './paddleOcr';
+import { paddleAssetsForLang, paddleOcrAvailable, installedPaddleLangs, type PaddleLang } from './paddleOcr';
 import { mangaOcrAvailable } from './mangaOcr';
 import { getAssetStatus, startDownload } from './downloads';
 import { summarizeAssetBundle } from '../shared/assetBundleProgress';
 import type { AssetError } from '../shared/assetRegistry';
-import { ocrAuto, type AutoOcrLine, type AutoOcrResult, type OcrEngineChoice } from './ocrAuto';
+import type { AutoOcrLine, AutoOcrResult, OcrEngineChoice } from './ocrAuto';
+import { readOcrSurface } from './ocrSurface';
+import { OCR_BUDGET_MS, unsureCharsOf, type OcrChar, type OcrPurpose, type OcrUnsureChar } from '../shared/ocrRouterTypes';
 import { orderReadingLensLines } from '../shared/readingLensLineOrder';
 import { getMainStudyLang } from './studyLanguage';
 import { pickScreenSource } from './screenSources';
@@ -27,6 +29,7 @@ import { isE2eHeadless } from './e2eHeadless';
 import { signatureFromBitmap, type RegionSignature } from './lensRegionWatch';
 
 export interface LensOcrLine {
+  unsure?: OcrUnsureChar[];
   text: string;
   /** [x, y, w, h] relative to the region's top-left, in DIP. */
   box: [number, number, number, number];
@@ -107,6 +110,9 @@ export type LensOcrStage = 'capturing' | 'reading' | 'refining';
 
 export interface LensOcrRunOptions {
   engine?: OcrEngineChoice;
+  purpose?: Extract<OcrPurpose, 'lens' | 'vn'>;
+  langs?: readonly string[];
+  budgetMs?: number;
   includeScreenshot?: boolean;
   /** The user's cancel: checked between capture and each OCR pass. */
   signal?: AbortSignal;
@@ -372,7 +378,7 @@ function decideZoom(lines: AutoOcrLine[]): number {
   return Math.max(1.5, Math.min(MAX_ZOOM, f));
 }
 
-function scaleLines(lines: AutoOcrLine[], k: number): AutoOcrLine[] {
+function scaleLines<T extends AutoOcrLine>(lines: T[], k: number): T[] {
   if (k === 1) return lines;
   return lines.map((l) => ({
     ...l,
@@ -386,7 +392,7 @@ function scaleLines(lines: AutoOcrLine[], k: number): AutoOcrLine[] {
 }
 
 /** Prefer clearly higher confidence; when it's close, prefer the fuller read. */
-function betterPass(a: AutoOcrResult, b: AutoOcrResult): AutoOcrResult {
+function betterPass<T extends AutoOcrResult>(a: T, b: T): T {
   const ca = meanConfidence(a.lines);
   const cb = meanConfidence(b.lines);
   if (Math.abs(ca - cb) > 0.03) return cb > ca ? b : a;
@@ -409,15 +415,29 @@ class LensScanCancelled extends Error {
   }
 }
 
+type SurfaceRead = AutoOcrResult & { lines: Array<AutoOcrLine & { chars?: OcrChar[] }> };
+
+async function routedRead(image: Electron.NativeImage, lang: PaddleLang, engine: OcrEngineChoice, run: LensOcrRunOptions): Promise<SurfaceRead> {
+  const result = await readOcrSurface(image, {
+    langs: run.langs ?? [lang], purpose: run.purpose ?? 'lens', engine,
+    orientation: 'auto', signal: run.signal, budgetMs: run.budgetMs,
+  });
+  if (!result.ok && result.error !== 'empty') throw new Error(result.error ?? 'ocr-failed');
+  return { ...result, engine: result.engine === 'manga' ? 'manga' : 'web', mangaConsidered: result.engines.includes('manga'),
+    alternate: result.alternate ? { ...result.alternate, engine: result.alternate.engine === 'manga' ? 'manga' : 'web' } : undefined };
+}
+
 async function ocrAdaptive(
   image: Electron.NativeImage,
   lang: PaddleLang,
   engine: OcrEngineChoice,
-  run: Pick<LensOcrRunOptions, 'signal' | 'onStage'> = {},
-): Promise<{ result: AutoOcrResult; zoom: number }> {
+  run: LensOcrRunOptions = {},
+): Promise<{ result: SurfaceRead; zoom: number }> {
   // The Lens reads one known study language, so pin the recognizer to it rather
   // than letting the multi-language probe misfire on hard text.
-  const first = await ocrAuto(image.toDataURL(), { engine, langHint: lang, forceLang: lang });
+  const startedAt = Date.now();
+  const budget = run.budgetMs ?? OCR_BUDGET_MS[run.purpose ?? 'lens'];
+  const first = await routedRead(image, lang, engine, run);
   if (first.engine === 'manga') return { result: first, zoom: 1 };
 
   let f = decideZoom(first.lines);
@@ -428,6 +448,9 @@ async function ocrAdaptive(
   f = Math.min(f, MAX_SIDE / Math.max(width, height));
   if (f <= 1.05) return { result: first, zoom: 1 };
 
+  const remaining = budget - (Date.now() - startedAt);
+  if (remaining <= 0) return { result: first, zoom: 1 };
+
   // The second pass is the expensive one; a reader who cancelled does not pay for it.
   if (run.signal?.aborted) throw new LensScanCancelled();
   run.onStage?.('refining');
@@ -437,11 +460,11 @@ async function ocrAdaptive(
     height: Math.round(height * f),
     quality: 'best',
   });
-  const second = await ocrAuto(upscaled.toDataURL(), { engine, langHint: lang, forceLang: lang });
+  const second = await routedRead(upscaled, lang, engine, { ...run, budgetMs: remaining });
   // Map the second pass back into the original crop's pixel space. The
   // alternate was read off the same upscaled bitmap, so it carries the same
   // factor — leaving it unscaled would place its hotspots f× too far out.
-  const secondMapped: AutoOcrResult = {
+  const secondMapped: SurfaceRead = {
     ...second,
     lines: scaleLines(second.lines, 1 / f),
     alternate: second.alternate
@@ -476,10 +499,10 @@ const OCR_CACHE_LIMIT = 24;
 type CachedRead = Omit<LensOcrResult, 'screenshotDataUrl' | 'cached' | 'fallbackImage'>;
 const ocrCache = new Map<string, CachedRead>();
 
-function ocrCacheKey(hash: string, engine: OcrEngineChoice, lang: string): string {
+function ocrCacheKey(hash: string, engine: OcrEngineChoice, lang: string, opts: LensOcrRunOptions): string {
   // Installed engines are part of the key: `auto` reads differently once
   // manga-ocr is installed, and a read cached before that must not outlive it.
-  return `${hash}|${engine}|${lang}|${paddleOcrAvailable() ? 1 : 0}${mangaOcrAvailable() ? 1 : 0}`;
+  return `${hash}|${engine}|${opts.purpose ?? 'lens'}|${(opts.langs ?? [lang]).join(',')}|${installedPaddleLangs().join(',')}|${mangaOcrAvailable() ? 1 : 0}`;
 }
 
 function ocrCacheGet(key: string): CachedRead | undefined {
@@ -533,6 +556,7 @@ export async function ocrRegion(
   // The Lens reads the study language: PaddleOCR's pack for it, and manga-ocr
   // (Japanese only) never for a Chinese or Russian learner.
   const lang = getMainStudyLang();
+  const webReady = paddleOcrAvailable() && installedPaddleLangs().includes(lang);
   const engine: OcrEngineChoice = lang !== 'ja' && opts.engine === 'manga' ? 'web' : opts.engine ?? 'auto';
 
   // Models first, capture second. The capture can fail for reasons of its own
@@ -548,7 +572,7 @@ export async function ocrRegion(
     });
   }
   // 'auto' still needs the general engine, since that is the pass it decides from.
-  if (engine !== 'manga' && !paddleOcrAvailable()) {
+  if (engine !== 'manga' && !webReady && !(lang === 'ja' && mangaOcrAvailable())) {
     const fetch = await ensureWebOcrModels(lang);
     const missing = EMPTY({
       engine: 'web',
@@ -591,7 +615,7 @@ export async function ocrRegion(
   const hash = crypto.createHash('sha1').update(image.toBitmap()).digest('hex');
   if (opts.signal?.aborted) return EMPTY({ error: 'cancelled', hash });
 
-  const key = ocrCacheKey(hash, engine, lang);
+  const key = ocrCacheKey(hash, engine, lang, opts);
   const cached = ocrCacheGet(key);
   if (cached) {
     return {
@@ -602,7 +626,7 @@ export async function ocrRegion(
   }
 
   opts.onStage?.('reading');
-  let result: AutoOcrResult;
+  let result: SurfaceRead;
   let zoom = 1;
   try {
     const adaptive = await ocrAdaptive(image, lang, engine, opts);
@@ -623,13 +647,14 @@ export async function ocrRegion(
   // Once geometry repairs the order, the passage must follow the same array
   // the renderer paints or downstream analysis would read a different story.
   const toLens = (
-    src: AutoOcrLine[],
+    src: Array<AutoOcrLine & { chars?: OcrChar[] }>,
     ownText: string,
   ): { lines: LensOcrLine[]; text: string } => {
-    const mapped: LensOcrLine[] = src.map((l: AutoOcrLine) => {
+    const mapped: LensOcrLine[] = src.map((l) => {
       const [x0, y0, x1, y1] = l.box; // original crop-pixel coords
       return {
         text: l.text,
+        unsure: unsureCharsOf([l]),
         box: [x0 / scale.x, y0 / scale.y, Math.max(1, (x1 - x0) / scale.x), Math.max(1, (y1 - y0) / scale.y)],
         vertical: l.vertical,
         confidence: l.confidence,
@@ -677,19 +702,23 @@ export async function ocrClipboardImage(image: Electron.NativeImage): Promise<{
   screenshotDataUrl?: string;
   /** Mean line confidence 0–1, weighted by line length (Snip to cards' garbage gate). */
   confidence?: number;
+  unsure?: OcrUnsureChar[];
+  lines?: LensOcrLine[];
   error?: string;
 }> {
   const lang = getMainStudyLang();
   if (image.isEmpty()) return { ok: false, text: '', engine: 'none', lang, error: 'empty' };
-  if (!paddleOcrAvailable() && !(lang === 'ja' && mangaOcrAvailable())) {
+  const webReady = paddleOcrAvailable() && installedPaddleLangs().includes(lang);
+  if (!webReady && !(lang === 'ja' && mangaOcrAvailable())) {
     return { ok: false, text: '', engine: 'none', lang, error: 'web-models-missing' };
   }
   try {
-    const engine: OcrEngineChoice = paddleOcrAvailable() ? 'auto' : 'manga';
+    const engine: OcrEngineChoice = webReady ? 'auto' : 'manga';
     const { result } = await ocrAdaptive(image, lang, engine);
     const lines = orderReadingLensLines(
       result.lines.map((l) => ({
         text: l.text,
+        unsure: unsureCharsOf([l]),
         box: [l.box[0], l.box[1], Math.max(1, l.box[2] - l.box[0]), Math.max(1, l.box[3] - l.box[1])] as [
           number,
           number,
@@ -701,6 +730,12 @@ export async function ocrClipboardImage(image: Electron.NativeImage): Promise<{
       })),
     );
     const text = lines.map((l) => l.text).join('\n').trim() || result.text.trim();
+    let offset = 0;
+    const unsure = lines.flatMap((line) => {
+      const fixes = (line.unsure ?? []).map((fix) => ({ ...fix, at: fix.at + offset }));
+      offset += [...line.text].length + 1;
+      return fixes;
+    });
     const chars = totalChars(result.lines);
     const confidence = chars
       ? result.lines.reduce((s, l) => s + l.confidence * l.text.length, 0) / chars
@@ -710,6 +745,8 @@ export async function ocrClipboardImage(image: Electron.NativeImage): Promise<{
       text,
       engine: result.engine,
       lang: result.lang || lang,
+      lines,
+      unsure,
       screenshotDataUrl: boundedScreenshotDataUrl(image),
       ...(confidence !== undefined && Number.isFinite(confidence) ? { confidence } : {}),
     };
