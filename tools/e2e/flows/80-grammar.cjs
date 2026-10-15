@@ -128,12 +128,16 @@ module.exports = {
 
     // --- A new N5 point, and example audio (G11, G12) -----------------------------
     await ev(`__e2e.click(__e2e.byText('.gram-mode-btn', 'Grammar points'))`);
-    await poll(ctx, `!!document.querySelector('.gram-search')`, 10000);
-    await ev(`__e2e.fill('.gram-search', 'をください')`);
+    // The Library window an earlier flow left open reuses the `.gram-search` class for its own
+    // box ("Title, author, series or tag"), and it comes first in the document: fill the
+    // explorer's search, found through the explorer's placeholder.
+    const explorerSearch = `[...document.querySelectorAll('.gram-search')].find((el) => el.placeholder === 'Search grammar or meaning…')`;
+    await poll(ctx, `!!${explorerSearch}`, 10000);
     const findRow = `[...document.querySelectorAll('.gram-x-row')].find((x) => x.querySelector('.gram-x-title')?.textContent === '〜をください')`;
+    await ev(`__e2e.fill(${explorerSearch}, 'をください')`);
     const row = await poll(ctx, `(() => { const r = ${findRow}; return r ? r.textContent : null; })()`, 10000);
     result.check('the new N5 point 〜をください is in the explorer', Boolean(row) && row.includes('N5'), row);
-    await ev(`__e2e.click(${findRow}.querySelector('.gram-x-row-main'))`);
+    if (row) await ev(`__e2e.click(${findRow}.querySelector('.gram-x-row-main'))`);
     const detail = await poll(ctx, `(() => { const c = document.querySelector('.gram-card'); return c && c.querySelector('h2')?.textContent === '〜をください' ? { examples: c.querySelectorAll('.gram-examples li').length, buttons: c.querySelectorAll('.gram-examples li .gram-ex-audio').length } : null; })()`, 5000);
     result.check('its detail shows examples, each with a speaker button', Boolean(detail) && detail.examples >= 3 && detail.buttons === detail.examples, detail);
 
