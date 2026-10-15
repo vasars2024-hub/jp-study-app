@@ -261,7 +261,10 @@ module.exports = {
     const byWinL = await lockedNow();
     result.check('a powerMonitor "lock-screen" (Win+L) arms the lock (auto-lock: screen-lock)', winL.ok === true && Boolean(byWinL) && (await logSays(mark, 'auto-lock: screen-lock')));
     await unlockWith(PIN2);
-    // Idle: the real 15 s poll reads the (overridden) system idle time.
+    // Idle: the real 15 s poll reads the (overridden) system idle time. Media counts as
+    // activity only when it can be heard or seen (lockAutoArm.ts): the music flow's queue,
+    // still playing into this flow under `--mute-audio` and drawn nowhere, must not hold
+    // the lock off (it did, run after video/youtube/music, before that was re-checked).
     mark = mainLog().length;
     const idle = await ctx.e2e('power', { idleSeconds: 61 });
     const byIdle = await pollAsync(ctx, `(async () => (await window.api.lockscreenIsLocked()) === true || null)()`, 25000, 500).catch(() => null);

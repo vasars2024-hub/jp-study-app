@@ -116,19 +116,14 @@ function powershell(script, timeout = 30000) {
   });
 }
 
-/** Every process descended from `rootPid`, plus any whose command line names the run dir. */
-async function processTree(rootPid, marker) {
-  const script = `
-$all = Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name, CommandLine, @{n='Created';e={ if ($_.CreationDate) { $_.CreationDate.ToFileTimeUtc() } else { 0 } }}
-$all | ConvertTo-Json -Compress -Depth 3`;
-  const r = await powershell(script);
-  let rows = [];
-  try {
-    rows = JSON.parse(r.stdout || '[]');
-  } catch {
-    rows = [];
-  }
-  if (!Array.isArray(rows)) rows = [rows];
+/**
+ * Every process descended from `rootPid`, plus any of this run's by its own paths
+ * (`isolation.runProcesses`). `null` when the process list could not be read: that is
+ * "unknown", never "none" (reading it as none is how two runs' apps were left running).
+ */
+async function processTree(rootPid, runPaths) {
+  const rows = await isolation.listProcesses({ log });
+  if (!rows) return null;
   const children = new Map();
   for (const row of rows) {
     const list = children.get(row.ParentProcessId) ?? [];
@@ -153,10 +148,8 @@ $all | ConvertTo-Json -Compress -Depth 3`;
       }
     }
   }
-  if (marker) {
-    for (const row of rows) {
-      if (row.CommandLine && row.CommandLine.toLowerCase().includes(marker.toLowerCase())) found.set(row.ProcessId, row);
-    }
+  if (runPaths) {
+    for (const row of isolation.runProcesses(rows, runPaths).ours) found.set(row.ProcessId, row);
   }
   return [...found.values()];
 }
@@ -196,6 +189,61 @@ class Harness {
     this.appLog = null;
     /** The fakes (tools/e2e/world.cjs), started before the app. */
     this.world = null;
+  }
+
+  /** This run's own paths, for telling its processes apart (`isolation.runProcesses`). */
+  runPaths() {
+    return {
+      runDir: this.runDir,
+      appDir: this.appDir,
+      otherRunIds: isolation.otherLiveRunIds(this.appDir, this.runId),
+    };
+  }
+
+  /** The launcher, while it runs: its PID is ours only until it exits (then Windows may reuse it). */
+  liveLauncherPid() {
+    return this.child && this.child.exitCode === null && this.child.signalCode === null ? this.child.pid : null;
+  }
+
+  /**
+   * The watchdog (`reaper.cjs`): a detached process that, if this harness dies without
+   * its teardown (killed outright), kills what this run left running.
+   */
+  startReaper() {
+    if (this.reaper) return;
+    try {
+      this.reaper = spawn(process.execPath, [path.join(__dirname, 'reaper.cjs')], {
+        cwd: REPO,
+        detached: true,
+        windowsHide: true,
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          GUM_E2E_REAP: JSON.stringify({
+            harnessPid: process.pid,
+            runDir: this.runDir,
+            runId: this.runId,
+            appDir: this.appDir,
+            logFile: path.join(OUT, 'run.log'),
+            keep: KEEP,
+          }),
+        },
+      });
+      this.reaper.unref();
+      log(`watchdog pid ${this.reaper.pid}`);
+    } catch (err) {
+      log(`could not start the watchdog: ${err}`);
+    }
+  }
+
+  /** Last resort, synchronous (an `exit` handler): end the launcher through Node's own handle. */
+  killLauncher() {
+    if (this.liveLauncherPid() === null) return false;
+    try {
+      return this.child.kill();
+    } catch {
+      return false;
+    }
   }
 
   env() {
@@ -269,6 +317,7 @@ class Harness {
       // The live dev server: convenient while writing a flow, but another agent's save
       // reloads the page under it (see build.cjs).
       this.appLog = fs.createWriteStream(path.join(OUT, 'app.log'), { flags: 'w' });
+      this.startReaper();
       this.child = spawn(process.execPath, [FORGE_CLI, 'start', '--', ...appArgs], {
         cwd: REPO,
         env: this.env(),
@@ -282,6 +331,7 @@ class Harness {
       await isolation.acquireSnapshot(this.appDir, this.runId, require('./build.cjs').linkResources);
       this.linked = true;
       this.appLog = fs.createWriteStream(path.join(OUT, 'app.log'), { flags: 'w' });
+      this.startReaper();
       this.child = spawn(ELECTRON, [this.appDir, ...appArgs], {
         cwd: REPO,
         env: this.env(),
@@ -436,7 +486,7 @@ class Harness {
 
   /** Fails loudly if anything of ours is on the desktop. */
   async checkDesktop(label) {
-    const tree = await processTree(this.child?.pid, this.runDir);
+    const tree = (await processTree(this.liveLauncherPid(), this.runPaths())) ?? [];
     const visible = await visibleWindowsOf(tree.map((p) => p.ProcessId));
     let violations = [];
     try {
@@ -454,40 +504,48 @@ class Harness {
   }
 
   /**
-   * Kill exactly what this run started: the launcher's verified descendants (creation
-   * time checked, see `processTree`) plus anything naming this run's temp dir. Each PID
-   * is killed on its own — never `taskkill /T`, whose tree walk trusts reused PIDs.
+   * Kill exactly what this run started, and prove it is gone. Once only: a second call
+   * (an interrupt during a teardown already running) waits for the first.
    */
-  async stop() {
-    const root = this.child?.pid;
-    const before = (await processTree(root, this.runDir)).filter((p) => p.ProcessId !== process.pid);
-    const killAll = async (rows) => {
-      // Leaves first, so a parent cannot respawn a child mid-teardown.
-      for (const p of [...rows].reverse()) {
-        await new Promise((r) => execFile('taskkill.exe', ['/PID', String(p.ProcessId), '/F'], { windowsHide: true }, () => r()));
-      }
-    };
-    await killAll(before);
-    await sleep(1500);
-    const ids = new Set(before.map((p) => `${p.ProcessId}:${p.Created}`));
-    const recheck = async () => {
-      const r = await powershell(`Get-CimInstance Win32_Process | Select-Object ProcessId, CommandLine, @{n='Created';e={ if ($_.CreationDate) { $_.CreationDate.ToFileTimeUtc() } else { 0 } }} | ConvertTo-Json -Compress`);
-      let rows = [];
-      try {
-        rows = JSON.parse(r.stdout || '[]');
-      } catch {
-        rows = [];
-      }
-      if (!Array.isArray(rows)) rows = [rows];
-      return rows.filter((p) => p.ProcessId !== process.pid
-        && (ids.has(`${p.ProcessId}:${p.Created}`) || (p.CommandLine ?? '').toLowerCase().includes(this.runDir.toLowerCase())));
-    };
-    let left = await recheck();
-    if (left.length) {
-      await killAll(left);
-      await sleep(1000);
-      left = await recheck();
+  stop() {
+    if (!this.stopping) this.stopping = this.stopOnce();
+    return this.stopping;
+  }
+
+  /**
+   * 1. The launcher's verified descendants (creation time checked, see `processTree`) and
+   *    anything of this run by its own paths, each PID killed on its own, leaves first.
+   * 2. The launcher itself through Node's handle (its PID cannot be reused while held).
+   *    If the process list could not be read at all, its tree goes with `taskkill /T`
+   *    while that handle still pins the root: the one place /T is used, and logged.
+   * 3. Verified: the list is read again until nothing naming this run's temp dir or (when
+   *    no other live run shares it) its snapshot dir is alive (`isolation.reapRun`).
+   *    Survivors, an unreadable list and processes left for a sharing run are reported.
+   */
+  async stopOnce() {
+    const root = this.liveLauncherPid();
+    const tree = await processTree(root, this.runPaths());
+    const before = (tree ?? []).filter((p) => p.ProcessId !== process.pid && p.ProcessId !== this.reaper?.pid);
+    // Leaves first, so a parent cannot respawn a child mid-teardown.
+    await isolation.killPids([...before].reverse().map((p) => p.ProcessId));
+    if (!tree && root !== null && this.liveLauncherPid() === root) {
+      log(`teardown: the process list could not be read; killing launcher ${root} with its tree`);
+      await new Promise((r) => execFile('taskkill.exe', ['/PID', String(root), '/T', '/F'], { windowsHide: true }, () => r()));
     }
+    this.killLauncher();
+    await sleep(1500);
+    const reap = await isolation.reapRun({
+      runDir: this.runDir,
+      appDir: this.appDir,
+      runId: this.runId,
+      known: before,
+      exceptPids: this.reaper?.pid ? [this.reaper.pid] : [],
+      log,
+    });
+    const left = reap.survivors;
+    if (reap.unverified) log('TEARDOWN UNVERIFIED: the process list could not be read; this run\'s app may still be running');
+    if (left.length) log(`TEARDOWN LEAK: still alive after the kill: ${JSON.stringify(left.map((p) => ({ pid: p.ProcessId, name: p.Name, cmd: String(p.CommandLine ?? '').slice(0, 300) })))}`);
+    if (reap.ambiguous.length) log(`teardown: left ${reap.ambiguous.length} process(es) naming the shared snapshot but no run (another live run uses it): ${reap.ambiguous.map((p) => p.ProcessId).join(', ')}`);
     this.appLog?.end();
     // The app is gone: release the snapshot. Its junctions are removed only when no other
     // live run still uses it (build.cjs, isolation.cjs).
@@ -505,7 +563,14 @@ class Harness {
     } catch (err) {
       log(`could not close the fakes: ${err}`);
     }
-    return { started: before.length, leftAfterKill: left.length, left: left.map((p) => p.ProcessId) };
+    return {
+      started: before.length,
+      listed: tree !== null,
+      verified: !reap.unverified,
+      leftAfterKill: left.length,
+      left: left.map((p) => ({ pid: p.ProcessId, name: p.Name })),
+      sharedSnapshotLeft: reap.ambiguous.map((p) => p.ProcessId),
+    };
   }
 
   cleanup() {
@@ -696,6 +761,7 @@ async function main() {
   const flows = loadFlows();
   if (!flows.length) throw new Error(`no flows match ${ONLY.join(',')}`);
   const h = new Harness();
+  guardTeardown(h);
   const meta = { runId: h.runId, startedAt: new Date().toISOString(), runDir: h.runDir, profile: h.profile };
   const results = [];
   let fatal = null;
@@ -792,7 +858,42 @@ async function main() {
   }
   const failed = results.filter((r) => r.status === 'FAIL').length;
   log(`done: ${results.map((r) => `${r.id}=${r.status}`).join(' ')}${fatal ? ` FATAL: ${fatal.split('\n')[0]}` : ''}`);
-  process.exitCode = fatal || failed || h.desktopLeaks.length ? 1 : 0;
+  const teardownLeak = meta.teardown && (meta.teardown.leftAfterKill > 0 || meta.teardown.verified === false);
+  if (teardownLeak) log(`the run's app was not proven gone: ${JSON.stringify(meta.teardown)}`);
+  process.exitCode = fatal || failed || h.desktopLeaks.length || teardownLeak ? 1 : 0;
+}
+
+/**
+ * The run must not outlive itself. Ctrl+C, a closed console, a kill signal or an
+ * exception nothing caught still tear the app down (the full, verified `stop()`); a
+ * plain `exit` without it ends at least the launcher, synchronously. A harness killed
+ * outright is the watchdog's case (`reaper.cjs`).
+ */
+function guardTeardown(h) {
+  let interrupted = false;
+  const teardown = (why, code) => {
+    if (interrupted) return;
+    interrupted = true;
+    log(`${why}: tearing the app down`);
+    // Never hang here: a stuck teardown still ends the process (the watchdog follows up).
+    setTimeout(() => process.exit(code), 3 * 60_000).unref();
+    h.stop()
+      .then((r) => log(`teardown ${JSON.stringify(r)}`), (err) => log(`teardown failed: ${err}`))
+      .finally(() => {
+        try {
+          h.cleanup();
+        } catch {
+          /* best effort */
+        }
+        process.exit(code);
+      });
+  };
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK', 'SIGHUP']) process.on(sig, () => teardown(`interrupted (${sig})`, 130));
+  process.on('uncaughtException', (err) => teardown(`uncaught exception: ${err && err.stack ? err.stack : err}`, 1));
+  process.on('unhandledRejection', (err) => teardown(`unhandled rejection: ${err && err.stack ? err.stack : err}`, 1));
+  process.on('exit', () => {
+    if (h.killLauncher()) log('exit without a teardown: killed the launcher');
+  });
 }
 
 /**
@@ -808,6 +909,7 @@ async function serve() {
   const stopFile = path.join(OUT, 'stop');
   fs.rmSync(stopFile, { force: true });
   const h = new Harness();
+  guardTeardown(h);
   try {
     await h.start(worldOptionsFor([]));
     const session ={ bridge: h.bridge, runDir: h.runDir, launcher: h.child.pid, outDir: OUT, ports: h.ports };

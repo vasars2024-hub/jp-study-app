@@ -6,11 +6,22 @@
  * covered by the e2e flow's direct event emit and by hand.
  */
 import { EventEmitter } from 'node:events';
-import { describe, expect, it } from 'vitest';
-import { installLockAutoArm, trackMediaActivity, IDLE_POLL_MS, type AutoLockReason, type MediaWebContentsLike } from '../lockAutoArm';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  installLockAutoArm,
+  trackMediaActivity,
+  IDLE_POLL_MS,
+  MEDIA_PROBE_TIMEOUT_MS,
+  VISIBLE_VIDEO_PROBE,
+  type AutoLockReason,
+  type MediaWebContentsLike,
+} from '../lockAutoArm';
 import type { AutoLockOptions } from '../../shared/lockStatus';
 
-function rig(options: Partial<AutoLockOptions>, opts: { hasPin?: boolean; idle?: number; media?: { secondsSinceMedia(): number | null } } = {}) {
+function rig(
+  options: Partial<AutoLockOptions>,
+  opts: { hasPin?: boolean; idle?: number; media?: { secondsSinceMedia(): number | null; refresh?(): Promise<void> } } = {},
+) {
   const power = Object.assign(new EventEmitter(), { idle: opts.idle ?? 0, getSystemIdleTime() { return this.idle; } });
   const state = { locked: false, reasons: [] as AutoLockReason[], intervals: [] as Array<{ fn: () => void; ms: number }> };
   const arm = installLockAutoArm({
@@ -142,5 +153,178 @@ describe('media playback counts as activity', () => {
       },
     });
     expect(broken.arm.checkIdle()).toBe(true);
+  });
+});
+
+describe('media counts only when the viewer can hear or see it (re-checked each poll)', () => {
+  /** A contents the tracker can ask: Chromium's audible flag and a look inside its page. */
+  const live = (id: number) => {
+    const state = { audible: false, visible: false as boolean | 'hang' | 'throw', destroyed: false, looks: 0, code: '' };
+    const wc = Object.assign(new EventEmitter(), {
+      id,
+      isDestroyed: () => state.destroyed,
+      isCurrentlyAudible: () => state.audible,
+      executeJavaScript: (code: string): Promise<unknown> => {
+        state.looks += 1;
+        state.code = code;
+        if (state.visible === 'hang') return new Promise(() => undefined);
+        if (state.visible === 'throw') return Promise.reject(new Error('frame gone'));
+        return Promise.resolve(state.visible);
+      },
+    }) as EventEmitter & MediaWebContentsLike;
+    return { wc, state };
+  };
+  const setup = () => {
+    const clock = { t: 5_000_000 };
+    const app = new EventEmitter();
+    const main = live(1);
+    const media = trackMediaActivity(app as never, [main.wc], () => clock.t);
+    return { clock, app, main, media };
+  };
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('muted music nobody sees (the e2e under --mute-audio) and a hidden warm video are not activity, and do not restart the idle clock', async () => {
+    const { clock, main, media } = setup();
+    main.wc.emit('media-started-playing');
+    await settle();
+    expect(main.state.looks).toBe(1);
+    expect(main.state.code).toBe(VISIBLE_VIDEO_PROBE);
+    expect(media.playing()).toBe(false);
+    clock.t += 30_000;
+    main.wc.emit('media-paused');
+    await settle();
+    expect(media.secondsSinceMedia()).toBeNull();
+    // 61 s of system idle with "after 1 minute": it locks, the silent song does not hold it.
+    const r = rig({ idleMinutes: 1 }, { idle: 61, media });
+    expect(r.arm.checkIdle()).toBe(true);
+  });
+
+  it('audible audio holds the lock off, and the clock restarts when it stops', async () => {
+    const { clock, main, media } = setup();
+    main.state.audible = true;
+    main.wc.emit('media-started-playing');
+    await settle();
+    const r = rig({ idleMinutes: 1 }, { idle: 3600, media });
+    expect(r.arm.checkIdle()).toBe(false);
+    clock.t += 10 * 60_000;
+    // Chromium still reports it audible when `media-paused` arrives.
+    main.wc.emit('media-paused');
+    main.state.audible = false;
+    clock.t += 59_000;
+    expect(r.arm.checkIdle()).toBe(false);
+    clock.t += 2_000;
+    expect(r.arm.checkIdle()).toBe(true);
+  });
+
+  it('a video on screen counts even muted; a missed media-paused cannot hold the lock off', async () => {
+    const { clock, main, media } = setup();
+    main.state.visible = true;
+    main.wc.emit('media-started-playing');
+    await settle();
+    expect(media.playing()).toBe(true);
+    const r = rig({ idleMinutes: 1 }, { idle: 3600, media });
+    clock.t += 60 * 60_000;
+    await media.refresh();
+    expect(r.arm.checkIdle()).toBe(false);
+    // The video stopped but Chromium's media-paused never came: the next look says so.
+    main.state.visible = false;
+    clock.t += IDLE_POLL_MS;
+    await media.refresh();
+    expect(media.playing()).toBe(false);
+    clock.t += 61_000;
+    expect(r.arm.checkIdle()).toBe(true);
+  });
+
+  it('without any look at all the "playing" claim goes stale instead of lasting forever', async () => {
+    const { clock, main, media } = setup();
+    main.state.visible = true;
+    main.wc.emit('media-started-playing');
+    await settle();
+    expect(media.playing()).toBe(true);
+    // Nobody refreshes (a stuck poll): the last sighting expires.
+    clock.t += 2 * IDLE_POLL_MS + MEDIA_PROBE_TIMEOUT_MS + 1;
+    expect(media.playing()).toBe(false);
+  });
+
+  it('two players in one window: one pausing does not stop the other counting', async () => {
+    const { main, media } = setup();
+    main.state.visible = true;
+    main.wc.emit('media-started-playing');
+    main.wc.emit('media-started-playing');
+    await settle();
+    main.wc.emit('media-paused');
+    // The clip is still on screen; the look after the pause finds it.
+    await settle();
+    expect(media.playing()).toBe(true);
+  });
+
+  it('looks in every frame (a video in an embedded frame counts)', async () => {
+    const clock = { t: 0 };
+    const app = new EventEmitter();
+    const frames = [{ executeJavaScript: () => Promise.resolve(false) }, { executeJavaScript: () => Promise.resolve(true) }];
+    const wc = Object.assign(new EventEmitter(), {
+      id: 7,
+      isDestroyed: () => false,
+      isCurrentlyAudible: () => false,
+      executeJavaScript: () => Promise.resolve(false),
+      mainFrame: { framesInSubtree: frames },
+    }) as EventEmitter & MediaWebContentsLike;
+    const media = trackMediaActivity(app as never, [], () => clock.t);
+    app.emit('web-contents-created', {}, wc);
+    wc.emit('media-started-playing');
+    await settle();
+    expect(media.playing()).toBe(true);
+  });
+
+  it('a look that never answers or throws counts as nothing seen', async () => {
+    vi.useFakeTimers();
+    const { main, media } = setup();
+    main.state.visible = 'hang';
+    main.wc.emit('media-started-playing');
+    // While the first look is on its way the start event holds...
+    expect(media.playing()).toBe(true);
+    await vi.advanceTimersByTimeAsync(MEDIA_PROBE_TIMEOUT_MS + 1);
+    // ...and no longer than the look's timeout.
+    expect(media.playing()).toBe(false);
+    main.state.visible = 'throw';
+    await media.refresh();
+    expect(media.playing()).toBe(false);
+  });
+
+  it('a contents that is gone stops counting even without a destroyed event', async () => {
+    const { main, media } = setup();
+    main.state.audible = true;
+    main.wc.emit('media-started-playing');
+    await settle();
+    expect(media.playing()).toBe(true);
+    main.state.destroyed = true;
+    expect(media.playing()).toBe(false);
+  });
+
+  it('the poll looks at the media again before it checks the idle time', async () => {
+    const order: string[] = [];
+    const media = {
+      refresh: vi.fn(async () => {
+        order.push('refresh');
+      }),
+      secondsSinceMedia: vi.fn(() => {
+        order.push('read');
+        return null;
+      }),
+    };
+    const r = rig({ idleMinutes: 1 }, { idle: 61, media });
+    r.state.intervals[0]!.fn();
+    await settle();
+    expect(order).toEqual(['refresh', 'read']);
+    expect(r.state.reasons).toEqual(['idle']);
+    // Idle lock off: the poll does not look at anything.
+    const off = rig({ idleMinutes: 0 }, { idle: 61, media });
+    off.state.intervals[0]!.fn();
+    await settle();
+    expect(media.refresh).toHaveBeenCalledTimes(1);
   });
 });

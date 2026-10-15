@@ -20,6 +20,7 @@
  *    reference-counted by per-run user markers, so one run's teardown cannot pull them
  *    from under another run's app.
  */
+const { execFile } = require('node:child_process');
 const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
@@ -287,6 +288,147 @@ async function pruneBuilds(outRoot, { keep = 2, unlink, log = () => undefined } 
 }
 
 // ---------------------------------------------------------------------------
+// Process teardown
+// ---------------------------------------------------------------------------
+//
+// Two runs' apps once lived on for hours after their runs ended (one spinning a core):
+// the one Windows query that lists processes had failed, the teardown read the empty
+// answer as "nothing of ours is running", killed nothing and reported `started: 0`.
+// So a failed listing is now `null` (never "nothing"), it is retried, and what a run
+// started is verified gone by its own paths afterwards; survivors are named.
+
+/** Hidden PowerShell, no profile. */
+function powershell(script, timeout = 90_000) {
+  return new Promise((resolve) => {
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { windowsHide: true, timeout, maxBuffer: 64 * 1024 * 1024 },
+      (err, stdout, stderr) => resolve({ ok: !err, stdout: String(stdout ?? ''), stderr: String(stderr ?? ''), error: err ? String(err.message || err) : null }),
+    );
+  });
+}
+
+/**
+ * Every process: `{ ProcessId, ParentProcessId, Name, CommandLine, Created }` (Created is
+ * a FILETIME, for telling a reused PID apart). `null` when Windows could not be asked
+ * after `attempts` tries — callers must treat that as "unknown", not as "none".
+ */
+async function listProcesses({ attempts = 3, timeoutMs = 90_000, log = () => undefined } = {}) {
+  const script = `Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name, CommandLine, @{n='Created';e={ if ($_.CreationDate) { $_.CreationDate.ToFileTimeUtc() } else { 0 } }} | ConvertTo-Json -Compress -Depth 3`;
+  let last = '';
+  for (let i = 1; i <= attempts; i++) {
+    const r = await powershell(script, timeoutMs);
+    try {
+      const rows = JSON.parse(r.stdout);
+      const list = Array.isArray(rows) ? rows : [rows];
+      // A machine always has more than a handful of processes: fewer is a broken answer.
+      if (r.ok && list.length > 3) return list;
+      last = `${list.length} rows`;
+    } catch {
+      last = r.error || r.stderr.slice(0, 200) || 'unparseable output';
+    }
+    log(`process listing failed (try ${i}/${attempts}): ${last}`);
+    if (i < attempts) await sleep(1000 * i);
+  }
+  return null;
+}
+
+/** Shells and inspectors: a command line that merely MENTIONS a run's path is not the run. */
+const NEVER_OURS = new Set(['bash.exe', 'sh.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'conhost.exe', 'grep.exe', 'rg.exe', 'findstr.exe', 'wmic.exe', 'tasklist.exe', 'taskkill.exe', 'git.exe']);
+
+function forMatch(s) {
+  return String(s ?? '').toLowerCase().replace(/\//g, '\\').replace(/\\+$/, '');
+}
+
+/**
+ * Which of `rows` belong to one run, by its own paths only:
+ *  - its run dir (`gum-e2e-<run-id>`): the app's `--e2e-run=`, every Chromium child's
+ *    `--user-data-dir=<run>\profile`, the media server's `--datadir`, ffmpeg's inputs;
+ *  - its snapshot dir (`out\builds\<build-id>\app`), but only when no other live run
+ *    uses that snapshot (`otherRunIds`). With one, a process naming the snapshot and no
+ *    run dir is `ambiguous`: reported, never killed.
+ * The owner's own Gum (run from the repo, profile elsewhere) names neither.
+ */
+function runProcesses(rows, { runDir, appDir = null, otherRunIds = [], exceptPids = [] }) {
+  const run = forMatch(runDir);
+  const snap = appDir ? forMatch(appDir) : null;
+  const others = otherRunIds.map((id) => forMatch(id));
+  const except = new Set(exceptPids);
+  const ours = [];
+  const ambiguous = [];
+  for (const row of rows ?? []) {
+    if (except.has(row.ProcessId)) continue;
+    if (NEVER_OURS.has(String(row.Name ?? '').toLowerCase())) continue;
+    const cmd = forMatch(row.CommandLine);
+    if (!cmd) continue;
+    if (run && cmd.includes(run)) {
+      ours.push(row);
+      continue;
+    }
+    if (!snap || !cmd.includes(snap)) continue;
+    if (others.some((id) => cmd.includes(id))) continue; // another live run's process
+    if (others.length) ambiguous.push(row);
+    else ours.push(row);
+  }
+  return { ours, ambiguous };
+}
+
+/** `taskkill /F` on each PID on its own (never `/T`: its tree walk trusts reused PIDs). */
+async function killPids(pids) {
+  for (const pid of pids) {
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) continue;
+    await new Promise((r) => execFile('taskkill.exe', ['/PID', String(pid), '/F'], { windowsHide: true }, () => r()));
+  }
+}
+
+/** `electron.exe#123 (gpu-process)`: enough to tell which part of the app survived. */
+function describeProcess(p) {
+  const type = /--type=([\w-]+)/.exec(String(p.CommandLine ?? ''))?.[1];
+  return `${p.Name}#${p.ProcessId}${type ? ` (${type})` : ''}`;
+}
+
+/** Run ids of the other live runs registered on a snapshot. */
+function otherLiveRunIds(appDir, runId) {
+  if (!appDir) return [];
+  return liveUsers(appDir, runId).map(({ name }) => name.replace(/\.json$/, ''));
+}
+
+/**
+ * After a run's known processes were killed: re-list, kill whatever of the run is still
+ * there (by `runProcesses`, plus any of `known` alive with the same creation time), up to
+ * `rounds` times. Returns `{ survivors, ambiguous, unverified }`; `unverified` means the
+ * process list could not be read, so nothing can be promised.
+ */
+async function reapRun({ runDir, appDir = null, runId, known = [], exceptPids = [], rounds = 3, log = () => undefined }) {
+  const knownIds = new Set(known.map((p) => `${p.ProcessId}:${p.Created}`));
+  let survivors = [];
+  let ambiguous = [];
+  for (let round = 0; round <= rounds; round++) {
+    const rows = await listProcesses({ log });
+    if (!rows) return { survivors, ambiguous, unverified: true };
+    const found = runProcesses(rows, { runDir, appDir, otherRunIds: otherLiveRunIds(appDir, runId), exceptPids });
+    ambiguous = found.ambiguous;
+    const byPid = new Map(found.ours.map((p) => [p.ProcessId, p]));
+    for (const p of rows) {
+      if (knownIds.has(`${p.ProcessId}:${p.Created}`) && !exceptPids.includes(p.ProcessId)) byPid.set(p.ProcessId, p);
+    }
+    survivors = [...byPid.values()].filter((p) => p.ProcessId !== process.pid);
+    if (!survivors.length || round === rounds) break;
+    log(`teardown round ${round + 1}: ${survivors.length} process(es) of this run still alive, killing ${survivors.map(describeProcess).join(', ')}`);
+    // Children before parents, so a parent cannot respawn one mid-teardown.
+    const depth = (p) => {
+      let d = 0;
+      for (let cur = p; cur && d < 50; d++) cur = byPid.get(cur.ParentProcessId);
+      return d;
+    };
+    await killPids([...survivors].sort((a, b) => depth(b) - depth(a)).map((p) => p.ProcessId));
+    await sleep(1500);
+  }
+  return { survivors, ambiguous, unverified: false };
+}
+
+// ---------------------------------------------------------------------------
 // Run output
 // ---------------------------------------------------------------------------
 
@@ -327,17 +469,24 @@ function pruneRunDirs(outRoot, { keep = 20, exceptRunId } = {}) {
 module.exports = {
   acquireSnapshot,
   containsLink,
+  describeProcess,
   freePort,
   isPidAlive,
+  killPids,
   latestBuild,
+  listProcesses,
+  liveUsers,
   makeRunId,
+  otherLiveRunIds,
   prepareBuild,
   pruneBuilds,
   pruneRunDirs,
   publishLatest,
   readJson,
+  reapRun,
   releaseSnapshot,
   resolvePorts,
+  runProcesses,
   withFileLock,
   writeJsonAtomic,
 };
