@@ -81,8 +81,12 @@ function migrateLegacyOnce(): void {
 
 // ----- one key rule: re-keying a store written under the old rules ----------
 
-/** The version of `shared/knowledgeKey` a store's keys follow. */
-export const KNOWLEDGE_KEY_RULE = '2';
+/**
+ * The version of `shared/knowledgeKey` a store's keys follow. 3: Chinese keys
+ * fold Traditional to Simplified (學習 → 学习), so a Chinese store marked 2 is
+ * re-keyed once more; a Japanese or Russian one moves nothing and is re-marked.
+ */
+export const KNOWLEDGE_KEY_RULE = '3';
 
 /** localStorage mark: this language's cache is keyed by `KNOWLEDGE_KEY_RULE`. */
 export function knowledgeKeyRuleMark(lang: StudyLang): string {
@@ -109,8 +113,9 @@ function kuromojiReady(): boolean {
 /**
  * Re-key the loaded store of `lang` to the one key rule, once. Japanese waits
  * for kuromoji (until then nothing is marked and the check costs a Set lookup);
- * Chinese and Russian need only NFKC. Idempotent: re-running it on a migrated
- * store moves nothing. Returns how many old keys moved.
+ * Chinese (NFKC and the Simplified fold) and Russian need no tokenizer.
+ * Idempotent: re-running it on a migrated store moves nothing. Returns how
+ * many old keys moved.
  */
 function migrateKeysOnce(lang: StudyLang, entries: Record<string, Entry>): number {
   if (keyRuleChecked.has(lang)) return 0;

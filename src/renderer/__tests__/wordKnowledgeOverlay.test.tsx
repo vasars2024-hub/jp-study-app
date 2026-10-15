@@ -189,9 +189,10 @@ describe('Known-word overlay on Lexicon results', () => {
     await render(<DictionaryResults query="貓" variant="page" lang="zh" />);
 
     await act(async () => chips()[0].click());
-    // And it lands in the Chinese store, not the Japanese one.
+    // And it lands in the Chinese store, not the Japanese one, under the
+    // Simplified key the Traditional headword folds to (貓 → 猫).
     expect(JSON.parse(localStorage.getItem(knowledgeKey('zh')) ?? '{}')).toEqual({
-      貓: { l: 1, m: 1 },
+      猫: { l: 1, m: 1 },
     });
     expect(localStorage.getItem(knowledgeKey('ja'))).toBeNull();
   });

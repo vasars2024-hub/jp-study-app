@@ -2,6 +2,7 @@
  * The pure halves of the one-key package (SCORECARD package 6): how two
  * entries that now share a key merge, the store re-key, and the suspended rule
  * — a word is out of rotation only when every card behind it is suspended.
+ * Chinese Traditional ↔ Simplified folding (`zhVariants`) and its migration.
  * The kuromoji-backed key table lives in renderer/__tests__/knowledgeKeyRule.test.ts.
  */
 import { describe, expect, it } from 'vitest';
@@ -16,10 +17,14 @@ import {
 import {
   japaneseAliasKeys,
   knowledgeKeyFor,
+  knowledgeKeysFor,
   mergeKnowledgeEntries,
+  migratedKnowledgeKeys,
   rekeyKnowledgeStore,
+  segmentKnowledgeKey,
   toKatakana,
 } from '../knowledgeKey';
+import { hasTraditionalChinese, toSimplifiedChinese, zhVariantPairCount } from '../zhVariants';
 import { toHiragana } from '../furigana';
 
 const thresholds = { familiar: 1, known: 21 };
@@ -113,5 +118,68 @@ describe('spelling variants', () => {
       { surface: '電話', lemma: '電話', content: true, pos: '名詞' },
     ];
     expect(knowledgeKeyFor('携帯電話', 'ja', { tokenizeJapanese: () => tokens })).toBe('携帯電話');
+  });
+});
+
+describe('Traditional and Simplified Chinese share one key', () => {
+  it.each([
+    ['學習', '学习'],
+    ['電腦', '电脑'],
+    ['漢語', '汉语'],
+    ['頭髮', '头发'],
+    ['發現', '发现'],
+    ['臺灣', '台湾'],
+    ['後來', '后来'],
+    ['圖書館', '图书馆'],
+    ['學习', '学习'],
+  ])('%s and its Simplified spelling are one word (%s)', (traditional, simplified) => {
+    expect(knowledgeKeyFor(traditional, 'zh')).toBe(simplified);
+    expect(knowledgeKeyFor(simplified, 'zh')).toBe(simplified);
+    expect(segmentKnowledgeKey(traditional, 'zh')).toBe(simplified);
+  });
+
+  it('a phrase the reader splits folds word by word', () => {
+    const keys = knowledgeKeysFor('我們學習漢語', 'zh');
+    expect(keys).toEqual(knowledgeKeysFor('我们学习汉语', 'zh'));
+    expect(keys.some((key) => hasTraditionalChinese(key))).toBe(false);
+  });
+
+  it('Japanese and Russian keys are never folded', () => {
+    expect(knowledgeKeyFor('學習', 'ja')).toBe('學習');
+    expect(knowledgeKeyFor('國語', 'ja')).toBe('國語');
+    expect(migratedKnowledgeKeys('學習', 'ja')).toBeNull();
+  });
+
+  it('leaves alone characters whose Traditional form is also a Simplified word', () => {
+    // 乾坤 is still 乾 in Simplified, 著名 still 著: folding them would merge words.
+    expect(toSimplifiedChinese('乾坤')).toBe('乾坤');
+    expect(toSimplifiedChinese('著名')).toBe('著名');
+    expect(toSimplifiedChinese('abc 123')).toBe('abc 123');
+  });
+
+  it('the table is idempotent, one character to one, and covers the common characters', () => {
+    expect(zhVariantPairCount()).toBeGreaterThanOrEqual(1500);
+    // The 200 most frequent Traditional-only characters of everyday text: all folded.
+    const common = '們個這來說時國會後對學過還發現當經動開長為點種實問樣進電頭從體關麼機與將業產無話聽讀寫買賣錢書東車門見號錯飯館間題師幫歡謝請認識氣熱網線';
+    for (const ch of common) expect(toSimplifiedChinese(ch), ch).not.toBe(ch);
+    const folded = toSimplifiedChinese(common);
+    expect(toSimplifiedChinese(folded)).toBe(folded);
+    expect([...folded]).toHaveLength([...common].length);
+  });
+
+  it('re-keys a store that holds both spellings into one entry (the migration)', () => {
+    const store = {
+      學習: { l: 3 as const },
+      学习: { l: 1 as const },
+      電腦: { l: 2 as const, m: 1 as const },
+      你好: { l: 3 as const },
+    };
+    const first = rekeyKnowledgeStore(store, (key) => migratedKnowledgeKeys(key, 'zh'));
+    expect(first.moved).toBe(2);
+    expect(first.entries).toEqual({ 学习: { l: 3 }, 电脑: { l: 2, m: 1 }, 你好: { l: 3 } });
+    // A second run moves nothing.
+    const second = rekeyKnowledgeStore(first.entries, (key) => migratedKnowledgeKeys(key, 'zh'));
+    expect(second.moved).toBe(0);
+    expect(second.entries).toEqual(first.entries);
   });
 });

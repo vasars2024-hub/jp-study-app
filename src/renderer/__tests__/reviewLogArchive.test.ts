@@ -97,4 +97,32 @@ describe('review-log archive', () => {
     log.resetReviewLogForTests();
     expect(await log.loadFullReviewLog()).toHaveLength(12);
   });
+
+  it('gives Statistics a range past the live window from the archive, and only then', async () => {
+    const log = await import('../reviewLog');
+    seedRows(12);
+    await log.pruneReviewLog(5);
+    // Rows 7..11 are live (at 1_007_000 on); 0..6 are archived.
+    const recent = await log.loadReviewLogSince(1_008_000);
+    expect(recent.map((entry) => entry.id)).toEqual(['row-007', 'row-008', 'row-009', 'row-010', 'row-011']);
+    const long = await log.loadReviewLogSince(1_002_000);
+    expect(long.map((entry) => entry.at)).toEqual(Array.from({ length: 10 }, (_, i) => 1_002_000 + i * 1000));
+    // The live window is untouched by a long read.
+    expect(await log.loadReviewLog()).toHaveLength(5);
+  });
+
+  it('reads the archive again after an archive pass, and nothing extra with no archive', async () => {
+    const log = await import('../reviewLog');
+    seedRows(4);
+    expect((await log.loadReviewLogSince(0)).map((entry) => entry.id)).toEqual(['row-000', 'row-001', 'row-002', 'row-003']);
+    for (let i = 4; i < 9; i += 1) {
+      const id = `row-${String(i).padStart(3, '0')}`;
+      h.store.set(`review-log-row:${id}`, { id, at: 1_000_000 + i * 1000, mode: 'review', cardId: 'c0', rating: 'good', correct: true });
+    }
+    log.resetReviewLogForTests();
+    expect(await log.loadReviewLogSince(0)).toHaveLength(9);
+    expect(await log.pruneReviewLog(5)).toBe(4);
+    log.resetReviewLogForTests();
+    expect(await log.loadReviewLogSince(0)).toHaveLength(9);
+  });
 });

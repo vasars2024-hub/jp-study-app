@@ -35,6 +35,7 @@ import {
   getLevel,
   isManualLevel,
   knowledgeKey,
+  KNOWLEDGE_KEY_RULE,
   knowledgeKeyBackupIdbKey,
   knowledgeKeyRuleMark,
   migrateKnowledgeKeys,
@@ -243,7 +244,7 @@ describe('migrating a store keyed the old ways', () => {
     expect(getLevel('カタカナ')).toBe(2);
     expect(getLevel('ねこ')).toBe(3);
     flushKnowledgeWrites();
-    expect(localStorage.getItem(knowledgeKeyRuleMark('ja'))).toBe('2');
+    expect(localStorage.getItem(knowledgeKeyRuleMark('ja'))).toBe(KNOWLEDGE_KEY_RULE);
     const stored = JSON.parse(localStorage.getItem(knowledgeKey('ja')) ?? '{}');
     expect(stored).not.toHaveProperty('勉強する');
     await vi.waitFor(() => expect(idb.get(knowledgeKeyBackupIdbKey('ja'))).toBeTruthy());
@@ -277,6 +278,25 @@ describe('migrating a store keyed the old ways', () => {
     setStudyLang('ru');
     seed('ru', { 'Кни́га': { l: 3 } });
     expect(getLevel('книга')).toBe(3);
+  });
+
+  it('folds a Chinese store keyed before rule 3: 學習 and 学习 become one entry, once', async () => {
+    setStudyLang('zh');
+    seed('zh', { 學習: { l: 3 }, 学习: { l: 1, m: 1 }, 電腦: { l: 2 }, 你好: { l: 3 } });
+    // A store already marked with the previous rule is re-keyed again.
+    localStorage.setItem(knowledgeKeyRuleMark('zh'), '2');
+    expect(migrateKnowledgeKeys('zh')).toBe(2);
+    expect(getLevel('学习')).toBe(1);
+    expect(isManualLevel('学习')).toBe(true);
+    expect(getLevel('电脑')).toBe(2);
+    expect(getLevel('學習')).toBe(0);
+    flushKnowledgeWrites();
+    expect(localStorage.getItem(knowledgeKeyRuleMark('zh'))).toBe(KNOWLEDGE_KEY_RULE);
+    expect(Object.keys(JSON.parse(localStorage.getItem(knowledgeKey('zh')) ?? '{}')).sort()).toEqual(['你好', '学习', '电脑'].sort());
+    await vi.waitFor(() => expect(idb.get(knowledgeKeyBackupIdbKey('zh'))).toBeTruthy());
+    expect(migrateKnowledgeKeys('zh')).toBe(0);
+    // The reader colours a Traditional token by the Simplified entry.
+    expect(wordKnowledgeKeys('學習', 'zh')).toEqual(['学习']);
   });
 
   it('the conservative rule leaves kana and already-correct keys alone', () => {

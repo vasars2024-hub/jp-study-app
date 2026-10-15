@@ -28,12 +28,12 @@ and the interface is available in English, Japanese, Chinese and Russian.
 | | |
 |---|---|
 | **Look things up** | Offline JMdict dictionary with pitch accent and audio, saved searches and your own notes. Sentence analysis and translation. A global overlay so a lookup never means leaving what you are reading. |
-| **Grammar** | 1,810 grammar points across JLPT N5–N1 and HSK 1–10, each with structure, usage and examples, plus a practice builder, tests and guides. |
+| **Grammar** | 2,892 grammar points across JLPT N5–N1 and HSK 1–10, each with structure, usage and examples, plus a practice builder, tests and guides. |
 | **Read** | Novel reader with tap-to-look-up, highlights and annotations. Manga reader with OCR. A browser for reading real sites with the dictionary attached. |
 | **Reading Lens** | A system-wide hotkey that OCRs any region of your screen — a game, a PDF, a video — and opens it as text you can look up and mine. |
 | **Mine and review** | One-click mining to Anki through AnkiConnect, `.apkg` import, a field-mapping editor, and a built-in flashcard deck with its own scheduling for when you do not use Anki. |
 | **Watch and listen** | Local video with study subtitles, sentence mining from a line, dictation practice, YouTube playlists and a music player with a visualizer. |
-| **Play** | Fifteen small games built on your own vocabulary: kana sprint, cloze blitz, particle panic, listening flash and more. |
+| **Play** | Nineteen small games built on your own vocabulary: kana sprint, cloze blitz, particle panic, listening flash and more. |
 | **Track** | Statistics, streaks with an optional weekly rest day, a review forecast, reading speed, a study calendar with reminders, and desktop widgets for all of it. |
 | **Focus** | Soundscape: fourteen generated sounds (rain, thunder, waves, café, fireplace, noise and more), each with its own slider, under generated lofi, jazz or piano. Scenes, saved mixes and a sleep timer. Nothing is a recording, so nothing loops. |
 | **Make it yours** | Themes, wallpapers and rotation playlists, a companion that reacts to your study, over a hundred rebindable keyboard commands and a command palette. |

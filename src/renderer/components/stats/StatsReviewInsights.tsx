@@ -16,7 +16,8 @@ import {
   type DeckFlashcard,
 } from '../../flashcardDeck';
 import { loadSchedulingConfig } from '../../flashcardScheduling';
-import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
+import { effectiveFsrsWeights, schedulingConfigForFolder } from '../../../shared/flashcardScheduling';
+import { loadReviewLogSince, onReviewLogChanged } from '../../reviewLog';
 import { getStudyDaysByKey, onStatsChanged } from '../../stats';
 import type { ReviewLogEntry } from '../../../shared/reviewLog';
 import {
@@ -89,7 +90,9 @@ export default function StatsReviewInsights() {
   useEffect(() => {
     let alive = true;
     const refresh = (): void => {
-      void loadReviewLog()
+      // The whole range, archive included when it reaches past the live
+      // window; a day more, so the oldest study day is never cut by the clock.
+      void loadReviewLogSince(Date.now() - (range + 1) * DAY_MS)
         .then((rows) => {
           if (!alive) return;
           setEntries(rows);
@@ -107,7 +110,7 @@ export default function StatsReviewInsights() {
       offDeck();
       offStats();
     };
-  }, []);
+  }, [range]);
 
   const number = useMemo(() => new Intl.NumberFormat(LANG_TAGS[lang], { maximumFractionDigits: 1 }), [lang]);
   const percent = useMemo(
@@ -118,6 +121,17 @@ export default function StatsReviewInsights() {
 
   const data = useMemo(() => {
     if (!entries) return null;
+    const scheduling = loadSchedulingConfig();
+    const weightsByFolder = new Map<string, readonly number[]>();
+    const weightsFor = (card: DeckFlashcard): readonly number[] => {
+      const folder = card.folder ?? '';
+      let weights = weightsByFolder.get(folder);
+      if (!weights) {
+        weights = effectiveFsrsWeights(schedulingConfigForFolder(scheduling, card.folder));
+        weightsByFolder.set(folder, weights);
+      }
+      return weights;
+    };
     const daily = dailyReviewStats(entries, range, now);
     const weeks = weeklyRetention(entries, Math.max(4, Math.round(range / 7)), now);
     return {
@@ -137,10 +151,12 @@ export default function StatsReviewInsights() {
           // own counts (new-card limit, Anki-owned and suspended cards,
           // learn-ahead), keyed exactly like `deckKeyOf`.
           dueByDeck: reviewSessionCounts(deck, true, 'mixed', now),
-          learnAheadMinutes: loadSchedulingConfig().learnAheadMinutes,
+          learnAheadMinutes: scheduling.learnAheadMinutes,
         },
       ),
-      recall: recallEstimate(deck, now),
+      // Each card on its own preset's forgetting curve: FSRS-6 decay where
+      // that preset runs FSRS-6, FSRS-5's fixed curve elsewhere.
+      recall: recallEstimate(deck, now, weightsFor),
     };
     // `statsVersion` is the change signal for the daily activity store.
   }, [entries, deck, range, now, since, statsVersion]);

@@ -20,7 +20,8 @@
 //
 // Beyond `REVIEW_LOG_LIMIT` rows the oldest are ARCHIVED, not deleted: moved, in
 // the same IndexedDB transaction that removes them, into chunk records
-// (`review-log-archive:`). Statistics reads the live window; the FSRS optimiser
+// (`review-log-archive:`). Statistics reads the live window, joined with the
+// archive when a range reaches past it (`loadReviewLogSince`); the FSRS optimiser
 // and the memory replay read everything (`loadFullReviewLog`).
 
 import { kvBatch, kvGet, kvScanPrefix, kvUpdate } from './storage/db';
@@ -109,7 +110,7 @@ async function readArchive(): Promise<ReviewLogEntry[]> {
 /**
  * The whole history: archived rows, every stored row and this window's own,
  * uncapped. For the FSRS optimiser and the memory replay, which need each
- * card's reviews back to its first; Statistics uses `loadReviewLog`.
+ * card's reviews back to its first; Statistics uses `loadReviewLogSince`.
  */
 export async function loadFullReviewLog(): Promise<ReviewLogEntry[]> {
   let stored: ReviewLogEntry[] = [];
@@ -121,6 +122,35 @@ export async function loadFullReviewLog(): Promise<ReviewLogEntry[]> {
   }
   const own = ownRows.map(normalizeReviewLogEntry).filter((entry): entry is ReviewLogEntry => entry !== null);
   return mergeNormalizedReviewLog([...stored, ...own, ...archived], Number.POSITIVE_INFINITY)
+    .filter((entry) => !ownRemoved.has(entry.id));
+}
+
+/** The archived rows, read once per window: only an archive pass or an import undo changes them. */
+let archiveCache: Promise<ReviewLogEntry[]> | null = null;
+
+function loadArchive(): Promise<ReviewLogEntry[]> {
+  if (!archiveCache) {
+    const read = readArchive().catch(() => {
+      if (archiveCache === read) archiveCache = null;
+      return [] as ReviewLogEntry[];
+    });
+    archiveCache = read;
+  }
+  return archiveCache;
+}
+
+/**
+ * Every row from `since` on, for a Statistics range that may reach past the
+ * live window: the live window alone when it already goes back that far (or
+ * nothing was ever archived), else the live window joined with the archived
+ * rows of the range. Rows before `since` may be included.
+ */
+export async function loadReviewLogSince(since: number): Promise<ReviewLogEntry[]> {
+  const live = await loadReviewLog();
+  if (live.length && live[0].at <= since) return live;
+  const archived = (await loadArchive()).filter((entry) => entry.at >= since);
+  if (!archived.length) return live;
+  return mergeNormalizedReviewLog([...archived, ...live], Number.POSITIVE_INFINITY)
     .filter((entry) => !ownRemoved.has(entry.id));
 }
 
@@ -138,7 +168,10 @@ export function loadReviewLog(): Promise<ReviewLogEntry[]> {
       }
       cache = withHeld(stored);
       if (heldAppends.length || heldRemovals.size) persist();
-      if (stored.length >= REVIEW_LOG_LIMIT) void pruneReviewLog().catch(() => undefined);
+      // Rows archived after this window read the archive are news to Statistics.
+      if (stored.length >= REVIEW_LOG_LIMIT) {
+        void pruneReviewLog().then((moved) => { if (moved) emit(); }).catch(() => undefined);
+      }
       return cache;
     })();
   }
@@ -202,6 +235,7 @@ export async function pruneReviewLog(limit = REVIEW_LOG_LIMIT): Promise<number> 
     puts.push({ type: 'put', key: `${REVIEW_LOG_ARCHIVE_PREFIX}${first}-${chunk[0].id}`, value: { version: 1, entries: chunk } });
   }
   await kvBatch([...puts, ...oldest.map(({ key }) => ({ type: 'delete' as const, key }))]);
+  archiveCache = null;
   return oldest.length;
 }
 
@@ -214,6 +248,7 @@ export function flushReviewLogWrites(): Promise<void> {
 export function resetReviewLogForTests(): void {
   cache = null;
   loading = null;
+  archiveCache = null;
   heldAppends = [];
   heldRemovals = new Set();
   ownRows = [];
@@ -375,6 +410,7 @@ export async function removeMergedReviewLogRows(ids: readonly string[]): Promise
       archivePuts.push({ type: 'put', key, value: { version: 1, entries: kept } });
     }
     if (deletes.length || archivePuts.length) await kvBatch([...deletes, ...archivePuts]);
+    if (archivePuts.length) archiveCache = null;
   });
   ownRows = ownRows.filter((row) => !drop.has(row.id));
   if (cache) cache = cache.filter((row) => !drop.has(row.id));

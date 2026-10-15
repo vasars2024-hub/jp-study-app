@@ -9,7 +9,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { ReviewLogEntry } from '../../shared/reviewLog';
 
-const log: { rows: ReviewLogEntry[] } = { rows: [] };
+const log: { rows: ReviewLogEntry[]; since: number[] } = { rows: [], since: [] };
 
 vi.mock('../i18n', () => ({
   useT: () => ({
@@ -21,6 +21,10 @@ vi.mock('../i18n', () => ({
 }));
 vi.mock('../reviewLog', () => ({
   loadReviewLog: () => Promise.resolve(log.rows),
+  loadReviewLogSince: (since: number) => {
+    log.since.push(since);
+    return Promise.resolve(log.rows);
+  },
   onReviewLogChanged: () => () => undefined,
 }));
 
@@ -41,6 +45,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.clear();
   log.rows = [];
+  log.since = [];
 });
 
 afterEach(() => {
@@ -81,5 +86,26 @@ describe('StatsReviewInsights', () => {
     expect(deckRow?.textContent).toContain('吾輩は猫である');
     // Must not reuse the 14-day chart's classes, which other suites count.
     expect(host.querySelector('.stats-bar-fill, .stats-bar-col')).toBeNull();
+  });
+
+  it('reads the whole range, archive included, when a longer range is picked', async () => {
+    const now = Date.now();
+    log.rows = [
+      { id: 'old', at: now - 200 * 86_400_000, mode: 'review', rating: 'good', correct: true, prevIntervalDays: 40 },
+      { id: 'new', at: now - 1000, mode: 'review', rating: 'good', correct: true, prevIntervalDays: 3 },
+    ];
+    await mount();
+    expect(log.since.length).toBeGreaterThan(0);
+    // 30 days (and one more, for the study-day rollover) back from now.
+    expect(now - log.since[log.since.length - 1]).toBeGreaterThanOrEqual(31 * 86_400_000 - 5000);
+    expect(now - log.since[log.since.length - 1]).toBeLessThan(32 * 86_400_000);
+    const select = host.querySelector('.stats2-range select') as HTMLSelectElement;
+    await act(async () => {
+      select.value = '365';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(now - log.since[log.since.length - 1]).toBeGreaterThanOrEqual(366 * 86_400_000 - 5000);
+    const labels = Array.from(host.querySelectorAll('.stats2-chart')).map((chart) => chart.getAttribute('aria-label') ?? '');
+    expect(labels.some((label) => label.startsWith('stats2.reviews.summary(total=2'))).toBe(true);
   });
 });

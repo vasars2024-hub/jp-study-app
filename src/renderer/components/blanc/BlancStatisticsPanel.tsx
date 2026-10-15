@@ -9,6 +9,7 @@
  * stylesheet these blocks rely on is loaded by the shell's lazy loader
  * (`withStudyOsCompat` in BlancShell.tsx), before first render.
  */
+import { lazy, Suspense } from 'react';
 import { useT } from '../../i18n';
 import {
   StatsBooks,
@@ -20,6 +21,14 @@ import {
 } from '../stats/StatsContent';
 import { formatDuration } from '../../stats';
 import { StatsGames } from '../stats/StatsGames';
+
+/**
+ * Review insights (retention, per-deck Due, intervals, the FSRS recall
+ * estimate): the component Study OS mounts, in its own chunk. Its charts and
+ * the review-log arithmetic are fetched when this panel opens, never with the
+ * Blanc shell, so the boot budget is untouched.
+ */
+const StatsReviewInsights = lazy(() => import('../stats/StatsReviewInsights'));
 
 /**
  * Pillar 0 fix for the `stats` tab bail-out, which mounted `StatisticsView`
@@ -80,6 +89,10 @@ export function BlancStatisticsPanel() {
         <legend>{t('stats.wk.title')}</legend>
         <WordKnowledge />
       </fieldset>
+
+      <Suspense fallback={null}>
+        <StatsReviewInsights />
+      </Suspense>
 
       <StatsGames />
     </div>

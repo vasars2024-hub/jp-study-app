@@ -35,7 +35,9 @@
 //     (two or more kanji, or katakana, followed by する).
 //
 // Chinese: ICU's word segmenter (`studySegmentation`), the reader's segmenter.
-// One word → that word; a phrase the reader splits → its words.
+// One word → that word; a phrase the reader splits → its words. Every key is
+// then folded to Simplified (`zhVariants`), so 學習 read in a Taiwanese novel and
+// 学习 mined from a mainland drama are one word with one level.
 //
 // Russian: ICU words, each keyed by the dictionary form the learner already
 // graded (книги → книга once книга is known), else the stem every form shares.
@@ -53,6 +55,7 @@ import type { StudyLang } from './studyLang';
 import { russianLemmaCandidates, stripRussianStress } from './russianMorphology';
 import { isVocabularySegment, segmentStudyText, studyWordKey } from './studySegmentation';
 import { hasKanji, toHiragana } from './furigana';
+import { toSimplifiedChinese } from './zhVariants';
 
 /** The fields of a kuromoji token this rule reads (renderer `JpToken` fits). */
 export interface KnowledgeKeyToken {
@@ -154,9 +157,15 @@ export function russianKnowledgeKey(word: string, levelOf: (key: string) => numb
   return studyWordKey(plain, 'ru');
 }
 
+/** Chinese: NFKC, then Traditional folded to Simplified (學習 → 学习). */
+export function chineseKnowledgeKey(text: string): string {
+  return toSimplifiedChinese(normalizeKnowledgeText(text));
+}
+
 /** The reader key of one ICU segment in Chinese or Russian. */
 export function segmentKnowledgeKey(text: string, lang: StudyLang, levelOf?: (key: string) => number): string {
   if (lang === 'ru') return russianKnowledgeKey(text, levelOf);
+  if (lang === 'zh') return chineseKnowledgeKey(text);
   return normalizeKnowledgeText(text);
 }
 
@@ -167,7 +176,10 @@ function segmentedKeys(word: string, lang: StudyLang, levelOf?: (key: string) =>
     .filter((part) => part.wordLike && isVocabularySegment(part.text, lang))
     .map((part) => segmentKnowledgeKey(part.text, lang, levelOf))
     .filter(Boolean);
-  if (!words.length) return [lang === 'ru' ? russianKnowledgeKey(text, levelOf) || text : text];
+  if (!words.length) {
+    if (lang === 'ru') return [russianKnowledgeKey(text, levelOf) || text];
+    return [lang === 'zh' ? toSimplifiedChinese(text) : text];
+  }
   return [...new Set(words)];
 }
 
@@ -189,7 +201,8 @@ export function knowledgeKeysFor(word: string, lang: StudyLang, deps: KnowledgeK
  */
 export function knowledgeKeyFor(word: string, lang: StudyLang, deps: KnowledgeKeyDeps = {}): string {
   const keys = knowledgeKeysFor(word, lang, deps);
-  return keys.length === 1 ? keys[0] : normalizeKnowledgeText(word);
+  if (keys.length === 1) return keys[0];
+  return lang === 'zh' ? chineseKnowledgeKey(word) : normalizeKnowledgeText(word);
 }
 
 // ----- spelling variants -----------------------------------------------------
@@ -303,7 +316,9 @@ export function rekeyKnowledgeStore<E extends KnowledgeStoreEntry>(
  * moves the new rule makes for certain. NFKC always; Japanese re-tokenized only
  * when the key has kanji (an all-kana key is a reader token and IPADIC cuts
  * unknown kana into nonsense); Russian lower-cased and stress-stripped (its
- * stems and graded forms are already keys). Null when the key stays.
+ * stems and graded forms are already keys); Chinese folded to Simplified, so a
+ * store that holds both 學習 and 学习 keeps one entry (`mergeKnowledgeEntries`).
+ * Null when the key stays.
  */
 export function migratedKnowledgeKeys(key: string, lang: StudyLang, deps: KnowledgeKeyDeps = {}): string[] | null {
   const plain = normalizeKnowledgeText(key);
@@ -313,6 +328,8 @@ export function migratedKnowledgeKeys(key: string, lang: StudyLang, deps: Knowle
     next = hasKanji(plain) && deps.tokenizeJapanese ? japaneseKeys(plain, deps.tokenizeJapanese) : [plain];
   } else if (lang === 'ru') {
     next = [stripRussianStress(plain.toLowerCase())];
+  } else if (lang === 'zh') {
+    next = [toSimplifiedChinese(plain)];
   } else {
     next = [plain];
   }

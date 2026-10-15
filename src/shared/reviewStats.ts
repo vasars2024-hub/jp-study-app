@@ -396,18 +396,26 @@ export const RECALL_BANDS: readonly number[] = [0.7, 0.8, 0.9, 0.95];
 /**
  * FSRS's own view of the deck now: each card's predicted recall from its
  * stability and the time since its last review (Anki's "retrievability").
+ *
+ * Only cards FSRS scheduled count (a stability is written by FSRS alone, and
+ * switching a card to SM-2 drops it). Each is read on its OWN forgetting curve:
+ * `weightsFor` names the weights its preset runs (`effectiveFsrsWeights`), so an
+ * FSRS-6 card decays by its fitted w20 and an FSRS-5 card by the fixed -0.5.
+ * Without it every card is read on FSRS-5's curve.
  */
-export function recallEstimate(
-  cards: ReadonlyArray<{ suspended?: boolean; srs?: { stability?: number; lastReviewedAt: number } | null }>,
+export function recallEstimate<C extends { suspended?: boolean; srs?: { stability?: number; lastReviewedAt: number; algorithm?: string } | null }>(
+  cards: ReadonlyArray<C>,
   now: number,
+  weightsFor?: (card: C) => readonly number[],
 ): RecallEstimate {
   const bands = new Array<number>(RECALL_BANDS.length + 1).fill(0);
   let count = 0;
   let sum = 0;
   for (const card of cards) {
     const s = card.srs?.stability;
-    if (card.suspended || typeof s !== 'number' || !card.srs) continue;
-    const r = fsrsRetrievability(s, Math.max(0, (now - card.srs.lastReviewedAt) / DAY_MS));
+    if (card.suspended || typeof s !== 'number' || !card.srs || card.srs.algorithm === 'sm2') continue;
+    const elapsed = Math.max(0, (now - card.srs.lastReviewedAt) / DAY_MS);
+    const r = weightsFor ? fsrsRetrievability(s, elapsed, weightsFor(card)) : fsrsRetrievability(s, elapsed);
     count += 1;
     sum += r;
     let band = RECALL_BANDS.findIndex((edge) => r < edge);

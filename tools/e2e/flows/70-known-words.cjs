@@ -87,5 +87,39 @@ module.exports = {
     const downloaded = (status.calls ?? []).some((c) => /download/.test(c.api));
     result.check('export writes the file (no Save As dialog under the harness)', Boolean(exportMsg) && content !== null && downloaded, { exportCount, exportMsg, file: content === null ? 'missing' : file });
     result.check('the exported file holds every imported word', content !== null && list.unique.every((w) => content.includes(w)), content && content.slice(0, 200));
+
+    // Chinese: Traditional and Simplified spellings are one word. A store written
+    // before the fold (key rule 2) holds 學習; switching to Chinese re-keys it to 学习,
+    // and a Traditional word imported now lands under its Simplified key.
+    const setStudyLang = (lang) => ev(`(() => {
+      localStorage.setItem('jp-study-dict-lang', ${JSON.stringify(lang)});
+      window.dispatchEvent(new CustomEvent('study-lang-changed', { detail: ${JSON.stringify(lang)} }));
+      return true;
+    })()`);
+    await ev(`(() => {
+      localStorage.setItem('jp-word-knowledge-zh', JSON.stringify({ 學習: { l: 3, m: 1 }, 你好: { l: 3, m: 1 } }));
+      localStorage.setItem('jp-word-knowledge-zh-key-rule', '2');
+      return true;
+    })()`);
+    try {
+      await setStudyLang('zh');
+      await rowsFor('');
+      const zhRows = await poll(ctx, `(() => { const w = [...document.querySelectorAll('.kw2-row .kw2-word')].map((x) => x.textContent); return w.includes('你好') ? w : null; })()`, 10000);
+      result.check('in Chinese, the store written before the fold lists 学习, not 學習', Boolean(zhRows) && zhRows.includes('学习') && !zhRows.includes('學習'), zhRows);
+      const marks = await ev(`({ rule: localStorage.getItem('jp-word-knowledge-zh-key-rule'), keys: Object.keys(JSON.parse(localStorage.getItem('jp-word-knowledge-zh') || '{}')) })`);
+      result.check('the Chinese store is re-keyed once, without a duplicate key', marks.rule === '3' && marks.keys.includes('学习') && !marks.keys.includes('學習'), marks);
+
+      await ev(`__e2e.fill(document.querySelector('.kw2-io textarea'), '電腦\\n学习')`);
+      await ev(`__e2e.click(document.querySelector('.kw2-io .btn.primary'))`);
+      const zhImport = await poll(ctx, `document.querySelector('.kw2-message')?.textContent`, 10000);
+      await rowsFor('电脑');
+      const folded = await readRow('电脑');
+      const stored = await poll(ctx, `(() => { const k = Object.keys(JSON.parse(localStorage.getItem('jp-word-knowledge-zh') || '{}')); return k.includes('电脑') ? k : null; })()`, 5000);
+      result.check('a Traditional word imported in Chinese is listed and stored under its Simplified key', Boolean(folded) && /Known/i.test(folded.level) && Boolean(stored) && !stored.includes('電腦'), { zhImport, folded, stored });
+      await ctx.shot('zh-folded');
+    } finally {
+      await setStudyLang('ja');
+      await rowsFor('');
+    }
   },
 };

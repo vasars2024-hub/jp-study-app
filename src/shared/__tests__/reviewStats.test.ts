@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ReviewLogEntry } from '../reviewLog';
+import { DEFAULT_FSRS6_WEIGHTS, DEFAULT_FSRS_WEIGHTS, fsrsRetrievability } from '../fsrs';
 import {
   activityMinutesByDay,
   answerTimeSummary,
@@ -147,6 +148,25 @@ describe('deckStats and recall', () => {
     expect(estimate.cards).toBe(2);
     expect(estimate.average).toBeCloseTo(0.95, 6);
     expect(estimate.bands).toEqual([0, 0, 0, 1, 1]);
+  });
+
+  it('reads each FSRS card on its own forgetting curve (FSRS-6 decay), and skips SM-2 cards', () => {
+    const six = [...DEFAULT_FSRS6_WEIGHTS];
+    six[20] = 0.2; // a flat FSRS-6 curve, far from FSRS-5's fixed 0.5
+    const cards = [
+      { id: 'five', srs: { stability: 10, lastReviewedAt: NOW - 40 * DAY, algorithm: 'fsrs' } },
+      { id: 'six', srs: { stability: 10, lastReviewedAt: NOW - 40 * DAY, algorithm: 'fsrs' } },
+      { id: 'sm2', srs: { stability: 10, lastReviewedAt: NOW - 40 * DAY, algorithm: 'sm2' } },
+    ];
+    const weightsFor = (card: (typeof cards)[number]): readonly number[] => (card.id === 'six' ? six : DEFAULT_FSRS_WEIGHTS);
+    const estimate = recallEstimate(cards, NOW, weightsFor);
+    expect(estimate.cards).toBe(2);
+    const r5 = fsrsRetrievability(10, 40, DEFAULT_FSRS_WEIGHTS);
+    const r6 = fsrsRetrievability(10, 40, six);
+    expect(r6).not.toBeCloseTo(r5, 2);
+    expect(estimate.expectedKnown).toBeCloseTo(r5 + r6, 9);
+    // Without a resolver: FSRS-5's curve for every card, as before.
+    expect(recallEstimate(cards, NOW).expectedKnown).toBeCloseTo(2 * r5, 9);
   });
 });
 
