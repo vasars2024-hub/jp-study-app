@@ -6,7 +6,7 @@
  * read-modify-write in one transaction, so two windows never drop each other's
  * minutes.
  */
-import { kvDelete, kvGet, kvSet, kvUpdate } from './storage/db';
+import { kvDelete, kvDeleteWhere, kvGet, kvSet, kvUpdate } from './storage/db';
 import { immersionDayKey, immersionHostOf } from '../shared/immersion';
 import {
   imm5AddReadingItem,
@@ -32,6 +32,8 @@ const SITE_DAY_KEY = 'imm5:siteDays';
 const MET_KEY = 'imm5:metWords';
 const READING_LIST_KEY = 'imm5:readingList';
 const SNAPSHOT_PREFIX = 'imm5:snapshot:';
+/** Set once the one-time orphan sweep (bug 29) has run on this profile. */
+const SWEEP_KEY = 'imm5:snapshotSweep';
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -59,6 +61,9 @@ export function loadImm5Store(): Promise<void> {
         const [days, list] = await Promise.all([kvGet<unknown>(SITE_DAY_KEY), kvGet<unknown>(READING_LIST_KEY)]);
         siteDays = imm5SanitizeSiteDayLog(days);
         readingList = imm5SanitizeReadingList(list);
+        // Only after a list that was really read: an unreadable one must never
+        // judge which copies are orphans.
+        void imm5SweepOrphanSnapshots().catch(() => undefined);
       } catch {
         /* no IndexedDB (tests, a broken profile): start empty, writes will retry */
       }
@@ -122,12 +127,46 @@ export async function imm5NoteWordsMet(
   return fresh;
 }
 
+/**
+ * Delete the offline copies of items a trim pushed off the list (bug 29: only
+ * removing an item by hand ever deleted its copy, so every save past the cap
+ * and every import that overflowed it left an article-sized copy behind).
+ */
+async function deleteSnapshots(ids: readonly string[]): Promise<void> {
+  for (const id of ids) {
+    try {
+      await kvDelete(`${SNAPSHOT_PREFIX}${id}`);
+    } catch {
+      /* IndexedDB refused: the copy stays an orphan; it is never shown, since no item points at it */
+    }
+  }
+}
+
+/**
+ * One-time sweep for the copies trims already left behind before bug 29 was
+ * fixed: every `imm5:snapshot:*` no saved item owns. Judged against the list as
+ * STORED, in the same transaction as the deletes, and skipped when that list is
+ * not readable. Resolves with how many copies were deleted.
+ */
+export async function imm5SweepOrphanSnapshots(force = false): Promise<number> {
+  if (!force && (await kvGet<unknown>(SWEEP_KEY))) return 0;
+  const stored = await kvGet<unknown>(READING_LIST_KEY);
+  if (stored !== undefined && !Array.isArray(stored)) return 0;
+  const owned = new Set(imm5SanitizeReadingList(stored).map((item) => `${SNAPSHOT_PREFIX}${item.id}`));
+  // An item saved in memory but not yet written (a save in flight) owns its copy too.
+  for (const item of readingList) owned.add(`${SNAPSHOT_PREFIX}${item.id}`);
+  const removed = await kvDeleteWhere(SNAPSHOT_PREFIX, (_value, key) => !owned.has(key));
+  await kvSet(SWEEP_KEY, Date.now());
+  return removed;
+}
+
 export async function imm5SaveForLater(input: { url: string; title: string; snapshotHtml?: string }): Promise<Imm5ReadingItem> {
   await loadImm5Store();
   const next = imm5AddReadingItem(readingList, input, Date.now());
   readingList = next.list;
   emit();
   let item = next.item;
+  await deleteSnapshots(next.dropped);
   if (next.snapshotHtml) {
     try {
       await kvSet(`${SNAPSHOT_PREFIX}${item.id}`, next.snapshotHtml);
@@ -189,6 +228,7 @@ export async function imm5ImportReadingList(text: string, now = Date.now()): Pro
   if (!parsed) return null;
   const merged = imm5MergeReadingLists(readingList, parsed.items, parsed.snapshots);
   let list = merged.list;
+  await deleteSnapshots(merged.dropped);
   for (const id of merged.snapshotIds) {
     try {
       await kvSet(`${SNAPSHOT_PREFIX}${id}`, parsed.snapshots[id]);

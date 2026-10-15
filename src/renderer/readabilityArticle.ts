@@ -38,6 +38,67 @@ export interface ReadableArticle {
   meta: ReaderArticleMeta;
 }
 
+/**
+ * Why no article could be read, as a code the UI translates (F3: main's and
+ * fetch's English used to reach the reader banner verbatim).
+ *
+ * - `no-article`: the page loaded but held no readable text;
+ * - `timeout`: the page took too long;
+ * - `http`: the site answered with an error status (`status`);
+ * - `not-html`: the address is a file or data, not a page;
+ * - `bad-url`: not a full http(s) address;
+ * - `network`: the site could not be reached at all;
+ * - `failed`: anything else.
+ */
+export type ReaderArticleErrorCode = 'no-article' | 'timeout' | 'http' | 'not-html' | 'bad-url' | 'network' | 'failed';
+
+/**
+ * A failed `fetchReadableArticle`. `message` stays the first English reason, as
+ * it always was, for callers that only log it; the UI reads `code`.
+ */
+export class ReaderArticleError extends Error {
+  constructor(message: string, readonly code: ReaderArticleErrorCode, readonly status?: number) {
+    super(message);
+    this.name = 'ReaderArticleError';
+  }
+}
+
+const NO_ARTICLE = 'No readable article found on that page.';
+
+/** Classify one English reason from main's extractor, `net:fetchPage` or fetch itself. */
+export function classifyReaderFetchError(message: string): { code: ReaderArticleErrorCode; status?: number } {
+  const m = message.trim();
+  const status = /^(\d{3})\b/.exec(m);
+  if (status) return { code: 'http', status: Number(status[1]) };
+  if (/took too long|abort|timed? ?out|ETIMEDOUT/i.test(m)) return { code: 'timeout' };
+  if (/^Not a web page/i.test(m)) return { code: 'not-html' };
+  if (/full http\(s\):\/\/ address|invalid url/i.test(m)) return { code: 'bad-url' };
+  if (/no readable article|too little (text|content)|could not parse page/i.test(m)) return { code: 'no-article' };
+  if (/fetch failed|net::ERR_|ENOTFOUND|ECONNREFUSED|ECONNRESET|EAI_AGAIN|getaddrinfo|network|certificate|CERT_|socket hang up/i.test(m)) {
+    return { code: 'network' };
+  }
+  return { code: 'failed' };
+}
+
+/** The code of any error a reader fetch can throw; a plain Error is classified by its text. */
+export function readerArticleErrorOf(error: unknown): ReaderArticleError {
+  if (error instanceof ReaderArticleError) return error;
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const { code, status } = classifyReaderFetchError(message);
+  return new ReaderArticleError(message, code, status);
+}
+
+/** The reason worth showing: a site-level failure (status, network, timeout) over "no article". */
+function pickReaderError(messages: readonly string[]): ReaderArticleError {
+  const classified = messages.map((message) => ({ message, ...classifyReaderFetchError(message) }));
+  const rank: Record<ReaderArticleErrorCode, number> = {
+    http: 0, 'not-html': 0, 'bad-url': 0, timeout: 1, network: 1, 'no-article': 2, failed: 3,
+  };
+  const best = classified.sort((a, b) => rank[a.code] - rank[b.code])[0];
+  if (!best) return new ReaderArticleError(NO_ARTICLE, 'no-article');
+  return new ReaderArticleError(messages[0], best.code, best.status);
+}
+
 type WebviewGuest = HTMLElement & {
   executeJavaScript?: (code: string, userGesture?: boolean) => Promise<unknown>;
   getURL?: () => string;
@@ -618,7 +679,7 @@ async function parseReadableArticleFromDocument(doc: Document, url: string): Pro
   if (!art?.content) {
     const fallback = extractMainContentFallback(doc);
     if (!fallback || plainTextLen(fallback.content) < 40) {
-      throw new Error('No readable article found on that page.');
+      throw new ReaderArticleError(NO_ARTICLE, 'no-article');
     }
     const meta: ReaderArticleMeta = {};
     return {
@@ -771,6 +832,5 @@ export async function fetchReadableArticle(url: string, webview?: WebviewGuest |
   const best = pickBestArticle(candidates, fetchUrl);
   if (best) return best;
 
-  if (errors.length) throw new Error(errors[0]);
-  throw new Error('No readable article found on that page.');
+  throw pickReaderError(errors);
 }

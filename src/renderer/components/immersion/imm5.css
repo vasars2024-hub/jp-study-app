@@ -98,3 +98,25 @@
 .imm5-day-strip li { display: grid; justify-items: center; padding: 2px 0; border-radius: 4px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .imm5-day-label { color: var(--text-muted); font-size: 0.72rem; }
 .imm5-day-value { font-variant-numeric: tabular-nums; }
+
+/* Read aloud: its controls in the reader bar, the spoken sentence and its paragraph. */
+.imm-read-aloud { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.imm-read-aloud-rate {
+  min-height: var(--lq-hit-target, 26px);
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel, var(--panel-2));
+  color: inherit;
+  font: inherit;
+}
+.imm-read-aloud-progress { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.imm-read-aloud-error { color: var(--danger, #dc2626); flex-basis: 100%; }
+::highlight(imm-read-aloud) {
+  background-color: color-mix(in srgb, var(--accent, #3b82f6) 32%, transparent);
+  color: inherit;
+}
+.immersion-reader [data-read-aloud-block] {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent, #3b82f6) 7%, transparent);
+}

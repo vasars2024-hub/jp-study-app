@@ -29,6 +29,7 @@ import {
   detectImmersionTextLang,
   emptySession,
   immersionNavAfter,
+  immersionPageKey,
   immersionScrollPct,
   immersionStatsId,
   immersionTotalsByHost,
@@ -68,6 +69,8 @@ import { READING_CANVAS_FILL_POLICY } from '../../../shared/liquidReadingCanvas'
 import { ReadingCanvas, type ReadingCanvasTool } from '../liquid/ReadingCanvas';
 import { AnchorSurface } from '../liquid/LiquidSurface';
 import { articleBodyHtml, fetchReadableArticle } from '../../wikiArticle';
+import { ReaderArticleError, readerArticleErrorOf } from '../../readabilityArticle';
+import { immersionUiTextLoaded, readerErrorMessage } from './immersionUiStrings';
 import {
   clearLookupHighlight,
   isLookupClick,
@@ -100,6 +103,14 @@ import '../reading/readingEcosystem.css';
 
 /** The reader's optional AI tools (explain i+1, simplify, ask the Agent): loaded with the first article. */
 const ImmersionAiTools = lazy(() => import('./ImmersionAiTools'));
+
+/** A Reader Mode pass that ended without an article, carrying the catalog key that says why. */
+class ReaderPassFailure extends Error {
+  constructor(readonly key: string) {
+    super(key);
+    this.name = 'ReaderPassFailure';
+  }
+}
 
 export { IMMERSION_MODE_CYCLE, IMMERSION_STARTERS, WK_HIGHLIGHT_CSS };
 export type { ImmersionMode };
@@ -425,6 +436,8 @@ export function useImmersion() {
 
       let art: Awaited<ReturnType<typeof fetchReadableArticle>> | null = null;
       let bestLen = 0;
+      // Why the last attempt found nothing, as a code: shown when no attempt found anything.
+      let lastFailure: ReaderArticleError | null = null;
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         if (attempt > 0) {
           await new Promise((r) => window.setTimeout(r, nhk ? 700 + attempt * 450 : 500 + attempt * 350));
@@ -439,16 +452,21 @@ export function useImmersion() {
             bestLen = nextLen;
           }
           if (articleReady(next.html)) break;
-        } catch {
+        } catch (e) {
           /* retry after webview hydration */
+          lastFailure = readerArticleErrorOf(e);
         }
       }
       if (!isCurrent()) return;
+      if (!art && lastFailure && lastFailure.code !== 'no-article' && lastFailure.code !== 'failed') {
+        // The site itself failed (a status, the network, a timeout): say that, not "no article".
+        throw lastFailure;
+      }
       if (!art || bestLen < 40) {
-        throw new Error(t('immersion.readerExtractionFailed'));
+        throw new ReaderPassFailure('immersion.readerExtractionFailed');
       }
       if (nhk && !nhkArticleLooksHydrated(art.html.replace(/<[^>]+>/g, ' '))) {
-        throw new Error(t('immersion.nhkStillLoading'));
+        throw new ReaderPassFailure('immersion.nhkStillLoading');
       }
       const body = articleBodyHtml(art.title, art.html, art.meta);
       setReaderHtml(body);
@@ -470,9 +488,15 @@ export function useImmersion() {
       setLoading(false);
     } catch (e) {
       if (!isCurrent()) return;
-      setError(
-        e instanceof Error ? e.message : t('immersion.readerExtractionFailedSwitchLive'),
-      );
+      // Codes, never `e.message`: main's and fetch's reasons are English (F3).
+      let message: string;
+      if (e instanceof ReaderPassFailure) message = t(e.key);
+      else if (e instanceof ReaderArticleError) {
+        const coded = readerErrorMessage(e.code, e.status);
+        message = await immersionUiTextLoaded(coded.key, coded.vars);
+        if (!isCurrent()) return;
+      } else message = t('immersion.readerExtractionFailedSwitchLive');
+      setError(message);
       setReaderHtml('');
       setLoading(false);
     }
@@ -838,7 +862,7 @@ export function useImmersion() {
   }, [liveLookup, showWebview]);
 
   // ----- Actions -----
-  const bookmarkKey = (url: string): string => immersionStatsId(url);
+  const bookmarkKey = (url: string): string => immersionPageKey(url);
   const currentBookmark = useMemo(
     () => (currentUrl ? bookmarks.find((b) => bookmarkKey(b.url) === bookmarkKey(currentUrl)) ?? null : null),
     [bookmarks, currentUrl],
@@ -914,7 +938,8 @@ export function useImmersion() {
     if (res.ok) {
       setStatus(res.duplicate ? t('immersion.toolAlready') : t('immersion.toolSaved'));
     } else {
-      setStatus(res.error ?? t('immersion.saveFailed'));
+      // `res.error` is main's English; the translated outcome is what the user can act on.
+      setStatus(t('immersion.saveFailed'));
     }
   };
 
@@ -933,7 +958,10 @@ export function useImmersion() {
         void window.api.immersionBumpMetrics({ pagesExported: 1 });
         setStatus(t('immersion.exported'));
       } catch (e) {
-        setStatus(e instanceof Error ? e.message : t('immersion.exportFailed'));
+        if (e instanceof ReaderArticleError) {
+          const coded = readerErrorMessage(e.code, e.status);
+          setStatus(await immersionUiTextLoaded(coded.key, coded.vars));
+        } else setStatus(t('immersion.exportFailed'));
       } finally {
         setLoading(false);
       }
@@ -948,8 +976,8 @@ export function useImmersion() {
       });
       void window.api.immersionBumpMetrics({ pagesExported: 1 });
       setStatus(t('immersion.exported'));
-    } catch (e) {
-      setStatus(e instanceof Error ? e.message : t('immersion.exportFailed'));
+    } catch {
+      setStatus(t('immersion.exportFailed'));
     }
   };
 
@@ -2038,7 +2066,7 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
           <div className="immersion-site-row">
             <button type="button" className="immersion-site-card" onClick={() => state.navigate(s.url)} title={s.url}>
               <span className="immersion-site-title">
-                {state.bookmarks.some((b) => immersionStatsId(b.url) === immersionStatsId(s.url)) && (
+                {state.bookmarks.some((b) => immersionPageKey(b.url) === immersionPageKey(s.url)) && (
                   <Icon name="star" size={11} className="immersion-site-fav" fill />
                 )}
                 {s.title}

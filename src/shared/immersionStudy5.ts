@@ -288,7 +288,7 @@ export function imm5AddReadingItem(
   list: readonly Imm5ReadingItem[],
   input: Imm5SaveInput,
   now: number,
-): { list: Imm5ReadingItem[]; item: Imm5ReadingItem; snapshotHtml: string | null } {
+): { list: Imm5ReadingItem[]; item: Imm5ReadingItem; snapshotHtml: string | null; dropped: string[] } {
   const id = imm5ReadingItemId(input.url);
   const snapshotHtml = input.snapshotHtml ? imm5TruncateSnapshot(input.snapshotHtml) : null;
   const text = snapshotHtml ? imm5HtmlText(snapshotHtml) : '';
@@ -305,7 +305,14 @@ export function imm5AddReadingItem(
     ...(hash ? { snapshotHash: hash } : {}),
   };
   const rest = list.filter((entry) => entry.id !== id);
-  return { list: [item, ...rest].slice(0, IMM5_READING_LIST_MAX), item, snapshotHtml };
+  const all = [item, ...rest];
+  // Bug 29: what the cap cuts off is returned, so the store deletes its offline copy too.
+  return {
+    list: all.slice(0, IMM5_READING_LIST_MAX),
+    item,
+    snapshotHtml,
+    dropped: all.slice(IMM5_READING_LIST_MAX).map((entry) => entry.id),
+  };
 }
 
 export function imm5RemoveReadingItem(list: readonly Imm5ReadingItem[], id: string): Imm5ReadingItem[] {
@@ -497,7 +504,7 @@ export function imm5MergeReadingLists(
   existing: readonly Imm5ReadingItem[],
   incoming: readonly Imm5ReadingItem[],
   incomingSnapshots: Readonly<Record<string, string>> = {},
-): { list: Imm5ReadingItem[]; added: number; updated: number; snapshotIds: string[] } {
+): { list: Imm5ReadingItem[]; added: number; updated: number; snapshotIds: string[]; dropped: string[] } {
   const byId = new Map(existing.map((item) => [item.id, item]));
   let added = 0;
   let updated = 0;
@@ -525,7 +532,9 @@ export function imm5MergeReadingLists(
   }
   const list = imm5SortedReadingList([...byId.values()]).slice(0, IMM5_READING_LIST_MAX);
   const kept = new Set(list.map((item) => item.id));
-  return { list, added, updated, snapshotIds: snapshotIds.filter((id) => kept.has(id)) };
+  // Bug 29: an article already saved here that the cap pushed out takes its offline copy with it.
+  const dropped = existing.filter((item) => !kept.has(item.id)).map((item) => item.id);
+  return { list, added, updated, snapshotIds: snapshotIds.filter((id) => kept.has(id)), dropped };
 }
 
 // --- per-page known-word coverage --------------------------------------------------

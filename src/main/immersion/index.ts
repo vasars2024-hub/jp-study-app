@@ -10,7 +10,9 @@ import {
   emptyDayMetrics,
   emptySession,
   emptySitesStore,
+  immersionCleanUrl,
   immersionDayKey,
+  immersionPageKey,
   migrateSitesStore,
   nextSiteStreak,
   normalizeImmersionUrl,
@@ -104,13 +106,12 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+/**
+ * Host, path and the page's meaningful query (bug 28: the query used to be
+ * dropped, so `?p=1` and `?p=2` shared one row). See `immersionPageKey`.
+ */
 function siteKey(url: string): string {
-  try {
-    const u = new URL(url);
-    return `${u.host}${u.pathname}`.replace(/\/$/, '') || u.host;
-  } catch {
-    return url;
-  }
+  return immersionPageKey(url);
 }
 
 function findSiteByUrl(store: ImmersionSitesStore, url: string): ImmersionSite | undefined {
@@ -125,8 +126,9 @@ function lookupDelta(input: ImmersionVisitInput): number {
 }
 
 function upsertVisit(input: ImmersionVisitInput): ImmersionSite {
-  const url = normalizeImmersionUrl(input.url);
-  if (!url) throw new Error('Invalid URL');
+  const normalized = normalizeImmersionUrl(input.url);
+  if (!normalized) throw new Error('Invalid URL');
+  const url = immersionCleanUrl(normalized);
   const store = loadSites();
   const now = Date.now();
   const today = immersionDayKey();
@@ -192,8 +194,9 @@ function findBookmarkByUrl(store: ImmersionSitesStore, url: string): ImmersionBo
  * Returns the bookmark, or `null` after an unstar.
  */
 function saveSite(input: ImmersionSaveSiteInput): ImmersionBookmark | null {
-  const url = normalizeImmersionUrl(input.url);
-  if (!url) throw new Error('Invalid URL');
+  const normalized = normalizeImmersionUrl(input.url);
+  if (!normalized) throw new Error('Invalid URL');
+  const url = immersionCleanUrl(normalized);
   const store = loadSites();
   const now = Date.now();
   let bookmark = findBookmarkByUrl(store, url);

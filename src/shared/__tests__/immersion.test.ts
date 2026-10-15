@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   applyMetricsDelta,
   emptyDayMetrics,
+  immersionCleanUrl,
+  immersionPageKey,
   immersionStatsId,
   isBrowsingPortalUrl,
   isImmersionSearchQuery,
@@ -154,5 +156,31 @@ describe('sanitizeSite', () => {
 describe('immersionStatsId', () => {
   it('prefixes host path', () => {
     expect(immersionStatsId('https://example.com/foo')).toBe('immersion:example.com/foo');
+  });
+
+  it('keeps the meaningful query (bug 28), so ?p=1 and ?p=2 are two pages', () => {
+    expect(immersionStatsId('https://kakuyomu.jp/works/1?p=1')).toBe('immersion:kakuyomu.jp/works/1?p=1');
+    expect(immersionStatsId('https://kakuyomu.jp/works/1?p=2')).not.toBe(immersionStatsId('https://kakuyomu.jp/works/1?p=1'));
+  });
+
+  it('drops tracking parameters and the fragment, so a query-less page keeps its old id', () => {
+    expect(immersionStatsId('https://example.com/foo?utm_source=x&fbclid=y#top')).toBe('immersion:example.com/foo');
+    expect(immersionStatsId('https://example.com/foo/')).toBe('immersion:example.com/foo/');
+  });
+});
+
+describe('immersionPageKey', () => {
+  it('is host, path without a trailing slash, and the sorted meaningful query', () => {
+    expect(immersionPageKey('https://ncode.syosetu.com/n1234/')).toBe('ncode.syosetu.com/n1234');
+    expect(immersionPageKey('https://ncode.syosetu.com/n1234/?p=2')).toBe('ncode.syosetu.com/n1234?p=2');
+    expect(immersionPageKey('https://a.example/r?b=2&a=1')).toBe(immersionPageKey('https://a.example/r?a=1&b=2'));
+    expect(immersionPageKey('https://a.example/r?id=1&utm_medium=x&gclid=3&_ga=1')).toBe('a.example/r?id=1');
+    expect(immersionPageKey('https://a.example/r?id=1')).not.toBe(immersionPageKey('https://a.example/r?id=2'));
+  });
+
+  it('cleans only tracking parameters from a stored URL', () => {
+    expect(immersionCleanUrl('https://a.example/r?id=1&utm_source=x')).toBe('https://a.example/r?id=1');
+    expect(immersionCleanUrl('https://a.example/r?fbclid=z')).toBe('https://a.example/r');
+    expect(immersionCleanUrl('https://a.example/r?id=1')).toBe('https://a.example/r?id=1');
   });
 });

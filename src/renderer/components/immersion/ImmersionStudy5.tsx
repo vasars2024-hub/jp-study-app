@@ -42,6 +42,7 @@ import {
   type Imm5OfflineOpen,
 } from '../../immersionStudy5Store';
 import { imm5ApplyIPlusOne, imm5ClearIPlusOne, imm5PageLemmas, imm5ReaderCoverage } from '../../immersionStudy5Dom';
+import { ImmersionReadAloudControls, useImmersionReadAloud } from './ImmersionReadAloud';
 import './imm5.css';
 
 const PREFS_KEY = 'jp-imm5-reader-prefs';
@@ -103,6 +104,7 @@ export function useImm5Study({ readerRef, readerHtml, showReader, currentUrl, ti
   const [saving, setSaving] = useState(false);
   const [readingOpen, setReadingOpen] = useState(false);
   const stamp = useImm5Store();
+  const readAloud = useImmersionReadAloud({ readerRef, readerHtml, showReader, currentUrl, studyLang });
 
   useEffect(() => onReaderSettingsChanged((s) => setHideFurigana(s.hideFurigana)), []);
 
@@ -248,6 +250,7 @@ export function useImm5Study({ readerRef, readerHtml, showReader, currentUrl, ti
     setReadingOpen,
     openOffline,
     mine,
+    readAloud,
   };
 }
 
@@ -308,6 +311,7 @@ export function Imm5ReaderBar({ study, canSave }: { study: Imm5Study; canSave: b
       >
         {study.savedHere ? t('imm5.reader.saved') : study.saving ? t('imm5.reader.saving') : t('imm5.reader.saveLater')}
       </button>
+      <ImmersionReadAloudControls readAloud={study.readAloud} />
     </div>
   );
 }

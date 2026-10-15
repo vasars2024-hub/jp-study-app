@@ -533,7 +533,7 @@ export function migrateSitesStore(raw: unknown): ImmersionSitesStore {
         updatedAt: site.updatedAt,
       }));
   }
-  return { schemaVersion: 2, sites, folders, bookmarks };
+  return migrateImmersionPageKeys({ schemaVersion: 2, sites, folders, bookmarks });
 }
 
 export function emptySession(): ImmersionSession {
@@ -633,12 +633,156 @@ export function immersionTotalsByHost(
     .slice(0, limit);
 }
 
-/** Stable id from URL host+path (for stats bookId without needing a saved site). */
+/* ------------------------------------------------------------------ *
+ * What makes two URLs the same page — bug 28.
+ *
+ * Both keys used to be host + path, so the query string was dropped: on a
+ * site that addresses its chapters or pages by query (`?p=2`, `?id=…`,
+ * `?episode=…`) every page shared ONE history row, one bookmark and one stats
+ * id. The query is part of the page now. Only the parameters that say where a
+ * click came from, never what was opened, are dropped, so a link shared with
+ * `utm_source` still lands on the page it always was.
+ * ------------------------------------------------------------------ */
+
+/** Tracking parameters: they name the referrer or campaign, not the page. */
+const TRACKING_PARAMS = new Set([
+  'fbclid', 'gclid', 'gclsrc', 'dclid', 'gbraid', 'wbraid', 'msclkid', 'yclid', 'twclid', 'ttclid',
+  'li_fat_id', 'igshid', 'mc_cid', 'mc_eid', '_ga', '_gl', '_hsenc', '_hsmi', 'mkt_tok',
+  'oly_anon_id', 'oly_enc_id', 'vero_id', 'vero_conv', 'wickedid', 'rb_clickid', 's_cid', 'ref_src',
+]);
+
+export function isImmersionTrackingParam(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.startsWith('utm_') || TRACKING_PARAMS.has(n);
+}
+
+/** The query that identifies the page: tracking parameters out, the rest sorted (`?b=1&a=2` is `?a=2&b=1`). */
+function meaningfulQuery(u: URL): string {
+  const kept = [...u.searchParams.entries()].filter(([name]) => !isImmersionTrackingParam(name));
+  if (!kept.length) return '';
+  kept.sort(([a, av], [b, bv]) => (a < b ? -1 : a > b ? 1 : av < bv ? -1 : av > bv ? 1 : 0));
+  return `?${new URLSearchParams(kept).toString()}`;
+}
+
+/** The URL without its tracking parameters (and otherwise as given), for storing. */
+export function immersionCleanUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const names = [...new Set([...u.searchParams.keys()])];
+    if (!names.some(isImmersionTrackingParam)) return url;
+    for (const name of names) if (isImmersionTrackingParam(name)) u.searchParams.delete(name);
+    return u.href;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * The key a history row and a bookmark are found by: host, path without a
+ * trailing slash, and the meaningful query. The fragment never counts.
+ */
+export function immersionPageKey(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${`${u.host}${u.pathname}`.replace(/\/$/, '') || u.host}${meaningfulQuery(u)}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Stable id from URL host + path + meaningful query (for stats bookId without
+ * needing a saved site). A URL without a query keeps exactly the id it always
+ * had, so the reading stats already banked under it stay attached.
+ */
 export function immersionStatsId(url: string): string {
   try {
     const u = new URL(url);
-    return `immersion:${u.host}${u.pathname}`.slice(0, 180);
+    return `immersion:${u.host}${u.pathname}${meaningfulQuery(u)}`.slice(0, 180);
   } catch {
     return `immersion:${url}`.slice(0, 180);
   }
+}
+
+/** Two history rows of one page, folded into one: every counter adds up, nothing is dropped. */
+function mergeSiteRows(a: ImmersionSite, b: ImmersionSite): ImmersionSite {
+  // The older row is the base: its id is the one other stores may already point at.
+  const [base, other] = a.createdAt <= b.createdAt ? [a, b] : [b, a];
+  const latest = a.lastVisited >= b.lastVisited ? a : b;
+  const streakFrom = (a.lastStreakDay ?? '') >= (b.lastStreakDay ?? '') ? a : b;
+  const lookups = (a.totalLookups ?? 0) + (b.totalLookups ?? 0);
+  return {
+    ...base,
+    title: latest.title || base.title,
+    lang: latest.lang !== 'auto' ? latest.lang : other.lang !== 'auto' ? other.lang : base.lang,
+    tags: [...new Set([...base.tags, ...other.tags])],
+    levelGuess: base.levelGuess ?? other.levelGuess,
+    completionPct: Math.max(a.completionPct, b.completionPct),
+    lastVisited: Math.max(a.lastVisited, b.lastVisited),
+    visitCount: a.visitCount + b.visitCount,
+    estimatedDifficulty: latest.estimatedDifficulty || other.estimatedDifficulty,
+    streakDays: streakFrom.streakDays,
+    lastStreakDay: streakFrom.lastStreakDay,
+    totalSeconds: a.totalSeconds + b.totalSeconds,
+    totalChars: a.totalChars + b.totalChars,
+    ...(lookups > 0 ? { totalLookups: lookups } : {}),
+    favorite: Boolean(a.favorite || b.favorite),
+    folderId: base.folderId ?? other.folderId,
+    createdAt: Math.min(a.createdAt, b.createdAt),
+    updatedAt: Math.max(a.updatedAt, b.updatedAt),
+  };
+}
+
+function mergeBookmarks(a: ImmersionBookmark, b: ImmersionBookmark): ImmersionBookmark {
+  const [base, other] = a.createdAt <= b.createdAt ? [a, b] : [b, a];
+  const latest = a.updatedAt >= b.updatedAt ? a : b;
+  return {
+    ...base,
+    title: latest.title || base.title,
+    lang: latest.lang !== 'auto' ? latest.lang : other.lang,
+    tags: [...new Set([...base.tags, ...other.tags])],
+    folderId: base.folderId ?? other.folderId,
+    createdAt: Math.min(a.createdAt, b.createdAt),
+    updatedAt: Math.max(a.updatedAt, b.updatedAt),
+  };
+}
+
+function foldByPageKey<T extends { url: string }>(rows: readonly T[], merge: (a: T, b: T) => T): T[] {
+  const byKey = new Map<string, T>();
+  const order: string[] = [];
+  for (const row of rows) {
+    const clean = immersionCleanUrl(row.url);
+    const next = clean === row.url ? row : { ...row, url: clean };
+    const key = immersionPageKey(clean);
+    const seen = byKey.get(key);
+    if (seen) byKey.set(key, merge(seen, next));
+    else {
+      byKey.set(key, next);
+      order.push(key);
+    }
+  }
+  return order.map((key) => byKey.get(key) as T);
+}
+
+/**
+ * Bug 28's migration, run on every read (it is idempotent and linear).
+ *
+ * The old key was host + path, so a store holds at most one row per page path,
+ * and each row's `url` is the first full URL that path was opened with. The new
+ * key is strictly finer, so no old row is ambiguous: each keeps its id, its URL
+ * and every second and character it banked, and from now on a page with a
+ * different query gets its own row (the "split" happens forward — which
+ * `?p=` banked which second was never recorded, so nothing older is guessed at).
+ *
+ * What does collapse is rows that differ only in tracking parameters, or a
+ * store edited by hand or by an older build: those are folded together, with
+ * their counters added rather than one of them dropped. Stored URLs lose their
+ * tracking parameters.
+ */
+export function migrateImmersionPageKeys(store: ImmersionSitesStore): ImmersionSitesStore {
+  return {
+    ...store,
+    sites: foldByPageKey(store.sites, mergeSiteRows),
+    bookmarks: foldByPageKey(store.bookmarks, mergeBookmarks),
+  };
 }
