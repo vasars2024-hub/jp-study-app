@@ -95,13 +95,13 @@ beforeEach(() => {
   resetReadingListsClientForTesting();
   installResizeObserver();
   /*
-   * `autoTranslate` ships ON, and it makes the reader scan the first page by
+   * `autoTranslate` and `autoOcr` ship ON, and they make the reader scan the first page by
    * itself — so with the default settings the panel is already open at mount and
    * "the user has not opened it" is not a state this surface has. The negative
    * control needs that state to exist, so it is turned off here and the panel is
    * opened by the click the shipped app uses. Everything else stays default.
    */
-  localStorage.setItem('jp-manga-reader-settings', JSON.stringify({ autoTranslate: false }));
+  localStorage.setItem('jp-manga-reader-settings', JSON.stringify({ autoTranslate: false, autoOcr: false }));
   installReadingSurfaceApi({
     getMangaPages: async () => PAGES,
     mangaOcrAvailable: async () => true,

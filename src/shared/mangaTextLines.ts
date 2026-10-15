@@ -260,23 +260,65 @@ function orderLines(lines: TextLine[], vertical: boolean): TextLine[] {
   );
 }
 
-/** Group lines into blocks (step 3 and 4 of the file header). */
-export function groupLinesIntoBlocks(lines: readonly TextLine[]): TextBlock[] {
+/**
+ * The detector block (`blockBoxes`) a line lies in: the one covering the
+ * largest share of the line, when that share is at least half. -1 for none.
+ */
+function owningBlock(line: MokuroBox, blockBoxes: readonly MokuroBox[]): number {
+  const area = width(line) * height(line);
+  if (area <= 0) return -1;
+  let best = -1;
+  let bestShare = 0.5;
+  blockBoxes.forEach((b, k) => {
+    const share = (Math.max(0, xOverlap(line, b)) * Math.max(0, yOverlap(line, b))) / area;
+    if (share >= bestShare) {
+      best = k;
+      bestShare = share;
+    }
+  });
+  return best;
+}
+
+/**
+ * Group lines into blocks (step 3 and 4 of the file header).
+ *
+ * `blockBoxes` are text blocks the detector found itself (comic-text-detector's
+ * block head). When given, lines inside one detector block are one block
+ * whatever the geometry says, and lines in two different detector blocks are
+ * never joined; only lines outside every detector block fall back to the
+ * geometric rule. A block's direction is that of most of its text.
+ */
+export function groupLinesIntoBlocks(lines: readonly TextLine[], blockBoxes: readonly MokuroBox[] = []): TextBlock[] {
   const sets = makeSets(lines.length);
+  const owner = lines.map((l) => owningBlock(l.box, blockBoxes));
   for (let i = 0; i < lines.length; i++) {
     for (let j = i + 1; j < lines.length; j++) {
-      if (sameBlock(lines[i], lines[j])) sets.join(i, j);
+      if (owner[i] >= 0 && owner[j] >= 0) {
+        if (owner[i] === owner[j]) sets.join(i, j);
+      } else if (sameBlock(lines[i], lines[j])) {
+        sets.join(i, j);
+      }
     }
   }
   const blocks = groupsOf(lines.length, sets.find).map((members): TextBlock => {
     const own = members.map((i) => lines[i]);
-    const vertical = own[0].vertical;
+    let verticalArea = 0;
+    let horizontalArea = 0;
+    for (const l of own) {
+      const a = width(l.box) * height(l.box);
+      if (l.vertical) verticalArea += a;
+      else horizontalArea += a;
+    }
+    const vertical = verticalArea >= horizontalArea;
+    const aligned = own.map((l) =>
+      l.vertical === vertical ? l : { ...l, vertical, fontSize: vertical ? width(l.box) : height(l.box) },
+    );
     return {
-      box: own.map((l) => l.box).reduce(union),
+      box: aligned.map((l) => l.box).reduce(union),
       vertical,
-      fontSize: median(own.map((l) => l.fontSize)),
-      score: Math.max(...own.map((l) => l.score)),
-      lines: orderLines(own, vertical),
+      fontSize: median(aligned.map((l) => l.fontSize)),
+      score: Math.max(...aligned.map((l) => l.score)),
+      lines: orderLines(aligned, vertical),
     };
   });
   return sortReadingOrder(absorbContained(blocks));
@@ -315,10 +357,13 @@ function absorbContained(blocks: TextBlock[]): TextBlock[] {
   return out;
 }
 
-/** Fragments → blocks of lines, in reading order. */
-export function groupTextLines(fragments: readonly TextFragment[]): TextBlock[] {
+/**
+ * Fragments → blocks of lines, in reading order. `blockBoxes` (optional) are
+ * the detector's own text blocks; see `groupLinesIntoBlocks`.
+ */
+export function groupTextLines(fragments: readonly TextFragment[], blockBoxes: readonly MokuroBox[] = []): TextBlock[] {
   if (!fragments.length) return [];
-  return groupLinesIntoBlocks(buildTextLines(fragments));
+  return groupLinesIntoBlocks(buildTextLines(fragments), blockBoxes);
 }
 
 /**

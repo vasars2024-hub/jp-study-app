@@ -42,6 +42,9 @@ const {
   sampleRgbaBilinear,
   cropGray,
   letterboxRgb,
+  carryCorrectionsToRegions,
+  boxFromRegionId,
+  topKTokens,
 } = await import('../mangaOcr');
 
 afterAll(() => {
@@ -388,5 +391,109 @@ describe('page resampling is bilinear, not nearest-neighbour', () => {
     expect(red[5]).toBeCloseTo(0.5, 5);
     expect(red[6]).toBeCloseTo(1, 5);
     expect(red[7]).toBeCloseTo(1, 5);
+  });
+});
+
+describe('letterbox for comic-text-detector', () => {
+  it('can put the page top-left on black, the way the detector was trained', () => {
+    const page = grayImage(8, 4, () => 255);
+    const { data, padX, padY } = letterboxRgb(page, 8, 4, 4, { align: 'start', fill: 0 });
+    expect(padX).toBe(0);
+    expect(padY).toBe(0);
+    const red = Array.from(data.slice(0, 16));
+    // Rows 0-1 are the page (white), rows 2-3 the black padding below it.
+    expect(red.slice(0, 8).every((v) => Math.abs(v - 1) < 1e-6)).toBe(true);
+    expect(red.slice(8, 16)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+  });
+});
+
+describe('corrections follow their region through a rescan', () => {
+  const stem = 'p001';
+  const id = (box: MokuroBox) => `${stem}:${box.join(',')}`;
+
+  it('reads the box back out of a region id', () => {
+    expect(boxFromRegionId('p001:10,20,110,220')).toEqual([10, 20, 110, 220]);
+    expect(boxFromRegionId('chapter 1:p:3,4,5,9')).toEqual([3, 4, 5, 9]);
+    expect(boxFromRegionId('handmade')).toBeNull();
+    expect(boxFromRegionId('p:10,10,5,20')).toBeNull();
+  });
+
+  it('moves a correction to the new box that overlaps its old one', () => {
+    const oldBox: MokuroBox = [100, 100, 200, 400];
+    const map = { [id(oldBox)]: { lines: ['直した'] } };
+    const regions = [
+      { regionId: id([104, 96, 205, 402]), box: [104, 96, 205, 402] as MokuroBox },
+      { regionId: id([400, 100, 480, 300]), box: [400, 100, 480, 300] as MokuroBox },
+    ];
+    const out = carryCorrectionsToRegions(map, regions);
+    expect(out.moved).toEqual({ [id(oldBox)]: id([104, 96, 205, 402]) });
+    expect(out.map).toEqual({ [id([104, 96, 205, 402])]: { lines: ['直した'] } });
+  });
+
+  it('follows a bubble now read as a tighter block inside its old box', () => {
+    const oldBox: MokuroBox = [100, 100, 300, 400];
+    const tight: MokuroBox = [140, 150, 260, 360];
+    const out = carryCorrectionsToRegions({ [id(oldBox)]: { kind: 'sfx' } }, [{ regionId: id(tight), box: tight }]);
+    expect(out.map[id(tight)]).toEqual({ kind: 'sfx' });
+  });
+
+  it('leaves a correction alone when nothing overlaps it enough, or its region is still there', () => {
+    const kept: MokuroBox = [0, 0, 50, 50];
+    const lost: MokuroBox = [100, 100, 200, 200];
+    const map = { [id(kept)]: { lines: ['a'] }, [id(lost)]: { lines: ['b'] } };
+    const regions = [
+      { regionId: id(kept), box: kept },
+      { regionId: id([180, 180, 260, 260]), box: [180, 180, 260, 260] as MokuroBox },
+    ];
+    const out = carryCorrectionsToRegions(map, regions);
+    expect(out.moved).toEqual({});
+    expect(out.map).toEqual(map);
+  });
+
+  it('pairs one to one, best overlap first, never onto a region with its own correction', () => {
+    const a: MokuroBox = [100, 100, 200, 300];
+    const b: MokuroBox = [100, 310, 200, 500];
+    const own: MokuroBox = [600, 100, 700, 300];
+    const map = {
+      [id(a)]: { lines: ['A'] },
+      [id(b)]: { lines: ['B'] },
+      [id(own)]: { lines: ['own'] },
+    };
+    const merged: MokuroBox = [100, 100, 200, 500];
+    const nearOwn: MokuroBox = [600, 100, 700, 300];
+    const out = carryCorrectionsToRegions(map, [
+      { regionId: id(merged), box: merged },
+      { regionId: id(nearOwn), box: nearOwn },
+    ]);
+    // a and b both overlap the merged block; only one can take it.
+    expect(Object.keys(out.moved)).toHaveLength(1);
+    expect(out.map[id(merged)]?.lines?.[0]).toMatch(/^[AB]$/);
+    expect(out.map[id(own)]).toEqual({ lines: ['own'] });
+  });
+});
+
+describe('topKTokens (per-step candidates for the OCR router)', () => {
+  const vocab = ['[PAD]', '[UNK]', '[CLS]', '[SEP]', '[MASK]', 'あ', 'い', 'う', 'え'];
+
+  it('returns the most likely text tokens with softmax probabilities, best first', () => {
+    const row = Float32Array.from([9, 0, 0, 50, 0, 2, 5, 1, 4]);
+    const top = topKTokens(row, 0, vocab.length, 3, vocab);
+    expect(top.map((c) => c.token)).toEqual(['い', 'え', 'あ']);
+    // Specials are never candidates, but they are part of the softmax.
+    const sum = [9, 0, 0, 50, 0, 2, 5, 1, 4].reduce((acc, v) => acc + Math.exp(v - 50), 0);
+    expect(top[0].prob).toBeCloseTo(Math.exp(5 - 50) / sum, 12);
+    expect(top[0].prob).toBeGreaterThan(top[1].prob);
+  });
+
+  it('reads a row at an offset and survives huge logits', () => {
+    const row = Float32Array.from([...new Array(9).fill(0), 0, 0, 0, 0, 0, 900, 950, 0, 0]);
+    const top = topKTokens(row, 9, vocab.length, 2, vocab);
+    expect(top.map((c) => c.token)).toEqual(['い', 'あ']);
+    expect(top[0].prob).toBeCloseTo(1, 6);
+    expect(Number.isFinite(top[1].prob)).toBe(true);
+  });
+
+  it('is empty for k = 0', () => {
+    expect(topKTokens(Float32Array.from([1, 2, 3, 4, 5, 6]), 0, 6, 0, vocab)).toEqual([]);
   });
 });

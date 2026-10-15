@@ -133,6 +133,45 @@ describe('blocks from lines', () => {
   });
 });
 
+describe('blocks with the detector\'s own block boxes', () => {
+  it('joins the lines of one detector block even when they sit further apart than the rule allows', () => {
+    // Two columns 70 px apart (over 1.1 glyphs): the geometry alone splits them.
+    const fragments = [...column(300, 30, [100, 260]), ...column(200, 30, [100, 220])];
+    expect(groupTextLines(fragments)).toHaveLength(2);
+    const blocks = groupTextLines(fragments, [[190, 90, 340, 270]]);
+    expect(blocks).toHaveLength(1);
+    expect(lineXs(blocks[0])).toEqual([300, 200]);
+  });
+
+  it('never joins lines of two different detector blocks', () => {
+    const fragments = [...column(300, 30, [100, 260]), ...column(260, 30, [100, 220])];
+    expect(groupTextLines(fragments)).toHaveLength(1);
+    const blocks = groupTextLines(fragments, [
+      [295, 90, 340, 270],
+      [250, 90, 292, 230],
+    ]);
+    expect(blocks).toHaveLength(2);
+  });
+
+  it('lets a line outside every detector block join its neighbour by the geometric rule', () => {
+    // The last, one-glyph column of a bubble the block head drew too tight.
+    const fragments = [...column(300, 30, [100, 260]), frag([258, 100, 288, 130])];
+    const blocks = groupTextLines(fragments, [[295, 90, 340, 270]]);
+    expect(blocks).toHaveLength(1);
+    expect(lineXs(blocks[0])).toEqual([300, 258]);
+    expect(blocks[0].vertical).toBe(true);
+  });
+
+  it('gives a mixed block the direction of most of its text', () => {
+    // A long column plus a short horizontal piece inside the same detector block.
+    const fragments = [...column(300, 30, [100, 300]), frag([240, 100, 290, 125])];
+    const blocks = groupTextLines(fragments, [[230, 90, 340, 310]]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].vertical).toBe(true);
+    expect(blocks[0].lines.every((l) => l.vertical)).toBe(true);
+  });
+});
+
 describe('lineCropBox', () => {
   it('pads a line by a fraction of its glyph size and stays on the page', () => {
     expect(lineCropBox({ box: [100, 100, 130, 300], fontSize: 30 }, 1000, 1000)).toEqual([95.5, 95.5, 134.5, 304.5]);

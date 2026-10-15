@@ -70,6 +70,17 @@ describe('mangaReaderSettings', () => {
     expect(loaded.themeColors.text).toBe(DEFAULT_MANGA_READER_SETTINGS.themeColors.text);
   });
 
+  it('reads pages automatically by default, and an old save without the field gets it', async () => {
+    const { loadMangaReaderSettings, DEFAULT_MANGA_READER_SETTINGS } = await import('../mangaReaderSettings');
+    expect(DEFAULT_MANGA_READER_SETTINGS.autoOcr).toBe(true);
+    storage.setItem('jp-manga-reader-settings', JSON.stringify({ autoTranslate: false }));
+    expect(loadMangaReaderSettings().autoOcr).toBe(true);
+    storage.setItem('jp-manga-reader-settings', JSON.stringify({ autoOcr: 'yes' }));
+    expect(loadMangaReaderSettings().autoOcr).toBe(true);
+    storage.setItem('jp-manga-reader-settings', JSON.stringify({ autoOcr: false }));
+    expect(loadMangaReaderSettings().autoOcr).toBe(false);
+  });
+
   it('falls back to defaults on corrupt JSON rather than throwing', async () => {
     const { loadMangaReaderSettings, DEFAULT_MANGA_READER_SETTINGS } = await import('../mangaReaderSettings');
     storage.setItem('jp-manga-reader-settings', '{not valid json');

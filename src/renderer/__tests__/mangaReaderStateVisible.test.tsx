@@ -108,6 +108,8 @@ describe('whole-volume translation outcome', () => {
       mangaOcrLoadCache: async () => null,
       mangaOcrLoadTranslateCache: async () => null,
       onMangaOcrVolumeProgress: () => () => undefined,
+      // The volume run starts only when it can translate (it says why it failed itself).
+      translateStatus: async () => ({ ready: true, modelFound: true, modelPath: null }),
       mangaOcrAnalyzeVolume: async () => ({
         ok: true,
         warning: 'OCR finished, but the translation model produced nothing usable',
@@ -135,6 +137,8 @@ describe('whole-volume translation outcome', () => {
       assetsList: async () => ({ assets: [], statuses: [] }),
       mangaOcrLoadCache: async () => null,
       onMangaOcrVolumeProgress: () => () => undefined,
+      // The volume run starts only when it can translate (it says why it failed itself).
+      translateStatus: async () => ({ ready: true, modelFound: true, modelPath: null }),
       mangaOcrAnalyzeVolume: async () => ({ ok: false, error: 'boom', failure: { reason: 'timeout' } }),
     });
     const h = await mountReader();

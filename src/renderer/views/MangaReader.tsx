@@ -78,6 +78,9 @@ import { getStudyLang } from '../studyEnvironment';
 import { mineToStudy } from '../studyMining';
 import { importMokuroFile } from '../mangaMokuroImport';
 import { mangaMineImage } from '../mangaMineImage';
+import { isMangaOcrCancelled, type MangaOcrProgress } from '../../shared/mangaOcrIpc';
+import { mangaReadAheadIndices, mangaScanPhase } from '../mangaAutoOcr';
+import { useMangaOcrUi } from '../mangaOcrUiStrings';
 
 type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
 
@@ -187,6 +190,7 @@ function savedPageIndex(item: LibraryItem): number {
 
 export default function MangaReader({ item, onClose }: Props) {
   const { t } = useT();
+  const { mt } = useMangaOcrUi();
   // K7: closing (Escape, Ctrl+H, Library) must hand focus back, not drop it on <body>.
   useReturnFocusOnClose(item);
   // L3.2 — the reader is the app's third Liquid host. See `readerPresentation.ts`.
@@ -215,6 +219,8 @@ export default function MangaReader({ item, onClose }: Props) {
   const [sidePanel, setSidePanel] = useState(() => loadMangaReaderSettings().showSidebarByDefault);
   const [ocrStatus, setOcrStatus] = useState<OcrStatus>('idle');
   const [ocrProgress, setOcrProgress] = useState(0);
+  /** The running scan's last progress event, for the line under the bar. */
+  const [ocrScanStep, setOcrScanStep] = useState<MangaOcrProgress | null>(null);
   const [volumeBusy, setVolumeBusy] = useState(false);
   const [volumeProgress, setVolumeProgress] = useState<{
     phase: string;
@@ -231,6 +237,8 @@ export default function MangaReader({ item, onClose }: Props) {
   const [mokuroPage, setMokuroPage] = useState<MokuroPage | null>(null);
   const [showSfx, setShowSfx] = useState(false);
   const [engineReady, setEngineReady] = useState(false);
+  /** Whether `engineReady` has been answered yet (it starts false either way). */
+  const [engineChecked, setEngineChecked] = useState(false);
   const [hoverRegionId, setHoverRegionId] = useState<string | null>(null);
   const [editingRegionId, setEditingRegionId] = useState<string | null>(null);
   const [handwritingOpen, setHandwritingOpen] = useState(false);
@@ -295,6 +303,12 @@ export default function MangaReader({ item, onClose }: Props) {
   volumeBusyRef.current = volumeBusy;
   const autoTranslateRef = useRef(true);
   autoTranslateRef.current = mangaSettings.autoTranslate;
+  const autoOcrRef = useRef(true);
+  autoOcrRef.current = mangaSettings.autoOcr;
+  /** Read-ahead of the next spread, through a ref for the same reason as `scanRef`. */
+  const readAheadRef = useRef<(() => void) | null>(null);
+  /** The model offer opens the OCR panel by itself once per reader open, not on every page. */
+  const autoOfferShownRef = useRef(false);
   /** One background volume analyze per reader open. */
   const autoVolumeStartedRef = useRef(false);
 
@@ -328,7 +342,9 @@ export default function MangaReader({ item, onClose }: Props) {
   useEffect(() => {
     let alive = true;
     void window.api.mangaOcrAvailable().then((ok) => {
-      if (alive) setEngineReady(ok);
+      if (!alive) return;
+      setEngineReady(ok);
+      setEngineChecked(true);
     });
     const off = window.api.onAssetStatus(() => {
       void window.api.mangaOcrAvailable().then((ok) => {
@@ -387,6 +403,7 @@ export default function MangaReader({ item, onClose }: Props) {
       setOcrOpen(true);
       setOcrStatus('scanning');
       setOcrProgress(0);
+      setOcrScanStep(null);
       setOcrError('');
       setOcrText('');
       setOcrIsFallback(false);
@@ -397,7 +414,11 @@ export default function MangaReader({ item, onClose }: Props) {
           mediaUrl: url,
           force,
           detectionSensitivity: mangaSettings.detectionSensitivity,
+          priority: 'page',
         });
+        // The reader turned the page while this one was read: it is cached for
+        // when they come back, but it must not paint over the page now shown.
+        if (mediaUrlRef.current !== url) return null;
         setMokuroPage(page);
         setOcrText(pageToOcrText(page));
         setOcrStatus(page.blocks.some((b) => b.lines.some((l) => l.trim())) ? 'done' : 'error');
@@ -410,6 +431,8 @@ export default function MangaReader({ item, onClose }: Props) {
         setFillByRegion({});
         return page;
       } catch (err) {
+        // Superseded by a page turn: not a failure, and not this page's state.
+        if (isMangaOcrCancelled(err) || mediaUrlRef.current !== url) return null;
         console.error(err);
         // Main's reason is English; say it in the UI language (ocr.ts).
         setOcrError(t(mangaOcrErrorKey(err)));
@@ -420,6 +443,30 @@ export default function MangaReader({ item, onClose }: Props) {
     [pages, idx, item.id, t, mangaSettings.detectionSensitivity],
   );
   scanRef.current = scanWithMangaOcr;
+
+  /**
+   * Read the next spread in the background, so the page after this one is
+   * ready when the reader turns to it. Main runs it after the shown page and
+   * drops it if the reader jumps elsewhere first; a page already read costs a
+   * cache check.
+   */
+  const readAhead = useCallback(() => {
+    if (!engineReady || !mangaSettings.autoOcr) return;
+    for (const i of mangaReadAheadIndices(spreadIndicesFor(idx), spreadCount, pages.length)) {
+      const url = pages[i];
+      if (!url) continue;
+      window.api
+        .mangaOcrScanPage({
+          itemId: item.id,
+          mediaUrl: url,
+          detectionSensitivity: mangaSettings.detectionSensitivity,
+          priority: 'prefetch',
+        })
+        // Cancelled by a jump, or a page that fails: it is reported when shown.
+        .catch(() => undefined);
+    }
+  }, [engineReady, mangaSettings.autoOcr, mangaSettings.detectionSensitivity, spreadIndicesFor, idx, spreadCount, pages, item.id]);
+  readAheadRef.current = readAhead;
 
   const scanWithTesseract = useCallback(
     async (choice: OcrOrientationChoice) => {
@@ -539,9 +586,11 @@ export default function MangaReader({ item, onClose }: Props) {
       if (p.phase === 'detect') {
         setOcrStatus('scanning');
         setOcrProgress(0.05);
+        setOcrScanStep(p);
       } else if (p.phase === 'ocr' && p.total > 0) {
         setOcrStatus('scanning');
-        setOcrProgress(p.current / p.total);
+        setOcrProgress(Math.max(0.05, p.current / p.total));
+        setOcrScanStep(p);
       } else if (p.phase === 'done') {
         setOcrStatus('done');
         setOcrProgress(1);
@@ -566,10 +615,23 @@ export default function MangaReader({ item, onClose }: Props) {
       const page = await window.api.mangaOcrLoadCache(item.id, url);
       if (cancelled) return;
       if (!page) {
-        if (!engineReady) return;
+        if (!engineReady) {
+          // Auto-read is on but there is nothing to read with: open the panel
+          // once, where the one-click model install is offered.
+          if (engineChecked && autoOcrRef.current && !autoOfferShownRef.current) {
+            autoOfferShownRef.current = true;
+            setOcrOpen(true);
+          }
+          return;
+        }
+        if (!autoOcrRef.current) return;
+        // Read this page now (main puts it ahead of any read-ahead or volume
+        // work, and drops the scans of pages the reader turned past).
+        const scanned = await scanRef.current?.(false);
+        if (cancelled || !scanned) return;
+        readAheadRef.current?.();
         if (autoTranslateRef.current && !volumeBusyRef.current && !autoVolumeStartedRef.current) {
-          const scanned = await scanRef.current?.(false);
-          if (!cancelled && scanned) await translateRef.current?.(scanned);
+          await translateRef.current?.(scanned);
         }
         return;
       }
@@ -579,6 +641,7 @@ export default function MangaReader({ item, onClose }: Props) {
       setOcrIsFallback(false);
       setOcrStatus('done');
       setOcrOpen(true);
+      readAheadRef.current?.();
       const target = targetLangRef.current;
       const tr = await window.api.mangaOcrLoadTranslateCache(item.id, url, target);
       if (cancelled) return;
@@ -604,7 +667,7 @@ export default function MangaReader({ item, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [pages, idx, item.id, engineReady, mokuroImportStamp]);
+  }, [pages, idx, item.id, engineReady, engineChecked, mangaSettings.autoOcr, mokuroImportStamp]);
 
   useEffect(() => {
     return window.api.onMangaOcrVolumeProgress((p) => {
@@ -1002,7 +1065,24 @@ export default function MangaReader({ item, onClose }: Props) {
       meta.targetLang === targetLang;
     if (alreadyDone) return;
     autoVolumeStartedRef.current = true;
-    void analyzeEntireManga();
+    let alive = true;
+    // Without the translation model the volume run stops before its first page
+    // with "model missing" — on every open — and, while it counted as started,
+    // the page-by-page reading below stood aside for it, so nothing was read
+    // at all. Only start it when it can translate; reading goes on regardless.
+    void window.api
+      .translateStatus()
+      .then((status) => {
+        if (!alive) return;
+        if (status.modelFound) void analyzeEntireManga();
+        else autoVolumeStartedRef.current = false;
+      })
+      .catch(() => {
+        autoVolumeStartedRef.current = false;
+      });
+    return () => {
+      alive = false;
+    };
   }, [mangaSettings.autoTranslate, engineReady, pages.length, item.ocrMeta, analyzeEntireManga, targetLang]);
 
   /**
@@ -1250,7 +1330,11 @@ export default function MangaReader({ item, onClose }: Props) {
   }, [item.id]);
 
   useEffect(() => {
+    // Progress events are matched against this; until the new page's scan or
+    // cache sets it, the old page's late events must not land on the new one.
+    mediaUrlRef.current = pages[idx] ?? null;
     setOcrStatus('idle');
+    setOcrScanStep(null);
     setOcrText('');
     setOcrError('');
     setOcrIsFallback(false);
@@ -1782,6 +1866,15 @@ export default function MangaReader({ item, onClose }: Props) {
                   />
                   {t('manga.ocr.sidePanel')}
                 </label>
+                <label className="ocr-check muted" title={mt('mangaOcrUi.autoOcr.hint')}>
+                  <input
+                    type="checkbox"
+                    data-manga-auto-ocr=""
+                    checked={mangaSettings.autoOcr}
+                    onChange={(e) => updateMangaSettings({ autoOcr: e.target.checked })}
+                  />
+                  {mt('mangaOcrUi.autoOcr')}
+                </label>
                 <label className="ocr-check muted" title={t('manga.settings.autoTranslate.hint')}>
                   <input
                     type="checkbox"
@@ -2103,19 +2196,25 @@ export default function MangaReader({ item, onClose }: Props) {
               <AssetInstallPrompt
                 ids={MANGA_OCR_ASSETS}
                 startIds={MANGA_OCR_START}
-                message={t('manga.ocr.modelsMissing')}
+                message={mangaSettings.autoOcr ? mt('mangaOcrUi.models.autoOffer') : t('manga.ocr.modelsMissing')}
               />
               <p className="muted ocr-hint">{t('manga.ocr.fallbackHint')}</p>
             </div>
           )}
 
           {ocrStatus === 'scanning' && (
-            <div className="ocr-progress">
+            <div className="ocr-progress" role="status" aria-busy data-manga-scan-progress="">
               <div className="ocr-bar">
                 <div className="ocr-bar-fill" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
               </div>
               <span className="muted">
-                {t('manga.ocr.reading', { pct: Math.round(ocrProgress * 100) })}
+                {/* The engine says what it is doing; the Tesseract fallback reports a percentage only. */}
+                {ocrIsFallback
+                  ? t('manga.ocr.reading', { pct: Math.round(ocrProgress * 100) })
+                  : (() => {
+                      const step = mangaScanPhase(ocrScanStep);
+                      return mt(step.key, step.vars);
+                    })()}
               </span>
             </div>
           )}

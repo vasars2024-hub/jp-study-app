@@ -40,6 +40,7 @@ import type {
   MangaMokuroImportResult,
   DetectionSensitivity,
 } from '../shared/mangaOcrIpc';
+import { isMangaOcrCancelled } from '../shared/mangaOcrIpc';
 import {
   MOKURO_VOLUME_MAX_BYTES,
   matchMokuroPages,
@@ -56,7 +57,15 @@ import {
 import { sequenceConfidence, tokenProbability } from '../shared/ocrConfidence';
 import { sortReadingOrder } from '../shared/readingOrder';
 import { groupTextLines, lineCropBox } from '../shared/mangaTextLines';
+import {
+  DEFAULT_LINE_MAP_OPTIONS,
+  blocksFromYolo,
+  linesFromShrinkMap,
+  orphanGlyphs,
+  tightenToMask,
+} from '../shared/mangaTextDetect';
 import { getMainStudyLang } from './studyLanguage';
+import { MangaScanCancelled, createMangaScanQueue, type MangaScanPriority } from './mangaScanQueue';
 import { recognizePaddleOcrDataUrl } from './paddleOcr';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
 import {
@@ -97,6 +106,8 @@ const DETECT_SIZE = 1024;
 const OCR_SIZE = 224;
 const BOS = 2;
 const EOS = 3;
+/** Ids below this are the tokenizer's specials ([PAD] [UNK] [CLS] [SEP] [MASK]). */
+const FIRST_TEXT_TOKEN = 5;
 const MAX_TOKENS = 300;
 
 // ----- sessions ----------------------------------------------------------
@@ -108,11 +119,34 @@ let vocab: string[] | null = null;
 let loadPromise: Promise<void> | null = null;
 let unloadRegistered = false;
 
+/**
+ * The three sessions hold about 600 MB. They load in about a second, so a
+ * reader that stopped scanning gives that memory back after a few idle minutes
+ * rather than keeping it for the rest of the app's life.
+ */
+export const MANGA_OCR_IDLE_UNLOAD_MS = 5 * 60_000;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Push the idle unload back: called on every use of the sessions. */
+function noteModelUse(): void {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    void unloadSessions();
+  }, MANGA_OCR_IDLE_UNLOAD_MS);
+  // Never what keeps the process alive.
+  (idleTimer as { unref?: () => void }).unref?.();
+}
+
 export function mangaOcrAvailable(): boolean {
   return ASSET_IDS.every((id) => isInstalled(id));
 }
 
 async function unloadSessions(): Promise<void> {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
   const sessions = [encoder, decoder, detector];
   encoder = decoder = detector = null;
   vocab = null;
@@ -136,6 +170,7 @@ function ensureUnloadHandlers(): void {
 
 async function ensureModels(): Promise<void> {
   ensureUnloadHandlers();
+  noteModelUse();
   if (encoder && decoder && detector && vocab) return;
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
@@ -153,6 +188,9 @@ async function ensureModels(): Promise<void> {
     const opts: OrtNamespace.InferenceSession.SessionOptions = {
       executionProviders: ['cpu'],
       graphOptimizationLevel: 'all',
+      // Without the arena the process peaks at ~0.7 GB instead of ~1.4 GB
+      // over a page (tools/ocr-eval), at the same speed.
+      enableCpuMemArena: false,
     };
     encoder = await runtime.InferenceSession.create(encPath, opts);
     decoder = await runtime.InferenceSession.create(decPath, opts);
@@ -248,15 +286,16 @@ export function letterboxRgb(
   srcW: number,
   srcH: number,
   size: number,
+  opts: { align?: 'center' | 'start'; fill?: number } = {},
 ): { data: Float32Array; ratio: number; padX: number; padY: number } {
   const ratio = Math.min(size / srcW, size / srcH);
   const newW = Math.round(srcW * ratio);
   const newH = Math.round(srcH * ratio);
-  const padX = Math.floor((size - newW) / 2);
-  const padY = Math.floor((size - newH) / 2);
+  const start = opts.align === 'start';
+  const padX = start ? 0 : Math.floor((size - newW) / 2);
+  const padY = start ? 0 : Math.floor((size - newH) / 2);
   const data = new Float32Array(3 * size * size);
-  // fill gray letterbox
-  data.fill(0.5);
+  data.fill(opts.fill ?? 0.5);
   const taps = tapsFor(1 / ratio, 3);
   const weight = 1 / (taps * taps * 255);
   for (let y = 0; y < newH; y++) {
@@ -282,23 +321,6 @@ export function letterboxRgb(
     }
   }
   return { data, ratio, padX, padY };
-}
-
-/** Letterbox RGB float CHW tensor for the detector (0–1). */
-function letterboxTensor(
-  runtime: Ort,
-  rgba: Buffer,
-  srcW: number,
-  srcH: number,
-  size: number,
-): { tensor: OrtNamespace.Tensor; ratio: number; padX: number; padY: number } {
-  const { data, ratio, padX, padY } = letterboxRgb(rgba, srcW, srcH, size);
-  return {
-    tensor: new runtime.Tensor('float32', data, [1, 3, size, size]),
-    ratio,
-    padX,
-    padY,
-  };
 }
 
 /**
@@ -390,6 +412,7 @@ export function scanRequestFromIpc(r: MangaOcrScanRequest): MangaOcrScanRequest 
     mediaUrl: r.mediaUrl,
     force: !!r.force,
     ...(detectionSensitivity ? { detectionSensitivity } : null),
+    ...(r.priority === 'prefetch' ? { priority: 'prefetch' as const } : null),
   };
 }
 
@@ -416,6 +439,12 @@ interface DetectTuning {
   minScore: number;
   /** Max regions kept after the area sort. */
   maxRegions: number;
+  /** Line map (`det`) binarization threshold. */
+  lineThresh: number;
+  /** Minimum mean line-map probability of a kept line. */
+  lineBoxThresh: number;
+  /** Minimum objectness × class score of a detector text block. */
+  blockConf: number;
 }
 
 /** Original conservative gates — the default when a caller/test passes no tuning. */
@@ -427,6 +456,9 @@ const LEGACY_TUNING: DetectTuning = {
   minAreaFrac: 0.00045,
   minScore: 0.2,
   maxRegions: 48,
+  lineThresh: 0.35,
+  lineBoxThresh: 0.6,
+  blockConf: 0.5,
 };
 
 export function detectTuning(sensitivity: DetectionSensitivity = 'normal'): DetectTuning {
@@ -442,6 +474,9 @@ export function detectTuning(sensitivity: DetectionSensitivity = 'normal'): Dete
         minAreaFrac: 0.00018,
         minScore: 0.08,
         maxRegions: 96,
+        lineThresh: 0.2,
+        lineBoxThresh: 0.35,
+        blockConf: 0.25,
       };
     case 'normal':
     default:
@@ -453,6 +488,9 @@ export function detectTuning(sensitivity: DetectionSensitivity = 'normal'): Dete
         minAreaFrac: 0.0003,
         minScore: 0.14,
         maxRegions: 64,
+        lineThresh: 0.3,
+        lineBoxThresh: 0.5,
+        blockConf: 0.4,
       };
   }
 }
@@ -643,13 +681,14 @@ export function finalizeTextBlocks(
   pageW = 0,
   pageH = 0,
   tuning: DetectTuning = LEGACY_TUNING,
+  blockBoxes: readonly MokuroBox[] = [],
 ): DetectedRegion[] {
   const sized =
     pageW > 0 && pageH > 0 ? filterWeakRegions(regions, pageW, pageH, tuning) : regions.slice();
   const fragments = sized
     .sort((a, b) => boxArea(b.box) - boxArea(a.box))
     .slice(0, tuning.maxRegions * 4);
-  const blocks = groupTextLines(fragments);
+  const blocks = groupTextLines(fragments, blockBoxes);
   // Keep the largest blocks when a page overflows the cap, in reading order.
   const kept = new Set(
     blocks
@@ -778,6 +817,82 @@ function connectedComponents(
   return regions;
 }
 
+/**
+ * The scanner's detection, from comic-text-detector's line map (`det`) and
+ * block head (`blk`), with the stroke mask (`seg`) tightening each line to its
+ * glyphs (see `shared/mangaTextDetect.ts`). Null when the model's outputs are
+ * not that shape, so the caller falls back to the mask-only path.
+ */
+function regionsFromLineMap(
+  outMap: Record<string, OrtNamespace.Tensor>,
+  srcW: number,
+  srcH: number,
+  ratio: number,
+  padX: number,
+  padY: number,
+  tuning: DetectTuning,
+): DetectedRegion[] | null {
+  const det = outMap.det;
+  if (!det || det.dims.length !== 4 || det.dims[1] < 1) return null;
+  const mh = det.dims[2];
+  const mw = det.dims[3];
+  if (mh < 32 || mw < 32) return null;
+  const toDetX = DETECT_SIZE / mw;
+  const toDetY = DETECT_SIZE / mh;
+  const lineMap = (det.data as Float32Array).subarray(0, mw * mh);
+  const contentW = (padX + srcW * ratio) / toDetX;
+  const contentH = (padY + srcH * ratio) / toDetY;
+  const lines = linesFromShrinkMap(
+    lineMap,
+    mw,
+    mh,
+    { ...DEFAULT_LINE_MAP_OPTIONS, thresh: tuning.lineThresh, boxThresh: tuning.lineBoxThresh },
+    Math.ceil(contentW),
+    Math.ceil(contentH),
+  );
+  const seg = outMap.seg;
+  const segData =
+    seg && seg.dims.length === 4 && seg.dims[2] === mh && seg.dims[3] === mw
+      ? (seg.data as Float32Array).subarray(0, mw * mh)
+      : null;
+  const toSrc = (box: MokuroBox): MokuroBox => {
+    const x0 = Math.max(0, Math.min(srcW, (box[0] * toDetX - padX) / ratio));
+    const y0 = Math.max(0, Math.min(srcH, (box[1] * toDetY - padY) / ratio));
+    const x1 = Math.max(0, Math.min(srcW, (box[2] * toDetX - padX) / ratio));
+    const y1 = Math.max(0, Math.min(srcH, (box[3] * toDetY - padY) / ratio));
+    return [x0, y0, Math.max(x0 + 1, x1), Math.max(y0 + 1, y1)];
+  };
+  const tight = segData
+    ? lines.map((line) => ({ ...line, box: tightenToMask(line.box, segData, mw, mh) }))
+    : lines;
+  // A column of one glyph is often too short for the line map; the stroke mask has it.
+  const orphans = segData ? orphanGlyphs(segData, mw, mh, tight.map((l) => l.box)) : [];
+  const fragments: DetectedRegion[] = [...tight, ...orphans].map((line) => {
+    const box = toSrc(line.box);
+    return { box, score: line.score, points: boxPoints(box) };
+  });
+  const blk = outMap.blk;
+  const blockBoxes =
+    blk && blk.dims.length === 3 && blk.dims[2] >= 5
+      ? blocksFromYolo(blk.data as Float32Array, blk.dims[1], blk.dims[2], tuning.blockConf).map((b) =>
+          // The block head works in the 1024 input space whatever the map size.
+          toSrc([b.box[0] / toDetX, b.box[1] / toDetY, b.box[2] / toDetX, b.box[3] / toDetY]),
+        )
+      : [];
+  // The page-area gate in `filterWeakRegions` is for mask speckles; a line or a
+  // lone glyph here already passed the line map or the stroke mask, and a small
+  // glyph on a low-resolution scan is below that gate. Only slivers go.
+  const kept = fragments.filter((f) => Math.min(f.box[2] - f.box[0], f.box[3] - f.box[1]) >= 4);
+  return finalizeTextBlocks(kept, 0, 0, tuning, blockBoxes);
+}
+
+/**
+ * How the page goes into the detector: top-left, black padding to the right or
+ * below — the letterbox comic-text-detector was trained with. Centring it on
+ * gray (what this used to do) is the form other YOLO exports use.
+ */
+const DETECT_LETTERBOX = { align: 'start', fill: 0 } as const;
+
 async function detectRegions(
   rgba: Buffer,
   srcW: number,
@@ -787,10 +902,13 @@ async function detectRegions(
   const tuning = detectTuning(sensitivity);
   if (!detector) throw new Error('Detector not loaded');
   const runtime = await loadOrt();
-  const { tensor, ratio, padX, padY } = letterboxTensor(runtime, rgba, srcW, srcH, DETECT_SIZE);
+  const { data, ratio, padX, padY } = letterboxRgb(rgba, srcW, srcH, DETECT_SIZE, DETECT_LETTERBOX);
+  const tensor = new runtime.Tensor('float32', data, [1, 3, DETECT_SIZE, DETECT_SIZE]);
   const inputName = detector.inputNames[0];
   const feeds: Record<string, OrtNamespace.Tensor> = { [inputName]: tensor };
   const outMap = await detector.run(feeds);
+  const fromLines = regionsFromLineMap(outMap, srcW, srcH, ratio, padX, padY, tuning);
+  if (fromLines) return fromLines;
   const outs = detector.outputNames.map((n) => outMap[n]);
   const maskData = pick2dMask(outs);
   if (!maskData) {
@@ -888,6 +1006,66 @@ interface MangaCropRead {
 }
 
 /**
+ * One decoding step of manga-ocr, for a caller that wants to second-guess a
+ * character (the shared OCR router's per-character fallback and dictionary-
+ * guided decoding). manga-ocr's tokenizer is character level, so a step is a
+ * character in practice.
+ */
+export interface MangaOcrTokenStep {
+  /** The token the greedy decoder chose. */
+  token: string;
+  /** Its softmax probability, 0-1. */
+  prob: number;
+  /** The most likely tokens at this step, best first; the chosen one is first. Special tokens are left out. */
+  candidates: Array<{ token: string; prob: number }>;
+}
+
+/** A crop read by manga-ocr, with the detail the OCR router needs. */
+export interface MangaCropRecognition {
+  /** The text after manga-ocr's post-processing (what the reader shows). */
+  text: string;
+  /** The tokens joined as decoded, before post-processing; `steps` line up with this. */
+  rawText: string;
+  /** Geometric mean of the chosen tokens' probabilities (see shared/ocrConfidence.ts). */
+  confidence: number;
+  /** True when the decoder hit the token ceiling without finishing (a repetition loop). */
+  truncated: boolean;
+  /** Per-step top-k candidates, present when `topK` was asked for. */
+  steps?: MangaOcrTokenStep[];
+}
+
+/**
+ * The `k` most likely non-special tokens in one logits row, with softmax
+ * probabilities. Exported for tests; the softmax is computed in log space like
+ * `tokenProbability`, so large logits do not overflow.
+ */
+export function topKTokens(
+  row: Float32Array | readonly number[],
+  offset: number,
+  vocabSize: number,
+  k: number,
+  vocabList: readonly string[],
+): Array<{ id: number; token: string; prob: number }> {
+  if (k <= 0 || vocabSize <= 0) return [];
+  let max = -Infinity;
+  for (let i = 0; i < vocabSize; i++) if (row[offset + i] > max) max = row[offset + i];
+  if (!Number.isFinite(max)) return [];
+  let sum = 0;
+  for (let i = 0; i < vocabSize; i++) sum += Math.exp(row[offset + i] - max);
+  // Keep a small sorted list instead of sorting the whole (~6k) row.
+  const best: Array<{ id: number; v: number }> = [];
+  for (let i = FIRST_TEXT_TOKEN; i < vocabSize; i++) {
+    const v = row[offset + i];
+    if (best.length === k && v <= best[k - 1].v) continue;
+    let at = best.length;
+    while (at > 0 && best[at - 1].v < v) at--;
+    best.splice(at, 0, { id: i, v });
+    if (best.length > k) best.pop();
+  }
+  return best.map(({ id, v }) => ({ id, token: vocabList[id] ?? '', prob: Math.exp(v - max) / sum }));
+}
+
+/**
  * One region cropped out of the page's RGBA pixels as a PNG data URL (the
  * native image wants BGRA), for a recognizer that reads images, not tensors.
  */
@@ -943,9 +1121,12 @@ async function recognizeCropJapanese(
   srcH: number,
   box: MokuroBox,
   points: Array<{ x: number; y: number }>,
-): Promise<MangaCropRead> {
+  topK = 0,
+): Promise<MangaCropRecognition> {
   if (!encoder || !decoder || !vocab) throw new Error('OCR models not loaded');
+  noteModelUse();
   const runtime = await loadOrt();
+  const vocabList = vocab;
 
   let rotateDeg = 0;
   if (shouldDewarp(points)) {
@@ -968,6 +1149,7 @@ async function recognizeCropJapanese(
   // Probability the decoder assigned to each token it actually chose. These are
   // what make a real confidence score possible — see shared/ocrConfidence.ts.
   const tokenProbs: number[] = [];
+  const steps: MangaOcrTokenStep[] = [];
   let finished = false;
   const decInIds = decoder.inputNames.find((n) => /input_ids/i.test(n)) ?? decoder.inputNames[1];
   const decInHidden =
@@ -994,7 +1176,18 @@ async function recognizeCropJapanese(
       }
     }
     tokenIds.push(best);
-    tokenProbs.push(tokenProbability(data, lastRow, vocabSize, best));
+    const prob = tokenProbability(data, lastRow, vocabSize, best);
+    tokenProbs.push(prob);
+    if (topK > 0 && best >= FIRST_TEXT_TOKEN) {
+      steps.push({
+        token: vocabList[best] ?? '',
+        prob,
+        candidates: topKTokens(data, lastRow, vocabSize, topK, vocabList).map(({ token, prob: p }) => ({
+          token,
+          prob: p,
+        })),
+      });
+    }
     if (best === EOS) {
       finished = true;
       break;
@@ -1003,14 +1196,17 @@ async function recognizeCropJapanese(
 
   let text = '';
   for (const id of tokenIds) {
-    if (id < 5) continue;
-    text += vocab[id] ?? '';
+    if (id < FIRST_TEXT_TOKEN) continue;
+    text += vocabList[id] ?? '';
   }
   return {
     text: postprocessMangaOcrText(text),
+    rawText: text,
     // Never finishing means the token ceiling was hit, which in practice is a
     // repetition loop; sequenceConfidence caps those rather than rewarding them.
     confidence: sequenceConfidence(tokenProbs, { truncated: !finished }),
+    truncated: !finished,
+    ...(topK > 0 ? { steps } : null),
   };
 }
 
@@ -1232,22 +1428,110 @@ async function recognizeRegion(
   region: DetectedRegion,
 ): Promise<{ lines: string[]; confidence: number }> {
   if (region.lines?.length && getMainStudyLang() === 'ja') {
-    const lines: string[] = [];
-    let weighted = 0;
-    let chars = 0;
-    for (const line of region.lines) {
-      const crop = lineCropBox(line, width, height);
-      const read = await recognizeCropJapanese(rgba, width, height, crop, boxPoints(crop));
-      const text = read.text.trim();
-      if (!text) continue;
-      lines.push(text);
-      weighted += read.confidence * text.length;
-      chars += text.length;
-    }
-    return { lines, confidence: chars ? weighted / chars : 0 };
+    const read = await readBlockLines(rgba, width, height, region, 0);
+    return { lines: read.lines.map((l) => l.text), confidence: read.confidence };
   }
   const read = await recognizeCrop(rgba, width, height, region.box, region.points);
   return { lines: read.text ? [read.text] : [], confidence: read.confidence };
+}
+
+/** One line of a block as `readMangaTextBlock` returns it. */
+export interface MangaBlockLineRead extends MangaCropRecognition {
+  /** The line's crop on the page (the line box plus a small margin). */
+  box: MokuroBox;
+}
+
+async function readBlockLines(
+  rgba: Buffer,
+  width: number,
+  height: number,
+  region: DetectedRegion,
+  topK: number,
+): Promise<{ lines: MangaBlockLineRead[]; confidence: number }> {
+  const lines: MangaBlockLineRead[] = [];
+  let weighted = 0;
+  let chars = 0;
+  for (const line of region.lines ?? []) {
+    const crop = lineCropBox(line, width, height);
+    const read = await recognizeCropJapanese(rgba, width, height, crop, boxPoints(crop), topK);
+    const text = read.text.trim();
+    if (!text) continue;
+    lines.push({ ...read, text, box: crop });
+    weighted += read.confidence * text.length;
+    chars += text.length;
+  }
+  return { lines, confidence: chars ? weighted / chars : 0 };
+}
+
+// ----- API for the shared OCR router and dev tools ----------------------
+//
+// These take a decoded page (RGBA, row-major) so a caller that already holds
+// pixels — the OCR router with a snip, `tools/ocr-eval` with a test page — runs
+// exactly the reader's pipeline without going through a library item.
+
+/**
+ * comic-text-detector over one page, grouped into blocks of lines in reading
+ * order (`finalizeTextBlocks`). Loads the models on first use.
+ */
+export async function detectMangaTextBlocks(
+  rgba: Buffer,
+  width: number,
+  height: number,
+  sensitivity?: DetectionSensitivity,
+): Promise<DetectedRegion[]> {
+  await ensureModels();
+  return detectRegions(rgba, width, height, sensitivity);
+}
+
+/**
+ * Read one detected block line by line with manga-ocr (Japanese), keeping each
+ * line's crop, confidence and — with `topK` — its per-step candidates. A block
+ * without lines (a hand-drawn box) is read as one crop.
+ */
+export async function readMangaTextBlock(
+  rgba: Buffer,
+  width: number,
+  height: number,
+  region: DetectedRegion,
+  opts: { topK?: number } = {},
+): Promise<{ lines: MangaBlockLineRead[]; confidence: number }> {
+  await ensureModels();
+  const topK = Math.max(0, Math.floor(opts.topK ?? 0));
+  if (region.lines?.length) return readBlockLines(rgba, width, height, region, topK);
+  const read = await recognizeCropJapanese(rgba, width, height, region.box, region.points, topK);
+  const text = read.text.trim();
+  return text
+    ? { lines: [{ ...read, text, box: region.box }], confidence: read.confidence }
+    : { lines: [], confidence: 0 };
+}
+
+/**
+ * manga-ocr on one crop of a decoded image: the entry point for the OCR
+ * router's per-line / per-character fallback. `box` is in image pixels; the
+ * crop is resampled to the model's 224×224 input as the reader does. Japanese
+ * only — the router picks another engine for other languages.
+ */
+export async function recognizeMangaCrop(
+  rgba: Buffer,
+  width: number,
+  height: number,
+  box: MokuroBox,
+  opts: { topK?: number } = {},
+): Promise<MangaCropRecognition> {
+  await ensureModels();
+  return recognizeCropJapanese(rgba, width, height, box, boxPoints(box), Math.max(0, Math.floor(opts.topK ?? 0)));
+}
+
+/** `recognizeMangaCrop` over a whole image given as a data URL (a snip, a lens crop). */
+export async function recognizeMangaCropDataUrl(
+  dataUrl: string,
+  opts: { topK?: number } = {},
+): Promise<MangaCropRecognition> {
+  await ensureModels();
+  const decoded = rgbaFromDataUrl(dataUrl);
+  if (!decoded) return { text: '', rawText: '', confidence: 0, truncated: false, ...(opts.topK ? { steps: [] } : null) };
+  const { rgba, width, height } = decoded;
+  return recognizeMangaCrop(rgba, width, height, [0, 0, width, height], opts);
 }
 
 /** Recognize one arbitrary box on an already-decoded page image. */
@@ -1274,7 +1558,116 @@ function broadcastProgress(progress: MangaOcrProgress): void {
 
 // ----- scan pipeline -----------------------------------------------------
 
-export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPage> {
+/** The box a region id was made from (`regionIdFromBox`), or null for an id of another shape. */
+export function boxFromRegionId(regionId: string): MokuroBox | null {
+  const m = /:(-?\d+),(-?\d+),(-?\d+),(-?\d+)$/.exec(regionId);
+  if (!m) return null;
+  const box = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] as MokuroBox;
+  return box[2] > box[0] && box[3] > box[1] ? box : null;
+}
+
+function overlapScore(a: MokuroBox, b: MokuroBox): number {
+  const inter = boxIntersectionArea(a, b);
+  if (inter <= 0) return 0;
+  const union = boxArea(a) + boxArea(b) - inter;
+  const iou = union > 0 ? inter / union : 0;
+  // A box that lies mostly inside the other (a bubble now read as a tighter
+  // block, or one of two halves) still counts, a little below a true match.
+  const containment = inter / Math.max(1, Math.min(boxArea(a), boxArea(b)));
+  return Math.max(iou, containment * 0.8);
+}
+
+/**
+ * Carry the user's corrections over to a fresh detection of the page.
+ *
+ * A correction is filed under its region's id, and the id is the region's box.
+ * A forced rescan (a new sensitivity, a better detector) finds slightly
+ * different boxes, so every correction used to be orphaned: still on disk,
+ * matching nothing, and the user's fixed text silently replaced by the raw
+ * read. Each correction whose region is gone moves to the new region that
+ * overlaps its old box best (IoU, or mostly-contained at 0.8 weight; at least
+ * 0.4), one to one, strongest overlaps first, never onto a region that has a
+ * correction of its own. Unmatched corrections stay as they are.
+ *
+ * Returns the new map and which old ids moved where.
+ */
+export function carryCorrectionsToRegions(
+  map: CorrectionMap,
+  regions: ReadonlyArray<{ regionId: string; box: MokuroBox }>,
+): { map: CorrectionMap; moved: Record<string, string> } {
+  const current = new Set(regions.map((r) => r.regionId));
+  const orphans = Object.keys(map).filter((id) => !current.has(id));
+  if (!orphans.length) return { map, moved: {} };
+  const pairs: Array<{ oldId: string; newId: string; score: number }> = [];
+  for (const oldId of orphans) {
+    const oldBox = boxFromRegionId(oldId);
+    if (!oldBox) continue;
+    for (const r of regions) {
+      if (map[r.regionId]) continue;
+      const score = overlapScore(oldBox, r.box);
+      if (score >= 0.4) pairs.push({ oldId, newId: r.regionId, score });
+    }
+  }
+  pairs.sort((a, b) => b.score - a.score);
+  const out: CorrectionMap = { ...map };
+  const moved: Record<string, string> = {};
+  const taken = new Set<string>();
+  for (const { oldId, newId } of pairs) {
+    if (oldId in moved || taken.has(newId)) continue;
+    out[newId] = out[oldId];
+    delete out[oldId];
+    moved[oldId] = newId;
+    taken.add(newId);
+  }
+  return { map: out, moved };
+}
+
+/**
+ * One queue for every page scan (see `mangaScanQueue.ts`): the page the reader
+ * shows first, then its read-ahead, then whole-volume work.
+ */
+const scanQueue = createMangaScanQueue<MangaOcrScanRequest, MokuroPage>((req, shouldCancel) =>
+  scanMangaPage(req, { shouldCancel }),
+);
+
+/**
+ * Scan a page through the queue. A `page` request first cancels the item's
+ * scans of other pages, then answers from the cache when it can without waiting
+ * for the queue — a turn to a page already read must not sit behind a volume
+ * pass's current page.
+ */
+export async function requestMangaPageScan(
+  req: MangaOcrScanRequest,
+  priority: MangaScanPriority = req.priority === 'prefetch' ? 'prefetch' : 'page',
+  opts: { shouldCancel?: () => boolean } = {},
+): Promise<MokuroPage> {
+  if (priority === 'page') scanQueue.cancelOthers(req.itemId, req.mediaUrl);
+  if (!req.force) {
+    const cached = await loadMangaOcrCache(req.itemId, req.mediaUrl);
+    if (cached) {
+      if (priority !== 'background') {
+        broadcastProgress({
+          itemId: req.itemId,
+          mediaUrl: req.mediaUrl,
+          phase: 'done',
+          current: cached.blocks.length,
+          total: cached.blocks.length,
+          page: cached,
+        });
+      }
+      return cached;
+    }
+  }
+  return scanQueue.request(req, priority, opts);
+}
+
+export async function scanMangaPage(
+  req: MangaOcrScanRequest,
+  opts: { shouldCancel?: () => boolean } = {},
+): Promise<MokuroPage> {
+  const checkCancel = (): void => {
+    if (opts.shouldCancel?.()) throw new MangaScanCancelled();
+  };
   const { itemId, mediaUrl, force } = req;
   const resolved = resolveMediaPath(mediaUrl);
   if (!resolved || resolved.itemId !== itemId) {
@@ -1298,6 +1691,7 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
   }
 
   await ensureModels();
+  checkCancel();
   const { width, height, rgba } = loadPageImage(full);
   const pageArea = width * height;
 
@@ -1311,7 +1705,16 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
   });
 
   const regions = await detectRegions(rgba, width, height, req.detectionSensitivity);
-  const corrections = await readCorrections(itemId, stem);
+  checkCancel();
+  const regionIds = regions.map((r) =>
+    regionIdFromBox(r.box.map((n) => Math.round(n)) as MokuroBox, stem),
+  );
+  const savedCorrections = await readCorrections(itemId, stem);
+  const carried = carryCorrectionsToRegions(
+    savedCorrections,
+    regions.map((r, i) => ({ regionId: regionIds[i], box: r.box })),
+  );
+  const corrections = carried.map;
   const previousPage = await readRawCachePage(itemId, stem);
   const prevRawByRegion = new Map<string, string[]>();
   if (previousPage) {
@@ -1321,16 +1724,24 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
   }
   const blocks: MokuroBlock[] = [];
   const total = Math.max(1, regions.length);
+  // The reader says "reading bubble 1 of N" from here, not "finding text" until
+  // the first block is done.
+  broadcastProgress({
+    itemId,
+    mediaUrl,
+    phase: 'ocr',
+    current: 0,
+    total,
+    page: { version: MOKURO_EMIT_VERSION, img_width: width, img_height: height, blocks: [] },
+  });
 
   for (let i = 0; i < regions.length; i++) {
+    checkCancel();
     const region = regions[i];
     const [xmin, ymin, xmax, ymax] = region.box;
     const bw = xmax - xmin;
     const bh = ymax - ymin;
-    const regionId = regionIdFromBox(
-      [Math.round(xmin), Math.round(ymin), Math.round(xmax), Math.round(ymax)],
-      stem,
-    );
+    const regionId = regionIds[i];
     const correction = corrections[regionId];
     // How sure the decoder was about this region's text. Starts at 1 so a
     // reused cached read or a user correction is treated as certain.
@@ -1430,7 +1841,9 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
     img_height: height,
     blocks: applyManualOrder(blocks),
   };
+  checkCancel();
   await writeCache(itemId, stem, page);
+  if (Object.keys(carried.moved).length) await writeCorrections(itemId, stem, corrections);
   const finalPage = applyCorrections(page, corrections);
   broadcastProgress({
     itemId,
@@ -1971,12 +2384,26 @@ export async function analyzeMangaVolume(
         mediaUrl,
         message: `OCR ${i + 1}/${allPages.length}`,
       });
-      const page = await scanMangaPage({
+      const pageReq: MangaOcrScanRequest = {
         itemId,
         mediaUrl,
         force,
         detectionSensitivity: req.detectionSensitivity,
-      });
+      };
+      const stop = { shouldCancel: () => volumeCancel.has(itemId) };
+      let page: MokuroPage;
+      try {
+        // Behind whatever page the reader shows, and its read-ahead.
+        page = await requestMangaPageScan(pageReq, 'background', stop);
+      } catch (err) {
+        if (!isMangaOcrCancelled(err) || volumeCancel.has(itemId)) {
+          if (isMangaOcrCancelled(err)) continue;
+          throw err;
+        }
+        // The reader's scan this pass had joined was cancelled by a page turn:
+        // the volume still wants the page.
+        page = await requestMangaPageScan(pageReq, 'background', stop);
+      }
 
       if (doTranslate) {
         if (volumeCancel.has(itemId)) {
@@ -2178,8 +2605,13 @@ export function registerMangaOcrIpc(): void {
       throw new Error('Invalid scan request');
     }
     try {
-      return await scanMangaPage(scanRequestFromIpc(r));
+      return await requestMangaPageScan(scanRequestFromIpc(r));
     } catch (err) {
+      // A page turn superseded it: the reader is on another page, nothing failed.
+      if (isMangaOcrCancelled(err)) throw err;
+      // A read-ahead failing is not this page's error; the page itself will
+      // report when the reader gets there.
+      if (r.priority === 'prefetch') throw err;
       const message = err instanceof Error ? err.message : String(err);
       broadcastProgress({
         itemId: r.itemId,

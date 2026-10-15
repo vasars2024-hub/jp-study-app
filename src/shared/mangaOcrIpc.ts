@@ -9,6 +9,25 @@ export interface MangaOcrScanRequest {
   force?: boolean;
   /** Detector aggressiveness for a fresh scan/rescan. Default 'normal'. */
   detectionSensitivity?: DetectionSensitivity;
+  /**
+   * `page` (the default): the page the reader is showing. It runs before any
+   * read-ahead or whole-volume work, and it cancels this item's other pending
+   * page and read-ahead scans — the reader has moved on from those pages.
+   * `prefetch`: read a page ahead of the reader, after the shown page.
+   */
+  priority?: 'page' | 'prefetch';
+}
+
+/**
+ * The message a scan rejects with when a page turn superseded it. Not an
+ * error to show: the reader asked for another page.
+ */
+export const MANGA_OCR_CANCELLED = 'MANGA_OCR_CANCELLED';
+
+/** Whether a rejected scan was cancelled (Electron wraps the message in its own text). */
+export function isMangaOcrCancelled(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+  return message.includes(MANGA_OCR_CANCELLED);
 }
 
 /** Manually drawn box on the page image — OCR'd and appended as a new region. */

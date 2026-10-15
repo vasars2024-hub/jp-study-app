@@ -79,7 +79,7 @@ const labels = (root: ParentNode, sel: string): string[] =>
 
 beforeEach(() => {
   installResizeObserver();
-  localStorage.setItem('jp-manga-reader-settings', JSON.stringify({ autoTranslate: false }));
+  localStorage.setItem('jp-manga-reader-settings', JSON.stringify({ autoTranslate: false, autoOcr: false }));
   installReadingSurfaceApi({
     getMangaPages: async () => PAGES,
     mangaOcrAvailable: async () => true,
@@ -173,11 +173,13 @@ describe('the manga reader tucks its adjustments behind disclosures', () => {
     expect(groups).toHaveLength(3);
     for (const g of groups) expect(g.open).toBe(false);
 
-    // Nothing left the panel. The three checkboxes and the target-language
-    // select are in the first group; the volume batch job and its ranges in the
-    // second; handwriting, region drawing and rescan in the third.
+    // Nothing left the panel. The four checkboxes (SFX, side panel, read each
+    // page automatically, auto-translate) and the target-language select are in
+    // the first group; the volume batch job and its ranges in the second;
+    // handwriting, region drawing and rescan in the third.
     const [options, volume, tools] = groups;
-    expect(options.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
+    expect(options.querySelectorAll('input[type="checkbox"]')).toHaveLength(4);
+    expect(options.querySelector('input[data-manga-auto-ocr]')).not.toBe(null);
     expect(options.querySelector('select')).not.toBe(null);
     expect(volume.querySelector('.manga-translate-range')).not.toBe(null);
     expect(volume.querySelector('.btn.primary')).not.toBe(null);

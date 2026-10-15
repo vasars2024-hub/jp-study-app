@@ -54,6 +54,11 @@ export interface MangaReaderSettings {
   showSidebarByDefault: boolean;
   /** Floating page thumbnail while hovering the seek bar. */
   showPagePreviews: boolean;
+  /**
+   * Read each page with the manga-OCR models as the reader opens it, plus the
+   * next page ahead, so its text is ready to hover. Cached per page on disk.
+   */
+  autoOcr: boolean;
   /** Auto-OCR + auto-translate every page in the background when a manga opens, saved to disk. */
   autoTranslate: boolean;
   /** How aggressively the detector finds text regions (affects a fresh scan/rescan only). */
@@ -83,6 +88,7 @@ export const DEFAULT_MANGA_READER_SETTINGS: MangaReaderSettings = {
   hoverHintsEnabled: false,
   showSidebarByDefault: false,
   showPagePreviews: false,
+  autoOcr: true,
   autoTranslate: true,
   detectionSensitivity: 'normal',
   theme: 'app-default',
@@ -126,6 +132,9 @@ export function loadMangaReaderSettings(): MangaReaderSettings {
     }
     if (!Number.isFinite(merged.spreadPageCount) || merged.spreadPageCount < 1) {
       merged.spreadPageCount = 1;
+    }
+    if (typeof merged.autoOcr !== 'boolean') {
+      merged.autoOcr = DEFAULT_MANGA_READER_SETTINGS.autoOcr;
     }
     if (typeof merged.autoTranslate !== 'boolean') {
       merged.autoTranslate = DEFAULT_MANGA_READER_SETTINGS.autoTranslate;

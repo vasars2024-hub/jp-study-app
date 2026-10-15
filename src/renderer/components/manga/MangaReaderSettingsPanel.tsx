@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Tabs, Slider, Select, Toggle } from '../ui';
 import { useT } from '../../i18n';
+import { useMangaOcrUi } from '../../mangaOcrUiStrings';
 import {
   CUBARI_THEME_COLORS,
   DEFAULT_MANGA_READER_SETTINGS,
@@ -34,6 +35,7 @@ const PAGE_FIT_MODES: PageFitMode[] = [
 
 export default function MangaReaderSettingsPanel({ settings, onChange, onClose }: Props) {
   const { t } = useT();
+  const { mt } = useMangaOcrUi();
   const [tab, setTab] = useState('display');
 
   const tabs = [
@@ -313,6 +315,15 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
 
           {tab === 'ocr' && (
             <>
+              <div className="manga-settings-row manga-settings-row-toggle">
+                <Toggle
+                  checked={settings.autoOcr}
+                  data-manga-auto-ocr-setting=""
+                  onChange={(e) => onChange({ autoOcr: e.target.checked })}
+                  label={mt('mangaOcrUi.autoOcr')}
+                />
+              </div>
+              <p className="muted manga-settings-hint">{mt('mangaOcrUi.autoOcr.hint')}</p>
               <div className="manga-settings-row manga-settings-row-toggle">
                 <Toggle
                   checked={settings.autoTranslate}
