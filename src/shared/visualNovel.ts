@@ -164,6 +164,20 @@ export interface VisualNovelSettings {
   reader: VisualNovelReaderSettings;
   /** Cleanup and the user's regex filters, applied to every hooked or copied line before it is saved. */
   lineFilters: Vn5LineFilters;
+  /** Attach a picture of the game window to every line captured live. Off by default. */
+  lineScreenshots: boolean;
+  /** The window that picture is taken of, by title; '' = the window in front when the line arrives. */
+  screenshotWindow: string;
+  /**
+   * Attach each line's voice: while capturing, keep a short replay buffer of
+   * the system audio and cut the clip between one line and the next. Off by default.
+   */
+  lineAudio: boolean;
+  /**
+   * For games without a text hook: read the game's text box with the Reading
+   * Lens watch region and capture each new line it reads. Off by default.
+   */
+  ocrCapture: boolean;
 }
 
 export type VisualNovelSettingsPatch = Partial<Omit<VisualNovelSettings, 'reader' | 'lineFilters'>> & {
@@ -354,6 +368,10 @@ export const DEFAULT_VISUAL_NOVEL_SETTINGS: VisualNovelSettings = {
   localeEmulatorPath: '',
   reader: { opacity: 0.94, fontSize: 20, bounds: null, autoShow: true },
   lineFilters: VN5_DEFAULT_LINE_FILTERS,
+  lineScreenshots: false,
+  screenshotWindow: '',
+  lineAudio: false,
+  ocrCapture: false,
 };
 
 function finiteIn(value: unknown, min: number, max: number, fallback: number): number {
@@ -409,6 +427,10 @@ export function normalizeVisualNovelSettings(value: unknown): VisualNovelSetting
       autoShow: reader.autoShow !== false,
     },
     lineFilters: vn5NormalizeLineFilters(raw.lineFilters),
+    lineScreenshots: raw.lineScreenshots === true,
+    screenshotWindow: clean(raw.screenshotWindow).slice(0, 300),
+    lineAudio: raw.lineAudio === true,
+    ocrCapture: raw.ocrCapture === true,
   };
 }
 

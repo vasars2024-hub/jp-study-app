@@ -12,12 +12,14 @@
  *                  websocket extension, Agent, LunaTranslator, …) pushes each
  *                  line over `ws://localhost:<port>`; main is the client.
  *   - hook       — the older file relay: tail a text file a hooker writes.
+ *   - ocr        — for games no hook reaches: the Reading Lens watches the
+ *                  game's text box and reads each new line off the screen.
  *
  * Nothing here bundles or launches a hooker. Textractor is GPL and is never
  * shipped; the user installs whatever tool they prefer.
  */
 
-export type VisualNovelCaptureSource = 'clipboard' | 'websocket' | 'hook';
+export type VisualNovelCaptureSource = 'clipboard' | 'websocket' | 'hook' | 'ocr';
 export type VisualNovelWebsocketStatus = 'off' | 'connecting' | 'connected' | 'error';
 
 /** The de-facto default port texthooker pages connect to. */
@@ -52,6 +54,16 @@ export interface VisualNovelCaptureState {
   filtered?: number;
   /** What `lastError` means, for the UI to say it in the user's language. */
   lastErrorCode?: VisualNovelErrorCode | '';
+  /**
+   * Reading the text box off the screen (games without a text hook):
+   * `pending` until the Lens has a region to watch, `lens-off` when the
+   * Reading Lens is switched off. Absent or `off` when not asked for.
+   */
+  ocr?: 'off' | 'pending' | 'watching' | 'lens-off';
+  /** The per-line voice clips' replay buffer: `error` when system audio could not be captured. */
+  audio?: 'off' | 'on' | 'error';
+  /** A picture is attached to every captured line. */
+  screenshots?: boolean;
 }
 
 // ---- error codes -------------------------------------------------------------

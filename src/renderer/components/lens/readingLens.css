@@ -1219,3 +1219,102 @@ button.lens-read-word:hover {
     transition: none;
   }
 }
+
+/* ---- Watch region ----
+   Nothing is drawn over the watched region (main samples those pixels to see
+   when the text changes): the frame sits just outside it, the read beside it. */
+
+.lens-watch-frame {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed rgba(178, 59, 71, 0.75);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.lens-watch-panel {
+  position: absolute;
+  box-sizing: border-box;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--lens-bg);
+  color: var(--lens-ink);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.lens-watch-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.lens-watch-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--lens-accent);
+  animation: lens-watch-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes lens-watch-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lens-watch-dot {
+    animation: none;
+  }
+}
+
+.lens-watch-title {
+  font-weight: 600;
+}
+
+.lens-watch-status {
+  flex: 1;
+  opacity: 0.72;
+}
+
+.lens-watch-head button {
+  min-height: 24px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--lens-ink);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.lens-watch-head button:hover,
+.lens-watch-head button:focus-visible {
+  background: var(--lens-accent);
+  color: #fff;
+}
+
+.lens-watch-text {
+  margin-top: 8px;
+  font-size: 20px;
+  line-height: 1.55;
+}
+
+.lens-watch-line {
+  margin: 0;
+}
+
+.lens-watch-hint,
+.lens-watch-error {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  opacity: 0.8;
+}
+
+.lens-watch-error {
+  color: #ffb3ba;
+  opacity: 1;
+}

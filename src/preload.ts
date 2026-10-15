@@ -3410,6 +3410,10 @@ const api = {
     ipcRenderer.invoke('visual-novel:art', url),
   visualNovelCaptureState: (): Promise<import('./shared/visualNovelCapture').VisualNovelCaptureState> =>
     ipcRenderer.invoke('visual-novel:captureState'),
+  /** Titles of the open windows a line's screenshot can be taken of. */
+  visualNovelCaptureWindows: (): Promise<string[]> => ipcRenderer.invoke('visual-novel:captureWindows'),
+  /** Ask the Reading Lens to watch the game's text box for the running capture. */
+  visualNovelOcrWatch: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('visual-novel:ocrWatch'),
   visualNovelCaptureStart: (
     id: string,
     options?: { test?: boolean },
@@ -3708,6 +3712,24 @@ const api = {
     ipcRenderer.send('lens:setInteractive', interactive);
   },
   lensClose: (): Promise<void> => ipcRenderer.invoke('lens:close'),
+  /** Watch region: start watching the region just read (main samples it and says when it changes). */
+  lensWatchStart: (region: { x: number; y: number; width: number; height: number }): Promise<{ ok: boolean; status: ReadingLensStatus }> =>
+    ipcRenderer.invoke('lens:watchStart', region),
+  lensWatchStop: (): Promise<ReadingLensStatus> => ipcRenderer.invoke('lens:watchStop'),
+  /** Hold sampling while the Lens's own popup covers the region. */
+  lensWatchPause: (paused: boolean): Promise<boolean> => ipcRenderer.invoke('lens:watchPause', paused),
+  /** A finished read of the watched region, for whoever asked for the watch. */
+  lensWatchText: (payload: { text: string }): Promise<boolean> => ipcRenderer.invoke('lens:watchText', payload),
+  onLensWatchChanged: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('lens:watchChanged', handler);
+    return () => ipcRenderer.removeListener('lens:watchChanged', handler);
+  },
+  onLensWatchStopped: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('lens:watchStopped', handler);
+    return () => ipcRenderer.removeListener('lens:watchStopped', handler);
+  },
 
   /**
    * Capture history. Main owns the store because the lens window is destroyed

@@ -9,6 +9,13 @@
  * session's reading speed, and one is mined into the deck from there with the line before
  * AND the line after it as context. The Capture setup's filter preview cleans a pasted
  * line. The in-memory clipboard (headless mode) is the second capture source.
+ *
+ * Then the per-line picture and voice (off by default): with both on, every hooked line
+ * gets a screenshot (headless: the harness's synthetic screen, never the real one) and the
+ * system-audio clip of its time span (headless: the page shim's synthetic tone, never the
+ * real system audio). And the OCR fallback for games without a hook: the Reading Lens
+ * watches the text box (drawn once on the synthetic screen) and what it reads is captured
+ * as lines.
  */
 const { installHelpers, poll, pollAsync } = require('./_lib.cjs');
 
@@ -29,6 +36,8 @@ const LINES = [
   { send: 'バイナリで届いた行です。', binary: true, japanese: 'バイナリで届いた行です。', speaker: '' },
 ];
 const MINE = '今日は雨ですね。';
+const MEDIA_LINES = ['声のある一行目です。', '声のある二行目です。'];
+const LENS = 'readingLens=1';
 const DECK = `(() => { const d = JSON.parse(localStorage.getItem('jp-flashcard-deck') || '{"cards":[]}'); return d.cards || d; })()`;
 
 module.exports = {
@@ -147,5 +156,86 @@ module.exports = {
     if (!stop) await ev(`window.api.visualNovelCaptureStop()`, { await: true });
     const off = await pollAsync(ctx, `window.api.visualNovelCaptureState().then((s) => !s || !s.active)`, 10000);
     result.check('"Stop capture" ends the session and lets the hook go', Boolean(off), { clientsLeft: hook.clients() });
+
+    // --- per-line picture and voice ------------------------------------------------------
+    result.check('pictures, voice and screen OCR are all off by default, and lines so far have none',
+      settings?.settings?.lineScreenshots === false && settings?.settings?.lineAudio === false && settings?.settings?.ocrCapture === false
+        && captures.every((c) => !c.screenshotPath && !c.audioPath),
+      { lineScreenshots: settings?.settings?.lineScreenshots, lineAudio: settings?.settings?.lineAudio, ocrCapture: settings?.settings?.ocrCapture });
+    await ev(`window.api.visualNovelUpdateSettings({ lineScreenshots: true, lineAudio: true })`, { await: true });
+    await ev(`window.api.visualNovelCaptureStart(${JSON.stringify(entry.id)})`, { await: true });
+    try {
+      await hook.waitForClient(1, 20000);
+    } catch {
+      /* the check below reports it */
+    }
+    const media = await pollAsync(ctx, `window.api.visualNovelCaptureState().then((s) => s && s.websocket === 'connected' && s.audio && s.audio !== 'off' ? s : null)`, 30000, 400);
+    result.check('with voice on, capture starts the system-audio replay buffer (headless: the synthetic tone)', media?.audio === 'on' && media?.screenshots === true, media && { audio: media.audio, screenshots: media.screenshots });
+    await ctx.sleep(2500); // let the buffer fill before the first line
+    for (const line of MEDIA_LINES) {
+      hook.send(line);
+      await ctx.sleep(2500);
+    }
+    await ev(`window.api.visualNovelCaptureStop()`, { await: true });
+    const withMedia = await pollAsync(ctx, `window.api.visualNovelList().then((d) => {
+      const all = ((d && (d.captures || d.database?.captures)) || []).filter((c) => ${JSON.stringify(MEDIA_LINES)}.includes(c.japanese));
+      return all.length === ${MEDIA_LINES.length} && all.every((c) => c.screenshotPath && c.audioPath) ? all.map((c) => ({ japanese: c.japanese, screenshotPath: c.screenshotPath, audioPath: c.audioPath })) : null;
+    })`, 30000, 500);
+    const mediaNow = withMedia ?? await ev(`window.api.visualNovelList().then((d) => ((d && (d.captures || d.database?.captures)) || []).filter((c) => ${JSON.stringify(MEDIA_LINES)}.includes(c.japanese)).map((c) => ({ japanese: c.japanese, screenshotPath: c.screenshotPath, audioPath: c.audioPath })))`, { await: true });
+    result.check('every line captured live gets its own screenshot and voice clip', Boolean(withMedia), mediaNow);
+    if (withMedia) {
+      const first = withMedia[0];
+      const image = await ev(`window.api.visualNovelReadCaptureImage(${JSON.stringify(first.screenshotPath)})`, { await: true });
+      const audio = await ev(`window.api.visualNovelReadCaptureAudio(${JSON.stringify(first.audioPath)})`, { await: true });
+      result.check('the stored screenshot and clip read back as an image and audio',
+        image?.ok === true && /^data:image\//.test(image.dataUrl ?? '') && audio?.ok === true && /^data:audio\//.test(audio.dataUrl ?? ''),
+        { image: image?.ok, imageType: (image?.dataUrl ?? '').slice(0, 22), audio: audio?.ok, audioType: (audio?.dataUrl ?? '').slice(0, 22) });
+      result.check('each line keeps its own clip', new Set(withMedia.map((c) => c.audioPath)).size === withMedia.length, withMedia.map((c) => c.audioPath));
+    }
+    const audioOff = await pollAsync(ctx, `window.api.captionsGetState ? window.api.captionsGetState().then((s) => (s && s.capture === 'off' ? true : null)) : Promise.resolve(true)`, 10000);
+    result.check('stopping capture lets the system-audio buffer go again', Boolean(audioOff));
+    await ev(`window.api.visualNovelUpdateSettings({ lineScreenshots: false, lineAudio: false })`, { await: true });
+
+    // --- OCR fallback: the Reading Lens watches the game's text box -----------------------
+    await ev(`window.api.lensSetEnabled(true)`, { await: true });
+    const lensEngines = await ev(`window.api.lensOcrEngineStatus()`, { await: true });
+    await ev(`window.api.lensSetDefaultEngine(${JSON.stringify(lensEngines?.manga ? 'manga' : 'web')})`, { await: true });
+    await ev(`window.api.visualNovelUpdateSettings({ ocrCapture: true, websocketEnabled: false })`, { await: true });
+    await ev(`window.api.visualNovelCaptureStart(${JSON.stringify(entry.id)})`, { await: true });
+    const inLens = (js, o = {}) => ctx.eval(js, { ...o, window: LENS });
+    const pending = await pollAsync(ctx, `window.api.visualNovelCaptureState().then((s) => s && s.ocr && s.ocr !== 'off' ? s.ocr : null)`, 10000);
+    const remembered = await ev(`window.api.lensGetSettings().then((s) => s && s.canRepeatRegion)`, { await: true });
+    if (!remembered) {
+      // A fresh profile: the Lens asks for the text box once.
+      const layer = await poll({ ...ctx, eval: (js) => inLens(js) }, `!!document.querySelector('.lens-select-layer')`, 20000);
+      result.check('with screen OCR on, capture opens the Reading Lens to choose the text box', pending === 'pending' && Boolean(layer), { pending, layer });
+      const init = await inLens(`window.api.lensGetInit()`, { await: true });
+      const bounds = init?.bounds ?? { width: 1920, height: 1080 };
+      const img = world.screen ?? { region: { x: 120, y: 200, width: 1680, height: 360 } };
+      const kx = bounds.width / 1920;
+      const ky = bounds.height / 1080;
+      const r = { x: Math.round(img.region.x * kx), y: Math.round(img.region.y * ky), w: Math.round(img.region.width * kx), h: Math.round(img.region.height * ky) };
+      const fire = (type, x, y, buttons) => inLens(`(() => { const el = document.querySelector('.lens-select-layer'); if (!el) return false; el.dispatchEvent(new MouseEvent(${JSON.stringify(type)}, { bubbles: true, cancelable: true, clientX: ${Math.round(x)}, clientY: ${Math.round(y)}, button: 0, buttons: ${buttons} })); return true; })()`);
+      await fire('mousedown', r.x, r.y, 1);
+      for (let i = 1; i <= 6; i++) {
+        await ctx.sleep(30);
+        await fire('mousemove', r.x + (r.w * i) / 6, r.y + (r.h * i) / 6, 1);
+      }
+      await ctx.sleep(60);
+      await fire('mouseup', r.x + r.w, r.y + r.h, 0);
+    } else {
+      result.check('with screen OCR on, capture asks the Reading Lens to watch the text box', pending === 'pending' || pending === 'watching', { pending });
+    }
+    const watching = await pollAsync(ctx, `window.api.visualNovelCaptureState().then((s) => s && s.ocr === 'watching' ? true : null)`, 120000, 500);
+    result.check('the Lens watches the chosen text box for the capture', Boolean(watching));
+    const ocrLine = await pollAsync(ctx, `window.api.visualNovelList().then((d) => { const c = ((d && (d.captures || d.database?.captures)) || []).filter((x) => x.visualNovelId === ${JSON.stringify(entry.id)} && x.source === 'ocr'); return c.length ? c.map((x) => x.japanese) : null; })`, 120000, 1000);
+    result.check('the text the Lens reads off the screen is captured as a line (source "ocr")', Boolean(ocrLine) && ocrLine.some((t) => /窓辺|猫|眠|雨/.test(t)), ocrLine);
+    await ctx.sleep(3000);
+    const ocrAgain = await ev(`window.api.visualNovelList().then((d) => ((d && (d.captures || d.database?.captures)) || []).filter((x) => x.visualNovelId === ${JSON.stringify(entry.id)} && x.source === 'ocr').length)`, { await: true });
+    result.check('the unchanged text box is not captured again', ocrAgain === (ocrLine ?? []).length, { first: (ocrLine ?? []).length, later: ocrAgain });
+    await ev(`window.api.visualNovelCaptureStop()`, { await: true });
+    const lensStopped = await pollAsync(ctx, `window.api.lensGetSettings().then((s) => (s && s.watching === false ? true : null))`, 10000);
+    result.check('stopping capture ends the Lens watch it started', Boolean(lensStopped));
+    await ev(`window.api.visualNovelUpdateSettings({ ocrCapture: false })`, { await: true });
   },
 };

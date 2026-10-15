@@ -23,6 +23,8 @@ import { ocrAuto, type AutoOcrLine, type AutoOcrResult, type OcrEngineChoice } f
 import { orderReadingLensLines } from '../shared/readingLensLineOrder';
 import { getMainStudyLang } from './studyLanguage';
 import { pickScreenSource } from './screenSources';
+import { isE2eHeadless } from './e2eHeadless';
+import { signatureFromBitmap, type RegionSignature } from './lensRegionWatch';
 
 export interface LensOcrLine {
   text: string;
@@ -142,7 +144,11 @@ async function ensureWebOcrModels(lang: PaddleLang): Promise<{
   const parent = `paddle-ocr-${lang}`;
   const before = summarizeAssetBundle(ids.map((id) => getAssetStatus(id)));
   let error: AssetError | undefined;
-  if (before.state !== 'busy' && before.state !== 'installed') {
+  // A headless test run never fetches a model pack on its own: the run must not
+  // depend on (or wait for) the network, and a pack landing mid-run would change
+  // what every later flow reads with. The offer is still returned, so the Lens
+  // shows its install button exactly as it would for a user.
+  if (before.state !== 'busy' && before.state !== 'installed' && !isE2eHeadless()) {
     try {
       const started = await startDownload(parent);
       if (!started.ok) error = started.error;
@@ -276,6 +282,46 @@ async function captureRegion(
   const crop = full.crop(px);
   if (crop.isEmpty()) return null;
   return { image: crop, scale };
+}
+
+/**
+ * The watch region's cheap look: the region at half the capture resolution,
+ * reduced to a grey-level grid (`lensRegionWatch.ts`). No OCR, no encoding.
+ *
+ * Inset a few DIP on every side so the watch frame the Lens draws just outside
+ * the region can never fall inside the sample, even on a fractional scale.
+ */
+const WATCH_SAMPLE_INSET = 3;
+
+export async function sampleRegionSignature(
+  region: RegionRect,
+  displayId: number,
+): Promise<RegionSignature | null> {
+  const display =
+    screen.getAllDisplays().find((d) => d.id === displayId) ?? screen.getPrimaryDisplay();
+  const sampleScale = Math.max(0.5, (display.scaleFactor || 1) / 2);
+  const thumbnailSize = {
+    width: Math.max(1, Math.round(display.bounds.width * sampleScale)),
+    height: Math.max(1, Math.round(display.bounds.height * sampleScale)),
+  };
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize });
+  if (!sources.length) return null;
+  const source = pickScreenSource(sources, screen.getAllDisplays(), display);
+  if (!source || source.thumbnail.isEmpty()) return null;
+  const full = source.thumbnail;
+  const scale = captureScale(display.bounds, full.getSize(), sampleScale);
+  if (!scale) return null;
+  const inset = Math.min(WATCH_SAMPLE_INSET, Math.floor(Math.min(region.width, region.height) / 4));
+  const px = regionToPixels(
+    { x: region.x + inset, y: region.y + inset, width: region.width - inset * 2, height: region.height - inset * 2 },
+    scale,
+    full.getSize(),
+  );
+  if (!px) return null;
+  const crop = full.crop(px);
+  if (crop.isEmpty()) return null;
+  const size = crop.getSize();
+  return signatureFromBitmap(new Uint8Array(crop.toBitmap()), size.width, size.height);
 }
 
 // ---- Adaptive zoom ------------------------------------------------------

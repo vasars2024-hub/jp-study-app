@@ -153,6 +153,8 @@ const ocrCalls: unknown[][] = [];
 const ocrImpl: { current: null | ((region: unknown, displayId: unknown, opts: unknown) => Promise<unknown>) } = { current: null };
 vi.mock('../screenOcr', () => ({
   ocrClipboardImage: async () => h.env.clipOcr,
+  // The watch region's sampler: a blank grid, so no change is ever seen here.
+  sampleRegionSignature: async () => ({ width: 1, height: 1, cells: new Uint8Array(1) }),
   ocrRegion: async (...args: unknown[]) => {
     ocrCalls.push(args);
     if (ocrImpl.current) return ocrImpl.current(args[0], args[1], args[2]);
@@ -1037,5 +1039,126 @@ describe('default OCR engine', () => {
     installed.manga = true;
     installed.web = true;
     installed.webLangs = ['ja'];
+  });
+});
+
+describe('watch region', () => {
+  async function booted() {
+    const m = await load();
+    m.startReadingLens();
+    m.registerReadingLensIpc();
+    return m;
+  }
+  const init = (): { mode: string; region?: unknown; watch?: boolean } =>
+    h.ipc.handlers.get('lens:getInit')!() as never;
+  const status = async (): Promise<{ watching: boolean }> =>
+    (await h.ipc.handlers.get('lens:getSettings')!()) as never;
+  const scan = async (region: Record<string, unknown>): Promise<void> => {
+    await h.ipc.handlers.get('lens:open')!({}, 'select');
+    await h.ipc.handlers.get('lens:ocr')!({}, region);
+  };
+  const REGION = { x: 100, y: 200, width: 300, height: 80 };
+
+  it('a watch open replays the remembered region and asks the Lens to watch it', async () => {
+    await booted();
+    await scan(REGION);
+    await h.ipc.handlers.get('lens:open')!({}, 'watch');
+    expect(init()).toMatchObject({ mode: 'repeat', region: REGION, watch: true });
+  });
+
+  it('with nothing remembered, a watch open is a selection whose region will be watched', async () => {
+    await booted();
+    await h.ipc.handlers.get('lens:open')!({}, 'watch');
+    expect(init().mode).toBe('select');
+    expect(init().watch).toBe(true);
+    expect(init().region).toBeUndefined();
+  });
+
+  it('starts watching the region the Lens read, on its display, and reports it', async () => {
+    const m = await booted();
+    await scan(REGION);
+    const res = (await h.ipc.handlers.get('lens:watchStart')!({}, REGION)) as { ok: boolean };
+    expect(res.ok).toBe(true);
+    expect((await status()).watching).toBe(true);
+    expect(m.__readingLensTestables.activeWatch()).toEqual({ region: { displayId: 7, ...REGION }, origin: 'user' });
+    expect(m.lensWatchActive()).toBe(true);
+    m.stopReadingLens();
+  });
+
+  it('refuses to watch while the Lens is switched off (it is opt-in)', async () => {
+    const m = await booted();
+    await scan(REGION);
+    await h.ipc.handlers.get('lens:setEnabled')!({}, false);
+    const res = (await h.ipc.handlers.get('lens:watchStart')!({}, REGION)) as { ok: boolean };
+    expect(res.ok).toBe(false);
+    expect(m.startLensWatch('visual-novel')).toBe(false);
+    expect((await status()).watching).toBe(false);
+  });
+
+  it('switching the Lens off ends a running watch', async () => {
+    await booted();
+    await scan(REGION);
+    await h.ipc.handlers.get('lens:watchStart')!({}, REGION);
+    await h.ipc.handlers.get('lens:setEnabled')!({}, false);
+    expect((await status()).watching).toBe(false);
+  });
+
+  it('closing the Lens ends the watch, tells the Lens and the listeners', async () => {
+    const m = await booted();
+    const seen: boolean[] = [];
+    m.onLensWatchState((watching) => seen.push(watching));
+    await scan(REGION);
+    await h.ipc.handlers.get('lens:watchStart')!({}, REGION);
+    await h.ipc.handlers.get('lens:close')!();
+    expect((await status()).watching).toBe(false);
+    expect(seen).toEqual([true, false]);
+    expect(h.sent.some((s) => s.channel === 'lens:watchStopped')).toBe(true);
+  });
+
+  it('a new open ends the previous watch', async () => {
+    await booted();
+    await scan(REGION);
+    await h.ipc.handlers.get('lens:watchStart')!({}, REGION);
+    await h.ipc.handlers.get('lens:open')!({}, 'select');
+    expect((await status()).watching).toBe(false);
+  });
+
+  it("hands each read to the caller that asked for the watch, and only that caller's stop ends it", async () => {
+    const m = await booted();
+    await scan(REGION);
+    const texts: Array<{ text: string; origin: string }> = [];
+    m.onLensWatchText((event) => texts.push({ text: event.text, origin: event.origin }));
+    expect(m.startLensWatch('visual-novel')).toBe(true);
+    expect(init()).toMatchObject({ mode: 'repeat', watch: true });
+    await h.ipc.handlers.get('lens:watchStart')!({}, REGION);
+    expect(await h.ipc.handlers.get('lens:watchText')!({}, { text: '  今日は雨ですね。 ' })).toBe(true);
+    expect(texts).toEqual([{ text: '今日は雨ですね。', origin: 'visual-novel' }]);
+    // Empty reads and reads with no watch running are not handed on.
+    expect(await h.ipc.handlers.get('lens:watchText')!({}, { text: '   ' })).toBe(false);
+    m.stopLensWatch('user');
+    expect(m.lensWatchActive()).toBe(true);
+    m.stopLensWatch('visual-novel');
+    expect(m.lensWatchActive()).toBe(false);
+    expect(await h.ipc.handlers.get('lens:watchText')!({}, { text: '次の行' })).toBe(false);
+  });
+
+  it("a capture session never stops a watch the reader started", async () => {
+    const m = await booted();
+    await scan(REGION);
+    await h.ipc.handlers.get('lens:watchStart')!({}, REGION);
+    m.stopLensWatch('visual-novel');
+    expect(m.lensWatchActive()).toBe(true);
+    m.stopReadingLens();
+  });
+
+  it('pausing and resuming answer only while a watch runs', async () => {
+    await booted();
+    expect(await h.ipc.handlers.get('lens:watchPause')!({}, true)).toBe(false);
+    await scan(REGION);
+    await h.ipc.handlers.get('lens:watchStart')!({}, REGION);
+    expect(await h.ipc.handlers.get('lens:watchPause')!({}, true)).toBe(true);
+    expect(await h.ipc.handlers.get('lens:watchPause')!({}, false)).toBe(true);
+    await h.ipc.handlers.get('lens:watchStop')!();
+    expect((await status()).watching).toBe(false);
   });
 });

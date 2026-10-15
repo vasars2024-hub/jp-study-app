@@ -16,8 +16,14 @@
  * globalShortcut exposes no key-up, so true press-and-hold is approximated by
  * "press → draw with the mouse", which is the natural snip interaction anyway).
  *
+ * Watch region (`lens.watch`): the region is picked once, then sampled cheaply
+ * (`lensRegionWatch.ts`) and read again whenever its pixels change and settle —
+ * a visual novel's text box without pressing "repeat" after every line. The
+ * new text is shown in the Lens and handed to whoever asked for the watch (the
+ * Visual Novels capture session uses it for games without a text hook).
+ *
  * The hotkeys (`lens.region`, `lens.auto`, `lens.repeat`, `lens.clipboard`,
- * `lens.atCursor`) belong to the one global-command registry
+ * `lens.atCursor`, `lens.watch`) belong to the one global-command registry
  * (`globalCommands.ts`) and are rebound in Settings → Shortcuts. The chord set
  * on the Lens's own settings page before that is carried over once
  * (`legacyKeys`); `settings.hotkey` is kept for that and nothing else.
@@ -36,6 +42,7 @@ import { refuseWhileLocked } from './lockGuard';
 import {
   ocrClipboardImage,
   ocrRegion,
+  sampleRegionSignature,
   type LensOcrResult,
   type LensOcrStage,
   type RegionRect,
@@ -76,6 +83,7 @@ import { mangaOcrAvailable } from './mangaOcr';
 import { createReadingLensClipboardCapture } from './readingLensClipboard';
 import { registerLexiconHandoffIpc } from './lexiconHandoff';
 import { registerReadingPassageHandoffIpc } from './readingPassageHandoff';
+import { createRegionWatcher, type RegionWatcher } from './lensRegionWatch';
 
 /**
  * The last region OCR'd, kept so `repeat` can re-scan it without a drag.
@@ -114,6 +122,18 @@ export interface ReadingLensStatus extends ReadingLensSettings {
   open: boolean;
   /** True only when `lastRegion` is replayable on a display that still exists. */
   canRepeatRegion: boolean;
+  /** A watch region is running (the Lens re-reads it when it changes). */
+  watching: boolean;
+}
+
+/** Who asked for the running watch: the reader, or a capture session reading through it. */
+export type LensWatchOrigin = 'user' | 'visual-novel';
+
+/** A finished read of the watched region, as the Lens showed it. */
+export interface LensWatchText {
+  text: string;
+  origin: LensWatchOrigin;
+  at: number;
 }
 
 /**
@@ -122,7 +142,7 @@ export interface ReadingLensStatus extends ReadingLensSettings {
  * OS-wide stand-in for the Chrome extension's hover lookup, which needs a
  * page to hook and has no equivalent for a game or a video.
  */
-export type LensOpenMode = 'select' | 'auto' | 'clipboard' | 'repeat' | 'cursor';
+export type LensOpenMode = 'select' | 'auto' | 'clipboard' | 'repeat' | 'cursor' | 'watch';
 
 /** The box `cursor` reads around the pointer, in DIP. */
 export const CURSOR_BOX = { width: 420, height: 132 } as const;
@@ -154,6 +174,12 @@ export interface LensInit {
   sourceApp?: string;
   /** `clipboard` with a picture on it that OCR could not read. */
   clipboardImageFailed?: boolean;
+  /**
+   * Start watching the region once it is read: a `watch` open either replays
+   * the remembered region (as `repeat`, with `region`) or, with nothing
+   * replayable, arrives as `select` so the region the reader draws is watched.
+   */
+  watch?: boolean;
 }
 
 const STATE_FILE = 'reading-lens.json';
@@ -316,7 +342,7 @@ export function resolveRepeatRegion(
 }
 
 function repeatTargetOf(mode: LensOpenMode): ReturnType<typeof resolveRepeatRegion> {
-  if (mode !== 'repeat') return null;
+  if (mode !== 'repeat' && mode !== 'watch') return null;
   return resolveRepeatRegion(settings.lastRegion, screen.getAllDisplays());
 }
 
@@ -350,10 +376,19 @@ function openLens(requestedMode: LensOpenMode, extras: LensOpenExtras = {}): voi
   // Every way in (hotkeys, wheel, IPC) ends here; the hotkeys are already refused
   // in globalCommands.ts, this covers the rest (lockGuard.ts).
   if (refuseWhileLocked('window:lens')) return;
+  // Every open is a new read: a watch still running belonged to the last one,
+  // and only a watch open carries a caller's request for the next one.
+  stopWatch();
+  if (requestedMode !== 'watch') pendingWatchOrigin = 'user';
   const repeat = repeatTargetOf(requestedMode);
   // A repeat with nothing replayable is an ordinary selection, decided here so
-  // the renderer never receives a `repeat` init it cannot honour.
-  const mode: LensOpenMode = requestedMode === 'repeat' && !repeat ? 'select' : requestedMode;
+  // the renderer never receives a `repeat` init it cannot honour. A watch is a
+  // repeat that keeps going: with no region it is a selection that, once
+  // drawn, is watched.
+  const watch = requestedMode === 'watch';
+  const mode: LensOpenMode = (requestedMode === 'repeat' || watch) && !repeat
+    ? 'select'
+    : watch ? 'repeat' : requestedMode;
   const display = repeat
     ? screen.getAllDisplays().find((d) => d.id === repeat.display.id) ?? displayUnderCursor()
     : displayUnderCursor();
@@ -384,6 +419,7 @@ function openLens(requestedMode: LensOpenMode, extras: LensOpenExtras = {}): voi
     defaultEngine: normalizeReadingLensEngine(settings.defaultEngine),
     ...(capture ? { capture } : {}),
     ...(extras.clipboardImageFailed ? { clipboardImageFailed: true } : {}),
+    ...(watch ? { watch: true } : {}),
     ...(cursor ? { region: cursor.region, point: cursor.point } : {}),
     ...(extras.source?.title ? { sourceTitle: extras.source.title } : {}),
     ...(extras.source?.process ? { sourceApp: extras.source.process } : {}),
@@ -449,6 +485,7 @@ function openLens(requestedMode: LensOpenMode, extras: LensOpenExtras = {}): voi
   });
   win.on('closed', () => {
     lens = null;
+    stopWatch();
   });
   win.webContents.on('did-finish-load', () => {
     if (!win.isDestroyed() && pendingInit) win.webContents.send('lens:open', pendingInit);
@@ -458,7 +495,136 @@ function openLens(requestedMode: LensOpenMode, extras: LensOpenExtras = {}): voi
 }
 
 function closeLens(): void {
+  // The Lens is where a watch shows its text: closing it ends the watch.
+  stopWatch();
   if (lens && !lens.isDestroyed()) lens.hide();
+}
+
+// ---- Watch region -------------------------------------------------------
+
+interface ActiveWatch {
+  region: LensRegionMemory;
+  origin: LensWatchOrigin;
+}
+
+let activeWatch: ActiveWatch | null = null;
+/** Bumped by every stop, so a start still taking its baseline knows it was overtaken. */
+let watchEpoch = 0;
+/** Who the next watch belongs to, set by a programmatic open before the reader draws. */
+let pendingWatchOrigin: LensWatchOrigin = 'user';
+let regionWatcher: RegionWatcher | null = null;
+const watchTextListeners = new Set<(text: LensWatchText) => void>();
+const watchStateListeners = new Set<(watching: boolean, origin: LensWatchOrigin | null) => void>();
+
+function sendToLens(channel: string, payload?: unknown): void {
+  try {
+    if (lens && !lens.isDestroyed()) lens.webContents.send(channel, payload);
+  } catch {
+    /* the lens closed in between */
+  }
+}
+
+function ensureWatcher(): RegionWatcher {
+  if (regionWatcher) return regionWatcher;
+  regionWatcher = createRegionWatcher({
+    sample: async () => {
+      const watch = activeWatch;
+      if (!watch) return null;
+      const { displayId, ...rect } = watch.region;
+      return sampleRegionSignature(rect, displayId);
+    },
+    // The Lens runs the read itself (the same scan a drag runs, with its
+    // engines, fallback and history), so main only says when.
+    onChange: () => sendToLens('lens:watchChanged', { at: Date.now() }),
+  });
+  return regionWatcher;
+}
+
+function notifyWatchState(): void {
+  const origin = activeWatch?.origin ?? null;
+  for (const listener of watchStateListeners) {
+    try {
+      listener(activeWatch !== null, origin);
+    } catch {
+      /* a listener's failure is its own */
+    }
+  }
+}
+
+async function startWatch(region: LensRegionMemory, origin: LensWatchOrigin): Promise<boolean> {
+  if (!settings.enabled) return false;
+  // The baseline is the region as it is now — the picture the Lens just read —
+  // taken before answering, so a change made right after the read is already a
+  // change rather than the starting point.
+  const { displayId, ...rect } = region;
+  const epoch = watchEpoch;
+  const baseline = await sampleRegionSignature(rect, displayId).catch(() => null);
+  // Closed, reopened or switched off while the baseline was taken.
+  if (!settings.enabled || epoch !== watchEpoch) return false;
+  activeWatch = { region, origin };
+  ensureWatcher().start(baseline);
+  broadcastSettings();
+  notifyWatchState();
+  return true;
+}
+
+function stopWatch(): void {
+  watchEpoch += 1;
+  if (!activeWatch) return;
+  activeWatch = null;
+  regionWatcher?.stop();
+  sendToLens('lens:watchStopped');
+  broadcastSettings();
+  notifyWatchState();
+}
+
+/**
+ * Watch a region for a caller other than the reader (the VN capture session):
+ * the remembered region when there is one, otherwise the Lens opens for the
+ * reader to draw it. False when the Lens is switched off — it is opt-in, and a
+ * capture session must not switch it on behind the user's back.
+ */
+export function startLensWatch(origin: LensWatchOrigin): boolean {
+  ensureSettings();
+  if (!settings.enabled) return false;
+  if (activeWatch) {
+    activeWatch = { ...activeWatch, origin };
+    notifyWatchState();
+    return true;
+  }
+  pendingWatchOrigin = origin;
+  openLens('watch');
+  return true;
+}
+
+/** End the watch, but only the caller's own: a session never stops a watch the reader started. */
+export function stopLensWatch(origin: LensWatchOrigin): void {
+  if (activeWatch?.origin === origin) closeLens();
+  if (pendingWatchOrigin === origin) pendingWatchOrigin = 'user';
+}
+
+export function lensWatchActive(): boolean {
+  return activeWatch !== null;
+}
+
+export function onLensWatchText(listener: (text: LensWatchText) => void): () => void {
+  watchTextListeners.add(listener);
+  return () => watchTextListeners.delete(listener);
+}
+
+export function onLensWatchState(listener: (watching: boolean, origin: LensWatchOrigin | null) => void): () => void {
+  watchStateListeners.add(listener);
+  return () => watchStateListeners.delete(listener);
+}
+
+/** `lens.watch`: start watching (the remembered region, or one drawn now), or stop. */
+async function toggleWatchFromHotkey(): Promise<void> {
+  if (activeWatch) {
+    closeLens();
+    return;
+  }
+  pendingWatchOrigin = 'user';
+  await openFromHotkey('watch');
 }
 
 // ---- Activation ---------------------------------------------------------
@@ -544,6 +710,7 @@ function ensureCommands(): void {
   registerGlobalCommand('lens.repeat', () => openFromHotkey('repeat'), { available });
   registerGlobalCommand('lens.clipboard', () => openClipboard(), { available });
   registerGlobalCommand('lens.atCursor', () => openFromHotkey('cursor'), { available });
+  registerGlobalCommand('lens.watch', () => toggleWatchFromHotkey(), { available });
 }
 
 function applyEnabledState(): { ok: boolean; error?: string } {
@@ -563,6 +730,7 @@ function getStatus(): ReadingLensStatus {
     // unplugged is stored but not replayable, and a Repeat control that is
     // enabled for it would open the lens and then silently do something else.
     canRepeatRegion: repeatTargetOf('repeat') !== null,
+    watching: activeWatch !== null,
   };
 }
 
@@ -591,6 +759,7 @@ export function startReadingLens(): void {
 
 export function stopReadingLens(): void {
   started = false;
+  stopWatch();
   refreshGlobalCommands();
   if (lens && !lens.isDestroyed()) lens.destroy();
   lens = null;
@@ -648,7 +817,46 @@ export function registerReadingLensIpc(): void {
     // OCR'd here too (openLens alone only reads clipboard text). No source
     // window: the caller is Gum's own UI, not the app the text came from.
     if (mode === 'clipboard') return openClipboard(null);
-    openLens(mode === 'auto' || mode === 'repeat' || mode === 'cursor' ? mode : 'select');
+    if (mode === 'watch') pendingWatchOrigin = 'user';
+    openLens(mode === 'auto' || mode === 'repeat' || mode === 'cursor' || mode === 'watch' ? mode : 'select');
+  });
+
+  // Watch region. The lens window starts it once the region has been read (so
+  // the first read is the baseline), stops it from its own controls, and pauses
+  // it while a popup of its own covers the region.
+  ipcMain.handle('lens:watchStart', async (_e, region: unknown): Promise<{ ok: boolean; status: ReadingLensStatus }> => {
+    const rect = region && typeof region === 'object' ? region as Record<string, unknown> : {};
+    const memory = normalizeLensRegionMemory({ ...rect, displayId: lensDisplayId });
+    if (!memory || !settings.enabled || !lens || lens.isDestroyed()) return { ok: false, status: getStatus() };
+    const origin = activeWatch?.origin ?? pendingWatchOrigin;
+    pendingWatchOrigin = 'user';
+    const ok = await startWatch(memory, origin);
+    return { ok, status: getStatus() };
+  });
+  ipcMain.handle('lens:watchStop', (): ReadingLensStatus => {
+    stopWatch();
+    return getStatus();
+  });
+  ipcMain.handle('lens:watchPause', (_e, paused: unknown): boolean => {
+    if (!activeWatch || !regionWatcher) return false;
+    if (paused === true) regionWatcher.pause();
+    else regionWatcher.resume();
+    return true;
+  });
+  ipcMain.handle('lens:watchText', (_e, payload: unknown): boolean => {
+    const watch = activeWatch;
+    const raw = payload && typeof payload === 'object' ? (payload as { text?: unknown }).text : undefined;
+    const text = typeof raw === 'string' ? raw.trim().slice(0, 4000) : '';
+    if (!watch || !text) return false;
+    const event: LensWatchText = { text, origin: watch.origin, at: Date.now() };
+    for (const listener of watchTextListeners) {
+      try {
+        listener(event);
+      } catch {
+        /* a listener's failure is its own */
+      }
+    }
+    return true;
   });
 
   ipcMain.handle('lens:getInit', (): LensInit | null => pendingInit);
@@ -767,6 +975,7 @@ export function registerReadingLensIpc(): void {
 
 export const __readingLensTestables = {
   loadSettings,
+  activeWatch: (): ActiveWatch | null => activeWatch,
   statePath,
   DEFAULTS,
   cursorRegion,

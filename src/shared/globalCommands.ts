@@ -28,6 +28,7 @@ export const GLOBAL_COMMAND_DEFAULTS: Readonly<Record<string, string>> = {
   'lens.region': 'Ctrl+Shift+Space',
   'lens.auto': '',
   'lens.repeat': '',
+  'lens.watch': '',
   'lens.clipboard': '',
   'vn.toggleCapture': '',
   // Snip to cards: pause / resume watching the clipboard for Win+Shift+S snips.
@@ -57,6 +58,7 @@ export const COMPANION_COMMAND_ORDER: readonly string[] = [
   'lens.region',
   'lens.auto',
   'lens.repeat',
+  'lens.watch',
   'lens.clipboard',
   'vn.toggleCapture',
   'snip.toggle',

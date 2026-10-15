@@ -72,7 +72,10 @@ beforeAll(async () => {
   installApiStub();
   CaptureBar = (await import('../components/immersion/VisualNovelCaptureControls')).VisualNovelCaptureBar;
   Panel = (await import('../components/immersion/VisualNovelPanel')).default;
-});
+  // Importing the whole Visual Novels panel graph cold takes seconds, and far
+  // longer when the suite runs beside many other workers; the default 10 s hook
+  // timeout used to fail this file under load with nothing actually wrong.
+}, 120_000);
 
 let root: Root | null = null;
 let host: HTMLDivElement;

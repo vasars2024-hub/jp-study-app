@@ -526,6 +526,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
       ['lens.region', 'Reading Lens: select a region', 'Drag a box over any app to read it. Press twice quickly to read the whole screen.'],
       ['lens.auto', 'Reading Lens: read the whole screen', 'Reads the display under the cursor without a drag.'],
       ['lens.repeat', 'Reading Lens: repeat the last region', 'Reads the same box again — for visual novels and games that keep text in one place.'],
+      ['lens.watch', 'Reading Lens: watch a region', 'Reads a box again by itself whenever its text changes — pick the region once (or reuse the last one). Press again to stop.'],
       ['lens.clipboard', 'Reading Lens: read the clipboard', 'Reads copied text, or a copied picture (a snip, a manga panel) with OCR.'],
       ['vn.toggleCapture', 'Start / stop visual novel text capture', 'Captures from the texthooker for the visual novel you are playing (or played last).'],
       ['snip.toggle', 'Snip to cards: pause / resume', 'Stops or restarts watching the clipboard for Win+Shift+S snips that become cards.'],
@@ -2425,6 +2426,7 @@ function builtinHandler(id: string): Handler | null {
     case 'lens.region':
     case 'lens.auto':
     case 'lens.repeat':
+    case 'lens.watch':
     case 'lens.clipboard':
     case 'vn.toggleCapture':
     case 'snip.toggle':

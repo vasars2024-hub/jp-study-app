@@ -6,6 +6,9 @@ import {
   SAME_SOURCE_BURST_MS,
   TEST_CAPTURE_MS,
   createCaptureSession,
+  isOcrRepeat,
+  ocrLineKey,
+  ocrLineSimilarity,
   type CaptureSocket,
 } from '../immersion/visualNovelCaptureSession';
 import type { VisualNovelCaptureState } from '../../shared/visualNovelCapture';
@@ -276,5 +279,89 @@ describe('line cleanup and filters in the session', () => {
     h.session.setLineFilters({ ...base, dedupeRecent: false });
     h.session.receive('二行目。', 'websocket');
     expect(h.saved).toHaveLength(3);
+  });
+});
+
+describe('OCR fallback: lines read off the screen by the Lens watch region', () => {
+  it('saves a new line read from the text box as an ocr line', () => {
+    const h = harness();
+    h.session.start('vn-1', { clipboard: false, websocket: false });
+    h.session.receive('紅莉栖「実験を始めよう。」', 'ocr');
+    expect(h.saved).toEqual([{
+      id: 'vn-1',
+      source: 'ocr',
+      lines: [{ japanese: '実験を始めよう。', speaker: '紅莉栖', kind: 'dialogue' }],
+    }]);
+    expect(h.session.state().lastLine?.source).toBe('ocr');
+  });
+
+  it('drops the same line read again, however much later and however it is spaced', () => {
+    const h = harness();
+    h.session.start('vn-1', { clipboard: false, websocket: false });
+    h.session.receive('今日はいい天気ですね。', 'ocr');
+    h.advance(10_000);
+    h.session.receive('今日は いい天気ですね', 'ocr');
+    h.session.receive('今日はいい天気ですね。', 'ocr');
+    expect(h.saved).toHaveLength(1);
+    // A re-read is not a filtered line: nothing the user asked for was dropped.
+    expect(h.session.state().filtered ?? 0).toBe(0);
+  });
+
+  it('drops a noisy re-read of the last line but keeps a genuinely new one', () => {
+    const h = harness();
+    h.session.start('vn-1', { clipboard: false, websocket: false });
+    h.session.receive('彼女は静かに窓の外を見つめていた。', 'ocr');
+    // One character misread, as OCR does on a second pass over the same box.
+    h.session.receive('彼女は静かに窓の外を見つめでいた。', 'ocr');
+    expect(h.saved).toHaveLength(1);
+    h.session.receive('雨はまだ止みそうにない。', 'ocr');
+    expect(h.saved).toHaveLength(2);
+  });
+
+  it('remembers several recent lines, so going back to an earlier box is not re-captured', () => {
+    const h = harness();
+    h.session.start('vn-1', { clipboard: false, websocket: false });
+    h.session.receive('一つ目の行です。', 'ocr');
+    h.session.receive('二つ目の行です。', 'ocr');
+    h.session.receive('一つ目の行です。', 'ocr');
+    expect(h.saved).toHaveLength(2);
+  });
+
+  it('keeps OCR and a text hook from saving the same line twice', () => {
+    const h = harness();
+    h.session.start('vn-1', { clipboard: false, websocket: false });
+    h.session.receive('同じ行。', 'websocket');
+    h.advance(1_000);
+    h.session.receive('同じ行。', 'ocr');
+    expect(h.saved).toHaveLength(1);
+  });
+
+  it('forgets the recent OCR lines when a new session starts', () => {
+    const h = harness();
+    h.session.start('vn-1', { clipboard: false, websocket: false });
+    h.session.receive('最初の行。', 'ocr');
+    h.session.stop();
+    h.session.start('vn-1', { clipboard: false, websocket: false });
+    h.session.receive('最初の行。', 'ocr');
+    expect(h.saved).toHaveLength(2);
+  });
+
+  it('compares lines by their characters only', () => {
+    expect(ocrLineKey(' 「はい。」 ')).toBe('はい');
+    expect(ocrLineSimilarity('あいうえお', 'あいうえお')).toBe(1);
+    expect(ocrLineSimilarity('あいうえお', 'かきくけこ')).toBe(0);
+    expect(isOcrRepeat('。。。', [])).toBe(true);
+    expect(isOcrRepeat('新しい行', [])).toBe(false);
+  });
+});
+
+describe('capture extras status', () => {
+  it('publishes the OCR, voice and picture state only while a session runs', () => {
+    const h = harness();
+    expect(h.session.setStatus({ ocr: 'watching' }).ocr).toBeUndefined();
+    h.session.start('vn-1', { clipboard: true, websocket: false });
+    const next = h.session.setStatus({ ocr: 'pending', audio: 'on', screenshots: true });
+    expect(next).toMatchObject({ ocr: 'pending', audio: 'on', screenshots: true });
+    expect(h.states[h.states.length - 1]).toMatchObject({ ocr: 'pending' });
   });
 });

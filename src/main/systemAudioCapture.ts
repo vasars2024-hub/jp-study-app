@@ -551,6 +551,32 @@ export async function mineRecent(seconds?: number): Promise<{ ok: boolean; draft
   return draftFromCut(cut, 'recent', title);
 }
 
+/** Whether the replay buffer is running (a caller that keeps its own timeline checks before cutting). */
+export function systemAudioCaptureOn(): boolean {
+  return capture === 'on';
+}
+
+/**
+ * The system audio between two wall times, encoded as a card clip — for a
+ * caller that keeps its own timeline of what was on screen (a visual novel's
+ * captured lines). Null when capture is off, the span has already left the
+ * buffer, or nothing audible was playing.
+ */
+export async function cutSystemAudio(
+  startMs: number,
+  endMs: number,
+): Promise<{ bytes: Buffer; extension: 'mp3' | 'wav' } | null> {
+  if (capture !== 'on' || !Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null;
+  const cut = await hostRequest<CutResult>({ type: 'cut', mode: 'range', startMs, endMs });
+  if (!cut?.ok || cut.silent || !cut.wavBase64) return null;
+  const audio = await audioForCut(cut);
+  if (!audio.audioBase64) return null;
+  return {
+    bytes: Buffer.from(audio.audioBase64, 'base64'),
+    extension: audio.audioMime === 'audio/mpeg' ? 'mp3' : 'wav',
+  };
+}
+
 let recordingTimer: NodeJS.Timeout | null = null;
 /** A Record press is still bringing capture up (a second or two from off). */
 let recordingStarting = false;

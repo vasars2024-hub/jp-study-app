@@ -4,6 +4,7 @@ import { pickLensWordAt } from './lensWordAt';
 import LensAnalysisPanel from './LensAnalysisPanel';
 import LensClipboardPassage from './LensClipboardPassage';
 import LensReadPanel from './LensReadPanel';
+import LensWatchPanel, { type LensWatchLine } from './LensWatchPanel';
 import AssetInstallPrompt from '../AssetInstallPrompt';
 import { useT } from '../../i18n';
 import { handOffToAgent, readingPassageAgentContext } from '../../agentContextHandoff';
@@ -309,6 +310,19 @@ export default function ReadingLensOverlay() {
   const scanSeqRef = useRef(0);
   /** Stops the bundled recognizer's remaining passes when the reader cancels. */
   const scanAbortRef = useRef<AbortController | null>(null);
+  /**
+   * Watch region: the region main is sampling, and the engine its reads use.
+   * While set, nothing is painted over the region (see `LensWatchPanel`).
+   */
+  const [watch, setWatch] = useState<{ region: Rect; engine: 'auto' | 'manga' | 'web' } | null>(null);
+  const watchRef = useRef(watch);
+  watchRef.current = watch;
+  /** This open asked to watch: the first read of its region starts the watch. */
+  const watchPendingRef = useRef(false);
+  /** The last read already handed to main, so a re-render does not send it twice. */
+  const watchSentRef = useRef('');
+  /** The newest watched read, kept on screen while the next one is taken. */
+  const [watchLines, setWatchLines] = useState<LensWatchLine[]>([]);
 
   const setInteractive = useCallback((on: boolean) => {
     if (interactiveRef.current === on) return;
@@ -326,6 +340,9 @@ export default function ReadingLensOverlay() {
 
   const close = useCallback(() => {
     stopScan();
+    watchPendingRef.current = false;
+    setWatch(null);
+    setWatchLines([]);
     setPopup(null);
     setAnalysisText(null);
     setReadOpen(false);
@@ -442,6 +459,11 @@ export default function ReadingLensOverlay() {
     // instead of reaching `lens:ocr` as a string no engine answers to.
     defaultEngineRef.current = normalizeReadingLensEngine(init.defaultEngine);
     interactiveRef.current = true; // main re-enabled the mouse on open
+    // A new open ends any watch (main stopped it); `watch` asks for a new one.
+    watchPendingRef.current = init.watch === true;
+    watchSentRef.current = '';
+    setWatch(null);
+    setWatchLines([]);
     sourceRef.current = { title: init.sourceTitle, app: init.sourceApp };
     cursorPointRef.current = init.mode === 'cursor' && init.region && init.point ? init.point : null;
     if (init.mode === 'clipboard') {
@@ -797,6 +819,82 @@ export default function ReadingLensOverlay() {
     return () => window.removeEventListener('mousemove', onMove);
   }, [state.kind, setInteractive, resizing, readOpen]);
 
+  // ---- Watch region ------------------------------------------------------
+
+  const startWatch = useCallback((region: Rect, engine: 'auto' | 'manga' | 'web') => {
+    watchPendingRef.current = false;
+    void window.api
+      .lensWatchStart({ x: region.x, y: region.y, width: region.width, height: region.height })
+      .then((res) => {
+        if (res?.ok) setWatch({ region, engine });
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const stopWatch = useCallback(() => {
+    watchPendingRef.current = false;
+    setWatch(null);
+    setWatchLines([]);
+    void window.api.lensWatchStop().catch(() => undefined);
+  }, []);
+
+  // An open that asked to watch starts once its region has been read — the
+  // read on screen is the baseline every change is measured against. A region
+  // that is empty right now (a text box between lines) is watched all the same.
+  useEffect(() => {
+    if (!watchPendingRef.current) return;
+    if (state.kind === 'reading') {
+      const engine: 'auto' | 'manga' | 'web' =
+        state.engine === 'manga' || state.engine === 'web' ? state.engine : defaultEngineRef.current;
+      startWatch(state.region, engine);
+    } else if (state.kind === 'empty') {
+      startWatch(state.region, defaultEngineRef.current);
+    }
+  }, [state, startWatch]);
+
+  // Main saw the region change and settle: read it again. A new scanning state
+  // always, so a read still running on the old pixels is superseded.
+  useEffect(() => {
+    const offChanged = window.api.onLensWatchChanged?.(() => {
+      const current = watchRef.current;
+      if (!current) return;
+      setState({ kind: 'scanning', region: current.region, engine: current.engine });
+    });
+    const offStopped = window.api.onLensWatchStopped?.(() => {
+      watchPendingRef.current = false;
+      setWatch(null);
+      setWatchLines([]);
+    });
+    return () => {
+      offChanged?.();
+      offStopped?.();
+    };
+  }, []);
+
+  // The Lens's own popups can cover the region; sampling waits until they close
+  // so a dictionary card is never mistaken for the game's next line.
+  const watchBlocked = Boolean(popup || analysisText || readOpen || editMode);
+  useEffect(() => {
+    if (!watch) return;
+    void window.api.lensWatchPause(watchBlocked).catch(() => undefined);
+  }, [watch, watchBlocked]);
+
+  // Each new read of the watched region is shown, and handed to main for the
+  // caller that asked for the watch (a visual novel's capture session).
+  useEffect(() => {
+    if (!watch) return;
+    if (state.kind === 'reading') {
+      setWatchLines(state.lines.map((line) => ({ text: line.text, tokens: line.tokens })));
+      const text = state.capture.text.trim();
+      if (text && text !== watchSentRef.current) {
+        watchSentRef.current = text;
+        void window.api.lensWatchText({ text }).catch(() => undefined);
+      }
+    } else if (state.kind === 'empty') {
+      setWatchLines([]);
+    }
+  }, [watch, state]);
+
   // Auto-dismiss so a finished read never lingers on screen. The fragments
   // ghost out — then the lens closes itself — once the cursor wanders away from
   // the text (not over any fragment, the panel, or the chrome, and not within a
@@ -823,7 +921,9 @@ export default function ReadingLensOverlay() {
       editMode ||
       resizeRect ||
       pinned ||
-      readOpen
+      readOpen ||
+      // A watch is a standing read: it stays until the reader stops it.
+      watch
     ) {
       setDimmed(false);
       return;
@@ -869,7 +969,7 @@ export default function ReadingLensOverlay() {
       window.removeEventListener('mousemove', onMove);
       clear();
     };
-  }, [state, popup, analysisText, editMode, resizeRect, pinned, readOpen, close]);
+  }, [state, popup, analysisText, editMode, resizeRect, pinned, readOpen, close, watch]);
 
   // ---- Region resize -----------------------------------------------------
 
@@ -1263,7 +1363,9 @@ export default function ReadingLensOverlay() {
             />
           ) : (
             <div className="lens-select-hint">
-              <div className="lens-select-hint-title">{t('lens.select.hint')}</div>
+              <div className="lens-select-hint-title">
+                {watchPendingRef.current ? t('lensOcr.watch.selectHint') : t('lens.select.hint')}
+              </div>
               <div className="lens-select-hint-sub">{t('lens.select.sub')}</div>
               <button
                 type="button"
@@ -1281,7 +1383,7 @@ export default function ReadingLensOverlay() {
       {/* Scanning — paints nothing at all until the capture is taken (the pill
           would be in the screenshot), then says where the read is and offers
           Cancel. */}
-      {state.kind === 'scanning' && scanProgress && scanProgress.stage !== 'capturing' && (
+      {state.kind === 'scanning' && !watch && scanProgress && scanProgress.stage !== 'capturing' && (
         <div className="lens-status-pill lens-scanning" role="status">
           <span className="lens-scan-label">
             {scanProgress.stage === 'basic'
@@ -1296,8 +1398,31 @@ export default function ReadingLensOverlay() {
         </div>
       )}
 
+      {/* Watching — the latest read beside the region, never over it. */}
+      {watch && (
+        <LensWatchPanel
+          t={t}
+          region={watch.region}
+          viewport={viewport()}
+          lines={watchLines}
+          status={
+            state.kind === 'scanning'
+              ? 'reading'
+              : state.kind === 'error'
+                ? 'error'
+                : state.kind === 'empty'
+                  ? 'empty'
+                  : 'ready'
+          }
+          message={state.kind === 'error' ? state.message : undefined}
+          onWordClick={(event, surface, context, tokens) => onWordClick(event, surface, context, tokens)}
+          onStop={stopWatch}
+          onClose={close}
+        />
+      )}
+
       {/* Reading — interactive text over each detected line. */}
-      {state.kind === 'reading' && (
+      {state.kind === 'reading' && !watch && (
         <>
           {/*
             The frame previews the rectangle being resized while the fragments
@@ -1413,6 +1538,7 @@ export default function ReadingLensOverlay() {
             dockSide={resolveLensChromeDock(state.region, viewport(), dock)}
             onCycleDock={cycleDock}
             onRescan={rescan}
+            onWatch={() => startWatch(state.region, scanEngineOf(state.engine))}
             alternateEngine={state.alternate?.engine}
             onUseAlternate={state.alternate ? useAlternate : undefined}
             onNewRegion={() => setState({ kind: 'selecting' })}
@@ -1464,7 +1590,7 @@ export default function ReadingLensOverlay() {
       )}
 
       {/* Empty / error messages live inside the region. */}
-      {(state.kind === 'empty' || state.kind === 'error') && (
+      {(state.kind === 'empty' || state.kind === 'error') && !watch && (
         <div
           className="lens-message lens-interactive"
           style={
@@ -1592,6 +1718,7 @@ export function LensChrome({
   alternateEngine,
   onUseAlternate,
   onNewRegion,
+  onWatch,
   onClose,
   onAskAgent,
   lookUpState = 'idle',
@@ -1630,6 +1757,8 @@ export function LensChrome({
   /** Swaps the alternate in with no second OCR pass. Absent when there is none. */
   onUseAlternate?: () => void;
   onNewRegion: () => void;
+  /** Keep reading this region by itself whenever its text changes. */
+  onWatch?: () => void;
   onClose: () => void;
   onAskAgent: () => void;
   lookUpState?: 'idle' | 'sending' | 'error';
@@ -1786,6 +1915,11 @@ export function LensChrome({
       <button type="button" onClick={onNewRegion} title={t('lens.action.newRegion')}>
         {t('lens.action.newRegion')}
       </button>
+      {onWatch && (
+        <button type="button" className="lens-watch-start" onClick={onWatch} title={t('lensOcr.watch.startHint')}>
+          {t('lensOcr.watch.start')}
+        </button>
+      )}
       {onCycleDock && (
         <button
           type="button"

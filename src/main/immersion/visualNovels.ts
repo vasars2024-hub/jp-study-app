@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, clipboard, desktopCapturer, dialog, ipcMain, screen, shell } from 'electron';
 import { execFile, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -75,6 +75,23 @@ import {
 import { registerGlobalCommand } from '../globalCommands';
 import { showCompanionNotice } from '../companion';
 import { mt } from '../i18n';
+import { createLineMediaAttacher, type LineMediaPatch } from './visualNovelLineMedia';
+import { boundedScreenshotDataUrl } from '../screenOcr';
+import { pickScreenSource } from '../screenSources';
+import { quickForegroundInfo } from '../companionContext';
+import {
+  cutSystemAudio,
+  startCapture as startSystemAudio,
+  stopCapture as stopSystemAudio,
+  systemAudioCaptureOn,
+} from '../systemAudioCapture';
+import {
+  lensWatchActive,
+  onLensWatchState,
+  onLensWatchText,
+  startLensWatch,
+  stopLensWatch,
+} from '../readingLens';
 
 const MAX_SCAN_FILES = 3_000;
 const MAX_SCAN_DEPTH = 4;
@@ -566,7 +583,7 @@ function saveCapturedLines(
     chapter: entry.currentChapter,
     scene: entry.currentScene,
     // A websocket texthooker is a text hook too, so it stays within the stored union.
-    source: source === 'clipboard' ? 'clipboard' as const : 'hook' as const,
+    source: source === 'clipboard' ? 'clipboard' as const : source === 'ocr' ? 'ocr' as const : 'hook' as const,
     // The session has already dropped duplicate deliveries; what is left is the
     // game really repeating a line, which belongs in the log like any other.
   })), () => crypto.randomUUID(), Date.now(), { keepRepeats: true });
@@ -575,6 +592,9 @@ function saveCapturedLines(
   if (added.length) {
     noteCaptured(id, added);
     saveDatabase(next);
+    // The picture and the voice are attached once they exist; the line itself
+    // is already saved, so a slow grab never holds the next line up.
+    void lineMedia.lineCaptured(added.map((capture) => capture.id));
   }
   return added.length;
 }
@@ -631,6 +651,9 @@ const captureSession = createCaptureSession({
   },
   savedLineContains,
   broadcast: (state) => {
+    // However the session ended (Stop, the hotkey, the game closing, the
+    // novel removed), its extras end with it.
+    if (!state.active && captureExtrasLive) endCaptureExtras();
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send('visual-novel:captureChanged', state);
     }
@@ -642,7 +665,7 @@ function startCapture(id: string, test = false) {
   const entry = database.entries.find((candidate) => candidate.id === id);
   if (!entry) throw new VisualNovelError('not-found', 'The visual novel does not exist.');
   const settings = visualNovelSettings(database);
-  return captureSession.start(id, {
+  captureSession.start(id, {
     // A test listens to both sources, so it can say which one is wired up.
     clipboard: test || entry.clipboardCapture,
     websocket: test || settings.websocketEnabled,
@@ -650,7 +673,175 @@ function startCapture(id: string, test = false) {
     test,
     lineFilters: settings.lineFilters,
   });
+  lineMedia.reset();
+  applyCaptureExtras(settings, test);
+  return captureSession.state();
 }
+
+// ---- per-line screenshot, voice clip and OCR -------------------------------
+
+/** The session's extras are running (and need ending when it stops). */
+let captureExtrasLive = false;
+/** Capture switched the system-audio buffer on, so capture switches it off again. */
+let systemAudioOwned = false;
+/** The game's window title the last time it, not Gum, was in front. */
+let lastGameWindowTitle = '';
+
+const LINE_SCREENSHOT_SIZE = { width: 1280, height: 720 };
+
+/**
+ * A picture of the game for a captured line: the window chosen in the
+ * settings, else the one in front (or, when Gum is in front, the game that
+ * last was). A game Windows does not list as a window (exclusive fullscreen)
+ * is taken from the screen it is on.
+ */
+async function grabLineScreenshot(): Promise<string> {
+  const settings = visualNovelSettings(loadDatabase());
+  let wanted = settings.screenshotWindow;
+  if (!wanted) {
+    const front = await quickForegroundInfo().catch(() => null);
+    if (front?.title && front.pid !== process.pid) lastGameWindowTitle = front.title;
+    wanted = lastGameWindowTitle;
+  }
+  let image: Electron.NativeImage | null = null;
+  if (wanted) {
+    const windows = await desktopCapturer.getSources({
+      types: ['window'],
+      thumbnailSize: LINE_SCREENSHOT_SIZE,
+      fetchWindowIcons: false,
+    });
+    const match = windows.find((source) => source.name === wanted)
+      ?? windows.find((source) => source.name.trim() === wanted.trim());
+    if (match && !match.thumbnail.isEmpty()) image = match.thumbnail;
+  }
+  if (!image) {
+    const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+    const ratio = display.bounds.height / Math.max(1, display.bounds.width);
+    const screens = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: LINE_SCREENSHOT_SIZE.width, height: Math.round(LINE_SCREENSHOT_SIZE.width * ratio) },
+    });
+    const source = pickScreenSource(screens, screen.getAllDisplays(), display) ?? screens[0];
+    if (source && !source.thumbnail.isEmpty()) image = source.thumbnail;
+  }
+  if (!image || image.isEmpty()) return '';
+  return saveCaptureScreenshot(boundedScreenshotDataUrl(image));
+}
+
+/** A line's voice, cut from the system-audio buffer and stored beside the screenshots. */
+async function cutLineAudio(startMs: number, endMs: number): Promise<string> {
+  const clip = await cutSystemAudio(startMs, endMs);
+  if (!clip || !clip.bytes.length || clip.bytes.length > MAX_CAPTURE_AUDIO_BYTES) return '';
+  const directory = captureImageDirectory();
+  await fs.promises.mkdir(directory, { recursive: true });
+  const filePath = path.join(directory, `${crypto.randomUUID()}.${clip.extension}`);
+  await fs.promises.writeFile(filePath, clip.bytes);
+  return filePath;
+}
+
+/** Write the stored files onto the lines; a picture or clip the user set by hand is kept. */
+function attachLineMedia(ids: readonly string[], patch: LineMediaPatch): void {
+  const wanted = new Set(ids);
+  const before = loadDatabase();
+  let changed = false;
+  const captures = before.captures.map((capture) => {
+    if (!wanted.has(capture.id)) return capture;
+    const next = { ...capture };
+    if (patch.screenshotPath && !capture.screenshotPath) next.screenshotPath = patch.screenshotPath;
+    if (patch.audioPath && !capture.audioPath) next.audioPath = patch.audioPath;
+    if (next.screenshotPath !== capture.screenshotPath || next.audioPath !== capture.audioPath) changed = true;
+    return next;
+  });
+  if (changed) {
+    saveDatabase({ ...before, captures });
+    return;
+  }
+  // The line was removed (or already had its own) before the file landed.
+  for (const file of [patch.screenshotPath, patch.audioPath]) {
+    if (file && isManagedCaptureAsset(file)) void fs.promises.unlink(file).catch(() => undefined);
+  }
+}
+
+const lineMedia = createLineMediaAttacher({
+  grabScreenshot: grabLineScreenshot,
+  cutAudio: cutLineAudio,
+  attach: attachLineMedia,
+  onError: (kind) => {
+    if (kind === 'audio' && !systemAudioCaptureOn()) captureSession.setStatus({ audio: 'error' });
+  },
+});
+
+/**
+ * Start (or, on a settings change, adjust) what a live session does beyond
+ * saving text: the per-line picture and voice, and reading the text box with
+ * the Reading Lens. A test session does none of it — it only answers "is my
+ * hooker wired up?".
+ */
+function applyCaptureExtras(settings: ReturnType<typeof visualNovelSettings>, test: boolean): void {
+  const live = captureSession.state();
+  if (!live.active) return;
+  const screenshot = !test && settings.lineScreenshots;
+  const audio = !test && settings.lineAudio;
+  const ocr = !test && settings.ocrCapture;
+  captureExtrasLive = screenshot || audio || ocr;
+  lineMedia.configure({ screenshot, audio });
+  captureSession.setStatus({ screenshots: screenshot });
+
+  if (audio) {
+    if (systemAudioCaptureOn()) {
+      captureSession.setStatus({ audio: 'on' });
+    } else {
+      captureSession.setStatus({ audio: 'off' });
+      void startSystemAudio().then((result) => {
+        if (!captureSession.state().active || !lineMedia.options().audio) {
+          if (result.ok) stopSystemAudio();
+          return;
+        }
+        if (result.ok) systemAudioOwned = true;
+        captureSession.setStatus({ audio: result.ok ? 'on' : 'error' });
+      }).catch(() => captureSession.setStatus({ audio: 'error' }));
+    }
+  } else {
+    releaseSystemAudio();
+    captureSession.setStatus({ audio: 'off' });
+  }
+
+  if (ocr) {
+    const asked = startLensWatch('visual-novel');
+    captureSession.setStatus({ ocr: !asked ? 'lens-off' : lensWatchActive() ? 'watching' : 'pending' });
+  } else {
+    stopLensWatch('visual-novel');
+    captureSession.setStatus({ ocr: 'off' });
+  }
+}
+
+function releaseSystemAudio(): void {
+  if (!systemAudioOwned) return;
+  systemAudioOwned = false;
+  stopSystemAudio();
+}
+
+function endCaptureExtras(): void {
+  captureExtrasLive = false;
+  // The last line's clip ends here, and the buffer goes once it is cut.
+  void lineMedia.flush().finally(() => {
+    if (!captureSession.state().active) releaseSystemAudio();
+  });
+  lineMedia.configure({ screenshot: false, audio: false });
+  stopLensWatch('visual-novel');
+}
+
+// What the Lens reads off the watched text box becomes a captured line.
+onLensWatchText(({ text, origin }) => {
+  const live = captureSession.state();
+  if (!live.active || live.test || origin !== 'visual-novel') return;
+  captureSession.receive(text, 'ocr');
+});
+onLensWatchState((watching, origin) => {
+  const live = captureSession.state();
+  if (!live.active || live.test || !live.ocr || live.ocr === 'off' || live.ocr === 'lens-off') return;
+  captureSession.setStatus({ ocr: watching && origin === 'visual-novel' ? 'watching' : 'pending' });
+});
 
 /**
  * The novel a capture hotkey means: the one the reader window is beside, else
@@ -1474,7 +1665,42 @@ export function registerVisualNovelIpc(): void {
       // Filters apply to the running session without reconnecting anything.
       captureSession.setLineFilters(settings.lineFilters);
     }
+    if (live.active && (
+      patch?.lineScreenshots !== undefined
+      || patch?.lineAudio !== undefined
+      || patch?.ocrCapture !== undefined
+    )) {
+      applyCaptureExtras(settings, live.test);
+    }
     return database;
+  });
+
+  // The windows a line's picture can be taken of: every titled window that is
+  // not one of Gum's own.
+  ipcMain.handle('visual-novel:captureWindows', async () => {
+    try {
+      const own = new Set(BrowserWindow.getAllWindows().map((window) => window.getTitle()));
+      const sources = await desktopCapturer.getSources({
+        types: ['window'],
+        thumbnailSize: { width: 0, height: 0 },
+        fetchWindowIcons: false,
+      });
+      const names = sources
+        .map((source) => source.name.trim())
+        .filter((name) => name && !own.has(name));
+      return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+    } catch {
+      return [] as string[];
+    }
+  });
+
+  // Capture setup's "Choose the text box": (re)start the Lens watch for this session.
+  ipcMain.handle('visual-novel:ocrWatch', async () => {
+    const live = captureSession.state();
+    if (!live.active || live.test) return { ok: false as const };
+    const asked = startLensWatch('visual-novel');
+    captureSession.setStatus({ ocr: !asked ? 'lens-off' : lensWatchActive() ? 'watching' : 'pending' });
+    return { ok: asked };
   });
 
   ipcMain.handle('visual-novel:pickLocaleEmulator', async () => {
@@ -1517,6 +1743,7 @@ export function registerVisualNovelIpc(): void {
     try {
       const database = appendVisualNovelCapture(
         loadDatabase(),
+        // A line typed or pasted by hand has no game frame or voice to go with it.
         { ...input, screenshotPath: '', audioPath: '' },
         crypto.randomUUID(),
       );

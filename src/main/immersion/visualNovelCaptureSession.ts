@@ -101,6 +101,60 @@ export const SAME_SOURCE_BURST_MS = 400;
 export const CROSS_SOURCE_ECHO_MS = 3_000;
 /** Captured lines a copy made in the reader is checked against. */
 export const READER_COPY_WINDOW = 50;
+/** OCR'd lines a new read is compared with: the text box re-read is not a new line. */
+export const OCR_RECENT_WINDOW = 8;
+/** Two reads of the box this alike are the same line read twice (OCR noise), not two lines. */
+export const OCR_SAME_LINE_SIMILARITY = 0.85;
+
+/** What an OCR'd line is compared by: its characters, without spacing or punctuation. */
+export function ocrLineKey(text: string): string {
+  return text.replace(/[\s\p{P}\p{S}]/gu, '');
+}
+
+function bigrams(text: string): Map<string, number> {
+  const chars = [...text];
+  const out = new Map<string, number>();
+  if (chars.length < 2) {
+    if (chars.length) out.set(chars[0], 1);
+    return out;
+  }
+  for (let i = 0; i < chars.length - 1; i += 1) {
+    const gram = chars[i] + chars[i + 1];
+    out.set(gram, (out.get(gram) ?? 0) + 1);
+  }
+  return out;
+}
+
+/** Dice similarity of two strings' character bigrams, 0–1. */
+export function ocrLineSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  const ga = bigrams(a);
+  const gb = bigrams(b);
+  let overlap = 0;
+  let total = 0;
+  for (const count of ga.values()) total += count;
+  for (const count of gb.values()) total += count;
+  for (const [gram, count] of ga) overlap += Math.min(count, gb.get(gram) ?? 0);
+  return total ? (2 * overlap) / total : 0;
+}
+
+/**
+ * Whether an OCR read of the text box is a line already captured.
+ *
+ * A watched box is re-read whenever its pixels change — a cursor arrow, a
+ * blinking "next" icon, a character sprite moving behind a translucent box —
+ * so the same line comes back many times, and OCR does not read it the same
+ * way twice. The same characters as any recent read, or a near-identical read
+ * of the last one, is that line again.
+ */
+export function isOcrRepeat(text: string, recent: readonly string[]): boolean {
+  const key = ocrLineKey(text);
+  if (!key) return true;
+  if (recent.includes(key)) return true;
+  const last = recent[recent.length - 1];
+  return last !== undefined && ocrLineSimilarity(key, last) >= OCR_SAME_LINE_SIMILARITY;
+}
 
 export function createCaptureSession(deps: CaptureSessionDeps) {
   const now = deps.now ?? Date.now;
@@ -146,6 +200,8 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
    * skipped.
    */
   let readerLines: string[] = [];
+  /** Recent OCR'd lines (`ocrLineKey`), for `isOcrRepeat`. */
+  let recentOcr: string[] = [];
 
   const setFilters = (next: Vn5LineFilters | undefined): void => {
     filters = vn5NormalizeLineFilters(next ?? VN5_DEFAULT_LINE_FILTERS);
@@ -180,6 +236,12 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     const text = cleaned.text;
     if (!isCapturableText(text)) return;
     const collapsed = text.replace(/\s+/g, '');
+    if (source === 'ocr') {
+      // The box is read again on every pixel change: only a new line counts,
+      // and a re-read is not "filtered" — nothing the user asked for was dropped.
+      if (isOcrRepeat(text, recentOcr)) return;
+      recentOcr = [...recentOcr, ocrLineKey(text)].slice(-OCR_RECENT_WINDOW);
+    }
     if (isEchoOfLastLine(collapsed, source)) return;
     if (filters.dedupeRecent && recentLines.includes(collapsed)) {
       publish({ filtered: (state.filtered ?? 0) + 1 });
@@ -400,6 +462,7 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
       echoedBy = new Set();
       recentLines = [];
       readerLines = [];
+      recentOcr = [];
       setFilters(options.lineFilters);
       reconnectAttempt = 0;
       state = {
@@ -428,6 +491,12 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
 
     /** New filters from the Capture settings apply to the running session at once. */
     setLineFilters: setFilters,
+
+    /** How the session's extras are doing (OCR watch, voice buffer, screenshots), for the UI. */
+    setStatus(patch: Partial<Pick<VisualNovelCaptureState, 'ocr' | 'audio' | 'screenshots'>>): VisualNovelCaptureState {
+      if (!state.active) return state;
+      return publish(patch);
+    },
 
     /** Test seam and hook-file entry point: feed text as if a source produced it. */
     receive,

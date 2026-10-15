@@ -48,6 +48,7 @@ const SOURCE_KEYS: Record<VisualNovelCaptureSource, string> = {
   clipboard: 'vnCapture.source.clipboard',
   websocket: 'vnCapture.source.websocket',
   hook: 'vnCapture.source.hook',
+  ocr: 'vnCapture.source.ocr',
 };
 
 export const TRACKING_KEYS: Record<NonNullable<VisualNovelSessionState['tracking']>, string> = {
@@ -155,6 +156,8 @@ export function VisualNovelCaptureBar({
               ? ` · ${t('vn5.ws.retry', { count: state.reconnectAttempt ?? 0 })}`
               : ''}
             {capturing ? ` · ${t('vnCapture.lines', { count: state.lines })}` : ''}
+            {capturing && state.screenshots ? ` · ${t('vnCapture.status.screenshotsOn')}` : ''}
+            {capturing && state.audio === 'on' ? ` · ${t('vnCapture.status.audioOn')}` : ''}
           </small>
         )}
         {capturing && <Vn5SessionStatsLine captures={captures} state={state} />}
@@ -171,6 +174,23 @@ export function VisualNovelCaptureBar({
           {state.lastLine.speaker && <b>{state.lastLine.speaker}</b>}
           <span>{state.lastLine.japanese}</span>
         </p>
+      )}
+      {capturing && state.ocr && state.ocr !== 'off' && (
+        <p className="vn-capture-ocr" data-vn-capture-ocr={state.ocr}>
+          {state.ocr === 'watching'
+            ? t('vnCapture.status.ocrWatching')
+            : state.ocr === 'lens-off'
+              ? t('vnCapture.status.ocrLensOff')
+              : t('vnCapture.status.ocrPending')}
+          {state.ocr === 'pending' && (
+            <button type="button" onClick={() => void window.api.visualNovelOcrWatch()}>
+              {t('vnCapture.ocr.choose')}
+            </button>
+          )}
+        </p>
+      )}
+      {capturing && state.audio === 'error' && (
+        <p className="media-error" data-vn-capture-audio="error">{t('vnCapture.status.audioError')}</p>
       )}
       {(capturing || testing) && state.lastErrorCode && (
         <p className="media-error" data-vn-capture-error={state.lastErrorCode}>{t(visualNovelErrorKey(state, 'vnCapture.lineFailed'))}</p>
@@ -215,6 +235,22 @@ export function VisualNovelCaptureSetup({
   const settings = visualNovelSettings(database);
   const [urlDraft, setUrlDraft] = useState(settings.websocketUrl);
   useEffect(() => setUrlDraft(settings.websocketUrl), [settings.websocketUrl]);
+  /** Open windows a line's picture can be taken of; null until listed. */
+  const [windows, setWindows] = useState<string[] | null>(null);
+  const listWindows = async (): Promise<void> => {
+    try {
+      const listed = await window.api.visualNovelCaptureWindows();
+      setWindows(Array.isArray(listed) ? listed : []);
+    } catch {
+      setWindows([]);
+    }
+  };
+  useEffect(() => {
+    if (settings.lineScreenshots && windows === null) void listWindows();
+  }, [settings.lineScreenshots, windows]);
+  const windowChoices = windows && settings.screenshotWindow && !windows.includes(settings.screenshotWindow)
+    ? [settings.screenshotWindow, ...windows]
+    : windows ?? (settings.screenshotWindow ? [settings.screenshotWindow] : []);
 
   const update = async (patch: Parameters<typeof window.api.visualNovelUpdateSettings>[0]): Promise<void> => {
     onDatabase(await window.api.visualNovelUpdateSettings(patch));
@@ -274,6 +310,56 @@ export function VisualNovelCaptureSetup({
           {t('vnCapture.reader.autoShow')}
         </label>
       </div>
+      <fieldset className="vn-capture-media">
+        <legend>{t('vnCapture.media.title')}</legend>
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.lineScreenshots}
+            onChange={(event) => void update({ lineScreenshots: event.target.checked })}
+          />
+          {t('vnCapture.media.screenshotToggle')}
+        </label>
+        {settings.lineScreenshots && (
+          <div className="vn-capture-window">
+            <label>
+              {t('vnCapture.media.window')}
+              <select
+                value={settings.screenshotWindow}
+                onChange={(event) => void update({ screenshotWindow: event.target.value })}
+              >
+                <option value="">{t('vnCapture.media.windowAuto')}</option>
+                {windowChoices.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" onClick={() => void listWindows()}>{t('vnCapture.media.windowRefresh')}</button>
+            <small className="muted">{t('vnCapture.media.windowHint')}</small>
+          </div>
+        )}
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.lineAudio}
+            onChange={(event) => void update({ lineAudio: event.target.checked })}
+          />
+          {t('vnCapture.media.audioToggle')}
+        </label>
+        <small className="muted">{t('vnCapture.media.audioHint')}</small>
+      </fieldset>
+      <fieldset className="vn-capture-media">
+        <legend>{t('vnCapture.ocr.title')}</legend>
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.ocrCapture}
+            onChange={(event) => void update({ ocrCapture: event.target.checked })}
+          />
+          {t('vnCapture.ocr.toggle')}
+        </label>
+        <small className="muted">{t('vnCapture.ocr.hint')}</small>
+      </fieldset>
       <VisualNovelLineFilters entry={entry} database={database} onDatabase={onDatabase} />
       <div className="vn-capture-le">
         <strong>{t('vnCapture.le.title')}</strong>

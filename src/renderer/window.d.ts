@@ -2105,6 +2105,8 @@ declare global {
       /** A VNDB image cached by main and served over media:// (the CSP blocks t.vndb.org). */
       visualNovelArt(url: string): Promise<{ ok: boolean; url?: string; error?: string }>;
       visualNovelCaptureState(): Promise<import('../shared/visualNovelCapture').VisualNovelCaptureState>;
+      visualNovelCaptureWindows(): Promise<string[]>;
+      visualNovelOcrWatch(): Promise<{ ok: boolean }>;
       visualNovelCaptureStart(
         id: string,
         options?: { test?: boolean },
@@ -2296,6 +2298,12 @@ declare global {
       ): () => void;
       lensSetInteractive(interactive: boolean): void;
       lensClose(): Promise<void>;
+      lensWatchStart(region: { x: number; y: number; width: number; height: number }): Promise<{ ok: boolean; status: ReadingLensStatus }>;
+      lensWatchStop(): Promise<ReadingLensStatus>;
+      lensWatchPause(paused: boolean): Promise<boolean>;
+      lensWatchText(payload: { text: string }): Promise<boolean>;
+      onLensWatchChanged(cb: () => void): () => void;
+      onLensWatchStopped(cb: () => void): () => void;
       lensHistoryRecord(
         capture: import('../shared/readingLens').ReadingLensCapture,
       ): Promise<import('../shared/readingLensHistory').ReadingLensHistoryEntry | null>;
