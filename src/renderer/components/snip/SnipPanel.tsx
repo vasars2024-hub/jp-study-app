@@ -4,10 +4,13 @@ import { LANG_TAGS } from '../../../shared/i18n/core';
 import { alignFurigana, hasKanji, toHiragana } from '../../../shared/furigana';
 import {
   SNIP_HISTORY_MAX_BYTES,
+  snipAccurateReader,
   snipEngineLabel,
+  snipErrorKey,
   snipNoticeOpen,
   snipOwnsWork,
   type SnipEntry,
+  type SnipReaders,
   type SnipWord,
 } from '../../../shared/snipToCards';
 import { normalizeStudyLang, type StudyLang } from '../../../shared/studyLang';
@@ -17,6 +20,7 @@ import { openGrammarPoint } from '../../extensionBridgeUi';
 import { confirmDialog } from '../ui/dialogService';
 import DeinflectTrace from '../lexicon/DeinflectTrace';
 import SnipSettingsForm, { useSnipStatus } from './SnipSettingsForm';
+import { SnipReaderOffer, SnipReaderSetup } from './SnipReaderSetup';
 import './snip.css';
 
 /** IPADIC parts of speech → catalog keys; anything else is shown as the analyser wrote it. */
@@ -291,6 +295,67 @@ function TextFixer({ entry, onDone }: { entry: SnipEntry; onDone: () => void }) 
   );
 }
 
+/** How many characters of context are shown either side of an unsure one. */
+const UNSURE_CONTEXT = 3;
+
+/**
+ * The characters the OCR was unsure of, each with the alternatives the engines
+ * considered: one click on an alternative fixes the character in the text and
+ * analyses the words again (only while the snip owns no cards).
+ */
+function UnsureChars({ entry, owns }: { entry: SnipEntry; owns: boolean }) {
+  const { t } = useT();
+  const id = useId();
+  const [busy, setBusy] = useState(false);
+  const chars = [...entry.text];
+  const list = (entry.unsure ?? []).filter((u) => chars[u.at] === u.ch && u.alts.length);
+  if (!list.length) return null;
+  const pick = async (at: number, alt: string): Promise<void> => {
+    const next = [...chars];
+    next[at] = alt;
+    setBusy(true);
+    try {
+      await window.api.snipAction({ id: entry.id, action: 'reanalyze', text: next.join('') });
+    } finally {
+      window.setTimeout(() => setBusy(false), 400);
+    }
+  };
+  return (
+    <section className="snip-section snip-unsure" aria-labelledby={`${id}-t`}>
+      <h4 id={`${id}-t`}>{t('snip2.unsure.title')}</h4>
+      <p className="muted snip-fix-hint">{owns ? t('snip2.text.undoFirst') : t('snip2.unsure.hint')}</p>
+      <ul className="snip-unsure-list">
+        {list.slice(0, 12).map((u) => {
+          const before = chars.slice(Math.max(0, u.at - UNSURE_CONTEXT), u.at).join('').replace(/\n/g, ' ');
+          const after = chars.slice(u.at + 1, u.at + 1 + UNSURE_CONTEXT).join('').replace(/\n/g, ' ');
+          return (
+            <li key={u.at} className="snip-unsure-item">
+              <span className="snip-unsure-context" lang={entry.lang}>
+                {before}<mark className="snip-unsure-char">{u.ch}</mark>{after}
+              </span>
+              <span className="snip-unsure-alts">
+                {u.alts.map((alt) => (
+                  <button
+                    key={alt}
+                    type="button"
+                    lang={entry.lang}
+                    className="btn small snip-btn snip-unsure-alt"
+                    disabled={owns || busy}
+                    aria-label={t('snip2.unsure.pick', { alt, ch: u.ch })}
+                    onClick={() => void pick(u.at, alt)}
+                  >
+                    {alt}
+                  </button>
+                ))}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 /** This snip's own deck: later adds go there, and the cards it added move there. */
 function SnipDeckField({ entry, defaultDeck }: { entry: SnipEntry; defaultDeck: string }) {
   const { t } = useT();
@@ -316,13 +381,13 @@ function SnipDeckField({ entry, defaultDeck }: { entry: SnipEntry; defaultDeck: 
   );
 }
 
-function SnipDetail({ entry, folder, defaultDeck, maxWords }: { entry: SnipEntry; folder: string; defaultDeck: string; maxWords: number }) {
+function SnipDetail({ entry, folder, defaultDeck, maxWords, readers }: { entry: SnipEntry; folder: string; defaultDeck: string; maxWords: number; readers: SnipReaders }) {
   const { t, lang: uiLang } = useT();
   const engineName = useEngineName();
   const lang = normalizeStudyLang(entry.lang);
   const [image, setImage] = useState<string | null>(null);
   const [furigana, setFurigana] = useState(true);
-  const [installState, setInstallState] = useState<'idle' | 'started' | 'failed'>('idle');
+  const [rereading, setRereading] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   const [fixingText, setFixingText] = useState(false);
   const headingId = useId();
@@ -357,35 +422,24 @@ function SnipDetail({ entry, folder, defaultDeck, maxWords }: { entry: SnipEntry
   }, []);
   const picked = [...selected].filter((i) => SELECTABLE.has(entry.words[i]?.status));
 
-  const install = async () => {
-    const id = entry.installIds?.[0];
-    if (!id) return;
+  useEffect(() => setRereading(false), [entry.id, entry.status]);
+  const reread = async (): Promise<void> => {
+    setRereading(true);
     try {
-      const res = await window.api.assetsStart(id);
-      setInstallState(res.ok ? 'started' : 'failed');
+      if (!(await window.api.snipAction({ id: entry.id, action: 'reread' }))) setRereading(false);
     } catch {
-      setInstallState('failed');
+      setRereading(false);
     }
   };
 
   const rows = entry.words.filter((w) => !ROW_HIDDEN.has(w.status));
   const added = entry.words.filter((w) => w.status === 'added').length;
   const merged = entry.words.filter((w) => w.status === 'merged').length;
-  const engine = engineName(entry.engine);
+  const engine = (entry.engines?.length ? entry.engines : [entry.engine]).map(engineName).filter(Boolean).join(' + ');
   const owns = snipOwnsWork(entry);
   const canFixText = (entry.status === 'done' || (entry.status === 'error' && Boolean(entry.text))) && entry.error !== 'models-missing';
   const columns = review ? 7 : 6;
-  const errorKey = entry.error === 'models-missing'
-    ? 'snip.error.modelsMissing'
-    : entry.error === 'no-text'
-      ? 'snip.error.noText'
-      : entry.error === 'garbage'
-        ? 'snip.error.garbage'
-        : entry.error === 'low-confidence'
-          ? 'snip.error.lowConfidence'
-          : entry.error === 'cancelled'
-            ? 'snip.error.cancelled'
-            : 'snip.error.ocrFailed';
+  const errorKey = snipErrorKey(entry.error);
 
   return (
     <article className="snip-detail" aria-labelledby={headingId}>
@@ -394,7 +448,22 @@ function SnipDetail({ entry, folder, defaultDeck, maxWords }: { entry: SnipEntry
         <p className="muted snip-detail-meta">
           {engine && t('snip.detail.engine', { engine })}
           {typeof entry.confidence === 'number' && ` · ${t('snip.detail.confidence', { percent: Math.round(entry.confidence * 100) })}`}
+          {entry.corrected ? ` · ${t('snip2.unsure.corrected', { count: entry.corrected })}` : ''}
         </p>
+        <div className="snip-detail-tools">
+          <button
+            type="button"
+            className="btn small snip-btn snip-reread"
+            disabled={owns || entry.status === 'processing' || rereading}
+            aria-describedby={`${headingId}-reread`}
+            onClick={() => void reread()}
+          >
+            {t('snip2.reread')}
+          </button>
+          <span id={`${headingId}-reread`} className="muted snip-fix-hint">
+            {owns ? t('snip2.text.undoFirst') : t('snip2.reread.hint')}
+          </span>
+        </div>
       </header>
       {image ? (
         <img className="snip-image" src={image} alt={t('snip.detail.image')} />
@@ -407,15 +476,7 @@ function SnipDetail({ entry, folder, defaultDeck, maxWords }: { entry: SnipEntry
         {entry.status === 'error' && (
           <div className="snip-note is-error" role="status">
             <p>{t(errorKey, { lang: t(`snip.lang.${lang}`) })}</p>
-            {entry.error === 'models-missing' && entry.installIds?.length ? (
-              <p>
-                <button type="button" className="btn small snip-btn" disabled={installState === 'started'} onClick={() => void install()}>
-                  {t('snip.detail.install', { lang: t(`snip.lang.${lang}`) })}
-                </button>
-                {installState === 'started' && <span className="muted"> {t('snip.detail.installStarted')}</span>}
-                {installState === 'failed' && <span className="muted"> {t('snip.detail.installFailed')}</span>}
-              </p>
-            ) : null}
+            <SnipReaderOffer entry={entry} readers={readers} />
           </div>
         )}
         {review && (
@@ -425,6 +486,7 @@ function SnipDetail({ entry, folder, defaultDeck, maxWords }: { entry: SnipEntry
               : t('snip2.review.manual')}
           </p>
         )}
+        {review && entry.review === 'uncertain' && <SnipReaderOffer entry={entry} readers={readers} />}
         {entry.undone && <p className="snip-note">{t('snip.detail.undone')}</p>}
       </div>
 
@@ -467,6 +529,8 @@ function SnipDetail({ entry, folder, defaultDeck, maxWords }: { entry: SnipEntry
           )}
         </section>
       )}
+
+      {(entry.status === 'done' || (entry.status === 'error' && entry.text)) && <UnsureChars entry={entry} owns={owns} />}
 
       {entry.status === 'done' && (
         <section className="snip-section" aria-label={t('snip.detail.translation')}>
@@ -705,6 +769,9 @@ export default function SnipPanel({ compact = false }: { compact?: boolean }) {
           </button>
         </div>
       </header>
+      {status.enabled && !snipAccurateReader(status.studyLang, status.readers) && (
+        <SnipReaderSetup readers={status.readers} studyLang={status.studyLang} compact={compact} />
+      )}
       {snipNoticeOpen(status) && status.enabled && (
         <SnipNotice onAnswer={(keep) => void save(keep ? { notice: 'answered' } : { enabled: false, notice: 'answered' })} />
       )}
@@ -789,7 +856,7 @@ export default function SnipPanel({ compact = false }: { compact?: boolean }) {
         </nav>
         <div className="snip-detail-wrap">
           {current ? (
-            <SnipDetail entry={current} folder={current.deck || status.deck} defaultDeck={status.deck} maxWords={status.maxWords} />
+            <SnipDetail entry={current} folder={current.deck || status.deck} defaultDeck={status.deck} maxWords={status.maxWords} readers={status.readers} />
           ) : (
             <p className="muted snip-empty">{t('snip.detail.select')}</p>
           )}

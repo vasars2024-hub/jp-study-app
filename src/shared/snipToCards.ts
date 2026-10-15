@@ -13,7 +13,8 @@
  * are testable on their own.
  */
 
-import type { StudyLang } from './studyLang';
+import { STUDY_LANGS, type StudyLang } from './studyLang';
+import type { OcrUnsureChar } from './ocrRouterTypes';
 
 // ---------------------------------------------------------------------------
 // Settings
@@ -514,6 +515,15 @@ export interface SnipEntry {
   /** Mean OCR confidence 0–1, when the engine reports one. */
   confidence?: number;
   text: string;
+  /**
+   * Characters the OCR was still unsure of, each with the alternatives the
+   * engines considered (indexed into `text`): the one-click fixes.
+   */
+  unsure?: OcrUnsureChar[];
+  /** Characters the dictionary-guided decoding corrected (彼後 → 恐竜). */
+  corrected?: number;
+  /** Every engine that contributed to the read (the router's second opinions). */
+  engines?: string[];
   words: SnipWord[];
   grammar: SnipGrammarPoint[];
   translation?: string;
@@ -562,10 +572,30 @@ export const SNIP_HISTORY_MAX_BYTES = 200 * 1024 * 1024;
 export interface SnipJob {
   entry: SnipEntry;
   settings: SnipSettings;
-  /** The accurate engine's read, when one is installed. */
-  ocr?: { text: string; engine: string; confidence?: number };
-  /** No accurate engine: read the picture with the bundled offline recognizer (Japanese). */
-  basicOcr?: { dataUrl: string; width: number; height: number };
+  /** The accurate engines' read (the OCR router's), when one is installed. */
+  ocr?: {
+    text: string;
+    engine: string;
+    confidence?: number;
+    unsure?: OcrUnsureChar[];
+    corrected?: number;
+    engines?: string[];
+  };
+  /**
+   * No accurate engine read it: read the picture with the bundled offline
+   * recognizer — Japanese always, Chinese when its optional data is installed
+   * (`models` are the URLs Tesseract loads it from). `langs` are the languages
+   * the snip may be in (the learner's own first); `offer` the download that
+   * reads each language that has no reader at all.
+   */
+  basicOcr?: {
+    dataUrl: string;
+    width: number;
+    height: number;
+    langs?: StudyLang[];
+    models?: Partial<Record<SnipTessModel, string>>;
+    offer?: Partial<Record<StudyLang, string[]>>;
+  };
   /** Bounded JPEG for the cards and Anki notes (base64, no data: prefix). */
   cardImage?: { base64: string; filename: string };
 }
@@ -579,6 +609,10 @@ export type SnipAction =
   | { id: string; action: 'editWord'; index: number; lemma?: string; reading?: string }
   /** Analyse corrected text again (no OCR); refused while the snip still owns cards. */
   | { id: string; action: 'reanalyze'; text: string }
+  /** Read the picture again with the best engine installed now (main); refused while it owns cards. */
+  | { id: string; action: 'reread' }
+  /** Install these readers (the learner clicked), then read the picture again. */
+  | { id: string; action: 'installReread'; assets: string[] }
   /** This snip's own deck: later adds go there, and the cards it owns move there. */
   | { id: string; action: 'setDeck'; deck: string };
 
@@ -630,6 +664,12 @@ export function normalizeSnipAction(raw: unknown): SnipAction | null {
     }
     case 'setDeck':
       return typeof r.deck === 'string' ? { id, action: 'setDeck', deck: cleanName(r.deck, '') } : null;
+    case 'reread':
+      return { id, action: 'reread' };
+    case 'installReread': {
+      const assets = Array.isArray(r.assets) ? [...new Set(r.assets.filter(isSnipReaderAsset))].slice(0, 6) : [];
+      return assets.length ? { id, action: 'installReread', assets } : null;
+    }
     default:
       return null;
   }
@@ -656,6 +696,8 @@ export interface SnipToastPayload {
   confidence?: number;
   /** Set by main only: the one-time "Snip to cards is on" notice rides on this toast. */
   notice?: boolean;
+  /** Set by main only: turned on with no accurate reader installed; the toast offers the setup. */
+  setup?: boolean;
 }
 
 /** How long the background toast offers Undo before closing (it holds while hovered or focused). */
@@ -693,6 +735,10 @@ export interface SnipStatus extends SnipSettings {
   watching: boolean;
   historyCount: number;
   historyBytes: number;
+  /** Which readers are installed (drives the setup offers). */
+  readers: SnipReaders;
+  /** The learner's own (active) study language. */
+  studyLang: StudyLang;
 }
 
 /** Patch fields the pipeline may set on an entry (never id/hash/createdAt/bytes). */
@@ -701,9 +747,12 @@ export type SnipEntryPatch = Partial<Omit<SnipEntry, 'id' | 'hash' | 'createdAt'
   clear?: SnipClearableField[];
 };
 
-export type SnipClearableField = 'error' | 'installIds' | 'translation' | 'translationError' | 'review' | 'overLimit';
+export type SnipClearableField =
+  | 'error' | 'installIds' | 'translation' | 'translationError' | 'review' | 'overLimit'
+  | 'unsure' | 'corrected' | 'engines' | 'confidence' | 'engine' | 'ocrText' | 'undone';
 export const SNIP_CLEARABLE_FIELDS: ReadonlySet<SnipClearableField> = new Set<SnipClearableField>([
   'error', 'installIds', 'translation', 'translationError', 'review', 'overLimit',
+  'unsure', 'corrected', 'engines', 'confidence', 'engine', 'ocrText', 'undone',
 ]);
 
 /**
@@ -786,4 +835,139 @@ export function normalizeSnipWord(raw: unknown): SnipWord | null {
     if (value !== undefined) (word as unknown as Record<string, unknown>)[key] = value;
   }
   return word;
+}
+
+// ---------------------------------------------------------------------------
+// Readers: which OCR engines are installed, and what the setup offers
+
+/** Tesseract data Gum can download for Chinese (Japanese ships with the app). */
+export type SnipTessModel = 'chi_sim' | 'chi_tra';
+
+export interface SnipReaders {
+  /** PaddleOCR's text detector (shared by every language). */
+  det: boolean;
+  /** PaddleOCR recognisers installed. */
+  paddle: StudyLang[];
+  /** manga-ocr (Japanese; best on manga and stylised lettering). */
+  manga: boolean;
+  /** Optional Tesseract data for the basic reader. */
+  tess: SnipTessModel[];
+}
+
+export const SNIP_NO_READERS: Readonly<SnipReaders> = Object.freeze({ det: false, paddle: [], manga: false, tess: [] });
+
+/** The OCR assets a Snips button may install (anything else from IPC is refused). */
+const READER_ASSET = /^(paddle-ocr-(det|ja|zh|ru)|manga-ocr|comic-text-detector|tessdata-chi_(sim|tra))$/;
+
+export function isSnipReaderAsset(value: unknown): value is string {
+  return typeof value === 'string' && READER_ASSET.test(value);
+}
+
+/** A stored or sent readers object, repaired. */
+export function normalizeSnipReaders(raw: unknown): SnipReaders {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const langs = Array.isArray(r.paddle) ? r.paddle.filter((l): l is StudyLang => STUDY_LANGS.includes(l as StudyLang)) : [];
+  const tess = Array.isArray(r.tess) ? r.tess.filter((m): m is SnipTessModel => m === 'chi_sim' || m === 'chi_tra') : [];
+  return { det: r.det === true, paddle: [...new Set(langs)], manga: r.manga === true, tess: [...new Set(tess)] };
+}
+
+/** Whether an accurate (downloaded) engine reads `lang`. */
+export function snipAccurateReader(lang: StudyLang, readers: SnipReaders): boolean {
+  return (readers.det && readers.paddle.includes(lang)) || (lang === 'ja' && readers.manga);
+}
+
+/** Whether any reader at all reads `lang` (the bundled Tesseract reads Japanese). */
+export function snipAnyReader(lang: StudyLang, readers: SnipReaders): boolean {
+  if (snipAccurateReader(lang, readers)) return true;
+  if (lang === 'ja') return true;
+  return lang === 'zh' && readers.tess.length > 0;
+}
+
+/**
+ * The languages a snip may be in: the learner's own, then every other
+ * language Gum supports that an installed reader reads. (A multi-language
+ * study set passes its languages as `studied`.)
+ */
+export function snipCandidateLangs(active: StudyLang, readers: SnipReaders, studied: readonly StudyLang[] = []): StudyLang[] {
+  const out: StudyLang[] = [active, ...studied];
+  for (const lang of STUDY_LANGS) if (snipAccurateReader(lang, readers) || (lang === 'zh' && readers.tess.length)) out.push(lang);
+  return [...new Set(out)];
+}
+
+/**
+ * The downloads that set up the accurate reader for `langs`: each language's
+ * PaddleOCR recogniser (its parent id pulls the shared detector and its
+ * charset in), plus manga-ocr when asked for (Japanese only).
+ */
+export function snipReaderSetupIds(langs: readonly StudyLang[], readers: SnipReaders, opts: { manga?: boolean } = {}): string[] {
+  const ids: string[] = [];
+  for (const lang of new Set(langs)) {
+    if (!(readers.det && readers.paddle.includes(lang))) ids.push(`paddle-ocr-${lang}`);
+  }
+  if (opts.manga && langs.includes('ja') && !readers.manga) ids.push('manga-ocr', 'comic-text-detector');
+  return ids;
+}
+
+/**
+ * What a snip's entry offers about readers:
+ *  - `lang`: it looks like a language no installed reader reads → install that one;
+ *  - `accurate`: the basic reader failed or was unsure, and an accurate reader
+ *    for this language is not installed → set it up and read again;
+ *  - `manga`: a Japanese snip PaddleOCR was unsure of, and manga-ocr (better on
+ *    stylised lettering) is not installed → add it, and read again;
+ *  - null: nothing to offer.
+ */
+export function snipReaderOffer(
+  entry: Pick<SnipEntry, 'status' | 'error' | 'engine' | 'review' | 'lang' | 'installIds'>,
+  readers: SnipReaders,
+): { kind: 'lang' | 'accurate' | 'manga'; lang: StudyLang; ids: string[] } | null {
+  if (entry.status === 'error' && entry.error === 'models-missing') {
+    if (snipAccurateReader(entry.lang, readers)) return null;
+    const ids = (entry.installIds ?? []).filter(isSnipReaderAsset);
+    return { kind: 'lang', lang: entry.lang, ids: ids.length ? ids : snipReaderSetupIds([entry.lang], readers) };
+  }
+  const weak = entry.status === 'error' ? entry.error !== 'cancelled' : entry.status === 'done' && entry.review === 'uncertain';
+  if (snipAccurateReader(entry.lang, readers)) {
+    return weak && entry.lang === 'ja' && !readers.manga ? { kind: 'manga', lang: 'ja', ids: ['manga-ocr', 'comic-text-detector'] } : null;
+  }
+  if (!weak || (entry.engine && entry.engine !== 'basic' && entry.engine !== 'none')) return null;
+  return { kind: 'accurate', lang: entry.lang, ids: snipReaderSetupIds([entry.lang], readers) };
+}
+
+/**
+ * The best of several reads of one snip (e.g. Tesseract's Japanese and
+ * Chinese data): confidence × script consistency × how much text came back.
+ */
+export function pickSnipRead<T extends { text: string; lang: StudyLang; confidence?: number }>(reads: readonly T[]): T | null {
+  let best: T | null = null;
+  let bestScore = -1;
+  for (const read of reads) {
+    const chars = [...read.text.replace(/\s+/g, '')];
+    if (!chars.length) continue;
+    const script = chars.filter((ch) => SCRIPT[read.lang].test(ch)).length / chars.length;
+    const score = (read.confidence ?? 0.5) * script * Math.min(1, chars.length / 4);
+    if (score > bestScore) {
+      bestScore = score;
+      best = read;
+    }
+  }
+  return best;
+}
+
+/** The catalog key that explains a snip error (each says what to do next). */
+export function snipErrorKey(error: SnipError | undefined): string {
+  switch (error) {
+    case 'models-missing':
+      return 'snip.error.modelsMissing';
+    case 'no-text':
+      return 'snip.error.noText';
+    case 'garbage':
+      return 'snip.error.garbage';
+    case 'low-confidence':
+      return 'snip.error.lowConfidence';
+    case 'cancelled':
+      return 'snip.error.cancelled';
+    default:
+      return 'snip.error.ocrFailed';
+  }
 }

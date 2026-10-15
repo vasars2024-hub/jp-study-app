@@ -18,13 +18,23 @@
  *  4. when the read is weak, also read the inverted polarity (outlined
  *     subtitles are white glyphs inside black outlines — either can be "ink");
  *  5. keep whichever read scores best (confidence weighted by how much text
- *     came back, as `scoreRecognition` does for the CTC engine).
+ *     came back, as `scoreRecognition` does for the CTC engine);
+ *  6. `stylised` (Snip to cards): when the read is still weak, also read the
+ *     adaptive-threshold planes and the text-shaped colour layers
+ *     (`ocrPreprocess.ts`) — outlined, coloured lettering over a photo — the
+ *     most text-like first, within a time budget.
  *
  * Every extra pass is skipped once `signal` is aborted.
  */
 import {
+  adaptiveBinarize,
+  colourLayers,
+  grayToRgba,
+  keepGlyphComponents,
   ORIENTATION_CONFIDENT,
   prepareOcrImage,
+  textLikeness,
+  toGray,
   prepToSourceBox,
   type InkPolarity,
   type PreparedOcrImage,
@@ -173,6 +183,9 @@ function meanConfidence(lines: readonly BasicOcrLine[]): number {
 /** Luminance above which a pixel counts as the white core of outlined lettering. */
 const OUTLINED_CORE_THRESHOLD = 222;
 
+/** The largest prepared side handed to the recognizer. */
+const MAX_PREPARED_SIDE = 8192;
+
 /** A read weaker than this earns the other polarity a try. */
 export const WEAK_READ_CONFIDENCE = 0.72;
 
@@ -189,11 +202,26 @@ interface Candidate {
   score: number;
 }
 
+/** How long the stylised passes may run, after the first ones. */
+export const STYLISED_BUDGET_MS = 12_000;
+
+export interface BasicReadOptions {
+  signal?: AbortSignal;
+  onPass?: (pass: number) => void;
+  /** Also try the adaptive and colour-layer preparations when the read is weak. */
+  stylised?: boolean;
+  /** The stylised passes stop once this much time has gone (default `STYLISED_BUDGET_MS`). */
+  budgetMs?: number;
+  now?: () => number;
+}
+
 export async function readWithBasicEngine(
   image: RgbaImage,
   recognize: BasicRecognizer,
-  opts: { signal?: AbortSignal; onPass?: (pass: number) => void } = {},
+  opts: BasicReadOptions = {},
 ): Promise<BasicOcrRead> {
+  const now = opts.now ?? (() => Date.now());
+  const startedAt = now();
   const source = { width: image.width, height: image.height };
   let passes = 0;
   const check = (): void => {
@@ -204,6 +232,9 @@ export async function readWithBasicEngine(
     // A preparation with no ink left (the flipped polarity of a clean page is
     // all background) costs no recognizer pass at all.
     if (!prepared.hasInk) return { prepared, lines: [], score: 0 };
+    // Tesseract refuses a side over 32767 px ("Image too large") and throws; a
+    // preparation that big is a layout gone wrong, never text worth reading.
+    if (prepared.width > MAX_PREPARED_SIDE || prepared.height > MAX_PREPARED_SIDE) return { prepared, lines: [], score: 0 };
     passes += 1;
     opts.onPass?.(passes);
     const page = await recognize({ rgba: prepared.rgba, width: prepared.width, height: prepared.height }, prepared.model);
@@ -233,6 +264,24 @@ export async function readWithBasicEngine(
   if (meanConfidence(best.lines) < WEAK_READ_CONFIDENCE) {
     const core = await run(prepareOcrImage(image, { polarity: 'light', threshold: OUTLINED_CORE_THRESHOLD }));
     if (core.score > best.score) best = core;
+  }
+
+  if (opts.stylised && meanConfidence(best.lines) < WEAK_READ_CONFIDENCE) {
+    const deadline = startedAt + (opts.budgetMs ?? STYLISED_BUDGET_MS);
+    const gray = toGray(image);
+    const planes = [
+      keepGlyphComponents(adaptiveBinarize(gray, { polarity: 'dark' })),
+      keepGlyphComponents(adaptiveBinarize(gray, { polarity: 'light' })),
+      ...colourLayers(image),
+    ]
+      .map((plane) => ({ plane, score: textLikeness(plane) }))
+      .filter((p) => p.score > 0)
+      .sort((a, b) => b.score - a.score);
+    for (const { plane } of planes) {
+      if (now() > deadline || meanConfidence(best.lines) >= WEAK_READ_CONFIDENCE) break;
+      const layer = await run(prepareOcrImage(grayToRgba(plane), { polarity: 'dark', threshold: 127 }));
+      if (layer.score > best.score) best = layer;
+    }
   }
 
   return {

@@ -21,9 +21,19 @@
  * on the clipboard when watching starts is never treated as a new snip, nor is
  * one that arrives while the app is locked, nor one Gum put there itself.
  *
+ * Reading goes through the OCR router (`ocrRouter.ts`): every installed
+ * engine, in every language the learner may be snipping (their own, plus any
+ * language an installed reader reads), with per-line second opinions and
+ * dictionary-guided decoding. The snip's language is detected from the text
+ * (`detectStudyLangOfText`), so a Chinese snip on a Japanese profile is made
+ * into Chinese cards when Chinese can be read, and otherwise offers the Chinese
+ * reader. With no accurate engine, the renderer's bundled Tesseract reads it.
+ * Any snip can be read again (`reread`), e.g. after a reader was installed.
+ *
  * Nothing leaves the machine from here: the pictures stay in the profile
  * (`snips/`, capped by count and bytes, oldest deleted first) and OCR only uses
- * engines that are installed — a missing model is offered, never downloaded.
+ * engines that are installed — a missing model is offered, and downloaded only
+ * when the learner clicks to install it.
  */
 
 import { app, BrowserWindow, clipboard, ipcMain, nativeImage, screen } from 'electron';
@@ -34,9 +44,14 @@ import { readJsonSync, writeFileAtomicSync, writeJsonAtomicSync } from './atomic
 import { appLocked } from './lockGuard';
 import { gumWroteClipboardRecently } from './gumClipboardWrites';
 import { getMainStudyLang } from './studyLanguage';
-import { installedPaddleLangs, paddleOcrAvailable, type PaddleLang } from './paddleOcr';
+import { installedPaddleLangs, isInstalledPaddleDetector } from './paddleOcr';
 import { mangaOcrAvailable } from './mangaOcr';
-import { boundedScreenshotDataUrl, ocrClipboardImage } from './screenOcr';
+import { boundedScreenshotDataUrl } from './screenOcr';
+import { defaultRouterDeps, recognizeWithRouter, routerImageFromNative, type EngineLine, type OcrProvider, type RouterDeps } from './ocrRouter';
+import { isE2eHeadless } from './e2eHeadless';
+import { assetPath, isInstalled, onAssetInstalled, startDownload } from './downloads';
+import { localFileUrl } from './library';
+import { ASSET_CATALOG, assetDependencyClosure } from '../shared/assetRegistry';
 import { refreshGlobalCommands, registerGlobalCommand } from './globalCommands';
 import { refreshAppTray } from './systemDictionary';
 import { mt } from './i18n';
@@ -55,7 +70,14 @@ import {
   SNIP_CLEARABLE_FIELDS,
   SNIP_SETTINGS_DEFAULTS,
   SNIP_TOAST_NOTICE_MS,
+  snipAccurateReader,
+  snipAnyReader,
+  snipCandidateLangs,
+  snipOwnsWork,
+  snipReaderSetupIds,
   type SnipAction,
+  type SnipReaders,
+  type SnipTessModel,
   type SnipEntry,
   type SnipEntryPatch,
   type SnipError,
@@ -64,7 +86,7 @@ import {
   type SnipStatus,
   type SnipToastPayload,
 } from '../shared/snipToCards';
-import { normalizeStudyLang } from '../shared/studyLang';
+import { normalizeStudyLang, STUDY_LANGS, type StudyLang } from '../shared/studyLang';
 import { holdUnsavedWork } from './unsavedWork';
 
 interface SnipDeps {
@@ -189,7 +211,26 @@ function normalizeEntry(raw: unknown): SnipEntry | null {
     ...(r.review === 'manual' || r.review === 'uncertain' ? { review: r.review } : {}),
     ...(cleanSnipDeckName(r.deck) ? { deck: cleanSnipDeckName(r.deck) } : {}),
     ...(typeof r.ocrText === 'string' ? { ocrText: r.ocrText.slice(0, 20_000) } : {}),
+    ...(Array.isArray(r.unsure) ? { unsure: normalizeUnsure(r.unsure) } : {}),
+    ...(Number.isFinite(Number(r.corrected)) && Number(r.corrected) > 0 ? { corrected: Math.round(Number(r.corrected)) } : {}),
+    ...(Array.isArray(r.engines) ? { engines: r.engines.filter((x): x is string => typeof x === 'string').slice(0, 4).map((x) => x.slice(0, 20)) } : {}),
   };
+}
+
+/** The unsure characters from disk or IPC, repaired (bounded: a snip is a few lines). */
+function normalizeUnsure(raw: unknown[]): NonNullable<SnipEntry['unsure']> {
+  const out: NonNullable<SnipEntry['unsure']> = [];
+  for (const item of raw.slice(0, 200)) {
+    if (!item || typeof item !== 'object') continue;
+    const u = item as Record<string, unknown>;
+    const at = Number(u.at);
+    if (!Number.isInteger(at) || at < 0 || at > 20_000 || typeof u.ch !== 'string' || !u.ch) continue;
+    const alts = Array.isArray(u.alts) ? u.alts.filter((a): a is string => typeof a === 'string' && a.length > 0 && a.length <= 4).slice(0, 6) : [];
+    if (!alts.length) continue;
+    const p = Number(u.p);
+    out.push({ at, ch: u.ch.slice(0, 4), p: Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : 0, alts });
+  }
+  return out;
 }
 
 function loadHistory(): SnipEntry[] {
@@ -463,30 +504,61 @@ function newId(): string {
   return `snip-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
 }
 
-/** Whether an accurate (downloaded) engine reads this study language. */
-function accurateEngineFor(lang: string): boolean {
-  if (lang === 'ja' && mangaOcrAvailable()) return true;
-  return paddleOcrAvailable() && installedPaddleLangs().includes(lang as PaddleLang);
+/** The readers installed right now (PaddleOCR per language, manga-ocr, Chinese Tesseract data). */
+function readers(): SnipReaders {
+  const tess = (['chi_sim', 'chi_tra'] as const).filter((m) => isInstalled(`tessdata-${m}`));
+  return {
+    det: isInstalledPaddleDetector(),
+    paddle: installedPaddleLangs(),
+    manga: mangaOcrAvailable(),
+    tess,
+  };
+}
+
+/** Where the renderer's Tesseract loads an installed Chinese model from (a `localfile:` URL). */
+function tessModelUrls(r: SnipReaders): Partial<Record<SnipTessModel, string>> {
+  const out: Partial<Record<SnipTessModel, string>> = {};
+  for (const model of r.tess) {
+    const file = assetPath(`tessdata-${model}`);
+    // Tesseract asks for `<langPath>/<model>.traineddata`; the token in the path names the file.
+    if (file) out[model] = localFileUrl(file);
+  }
+  return out;
+}
+
+/**
+ * Headless E2E only: canned engine reads for a picture of a given size, from
+ * `<profile>/e2e-snip-ocr.json` (`{ "1240x200": { "ja": [{ "text", "confidence" }], "zh": [...] } }`).
+ * No OCR model is installed in a harness run and none is downloaded, so a flow
+ * that tests the router, language detection and the install offers plugs in a
+ * fake provider this way. Never consulted outside a harness run.
+ */
+function e2eFakeProvider(width: number, height: number): OcrProvider | null {
+  if (!isE2eHeadless()) return null;
+  const all = readJsonSync<Record<string, Record<string, Array<{ text?: unknown; confidence?: unknown }>>>>(
+    path.join(app.getPath('userData'), 'e2e-snip-ocr.json'),
+    {},
+  );
+  const reads = all[`${width}x${height}`];
+  if (!reads || typeof reads !== 'object') return null;
+  const langs = Object.keys(reads);
+  const lines = (lang: string): EngineLine[] => (reads[lang] ?? []).map((l) => ({
+    text: String(l.text ?? ''),
+    confidence: Number(l.confidence) || 0.9,
+    box: [0, 0, width, height],
+    vertical: false,
+  }));
+  return { id: 'web', langs, tier: 0, available: () => true, readPage: async (_image, lang) => lines(lang) };
+}
+
+/** The fresh entry a (re-)read starts from. */
+function blankEntry(base: Pick<SnipEntry, 'id' | 'createdAt' | 'width' | 'height' | 'bytes' | 'hash'>, lang: StudyLang): SnipEntry {
+  return { ...base, lang, status: 'processing', text: '', words: [], grammar: [], cardIds: [], ankiNoteIds: [] };
 }
 
 async function processSnip(image: Electron.NativeImage, png: Buffer, hash: string): Promise<void> {
-  const lang = getMainStudyLang();
   const { width, height } = image.getSize();
-  const entry: SnipEntry = {
-    id: newId(),
-    createdAt: Date.now(),
-    lang,
-    status: 'processing',
-    width,
-    height,
-    bytes: png.length,
-    hash,
-    text: '',
-    words: [],
-    grammar: [],
-    cardIds: [],
-    ankiNoteIds: [],
-  };
+  const entry = blankEntry({ id: newId(), createdAt: Date.now(), width, height, bytes: png.length, hash }, getMainStudyLang());
   try {
     fs.mkdirSync(historyDir(), { recursive: true });
     writeFileAtomicSync(imagePath(entry.id), png);
@@ -496,7 +568,26 @@ async function processSnip(image: Electron.NativeImage, png: Buffer, hash: strin
   }
   addEntry(entry);
   broadcast('snip:history-changed', { id: entry.id });
+  await readSnip(entry, image, png);
+}
 
+/**
+ * Read a stored snip and hand it to the pipeline window: the OCR router when
+ * an accurate engine is installed for any language the snip may be in, else
+ * the renderer's bundled recognizer; the snip's language is the one its text
+ * is in.
+ */
+async function readSnip(entry: SnipEntry, image: Electron.NativeImage, png: Buffer): Promise<void> {
+  const active = getMainStudyLang();
+  const { width, height } = image.getSize();
+  const fake = e2eFakeProvider(width, height);
+  const real = readers();
+  // A harness fake reads like an installed PaddleOCR for its languages.
+  const installed: SnipReaders = fake && fake.langs !== 'any'
+    ? { ...real, det: true, paddle: [...new Set([...real.paddle, ...fake.langs.map((l) => normalizeStudyLang(l))])] }
+    : real;
+  const langs = snipCandidateLangs(active, installed);
+  const routerDeps: RouterDeps | undefined = fake ? { ...defaultRouterDeps(), providers: [fake], wordOracle: () => null } : undefined;
   const job: SnipJob = { entry, settings: { ...ensureSettings() } };
   try {
     const jpeg = boundedScreenshotDataUrl(image);
@@ -505,29 +596,132 @@ async function processSnip(image: Electron.NativeImage, png: Buffer, hash: strin
     /* cards without the picture are still cards */
   }
 
-  if (accurateEngineFor(lang)) {
-    const read = await ocrClipboardImage(image);
-    if (read.ok && read.text.trim()) {
-      job.ocr = { text: read.text, engine: read.engine, ...(read.confidence !== undefined ? { confidence: read.confidence } : {}) };
-    } else if (lang !== 'ja') {
-      job.entry = patchEntry(entry.id, { status: 'error', error: read.error ? 'ocr-failed' : 'no-text' }) ?? entry;
+  if (langs.some((lang) => snipAccurateReader(lang, installed))) {
+    const read = await recognizeWithRouter(routerImageFromNative(image), { langs, purpose: 'snip' }, routerDeps).catch((err) => {
+      console.warn('[snipToCards] OCR router failed', err);
+      return null;
+    });
+    if (read?.missing && read.text) {
+      // It reads as a language no installed engine reads (Chinese on a Japanese
+      // install): keep the read, and offer that language's reader.
+      job.entry = patchEntry(entry.id, {
+        lang: normalizeStudyLang(read.missing.lang, active),
+        status: 'error',
+        error: 'models-missing',
+        installIds: read.missing.assetIds,
+        text: read.text,
+        engine: read.engine,
+        ...(read.confidence !== undefined ? { confidence: read.confidence } : {}),
+      }) ?? entry;
+    } else if (read?.ok && read.text.trim()) {
+      const lang = normalizeStudyLang(read.lang, active);
+      job.entry = patchEntry(entry.id, { lang }) ?? { ...entry, lang };
+      job.ocr = {
+        text: read.text,
+        engine: read.engine,
+        ...(read.confidence !== undefined ? { confidence: read.confidence } : {}),
+        ...(read.unsure.length ? { unsure: read.unsure } : {}),
+        ...(read.lines.some((l) => l.corrected) ? { corrected: read.lines.reduce((n, l) => n + (l.corrected ?? 0), 0) } : {}),
+        ...(read.engines.length > 1 ? { engines: read.engines } : {}),
+      };
     }
   }
   if (!job.ocr && job.entry.status === 'processing') {
-    if (lang === 'ja') {
-      // The bundled offline recognizer (Tesseract, in the renderer) reads Japanese
-      // with no download. The PNG is lossless, which is what it needs.
-      job.basicOcr = { dataUrl: `data:image/png;base64,${png.toString('base64')}`, width, height };
-    } else {
-      // Chinese and Russian need their PaddleOCR pack. Offer it; never fetch it unasked.
-      job.entry = patchEntry(entry.id, {
-        status: 'error',
-        error: 'models-missing',
-        installIds: [`paddle-ocr-${lang}`],
-      }) ?? entry;
-    }
+    // The bundled offline recognizer (Tesseract, in the renderer) reads Japanese
+    // with no download, and Chinese once its optional data is installed. The
+    // PNG is lossless, which is what it needs. A language with no reader at all
+    // is offered its download, never fetched unasked.
+    const offer: Partial<Record<StudyLang, string[]>> = {};
+    for (const lang of STUDY_LANGS) if (!snipAnyReader(lang, installed)) offer[lang] = snipReaderSetupIds([lang], installed);
+    const basicLangs = [...new Set([...langs, 'ja' as StudyLang])].filter((lang) => snipAnyReader(lang, installed) || lang === active);
+    job.basicOcr = {
+      dataUrl: `data:image/png;base64,${png.toString('base64')}`,
+      width,
+      height,
+      langs: basicLangs,
+      models: tessModelUrls(installed),
+      offer,
+    };
   }
   dispatch({ kind: 'process', payload: job });
+}
+
+// ---- Read again; install a reader, then read again --------------------------
+
+/** Everything a read wrote, cleared before the picture is read again. */
+const READ_FIELDS = ['error', 'installIds', 'translation', 'translationError', 'review', 'overLimit', 'unsure', 'corrected', 'engines', 'confidence', 'engine', 'ocrText', 'undone'] as const;
+
+/**
+ * Read a stored snip again with the best engine installed now. Refused while
+ * it is being read, or while it still owns cards (Undo first, so its cards
+ * always match its words).
+ */
+function rereadSnip(id: string): boolean {
+  const entry = getEntry(id);
+  if (!entry || entry.status === 'processing' || snipOwnsWork(entry)) return false;
+  let png: Buffer;
+  try {
+    png = fs.readFileSync(imagePath(entry.id));
+  } catch {
+    return false;
+  }
+  const image = nativeImage.createFromBuffer(png);
+  if (image.isEmpty()) return false;
+  const reset = patchEntry(entry.id, {
+    status: 'processing',
+    lang: getMainStudyLang(),
+    text: '',
+    words: [],
+    grammar: [],
+    cardIds: [],
+    ankiNoteIds: [],
+    clear: [...READ_FIELDS],
+  });
+  if (!reset) return false;
+  const releaseUnsaved = holdUnsavedWork('snip');
+  chain = chain.then(() => readSnip(reset, image, png)).catch((err) => {
+    console.error('[snipToCards] re-read failed', err);
+  }).finally(releaseUnsaved);
+  return true;
+}
+
+/** Snips waiting for readers the learner chose to install: snip id → every asset id needed. */
+const waitingForReaders = new Map<string, string[]>();
+let installWatch: (() => void) | null = null;
+
+function rereadWhenReady(): void {
+  for (const [id, needed] of [...waitingForReaders]) {
+    if (!needed.every((asset) => isInstalled(asset))) continue;
+    waitingForReaders.delete(id);
+    rereadSnip(id);
+  }
+  if (!waitingForReaders.size && installWatch) {
+    installWatch();
+    installWatch = null;
+  }
+}
+
+/**
+ * The learner clicked "Install … and read again": start the downloads (with
+ * their dependencies), and read the snip again once all of them are installed.
+ */
+async function installAndReread(id: string, assets: readonly string[]): Promise<boolean> {
+  if (!getEntry(id)) return false;
+  const needed = [...new Set(assets.flatMap((asset) => assetDependencyClosure(ASSET_CATALOG, asset).map((a) => a.id)))];
+  let started = false;
+  for (const asset of assets) {
+    if (isInstalled(asset)) continue;
+    try {
+      const res = await startDownload(asset);
+      started = started || res.ok;
+    } catch (err) {
+      console.warn('[snipToCards] could not start', asset, err);
+    }
+  }
+  if (needed.every((asset) => isInstalled(asset))) return rereadSnip(id);
+  waitingForReaders.set(id, needed);
+  if (!installWatch) installWatch = onAssetInstalled(() => rereadWhenReady());
+  return started;
 }
 
 // ---- The pipeline window ----------------------------------------------------
@@ -593,6 +787,7 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 function toastHeight(payload: SnipToastPayload): number {
   if (payload.notice) return TOAST_HEIGHT.notice;
+  if (payload.setup) return TOAST_HEIGHT.undo;
   return payload.kind === 'added' && (payload.count ?? 0) > 0 ? TOAST_HEIGHT.undo : TOAST_HEIGHT.plain;
 }
 
@@ -698,6 +893,8 @@ function status(): SnipStatus {
     watching: started && s.enabled && !appLocked(),
     historyCount: loadHistory().length,
     historyBytes: historyBytes(),
+    readers: readers(),
+    studyLang: getMainStudyLang(),
   };
 }
 
@@ -717,7 +914,9 @@ function applySettings(next: SnipSettings): SnipStatus {
 
 function toggleWatching(): void {
   const next = applySettings({ ...ensureSettings(), enabled: !ensureSettings().enabled });
-  showToast({ kind: next.enabled ? 'resumed' : 'paused' });
+  // Turned on with no accurate reader for the study language: the toast offers the setup.
+  const setup = next.enabled && !snipAccurateReader(next.studyLang, next.readers);
+  showToast({ kind: next.enabled ? 'resumed' : 'paused', ...(setup ? { setup: true } : {}) });
 }
 
 /** Gum's tray rows for the feature (added to the one app tray by main.ts). */
@@ -820,9 +1019,12 @@ export function registerSnipToCardsIpc(): void {
     flushPending();
   });
   // Undo and the per-word toggle run where the deck lives.
-  ipcMain.handle('snip:action', (_e, raw: unknown): boolean => {
+  ipcMain.handle('snip:action', async (_e, raw: unknown): Promise<boolean> => {
     const action = normalizeSnipAction(raw);
     if (!action || !getEntry(action.id)) return false;
+    // Reading the picture is main's job; everything else runs where the deck lives.
+    if (action.action === 'reread') return rereadSnip(action.id);
+    if (action.action === 'installReread') return installAndReread(action.id, action.assets);
     dispatch({ kind: 'action', payload: action });
     return true;
   });
@@ -847,6 +1049,9 @@ export const __snipToCardsTestables = {
   acceptImage,
   loadHistory,
   status,
+  rereadSnip,
+  installAndReread,
+  waitingForReaders: (): ReadonlyMap<string, string[]> => waitingForReaders,
   reset(): void {
     history = null;
     settingsLoaded = false;
@@ -857,6 +1062,7 @@ export const __snipToCardsTestables = {
     idleDelay = POLL_MS;
     decodes = 0;
     sessionHashes.clear();
+    waitingForReaders.clear();
     readyIds.clear();
     pending.splice(0);
     chain = Promise.resolve();

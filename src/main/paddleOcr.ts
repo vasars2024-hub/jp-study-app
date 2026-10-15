@@ -28,11 +28,15 @@ import {
 import { columnsFromInkProfile } from '../shared/tategakiColumns';
 import {
   buildCharset,
-  ctcGreedyDecode,
   parseKeysFile,
   scoreRecognition,
   type CtcDecodeResult,
 } from '../shared/ctcDecode';
+import { ctcDecodeTopK, trimChars } from '../shared/ctcTopK';
+import type { OcrChar } from '../shared/ocrRouterTypes';
+
+/** A decode with the per-character candidates the OCR router uses (empty when not aligned). */
+type DecodedLine = CtcDecodeResult & { chars: OcrChar[] };
 
 export type PaddleLang = 'ja' | 'zh' | 'ru';
 
@@ -42,6 +46,11 @@ export interface PaddleOcrLine {
   box: [number, number, number, number];
   vertical: boolean;
   confidence: number;
+  /**
+   * Per character, aligned with `[...text]`: the recogniser's probability and
+   * its top-k other candidates (`shared/ctcTopK.ts`). Absent when not aligned.
+   */
+  chars?: OcrChar[];
 }
 
 export interface PaddleOcrResult {
@@ -118,6 +127,11 @@ let unloadRegistered = false;
 /** True when detection plus at least one language is installed. */
 export function paddleOcrAvailable(): boolean {
   return isInstalled(DET_ASSET) && installedPaddleLangs().length > 0;
+}
+
+/** True when the shared text detector is installed (each language also needs its recogniser). */
+export function isInstalledPaddleDetector(): boolean {
+  return isInstalled(DET_ASSET);
 }
 
 export function installedPaddleLangs(): PaddleLang[] {
@@ -349,7 +363,7 @@ async function detectBoxes(bmp: Bitmap): Promise<DetBox[]> {
 
 // ----- recognition -------------------------------------------------------
 
-async function recognizeCrop(rec: Recognizer, crop: Bitmap): Promise<CtcDecodeResult> {
+async function recognizeCrop(rec: Recognizer, crop: Bitmap): Promise<DecodedLine> {
   const runtime = await loadOrt();
   const ratio = crop.width / Math.max(1, crop.height);
   const w = Math.min(REC_MAX_WIDTH, Math.max(REC_MIN_WIDTH, Math.round(REC_HEIGHT * ratio)));
@@ -377,7 +391,8 @@ async function recognizeCrop(rec: Recognizer, crop: Bitmap): Promise<CtcDecodeRe
   const dims = logits.dims;
   const timeSteps = Number(dims[dims.length - 2]);
   const numClasses = Number(dims[dims.length - 1]);
-  return ctcGreedyDecode(logits.data as Float32Array, timeSteps, numClasses, rec.charset);
+  // Same text and confidence as the greedy decode, plus each character's runners-up.
+  return ctcDecodeTopK(logits.data as Float32Array, timeSteps, numClasses, rec.charset);
 }
 
 /**
@@ -399,7 +414,7 @@ async function recognizeCrop(rec: Recognizer, crop: Bitmap): Promise<CtcDecodeRe
  * reporting high confidence — measured 0.95 on a novel page that came back as
  * pure noise. Splitting first is what makes vertical text work at all.
  */
-async function readBox(rec: Recognizer, bmp: Bitmap, box: DetBox): Promise<CtcDecodeResult> {
+async function readBox(rec: Recognizer, bmp: Bitmap, box: DetBox): Promise<DecodedLine> {
   const columns = splitTategakiColumns(bmp, box);
   if (columns) return recognizeColumns(rec, bmp, box, columns);
   return isVerticalBox(box)
@@ -418,27 +433,31 @@ async function recognizeColumns(
   bmp: Bitmap,
   box: DetBox,
   columns: Array<[number, number]>,
-): Promise<CtcDecodeResult> {
+): Promise<DecodedLine> {
   let text = '';
   let weighted = 0;
   let chars = 0;
+  const perChar: OcrChar[] = [];
+  let aligned = true;
   for (const [x0, x1] of columns) {
     const column: DetBox = { x0, y0: box.y0, x1, y1: box.y1, score: box.score };
     const decoded = await recognizeVerticalBox(rec, bmp, column);
-    const piece = decoded.text.trim();
-    if (!piece) continue;
-    text += piece;
-    weighted += decoded.confidence * piece.length;
-    chars += piece.length;
+    const piece = trimChars(decoded.text, decoded.chars);
+    if (!piece.text) continue;
+    text += piece.text;
+    weighted += decoded.confidence * piece.text.length;
+    chars += piece.text.length;
+    if (piece.chars.length) perChar.push(...piece.chars);
+    else aligned = false;
   }
-  return { text, confidence: chars > 0 ? weighted / chars : 0 };
+  return { text, confidence: chars > 0 ? weighted / chars : 0, chars: aligned ? perChar : [] };
 }
 
 async function recognizeVerticalBox(
   rec: Recognizer,
   bmp: Bitmap,
   box: DetBox,
-): Promise<CtcDecodeResult> {
+): Promise<DecodedLine> {
   const rotated = await recognizeCrop(rec, extractCrop(bmp, box, true));
   const stacked = await recognizeStackedColumn(rec, bmp, box);
   return scoreRecognition(stacked) >= scoreRecognition(rotated) ? stacked : rotated;
@@ -625,13 +644,15 @@ async function recognizeStackedColumn(
   rec: Recognizer,
   bmp: Bitmap,
   box: DetBox,
-): Promise<CtcDecodeResult> {
+): Promise<DecodedLine> {
   const rows = segmentColumnRows(bmp, box);
   if (rows.length < 2) return recognizeCrop(rec, extractCrop(bmp, box, false));
 
   let text = '';
   let confidenceSum = 0;
   let read = 0;
+  const perChar: OcrChar[] = [];
+  let aligned = true;
 
   for (const [top, bottom] of rows) {
     // Pad each cell slightly: the recogniser was trained on text with margin,
@@ -645,14 +666,17 @@ async function recognizeStackedColumn(
       score: box.score,
     };
     const decoded = await recognizeCrop(rec, extractCrop(bmp, cell, false));
-    const ch = decoded.text.trim();
+    const piece = trimChars(decoded.text, decoded.chars);
+    const ch = piece.text;
     if (!ch) continue;
     text += ch;
     confidenceSum += decoded.confidence;
     read += 1;
+    if (piece.chars.length) perChar.push(...piece.chars);
+    else aligned = false;
   }
 
-  return { text, confidence: read > 0 ? confidenceSum / read : 0 };
+  return { text, confidence: read > 0 ? confidenceSum / read : 0, chars: aligned ? perChar : [] };
 }
 
 /**
@@ -757,15 +781,46 @@ export async function recognizePaddleOcrDataUrl(
   for (const box of ordered) {
     const vertical = isVerticalBox(box);
     const decoded = await readBox(rec, bmp, box);
-    const text = decoded.text.trim();
+    const { text, chars } = trimChars(decoded.text, decoded.chars);
     if (!text || decoded.confidence < MIN_LINE_CONFIDENCE) continue;
     lines.push({
       text,
       box: [box.x0, box.y0, box.x1, box.y1],
       vertical,
       confidence: decoded.confidence,
+      ...(chars.length ? { chars } : {}),
     });
   }
 
   return { text: lines.map((l) => l.text).join('\n'), lang, lines };
+}
+
+/**
+ * Read a picture that is already one line of text (a crop the OCR router wants
+ * a second opinion on): no detection, the whole picture is the box. Vertical
+ * crops are read the way a detected column is (split into cells or rotated,
+ * whichever reads better). Returns null when the language's recogniser is not
+ * installed.
+ */
+export async function recognizePaddleLineDataUrl(
+  dataUrl: string,
+  lang: PaddleLang,
+  opts: { vertical?: boolean } = {},
+): Promise<PaddleOcrLine | null> {
+  if (!installedPaddleLangs().includes(lang)) return null;
+  const bmp = decodeDataUrl(dataUrl);
+  const rec = await ensureRecognizer(lang);
+  const vertical = opts.vertical ?? bmp.height > bmp.width * 1.5;
+  const box: DetBox = { x0: 0, y0: 0, x1: bmp.width, y1: bmp.height, score: 1 };
+  const decoded = vertical
+    ? (splitTategakiColumns(bmp, box) ? await readBox(rec, bmp, box) : await recognizeVerticalBox(rec, bmp, box))
+    : await recognizeCrop(rec, extractCrop(bmp, box, false));
+  const { text, chars } = trimChars(decoded.text, decoded.chars);
+  return {
+    text,
+    box: [0, 0, bmp.width, bmp.height],
+    vertical,
+    confidence: decoded.confidence,
+    ...(chars.length ? { chars } : {}),
+  };
 }

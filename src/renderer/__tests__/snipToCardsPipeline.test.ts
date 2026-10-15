@@ -23,13 +23,15 @@ const h = vi.hoisted(() => ({
   toasts: [] as unknown[],
   ankiDeleteOk: true,
   nextNote: 900,
+  ocrLang: 'ja' as 'ja' | 'zh' | 'ru',
+  basicLangs: [] as string[][],
 }));
 
-vi.mock('../lensOfflineOcr', () => ({
-  readLensFallbackImage: async () => ({
-    text: h.ocrText,
-    lines: [{ text: h.ocrText, confidence: h.ocrConfidence, box: [0, 0, 1, 1] }],
-  }),
+vi.mock('../snipBasicOcr', () => ({
+  readSnipBasic: async (basic: { langs?: string[] }) => {
+    h.basicLangs.push(basic.langs ?? []);
+    return { text: h.ocrText, confidence: h.ocrConfidence, lang: h.ocrLang, model: h.ocrLang === 'zh' ? 'chi_sim' : 'jpn' };
+  },
 }));
 vi.mock('../tokenizer', () => ({
   getTokenizer: async () => ({}),
@@ -163,6 +165,8 @@ async function load() {
 beforeEach(() => {
   h.ocrText = '窓辺の猫は静かに眠っていた。';
   h.ocrConfidence = 0.92;
+  h.ocrLang = 'ja';
+  h.basicLangs = [];
   h.deck = [];
   h.known = new Set();
   h.mined = [];
@@ -248,6 +252,65 @@ describe('a snip becomes cards', () => {
     await processSnip({ ...base, entry: failed, basicOcr: undefined });
     expect(h.mined).toHaveLength(0);
     expect(h.toasts[0]).toMatchObject({ kind: 'error', error: 'models-missing', lang: 'zh' });
+  });
+});
+
+describe('many languages', () => {
+  it('a Chinese snip on a Japanese profile with no Chinese reader: kept, and the Chinese reader offered', async () => {
+    h.ocrText = '过度的崇拜。';
+    h.ocrLang = 'zh';
+    h.ocrConfidence = 0.6;
+    const { processSnip } = await load();
+    const entry = await processSnip(job({
+      basicOcr: { dataUrl: 'data:image/png;base64,AA==', width: 600, height: 120, langs: ['ja'], models: {}, offer: { zh: ['paddle-ocr-zh'], ru: ['paddle-ocr-ru'] } },
+    }));
+    expect(h.mined).toHaveLength(0);
+    // Never "not in your study language": it is Chinese, and Chinese can be installed.
+    expect(entry).toMatchObject({ status: 'error', error: 'models-missing', lang: 'zh', installIds: ['paddle-ocr-zh'], text: '过度的崇拜。' });
+    expect(h.toasts[0]).toMatchObject({ kind: 'error', error: 'models-missing', lang: 'zh' });
+  });
+
+  it('a Chinese snip read by the installed Chinese data becomes Chinese cards', async () => {
+    h.ocrText = '我们喜欢读书';
+    h.ocrLang = 'zh';
+    const { processSnip } = await load();
+    const entry = await processSnip(job({
+      basicOcr: { dataUrl: 'data:image/png;base64,AA==', width: 600, height: 120, langs: ['ja', 'zh'], models: { chi_sim: 'localfile://wall/t' }, offer: { ru: ['paddle-ocr-ru'] } },
+    }));
+    expect(h.basicLangs[0]).toEqual(['ja', 'zh']);
+    expect(entry).toMatchObject({ status: 'done', lang: 'zh' });
+    expect(h.mined.length).toBeGreaterThan(0);
+    expect(h.mined.every((m) => m.studyLang === 'zh')).toBe(true);
+  });
+
+  it('a Russian learner with no Russian reader: an empty basic read offers the Russian reader', async () => {
+    h.ocrText = '';
+    h.ocrLang = 'ru';
+    const { processSnip } = await load();
+    const base = job();
+    const entry = await processSnip({
+      ...base,
+      entry: { ...base.entry, lang: 'ru' },
+      basicOcr: { dataUrl: 'data:image/png;base64,AA==', width: 600, height: 120, langs: ['ru', 'ja'], models: {}, offer: { ru: ['paddle-ocr-ru'], zh: ['paddle-ocr-zh'] } },
+    });
+    expect(entry).toMatchObject({ status: 'error', error: 'models-missing', lang: 'ru', installIds: ['paddle-ocr-ru'] });
+  });
+
+  it('the accurate read carries its unsure characters; one fixed character keeps the rest of the list', async () => {
+    const { processSnip, runAction, unsureAfterEdit } = await load();
+    const entry = await processSnip(job({
+      basicOcr: undefined,
+      ocr: { text: '窓辺の猫は静かに眠っていた。', engine: 'web', confidence: 0.7, unsure: [{ at: 2, ch: 'の', p: 0.4, alts: ['ノ'] }, { at: 3, ch: '猫', p: 0.5, alts: ['描', '錨'] }], corrected: 1 },
+    }));
+    expect(entry).toMatchObject({ status: 'done', review: 'uncertain', corrected: 1 });
+    expect(h.entries.get('snip-1')!.unsure).toHaveLength(2);
+    expect(unsureAfterEdit(h.entries.get('snip-1')!, '窓辺の描は静かに眠っていた。')).toEqual([
+      { at: 2, ch: 'の', p: 0.4, alts: ['ノ'] },
+      { at: 3, ch: '描', p: 0.5, alts: ['猫', '錨'] },
+    ]);
+    expect(unsureAfterEdit(h.entries.get('snip-1')!, '窓の猫')).toEqual([]);
+    await runAction({ id: 'snip-1', action: 'reanalyze', text: '窓辺の描は静かに眠っていた。' });
+    expect(h.entries.get('snip-1')!.unsure?.[1]).toMatchObject({ ch: '描', alts: ['猫', '錨'] });
   });
 });
 

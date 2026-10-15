@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import {
   snipEngineLabel,
+  snipErrorKey,
   snipWordList,
   SNIP_TOAST_NOTICE_MS,
   SNIP_TOAST_PLAIN_MS,
@@ -124,18 +125,12 @@ export default function SnipToastWindow() {
       message = t('snip.toast.paused');
       break;
     case 'resumed':
-      message = t('snip.toast.resumed');
+      message = payload.setup ? `${t('snip.toast.resumed')} ${t('snip2.toast.setup')}` : t('snip.toast.resumed');
       break;
     default:
       message = payload.error === 'models-missing'
         ? t('snip.toast.modelsMissing', { lang: t(`snip.lang.${payload.lang ?? 'zh'}`) })
-        : payload.error === 'no-text'
-          ? t('snip.error.noText')
-          : payload.error === 'garbage'
-            ? t('snip.error.garbage')
-            : payload.error === 'low-confidence'
-              ? t('snip.error.lowConfidence')
-              : t('snip.error.ocrFailed');
+        : t(snipErrorKey(payload.error), { lang: t(`snip.lang.${payload.lang ?? 'ja'}`) });
   }
   if (turnedOff) message = t('snip2.notice.turnedOff');
   const label = snipEngineLabel(payload.engine);
@@ -188,6 +183,11 @@ export default function SnipToastWindow() {
         {undoable && (
           <button type="button" className="snip-toast-undo" onClick={() => void window.api.snipAction({ id: payload.id as string, action: 'undo' })}>
             {t('snip.toast.undo')}
+          </button>
+        )}
+        {payload.setup && !payload.id && (
+          <button type="button" className="snip-toast-open snip-toast-setup" onClick={() => void window.api.snipOpen(null)}>
+            {t('snip2.toast.setupAction')}
           </button>
         )}
         {payload.id && (

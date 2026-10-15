@@ -77,7 +77,13 @@ const h = vi.hoisted(() => {
     locked: false,
     lang: 'ja' as 'ja' | 'zh' | 'ru',
     paddleLangs: [] as string[],
+    manga: false,
     ocrCalls: 0,
+    routerCalls: [] as Array<{ langs: readonly string[]; purpose: string }>,
+    router: null as null | Record<string, unknown>,
+    installed: new Set<string>(),
+    started: [] as string[],
+    installedListener: null as null | ((id: string) => void),
     commands: new Map<string, () => void>(),
     main: null as FakeWindow | null,
     ensureCalls: 0,
@@ -96,7 +102,10 @@ vi.mock('electron', () => {
       readBuffer: (format: string) => (format === 'PNG' && h.clip.raw ? Buffer.from(h.clip.raw) : Buffer.alloc(0)),
       readText: () => h.clip.text,
     },
-    nativeImage: { createFromPath: (p: string) => new h.FakeImage(fs.existsSync(p) ? 'stored' : '') },
+    nativeImage: {
+      createFromPath: (p: string) => new h.FakeImage(fs.existsSync(p) ? 'stored' : ''),
+      createFromBuffer: (b: Buffer) => new h.FakeImage(b.length ? 'stored' : ''),
+    },
     ipcMain: {
       handle: (ch: string, fn: (...a: unknown[]) => unknown) => h.handlers.set(ch, fn),
       on: () => undefined,
@@ -110,17 +119,39 @@ vi.mock('electron', () => {
 vi.mock('../lockGuard', () => ({ appLocked: () => h.locked }));
 vi.mock('../studyLanguage', () => ({ getMainStudyLang: () => h.lang }));
 vi.mock('../paddleOcr', () => ({
-  paddleOcrAvailable: () => h.paddleLangs.length > 0,
+  isInstalledPaddleDetector: () => h.paddleLangs.length > 0,
   installedPaddleLangs: () => h.paddleLangs,
 }));
-vi.mock('../mangaOcr', () => ({ mangaOcrAvailable: () => false }));
+vi.mock('../mangaOcr', () => ({ mangaOcrAvailable: () => h.manga }));
 vi.mock('../screenOcr', () => ({
   boundedScreenshotDataUrl: () => 'data:image/jpeg;base64,SlBFRw==',
-  ocrClipboardImage: async () => {
+}));
+vi.mock('../ocrRouter', () => ({
+  routerImageFromNative: (image: unknown) => image,
+  recognizeWithRouter: async (_image: unknown, opts: { langs: readonly string[]; purpose: string }) => {
     h.ocrCalls += 1;
-    return { ok: true, text: '今天天气很好', engine: 'web', lang: 'zh', confidence: 0.93 };
+    h.routerCalls.push({ langs: opts.langs, purpose: opts.purpose });
+    return h.router ?? {
+      ok: true, text: '今天天气很好', lines: [{ text: '今天天气很好', corrected: 0 }], engine: 'web', engines: ['web'], lang: 'zh', confidence: 0.93, unsure: [],
+    };
   },
 }));
+vi.mock('../downloads', () => ({
+  isInstalled: (id: string) => h.installed.has(id),
+  assetPath: (id: string) => (h.installed.has(id) ? `C:/models/${id}/${id.replace('tessdata-', '')}.traineddata` : null),
+  onAssetInstalled: (fn: (id: string) => void) => {
+    h.installedListener = fn;
+    return () => {
+      h.installedListener = null;
+    };
+  },
+  startDownload: async (id: string) => {
+    h.started.push(id);
+    return { ok: true };
+  },
+}));
+vi.mock('../library', () => ({ localFileUrl: (p: string) => `localfile://wall/token-${path.basename(p)}` }));
+vi.mock('../e2eHeadless', () => ({ isE2eHeadless: () => false }));
 vi.mock('../globalCommands', () => ({
   registerGlobalCommand: (id: string, fn: () => void) => {
     h.commands.set(id, fn);
@@ -144,6 +175,12 @@ async function load(): Promise<Mod> {
   h.main = null;
   h.ensureCalls = 0;
   h.ocrCalls = 0;
+  h.routerCalls = [];
+  h.router = null;
+  h.installed = new Set();
+  h.started = [];
+  h.installedListener = null;
+  h.manga = false;
   h.locked = false;
   h.lang = 'ja';
   h.paddleLangs = [];
@@ -276,21 +313,134 @@ describe('watching the clipboard', () => {
 });
 
 describe('languages and engines', () => {
-  it('Chinese with no model installed: an error with the install offer, never a download', async () => {
+  type Job = { entry: { lang: string; status: string }; ocr?: Record<string, unknown>; basicOcr?: Record<string, unknown> };
+  const job = (): Job => mod.__snipToCardsTestables.pending()[0].payload as Job;
+
+  it('Chinese with no reader at all: the bundled reader runs, with the Chinese reader offered, never downloaded', async () => {
     h.lang = 'zh';
     await snip('汉字');
-    const [entry] = history();
-    expect(entry).toMatchObject({ status: 'error', error: 'models-missing', installIds: ['paddle-ocr-zh'] });
     expect(h.ocrCalls).toBe(0);
+    expect(job().basicOcr).toMatchObject({ langs: ['zh', 'ja'], offer: { zh: ['paddle-ocr-zh'], ru: ['paddle-ocr-ru'] }, models: {} });
+    expect(job().basicOcr?.offer).not.toHaveProperty('ja');
+    expect(h.started).toEqual([]);
   });
 
-  it('Chinese with its model: read in main with the accurate engine, confidence carried', async () => {
+  it('Chinese with its model: read by the OCR router in every candidate language, confidence carried', async () => {
     h.lang = 'zh';
     h.paddleLangs = ['zh'];
     await snip('汉字');
-    const job = mod.__snipToCardsTestables.pending()[0].payload as { ocr?: unknown; basicOcr?: unknown };
-    expect(job.ocr).toEqual({ text: '今天天气很好', engine: 'web', confidence: 0.93 });
-    expect(job.basicOcr).toBeUndefined();
+    expect(h.routerCalls).toEqual([{ langs: ['zh'], purpose: 'snip' }]);
+    expect(job().ocr).toEqual({ text: '今天天气很好', engine: 'web', confidence: 0.93 });
+    expect(job().basicOcr).toBeUndefined();
+  });
+
+  it('a Japanese learner with the Chinese reader installed: a Chinese snip becomes a Chinese snip', async () => {
+    h.lang = 'ja';
+    h.paddleLangs = ['zh'];
+    await snip('过度的崇拜');
+    expect(h.routerCalls[0].langs).toEqual(['ja', 'zh']);
+    expect(job().entry).toMatchObject({ lang: 'zh', status: 'processing' });
+    expect(history()[0].lang).toBe('zh');
+  });
+
+  it('the router says the text is in a language with no reader: kept, and that reader offered', async () => {
+    h.lang = 'ja';
+    h.paddleLangs = ['ja'];
+    h.router = {
+      ok: true, text: '过度的崇拜', lines: [], engine: 'web', engines: ['web'], lang: 'zh', confidence: 0.6, unsure: [],
+      missing: { lang: 'zh', assetIds: ['paddle-ocr-zh'] },
+    };
+    await snip('过度的崇拜');
+    expect(history()[0]).toMatchObject({ status: 'error', error: 'models-missing', lang: 'zh', installIds: ['paddle-ocr-zh'], text: '过度的崇拜' });
+    expect(h.started).toEqual([]);
+  });
+
+  it('unsure characters, dictionary corrections and second opinions travel with the read', async () => {
+    h.paddleLangs = ['ja'];
+    h.manga = true;
+    h.router = {
+      ok: true, text: '恐竜の魅力を語る', lines: [{ text: '恐竜の魅力を語る', corrected: 2 }], engine: 'web', engines: ['web', 'manga'], lang: 'ja', confidence: 0.7,
+      unsure: [{ at: 6, ch: '語', p: 0.4, alts: ['話'] }],
+    };
+    await snip('thumb');
+    expect(job().ocr).toEqual({
+      text: '恐竜の魅力を語る', engine: 'web', confidence: 0.7, unsure: [{ at: 6, ch: '語', p: 0.4, alts: ['話'] }], corrected: 2, engines: ['web', 'manga'],
+    });
+  });
+
+  it('installed Chinese Tesseract data is handed to the bundled reader by URL', async () => {
+    h.lang = 'zh';
+    h.installed = new Set(['tessdata-chi_sim']);
+    await snip('汉字');
+    expect(job().basicOcr).toMatchObject({ langs: ['zh', 'ja'], models: { chi_sim: 'localfile://wall/token-chi_sim.traineddata' } });
+    expect((job().basicOcr?.offer as Record<string, unknown>).zh).toBeUndefined();
+  });
+
+  it('status reports the installed readers and the study language', async () => {
+    h.paddleLangs = ['ja'];
+    h.installed = new Set(['tessdata-chi_tra']);
+    const status = (await h.handlers.get('snip:getStatus')!({})) as { readers: unknown; studyLang: string };
+    expect(status.readers).toEqual({ det: true, paddle: ['ja'], manga: false, tess: ['chi_tra'] });
+    expect(status.studyLang).toBe('ja');
+  });
+});
+
+describe('turning it on offers the accurate reader', () => {
+  it('turned on from the tray or the hotkey with no accurate reader: the toast offers the setup', async () => {
+    await h.handlers.get('snip:setSettings')!({}, { enabled: false });
+    h.commands.get('snip.toggle')!();
+    expect(await h.handlers.get('snip:toast:get')!({})).toMatchObject({ kind: 'resumed', setup: true });
+    h.commands.get('snip.toggle')!();
+    h.paddleLangs = ['ja'];
+    h.commands.get('snip.toggle')!();
+    expect(await h.handlers.get('snip:toast:get')!({})).toEqual({ kind: 'resumed' });
+  });
+});
+
+describe('read again', () => {
+  it('re-reads the stored picture with the best reader now, clearing the old read', async () => {
+    await snip('猫');
+    const [entry] = history();
+    await h.handlers.get('snip:history:update')!({}, entry.id, { status: 'error', error: 'garbage', text: 'しJ4', engine: 'basic', confidence: 0.53 });
+    h.paddleLangs = ['ja'];
+    h.router = { ok: true, text: '猫が好き', lines: [], engine: 'web', engines: ['web'], lang: 'ja', confidence: 0.95, unsure: [] };
+    expect(await h.handlers.get('snip:action')!({}, { id: entry.id, action: 'reread' })).toBe(true);
+    await mod.__snipToCardsTestables.settled();
+    const after = history()[0];
+    expect(after).toMatchObject({ id: entry.id, status: 'processing', text: '' });
+    expect(after.error).toBeUndefined();
+    expect(after.engine).toBeUndefined();
+    const sent = mod.__snipToCardsTestables.pending().at(-1)!.payload as { entry: { id: string }; ocr: { text: string } };
+    expect(sent).toMatchObject({ entry: { id: entry.id }, ocr: { text: '猫が好き' } });
+  });
+
+  it('is refused while the snip owns cards, or is still being read', async () => {
+    await snip('猫');
+    const [entry] = history();
+    expect(await h.handlers.get('snip:action')!({}, { id: entry.id, action: 'reread' })).toBe(false);
+    await h.handlers.get('snip:history:update')!({}, entry.id, { status: 'done', cardIds: ['c1'], words: [{ surface: '猫', lemma: '猫', status: 'added', cardId: 'c1' }] });
+    expect(await h.handlers.get('snip:action')!({}, { id: entry.id, action: 'reread' })).toBe(false);
+  });
+
+  it('install and read again: downloads only what was clicked, and reads once everything is installed', async () => {
+    await snip('过度');
+    const [entry] = history();
+    await h.handlers.get('snip:history:update')!({}, entry.id, { status: 'error', error: 'models-missing', lang: 'zh', installIds: ['paddle-ocr-zh'] });
+    const pendingBefore = mod.__snipToCardsTestables.pending().length;
+    expect(await h.handlers.get('snip:action')!({}, { id: entry.id, action: 'installReread', assets: ['paddle-ocr-zh', 'qwen3-1.7b'] })).toBe(true);
+    // Only reader assets are accepted from IPC.
+    expect(h.started).toEqual(['paddle-ocr-zh']);
+    expect([...mod.__snipToCardsTestables.waitingForReaders().get(entry.id) ?? []].sort()).toEqual(['paddle-ocr-det', 'paddle-ocr-zh', 'paddle-ocr-zh-keys']);
+    h.installed.add('paddle-ocr-zh');
+    h.installedListener?.('paddle-ocr-zh');
+    expect(mod.__snipToCardsTestables.pending()).toHaveLength(pendingBefore);
+    h.installed = new Set(['paddle-ocr-zh', 'paddle-ocr-zh-keys', 'paddle-ocr-det']);
+    h.paddleLangs = ['zh'];
+    h.installedListener?.('paddle-ocr-det');
+    await mod.__snipToCardsTestables.settled();
+    expect(mod.__snipToCardsTestables.waitingForReaders().size).toBe(0);
+    expect(mod.__snipToCardsTestables.pending().length).toBe(pendingBefore + 1);
+    expect(history()[0]).toMatchObject({ id: entry.id, lang: 'zh', status: 'processing' });
   });
 });
 

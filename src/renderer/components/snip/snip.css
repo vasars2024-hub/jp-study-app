@@ -578,3 +578,119 @@ html.snip-toast-window body {
     transition: none;
   }
 }
+
+/* ---- The accurate reader: setup card, per-snip offer, progress ---------------- */
+.snip-reader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--panel, transparent);
+}
+
+.snip-reader.is-compact {
+  padding: 8px 10px;
+}
+
+.snip-reader-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.snip-reader-text {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.snip-reader-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.snip-reader-options .snip-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.snip-reader-start,
+.snip-reader-install {
+  align-self: flex-start;
+}
+
+.snip-reader-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.snip-reader-progress progress {
+  width: min(240px, 100%);
+  height: 8px;
+  accent-color: var(--accent, currentColor);
+}
+
+.snip-reader-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.snip-reader-offer p {
+  margin: 0;
+}
+
+/* ---- Read again ---------------------------------------------------------------- */
+.snip-detail-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* ---- Unsure characters: one click on the right one ----------------------------- */
+.snip-unsure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.snip-unsure-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.snip-unsure-context {
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+
+.snip-unsure-char {
+  background: color-mix(in srgb, var(--accent, #c33) 28%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.snip-unsure-alts {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.snip-unsure-alt {
+  font-size: 16px;
+  min-width: 32px;
+}

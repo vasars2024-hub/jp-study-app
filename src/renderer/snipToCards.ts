@@ -4,8 +4,9 @@
  * Main notices a Win+Shift+S snip on the clipboard and sends it here
  * (`main/snipToCards.ts`), because the deck, the known words and the
  * pending-Anki queue live in this window's storage. This reads the picture
- * (main's accurate engine when one is installed, otherwise the bundled offline
- * recognizer for Japanese), splits the sentence into words, adds every word
+ * (main's OCR router when an accurate engine is installed, otherwise the
+ * bundled offline recognizer, `snipBasicOcr.ts`), takes the language the text
+ * is in, splits the sentence into words, adds every word
  * the learner does not know yet as a card through the one mining path every
  * surface uses (`mineToStudy`), and writes the analysis back to main's history.
  *
@@ -49,6 +50,7 @@ import {
   type SnipWord,
 } from '../shared/snipToCards';
 import { normalizeStudyLang, type StudyLang } from '../shared/studyLang';
+import { snipErrorKey } from '../shared/snipToCards';
 import { t, getUiLang } from './i18n';
 import { isDnd } from './notificationStore';
 import { SECTION_OPEN_EVENT } from './sectionSurface';
@@ -148,29 +150,50 @@ interface OcrRead {
   engine: string;
   confidence?: number;
   error?: SnipError;
+  /** The language the text is in (absent: the entry's own). */
+  lang?: StudyLang;
+  unsure?: SnipEntry['unsure'];
+  corrected?: number;
+  engines?: string[];
 }
 
 async function readPicture(job: SnipJob): Promise<OcrRead> {
-  if (job.ocr) return { text: job.ocr.text, engine: job.ocr.engine, confidence: job.ocr.confidence };
+  if (job.ocr) {
+    return {
+      text: job.ocr.text,
+      engine: job.ocr.engine,
+      confidence: job.ocr.confidence,
+      ...(job.ocr.unsure?.length ? { unsure: job.ocr.unsure } : {}),
+      ...(job.ocr.corrected ? { corrected: job.ocr.corrected } : {}),
+      ...(job.ocr.engines?.length ? { engines: job.ocr.engines } : {}),
+    };
+  }
   if (!job.basicOcr) return { text: '', engine: 'none', error: 'ocr-failed' };
   try {
-    const { readLensFallbackImage } = await import('./lensOfflineOcr');
-    const read = await readLensFallbackImage({
-      dataUrl: job.basicOcr.dataUrl,
-      width: job.basicOcr.width,
-      height: job.basicOcr.height,
-      dipPerPixelX: 1,
-      dipPerPixelY: 1,
-    });
-    const chars = read.lines.reduce((sum, line) => sum + line.text.length, 0);
-    const confidence = chars
-      ? read.lines.reduce((sum, line) => sum + line.confidence * line.text.length, 0) / chars
-      : undefined;
-    return { text: read.text, engine: 'basic', ...(confidence !== undefined ? { confidence } : {}) };
+    const { readSnipBasic } = await import('./snipBasicOcr');
+    const read = await readSnipBasic(job.basicOcr, normalizeStudyLang(job.entry.lang));
+    return { text: read.text, engine: 'basic', lang: read.lang, ...(read.confidence !== undefined ? { confidence: read.confidence } : {}) };
   } catch (err) {
     console.warn('[snipToCards] offline OCR failed', err);
     return { text: '', engine: 'basic', error: 'ocr-failed' };
   }
+}
+
+/**
+ * The basic reader's text is in a language with no reader at all (Chinese on
+ * a Japanese-only install), or the learner's own language has none and the
+ * read failed: the download that reads it, for the entry's install offer.
+ */
+export function basicReaderOffer(
+  read: Pick<OcrRead, 'text' | 'lang' | 'error'>,
+  active: StudyLang,
+  offer: Partial<Record<StudyLang, string[]>> | undefined,
+): { lang: StudyLang; ids: string[] } | null {
+  if (!offer) return null;
+  const lang = read.lang ?? active;
+  if (read.text.trim() && offer[lang]?.length) return { lang, ids: offer[lang] as string[] };
+  if (offer[active]?.length && (!read.text.trim() || read.error)) return { lang: active, ids: offer[active] as string[] };
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -491,20 +514,7 @@ async function addOne(word: SnipWord, ctx: MineContext, merge: boolean): Promise
 // Telling the user
 
 function errorMessage(error: SnipError | undefined, lang: StudyLang): string {
-  switch (error) {
-    case 'models-missing':
-      return t('snip.toast.modelsMissing', { lang: t(`snip.lang.${lang}`) });
-    case 'no-text':
-      return t('snip.error.noText');
-    case 'garbage':
-      return t('snip.error.garbage');
-    case 'low-confidence':
-      return t('snip.error.lowConfidence');
-    case 'cancelled':
-      return t('snip.error.cancelled');
-    default:
-      return t('snip.error.ocrFailed');
-  }
+  return t(snipErrorKey(error), { lang: t(`snip.lang.${lang}`) });
 }
 
 function reviewMessage(count: number, review: SnipReviewReason, confidence: number | undefined): string {
@@ -593,7 +603,9 @@ async function translateLater(entry: SnipEntry): Promise<void> {
     const text = await translateTo(flatText(entry.text, lang), lang, target);
     await update(entry.id, text.trim() ? { translation: text.trim() } : { translationError: t('snip.translate.empty') });
   } catch (err) {
-    await update(entry.id, { translationError: err instanceof Error ? err.message : t('snip.translate.failed') });
+    // The engines' own messages are English; the learner gets the translated reason and what to do.
+    console.warn('[snipToCards] translation failed', err);
+    await update(entry.id, { translationError: t('snip.translate.failed') });
   }
 }
 
@@ -609,24 +621,31 @@ async function addAll(words: SnipWord[], ctx: MineContext): Promise<SnipWord[]> 
 
 export async function processSnip(job: SnipJob): Promise<SnipEntry | null> {
   const { entry, settings } = job;
-  const lang = normalizeStudyLang(entry.lang);
+  const active = normalizeStudyLang(entry.lang);
   if (entry.status === 'error') {
     announce(entry, { added: [], merged: 0, waiting: 0 });
     return entry;
   }
   const read = await readPicture(job);
+  const lang = read.lang ?? active;
+  const readFields = {
+    text: read.text.trim(),
+    engine: read.engine,
+    ...(read.confidence !== undefined ? { confidence: read.confidence } : {}),
+  };
+  // The text is in a language nothing here reads well: keep the read and offer that reader.
+  const offer = job.basicOcr ? basicReaderOffer(read, active, job.basicOcr.offer) : null;
+  if (offer) {
+    const missing = await update(entry.id, { ...readFields, status: 'error', error: 'models-missing', lang: offer.lang, installIds: offer.ids });
+    announce(missing ?? { ...entry, ...readFields, lang: offer.lang, status: 'error', error: 'models-missing' }, { added: [], merged: 0, waiting: 0 });
+    return missing;
+  }
   const problem = read.error ?? snipTextProblem(read.text, lang, read.confidence);
   if (problem) {
     // Never cards from an empty or garbled read: the entry keeps what was read, for the
     // history (and for "Fix the text" in the Snips view).
-    const failed = await update(entry.id, {
-      status: 'error',
-      error: problem,
-      text: read.text.trim(),
-      engine: read.engine,
-      ...(read.confidence !== undefined ? { confidence: read.confidence } : {}),
-    });
-    announce(failed ?? { ...entry, status: 'error', error: problem }, { added: [], merged: 0, waiting: 0 });
+    const failed = await update(entry.id, { ...readFields, status: 'error', error: problem, lang });
+    announce(failed ?? { ...entry, ...readFields, lang, status: 'error', error: problem }, { added: [], merged: 0, waiting: 0 });
     return failed;
   }
   const text = read.text.trim();
@@ -639,6 +658,7 @@ export async function processSnip(job: SnipJob): Promise<SnipEntry | null> {
       : undefined;
   const base: SnipEntry = {
     ...entry,
+    lang,
     text,
     engine: read.engine,
     ...(read.confidence !== undefined ? { confidence: read.confidence } : {}),
@@ -648,9 +668,13 @@ export async function processSnip(job: SnipJob): Promise<SnipEntry | null> {
     ...(review ? { review } : {}),
   };
   await update(entry.id, {
+    lang,
     text: base.text,
     engine: base.engine,
     ...(read.confidence !== undefined ? { confidence: read.confidence } : {}),
+    ...(read.unsure?.length ? { unsure: read.unsure } : {}),
+    ...(read.corrected ? { corrected: read.corrected } : {}),
+    ...(read.engines?.length ? { engines: read.engines } : {}),
     words: analysed,
     grammar,
     overLimit: base.overLimit,
@@ -848,10 +872,12 @@ async function reanalyze(id: string, text: string): Promise<void> {
   const lang = normalizeStudyLang(entry.lang);
   const status = await window.api.snipGetStatus();
   const { words, grammar } = await analyse(text, lang, status.maxWords);
+  const unsure = unsureAfterEdit(entry, text);
   const next = await update(id, {
     status: 'done',
     text,
     ...(entry.ocrText === undefined ? { ocrText: entry.text } : {}),
+    ...(unsure.length ? { unsure } : {}),
     words,
     grammar,
     review: 'manual',
@@ -859,9 +885,31 @@ async function reanalyze(id: string, text: string): Promise<void> {
     cardIds: [],
     ankiNoteIds: [],
     ...(words.some((w) => w.status === 'overLimit') ? { overLimit: words.filter((w) => w.status === 'overLimit').length } : {}),
-    clear: ['error', 'installIds', 'translation', 'translationError', ...(words.some((w) => w.status === 'overLimit') ? [] : ['overLimit' as const])],
+    clear: [
+      'error', 'installIds', 'translation', 'translationError',
+      ...(words.some((w) => w.status === 'overLimit') ? [] : ['overLimit' as const]),
+      ...(unsure.length ? [] : ['unsure' as const]),
+    ],
   });
   if (next) void translateLater(next);
+}
+
+/**
+ * The unsure characters still worth offering after the learner changed the
+ * text. A one-character fix (the same length) keeps the list: the fixed
+ * position now offers what it was before. Any other edit moves the positions,
+ * so the list is dropped.
+ */
+export function unsureAfterEdit(entry: Pick<SnipEntry, 'text' | 'unsure'>, text: string): NonNullable<SnipEntry['unsure']> {
+  const list = entry.unsure ?? [];
+  const before = [...entry.text];
+  const after = [...text];
+  if (!list.length || before.length !== after.length) return [];
+  return list.map((u) => {
+    const now = after[u.at];
+    if (now === u.ch) return u;
+    return { ...u, ch: now, alts: [u.ch, ...u.alts.filter((a) => a !== now && a !== u.ch)].slice(0, 6) };
+  });
 }
 
 /** This snip's own deck: later adds go there, and the cards it added move there. */
@@ -932,4 +980,4 @@ export function installSnipToCards(): () => void {
   };
 }
 
-export const __snipToCardsRendererTestables = { tokensOf, enrichWord, ownedIds, announce };
+export const __snipToCardsRendererTestables = { tokensOf, enrichWord, ownedIds, announce, readPicture };

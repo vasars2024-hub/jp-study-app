@@ -765,6 +765,10 @@ function relayoutColumns(
 
   const outW = Math.max(...lines.map((line) => line.width));
   const outH = margin * 2 + lines.length * rowH + (lines.length - 1) * rowGap;
+  // A "column" that is really a photo cut into hundreds of cells lays out as a
+  // strip hundreds of thousands of pixels long, which the recognizer refuses
+  // outright (it failed a whole snip). That is not tategaki: read it as it is.
+  if (outW > MAX_SIDE || outH > MAX_SIDE) return null;
   const out = new Uint8Array(outW * outH).fill(255);
   const rows: Array<{ y0: number; y1: number; box: [number, number, number, number] }> = [];
   lines.forEach((line, index) => {
@@ -982,4 +986,220 @@ export function prepToSourceBox(
   const x1 = Math.max(0, Math.min(source.width, map(box.x1)));
   const y1 = Math.max(0, Math.min(source.height, map(box.y1)));
   return [x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0)];
+}
+// ---------------------------------------------------------------------------
+// Extra preparations for stylised text (Snip to cards' basic reader)
+// ---------------------------------------------------------------------------
+//
+// A video thumbnail's title is not a page: big red, white and green glyphs,
+// each with a contrasting outline, over a photo. No single global threshold
+// separates that ink from that background. Two more ways to find the ink:
+//
+//  - **Adaptive threshold** (Bradley's local mean): a pixel is ink when it is
+//    clearly darker (or lighter) than its own neighbourhood, so a glyph over a
+//    bright sky and one over dark hair are both found.
+//  - **Colour layers**: the picture's colours are clustered (k-means on a
+//    sample), and each cluster that is shaped like text — many glyph-sized
+//    components, a modest share of the picture — becomes its own ink plane.
+//    Outlined lettering separates cleanly: the fill is one colour and its
+//    outline another, and either reads better alone than the mix of both.
+//
+// Each returns plain grey planes (0 = ink, 255 = paper) that go through
+// `prepareOcrImage` like any picture.
+
+/** A grey plane as an RGBA image (for `prepareOcrImage`). */
+export function grayToRgba(gray: GrayImage): RgbaImage {
+  const data = new Uint8ClampedArray(gray.width * gray.height * 4);
+  for (let i = 0, o = 0; i < gray.data.length; i++, o += 4) {
+    data[o] = gray.data[i];
+    data[o + 1] = gray.data[i];
+    data[o + 2] = gray.data[i];
+    data[o + 3] = 255;
+  }
+  return { data, width: gray.width, height: gray.height };
+}
+
+/**
+ * Bradley's adaptive threshold: ink where a pixel is `k` (a fraction) darker
+ * than the mean of its `(2r+1)²` neighbourhood — or lighter, for light ink.
+ * Integral image, so the cost does not depend on the radius.
+ */
+export function adaptiveBinarize(
+  gray: GrayImage,
+  opts: { polarity: InkPolarity; radius?: number; k?: number },
+): GrayImage {
+  const { width, height, data } = gray;
+  const radius = Math.max(4, Math.round(opts.radius ?? Math.min(width, height) / 12));
+  const k = opts.k ?? 0.15;
+  const integral = new Float64Array((width + 1) * (height + 1));
+  for (let y = 0; y < height; y++) {
+    let row = 0;
+    for (let x = 0; x < width; x++) {
+      row += data[y * width + x];
+      integral[(y + 1) * (width + 1) + (x + 1)] = integral[y * (width + 1) + (x + 1)] + row;
+    }
+  }
+  const out = new Uint8Array(width * height).fill(255);
+  for (let y = 0; y < height; y++) {
+    const y0 = Math.max(0, y - radius);
+    const y1 = Math.min(height, y + radius + 1);
+    for (let x = 0; x < width; x++) {
+      const x0 = Math.max(0, x - radius);
+      const x1 = Math.min(width, x + radius + 1);
+      const sum = integral[y1 * (width + 1) + x1] - integral[y0 * (width + 1) + x1]
+        - integral[y1 * (width + 1) + x0] + integral[y0 * (width + 1) + x0];
+      const mean = sum / ((x1 - x0) * (y1 - y0));
+      const v = data[y * width + x];
+      const ink = opts.polarity === 'dark' ? v < mean * (1 - k) : v > mean * (1 + k) && v > mean + 12;
+      if (ink) out[y * width + x] = 0;
+    }
+  }
+  return { data: out, width, height };
+}
+
+interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+function colourDistance(a: Rgb, b: Rgb): number {
+  return (a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2;
+}
+
+/** k-means on a deterministic sample of the picture's colours. */
+export function colourClusters(image: RgbaImage, k = 6, iterations = 8): Rgb[] {
+  const { width, height, data } = image;
+  const total = width * height;
+  const step = Math.max(1, Math.floor(total / 4000));
+  const sample: Rgb[] = [];
+  for (let i = 0; i < total; i += step) sample.push({ r: data[i * 4], g: data[i * 4 + 1], b: data[i * 4 + 2] });
+  if (!sample.length) return [];
+  // Farthest-point seeding: deterministic, and it does not miss a small, vivid cluster (red lettering).
+  const centres: Rgb[] = [sample[0]];
+  while (centres.length < Math.min(k, sample.length)) {
+    let far = sample[0];
+    let farD = -1;
+    for (const c of sample) {
+      const d = Math.min(...centres.map((m) => colourDistance(c, m)));
+      if (d > farD) {
+        farD = d;
+        far = c;
+      }
+    }
+    if (farD <= 0) break;
+    centres.push(far);
+  }
+  for (let it = 0; it < iterations; it++) {
+    const sums = centres.map(() => ({ r: 0, g: 0, b: 0, n: 0 }));
+    for (const c of sample) {
+      let best = 0;
+      let bestD = Infinity;
+      centres.forEach((m, j) => {
+        const d = colourDistance(c, m);
+        if (d < bestD) {
+          bestD = d;
+          best = j;
+        }
+      });
+      sums[best].r += c.r;
+      sums[best].g += c.g;
+      sums[best].b += c.b;
+      sums[best].n += 1;
+    }
+    sums.forEach((s, j) => {
+      if (s.n) centres[j] = { r: s.r / s.n, g: s.g / s.n, b: s.b / s.n };
+    });
+  }
+  return centres;
+}
+
+/**
+ * How much a binary plane looks like text: glyph-sized components (not
+ * specks, not the whole picture), covering a modest share of it. 0 = not text.
+ */
+export function textLikeness(plane: GrayImage): number {
+  const mask = new Uint8Array(plane.data.length);
+  let ink = 0;
+  for (let i = 0; i < mask.length; i++) {
+    if (plane.data[i] < 128) {
+      mask[i] = 1;
+      ink += 1;
+    }
+  }
+  const share = ink / Math.max(1, mask.length);
+  if (share < 0.004 || share > 0.45) return 0;
+  const { components } = connectedComponents(mask, plane.width, plane.height);
+  const minSide = Math.max(6, Math.min(plane.width, plane.height) * 0.04);
+  let glyphs = 0;
+  for (const c of components) {
+    const w = c.x1 - c.x0;
+    const h = c.y1 - c.y0;
+    const edges = (c.x0 === 0 ? 1 : 0) + (c.y0 === 0 ? 1 : 0) + (c.x1 === plane.width ? 1 : 0) + (c.y1 === plane.height ? 1 : 0);
+    if (edges >= 2) continue;
+    if (Math.max(w, h) < minSide || h > plane.height * 0.9 || w > plane.width * 0.9) continue;
+    const density = c.area / Math.max(1, w * h);
+    if (density < 0.08 || density > 0.9) continue;
+    glyphs += 1;
+  }
+  return glyphs ? Math.log1p(glyphs) * (1 - Math.abs(share - 0.12)) : 0;
+}
+
+/**
+ * A plane with only its glyph-sized components left: photo texture (specks
+ * smaller than a stroke), and regions that touch two edges or span the picture
+ * are dropped. What stays is what a recognizer can read as lettering.
+ */
+export function keepGlyphComponents(plane: GrayImage): GrayImage {
+  const { width, height } = plane;
+  const mask = new Uint8Array(plane.data.length);
+  for (let i = 0; i < mask.length; i++) mask[i] = plane.data[i] < 128 ? 1 : 0;
+  const { labels, components } = connectedComponents(mask, width, height);
+  const minSide = Math.max(5, Math.min(width, height) * 0.035);
+  const keep = components.map((c) => {
+    const w = c.x1 - c.x0;
+    const h = c.y1 - c.y0;
+    const edges = (c.x0 === 0 ? 1 : 0) + (c.y0 === 0 ? 1 : 0) + (c.x1 === width ? 1 : 0) + (c.y1 === height ? 1 : 0);
+    const density = c.area / Math.max(1, w * h);
+    return edges < 2 && Math.max(w, h) >= minSide && w <= width * 0.9 && h <= height * 0.9 && density >= 0.06;
+  });
+  const out = new Uint8Array(mask.length).fill(255);
+  for (let i = 0; i < mask.length; i++) if (labels[i] && keep[labels[i] - 1]) out[i] = 0;
+  return { data: out, width, height };
+}
+
+/**
+ * The colour clusters that look like text, as ink planes (best first, at most
+ * `max`). A pixel belongs to a layer when its colour is nearer that cluster's
+ * centre than any other's.
+ */
+export function colourLayers(image: RgbaImage, opts: { k?: number; max?: number } = {}): GrayImage[] {
+  const centres = colourClusters(image, opts.k ?? 6);
+  if (centres.length < 2) return [];
+  const { width, height, data } = image;
+  const labels = new Uint8Array(width * height);
+  for (let i = 0; i < labels.length; i++) {
+    const c = { r: data[i * 4], g: data[i * 4 + 1], b: data[i * 4 + 2] };
+    let best = 0;
+    let bestD = Infinity;
+    centres.forEach((m, j) => {
+      const d = colourDistance(c, m);
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
+    });
+    labels[i] = best;
+  }
+  const layers = centres.map((_, j) => {
+    const out = new Uint8Array(width * height).fill(255);
+    for (let i = 0; i < labels.length; i++) if (labels[i] === j) out[i] = 0;
+    const plane = keepGlyphComponents({ data: out, width, height });
+    return { plane, score: textLikeness(plane) };
+  });
+  return layers
+    .filter((l) => l.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, opts.max ?? 3)
+    .map((l) => l.plane);
 }

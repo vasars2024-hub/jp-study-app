@@ -18,7 +18,17 @@
  *  - carries the one-time "Snip to cards is on" notice on that first toast (Turn off / Keep);
  *  - never reads the same picture twice;
  *  - review mode: with automatic adding off, a second snip adds nothing, a reading corrected
- *    before adding is what the card gets, and "Add selected" adds exactly the chosen words.
+ *    before adding is what the card gets, and "Add selected" adds exactly the chosen words;
+ *  - Read again: a snip the bundled recognizer read is read again (from the Snips view) by the
+ *    best reader now available, and makes its cards;
+ *  - many languages: a Chinese snip on a Japanese profile with a Chinese reader becomes a
+ *    Chinese snip with Chinese cards; with no Chinese reader it is kept and the view offers
+ *    "Install the Chinese reader and read again" (never downloaded by itself).
+ *
+ * No OCR model is installed headless and none is downloaded, so the accurate reader is the
+ * app's harness fake (`e2eFakeProvider` in main/snipToCards.ts): canned engine reads per
+ * picture size, from `e2e-snip-ocr.json` in the run's profile. Everything after the engine —
+ * the OCR router, language detection, the install offer, the pipeline — is the real code.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -29,16 +39,23 @@ const SNIP_TEXT = '窓辺の猫は静かに眠っていた。';
 const REVIEW_TEXT = '図書館で古い地図を見つけた。';
 const TOAST = 'snipToast=1';
 
-/** The snip: one line of Japanese on white, the size of a typical text snip. */
-async function renderSnip(dir, text = SNIP_TEXT, name = 'snip-cards') {
+/** Chinese snips, told apart from the Japanese ones (and each other) by their size. */
+const ZH_TEXT = '今天我们去图书馆看书。';
+const ZH_SIZE = '1250x200';
+const ZH_MISSING_TEXT = '这是我们的书。';
+const ZH_MISSING_SIZE = '1260x200';
+const CHINESE_FONT = ['C:/Windows/Fonts/msyh.ttc', 'C:/Windows/Fonts/simsun.ttc'].find((f) => fs.existsSync(f));
+
+/** The snip: one line of text on white, the size of a typical text snip. */
+async function renderSnip(dir, text = SNIP_TEXT, name = 'snip-cards', size = '1240x200', font = undefined) {
   const world = require('../world.cjs');
   const file = path.join(dir, `${name}.png`);
   const textFile = path.join(dir, `${name}.txt`);
   fs.writeFileSync(textFile, text, 'utf8');
   await world.ffmpeg([
-    '-f', 'lavfi', '-i', 'color=c=white:s=1240x200',
+    '-f', 'lavfi', '-i', `color=c=white:s=${size}`,
     '-frames:v', '1',
-    '-vf', `drawtext=fontfile='${world.filterPath(world.FONT)}':textfile='${world.filterPath(textFile)}':x=40:y=56:fontsize=80:fontcolor=black`,
+    '-vf', `drawtext=fontfile='${world.filterPath(font || world.FONT)}':textfile='${world.filterPath(textFile)}':x=40:y=56:fontsize=80:fontcolor=black`,
     file,
   ]);
   return file;
@@ -240,6 +257,89 @@ module.exports = {
       }
     }
     await ev(`window.api.snipSetSettings({ autoAdd: true })`, { await: true });
+
+    // --- The accurate reader (the harness fake), Read again, and many languages -------------
+    const fakeFile = path.join(ctx.profile, 'e2e-snip-ocr.json');
+    fs.writeFileSync(fakeFile, JSON.stringify({
+      // The first snip again, now read by the "accurate reader".
+      '1240x200': { ja: [{ text: SNIP_TEXT, confidence: 0.97 }] },
+      // Chinese, with a Chinese reader installed: it reads Japanese poorly, Chinese well.
+      [ZH_SIZE]: { ja: [{ text: ZH_TEXT, confidence: 0.62 }], zh: [{ text: ZH_TEXT, confidence: 0.96 }] },
+    }), 'utf8');
+
+    // Read again, from the Snips view: the first snip (undone above, so it owns nothing).
+    await ev(`__e2e.open('snips')`);
+    const picked = await poll(ctx, `(() => {
+      const item = [...document.querySelectorAll('.snip-app .snip-history-open')].find((b) => b.textContent.includes(${JSON.stringify(SNIP_TEXT.slice(0, 4))}));
+      if (!item) return false;
+      item.click();
+      return true;
+    })()`, 15000);
+    const reread = picked ? await poll(ctx, `(() => { const b = document.querySelector('.snip-app .snip-reread'); if (!b || b.disabled) return false; b.click(); return true; })()`, 15000) : false;
+    result.check('Read again is offered on a snip that owns no cards, and starts from the Snips view', Boolean(picked && reread), { picked, reread });
+    const again = await pollAsync(ctx, `window.api.snipHistoryGet(${JSON.stringify(entry.id)}).then((e) => e && e.status === 'done' && e.engine === 'web' && !e.undone ? e : null)`, 120000, 500);
+    result.check('Read again reads the picture with the best reader now (the accurate one) and makes the cards',
+      Boolean(again) && again.text === SNIP_TEXT && again.cardIds.length >= 1,
+      again ? { engine: again.engine, text: again.text, cards: again.cardIds.length } : null);
+    if (again?.cardIds.length) {
+      await ev(`window.api.snipAction({ id: ${JSON.stringify(entry.id)}, action: 'undo' })`, { await: true });
+      await pollAsync(ctx, `window.api.snipHistoryGet(${JSON.stringify(entry.id)}).then((e) => e && e.undone ? e : null)`, 30000, 300);
+    }
+
+    // A Chinese snip on a Japanese profile, with a Chinese reader: Chinese cards.
+    const zhImage = await renderSnip(ctx.mediaDir, ZH_TEXT, 'snip-zh', ZH_SIZE, CHINESE_FONT).catch(() => null);
+    if (zhImage) {
+      const before = ((await ev(`window.api.snipHistoryList({})`, { await: true })) ?? []).map((e) => e.id);
+      await ctx.e2e('clipboard', { set: { text: 'z' } });
+      await ctx.sleep(800);
+      await ctx.e2e('clipboard', { set: { imagePath: zhImage } });
+      const zh = await pollAsync(ctx, `window.api.snipHistoryList({}).then((list) => (list || []).find((e) => !${JSON.stringify(before)}.includes(e.id) && e.status !== 'processing') || null)`, 120000, 500);
+      result.note(zh ? `Chinese snip: lang ${zh.lang}, ${zh.status}, words ${(zh.words || []).map((w) => `${w.surface}:${w.status}`).join(' ')}` : 'Chinese snip not read');
+      result.check('a Chinese snip on a Japanese profile is detected as Chinese and made into Chinese cards (never "not your study language")',
+        Boolean(zh) && zh.status === 'done' && zh.lang === 'zh' && zh.text === ZH_TEXT && zh.cardIds.length >= 1,
+        zh ? { lang: zh.lang, status: zh.status, error: zh.error, cards: zh.cardIds.length } : null);
+      if (zh?.cardIds?.length) await ev(`window.api.snipAction({ id: ${JSON.stringify(zh.id)}, action: 'undo' })`, { await: true });
+    } else {
+      result.note('could not render the Chinese snip; the Chinese routing check did not run');
+    }
+
+    // A Chinese snip with only a Japanese reader: kept, and the Chinese reader offered.
+    fs.writeFileSync(fakeFile, JSON.stringify({ [ZH_MISSING_SIZE]: { ja: [{ text: ZH_MISSING_TEXT, confidence: 0.8 }] } }), 'utf8');
+    const missingImage = await renderSnip(ctx.mediaDir, ZH_MISSING_TEXT, 'snip-zh-missing', ZH_MISSING_SIZE, CHINESE_FONT).catch(() => null);
+    if (missingImage) {
+      const before = ((await ev(`window.api.snipHistoryList({})`, { await: true })) ?? []).map((e) => e.id);
+      await ctx.e2e('clipboard', { set: { text: 'm' } });
+      await ctx.sleep(800);
+      await ctx.e2e('clipboard', { set: { imagePath: missingImage } });
+      const missing = await pollAsync(ctx, `window.api.snipHistoryList({}).then((list) => (list || []).find((e) => !${JSON.stringify(before)}.includes(e.id) && e.status !== 'processing') || null)`, 120000, 500);
+      result.check('a snip in a language with no reader is kept, as that language, with its reader offered',
+        Boolean(missing) && missing.status === 'error' && missing.error === 'models-missing' && missing.lang === 'zh'
+          && JSON.stringify(missing.installIds) === JSON.stringify(['paddle-ocr-zh']) && missing.text === ZH_MISSING_TEXT,
+        missing ? { status: missing.status, error: missing.error, lang: missing.lang, installIds: missing.installIds } : null);
+      if (missing) {
+        await ev(`__e2e.open('snips')`);
+        const offer = await poll(ctx, `(() => {
+          const item = [...document.querySelectorAll('.snip-app .snip-history-open')].find((b) => b.textContent.includes(${JSON.stringify(ZH_MISSING_TEXT.slice(0, 3))}));
+          if (item) item.click();
+          const box = document.querySelector('.snip-app [data-snip-offer="lang"]');
+          const button = box && box.querySelector('.snip-reader-install');
+          return box && button ? { text: box.textContent, button: button.textContent, disabled: button.disabled } : null;
+        })()`, 20000);
+        result.check('the Snips view offers "Install the Chinese reader and read again", with its size, and downloads nothing by itself',
+          Boolean(offer) && /looks like Chinese/.test(offer.text) && /Install the Chinese reader and read again \(\d+(\.\d)? MB\)/.test(offer.button),
+          offer);
+        try {
+          await ctx.shot('install-offer');
+        } catch (err) {
+          result.note(`no offer screenshot: ${err.message}`);
+        }
+        const assets = await ev(`window.api.assetsList()`, { await: true });
+        const zhState = (assets?.statuses || []).find((s) => s.id === 'paddle-ocr-zh')?.state || 'not-installed';
+        result.check('the Chinese reader was not downloaded without a click', zhState === 'not-installed', { zhState });
+      }
+    }
+    fs.rmSync(fakeFile, { force: true });
+
     // Back to the default (off) for the flows after this one.
     const off = await ev(`window.api.snipSetSettings({ enabled: false })`, { await: true });
     result.check('turning it off again stops watching', off?.enabled === false && off?.watching === false, off);

@@ -54,7 +54,7 @@ export const SNIP_UI_EN: Catalog = {
   'snip.detail.translating': 'Translating…',
   'snip.detail.noTranslation': 'No translation: {reason}',
   'snip.translate.empty': 'the engine returned nothing.',
-  'snip.translate.failed': 'the translation failed.',
+  'snip.translate.failed': 'no translation engine is set up or reachable. Choose one in Settings → Translate.',
   'snip.detail.words': 'Words',
   'snip.detail.grammar': 'Grammar',
   'snip.detail.noGrammar': 'No grammar points from the library were found in this sentence.',
@@ -67,9 +67,6 @@ export const SNIP_UI_EN: Catalog = {
     one: '{count} more new word is listed but was not added (limit {max} per snip).',
     other: '{count} more new words are listed but were not added (limit {max} per snip).',
   },
-  'snip.detail.install': 'Install the {lang} OCR model',
-  'snip.detail.installStarted': 'Download started. Snip again once it has finished.',
-  'snip.detail.installFailed': 'The download could not start. Try again from Settings → Storage.',
   'snip.col.word': 'Word',
   'snip.col.reading': 'Reading',
   'snip.col.meaning': 'Meaning and form',
@@ -109,13 +106,12 @@ export const SNIP_UI_EN: Catalog = {
   'snip.pos.prefix': 'prefix',
 
   // ---- Errors (never cards from these) ----
-  'snip.error.modelsMissing': 'Snip not read: the {lang} OCR model is not installed. It is never downloaded without asking: install it here.',
-  'snip.error.noText': 'No text was found in the snip.',
-  'snip.error.garbage': 'The snip did not read as text in your study language, so no cards were made.',
-  'snip.error.lowConfidence': 'The snip was too hard to read reliably, so no cards were made.',
-  'snip.error.ocrFailed': 'The snip could not be read.',
-  'snip.error.cancelled': 'Gum closed before this snip was read.',
-
+  'snip.error.modelsMissing': 'This looks like {lang}, and no {lang} reader is installed, so no cards were made. Install it below and the snip is read again.',
+  'snip.error.noText': 'No text was found. Snip closer around the text, or read it again with the accurate reader.',
+  'snip.error.garbage': 'The snip did not read as {lang} text, so no cards were made. Read it again with the accurate reader, or fix the text.',
+  'snip.error.lowConfidence': 'Too hard to read reliably, so no cards were made. Read it again with the accurate reader, or fix the text.',
+  'snip.error.ocrFailed': 'The snip could not be read. Press Read again; if it still fails, set up the accurate reader.',
+  'snip.error.cancelled': 'Gum closed before this snip was read. Press Read again to read it now.',
   // ---- Toast ----
   'snip.toast.label': 'Snip to cards',
   'snip.toast.added': {
@@ -123,7 +119,7 @@ export const SNIP_UI_EN: Catalog = {
     other: 'Added {count} words from snip: {words}',
   },
   'snip.toast.none': 'Snip read: no new words to add.',
-  'snip.toast.modelsMissing': 'Snip not read: the {lang} OCR model is not installed. Open the analysis to install it.',
+  'snip.toast.modelsMissing': 'This snip looks like {lang}. Open it to install the {lang} reader and read it again.',
   'snip.toast.undo': 'Undo',
   'snip.toast.open': 'Open analysis',
   'snip.toast.close': 'Close',

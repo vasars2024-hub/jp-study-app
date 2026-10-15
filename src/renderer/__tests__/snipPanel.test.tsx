@@ -57,6 +57,21 @@ const MISSING: SnipEntry = {
 
 /** Most tests run on a profile where the learner turned watching on (off by default since v1). */
 let enabledInMain = true;
+/** A fresh profile: no accurate reader installed. */
+let readersInMain = { det: false, paddle: [] as string[], manga: false, tess: [] as string[] };
+
+/** The reader assets as the catalog has them (sizes are what the buttons show). */
+const ASSETS = [
+  { id: 'paddle-ocr-det', sizeBytes: 4_000_000 },
+  { id: 'paddle-ocr-ja', sizeBytes: 10_000_000, requires: ['paddle-ocr-det', 'paddle-ocr-ja-keys'] },
+  { id: 'paddle-ocr-ja-keys', sizeBytes: 20_000 },
+  { id: 'paddle-ocr-zh', sizeBytes: 11_000_000, requires: ['paddle-ocr-det', 'paddle-ocr-zh-keys'] },
+  { id: 'paddle-ocr-zh-keys', sizeBytes: 26_000 },
+  { id: 'paddle-ocr-ru', sizeBytes: 9_000_000, requires: ['paddle-ocr-det', 'paddle-ocr-ru-keys'] },
+  { id: 'paddle-ocr-ru-keys', sizeBytes: 400 },
+  { id: 'manga-ocr', sizeBytes: 343_000_000 },
+  { id: 'comic-text-detector', sizeBytes: 94_000_000 },
+].map((a) => ({ name: a.id, description: '', kind: 'ocr', lang: 'any', url: '', version: '1', installDir: a.id, ...a }));
 
 function installApi(): void {
   const record = (name: string, value: unknown = undefined) => async (...args: unknown[]) => {
@@ -64,7 +79,12 @@ function installApi(): void {
     return value;
   };
   (window as unknown as { api: Record<string, unknown> }).api = {
-    snipGetStatus: async () => ({ ...SNIP_SETTINGS_DEFAULTS, enabled: enabledInMain, watching: enabledInMain, historyCount: entries.length, historyBytes: 4096 }),
+    snipGetStatus: async () => ({
+      ...SNIP_SETTINGS_DEFAULTS, enabled: enabledInMain, watching: enabledInMain, historyCount: entries.length, historyBytes: 4096,
+      readers: readersInMain, studyLang: 'ja',
+    }),
+    assetsList: async () => ({ assets: ASSETS, statuses: [] }),
+    onAssetStatus: () => () => undefined,
     onSnipSettingsChanged: () => () => undefined,
     onSnipHistoryChanged: () => () => undefined,
     snipHistoryList: async () => entries,
@@ -90,6 +110,7 @@ beforeAll(() => {
 beforeEach(() => {
   calls.length = 0;
   entries = [DONE, MISSING];
+  readersInMain = { det: false, paddle: [], manga: false, tess: [] };
   installApi();
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -155,9 +176,70 @@ describe('Snips app', () => {
     await settle();
     await act(async () => (host.querySelectorAll('.snip-history-open')[1] as HTMLButtonElement).click());
     await settle();
+    expect(calls.some((c) => c.name === 'assetsStart' || (c.name === 'snipAction' && (c.args[0] as { action: string }).action === 'installReread'))).toBe(false);
+    expect(host.querySelector('.snip-note.is-error')?.textContent).toMatch(/looks like Chinese/);
+    // One click installs the Chinese reader (its detector and charset come with it) and reads the snip again.
+    await act(async () => button(/Install the Chinese reader and read again \(14 MB\)/).click());
+    expect(calls.find((c) => c.name === 'snipAction')?.args).toEqual([{ id: 'snip-b', action: 'installReread', assets: ['paddle-ocr-zh'] }]);
+  });
+
+  it('a fresh profile with Snip on offers the accurate reader with its size; the click installs exactly that', async () => {
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    const card = host.querySelector('[data-snip-reader="missing"]');
+    expect(card?.textContent).toMatch(/built-in reader misses/);
     expect(calls.some((c) => c.name === 'assetsStart')).toBe(false);
-    await act(async () => button(/Install the Chinese OCR model/).click());
-    expect(calls.find((c) => c.name === 'assetsStart')?.args).toEqual(['paddle-ocr-zh']);
+    // Chinese ticked as well: the size follows.
+    const zh = [...card!.querySelectorAll('label')].find((l) => /Also read Chinese/.test(l.textContent ?? ''))!.querySelector('input')!;
+    await act(async () => zh.click());
+    await act(async () => button(/Set up the accurate reader \(24 MB\)/).click());
+    expect(calls.filter((c) => c.name === 'assetsStart').map((c) => c.args[0])).toEqual(['paddle-ocr-ja', 'paddle-ocr-zh']);
+  });
+
+  it('with the reader installed, no setup card; Read again re-reads a snip that owns nothing', async () => {
+    readersInMain = { det: true, paddle: ['ja'], manga: false, tess: [] };
+    entries = [{ ...DONE, id: 'snip-c', status: 'error', error: 'garbage', text: 'しJ4', words: [], cardIds: [], ankiNoteIds: [], grammar: [], translation: undefined }];
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.querySelector('[data-snip-reader]')).toBeNull();
+    // Japanese has its accurate reader now: only manga-ocr (better on stylised text) is offered, and Read again.
+    expect(host.querySelector('[data-snip-offer]')?.getAttribute('data-snip-offer')).toBe('manga');
+    await act(async () => button(/^Read again$/).click());
+    expect(calls.find((c) => c.name === 'snipAction')?.args).toEqual([{ id: 'snip-c', action: 'reread' }]);
+  });
+
+  it('a failed basic read offers the accurate reader and a read again in one click', async () => {
+    entries = [{ ...DONE, id: 'snip-d', status: 'error', error: 'garbage', text: 'しJ4', engine: 'basic', words: [], cardIds: [], ankiNoteIds: [], grammar: [], translation: undefined }];
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.querySelector('[data-snip-offer="accurate"]')).toBeTruthy();
+    await act(async () => button(/Install the accurate reader and read again/).click());
+    expect(calls.find((c) => c.name === 'snipAction')?.args).toEqual([{ id: 'snip-d', action: 'installReread', assets: ['paddle-ocr-ja'] }]);
+  });
+
+  it('Read again is refused while the snip owns cards (Undo first)', async () => {
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(button(/^Read again$/).disabled).toBe(true);
+    expect(host.textContent).toMatch(/Undo this snip first/);
+  });
+
+  it('an unsure character is fixed in one click: the text is analysed again with the alternative', async () => {
+    entries = [{
+      ...DONE, id: 'snip-e', review: 'uncertain', text: '彼後の魅力を語え', words: [{ surface: '彼後', lemma: '彼後', status: 'candidate' }],
+      cardIds: [], ankiNoteIds: [], confidence: 0.7, engine: 'web',
+      unsure: [{ at: 0, ch: '彼', p: 0.3, alts: ['恐'] }, { at: 7, ch: 'え', p: 0.4, alts: ['る', 'ろ'] }],
+    }];
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.querySelectorAll('.snip-unsure-item')).toHaveLength(2);
+    await act(async () => button(/Use る instead of え/).click());
+    expect(calls.find((c) => c.name === 'snipAction')?.args).toEqual([{ id: 'snip-e', action: 'reanalyze', text: '彼後の魅力を語る' }]);
   });
 
   it('search narrows the list', async () => {

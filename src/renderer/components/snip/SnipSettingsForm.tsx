@@ -3,16 +3,27 @@ import { useT } from '../../i18n';
 import { Toggle } from '../ui/Toggle';
 import GlobalChordRow from '../settings/GlobalChordRow';
 import {
+  normalizeSnipReaders,
   normalizeSnipSettings,
   SNIP_MAX_WORDS_LIMIT,
+  SNIP_NO_READERS,
   SNIP_SETTINGS_DEFAULTS,
   type SnipAnkiMode,
   type SnipSettings,
   type SnipStatus,
 } from '../../../shared/snipToCards';
+import { normalizeStudyLang } from '../../../shared/studyLang';
+import { SnipReaderSetup } from './SnipReaderSetup';
 import './snip.css';
 
-const DEFAULT_STATUS: SnipStatus = { ...SNIP_SETTINGS_DEFAULTS, watching: false, historyCount: 0, historyBytes: 0 };
+const DEFAULT_STATUS: SnipStatus = {
+  ...SNIP_SETTINGS_DEFAULTS,
+  watching: false,
+  historyCount: 0,
+  historyBytes: 0,
+  readers: SNIP_NO_READERS,
+  studyLang: 'ja',
+};
 
 const ANKI_MODES: readonly SnipAnkiMode[] = ['auto', 'on', 'off'];
 
@@ -30,6 +41,8 @@ export function useSnipStatus(): [SnipStatus, (patch: Partial<SnipSettings>) => 
         watching: r.watching === true,
         historyCount: Number(r.historyCount) || 0,
         historyBytes: Number(r.historyBytes) || 0,
+        readers: normalizeSnipReaders(r.readers),
+        studyLang: normalizeStudyLang(r.studyLang),
       });
     };
     Promise.resolve(window.api?.snipGetStatus?.()).then(apply).catch(() => undefined);
@@ -76,6 +89,7 @@ export default function SnipSettingsForm({ showShortcut = true }: { showShortcut
         label={t('snip.settings.enable')}
       />
       <p className="muted os-set-hint">{t('snip.settings.enableHint')}</p>
+      {status.enabled && <SnipReaderSetup readers={status.readers} studyLang={status.studyLang} compact />}
       <Toggle
         className="os-toggle os-toggle-compact"
         checked={status.autoAdd}

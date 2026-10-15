@@ -291,7 +291,7 @@
    "license": "Various",
    "copyright": "See each model",
    "url": "https://huggingface.co/",
-   "attribution": "Manga OCR (kha-white/manga-ocr, ONNX by mayocream; Apache-2.0); comic-text-detector (zyddnys/manga-image-translator release; GPL-3.0); PaddleOCR detection/recognition (deepghs/paddleocr; upstream Apache-2.0, repackaging under its own model-distribution licence); Tesseract jpn trained data (tessdata_fast; Apache-2.0); Whisper (OpenAI, MIT; whisper.cpp ggml and transformers.js conversions; kotoba-whisper by Kotoba Technologies, Apache-2.0); Supertonic 3 TTS voices (Supertone; OpenRAIL licence, use restrictions apply); Qwen3-1.7B GGUF (Alibaba Qwen team; Apache-2.0).",
+   "attribution": "Manga OCR (kha-white/manga-ocr, ONNX by mayocream; Apache-2.0); comic-text-detector (zyddnys/manga-image-translator release; GPL-3.0); PaddleOCR detection/recognition (deepghs/paddleocr; upstream Apache-2.0, repackaging under its own model-distribution licence); Tesseract jpn, chi_sim and chi_tra trained data (tessdata_fast; Apache-2.0); Whisper (OpenAI, MIT; whisper.cpp ggml and transformers.js conversions; kotoba-whisper by Kotoba Technologies, Apache-2.0); Supertonic 3 TTS voices (Supertone; OpenRAIL licence, use restrictions apply); Qwen3-1.7B GGUF (Alibaba Qwen team; Apache-2.0).",
    "credit": false
   },
   {
