@@ -1,8 +1,10 @@
 // Top-level crash guard (PHASE_6_5_AUDIT.md Phase 8 gap — previously a render
 // error anywhere in the tree white-screened the whole app with no recovery
 // path and no record of what happened). Wraps <App /> in main.tsx.
+// Words: appErrorBoundaryText.ts, not useT() (i18n may be what broke).
 
 import React from 'react';
+import { crashScreenText } from './appErrorBoundaryText';
 
 interface Props {
   children: React.ReactNode;
@@ -37,8 +39,10 @@ export class AppErrorBoundary extends React.Component<Props, State> {
 
   render(): React.ReactNode {
     if (!this.state.error) return this.props.children;
+    const text = crashScreenText();
     return (
       <div
+        role="alert"
         style={{
           position: 'fixed',
           inset: 0,
@@ -55,11 +59,8 @@ export class AppErrorBoundary extends React.Component<Props, State> {
           zIndex: 999999,
         }}
       >
-        <div style={{ fontSize: 18, fontWeight: 600 }}>Something went wrong.</div>
-        <div style={{ fontSize: 13, opacity: 0.75, maxWidth: 480 }}>
-          The window ran into an unexpected error. Your saved data is untouched — this
-          only affects the current view. The error was written to the diagnostic log.
-        </div>
+        <div style={{ fontSize: 18, fontWeight: 600 }}>{text.title}</div>
+        <div style={{ fontSize: 13, opacity: 0.75, maxWidth: 480 }}>{text.body}</div>
         <button
           type="button"
           onClick={this.reload}
@@ -74,7 +75,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
             fontSize: 13,
           }}
         >
-          Reload
+          {text.reload}
         </button>
       </div>
     );

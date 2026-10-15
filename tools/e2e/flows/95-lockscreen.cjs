@@ -60,9 +60,21 @@ module.exports = {
         return '';
       }
     };
+    // The pad's state, read from the DOM: filled dots, the error shake, the wait text.
+    const padState = `(() => {
+      const l = document.querySelector('.lockscreen[role=dialog]');
+      if (!l) return 'gone';
+      if (/Try again in/.test(l.innerText || '')) return 'waiting';
+      if (l.querySelector('[class$="-dot"].is-error')) return 'error';
+      return 'filled:' + l.querySelectorAll('[class$="-dot"].is-filled').length;
+    })()`;
+    // Poll instead of a fixed wait: first for the PIN to have been taken (four dots, the
+    // error shake, the backoff text, or the lock gone), then for the pad to settle (the
+    // lock gone, or the dots cleared with no shake), which is when main has answered.
     const typePin = async (pin) => {
       for (const digit of pin) await ctx.request('/key', { window: 'main', key: digit });
-      await ctx.sleep(900);
+      await poll(ctx, `(() => { const s = ${padState}; return s === 'filled:${pin.length}' || s === 'error' || s === 'waiting' || s === 'gone' || null; })()`, 5000, 50);
+      await poll(ctx, `(() => { const s = ${padState}; return s === 'gone' || s === 'waiting' || s === 'filled:0' || null; })()`, 10000, 50);
     };
     const lockText = () => ev(`(() => { const l = document.querySelector('.lockscreen[role=dialog]'); return l ? l.innerText.replace(/\\s+/g, ' ').trim() : null; })()`);
 

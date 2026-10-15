@@ -65,7 +65,8 @@ export async function checkForAppRelease(options?: { force?: boolean }): Promise
   await checkLocalExtensionBump();
 
   try {
-    const release = await window.api.checkAppRelease();
+    // Automatic: main answers null while automatic checks are off or paused.
+    const release = await window.api.checkAppRelease(options?.force ? undefined : { automatic: true });
     if (!release) return;
 
     // Prefer explicit flag from main; older builds omit it and always mean app update.

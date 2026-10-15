@@ -999,7 +999,8 @@ declare global {
       getWindowChromeMode(): Promise<'standard' | 'borderless' | 'frameless'>;
       setWindowChromeMode(mode: 'standard' | 'borderless' | 'frameless'): Promise<'standard' | 'borderless' | 'frameless'>;
       appVersion(): Promise<string>;
-      checkAppRelease(): Promise<AppReleaseInfo | null>;
+      /** `automatic`: the background check, which main skips while updates are off or paused. */
+      checkAppRelease(opts?: { automatic?: boolean }): Promise<AppReleaseInfo | null>;
       /** Honest update status for Settings > Help (see shared/release.ts ReleaseStatusKind). */
       releaseStatus(): Promise<import('../shared/release').ReleaseStatus>;
       /** Squirrel self-update state (installed builds); `install: 'portable'` on the zip. */
@@ -2192,6 +2193,13 @@ declare global {
       diagnosticsOpenLogFolder(): Promise<string>;
       /** Non-null once, right after main reloaded this window from a crash. */
       diagnosticsConsumeCrashRecovery(): Promise<{ reason: string; crashes: number; safeMode: boolean } | null>;
+      /** Local crash reports (opt-in, never uploaded): the switch, and whether any dumps exist. */
+      diagnosticsCrashReports?(): Promise<import('../main/crashRecovery').CrashReportingState>;
+      diagnosticsSetCrashReports?(enabled: boolean): Promise<import('../main/crashRecovery').CrashReportingState>;
+      /** "Save problem report…": a redacted zip where the user picks; nothing is sent. */
+      diagnosticsSaveProblemReport?(opts: { title: string; ui?: Record<string, string> }): Promise<import('../main/crashRecovery').ProblemReportSaveResult>;
+      /** Reveal a report this session saved. */
+      diagnosticsShowProblemReport?(file: string): Promise<boolean>;
       backupStatus(): Promise<import('../main/backup/backupService').BackupStatus>;
       backupCreate(args: { includeBookFiles: boolean; renderer: unknown }): Promise<import('../main/backup/backupService').CreateBackupReply>;
       backupAutoDue(): Promise<boolean>;

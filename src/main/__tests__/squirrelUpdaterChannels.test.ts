@@ -28,11 +28,11 @@ const ok = (version: string, prerelease = false): FeedFetch => ({
 
 function harness(opts: {
   answer?: (channel: ReleaseChannel) => Promise<FeedFetch>;
-  prefs?: AppUpdatePrefs;
+  prefs?: Pick<AppUpdatePrefs, 'channel' | 'skippedVersion'> & Partial<AppUpdatePrefs>;
   unsaved?: AppUpdateUnsavedKind[];
 } = {}) {
   const updater = fakeUpdater();
-  let saved: AppUpdatePrefs | null = opts.prefs ?? null;
+  let saved: AppUpdatePrefs | null = opts.prefs ? { autoCheck: true, pausedUntil: null, ...opts.prefs } : null;
   const asked: ReleaseChannel[] = [];
   const c = createAppUpdateController({
     install: 'installed',
@@ -40,7 +40,7 @@ function harness(opts: {
     currentVersion: '1.0.1',
     broadcast: () => undefined,
     setTimer: () => undefined,
-    prefsStore: { load: () => saved ?? { channel: 'stable', skippedVersion: null }, save: (p) => void (saved = p) },
+    prefsStore: { load: () => saved ?? { channel: 'stable', skippedVersion: null, autoCheck: true, pausedUntil: null }, save: (p) => void (saved = p) },
     resolveRelease: (channel) => {
       asked.push(channel);
       return opts.answer ? opts.answer(channel) : Promise.resolve(ok('1.0.1'));
@@ -89,7 +89,7 @@ describe('release feed before Squirrel', () => {
   it('beta pins Squirrel to the picked pre-release\'s assets', async () => {
     const h = harness({ answer: async (ch) => (ch === 'beta' ? ok('1.2.0-beta.1', true) : ok('1.0.1')) });
     expect(h.c.setPrefs({ channel: 'beta' }).channel).toBe('beta');
-    expect(h.saved()).toEqual({ channel: 'beta', skippedVersion: null });
+    expect(h.saved()).toEqual({ channel: 'beta', skippedVersion: null, autoCheck: true, pausedUntil: null });
     h.c.checkNow();
     await settle();
     expect(h.asked).toEqual(['beta']);
@@ -125,7 +125,7 @@ describe('release feed before Squirrel', () => {
 
   it('prefs from disk are validated', () => {
     const h = harness({ prefs: { channel: 'nightly' as ReleaseChannel, skippedVersion: '<script>' } });
-    expect(h.c.prefs()).toEqual({ channel: 'stable', skippedVersion: null });
+    expect(h.c.prefs()).toEqual({ channel: 'stable', skippedVersion: null, autoCheck: true, pausedUntil: null });
   });
 });
 

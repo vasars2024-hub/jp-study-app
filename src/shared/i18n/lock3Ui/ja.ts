@@ -63,7 +63,7 @@ export const LOCK3_UI_JA: Catalog = {
     other: '{count} 分',
   },
   'lock3.settings.auto.idleNote':
-    '操作なしとは、PC 全体でキーボードやマウスの入力がないことです。何も触らずに動画を見ている間も操作なしとみなされます。',
+    '操作なしとは、PC 全体でキーボードやマウスの入力がないことです。Gum で動画や音声を再生している間は操作中とみなし、再生が止まってから数え直します。',
   'lock3.settings.auto.sleep': 'PC がスリープするとき',
   'lock3.settings.auto.screenLock': 'Windows がロックされたとき（Win+L）',
   'lock3.settings.study.title': 'ロック画面での学習',

@@ -27,6 +27,8 @@ import path from 'node:path';
 import {
   classifyUpdateError,
   DEFAULT_APP_UPDATE_PREFS,
+  automaticUpdateCheckAllowed,
+  isAppUpdatePaused,
   sanitizeAppUpdatePrefs,
   type AppUpdateChannel,
   type AppUpdateDetails,
@@ -177,7 +179,10 @@ export interface AppUpdateController {
    */
   requestRestart(force?: boolean): AppUpdateRestartResult;
   prefs(): AppUpdatePrefs;
-  /** Change channel / skipped version. A channel change forgets the last check's answer. */
+  /**
+   * Change channel / skipped version / automatic checks / pause. A channel change
+   * forgets the last check's answer.
+   */
   setPrefs(patch: Partial<AppUpdatePrefs>): AppUpdateDetails;
   /**
    * Stop Gum's own download; what has arrived stays on disk and "Check now"
@@ -247,6 +252,8 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
       feedUrl: activeFeed,
       lastCheckedAt,
       skippedVersion: prefs.skippedVersion,
+      autoCheck: prefs.autoCheck,
+      ...(prefs.pausedUntil !== null && isAppUpdatePaused(prefs, now()) ? { pausedUntil: prefs.pausedUntil } : {}),
       ...(latestVersion ? { latestVersion } : {}),
       ...(state === 'downloading' && downloadStartedAt ? { downloadStartedAt } : {}),
       ...(state === 'downloading' && download ? { download: { ...download } } : {}),
@@ -452,6 +459,11 @@ export function createAppUpdateController(deps: AppUpdateControllerDeps): AppUpd
   const autoCheck = () => {
     // The user cancelled a download: only they resume it ("Check now").
     if (paused) return;
+    // "Check for updates automatically" is off, or updates are paused: only "Check now".
+    if (!automaticUpdateCheckAllowed(prefs, now())) {
+      deps.log?.(prefs.autoCheck ? '[update] automatic check skipped: updates are paused' : '[update] automatic check skipped: turned off');
+      return;
+    }
     if (!deps.isMetered) {
       check();
       return;

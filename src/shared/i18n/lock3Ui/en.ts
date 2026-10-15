@@ -73,7 +73,7 @@ export const LOCK3_UI_EN: Catalog = {
     other: '{count} minutes',
   },
   'lock3.settings.auto.idleNote':
-    'Idle means no keyboard or mouse input anywhere on the PC. Watching a video without touching anything counts as idle.',
+    'Idle means no keyboard or mouse input anywhere on the PC. A video or audio playing in Gum counts as activity, and the idle time starts again when it stops.',
   'lock3.settings.auto.sleep': 'When the PC goes to sleep',
   'lock3.settings.auto.screenLock': 'When Windows locks (Win+L)',
   'lock3.settings.study.title': 'Study on the lock screen',

@@ -28,9 +28,9 @@
  *    owner opted in (`lockAutoArm.ts`).
  *
  * It is a STUDY lock, not a security boundary: the app ships without asar, so
- * anyone with write access to the install folder can edit main.js, and Chromium
- * honours `--remote-debugging-port` before any of this runs. Settings -> Lockscreen
- * says so in-app (`lock2.note.*`).
+ * anyone with write access to the install folder can edit main.js. (A packaged
+ * build no longer accepts `--remote-debugging-*`: `debugSwitchGuard.ts`.)
+ * Settings -> Lockscreen says so in-app (`lock2.note.*`).
  *
  * No `electron` import: the window and webContents shapes are structural, so the
  * guard runs under plain vitest with stubs, and modules that consult it

@@ -27,6 +27,8 @@ import SettingsCard from '../SettingsCard';
 import { useT } from '../../../i18n';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import {
+  APP_UPDATE_PAUSE_DAYS,
+  APP_UPDATE_PAUSE_MS,
   describeAppUpdate,
   type AppReleaseNotes,
   type AppUpdateChannel,
@@ -194,6 +196,19 @@ export default function UpdatePanel() {
     }
   }, []);
 
+  // "Check for updates automatically" and "Pause updates": main's background check
+  // (and the release notice) honour both; "Check now" ignores them.
+  const setAutoPrefs = useCallback(async (patch: { autoCheck?: boolean; pausedUntil?: number | null }) => {
+    if (!window.api?.appUpdateSetPrefs) return;
+    try {
+      setDetails(await window.api.appUpdateSetPrefs(patch));
+    } catch {
+      /* the switch keeps showing what main has */
+    }
+  }, []);
+  const autoCheck = details?.autoCheck !== false;
+  const pausedUntil = typeof details?.pausedUntil === 'number' ? details.pausedUntil : null;
+
   // "Restart to update": main refuses while a restart would cut something short
   // (a recording, an open edit, a review, an AI job …) and the panel lists it,
   // asking before trying again with `force`.
@@ -330,6 +345,40 @@ export default function UpdatePanel() {
           <dd style={FACT_VALUE_STYLE}>{lastChecked ?? t('upd2.lastCheck.never')}</dd>
         </div>
       </dl>
+
+      {window.api?.appUpdateSetPrefs && details ? (
+        <div className="upd3-auto">
+          <label className="os-check-row">
+            <input
+              type="checkbox"
+              checked={autoCheck}
+              onChange={(e) => void setAutoPrefs({ autoCheck: e.target.checked })}
+            />
+            <span>
+              {t('upd3.auto.label')}
+              <span className="muted os-check-row-desc">{t('upd3.auto.desc')}</span>
+            </span>
+          </label>
+          {autoCheck && pausedUntil ? (
+            <p className="muted upd3-paused-until" role="status">
+              {t('upd3.pause.until', { date: new Date(pausedUntil).toLocaleDateString(tag, { dateStyle: 'medium' }) })}{' '}
+              <button type="button" className="btn" onClick={() => void setAutoPrefs({ pausedUntil: null })}>
+                {t('upd3.pause.resume')}
+              </button>
+            </p>
+          ) : autoCheck ? (
+            <div className="fm-actions">
+              <button
+                type="button"
+                className="btn upd3-pause"
+                onClick={() => void setAutoPrefs({ pausedUntil: Date.now() + APP_UPDATE_PAUSE_MS })}
+              >
+                {t('upd3.pause.button', { count: APP_UPDATE_PAUSE_DAYS })}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {pending ? (
         <p className="muted upd2-loading" role="status" aria-live="polite">

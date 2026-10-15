@@ -60,7 +60,7 @@ export const LOCK3_UI_ZH: Catalog = {
   'lock3.settings.auto.minutes': {
     other: '{count} 分钟',
   },
-  'lock3.settings.auto.idleNote': '空闲指整台电脑上没有键盘或鼠标输入。不碰电脑看视频也算空闲。',
+  'lock3.settings.auto.idleNote': '空闲指整台电脑上没有键盘或鼠标输入。Gum 中正在播放视频或音频时算作有活动，停止播放后重新计时。',
   'lock3.settings.auto.sleep': '电脑进入睡眠时',
   'lock3.settings.auto.screenLock': 'Windows 锁定时（Win+L）',
   'lock3.settings.study.title': '锁屏上的学习',

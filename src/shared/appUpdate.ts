@@ -38,9 +38,25 @@ export interface AppUpdatePrefs {
   channel: AppUpdateChannel;
   /** A version the user said to skip: not offered, not downloaded. */
   skippedVersion: string | null;
+  /**
+   * "Check for updates automatically". Off: no timer check and no background
+   * download; "Check now" still works.
+   */
+  autoCheck: boolean;
+  /**
+   * "Pause updates": automatic checks are skipped until this time (ms since the
+   * epoch). null = not paused. "Check now" ignores it; it is the user's call.
+   */
+  pausedUntil: number | null;
 }
 
-export const DEFAULT_APP_UPDATE_PREFS: AppUpdatePrefs = { channel: 'stable', skippedVersion: null };
+export const DEFAULT_APP_UPDATE_PREFS: AppUpdatePrefs = { channel: 'stable', skippedVersion: null, autoCheck: true, pausedUntil: null };
+
+/** "Pause updates" offers this long. */
+export const APP_UPDATE_PAUSE_DAYS = 7;
+export const APP_UPDATE_PAUSE_MS = APP_UPDATE_PAUSE_DAYS * 24 * 60 * 60 * 1000;
+/** No pause is kept for longer than this (a clock set far ahead, a hand-edited file). */
+export const APP_UPDATE_PAUSE_MAX_MS = 35 * 24 * 60 * 60 * 1000;
 
 /** Validate prefs read from disk or sent over IPC; anything unknown falls back to the default. */
 export function sanitizeAppUpdatePrefs(raw: unknown, base: AppUpdatePrefs = DEFAULT_APP_UPDATE_PREFS): AppUpdatePrefs {
@@ -49,7 +65,27 @@ export function sanitizeAppUpdatePrefs(raw: unknown, base: AppUpdatePrefs = DEFA
   let skippedVersion = base.skippedVersion;
   if (r.skippedVersion === null) skippedVersion = null;
   else if (typeof r.skippedVersion === 'string' && isReleaseVersion(r.skippedVersion)) skippedVersion = normalizeVersion(r.skippedVersion);
-  return { channel, skippedVersion };
+  // Older state files have neither field: the base (on by default, not paused) stays.
+  const autoCheck = typeof r.autoCheck === 'boolean' ? r.autoCheck : base.autoCheck ?? true;
+  let pausedUntil = base.pausedUntil ?? null;
+  if (r.pausedUntil === null) pausedUntil = null;
+  else if (typeof r.pausedUntil === 'number' && Number.isFinite(r.pausedUntil) && r.pausedUntil > 0) pausedUntil = Math.round(r.pausedUntil);
+  return { channel, skippedVersion, autoCheck, pausedUntil };
+}
+
+/**
+ * Whether the automatic (timer) check may run now. "Check now" never asks.
+ * A pause longer than `APP_UPDATE_PAUSE_MAX_MS` from now is treated as over.
+ */
+export function automaticUpdateCheckAllowed(prefs: Pick<AppUpdatePrefs, 'autoCheck' | 'pausedUntil'>, now: number): boolean {
+  if (!prefs.autoCheck) return false;
+  return !isAppUpdatePaused(prefs, now);
+}
+
+/** A pause is in force at `now`. */
+export function isAppUpdatePaused(prefs: Pick<AppUpdatePrefs, 'pausedUntil'>, now: number): boolean {
+  const until = prefs.pausedUntil;
+  return typeof until === 'number' && until > now && until - now <= APP_UPDATE_PAUSE_MAX_MS;
 }
 
 /**
@@ -155,6 +191,10 @@ export interface AppUpdateDetails extends AppUpdateStatus {
   skippedMetered?: boolean;
   /** The version the user chose to skip, if any. */
   skippedVersion?: string | null;
+  /** "Check for updates automatically" (absent from an older main: on). */
+  autoCheck?: boolean;
+  /** Automatic checks are paused until this time; absent when not paused (or the pause is over). */
+  pausedUntil?: number;
   /** The newest release the last check found on this channel (before any download). */
   latestVersion?: string;
   /** Gum's own download, with byte counts (installed copies). */
@@ -290,8 +330,12 @@ export function describeAppUpdate(d: AppUpdateDetails): AppUpdateView {
       if (d.skippedVersion && d.latestVersion && d.skippedVersion === d.latestVersion) {
         return { tone: 'muted', messageKey: 'upd2.state.skipped', vars: { version: d.skippedVersion }, progress: null, canCheck: true, canRestart: false };
       }
-      return d.lastCheckedAt
-        ? { tone: 'ok', messageKey: 'upd2.state.upToDate', vars: { version: d.current }, progress: null, canCheck: true, canRestart: false }
+      if (d.lastCheckedAt) {
+        return { tone: 'ok', messageKey: 'upd2.state.upToDate', vars: { version: d.current }, progress: null, canCheck: true, canRestart: false };
+      }
+      // "Gum checks a minute after it starts …" is not true with automatic checks off or paused.
+      return d.autoCheck === false || typeof d.pausedUntil === 'number'
+        ? { tone: 'muted', messageKey: 'upd3.state.manualOnly', progress: null, canCheck: true, canRestart: false }
         : { tone: 'muted', messageKey: 'upd2.state.notChecked', progress: null, canCheck: true, canRestart: false };
   }
 }

@@ -7,10 +7,10 @@
  */
 import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
-import { installLockAutoArm, IDLE_POLL_MS, type AutoLockReason } from '../lockAutoArm';
+import { installLockAutoArm, trackMediaActivity, IDLE_POLL_MS, type AutoLockReason, type MediaWebContentsLike } from '../lockAutoArm';
 import type { AutoLockOptions } from '../../shared/lockStatus';
 
-function rig(options: Partial<AutoLockOptions>, opts: { hasPin?: boolean; idle?: number } = {}) {
+function rig(options: Partial<AutoLockOptions>, opts: { hasPin?: boolean; idle?: number; media?: { secondsSinceMedia(): number | null } } = {}) {
   const power = Object.assign(new EventEmitter(), { idle: opts.idle ?? 0, getSystemIdleTime() { return this.idle; } });
   const state = { locked: false, reasons: [] as AutoLockReason[], intervals: [] as Array<{ fn: () => void; ms: number }> };
   const arm = installLockAutoArm({
@@ -28,6 +28,7 @@ function rig(options: Partial<AutoLockOptions>, opts: { hasPin?: boolean; idle?:
       return state.intervals.length;
     },
     clearInterval: () => undefined,
+    ...(opts.media ? { media: opts.media } : {}),
   });
   return { power, state, arm };
 }
@@ -78,5 +79,68 @@ describe('auto-lock', () => {
       throw new Error('gone');
     };
     expect(r.arm.checkIdle()).toBe(false);
+  });
+});
+
+describe('media playback counts as activity', () => {
+  const contents = (id: number) => Object.assign(new EventEmitter(), { id }) as EventEmitter & MediaWebContentsLike;
+  const clockRig = () => {
+    const clock = { t: 1_000_000 };
+    const app = new EventEmitter();
+    const existing = contents(1);
+    const media = trackMediaActivity(app as never, [existing], () => clock.t);
+    return { clock, app, existing, media };
+  };
+
+  it('tracks every Gum webContents, existing and created later', () => {
+    const { app, existing, media } = clockRig();
+    expect(media.playing()).toBe(false);
+    expect(media.secondsSinceMedia()).toBeNull();
+    existing.emit('media-started-playing');
+    expect(media.playing()).toBe(true);
+    const popout = contents(2);
+    app.emit('web-contents-created', {}, popout);
+    popout.emit('media-started-playing');
+    existing.emit('media-paused');
+    // The pop-out is still playing.
+    expect(media.playing()).toBe(true);
+    expect(media.secondsSinceMedia()).toBe(0);
+    // Closed mid-video: no media-paused ever comes, and it stops counting.
+    popout.emit('destroyed');
+    expect(media.playing()).toBe(false);
+  });
+
+  it('does not idle-lock while a video plays, and the idle clock restarts when it stops', () => {
+    const { clock, existing, media } = clockRig();
+    const r = rig({ idleMinutes: 5 }, { idle: 2 * 60 * 60, media });
+    existing.emit('media-started-playing');
+    // Two hours without a key press, but the film is still on.
+    expect(r.arm.checkIdle()).toBe(false);
+    existing.emit('media-paused');
+    // It just ended: the system has been idle for hours, Gum has not.
+    expect(r.arm.checkIdle()).toBe(false);
+    clock.t += 4 * 60 * 1000;
+    expect(r.arm.checkIdle()).toBe(false);
+    clock.t += 60 * 1000;
+    expect(r.arm.checkIdle()).toBe(true);
+    expect(r.state.reasons).toEqual(['idle']);
+  });
+
+  it('the system idle time still wins when it is shorter, and a broken tracker never blocks the lock', () => {
+    const { clock, existing, media } = clockRig();
+    existing.emit('media-started-playing');
+    existing.emit('media-paused');
+    clock.t += 60 * 60 * 1000;
+    const typed = rig({ idleMinutes: 5 }, { idle: 30, media });
+    expect(typed.arm.checkIdle()).toBe(false);
+    const broken = rig({ idleMinutes: 5 }, {
+      idle: 10 * 60,
+      media: {
+        secondsSinceMedia() {
+          throw new Error('gone');
+        },
+      },
+    });
+    expect(broken.arm.checkIdle()).toBe(true);
   });
 });

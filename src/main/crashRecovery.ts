@@ -15,12 +15,26 @@
  *   repeated crashes the user is offered safe mode (the presentation-only
  *   `aeroSafeMode` flag the renderer applies on the next boot).
  * - `readRecentDiagnostics` makes the log readable from Settings > Help.
+ * - Local crash reports (D9: opt-in, local only): with the Diagnostics switch on,
+ *   `crashReporter` writes native minidumps to `<userData>/Crashpad` and never
+ *   uploads them (`uploadToServer: false`, no submit URL). Off by default.
+ * - "Save problem report…" writes a redacted zip (`problemReport.ts`) where the
+ *   user picks in a save dialog. Nothing is sent anywhere.
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type WebContents } from 'electron';
+import { app, BrowserWindow, clipboard, crashReporter, dialog, ipcMain, shell, type WebContents } from 'electron';
 import { errorDetail, logDiagnostic, redactSecrets } from './errorLog';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import {
+  buildProblemReportZip,
+  problemReportFileName,
+  PROBLEM_REPORT_MAX_DUMP_BYTES,
+  PROBLEM_REPORT_MAX_DUMPS,
+  PROBLEM_REPORT_MAX_SETTINGS_BYTES,
+  PROBLEM_REPORT_SETTINGS_FILES,
+} from './problemReport';
 import { mt } from './i18n';
 
 // ── fatal main-process errors ────────────────────────────────────────────────
@@ -251,7 +265,207 @@ function summary(): DiagnosticsSummary {
   };
 }
 
+// ── local crash reports (opt-in) ─────────────────────────────────────────────
+
+const CRASH_PREF_FILE = 'crash-reporting.json';
+
+export interface CrashReportingState {
+  /** The Diagnostics switch: keep native crash reports on this PC. */
+  enabled: boolean;
+  /** The crash reporter is running in this process (it cannot be stopped once started). */
+  active: boolean;
+  /** Minidumps on disk now. */
+  dumps: number;
+}
+
+let crashReporterActive = false;
+
+function crashPrefPath(): string {
+  return path.join(app.getPath('userData'), CRASH_PREF_FILE);
+}
+
+/** Minidumps live in the profile, next to the log, whatever the platform default. */
+export function crashDumpsDir(): string {
+  return path.join(app.getPath('userData'), 'Crashpad');
+}
+
+export function crashReportingEnabled(): boolean {
+  try {
+    return readJsonSync<{ enabled?: unknown }>(crashPrefPath(), {}).enabled === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Every `.dmp` under the dumps folder (Crashpad keeps them in `reports/`), newest first. */
+export function listMinidumps(dir: string = crashDumpsDir()): Array<{ file: string; mtimeMs: number; size: number }> {
+  const out: Array<{ file: string; mtimeMs: number; size: number }> = [];
+  const walk = (d: string, depth: number) => {
+    if (depth > 3) return;
+    let names: fs.Dirent[];
+    try {
+      names = fs.readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const n of names) {
+      const full = path.join(d, n.name);
+      if (n.isDirectory()) walk(full, depth + 1);
+      else if (n.isFile() && n.name.toLowerCase().endsWith('.dmp')) {
+        try {
+          const st = fs.statSync(full);
+          out.push({ file: full, mtimeMs: st.mtimeMs, size: st.size });
+        } catch {
+          /* vanished */
+        }
+      }
+    }
+  };
+  walk(dir, 0);
+  return out.sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
+
+/**
+ * Start the local crash reporter. Called once at startup (before `ready`, so every
+ * child process is covered) when the switch is on, and when the user turns it on.
+ * Never uploads: `uploadToServer: false` and no submit URL.
+ */
+export function startLocalCrashReporter(): boolean {
+  if (crashReporterActive) return true;
+  try {
+    const dir = crashDumpsDir();
+    fs.mkdirSync(dir, { recursive: true });
+    app.setPath('crashDumps', dir);
+    crashReporter.start({ uploadToServer: false, compress: true });
+    crashReporterActive = true;
+    return true;
+  } catch (err) {
+    logDiagnostic('warn', 'crash', 'crashReporter', errorDetail(err));
+    return false;
+  }
+}
+
+/** main.ts calls this as early as it can: it starts only when the user turned crash reports on. */
+export function startCrashReporterIfEnabled(): void {
+  if (crashReportingEnabled()) startLocalCrashReporter();
+}
+
+function crashReportingState(): CrashReportingState {
+  return { enabled: crashReportingEnabled(), active: crashReporterActive, dumps: listMinidumps().length };
+}
+
+function setCrashReporting(enabled: boolean): CrashReportingState {
+  try {
+    writeJsonAtomicSync(crashPrefPath(), { enabled });
+  } catch (err) {
+    logDiagnostic('warn', 'crash', 'pref', errorDetail(err));
+  }
+  // On takes effect now (and for every process from the next start); off from the
+  // next start, since a running crash reporter cannot be stopped.
+  if (enabled) startLocalCrashReporter();
+  return crashReportingState();
+}
+
+// ── "Save problem report…" ───────────────────────────────────────────────────
+
+export type ProblemReportSaveResult =
+  | { ok: true; file: string; files: string[] }
+  | { ok: false; reason: 'canceled' | 'failed' };
+
+/** Reports saved in this session: the only files "Show in folder" will reveal. */
+const savedReports = new Set<string>();
+
+function readSettingsForReport(): Record<string, string> {
+  const out: Record<string, string> = {};
+  const dir = app.getPath('userData');
+  for (const name of PROBLEM_REPORT_SETTINGS_FILES) {
+    const file = path.join(dir, name);
+    try {
+      const st = fs.statSync(file);
+      // Oversized: a stand-in the builder lists as left out, never the content.
+      out[name] = st.size > PROBLEM_REPORT_MAX_SETTINGS_BYTES ? ' '.repeat(PROBLEM_REPORT_MAX_SETTINGS_BYTES + 1) : fs.readFileSync(file, 'utf8');
+    } catch {
+      /* not there on this profile */
+    }
+  }
+  return out;
+}
+
+function readDumpsForReport(): Array<{ name: string; data: Uint8Array }> {
+  return listMinidumps()
+    .filter((d) => d.size > 0 && d.size <= PROBLEM_REPORT_MAX_DUMP_BYTES)
+    .slice(0, PROBLEM_REPORT_MAX_DUMPS)
+    .flatMap((d) => {
+      try {
+        return [{ name: path.basename(d.file), data: new Uint8Array(fs.readFileSync(d.file)) }];
+      } catch {
+        return [];
+      }
+    });
+}
+
+/** The renderer's few preferences (UI language, theme): short plain values only. */
+function cleanUi(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>).slice(0, 12)) {
+    if (/^[A-Za-z][A-Za-z0-9_-]{0,40}$/.test(k) && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) {
+      out[k] = String(v).slice(0, 80);
+    }
+  }
+  return out;
+}
+
+/** Build the report zip from this profile. */
+export function makeProblemReport(ui?: unknown): ReturnType<typeof buildProblemReportZip> {
+  return buildProblemReportZip({
+    appVersion: app.getVersion(),
+    os: `${process.platform} ${os.release()} ${process.arch}`,
+    createdAt: new Date(),
+    homeDir: os.homedir(),
+    summary: summary(),
+    log: readRecentDiagnostics(path.join(logDir(), 'main.log'), 200, 'info'),
+    settings: readSettingsForReport(),
+    ui: cleanUi(ui),
+    dumps: readDumpsForReport(),
+    crashReportsOn: crashReportingEnabled(),
+  });
+}
+
+async function saveProblemReport(sender: WebContents, opts: unknown): Promise<ProblemReportSaveResult> {
+  const o = opts && typeof opts === 'object' ? (opts as Record<string, unknown>) : {};
+  // The renderer sends the dialog title in the UI language.
+  const title = typeof o.title === 'string' && o.title.trim() ? o.title.trim().slice(0, 120) : 'Save problem report';
+  const parent = BrowserWindow.fromWebContents(sender) ?? undefined;
+  const options = {
+    title,
+    defaultPath: path.join(app.getPath('documents'), problemReportFileName(new Date())),
+    filters: [{ name: 'Zip', extensions: ['zip'] }],
+  };
+  try {
+    const picked = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
+    if (picked.canceled || !picked.filePath) return { ok: false, reason: 'canceled' };
+    const { zip, files } = makeProblemReport(o.ui);
+    const target = /\.zip$/i.test(picked.filePath) ? picked.filePath : `${picked.filePath}.zip`;
+    fs.writeFileSync(target, zip);
+    savedReports.add(path.resolve(target));
+    logDiagnostic('info', 'diagnostics', 'problemReport', `saved ${files.length} file(s)`);
+    return { ok: true, file: target, files };
+  } catch (err) {
+    logDiagnostic('error', 'diagnostics', 'problemReport', errorDetail(err));
+    return { ok: false, reason: 'failed' };
+  }
+}
+
 export function registerCrashRecoveryIpc(): void {
+  ipcMain.handle('diagnostics:crashReports', () => crashReportingState());
+  ipcMain.handle('diagnostics:setCrashReports', (_e, enabled: unknown) => setCrashReporting(enabled === true));
+  ipcMain.handle('diagnostics:saveProblemReport', (event, opts: unknown) => saveProblemReport(event.sender, opts));
+  ipcMain.handle('diagnostics:showProblemReport', (_e, file: unknown) => {
+    if (typeof file !== 'string' || !savedReports.has(path.resolve(file)) || !fs.existsSync(file)) return false;
+    shell.showItemInFolder(file);
+    return true;
+  });
   ipcMain.handle('diagnostics:recent', (_e, limit: unknown) =>
     readRecentDiagnostics(path.join(logDir(), 'main.log'), typeof limit === 'number' ? Math.min(Math.max(1, limit), 200) : 50),
   );

@@ -14,7 +14,10 @@
  * Asserted, in order:
  *  - opening the panel is idle and touches NO update endpoint; Squirrel is never asked to check;
  *  - "What's new" is shown once: its notice was posted at boot, the card is in the panel;
- *  - "Check now" on Stable reaches the fake feed (never api.github.com) and says up to date;
+ *  - "Check for updates automatically" turns off and on in main; "Pause updates for 7 days"
+ *    is kept by main and shown with its end date, and "Resume updates" ends it;
+ *  - "Check now" on Stable (while paused) reaches the fake feed (never api.github.com) and
+ *    says up to date;
  *  - Beta finds the pre-release and DOWNLOADS it with real byte progress; the fake cuts the
  *    first response at 1 MiB and the download resumes with a Range request by itself;
  *  - Cancel pauses with the bytes kept; Resume continues with a Range request, verifies the
@@ -83,7 +86,31 @@ module.exports = {
     if (idle.network.length) result.note(`other requests while the panel sat idle: ${idle.network.map((n) => n.detail).join(', ')}`);
     result.check('Squirrel was never asked to check', !idle.calls.some((c) => c.api === 'autoUpdater.checkForUpdates'), idle.calls.filter((c) => /autoUpdater/.test(c.api)));
 
-    // "Check now" on Stable: the fake says this build is the latest.
+    // "Check for updates automatically" and "Pause updates": both kept by main, the
+    // background check honours them (squirrelUpdateAutoCheck.test.ts; the harness never
+    // checks on a timer), and "Check now" below still reads the feed while paused.
+    const autoBox = `document.querySelector('.upd3-auto input[type=checkbox]')`;
+    result.check('"Check for updates automatically" is on by default', (await ev(`${autoBox}?.checked ?? null`)) === true && details?.autoCheck === true, details?.autoCheck);
+    await ev(`(${autoBox}.click(), true)`);
+    const autoOff = await pollAsync(ctx, `window.api.appUpdateDetails().then((d) => (d.autoCheck === false ? d : null))`, 5000);
+    const autoOffUi = await poll(ctx, `(${autoBox}.checked === false && !document.querySelector('.upd3-pause')) || null`, 5000);
+    result.check('turning it off reaches main, and the pause option goes away with it', Boolean(autoOff) && Boolean(autoOffUi), autoOff?.autoCheck);
+    await ev(`(${autoBox}.click(), true)`);
+    const autoOn = await pollAsync(ctx, `window.api.appUpdateDetails().then((d) => (d.autoCheck === true ? true : null))`, 5000);
+    result.check('turning it back on reaches main', Boolean(autoOn));
+    const pauseLabel = await poll(ctx, `document.querySelector('.upd3-pause')?.textContent.trim() || null`, 5000);
+    result.check('"Pause updates for 7 days" is offered', pauseLabel === 'Pause updates for 7 days', pauseLabel);
+    const pauseClickedAt = Date.now();
+    await ev(`__e2e.click(document.querySelector('.upd3-pause'))`);
+    const pausedPrefs = await pollAsync(ctx, `window.api.appUpdateDetails().then((d) => (typeof d.pausedUntil === 'number' ? d : null))`, 5000);
+    const week = 7 * 24 * 60 * 60 * 1000;
+    result.check('main keeps the pause for a week', Boolean(pausedPrefs) && Math.abs(pausedPrefs.pausedUntil - (pauseClickedAt + week)) < 60_000, pausedPrefs?.pausedUntil);
+    const pausedNote = await poll(ctx, `(() => { const p = document.querySelector('.upd3-paused-until'); return p && __e2e.byText('.upd3-paused-until button', 'Resume updates') ? p.textContent.replace(/\\s+/g, ' ').trim() : null; })()`, 5000);
+    result.check('the panel says until when, and offers "Resume updates"', Boolean(pausedNote) && /Updates are paused until/.test(pausedNote) && !/\bupd3\./.test(pausedNote), pausedNote);
+    await ctx.shot('updates-paused');
+
+    // "Check now" on Stable (still paused: the user's own check is never held): the fake
+    // says this build is the latest.
     const feedHitsBefore = feed ? feed.hits.length : 0;
     await ev(`__e2e.click(__e2e.byText('.fm-actions button', 'Check now'))`);
     const upToDate = await poll(ctx, `(() => { const t = document.querySelector('.upd2-state')?.textContent ?? ''; return /up to date/i.test(t) ? t : null; })()`, 20000, 300);
@@ -91,6 +118,9 @@ module.exports = {
     result.check('"Check now" reads the fake feed\'s /releases/latest', !feed || feed.hits.slice(feedHitsBefore).some((h) => /\/releases\/latest$/.test(h)), feed?.hits.slice(feedHitsBefore));
     result.check('no update request reached the real api.github.com', !after.network.some((n) => /api\.github\.com/.test(n.detail)), after.network.filter((n) => /github/.test(n.detail)));
     result.check('the panel says this version is up to date', Boolean(upToDate) && (!feed || upToDate.includes(feed.version)), upToDate);
+    await ev(`__e2e.click(__e2e.byText('.upd3-paused-until button', 'Resume updates'))`);
+    const resumedPrefs = await pollAsync(ctx, `window.api.appUpdateDetails().then((d) => (d.pausedUntil === undefined && !document.querySelector('.upd3-paused-until') && document.querySelector('.upd3-pause') ? true : null))`, 5000);
+    result.check('"Resume updates" ends the pause at once', Boolean(resumedPrefs));
 
     // Beta: the pre-release is newer, so Gum downloads it itself, with bytes.
     await ev(`(() => { const s = document.querySelector('select.upd2-channel'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(s, 'beta'); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -160,6 +190,6 @@ module.exports = {
     result.check('"What\'s new" is dismissed for good', Boolean(dismissed));
 
     // Leave the profile as it was: stable channel, nothing skipped.
-    await ev(`window.api.appUpdateSetPrefs({ channel: 'stable', skippedVersion: null })`, { await: true });
+    await ev(`window.api.appUpdateSetPrefs({ channel: 'stable', skippedVersion: null, autoCheck: true, pausedUntil: null })`, { await: true });
   },
 };

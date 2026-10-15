@@ -1726,7 +1726,7 @@ const api = {
   setWindowChromeMode: (mode: string): Promise<string> =>
     ipcRenderer.invoke('shell:setWindowChromeMode', mode),
   appVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
-  checkAppRelease: (): Promise<AppReleaseInfo | null> => ipcRenderer.invoke('release:check'),
+  checkAppRelease: (opts?: { automatic?: boolean }): Promise<AppReleaseInfo | null> => ipcRenderer.invoke('release:check', opts),
   releaseStatus: (): Promise<import('./shared/release').ReleaseStatus> => ipcRenderer.invoke('release:status'),
   /** Squirrel self-update (main/squirrelUpdater.ts); idle on the portable zip. */
   appUpdateStatus: (): Promise<import('./shared/appUpdate').AppUpdateStatus> => ipcRenderer.invoke('appUpdate:status'),
@@ -3551,6 +3551,13 @@ const api = {
   diagnosticsOpenLogFolder: (): Promise<string> => ipcRenderer.invoke('diagnostics:openLogFolder'),
   diagnosticsConsumeCrashRecovery: (): Promise<{ reason: string; crashes: number; safeMode: boolean } | null> =>
     ipcRenderer.invoke('diagnostics:consumeCrashRecovery'),
+  diagnosticsCrashReports: (): Promise<import('./main/crashRecovery').CrashReportingState> =>
+    ipcRenderer.invoke('diagnostics:crashReports'),
+  diagnosticsSetCrashReports: (enabled: boolean): Promise<import('./main/crashRecovery').CrashReportingState> =>
+    ipcRenderer.invoke('diagnostics:setCrashReports', enabled),
+  diagnosticsSaveProblemReport: (opts: { title: string; ui?: Record<string, string> }): Promise<import('./main/crashRecovery').ProblemReportSaveResult> =>
+    ipcRenderer.invoke('diagnostics:saveProblemReport', opts),
+  diagnosticsShowProblemReport: (file: string): Promise<boolean> => ipcRenderer.invoke('diagnostics:showProblemReport', file),
   // Backup & restore (main/backup/backupService.ts)
   backupStatus: (): Promise<import('./main/backup/backupService').BackupStatus> => ipcRenderer.invoke('backup:status'),
   backupCreate: (args: { includeBookFiles: boolean; renderer: unknown }): Promise<import('./main/backup/backupService').CreateBackupReply> =>

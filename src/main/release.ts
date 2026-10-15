@@ -15,6 +15,7 @@ import path from 'node:path';
 import {
   APP_UPDATE_UNSAVED_KINDS,
   DEFAULT_APP_UPDATE_PREFS,
+  automaticUpdateCheckAllowed,
   RELEASE_NOTES_MAX_CHARS,
   sanitizeAppUpdatePrefs,
   type AppReleaseNotes,
@@ -159,7 +160,11 @@ function localSquirrelVersion(execPath: string): string | null {
 
 export function registerReleaseIpc(): void {
   ipcMain.handle('app:version', () => app.getVersion());
-  ipcMain.handle('release:check', () => fetchLatestRelease());
+  // The renderer's background notice check honours 'check automatically' and 'pause'.
+  ipcMain.handle('release:check', (_e, opts?: unknown) =>
+    opts && typeof opts === 'object' && (opts as { automatic?: unknown }).automatic === true && !automaticUpdateCheckAllowed(currentPrefs(), Date.now())
+      ? null
+      : fetchLatestRelease());
   ipcMain.handle('release:status', () => getReleaseStatus());
 
   // An installed (Squirrel) copy also downloads the update itself and offers
@@ -229,7 +234,7 @@ export function registerReleaseIpc(): void {
     },
     prefsStore: {
       load: () => sanitizeAppUpdatePrefs(readState()),
-      save: (prefs) => writeState({ channel: prefs.channel, skippedVersion: prefs.skippedVersion }),
+      save: (prefs) => writeState({ channel: prefs.channel, skippedVersion: prefs.skippedVersion, autoCheck: prefs.autoCheck, pausedUntil: prefs.pausedUntil }),
     },
     resolveRelease: (channel) => fetchLatest(channel),
     unsavedWork: unsavedWorkKinds,

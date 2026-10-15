@@ -58,4 +58,25 @@ export const UPDATE3_UI_EN: Catalog = {
   'upd3.whatsNew.noticeTitle': 'Gum was updated to {version}',
   'upd3.whatsNew.noticeBody': 'See what’s new in Settings > Help > Updates.',
   'upd3.whatsNew.open': 'What’s new',
+
+  // "Check for updates automatically" and "Pause updates" (shared/appUpdate.ts AppUpdatePrefs).
+  'upd3.auto.label': 'Check for updates automatically',
+  'upd3.auto.desc': 'Off: Gum checks only when you press “Check now”.',
+  'upd3.pause.button': {
+    one: 'Pause updates for {count} day',
+    other: 'Pause updates for {count} days',
+  },
+  'upd3.pause.until': 'Updates are paused until {date}. “Check now” still checks.',
+  'upd3.pause.resume': 'Resume updates',
+  // Settings -> Help -> Diagnostics: local crash reports and "Save problem report…".
+  'upd3.diag.crash.label': 'Keep crash reports on this PC',
+  'upd3.diag.crash.desc': 'When Gum crashes, a small crash file is saved in your Gum folder. Nothing is ever sent anywhere. You can add it to a problem report yourself.',
+  'upd3.diag.crash.restart': 'Turning this off takes effect the next time Gum starts.',
+  'upd3.diag.report.save': 'Save problem report…',
+  'upd3.diag.report.desc': 'A zip file to attach to a bug report: the recent error log, the Gum and Windows versions, your settings with keys, tokens and personal folder paths removed, and any crash files. It stays on your PC until you share it.',
+  'upd3.diag.report.dialogTitle': 'Save problem report',
+  'upd3.diag.report.saved': 'Problem report saved: {file}',
+  'upd3.diag.report.failed': 'The problem report could not be saved.',
+  'upd3.diag.report.show': 'Show in folder',
+  'upd3.state.manualOnly': 'Not checked yet. Gum checks for updates only when you press “Check now”.',
 };

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, shell, ipcMain, dialog, globalShortcut, session, powerMonitor, type OpenDialogOptions } from 'electron';
+import { app, BrowserWindow, protocol, net, shell, ipcMain, dialog, globalShortcut, session, powerMonitor, webContents, type OpenDialogOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -23,7 +23,7 @@ import {
   type LockGuard,
 } from './main/lockGuard';
 import { installIpcLockGate } from './main/lockIpcGate';
-import { installLockAutoArm } from './main/lockAutoArm';
+import { installLockAutoArm, trackMediaActivity } from './main/lockAutoArm';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, listLibraryItems, onLibraryItemsAdded } from './main/library';
 import { loadAfterCacheClear, loadWindowWithRetry, loadWithRetry } from './main/bootLoad';
 import { registerReadingListsIpc } from './main/readingListsIpc';
@@ -82,7 +82,7 @@ import { registerWatchLibraryIpc } from './main/watchLibrary';
 import { registerReleaseIpc } from './main/release';
 import { registerStorageRecoveryIpc } from './main/backup/storageRecovery';
 import { registerBackupIpc } from './main/backup/backupService';
-import { handleFatalMainError, registerCrashRecoveryIpc, watchRendererCrashes } from './main/crashRecovery';
+import { handleFatalMainError, registerCrashRecoveryIpc, startCrashReporterIfEnabled, watchRendererCrashes } from './main/crashRecovery';
 import { PDF_RASTER_SCHEME_PRIVILEGES } from './main/pdfRasterize';
 import {
   installIpcSenderGuard,
@@ -204,6 +204,7 @@ import { resolveAppAsset } from './main/appProtocolResolve';
 import { createFileOpenRouter, filePathsFromArgv, type FileOpenRouter } from './main/fileOpenRouter';
 import { APP_USER_MODEL_ID, handleSquirrelStartup } from './main/squirrelEvents';
 import { e2eMarkCreatedShown, initE2eHeadless, isE2eHeadless } from './main/e2eHeadless';
+import { guardDebugSwitches } from './main/debugSwitchGuard';
 
 // Windows identity, before any window or notification exists: the id Squirrel stamps
 // on the installer's shortcuts, used by every build so the zip and an installed copy
@@ -245,6 +246,24 @@ if (altUserData) {
   app.setPath('sessionData', path.resolve(altUserData));
   console.log(`[main] JP_USER_DATA_DIR -> userData = ${app.getPath('userData')}`);
 }
+
+// A packaged build strips `--remote-debugging-*` before `ready` (when Chromium would
+// open the DevTools port), and refuses to start if a switch will not come off.
+// Unpackaged runs (npm start, the e2e harness) keep them (main/debugSwitchGuard.ts).
+const debugGuard = guardDebugSwitches({
+  isPackaged: app.isPackaged,
+  commandLine: app.commandLine,
+  argv: process.argv,
+  log: (message) => logDiagnostic('warn', 'security', 'debugSwitch', message),
+});
+if (debugGuard.action === 'refuse') {
+  app.exit(1);
+  process.exit(1);
+}
+
+// Local crash reports (Settings -> Help -> Diagnostics, off by default): minidumps in
+// `<userData>/Crashpad`, never uploaded. Before `ready`, so every child process is covered.
+startCrashReporterIfEnabled();
 
 // The end-to-end harness's headless mode (main/e2eHeadless.ts): `GUM_E2E_HEADLESS=1`, plus
 // `--e2e` in a packaged build. Before any window, tray, shortcut or session exists.
@@ -2269,8 +2288,10 @@ app.whenReady().then(async () => {
   registerLockscreenIpc();
   registerLockscreenPinIpc(lockGate());
   // lock3: idle / sleep / Windows-lock auto-lock, each opt-in, stored in main's record.
+  // Media playing in any Gum window counts as activity, not idle.
   installLockAutoArm({
     power: powerMonitor,
+    media: trackMediaActivity(app, webContents.getAllWebContents()),
     options: () => lockGate().autoLock(),
     canLock: () => lockGate().status().hasPin,
     isLocked: isAppLocked,
