@@ -743,6 +743,8 @@ async function startWorld(dir, options = {}) {
           JSON.stringify({ history: [{ version: '0.9.0', at: Date.UTC(2026, 8, 1) }] }, null, 2),
         );
       }
+      // Local runs only (GUM_E2E_OCR_MODELS): real OCR models, installed as after a download.
+      require('./realModels.cjs').seedRealModels(profileDir);
     },
     /** Which fake ports are whose (the report names loopback ports by owner). */
     ports() {

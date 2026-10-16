@@ -13,7 +13,8 @@
  *    alternatives (one position, or two near each other: 彼後 → 恐竜 needs both)
  *    and take a change only when it turns characters that were in no word into
  *    a real word, and only when the alternative's probability is reasonable.
- *    A character already inside a word is never touched.
+ *    A character already inside a word is touched only when the engine all
+ *    but tied it (or read the other size of the same kana: っ/つ, ょ/よ).
  *  - **Merge.** Two engines' reads of the same line are combined per character
  *    when they align, otherwise compared whole, by coverage plus confidence.
  *
@@ -169,6 +170,28 @@ export interface DecodeOptions {
 export const DECODE_UNSURE_P = 0.9;
 export const DECODE_MIN_ALT_P = 0.04;
 export const DECODE_MIN_ALT_RATIO = 0.08;
+/**
+ * A character already inside a word is still contested when the engine all but
+ * tied it with an alternative (this share of its probability or more), or when
+ * the alternative is the same kana in the other size (っ/つ, ょ/よ) at
+ * `DECODE_KANA_SIZE_MIN_P`: 見っけた (a colloquial word) for 見つけた, でしよう
+ * (しよう is a word) for でしょう. Then the reading with more of the line in
+ * words wins.
+ */
+export const DECODE_NEAR_TIE_RATIO = 0.75;
+export const DECODE_KANA_SIZE_MIN_P = 0.15;
+
+const KANA_SIZE_PAIRS = 'あぁいぃうぅえぇおぉつっやゃゆゅよょわゎアァイィウゥエェオォツッヤャユュヨョワヮカヵケヶ';
+
+/** The same kana in its large and small (sutegana) form. */
+export function kanaSizeVariants(a: string, b: string): boolean {
+  if (a === b || [...a].length !== 1 || [...b].length !== 1) return false;
+  for (let i = 0; i < KANA_SIZE_PAIRS.length; i += 2) {
+    const pair = KANA_SIZE_PAIRS.slice(i, i + 2);
+    if (pair.includes(a) && pair.includes(b)) return true;
+  }
+  return false;
+}
 
 function product(values: readonly number[]): number {
   return values.reduce((a, b) => a * b, 1);
@@ -203,18 +226,23 @@ export async function dictionaryDecode(chars: readonly OcrChar[], opts: DecodeOp
   let coverage = await wordCoverage(current, opts.lang, opts.oracle);
   const done = new Set<number>();
   let changed = 0;
+  // A character inside a word is tried only with the alternatives it is contested by.
+  const contestedAlts = (i: number): Array<{ ch: string; p: number }> => altsAt(i).filter((a) => (
+    a.p >= out[i].p * DECODE_NEAR_TIE_RATIO || (kanaSizeVariants(a.ch, out[i].ch) && a.p >= DECODE_KANA_SIZE_MIN_P)
+  ));
+  const candidatesAt = (i: number): Array<{ ch: string; p: number }> => (coverage.covered[i] ? contestedAlts(i) : altsAt(i));
   while (changed < maxChanges && !opts.oracle.exhausted) {
-    const open = positions.filter((i) => !done.has(i) && !coverage.covered[i]);
+    const open = positions.filter((i) => !done.has(i) && candidatesAt(i).length > 0);
     if (!open.length) break;
     type Change = Array<{ i: number; ch: string; p: number }>;
     const tries: Change[] = [];
-    for (const i of open) for (const a of altsAt(i)) tries.push([{ i, ch: a.ch, p: a.p }]);
+    for (const i of open) for (const a of candidatesAt(i)) tries.push([{ i, ch: a.ch, p: a.p }]);
     for (let x = 0; x < open.length; x++) {
       for (let y = x + 1; y < open.length; y++) {
         const i = open[x];
         const j = open[y];
         if (j - i >= COVERAGE_MAX_LEN) break;
-        for (const a of altsAt(i).slice(0, 2)) for (const b of altsAt(j).slice(0, 2)) tries.push([{ i, ch: a.ch, p: a.p }, { i: j, ch: b.ch, p: b.p }]);
+        for (const a of candidatesAt(i).slice(0, 2)) for (const b of candidatesAt(j).slice(0, 2)) tries.push([{ i, ch: a.ch, p: a.p }, { i: j, ch: b.ch, p: b.p }]);
         // One side kept as read, the other changed, is already a single try.
       }
     }

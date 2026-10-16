@@ -39,8 +39,13 @@
  *     on vertical text and manga pages and PaddleOCR on horizontal and screen
  *     text (manga-ocr hallucinates on printed screen text); Chinese and Russian
  *     have PaddleOCR. When the picture may be in several languages, each
- *     candidate with a provider is read (stopping early once one reads well in
- *     its own script) and the best confidence × script consistency wins.
+ *     candidate with a provider is read, stopping early only once one reads
+ *     well in script no other recogniser can fake (kana, Cyrillic). The
+ *     language is judged on all the reads together (`RouterDeps.judgeReads`,
+ *     `detectStudyLangOfReads`): a recogniser writes its own language's
+ *     character forms for everything, so PaddleOCR's Japanese head reading a
+ *     Chinese sentence as 対/毎/歩 is no evidence of Japanese. The text is then
+ *     that language's own read.
  *     Tesseract (bundled, renderer side) is the last resort: with no provider
  *     here the result is `error: 'no-engine'` and the surface runs it.
  *  2. **Fallback per line.** A line below `OCR_LINE_FALLBACK_CONFIDENCE`, or
@@ -82,8 +87,8 @@ import {
   type OcrRouterOptions,
   type OcrRouterResult,
 } from '../shared/ocrRouterTypes';
-import { isStudyLang } from '../shared/studyLang';
-import { detectStudyLangOfText } from '../shared/textLangDetect';
+import { isStudyLang, type StudyLang } from '../shared/studyLang';
+import { detectStudyLangOfReads, detectStudyLangOfText } from '../shared/textLangDetect';
 import {
   installedPaddleLangs,
   isInstalledPaddleDetector,
@@ -141,12 +146,27 @@ export interface OcrProvider {
   readLine?(image: RouterImage, lang: OcrLangId, opts: { vertical: boolean }): Promise<EngineLine | null>;
 }
 
+/** One candidate language's read, as `RouterDeps.judgeReads` sees it. */
+export interface RouterLangRead {
+  lang: OcrLangId;
+  text: string;
+  confidence: number;
+}
+
 export interface RouterDeps {
   providers: readonly OcrProvider[];
   /** A dictionary for `lang`, bounded by `deadline` (null: none; coverage is then not used). */
   wordOracle(lang: OcrLangId, deadline: number): WordOracle | null;
   /** The language some text is in, among `candidates` (the learner's own first). */
   detectLang(text: string, candidates: readonly OcrLangId[]): OcrLangId;
+  /**
+   * The language a picture is in, from every read so far (one per candidate
+   * language, each by that language's recogniser). `decisive`: settled by
+   * script no other recogniser can fake, so no other language needs reading.
+   * Absent: `detectLang` of the best read decides, and a good read in its own
+   * language stops the search.
+   */
+  judgeReads?(reads: readonly RouterLangRead[], candidates: readonly OcrLangId[]): { lang: OcrLangId; decisive: boolean };
   /** Which characters belong to `lang`'s script (for script consistency). */
   scriptOf(lang: OcrLangId): RegExp;
   /** The download that would read `lang` (empty when none is known). */
@@ -220,6 +240,14 @@ interface LangRead {
   score: number;
 }
 
+function textOf(read: Pick<LangRead, 'lines'>): string {
+  return read.lines.map((l) => l.text).join('\n');
+}
+
+function judgeView(read: LangRead): RouterLangRead {
+  return { lang: read.lang, text: textOf(read), confidence: meanLineConfidence(read.lines) ?? 0 };
+}
+
 const NO_DICTIONARY: WordOracle = memoWordOracle(async () => false, { maxLookups: 0 });
 
 function emptyResult(lang: OcrLangId, over: Partial<OcrRouterResult>): OcrRouterResult {
@@ -276,17 +304,25 @@ export async function recognizeWithRouter(
     }
     const read = await readLang(lang);
     if (!read) continue;
-    const own = deps.detectLang(read.lines.map((l) => l.text).join('\n'), langs) === lang;
-    if (own && (meanLineConfidence(read.lines) ?? 0) >= GOOD_READ_CONFIDENCE) break;
+    const good = (meanLineConfidence(read.lines) ?? 0) >= GOOD_READ_CONFIDENCE;
+    if (deps.judgeReads) {
+      // Only script the other recognisers cannot fake ends the search early: a
+      // Japanese recogniser reads a Chinese sentence in Japanese forms, confidently.
+      const verdict = deps.judgeReads(reads.map(judgeView), langs);
+      if (verdict.decisive && verdict.lang === lang && good) break;
+    } else if (good && deps.detectLang(textOf(read), langs) === lang) {
+      break;
+    }
   }
   let best = reads.reduce<LangRead | null>((a, b) => (!a || b.score > a.score ? b : a), null);
   if (!best || !best.lines.length) {
     return emptyResult(active, { error: failed && !best ? 'ocr-failed' : 'empty', engines: reads.map((r) => r.provider.id), timedOut });
   }
 
-  // 2. The language the text is actually in: read it with its own provider when
-  //    one is installed; otherwise say which download would.
-  let lang = deps.detectLang(best.lines.map((l) => l.text).join('\n'), langs);
+  // 2. The language the text is actually in (judged on every read, when the
+  //    deps can): read it with its own provider when one is installed;
+  //    otherwise say which download would.
+  let lang = deps.judgeReads ? deps.judgeReads(reads.map(judgeView), langs).lang : deps.detectLang(textOf(best), langs);
   let missing: OcrRouterResult['missing'];
   if (lang !== best.lang) {
     const own = reads.find((r) => r.lang === lang)
@@ -573,11 +609,33 @@ function defaultDetectLang(text: string, candidates: readonly OcrLangId[]): OcrL
   return detectStudyLangOfText(text, active, study).lang;
 }
 
+/**
+ * Gum's study languages are judged on every recogniser's read together
+ * (`detectStudyLangOfReads`: a recogniser's own character forms are no evidence
+ * of its language); any other language set falls back to the best read's text.
+ */
+export function defaultJudgeReads(reads: readonly RouterLangRead[], candidates: readonly OcrLangId[]): { lang: OcrLangId; decisive: boolean } {
+  const active = candidates[0];
+  if (active && isStudyLang(active) && reads.every((r) => isStudyLang(r.lang))) {
+    const guess = detectStudyLangOfReads(
+      reads.map((r) => ({ lang: r.lang as StudyLang, text: r.text, confidence: r.confidence })),
+      active,
+      candidates.filter(isStudyLang),
+    );
+    return { lang: guess.lang, decisive: guess.decisive };
+  }
+  const best = [...reads].sort((a, b) => b.confidence - a.confidence)[0];
+  if (!best) return { lang: active ?? 'ja', decisive: false };
+  const lang = defaultDetectLang(best.text, candidates);
+  return { lang, decisive: lang === reads[reads.length - 1]?.lang };
+}
+
 export function defaultRouterDeps(): RouterDeps {
   return {
     providers: [paddleProvider(), mangaProvider()],
     wordOracle: dictionaryOracle,
     detectLang: defaultDetectLang,
+    judgeReads: defaultJudgeReads,
     scriptOf: defaultScriptOf,
     assetsFor: (lang) => {
       const rec = paddleLangOf(lang);

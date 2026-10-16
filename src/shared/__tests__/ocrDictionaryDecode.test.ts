@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   dictionaryDecode,
+  kanaSizeVariants,
   memoWordOracle,
   mergeLineReads,
   wordCoverage,
@@ -56,7 +57,33 @@ describe('dictionary-guided decoding', () => {
     expect(out[0]).toMatchObject({ ch: '恐', was: '彼', alts: [{ ch: '彼', p: 0.41 }, { ch: '披', p: 0.1 }] });
   });
 
-  it('never touches a character that is already inside a word', async () => {
+  it('a character inside a word, all but tied with the alternative: the reading with more of the line in words wins (見っけた → 見つけた)', async () => {
+    // 見っける is a (colloquial) word, so っ is "inside a word"; PaddleOCR read it 0.53 against つ 0.47.
+    const words = ['図書館', '地図', '古い', '見っけ', '見つけた'];
+    const line = chars('図書館で古い地図を見っけた', { 10: { p: 0.53, alts: [['つ', 0.47]] } });
+    const { chars: out, changed } = await dictionaryDecode(line, { lang: 'ja', oracle: oracle(words) });
+    expect(out.map((c) => c.ch).join('')).toBe('図書館で古い地図を見つけた');
+    expect(changed).toBe(1);
+    expect(out[10]).toMatchObject({ ch: 'つ', was: 'っ' });
+  });
+
+  it('the same kana in the other size counts as contested well below a tie', async () => {
+    expect(kanaSizeVariants('っ', 'つ')).toBe(true);
+    expect(kanaSizeVariants('ョ', 'ヨ')).toBe(true);
+    expect(kanaSizeVariants('つ', 'ツ')).toBe(false);
+    // きゆ is a word, so ゆ is inside one; ゅ at 0.2 is below a tie but it is the small ゆ, and きゅう covers more.
+    const line = chars('きゆう', { 1: { p: 0.75, alts: [['ゅ', 0.2]] } });
+    const { chars: out } = await dictionaryDecode(line, { lang: 'ja', oracle: oracle(['きゆ', 'きゅう']) });
+    expect(out.map((c) => c.ch).join('')).toBe('きゅう');
+  });
+
+  it('a contested change is still refused when it gains nothing', async () => {
+    const line = chars('魅力を語る', { 3: { p: 0.5, alts: [['話', 0.45]] } });
+    const { changed } = await dictionaryDecode(line, { lang: 'ja', oracle: oracle(['話る']) });
+    expect(changed).toBe(0);
+  });
+
+  it('never touches a character that is already inside a word unless it was all but tied', async () => {
     // を is unsure and 物 would make 物語, but 語 already makes a word with る.
     const line = chars('魅力を語る', { 2: { p: 0.6, alts: [['物', 0.3]] } });
     const { chars: out, changed } = await dictionaryDecode(line, { lang: 'ja', oracle: oracle() });

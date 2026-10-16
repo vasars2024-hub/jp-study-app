@@ -197,6 +197,48 @@ describe('recognizeWithRouter', () => {
     expect(web.pages).toEqual(['ja']);
   });
 
+  it('a confident Japanese-head read of a Chinese sentence (in Japanese forms) does not end the search; the Chinese read wins', async () => {
+    // The owner's 摔了几次就放弃学走路。对！ snip, as the two PaddleOCR heads read it.
+    const web = provider({ id: 'web', langs: ['ja', 'zh'], tier: 1 }, {
+      page: (lang) => (lang === 'ja'
+        ? [line('揉几次就放卉学走路', 0.88), line('対!', 0.86)]
+        : [line('摔了几次就放弃学走路。', 0.998), line('对！', 0.997)]),
+    });
+    const result = await recognizeWithRouter(image, { langs: ['ja', 'zh'], purpose: 'snip' }, deps([web]));
+    expect(web.pages).toEqual(['ja', 'zh']);
+    expect(result).toMatchObject({ lang: 'zh', text: '摔了几次就放弃学走路。\n对！' });
+  });
+
+  it('Traditional Chinese the Japanese head reads a hair better is still Chinese, read by the Chinese head', async () => {
+    const web = provider({ id: 'web', langs: ['ja', 'zh'], tier: 1 }, {
+      page: (lang) => (lang === 'ja' ? [line('這個問題比我想像的複雑得多。', 0.951)] : [line('這個問題比我想像的複雜得多。', 0.949)]),
+    });
+    const result = await recognizeWithRouter(image, { langs: ['ja', 'zh'], purpose: 'snip' }, deps([web]));
+    expect(result).toMatchObject({ lang: 'zh', text: '這個問題比我想像的複雜得多。' });
+  });
+
+  it('a kanji-only Japanese word stays Japanese though the Chinese head was read too', async () => {
+    const web = provider({ id: 'web', langs: ['ja', 'zh'], tier: 1 }, {
+      page: (lang) => (lang === 'ja' ? [line('駅前広場', 1)] : [line('职前店場', 0.767)]),
+    });
+    const result = await recognizeWithRouter(image, { langs: ['ja', 'zh'], purpose: 'snip' }, deps([web]));
+    expect(web.pages).toEqual(['ja', 'zh']);
+    expect(result).toMatchObject({ lang: 'ja', text: '駅前広場' });
+  });
+
+  it('only a Japanese reader: a Chinese sentence it read in Japanese forms is kept as Chinese, with the reader offered', async () => {
+    const web = provider({ id: 'web', langs: ['ja'], tier: 1 }, { page: () => [line('揉几次就放卉学走路', 0.86), line('対!', 0.86)] });
+    const result = await recognizeWithRouter(image, { langs: ['ja'], purpose: 'snip' }, deps([web]));
+    expect(result).toMatchObject({ lang: 'zh', missing: { lang: 'zh', assetIds: ['paddle-ocr-zh'] } });
+  });
+
+  it('deps without a reads judge keep the single-text policy: a good read in its own language stops the search', async () => {
+    const web = provider({ id: 'web', langs: ['ja', 'zh'], tier: 1 }, { page: () => [line('図書館', 0.97)] });
+    const result = await recognizeWithRouter(image, { langs: ['ja', 'zh'], purpose: 'snip' }, deps([web], { judgeReads: undefined }));
+    expect(web.pages).toEqual(['ja']);
+    expect(result.lang).toBe('ja');
+  });
+
   it('text in a language no provider reads: kept, with that reader offered', async () => {
     const web = provider({ id: 'web', langs: ['ja'], tier: 1 }, { page: () => [line('这是我们的书', 0.7)] });
     const result = await recognizeWithRouter(image, { langs: ['ja'], purpose: 'snip' }, deps([web]));

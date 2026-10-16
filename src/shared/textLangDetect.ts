@@ -140,3 +140,161 @@ export function detectStudyLangOfText(
   if (cyrillic > 0) return { lang: 'ru', evidence: 'cyrillic' };
   return { lang: active, evidence: latin > 0 ? 'latin' : 'none' };
 }
+
+// ---------------------------------------------------------------------------
+// Which language a picture is in, from several recognisers' reads of it
+//
+// A recogniser can only write the characters it was trained on, so its read is
+// partly evidence about itself. PaddleOCR's Japanese head reads a Chinese
+// sentence in Japanese forms (对 → 対, 每 → 毎, 雜 → 雑) and its Chinese head
+// reads a Japanese word in Chinese ones (駅 → 职, 竜 → 童); judged on its own,
+// each read "proves" its recogniser's language. What does settle it:
+//
+//  - Script only one language writes and the other recogniser cannot fake:
+//    kana (a run of it, not one slip) and Cyrillic.
+//  - Kana-less Han text of sentence length: Chinese, unless the Japanese
+//    recogniser read it in Japanese forms clearly better than the Chinese one
+//    read it at all (a kana-less Japanese headline) and nothing in either read
+//    is Chinese grammar.
+//  - Short kana-less text (a word, a heading): the recogniser that reads it
+//    better, when its read carries its own language's forms; otherwise the
+//    better read's text decides, and the learner's language breaks a tie.
+
+/** One recogniser's read, for `detectStudyLangOfReads`. */
+export interface StudyLangRead {
+  /** The language the recogniser reads. */
+  lang: StudyLang;
+  text: string;
+  /** 0–1. */
+  confidence: number;
+}
+
+export interface StudyLangReadsGuess extends TextLangGuess {
+  /**
+   * Settled by script no other recogniser can fake (kana, Cyrillic) in a read
+   * of its own language: no other language needs to be read.
+   */
+  decisive: boolean;
+}
+
+/** How much better (0–1 confidence) the Japanese read must be to make kana-less sentence-length text Japanese. */
+export const KANALESS_JAPANESE_MARGIN = 0.05;
+/** A run of kana this long, or this share of the CJK characters, is Japanese, not an OCR slip. */
+const DECISIVE_KANA = 2;
+const DECISIVE_KANA_SHARE = 0.2;
+
+function scriptCounts(text: string): { kana: number; han: number; cyrillic: number; chineseGrammar: number } {
+  let kana = 0;
+  let han = 0;
+  let cyrillic = 0;
+  let chineseGrammar = 0;
+  for (const ch of String(text ?? '')) {
+    if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(ch) && ch !== 'ー') kana += 1;
+    else if (/\p{Script=Han}/u.test(ch)) {
+      han += 1;
+      if (CHINESE_FUNCTION_HAN.has(ch)) chineseGrammar += 1;
+    } else if (/\p{Script=Cyrillic}/u.test(ch)) cyrillic += 1;
+    else if (CHINESE_PUNCTUATION.has(ch)) chineseGrammar += 1;
+  }
+  return { kana, han, cyrillic, chineseGrammar };
+}
+
+/** The read is settled by its own script: kana in a Japanese read, Cyrillic in a Russian one. */
+function decisiveFor(read: StudyLangRead, active: StudyLang, candidates: readonly StudyLang[]): TextLangGuess | null {
+  const guess = detectStudyLangOfText(read.text, active, candidates);
+  if (guess.lang !== read.lang) return null;
+  if (guess.evidence === 'cyrillic') return guess;
+  if (guess.evidence !== 'kana') return null;
+  const { han } = scriptCounts(read.text);
+  const kana = wordKana(read.text);
+  return kana >= DECISIVE_KANA && kana >= (kana + han) * DECISIVE_KANA_SHARE ? guess : null;
+}
+
+/**
+ * Kana that reads as Japanese words: every hiragana, and katakana in runs of
+ * two letters or more (コーヒー, テレビ). A lone katakana letter between Han
+ * characters is what the Japanese head writes for a Chinese glyph it does not
+ * know (办 → カ, 卡 → ト).
+ */
+export function wordKana(text: string): number {
+  let count = 0;
+  let run = 0;
+  const flush = (): void => {
+    if (run >= 2) count += run;
+    run = 0;
+  };
+  for (const ch of String(text ?? '')) {
+    if (/\p{Script=Hiragana}/u.test(ch)) {
+      flush();
+      count += 1;
+    } else if (/\p{Script=Katakana}/u.test(ch) && ch !== 'ー') run += 1;
+    else if (ch !== 'ー') flush();
+  }
+  flush();
+  return count;
+}
+
+/**
+ * The language a picture is in, from the reads of one recogniser per candidate
+ * language (see above). `active` is the learner's language; `candidates` the
+ * languages the picture may be in. With one read this is `detectStudyLangOfText`
+ * of it, except that a long kana-less read by the Japanese recogniser is not
+ * made Japanese by the Japanese forms that recogniser writes for everything.
+ */
+export function detectStudyLangOfReads(
+  reads: readonly StudyLangRead[],
+  active: StudyLang = DEFAULT_STUDY_LANG,
+  candidates: readonly StudyLang[] = [active],
+): StudyLangReadsGuess {
+  const usable = reads.filter((r) => r.text.trim());
+  if (!usable.length) return { lang: active, evidence: 'none', decisive: false };
+  const decisive = usable
+    .map((read) => ({ read, guess: decisiveFor(read, active, candidates) }))
+    .filter((x): x is { read: StudyLangRead; guess: TextLangGuess } => Boolean(x.guess))
+    .sort((a, b) => b.read.confidence - a.read.confidence)[0];
+  if (decisive) return { ...decisive.guess, decisive: true };
+
+  const ja = usable.find((r) => r.lang === 'ja');
+  const zh = usable.find((r) => r.lang === 'zh');
+  const best = [...usable].sort((a, b) => b.confidence - a.confidence)[0];
+  const counts = (r: StudyLangRead | undefined) => (r ? scriptCounts(r.text) : { kana: 0, han: 0, cyrillic: 0, chineseGrammar: 0 });
+  const cj = counts(ja);
+  const cz = counts(zh);
+  const hanOnly = (r: StudyLangRead, c: ReturnType<typeof counts>) => c.han > 0 && wordKana(r.text) < DECISIVE_KANA && c.cyrillic === 0;
+
+  if (ja && zh && hanOnly(ja, cj) && hanOnly(zh, cz)) {
+    const gj = detectStudyLangOfText(ja.text, active, candidates);
+    const gz = detectStudyLangOfText(zh.text, active, candidates);
+    if (Math.max(cj.han, cz.han) >= KANALESS_SENTENCE_HAN) {
+      const japanese = gj.lang === 'ja' && gj.evidence === 'japanese'
+        && ja.confidence - zh.confidence >= KANALESS_JAPANESE_MARGIN
+        && cj.chineseGrammar === 0 && cz.chineseGrammar === 0;
+      if (japanese) return { lang: 'ja', evidence: 'japanese', decisive: false };
+      return { lang: 'zh', evidence: gz.lang === 'zh' && gz.evidence !== 'han' ? gz.evidence : 'no-kana', decisive: false };
+    }
+    if (zh.confidence >= ja.confidence && gz.lang === 'zh' && (gz.evidence === 'simplified' || gz.evidence === 'chinese-grammar')) {
+      return { lang: 'zh', evidence: gz.evidence, decisive: false };
+    }
+    if (ja.confidence >= zh.confidence && gj.lang === 'ja' && gj.evidence === 'japanese') {
+      return { lang: 'ja', evidence: 'japanese', decisive: false };
+    }
+    return { ...detectStudyLangOfText(best.text, active, candidates), decisive: false };
+  }
+
+  // One Han read (the other recogniser is not installed, or read nothing).
+  const guess = detectStudyLangOfText(best.text, active, candidates);
+  if (best.lang === 'ja' && guess.lang === 'ja' && guess.evidence !== 'latin' && guess.evidence !== 'none') {
+    const c = counts(best);
+    // The Japanese recogniser writes Japanese forms (and the odd katakana:
+    // 力 → カ, 卡 → ト) for Chinese text too: on sentence-length text with no
+    // hiragana and no decisive kana they are no evidence (see above).
+    // Nor next to 的 / 了 with no hiragana at all: Japanese writes 経済的な and
+    // 完了した; 的 and 了 in kana-less text are Chinese grammar.
+    const hiragana = [...best.text].filter((ch) => /\p{Script=Hiragana}/u.test(ch)).length;
+    const zhParticle = /[的了]/u.test(best.text) && c.han >= 4;
+    if (hiragana === 0 && (c.han >= KANALESS_SENTENCE_HAN || zhParticle || c.chineseGrammar > 0)) {
+      return { lang: 'zh', evidence: c.chineseGrammar ? 'chinese-grammar' : 'no-kana', decisive: false };
+    }
+  }
+  return { ...guess, decisive: false };
+}
