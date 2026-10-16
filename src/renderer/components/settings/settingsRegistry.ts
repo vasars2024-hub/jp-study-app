@@ -1003,6 +1003,14 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'System',
   },
   {
+    id: 'ai-ocr-vision',
+    titleKey: 'aiProv.ocr.title',
+    descKey: 'aiProv.ocr.desc',
+    keywords: ['read text with ai', 'ai ocr', 'vision', 'snip', 'manga ocr', 'picture', 'image', 'claude', 'chatgpt', 'gemini'],
+    pageId: 'ai',
+    group: 'System',
+  },
+  {
     id: 'ai-model',
     titleKey: 'settings.ai.model.title',
     descKey: 'settings.ai.model.desc',
