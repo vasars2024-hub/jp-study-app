@@ -4,6 +4,7 @@ import {
   type RouterDeps, type OcrRouterRead,
 } from './ocrRouter';
 import type { OcrRouterOptions } from '../shared/ocrRouterTypes';
+import { withAiVision } from './ocrAiVisionProvider';
 
 export interface SurfaceOcrOptions extends OcrRouterOptions {
   engine?: 'auto' | 'web' | 'manga';
@@ -20,5 +21,6 @@ export function readOcrSurface(
     ...deps,
     providers: deps.providers.map((p) => ({ ...p, tier: p.id === preferred ? -10 : p.tier })),
   } : deps;
-  return (opts.line ? recognizeLineWithRouter : recognizeWithRouter)(routerImageFromNative(image), opts, routed);
+  // The learner's "Read text with AI" mode (off by default; needs the ocrVision consent) checks or replaces the local read.
+  return withAiVision(routerImageFromNative(image), opts, routed, opts.line ? recognizeLineWithRouter : recognizeWithRouter);
 }
