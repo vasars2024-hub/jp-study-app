@@ -1,0 +1,40 @@
+// "Read text with AI" (see ./en.ts). Chinese (Simplified).
+
+import type { Catalog } from '../core';
+
+export const AI_OCR_UI_ZH: Catalog = {
+  'aiProv.ocr.title': '用 AI 识别文字',
+  'aiProv.ocr.desc': '使用你自己密钥的视觉模型来识别截图、漫画、阅读透镜、视觉小说和书页。它通常是最准确的识别方式，尤其适合艺术字和小字。',
+  'aiProv.ocr.mode': '何时使用',
+  'aiProv.ocr.mode.off': '关闭',
+  'aiProv.ocr.mode.unsure': '仅在不确定时',
+  'aiProv.ocr.mode.always': '始终',
+  'aiProv.ocr.mode.off.hint': '只使用本机上的识别引擎。你仍然可以单独用 AI 检查某张截图。',
+  'aiProv.ocr.mode.unsure.hint': '先由本机引擎识别。不确定时，图片只发送一次，两者不一致的地方以 AI 的识别为准。',
+  'aiProv.ocr.mode.always.hint': '所有图片都由 AI 识别。AI 失败时由本机引擎接手。',
+  'aiProv.ocr.provider': '识别所用模型',
+  'aiProv.ocr.provider.follow': '与 设置 › AI 相同（{provider}）',
+  'aiProv.ocr.provider.reads': '{provider}（支持图片）',
+  'aiProv.ocr.provider.noKey': '{provider}（支持图片，尚未添加密钥）',
+  'aiProv.ocr.provider.textOnly': '{provider}（仅文本）',
+  'aiProv.ocr.compatVision': '我的本地模型能识别图片',
+  'aiProv.ocr.compatVision.hint': '仅在使用视觉模型（如 qwen2.5-vl、llava 或 gemma3）时开启。纯文本模型无法识别图片。',
+  'aiProv.ocr.consent': '允许向 {provider} 发送图片',
+  'aiProv.ocr.privacy': '你截取或识别的图片会发送到 {provider}（{host}）。',
+  'aiProv.ocr.privacyLocal': '你截取或识别的图片会发送到你的本地服务器（{host}），不会离开这台电脑。',
+  'aiProv.ocr.cost': '每张截图、每页或每个区域一次请求。服务商会像其他请求一样计费，并计入你的支出上限。',
+  'aiProv.ocr.status.ready': '已就绪：由 {provider} 识别图片。',
+  'aiProv.ocr.status.ai-off': '请先在 设置 › AI 中开启“使用 AI 功能”。',
+  'aiProv.ocr.status.no-vision': '{provider} 无法识别图片。请选择 Claude、OpenAI 或 Gemini，或本地视觉模型。',
+  'aiProv.ocr.status.not-configured': '请先在 设置 › AI 中添加 {provider} 的密钥。',
+  'aiProv.ocr.status.no-consent': '允许发送图片后即可使用。',
+  'aiProv.ocr.openSettings': '打开 设置 › AI',
+
+  'aiProv.ocr.check': '用 AI 检查',
+  'aiProv.ocr.check.hint': '把这张图片发送给 {provider} 一次。两者不一致的地方会替换为 AI 的识别结果。',
+  'aiProv.ocr.check.confirmTitle': '要把这张图片发送给 {provider} 吗？',
+  'aiProv.ocr.check.confirmBody': '用 AI 检查会把截图发送到 {provider}（{host}）。选择“是”后，今后也允许发送图片；你可以随时在 设置 › AI 中关闭。',
+  'aiProv.ocr.check.confirm': '发送',
+  'aiProv.ocr.check.running': '正在用 AI 检查…',
+  'aiProv.ocr.check.failed': 'AI 无法识别这张截图：{reason}',
+};

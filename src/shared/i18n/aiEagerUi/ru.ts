@@ -142,4 +142,6 @@ export const AI_EAGER_UI_RU: Catalog = {
   'deckExport.notes.distinction': 'Не путать с',
   'deckExport.notes.examples': 'Примеры',
   'deckExport.notes.accepted': 'Тоже правильно',
+  'aiProv.feature.ocrVision': 'Распознавание текста на картинках',
+  'aiProv.feature.ocrVision.desc': 'Картинки, которые читает ИИ, отправляются вашему провайдеру. Выключено, пока вы не разрешите.',
 };

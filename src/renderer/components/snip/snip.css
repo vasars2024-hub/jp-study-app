@@ -694,3 +694,28 @@ html.snip-toast-window body {
   font-size: 16px;
   min-width: 32px;
 }
+
+/* No translation: the reason, and the way to choose an engine. */
+.snip-translation-missing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.snip-translation-missing p {
+  margin: 0;
+}
+
+/* "Check with AI": the one-picture read by the learner's own vision model. */
+.snip-ai-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 6px;
+}
+
+.snip-ai-check .snip-fix-hint {
+  margin: 0;
+}

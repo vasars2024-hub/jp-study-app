@@ -139,4 +139,6 @@ export const AI_EAGER_UI_ZH: Catalog = {
   'deckExport.notes.distinction': '不要混淆',
   'deckExport.notes.examples': '例句',
   'deckExport.notes.accepted': '也算正确',
+  'aiProv.feature.ocrVision': '识别图片中的文字',
+  'aiProv.feature.ocrVision.desc': '用 AI 识别的图片会发送给你的服务商。在你允许之前保持关闭。',
 };

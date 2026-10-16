@@ -19,6 +19,7 @@ import type { AiConnectionTestResult } from '../shared/aiConnectionTest';
 import { aiCredentialsUsable } from './credentials/ai';
 import { setAiCloudFeatureReader, setAiFeaturesReader, setConfiguredAiProviderReader } from './aiFeatureGate';
 import { getAiSetupStore, type AiSetupStore } from './aiSetupStore';
+import { registerAiOcrVisionIpc } from './aiOcrVisionStore';
 import { listLocalModelFiles, resolveQwenSmallModelPath } from './localModelFiles';
 import { AiProviderRuntimeError, runCloudAiRequest, setAiProviderOptionsReader } from './providerRuntime';
 
@@ -131,6 +132,9 @@ export function registerAiSetupIpc(resolveStore: () => AiSetupStore = getAiSetup
   void import('./mining')
     .then((mining) => setConfiguredAiProviderReader(() => mining.getConfiguredAiProvider().providerId))
     .catch(() => undefined);
+  // "Read text with AI" (Settings > AI and the Snips settings): its mode, provider and
+  // whether the local server's model reads pictures, beside the switch and opt-ins above.
+  registerAiOcrVisionIpc();
 
   ipcMain.handle('aiSetup:status', () => readAiSetupStatus(resolveStore()));
 

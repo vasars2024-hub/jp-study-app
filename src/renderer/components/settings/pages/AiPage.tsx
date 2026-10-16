@@ -44,6 +44,7 @@ import {
   saveLocalAgentSettings,
 } from '../../../localAgentSettingsStore';
 import { AiModelInstallControl } from '../../ai/AiModelInstall';
+import AiOcrVisionSettings from '../../ai/AiOcrVisionSettings';
 import { loadAiImmersePrefs, onAiImmersePrefsChanged, saveAiImmersePrefs } from '../../../aiImmersePrefs';
 import { AgentAutomationEditor } from '../../agent/AgentAutomationEditor';
 import { AgentSpendPanel } from '../../agent/AgentSpendPanel';
@@ -373,6 +374,10 @@ export default function AiPage() {
               />
               <p className="muted os-set-hint">{t('aiImmerse.settings.vnAutoTranslate.desc')}</p>
             </div>
+          </SettingsCard>
+
+          <SettingsCard id="ai-ocr-vision" title={t('aiProv.ocr.title')} description={t('aiProv.ocr.desc')}>
+            <AiOcrVisionSettings />
           </SettingsCard>
 
           <SettingsCard

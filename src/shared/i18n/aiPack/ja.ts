@@ -10,6 +10,7 @@ import { AI_TUTOR_UI_JA } from '../aiTutorUi/ja';
 import { AI_SPEAK_UI_JA } from '../aiSpeakUi/ja';
 import { AI_SPEAK2_UI_JA } from '../aiSpeak2Ui/ja';
 import { AI_STREAM_UI_JA } from '../aiStreamUi/ja';
+import { AI_OCR_UI_JA } from '../aiOcrUi/ja';
 
 export const AI_PACK_JA: Catalog = {
   ...AI_FIX_UI_JA,
@@ -21,4 +22,5 @@ export const AI_PACK_JA: Catalog = {
   ...AI_SPEAK_UI_JA,
   ...AI_SPEAK2_UI_JA,
   ...AI_STREAM_UI_JA,
+  ...AI_OCR_UI_JA,
 };

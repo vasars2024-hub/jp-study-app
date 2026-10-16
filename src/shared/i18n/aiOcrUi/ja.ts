@@ -1,0 +1,40 @@
+// "Read text with AI" (see ./en.ts). Japanese.
+
+import type { Catalog } from '../core';
+
+export const AI_OCR_UI_JA: Catalog = {
+  'aiProv.ocr.title': 'AI で文字を読み取る',
+  'aiProv.ocr.desc': '自分のキーで使う画像対応モデルが、スニップ、マンガ、リーディングレンズ、ビジュアルノベル、本のページを読み取ります。特にデザイン文字や小さな文字では、たいてい最も正確です。',
+  'aiProv.ocr.mode': '使うタイミング',
+  'aiProv.ocr.mode.off': 'オフ',
+  'aiProv.ocr.mode.unsure': '自信がないときだけ',
+  'aiProv.ocr.mode.always': '常に',
+  'aiProv.ocr.mode.off.hint': 'このパソコン上の読み取りエンジンだけを使います。スニップを 1 枚ずつ AI で確認することはできます。',
+  'aiProv.ocr.mode.unsure.hint': 'まずこのパソコン上のエンジンが読み取ります。自信がない場合は画像を 1 回だけ送信し、結果が食い違う箇所は AI の読み取りを優先します。',
+  'aiProv.ocr.mode.always.hint': 'すべての画像を AI が読み取ります。失敗したときは、このパソコン上のエンジンが代わりに読み取ります。',
+  'aiProv.ocr.provider': '読み取りに使うモデル',
+  'aiProv.ocr.provider.follow': '設定 › AI と同じ（{provider}）',
+  'aiProv.ocr.provider.reads': '{provider}（画像に対応）',
+  'aiProv.ocr.provider.noKey': '{provider}（画像に対応・キー未設定）',
+  'aiProv.ocr.provider.textOnly': '{provider}（テキストのみ）',
+  'aiProv.ocr.compatVision': 'ローカルモデルが画像を読み取れる',
+  'aiProv.ocr.compatVision.hint': 'qwen2.5-vl、llava、gemma3 などの画像対応モデルのときだけオンにしてください。テキスト専用モデルは画像を読み取れません。',
+  'aiProv.ocr.consent': '{provider} への画像の送信を許可する',
+  'aiProv.ocr.privacy': 'スニップした画像や読み取る画像は {provider}（{host}）に送信されます。',
+  'aiProv.ocr.privacyLocal': 'スニップした画像や読み取る画像はローカルサーバー（{host}）に送信され、このパソコンの外には出ません。',
+  'aiProv.ocr.cost': 'スニップ・ページ・範囲ごとに 1 回のリクエストです。ほかのリクエストと同様にプロバイダーから請求され、利用上限の対象になります。',
+  'aiProv.ocr.status.ready': '準備完了：{provider} が画像を読み取ります。',
+  'aiProv.ocr.status.ai-off': '先に 設定 › AI で「AI 機能を使う」をオンにしてください。',
+  'aiProv.ocr.status.no-vision': '{provider} は画像を読み取れません。Claude、OpenAI、Gemini、またはローカルの画像対応モデルを選んでください。',
+  'aiProv.ocr.status.not-configured': '先に 設定 › AI で {provider} のキーを追加してください。',
+  'aiProv.ocr.status.no-consent': '使うには画像の送信を許可してください。',
+  'aiProv.ocr.openSettings': '設定 › AI を開く',
+
+  'aiProv.ocr.check': 'AI で確認',
+  'aiProv.ocr.check.hint': 'この画像を {provider} に 1 回だけ送信します。食い違う箇所は AI の読み取りに置き換わります。',
+  'aiProv.ocr.check.confirmTitle': 'この画像を {provider} に送信しますか？',
+  'aiProv.ocr.check.confirmBody': 'AI で確認すると、スニップした画像が {provider}（{host}）に送信されます。「はい」を選ぶと、今後も画像の送信が許可されます。設定 › AI でいつでもオフにできます。',
+  'aiProv.ocr.check.confirm': '送信する',
+  'aiProv.ocr.check.running': 'AI で確認しています…',
+  'aiProv.ocr.check.failed': 'AI でこのスニップを読み取れませんでした：{reason}',
+};

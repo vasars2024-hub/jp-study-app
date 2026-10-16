@@ -145,4 +145,6 @@ export const AI_EAGER_UI_EN: Catalog = {
   'deckExport.notes.distinction': 'Not to confuse with',
   'deckExport.notes.examples': 'Example sentences',
   'deckExport.notes.accepted': 'Also accepted',
+  'aiProv.feature.ocrVision': 'Read text in pictures',
+  'aiProv.feature.ocrVision.desc': 'Pictures read with AI are sent to your provider. Off until you allow it.',
 };

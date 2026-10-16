@@ -8,7 +8,7 @@ export const SNIP_UI_EN: Catalog = {
   // ---- The app ----
   'snip.paletteTerms': 'snip snipping tool screenshot ocr cards',
   'snip.view.title': 'Snip to cards',
-  'snip.view.intro': 'Press Win+Shift+S and snip any {lang} text on screen. Gum reads it and adds the words you do not know yet as cards.',
+  'snip.view.intro': 'Press Win+Shift+S and snip text on screen in a language you study. Gum reads it and adds the words you do not know yet as cards.',
   'snip.view.settings': 'Settings',
   'snip.status.watching': 'Watching the clipboard for snips.',
   'snip.status.paused': 'Paused: snips are not read.',
@@ -54,7 +54,7 @@ export const SNIP_UI_EN: Catalog = {
   'snip.detail.translating': 'Translating…',
   'snip.detail.noTranslation': 'No translation: {reason}',
   'snip.translate.empty': 'the engine returned nothing.',
-  'snip.translate.failed': 'no translation engine is set up or reachable. Choose one in Settings → Translate.',
+  'snip.translate.failed': 'no translation engine is set up or reachable.',
   'snip.detail.words': 'Words',
   'snip.detail.grammar': 'Grammar',
   'snip.detail.noGrammar': 'No grammar points from the library were found in this sentence.',

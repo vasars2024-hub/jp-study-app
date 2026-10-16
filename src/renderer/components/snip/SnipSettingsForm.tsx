@@ -14,6 +14,7 @@ import {
 } from '../../../shared/snipToCards';
 import { normalizeStudyLang } from '../../../shared/studyLang';
 import { SnipReaderSetup } from './SnipReaderSetup';
+import AiOcrVisionSettings from '../ai/AiOcrVisionSettings';
 import './snip.css';
 
 const DEFAULT_STATUS: SnipStatus = {
@@ -163,6 +164,8 @@ export default function SnipSettingsForm({ showShortcut = true }: { showShortcut
         />
       </div>
       {showShortcut && <GlobalChordRow commandId="snip.toggle" label={t('cmd.snip.toggle')} />}
+      {/* "Read text with AI": the same setting as in Settings > AI, here where snips are read. */}
+      <AiOcrVisionSettings compact />
     </div>
   );
 }

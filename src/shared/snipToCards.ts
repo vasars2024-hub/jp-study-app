@@ -15,6 +15,7 @@
 
 import { STUDY_LANGS, type StudyLang } from './studyLang';
 import type { OcrUnsureChar } from './ocrRouterTypes';
+import { aiOcrEngineLabel } from './aiOcrVision';
 
 // ---------------------------------------------------------------------------
 // Settings
@@ -230,7 +231,8 @@ export function snipEngineLabel(engine: string | undefined): { name?: string; ke
   if (engine === 'basic') return { key: 'snip.engine.basic' };
   if (engine === 'manga') return { name: 'manga-ocr' };
   if (engine === 'web') return { name: 'PaddleOCR' };
-  return { key: 'snip.engine.other' };
+  // "Read text with AI": the provider's product name ("Read by Claude Sonnet 5.5").
+  return aiOcrEngineLabel(engine) ?? { key: 'snip.engine.other' };
 }
 
 export type SnipTextProblem = 'no-text' | 'garbage' | 'low-confidence';
@@ -545,6 +547,8 @@ export interface SnipEntry {
   deck?: string;
   /** The OCR's own text, kept once the learner corrected it. */
   ocrText?: string;
+  /** Why the AI reader, asked to read this snip, did not (an `AiProviderErrorCode`). */
+  aiError?: string;
 }
 
 export type SnipReviewReason = 'manual' | 'uncertain';
@@ -611,6 +615,8 @@ export type SnipAction =
   | { id: string; action: 'reanalyze'; text: string }
   /** Read the picture again with the best engine installed now (main); refused while it owns cards. */
   | { id: string; action: 'reread' }
+  /** "Check with AI": read it again, and have the learner's AI reader check it (main; needs the opt-in). */
+  | { id: string; action: 'aiCheck' }
   /** Install these readers (the learner clicked), then read the picture again. */
   | { id: string; action: 'installReread'; assets: string[] }
   /** This snip's own deck: later adds go there, and the cards it owns move there. */
@@ -666,6 +672,8 @@ export function normalizeSnipAction(raw: unknown): SnipAction | null {
       return typeof r.deck === 'string' ? { id, action: 'setDeck', deck: cleanName(r.deck, '') } : null;
     case 'reread':
       return { id, action: 'reread' };
+    case 'aiCheck':
+      return { id, action: 'aiCheck' };
     case 'installReread': {
       const assets = Array.isArray(r.assets) ? [...new Set(r.assets.filter(isSnipReaderAsset))].slice(0, 6) : [];
       return assets.length ? { id, action: 'installReread', assets } : null;
@@ -749,10 +757,10 @@ export type SnipEntryPatch = Partial<Omit<SnipEntry, 'id' | 'hash' | 'createdAt'
 
 export type SnipClearableField =
   | 'error' | 'installIds' | 'translation' | 'translationError' | 'review' | 'overLimit'
-  | 'unsure' | 'corrected' | 'engines' | 'confidence' | 'engine' | 'ocrText' | 'undone';
+  | 'unsure' | 'corrected' | 'engines' | 'confidence' | 'engine' | 'ocrText' | 'undone' | 'aiError';
 export const SNIP_CLEARABLE_FIELDS: ReadonlySet<SnipClearableField> = new Set<SnipClearableField>([
   'error', 'installIds', 'translation', 'translationError', 'review', 'overLimit',
-  'unsure', 'corrected', 'engines', 'confidence', 'engine', 'ocrText', 'undone',
+  'unsure', 'corrected', 'engines', 'confidence', 'engine', 'ocrText', 'undone', 'aiError',
 ]);
 
 /**

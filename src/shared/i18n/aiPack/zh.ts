@@ -10,6 +10,7 @@ import { AI_TUTOR_UI_ZH } from '../aiTutorUi/zh';
 import { AI_SPEAK_UI_ZH } from '../aiSpeakUi/zh';
 import { AI_SPEAK2_UI_ZH } from '../aiSpeak2Ui/zh';
 import { AI_STREAM_UI_ZH } from '../aiStreamUi/zh';
+import { AI_OCR_UI_ZH } from '../aiOcrUi/zh';
 
 export const AI_PACK_ZH: Catalog = {
   ...AI_FIX_UI_ZH,
@@ -21,4 +22,5 @@ export const AI_PACK_ZH: Catalog = {
   ...AI_SPEAK_UI_ZH,
   ...AI_SPEAK2_UI_ZH,
   ...AI_STREAM_UI_ZH,
+  ...AI_OCR_UI_ZH,
 };

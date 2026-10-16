@@ -23,7 +23,12 @@
  *    best reader now available, and makes its cards;
  *  - many languages: a Chinese snip on a Japanese profile with a Chinese reader becomes a
  *    Chinese snip with Chinese cards; with no Chinese reader it is kept and the view offers
- *    "Install the Chinese reader and read again" (never downloaded by itself).
+ *    "Install the Chinese reader and read again" (never downloaded by itself);
+ *  - Read text with AI (src/main/ocrAiVisionProvider.ts): with the mode "Always", the
+ *    provider the OpenAI-compatible server (a flow-owned fake vision model on loopback,
+ *    `_aiVisionFake.cjs`), its "reads pictures" switch and the "Read text in pictures"
+ *    opt-in, a snip is read by the model, one request with the picture, and the Snips view
+ *    says who read it. Nothing is sent before the opt-in, and the settings are put back.
  *
  * No OCR model is installed headless and none is downloaded, so the accurate reader is the
  * app's harness fake (`e2eFakeProvider` in main/snipToCards.ts): canned engine reads per
@@ -33,6 +38,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { ensureDictionaryReady, installHelpers, poll, pollAsync, DECK } = require('./_lib.cjs');
+const { startFakeVision } = require('./_aiVisionFake.cjs');
 
 const SNIP_TEXT = '窓辺の猫は静かに眠っていた。';
 /** The review-mode snip: different words, so it is a new picture with new candidates. */
@@ -45,6 +51,11 @@ const ZH_SIZE = '1250x200';
 const ZH_MISSING_TEXT = '这是我们的书。';
 const ZH_MISSING_SIZE = '1260x200';
 const CHINESE_FONT = ['C:/Windows/Fonts/msyh.ttc', 'C:/Windows/Fonts/simsun.ttc'].find((f) => fs.existsSync(f));
+
+/** Read text with AI: the picture the fake vision model "reads", and what it answers. */
+const AI_TEXT = '雨の日は図書館で静かに本を読む。';
+const AI_SIZE = '1270x200';
+const AI_MODEL = 'gum-e2e-vision';
 
 /** The snip: one line of text on white, the size of a typical text snip. */
 async function renderSnip(dir, text = SNIP_TEXT, name = 'snip-cards', size = '1240x200', font = undefined) {
@@ -340,6 +351,9 @@ module.exports = {
     }
     fs.rmSync(fakeFile, { force: true });
 
+    // --- Read text with AI: "Always", the local OpenAI-compatible server (a fake vision model) ---
+    await readWithAi(ctx);
+
     // Back to the default (off) for the flows after this one.
     const off = await ev(`window.api.snipSetSettings({ enabled: false })`, { await: true });
     result.check('turning it off again stops watching', off?.enabled === false && off?.watching === false, off);
@@ -348,3 +362,74 @@ module.exports = {
     await ctx.e2e('clipboard', { set: { text: '' } });
   },
 };
+
+/**
+ * "Read text with AI" end to end: the real settings IPC, the real provider (prompt, schema,
+ * picture, zod), the real snip pipeline — answered by a flow-owned fake vision server.
+ */
+async function readWithAi(ctx) {
+  const { eval: ev, result } = ctx;
+  const vision = await startFakeVision({ model: AI_MODEL, text: AI_TEXT });
+  const before = await ev(`window.api.aiSetupStatus()`, { await: true });
+  try {
+    // Nothing is sent before the opt-in: the mode alone cannot start uploads.
+    await ev(`window.api.aiSetProvider('openai-compatible').then(() => true)`, { await: true });
+    await ev(`window.api.aiSetupUpdate({ compatBaseUrl: ${JSON.stringify(vision.base)}, compatModel: ${JSON.stringify(AI_MODEL)} }).then(() => true)`, { await: true });
+    await ev(`window.api.aiOcrVisionUpdate({ compatVision: true, mode: 'always' }).then(() => true)`, { await: true });
+    const blocked = await ev(`window.api.aiOcrVisionStatus()`, { await: true });
+    result.check('Read text with AI: with the mode set but no opt-in, pictures may not be sent',
+      blocked?.ready === false && blocked?.blocked === 'no-consent' && blocked?.available === true && blocked?.local === true,
+      blocked);
+
+    await ev(`window.api.aiSetupUpdate({ cloudFeatures: { ocrVision: true } }).then(() => true)`, { await: true });
+    const ready = await ev(`window.api.aiOcrVisionStatus()`, { await: true });
+    result.check('with "Read text in pictures" allowed, the local vision model is ready to read',
+      ready?.ready === true && ready?.mode === 'always' && ready?.effectiveProviderId === 'openai-compatible' && ready?.host === `127.0.0.1:${vision.port}`,
+      ready);
+
+    let image = null;
+    try {
+      image = await renderSnip(ctx.mediaDir, AI_TEXT, 'snip-ai', AI_SIZE);
+    } catch (err) {
+      result.note(`could not render the AI snip (${err.message}); Read text with AI not exercised`);
+    }
+    if (!image) return;
+    const known = ((await ev(`window.api.snipHistoryList({})`, { await: true })) ?? []).map((e) => e.id);
+    await ctx.e2e('clipboard', { set: { text: 'ai' } });
+    await ctx.sleep(800);
+    await ctx.e2e('clipboard', { set: { imagePath: image } });
+    const read = await pollAsync(ctx, `window.api.snipHistoryList({}).then((list) => (list || []).find((e) => !${JSON.stringify(known)}.includes(e.id) && e.status !== 'processing') || null)`, 120000, 500);
+    result.note(read ? `AI snip: ${read.status} by ${read.engine}: ${JSON.stringify(read.text)}; fake hits ${JSON.stringify(vision.hits)}` : `AI snip not read; fake hits ${JSON.stringify(vision.hits)}`);
+    const sent = vision.hits.filter((h) => h.status === 200);
+    result.check('the snip went to the vision model once, as a PNG picture, asking for the reader\'s JSON schema',
+      sent.length === 1 && sent[0].images === 1 && sent[0].mime === 'image/png' && sent[0].schema === true && sent[0].model === AI_MODEL,
+      vision.hits);
+    result.check('the snip is read by the model: its transcription, engine "ai:openai-compatible", and cards made from it',
+      Boolean(read) && read.status === 'done' && read.text === AI_TEXT && read.engine === 'ai:openai-compatible' && read.cardIds.length >= 1 && !read.aiError,
+      read ? { status: read.status, text: read.text, engine: read.engine, cards: read.cardIds.length, aiError: read.aiError } : null);
+    if (read) {
+      await ev(`__e2e.open('snips')`);
+      const meta = await poll(ctx, `(() => {
+        const item = [...document.querySelectorAll('.snip-app .snip-history-open')].find((b) => b.textContent.includes(${JSON.stringify(AI_TEXT.slice(0, 4))}));
+        if (item) item.click();
+        const m = document.querySelector('.snip-app .snip-detail-meta');
+        // The selected entry is this snip (its text shows with readings, so the history row is what is matched).
+        const current = document.querySelector('.snip-app .snip-history-open[aria-current="true"]');
+        return m && /Read by/.test(m.textContent) && current && current.textContent.includes(${JSON.stringify(AI_TEXT.slice(0, 4))}) ? m.textContent : null;
+      })()`, 20000);
+      result.check('the Snips view says the AI reader read it ("Read by Local server …")', /Read by Local server/.test(meta || ''), meta);
+      if (read.cardIds.length) {
+        await ev(`window.api.snipAction({ id: ${JSON.stringify(read.id)}, action: 'undo' })`, { await: true });
+        await pollAsync(ctx, `window.api.snipHistoryGet(${JSON.stringify(read.id)}).then((e) => e && e.undone ? e : null)`, 30000, 300);
+      }
+    }
+  } finally {
+    // Put the profile back: Off, no opt-in, no local server, the provider it had.
+    await ev(`window.api.aiOcrVisionUpdate({ mode: 'off', compatVision: false, providerId: '' }).then(() => true)`, { await: true }).catch(() => undefined);
+    await ev(`window.api.aiSetupUpdate({ compatBaseUrl: ${JSON.stringify(before?.compatBaseUrl ?? '')}, compatModel: ${JSON.stringify(before?.compatModel ?? '')}, cloudFeatures: { ocrVision: false } }).then(() => true)`, { await: true }).catch(() => undefined);
+    if (before?.providerId) await ev(`window.api.aiSetProvider(${JSON.stringify(before.providerId)}).then(() => true)`, { await: true }).catch(() => undefined);
+    const after = await ev(`window.api.aiOcrVisionStatus()`, { await: true }).catch(() => null);
+    result.check('Read text with AI is put back to Off, with no opt-in', after?.mode === 'off' && after?.consent === false, after);
+    await vision.close();
+  }
+}

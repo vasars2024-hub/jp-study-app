@@ -136,6 +136,8 @@ describe('what crosses the bridge', () => {
       // Grammar, statistics, planning, onboarding and Blanc helpers: off for the cloud too.
       ...TUTOR_FEATURES_OFF,
       ...SPEAK_FEATURES_OFF,
+      // Reading text in pictures with AI sends the picture: off until the learner allows it.
+      ocrVision: false,
     });
     const patched = applyAiFeatureSettingsPatch(normalizeAiFeatureSettings(undefined), {
       cloudFeatures: { subtitleTranslate: true, bogus: true, mirror: 'yes' },
@@ -162,6 +164,8 @@ describe('what crosses the bridge', () => {
       studyCommand: false,
       ...TUTOR_FEATURES_OFF,
       ...SPEAK_FEATURES_OFF,
+      // Reading text in pictures with AI sends the picture: off until the learner allows it.
+      ocrVision: false,
     });
   });
 

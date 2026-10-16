@@ -16,11 +16,16 @@ import {
 import { normalizeStudyLang, type StudyLang } from '../../../shared/studyLang';
 import { SNIP_FOCUS_EVENT, takeSnipFocus } from '../../snipToCards';
 import { requestFlashcardsFocus } from '../../openIntents';
+import { openSectionSurface } from '../../sectionSurface';
 import { openGrammarPoint } from '../../extensionBridgeUi';
 import { confirmDialog } from '../ui/dialogService';
 import DeinflectTrace from '../lexicon/DeinflectTrace';
 import SnipSettingsForm, { useSnipStatus } from './SnipSettingsForm';
 import { SnipReaderOffer, SnipReaderSetup } from './SnipReaderSetup';
+import { snipAiCheckWanted } from '../../../shared/aiOcrVision';
+import { providerById } from '../../../shared/aiProviders';
+import { aiErrorMessageKey } from '../../../shared/aiConnectionTest';
+import { aiOcrProviderName, useAiOcrVision } from '../../aiOcrVisionClient';
 import './snip.css';
 
 /** IPADIC parts of speech → catalog keys; anything else is shown as the analyser wrote it. */
@@ -381,6 +386,63 @@ function SnipDeckField({ entry, defaultDeck }: { entry: SnipEntry; defaultDeck: 
   );
 }
 
+/**
+ * "Check with AI" on an unsure snip: offered only once a provider that reads
+ * pictures is set up, and it sends nothing before the learner has allowed
+ * pictures to be sent (asked here, once, if not yet). Never automatic: the
+ * modes in "Read text with AI" are what run by themselves. Like Read again, it
+ * waits for Undo while the snip owns cards.
+ */
+function SnipAiCheck({ entry, owns }: { entry: SnipEntry; owns: boolean }) {
+  const { t } = useT();
+  const { status, setConsent } = useAiOcrVision();
+  const [checking, setChecking] = useState(false);
+  const hintId = useId();
+  useEffect(() => setChecking(false), [entry.id, entry.status]);
+  const failure = entry.aiError && entry.status !== 'processing'
+    ? <p className="snip-note is-error" role="status">{t('aiProv.ocr.check.failed', { reason: t(aiErrorMessageKey(entry.aiError)) })}</p>
+    : null;
+  if (!status?.available || !snipAiCheckWanted(entry)) return failure;
+  const provider = aiOcrProviderName(status.effectiveProviderId, providerById(status.effectiveProviderId).label, t);
+
+  const check = async (): Promise<void> => {
+    if (!status.consent) {
+      const ok = await confirmDialog({
+        title: t('aiProv.ocr.check.confirmTitle', { provider }),
+        message: t('aiProv.ocr.check.confirmBody', { provider, host: status.host }),
+        confirmLabel: t('aiProv.ocr.check.confirm'),
+      });
+      if (!ok || !(await setConsent(true))) return;
+    }
+    setChecking(true);
+    try {
+      if (!(await window.api.snipAction({ id: entry.id, action: 'aiCheck' }))) setChecking(false);
+    } catch {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <>
+      {failure}
+      <div className="snip-ai-check" data-ai-entry="">
+        <button
+          type="button"
+          className="btn small snip-btn snip-ai-check-btn"
+          disabled={owns || checking}
+          aria-describedby={hintId}
+          onClick={() => void check()}
+        >
+          {checking ? t('aiProv.ocr.check.running') : t('aiProv.ocr.check')}
+        </button>
+        <span id={hintId} className="muted snip-fix-hint">
+          {owns ? t('snip2.text.undoFirst') : t('aiProv.ocr.check.hint', { provider })}
+        </span>
+      </div>
+    </>
+  );
+}
+
 function SnipDetail({ entry, folder, defaultDeck, maxWords, readers }: { entry: SnipEntry; folder: string; defaultDeck: string; maxWords: number; readers: SnipReaders }) {
   const { t, lang: uiLang } = useT();
   const engineName = useEngineName();
@@ -464,6 +526,7 @@ function SnipDetail({ entry, folder, defaultDeck, maxWords, readers }: { entry: 
             {owns ? t('snip2.text.undoFirst') : t('snip2.reread.hint')}
           </span>
         </div>
+        <SnipAiCheck entry={entry} owns={owns} />
       </header>
       {image ? (
         <img className="snip-image" src={image} alt={t('snip.detail.image')} />
@@ -538,7 +601,13 @@ function SnipDetail({ entry, folder, defaultDeck, maxWords, readers }: { entry: 
           {entry.translation ? (
             <p className="snip-translation">{entry.translation}</p>
           ) : entry.translationError ? (
-            <p className="muted">{t('snip.detail.noTranslation', { reason: entry.translationError })}</p>
+            <div className="snip-translation-missing">
+              <p className="muted">{t('snip.detail.noTranslation', { reason: entry.translationError })}</p>
+              {/* The engine for each language pair is chosen on the Translate app's engine bar. */}
+              <button type="button" className="btn small snip-btn snip-translate-setup" onClick={() => openSectionSurface('translate')}>
+                {t('translator.openApp')}
+              </button>
+            </div>
           ) : (
             <p className="muted">{t('snip.detail.translating')}</p>
           )}
@@ -744,8 +813,6 @@ export default function SnipPanel({ compact = false }: { compact?: boolean }) {
     setSelected(null);
   };
 
-  const lang = normalizeStudyLang(current?.lang);
-
   return (
     <div className={`snip-app${compact ? ' is-compact' : ''}`}>
       <header className="snip-app-head">
@@ -780,7 +847,7 @@ export default function SnipPanel({ compact = false }: { compact?: boolean }) {
           <SnipSettingsForm showShortcut={!compact} />
         </section>
       )}
-      <p className="muted snip-app-intro">{t('snip.view.intro', { lang: t(`snip.lang.${lang}`) })}</p>
+      <p className="muted snip-app-intro">{t('snip.view.intro')}</p>
 
       <div className="snip-app-body">
         <nav className="snip-history" aria-label={t('snip.history.title')}>

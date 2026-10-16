@@ -13,6 +13,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SNIP_SETTINGS_DEFAULTS } from '../snipToCards';
+import { DEFAULT_AI_OCR_VISION_SETTINGS } from '../aiOcrVision';
+import { AI_CLOUD_FEATURES } from '../aiSetup';
 import { STATS_BASE } from '../stats';
 
 const ROOT = resolve(__dirname, '..', '..', '..');
@@ -99,11 +101,32 @@ describe('"Snip to cards is off by default … the OCR is local"', () => {
     expect(privacy).toContain('Snip to cards is off by default');
   });
 
-  it('the snip pipeline reads pictures with local engines only (no network call in it)', () => {
+  it('the snip pipeline itself makes no network call (AI OCR goes only through its gated provider)', () => {
     for (const file of ['src/main/snipToCards.ts', 'src/renderer/snipToCards.ts']) {
       const code = read(file);
       expect(code, file).not.toMatch(/\bfetch\s*\(|net\.request|https?:\/\/(?!127\.0\.0\.1|localhost)/);
     }
+  });
+});
+
+describe('"Read text with AI (AI OCR) is off by default"', () => {
+  it('no mode and no opt-in for a new profile, and the statement says so', () => {
+    expect(DEFAULT_AI_OCR_VISION_SETTINGS.mode).toBe('off');
+    expect(AI_CLOUD_FEATURES.find((f) => f.id === 'ocrVision')?.defaultAllowed).toBe(false);
+    expect(privacy).toContain('Read text with AI (AI OCR) is off by default');
+    const section = privacy.split('Read text with AI (AI OCR)')[1] ?? '';
+    for (const host of ['api.anthropic.com', 'api.openai.com', 'generativelanguage.googleapis.com']) {
+      expect(section).toContain(host);
+    }
+    expect(privacy).toMatch(/DeepSeek is never sent pictures/);
+  });
+
+  it('pictures reach a model only through the provider, under the "ocrVision" opt-in that callAiProvider enforces', () => {
+    expect(grep(/feature:\s*'ocrVision'/)).toEqual(['src/main/ocrAiVisionProvider.ts']);
+    expect(read('src/main/snipToCards.ts')).toContain("from './ocrAiVisionProvider'");
+    expect(read('src/main/aiProviderClient.ts')).toContain("if (options?.feature) assertAiFeatureAllowed(options.feature, 'cloud');");
+    // The plan (mode, the AI switch, a provider that reads pictures, the opt-in) is checked before every read.
+    expect(read('src/main/aiOcrVisionStore.ts')).toContain("consent: () => aiCloudAllowedFor('ocrVision')");
   });
 });
 

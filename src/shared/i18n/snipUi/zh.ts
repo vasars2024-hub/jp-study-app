@@ -3,7 +3,7 @@ import type { Catalog } from '../core';
 export const SNIP_UI_ZH: Catalog = {
   'snip.paletteTerms': '截图 截屏 屏幕 文字识别 OCR 卡片',
   'snip.view.title': '截图生成卡片',
-  'snip.view.intro': '按 Win+Shift+S 截取屏幕上的任何{lang}文字，Gum 会识别它，并把你还不认识的词加为卡片。',
+  'snip.view.intro': '按 Win+Shift+S 截取屏幕上你所学语言的文字，Gum 会识别它，并把你还不认识的词加为卡片。',
   'snip.view.settings': '设置',
   'snip.status.watching': '正在监视剪贴板中的截图。',
   'snip.status.paused': '已暂停：不会识别截图。',
@@ -38,7 +38,7 @@ export const SNIP_UI_ZH: Catalog = {
   'snip.detail.translating': '正在翻译…',
   'snip.detail.noTranslation': '没有翻译：{reason}',
   'snip.translate.empty': '引擎没有返回内容。',
-  'snip.translate.failed': '翻译引擎未设置或无法连接。请在 设置 → 翻译 中选择一个。',
+  'snip.translate.failed': '翻译引擎未设置或无法连接。',
   'snip.detail.words': '词语',
   'snip.detail.grammar': '语法',
   'snip.detail.noGrammar': '这句话中没有找到语法库里的语法点。',

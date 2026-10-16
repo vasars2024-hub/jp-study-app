@@ -1,0 +1,40 @@
+// "Read text with AI" (see ./en.ts). Russian.
+
+import type { Catalog } from '../core';
+
+export const AI_OCR_UI_RU: Catalog = {
+  'aiProv.ocr.title': 'Распознавание текста с ИИ',
+  'aiProv.ocr.desc': 'Модель с поддержкой изображений на вашем ключе читает снимки, мангу, Reading Lens, визуальные новеллы и страницы книг. Обычно это самый точный способ, особенно для стилизованного или мелкого текста.',
+  'aiProv.ocr.mode': 'Когда использовать',
+  'aiProv.ocr.mode.off': 'Выключено',
+  'aiProv.ocr.mode.unsure': 'Только при сомнениях',
+  'aiProv.ocr.mode.always': 'Всегда',
+  'aiProv.ocr.mode.off.hint': 'Читают только движки на этом компьютере. Отдельный снимок всё равно можно проверить с ИИ.',
+  'aiProv.ocr.mode.unsure.hint': 'Сначала читают движки на этом компьютере. Если они не уверены, картинка отправляется один раз, и при расхождениях побеждает вариант ИИ.',
+  'aiProv.ocr.mode.always.hint': 'ИИ читает каждую картинку. Если он не справился, читают движки на этом компьютере.',
+  'aiProv.ocr.provider': 'Чем читать',
+  'aiProv.ocr.provider.follow': 'Как в Настройки › ИИ ({provider})',
+  'aiProv.ocr.provider.reads': '{provider} (читает картинки)',
+  'aiProv.ocr.provider.noKey': '{provider} (читает картинки, ключ не добавлен)',
+  'aiProv.ocr.provider.textOnly': '{provider} (только текст)',
+  'aiProv.ocr.compatVision': 'Моя локальная модель читает картинки',
+  'aiProv.ocr.compatVision.hint': 'Включайте только для модели с поддержкой изображений, например qwen2.5-vl, llava или gemma3. Текстовая модель картинки не прочитает.',
+  'aiProv.ocr.consent': 'Разрешить отправку картинок в {provider}',
+  'aiProv.ocr.privacy': 'Снимки и картинки, которые вы распознаёте, отправляются в {provider} ({host}).',
+  'aiProv.ocr.privacyLocal': 'Снимки и картинки, которые вы распознаёте, отправляются на ваш локальный сервер ({host}) и не покидают этот компьютер.',
+  'aiProv.ocr.cost': 'Один запрос на снимок, страницу или область. Провайдер выставляет за него счёт, как за любой запрос, в пределах вашего лимита расходов.',
+  'aiProv.ocr.status.ready': 'Готово: картинки читает {provider}.',
+  'aiProv.ocr.status.ai-off': 'Сначала включите «Использовать функции ИИ» в Настройки › ИИ.',
+  'aiProv.ocr.status.no-vision': '{provider} не читает картинки. Выберите Claude, OpenAI или Gemini либо локальную модель с поддержкой изображений.',
+  'aiProv.ocr.status.not-configured': 'Сначала добавьте ключ для {provider} в Настройки › ИИ.',
+  'aiProv.ocr.status.no-consent': 'Чтобы пользоваться, разрешите отправку картинок.',
+  'aiProv.ocr.openSettings': 'Открыть Настройки › ИИ',
+
+  'aiProv.ocr.check': 'Проверить с ИИ',
+  'aiProv.ocr.check.hint': 'Отправляет эту картинку в {provider} один раз. Там, где варианты расходятся, текст заменяется распознанным ИИ.',
+  'aiProv.ocr.check.confirmTitle': 'Отправить эту картинку в {provider}?',
+  'aiProv.ocr.check.confirmBody': 'При проверке с ИИ снимок отправляется в {provider} ({host}). Ответ «да» разрешает отправку картинок и дальше; это можно выключить в Настройки › ИИ.',
+  'aiProv.ocr.check.confirm': 'Отправить',
+  'aiProv.ocr.check.running': 'Проверка с ИИ…',
+  'aiProv.ocr.check.failed': 'ИИ не смог прочитать этот снимок: {reason}',
+};

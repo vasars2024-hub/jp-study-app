@@ -23,6 +23,7 @@ import { AI_TUTOR_UI_EN } from '../aiTutorUi/en';
 import { AI_SPEAK_UI_EN } from '../aiSpeakUi/en';
 import { AI_SPEAK2_UI_EN } from '../aiSpeak2Ui/en';
 import { AI_STREAM_UI_EN } from '../aiStreamUi/en';
+import { AI_OCR_UI_EN } from '../aiOcrUi/en';
 
 export const AI_PACK_EN: Catalog = {
   ...AI_FIX_UI_EN,
@@ -34,4 +35,5 @@ export const AI_PACK_EN: Catalog = {
   ...AI_SPEAK_UI_EN,
   ...AI_SPEAK2_UI_EN,
   ...AI_STREAM_UI_EN,
+  ...AI_OCR_UI_EN,
 };

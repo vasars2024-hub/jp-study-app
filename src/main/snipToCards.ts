@@ -33,7 +33,10 @@
  * Nothing leaves the machine from here: the pictures stay in the profile
  * (`snips/`, capped by count and bytes, oldest deleted first) and OCR only uses
  * engines that are installed — a missing model is offered, and downloaded only
- * when the learner clicks to install it.
+ * when the learner clicks to install it. The one exception is "Read text with
+ * AI" (`ocrAiVisionProvider.ts`), off by default: only with a mode chosen, or
+ * "Check with AI" pressed on one snip, AND the `ocrVision` cloud opt-in does a
+ * picture go to the learner's own vision model.
  */
 
 import { app, BrowserWindow, clipboard, ipcMain, nativeImage, screen } from 'electron';
@@ -48,6 +51,10 @@ import { installedPaddleLangs, isInstalledPaddleDetector } from './paddleOcr';
 import { mangaOcrAvailable } from './mangaOcr';
 import { boundedScreenshotDataUrl } from './screenOcr';
 import { defaultRouterDeps, recognizeWithRouter, routerImageFromNative, type EngineLine, type OcrProvider, type RouterDeps } from './ocrRouter';
+import { checkWithAiVision, defaultAiVisionDeps, withAiVision, type AiCheckedRead } from './ocrAiVisionProvider';
+import { resolveAiOcrVisionPlan, type AiOcrVisionPlan } from './aiOcrVisionStore';
+import { aiOcrCheckWanted } from '../shared/aiOcrVision';
+import type { OcrRouterResult } from '../shared/ocrRouterTypes';
 import { isE2eHeadless } from './e2eHeadless';
 import { assetPath, isInstalled, onAssetInstalled, startDownload } from './downloads';
 import { localFileUrl } from './library';
@@ -213,7 +220,8 @@ function normalizeEntry(raw: unknown): SnipEntry | null {
     ...(typeof r.ocrText === 'string' ? { ocrText: r.ocrText.slice(0, 20_000) } : {}),
     ...(Array.isArray(r.unsure) ? { unsure: normalizeUnsure(r.unsure) } : {}),
     ...(Number.isFinite(Number(r.corrected)) && Number(r.corrected) > 0 ? { corrected: Math.round(Number(r.corrected)) } : {}),
-    ...(Array.isArray(r.engines) ? { engines: r.engines.filter((x): x is string => typeof x === 'string').slice(0, 4).map((x) => x.slice(0, 20)) } : {}),
+    ...(Array.isArray(r.engines) ? { engines: r.engines.filter((x): x is string => typeof x === 'string').slice(0, 4).map((x) => x.slice(0, 40)) } : {}),
+    ...(typeof r.aiError === 'string' && r.aiError ? { aiError: r.aiError.slice(0, 40) } : {}),
   };
 }
 
@@ -577,7 +585,7 @@ async function processSnip(image: Electron.NativeImage, png: Buffer, hash: strin
  * the renderer's bundled recognizer; the snip's language is the one its text
  * is in.
  */
-async function readSnip(entry: SnipEntry, image: Electron.NativeImage, png: Buffer): Promise<void> {
+async function readSnip(entry: SnipEntry, image: Electron.NativeImage, png: Buffer, opts: { aiCheck?: boolean } = {}): Promise<void> {
   const active = getMainStudyLang();
   const { width, height } = image.getSize();
   const fake = e2eFakeProvider(width, height);
@@ -588,6 +596,13 @@ async function readSnip(entry: SnipEntry, image: Electron.NativeImage, png: Buff
     : real;
   const langs = snipCandidateLangs(active, installed);
   const routerDeps: RouterDeps | undefined = fake ? { ...defaultRouterDeps(), providers: [fake], wordOracle: () => null } : undefined;
+  // "Read text with AI": the mode, or "Check with AI" on this one snip; null unless allowed.
+  let vision: AiOcrVisionPlan | null = null;
+  try {
+    vision = resolveAiOcrVisionPlan({ check: opts.aiCheck });
+  } catch (err) {
+    console.warn('[snipToCards] AI reader settings unreadable', err);
+  }
   const job: SnipJob = { entry, settings: { ...ensureSettings() } };
   try {
     const jpeg = boundedScreenshotDataUrl(image);
@@ -596,11 +611,10 @@ async function readSnip(entry: SnipEntry, image: Electron.NativeImage, png: Buff
     /* cards without the picture are still cards */
   }
 
-  if (langs.some((lang) => snipAccurateReader(lang, installed))) {
-    const read = await recognizeWithRouter(routerImageFromNative(image), { langs, purpose: 'snip' }, routerDeps).catch((err) => {
-      console.warn('[snipToCards] OCR router failed', err);
-      return null;
-    });
+  const accurate = langs.some((lang) => snipAccurateReader(lang, installed));
+  if (accurate || vision) {
+    const read = await readWithEngines(image, langs, routerDeps, accurate, vision, active);
+    if (read?.aiError) job.entry = patchEntry(entry.id, { aiError: read.aiError }) ?? job.entry;
     if (read?.missing && read.text) {
       // It reads as a language no installed engine reads (Chinese on a Japanese
       // install): keep the read, and offer that language's reader.
@@ -646,19 +660,58 @@ async function readSnip(entry: SnipEntry, image: Electron.NativeImage, png: Buff
   dispatch({ kind: 'process', payload: job });
 }
 
+/**
+ * The router with the installed engines, and the learner's AI reader by its
+ * mode: Always → it reads (the local engines when it fails); Only when unsure,
+ * or "Check with AI" → the local read first, then one look by the model when
+ * it is unsure (or always, for the button), whose text wins where they differ.
+ * With AI the snip may be in any studied language: the model reads them all.
+ */
+async function readWithEngines(
+  image: Electron.NativeImage,
+  langs: StudyLang[],
+  routerDeps: RouterDeps | undefined,
+  accurate: boolean,
+  vision: AiOcrVisionPlan | null,
+  active: StudyLang,
+): Promise<AiCheckedRead<OcrRouterResult> | null> {
+  const picture = routerImageFromNative(image);
+  const failed = (err: unknown): null => {
+    console.warn('[snipToCards] OCR router failed', err);
+    return null;
+  };
+  if (!vision) return recognizeWithRouter(picture, { langs, purpose: 'snip' }, routerDeps).catch(failed);
+  const aiLangs = [...new Set([...langs, ...STUDY_LANGS])];
+  const ai = { ...defaultAiVisionDeps(), plan: () => vision };
+  const deps = routerDeps ?? defaultRouterDeps();
+  if (vision.mode === 'always') {
+    return withAiVision(picture, { langs: aiLangs, purpose: 'snip' }, deps, recognizeWithRouter, ai).catch(failed);
+  }
+  const local: OcrRouterResult | null = accurate
+    ? await recognizeWithRouter(picture, { langs, purpose: 'snip' }, routerDeps).catch(failed)
+    : null;
+  if (vision.mode === 'unsure' && local && !aiOcrCheckWanted(local)) return local;
+  const base: OcrRouterResult = local ?? { ok: false, text: '', lines: [], engine: 'none', engines: [], lang: active, unsure: [] };
+  return checkWithAiVision(picture, { langs: aiLangs, purpose: 'snip' }, base, vision.providerId, ai,
+    (text) => deps.detectLang(text, aiLangs));
+}
+
 // ---- Read again; install a reader, then read again --------------------------
 
 /** Everything a read wrote, cleared before the picture is read again. */
-const READ_FIELDS = ['error', 'installIds', 'translation', 'translationError', 'review', 'overLimit', 'unsure', 'corrected', 'engines', 'confidence', 'engine', 'ocrText', 'undone'] as const;
+const READ_FIELDS = ['error', 'installIds', 'translation', 'translationError', 'review', 'overLimit', 'unsure', 'corrected', 'engines', 'confidence', 'engine', 'ocrText', 'undone', 'aiError'] as const;
 
 /**
- * Read a stored snip again with the best engine installed now. Refused while
- * it is being read, or while it still owns cards (Undo first, so its cards
- * always match its words).
+ * Read a stored snip again with the best engine installed now; for "Check with
+ * AI" (`aiCheck`), with the learner's AI reader as well, which is refused when
+ * it may not run (AI off, no provider that reads pictures, or no opt-in).
+ * Refused while it is being read, or while it still owns cards (Undo first, so
+ * its cards always match its words).
  */
-function rereadSnip(id: string): boolean {
+function rereadSnip(id: string, opts: { aiCheck?: boolean } = {}): boolean {
   const entry = getEntry(id);
   if (!entry || entry.status === 'processing' || snipOwnsWork(entry)) return false;
+  if (opts.aiCheck && !aiCheckAllowed()) return false;
   let png: Buffer;
   try {
     png = fs.readFileSync(imagePath(entry.id));
@@ -679,10 +732,18 @@ function rereadSnip(id: string): boolean {
   });
   if (!reset) return false;
   const releaseUnsaved = holdUnsavedWork('snip');
-  chain = chain.then(() => readSnip(reset, image, png)).catch((err) => {
+  chain = chain.then(() => readSnip(reset, image, png, opts)).catch((err) => {
     console.error('[snipToCards] re-read failed', err);
   }).finally(releaseUnsaved);
   return true;
+}
+
+function aiCheckAllowed(): boolean {
+  try {
+    return resolveAiOcrVisionPlan({ check: true }) !== null;
+  } catch {
+    return false;
+  }
 }
 
 /** Snips waiting for readers the learner chose to install: snip id → every asset id needed. */
@@ -1024,6 +1085,7 @@ export function registerSnipToCardsIpc(): void {
     if (!action || !getEntry(action.id)) return false;
     // Reading the picture is main's job; everything else runs where the deck lives.
     if (action.action === 'reread') return rereadSnip(action.id);
+    if (action.action === 'aiCheck') return rereadSnip(action.id, { aiCheck: true });
     if (action.action === 'installReread') return installAndReread(action.id, action.assets);
     dispatch({ kind: 'action', payload: action });
     return true;

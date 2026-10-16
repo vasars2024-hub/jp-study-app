@@ -3,7 +3,7 @@ import type { Catalog } from '../core';
 export const SNIP_UI_RU: Catalog = {
   'snip.paletteTerms': 'снимок скриншот экран распознавание текста карточки',
   'snip.view.title': 'Снимок в карточки',
-  'snip.view.intro': 'Нажмите Win+Shift+S и выделите любой текст ({lang}) на экране. Gum прочитает его и добавит незнакомые слова в карточки.',
+  'snip.view.intro': 'Нажмите Win+Shift+S и выделите на экране текст на изучаемом языке. Gum прочитает его и добавит незнакомые слова в карточки.',
   'snip.view.settings': 'Настройки',
   'snip.status.watching': 'Буфер обмена отслеживается: снимки читаются.',
   'snip.status.paused': 'Пауза: снимки не читаются.',
@@ -53,7 +53,7 @@ export const SNIP_UI_RU: Catalog = {
   'snip.detail.translating': 'Перевожу…',
   'snip.detail.noTranslation': 'Нет перевода: {reason}',
   'snip.translate.empty': 'движок ничего не вернул.',
-  'snip.translate.failed': 'переводчик не настроен или недоступен. Выберите его в Настройки → Перевод.',
+  'snip.translate.failed': 'переводчик не настроен или недоступен.',
   'snip.detail.words': 'Слова',
   'snip.detail.grammar': 'Грамматика',
   'snip.detail.noGrammar': 'В этом предложении не найдено пунктов из грамматической библиотеки.',

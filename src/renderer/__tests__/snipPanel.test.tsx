@@ -12,6 +12,22 @@ import type { SnipEntry, SnipToastPayload } from '../../shared/snipToCards';
 import { SNIP_SETTINGS_DEFAULTS } from '../../shared/snipToCards';
 
 vi.mock('../components/settings/GlobalChordRow', () => ({ default: () => null }));
+const dialog = vi.hoisted(() => ({ answer: true, asked: [] as Array<{ title?: string; message: unknown }> }));
+vi.mock('../components/ui/dialogService', () => ({
+  confirmDialog: async (opts: { title?: string; message: unknown }) => {
+    dialog.asked.push(opts);
+    return dialog.answer;
+  },
+}));
+const sections = vi.hoisted(() => ({ opened: [] as string[] }));
+vi.mock('../sectionSurface', () => ({ openSectionSurface: (id: string) => sections.opened.push(id) }));
+
+/** "Read text with AI" as main reports it (main/aiOcrVisionStore.ts); null: no bridge answer. */
+let vision: Record<string, unknown> | null = null;
+const VISION_READY = {
+  mode: 'off', providerId: '', compatVision: false, effectiveProviderId: 'claude-sonnet-5-5', host: 'api.anthropic.com', local: false,
+  providers: [{ id: 'claude-sonnet-5-5', vision: true, configured: true }], consent: true, available: true, ready: true,
+};
 
 const calls: Array<{ name: string; args: unknown[] }> = [];
 let entries: SnipEntry[] = [];
@@ -97,6 +113,15 @@ function installApi(): void {
     onSnipToast: () => () => undefined,
     snipToastClose: record('snipToastClose'),
     snipOpen: record('snipOpen'),
+    aiOcrVisionStatus: async () => vision,
+    aiOcrVisionUpdate: record('aiOcrVisionUpdate', vision),
+    onAiOcrVisionChanged: () => () => undefined,
+    onAiSetupChanged: () => () => undefined,
+    aiSetupUpdate: async (...args: unknown[]) => {
+      calls.push({ name: 'aiSetupUpdate', args });
+      if (vision) vision = { ...vision, consent: true, ready: true };
+      return {};
+    },
   };
 }
 
@@ -109,6 +134,10 @@ beforeAll(() => {
 
 beforeEach(() => {
   calls.length = 0;
+  vision = null;
+  dialog.answer = true;
+  dialog.asked = [];
+  sections.opened = [];
   entries = [DONE, MISSING];
   readersInMain = { det: false, paddle: [], manga: false, tess: [] };
   installApi();
@@ -430,5 +459,83 @@ describe('review mode and corrections', () => {
     expect(calls.filter((c) => c.name === 'snipAction').map((c) => c.args[0])).toEqual([
       { id: 'snip-a', action: 'setDeck', deck: 'Manga' },
     ]);
+  });
+});
+
+describe('Check with AI, and the missing translation', () => {
+  const UNSURE: SnipEntry = { ...DONE, id: 'snip-u', engine: 'web', confidence: 0.6, cardIds: [], ankiNoteIds: [], words: [] };
+
+  it('is not offered until a provider that reads pictures is set up', async () => {
+    entries = [UNSURE];
+    vision = { ...VISION_READY, available: false, ready: false, blocked: 'no-vision' };
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.textContent).not.toMatch(/Check with AI/);
+  });
+
+  it('is offered on an unsure snip only, and sends it to main as one action', async () => {
+    entries = [{ ...UNSURE, confidence: 0.97 }];
+    vision = VISION_READY;
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.textContent).not.toMatch(/Check with AI/);
+    entries = [UNSURE];
+    act(() => root?.unmount());
+    root = createRoot(host);
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.textContent).toMatch(/Sends this picture to Claude Sonnet 5\.5 once/);
+    await act(async () => button(/^Check with AI$/).click());
+    await settle();
+    expect(dialog.asked).toEqual([]);
+    expect(calls.filter((c) => c.name === 'snipAction').map((c) => c.args[0])).toEqual([{ id: 'snip-u', action: 'aiCheck' }]);
+  });
+
+  it('asks before the first picture leaves the PC; No sends nothing, Yes allows it and sends', async () => {
+    entries = [UNSURE];
+    vision = { ...VISION_READY, consent: false, ready: false, blocked: 'no-consent' };
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    dialog.answer = false;
+    await act(async () => button(/^Check with AI$/).click());
+    await settle();
+    expect(dialog.asked[0]?.title).toBe('Send this picture to Claude Sonnet 5.5?');
+    expect(String(dialog.asked[0]?.message)).toMatch(/api\.anthropic\.com/);
+    expect(calls.some((c) => c.name === 'snipAction' || c.name === 'aiSetupUpdate')).toBe(false);
+    dialog.answer = true;
+    await act(async () => button(/^Check with AI$/).click());
+    await settle();
+    expect(calls.find((c) => c.name === 'aiSetupUpdate')?.args).toEqual([{ cloudFeatures: { ocrVision: true } }]);
+    expect(calls.filter((c) => c.name === 'snipAction').map((c) => c.args[0])).toEqual([{ id: 'snip-u', action: 'aiCheck' }]);
+  });
+
+  it('says which model read a snip, and why it could not', async () => {
+    entries = [{ ...UNSURE, engine: 'ai:claude-sonnet-5-5', confidence: 0.9 }, { ...UNSURE, id: 'snip-v', aiError: 'rate-limit' }];
+    vision = VISION_READY;
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.querySelector('.snip-detail-meta')?.textContent).toMatch(/Read by Claude Sonnet 5\.5/);
+    expect(host.textContent).not.toMatch(/Check with AI/);
+  });
+
+  it('no translation: the reason, and a button to the Translate app where the engine is chosen', async () => {
+    entries = [{ ...DONE, translation: undefined, translationError: 'no translation engine is set up or reachable.' }];
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.textContent).toMatch(/No translation: no translation engine is set up or reachable\./);
+    await act(async () => button(/^Open Translate$/).click());
+    expect(sections.opened).toEqual(['translate']);
+  });
+
+  it('the Snips intro names no one language', async () => {
+    const SnipPanel = (await import('../components/snip/SnipPanel')).default;
+    await act(async () => root!.render(<SnipPanel />));
+    await settle();
+    expect(host.querySelector('.snip-app-intro')?.textContent).toMatch(/snip text on screen in a language you study/);
   });
 });

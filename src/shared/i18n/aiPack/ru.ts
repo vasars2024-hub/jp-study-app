@@ -10,6 +10,7 @@ import { AI_TUTOR_UI_RU } from '../aiTutorUi/ru';
 import { AI_SPEAK_UI_RU } from '../aiSpeakUi/ru';
 import { AI_SPEAK2_UI_RU } from '../aiSpeak2Ui/ru';
 import { AI_STREAM_UI_RU } from '../aiStreamUi/ru';
+import { AI_OCR_UI_RU } from '../aiOcrUi/ru';
 
 export const AI_PACK_RU: Catalog = {
   ...AI_FIX_UI_RU,
@@ -21,4 +22,5 @@ export const AI_PACK_RU: Catalog = {
   ...AI_SPEAK_UI_RU,
   ...AI_SPEAK2_UI_RU,
   ...AI_STREAM_UI_RU,
+  ...AI_OCR_UI_RU,
 };

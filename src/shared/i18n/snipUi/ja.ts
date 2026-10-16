@@ -3,7 +3,7 @@ import type { Catalog } from '../core';
 export const SNIP_UI_JA: Catalog = {
   'snip.paletteTerms': 'スニップ 切り取り スクリーンショット 画面 OCR 文字認識 カード',
   'snip.view.title': 'スニップでカード作成',
-  'snip.view.intro': 'Win+Shift+S で画面上の{lang}の文章を切り取ると、Gum が読み取り、まだ知らない単語をカードに追加します。',
+  'snip.view.intro': 'Win+Shift+S で画面上の学習中の言語の文章を切り取ると、Gum が読み取り、まだ知らない単語をカードに追加します。',
   'snip.view.settings': '設定',
   'snip.status.watching': 'クリップボードのスニップを監視中です。',
   'snip.status.paused': '一時停止中：スニップは読み取りません。',
@@ -38,7 +38,7 @@ export const SNIP_UI_JA: Catalog = {
   'snip.detail.translating': '翻訳中…',
   'snip.detail.noTranslation': '翻訳できませんでした：{reason}',
   'snip.translate.empty': 'エンジンが何も返しませんでした。',
-  'snip.translate.failed': '翻訳エンジンが設定されていないか、接続できません。設定 → 翻訳 で選んでください。',
+  'snip.translate.failed': '翻訳エンジンが設定されていないか、接続できません。',
   'snip.detail.words': '単語',
   'snip.detail.grammar': '文法',
   'snip.detail.noGrammar': 'この文には文法ライブラリの項目が見つかりませんでした。',

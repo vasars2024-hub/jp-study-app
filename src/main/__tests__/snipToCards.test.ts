@@ -116,6 +116,31 @@ vi.mock('electron', () => {
     },
   };
 });
+/** "Read text with AI": the plan main would resolve, and what the model call saw and answers. */
+const ai = vi.hoisted(() => ({
+  plan: null as null | { mode: 'unsure' | 'always' | 'check'; providerId: string },
+  asked: [] as Array<{ check?: boolean }>,
+  calls: [] as Array<{ kind: 'check' | 'always'; providerId: string; local: unknown }>,
+  read: null as null | Record<string, unknown>,
+}));
+vi.mock('../aiOcrVisionStore', () => ({
+  resolveAiOcrVisionPlan: (opts: { check?: boolean } = {}) => {
+    ai.asked.push(opts);
+    if (!ai.plan) return null;
+    return opts.check ? { ...ai.plan, mode: 'check' } : ai.plan.mode === 'check' ? null : ai.plan;
+  },
+}));
+vi.mock('../ocrAiVisionProvider', () => ({
+  defaultAiVisionDeps: () => ({}),
+  checkWithAiVision: async (_image: unknown, _opts: unknown, local: Record<string, unknown>, providerId: string) => {
+    ai.calls.push({ kind: 'check', providerId, local });
+    return ai.read ?? local;
+  },
+  withAiVision: async (_image: unknown, _opts: unknown, _deps: unknown, _run: unknown, deps: { plan: () => { providerId: string } }) => {
+    ai.calls.push({ kind: 'always', providerId: deps.plan().providerId, local: null });
+    return ai.read;
+  },
+}));
 vi.mock('../lockGuard', () => ({ appLocked: () => h.locked }));
 vi.mock('../studyLanguage', () => ({ getMainStudyLang: () => h.lang }));
 vi.mock('../paddleOcr', () => ({
@@ -128,6 +153,7 @@ vi.mock('../screenOcr', () => ({
 }));
 vi.mock('../ocrRouter', () => ({
   routerImageFromNative: (image: unknown) => image,
+  defaultRouterDeps: () => ({ providers: [], detectLang: () => 'ja' }),
   recognizeWithRouter: async (_image: unknown, opts: { langs: readonly string[]; purpose: string }) => {
     h.ocrCalls += 1;
     h.routerCalls.push({ langs: opts.langs, purpose: opts.purpose });
@@ -228,6 +254,10 @@ function clearClipboard(): void {
 const history = () => mod.__snipToCardsTestables.loadHistory();
 
 beforeEach(async () => {
+  ai.plan = null;
+  ai.asked = [];
+  ai.calls = [];
+  ai.read = null;
   h.userData = fs.mkdtempSync(path.join(os.tmpdir(), 'gum-snip-'));
   // Watching is off by default since v1: these tests run on a profile where the
   // learner turned it on (the migration has its own describe block below).
@@ -420,6 +450,61 @@ describe('read again', () => {
     expect(await h.handlers.get('snip:action')!({}, { id: entry.id, action: 'reread' })).toBe(false);
     await h.handlers.get('snip:history:update')!({}, entry.id, { status: 'done', cardIds: ['c1'], words: [{ surface: '猫', lemma: '猫', status: 'added', cardId: 'c1' }] });
     expect(await h.handlers.get('snip:action')!({}, { id: entry.id, action: 'reread' })).toBe(false);
+  });
+
+  it('"Check with AI" is refused while AI may not read pictures, and never runs by itself', async () => {
+    await snip('猫');
+    const [entry] = history();
+    await h.handlers.get('snip:history:update')!({}, entry.id, { status: 'done', text: '猫', engine: 'basic', confidence: 0.6 });
+    expect(await h.handlers.get('snip:action')!({}, { id: entry.id, action: 'aiCheck' })).toBe(false);
+    // The ordinary read asked for the mode only (no `check`), which was Off: nothing went to a model.
+    expect(ai.asked.filter((opts) => !opts.check).length).toBeGreaterThan(0);
+    expect(ai.asked.at(-1)).toEqual({ check: true });
+    expect(ai.calls).toEqual([]);
+  });
+
+  it('"Check with AI": the local read, then one look by the model, whose read the snip gets', async () => {
+    await snip('猫');
+    const [entry] = history();
+    await h.handlers.get('snip:history:update')!({}, entry.id, { status: 'done', text: '描', engine: 'web', confidence: 0.6 });
+    h.paddleLangs = ['ja'];
+    h.router = { ok: true, text: '描', lines: [], engine: 'web', engines: ['web'], lang: 'ja', confidence: 0.6, unsure: [] };
+    ai.plan = { mode: 'check', providerId: 'claude-sonnet-5-5' };
+    ai.read = { ok: true, text: '猫', lines: [], engine: 'ai:claude-sonnet-5-5', engines: ['web', 'ai:claude-sonnet-5-5'], lang: 'ja', confidence: 0.9, unsure: [] };
+    expect(await h.handlers.get('snip:action')!({}, { id: entry.id, action: 'aiCheck' })).toBe(true);
+    await mod.__snipToCardsTestables.settled();
+    expect(ai.calls).toHaveLength(1);
+    expect(ai.calls[0]).toMatchObject({ kind: 'check', providerId: 'claude-sonnet-5-5', local: { text: '描' } });
+    const sent = mod.__snipToCardsTestables.pending().at(-1)!.payload as { ocr: { text: string; engine: string; engines: string[] } };
+    expect(sent.ocr).toMatchObject({ text: '猫', engine: 'ai:claude-sonnet-5-5', engines: ['web', 'ai:claude-sonnet-5-5'] });
+  });
+
+  it('Always: the model reads even with no reader installed; when it fails, the bundled reader does, and the reason is kept', async () => {
+    ai.plan = { mode: 'always', providerId: 'openai-compatible' };
+    ai.read = { ok: true, text: '窓辺の猫', lines: [], engine: 'ai:openai-compatible', engines: ['ai:openai-compatible'], lang: 'ja', confidence: 0.9, unsure: [] };
+    await snip('窓辺');
+    let sent = mod.__snipToCardsTestables.pending().at(-1)!.payload as { ocr?: { text: string; engine: string }; basicOcr?: unknown };
+    expect(ai.calls.map((c) => c.kind)).toEqual(['always']);
+    expect(sent.ocr).toMatchObject({ text: '窓辺の猫', engine: 'ai:openai-compatible' });
+    expect(sent.basicOcr).toBeUndefined();
+
+    ai.read = { ok: false, text: '', lines: [], engine: 'none', engines: [], lang: 'ja', unsure: [], error: 'no-engine', aiError: 'network' };
+    await snip('別');
+    sent = mod.__snipToCardsTestables.pending().at(-1)!.payload as typeof sent;
+    expect(sent.ocr).toBeUndefined();
+    expect(sent.basicOcr).toBeTruthy();
+    expect(history()[0].aiError).toBe('network');
+  });
+
+  it('Only when unsure: a sure local read is not sent to the model', async () => {
+    h.paddleLangs = ['ja'];
+    h.router = { ok: true, text: '猫が好き', lines: [], engine: 'web', engines: ['web'], lang: 'ja', confidence: 0.96, unsure: [] };
+    ai.plan = { mode: 'unsure', providerId: 'gemini-2.5-flash' };
+    await snip('猫');
+    expect(ai.calls).toEqual([]);
+    h.router = { ...h.router, confidence: 0.6 };
+    await snip('犬');
+    expect(ai.calls.map((c) => c.kind)).toEqual(['check']);
   });
 
   it('install and read again: downloads only what was clicked, and reads once everything is installed', async () => {

@@ -12,12 +12,19 @@
  *   `responseSchema`, an Anthropic forced tool, an OpenAI `json_schema` /
  *   DeepSeek JSON mode with the schema in the system prompt;
  * - code fences are stripped from the reply;
- * - a caller can cancel (`signal`), which reaches the HTTP request.
+ * - a caller can cancel (`signal`), which reaches the HTTP request;
+ * - pictures (`images`) go only to a provider that reads them — the runtime
+ *   refuses the rest (`vision-unsupported`) rather than answer without them.
  */
 import type { ZodType, ZodTypeDef } from 'zod';
 import type { AiProviderId } from '../shared/aiProviders';
 import type { AiCloudFeatureId } from '../shared/aiSetup';
-import { AI_PROVIDER_TIMEOUT_MS, AiProviderRuntimeError, runCloudAiRequest } from './providerRuntime';
+import {
+  AI_PROVIDER_TIMEOUT_MS,
+  AiProviderRuntimeError,
+  runCloudAiRequest,
+  type AiProviderImageInput,
+} from './providerRuntime';
 import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled, assertAiFeatureAllowed } from './aiFeatureGate';
 import { parseAiReplyJson, parseAiReplyWith, stripJsonFences } from './aiStructuredOutput';
 import { AI_PROVIDERS } from '../shared/aiProviders';
@@ -51,10 +58,16 @@ export interface CallAiProviderOptions {
    * A preview only: the returned text, and so the parse, are the same either way.
    */
   onTextChunk?: (text: string) => void;
+  /** Pictures sent with the prompt (AI OCR). Images lead the message on every wire format. */
+  images?: readonly AiProviderImageInput[];
+  /** Replaces the default "language-learning assistant" role; the JSON rules are kept. */
+  systemPrompt?: string;
+  /** Sampling temperature where the provider takes one (OpenAI's current models do not). */
+  temperature?: number;
 }
 
-const JSON_SYSTEM_PROMPT =
-  'You are a careful language-learning assistant. Respond with valid JSON only (json), no prose and no code fences, and follow the schema exactly.';
+const JSON_ONLY_RULE = 'Respond with valid JSON only (json), no prose and no code fences, and follow the schema exactly.';
+const JSON_SYSTEM_PROMPT = `You are a careful language-learning assistant. ${JSON_ONLY_RULE}`;
 
 export async function callAiProvider(
   providerId: AiProviderId,
@@ -83,13 +96,15 @@ export async function callAiProvider(
     providerId,
     apiKey,
     prompt,
-    systemPrompt: JSON_SYSTEM_PROMPT + schemaHint,
+    systemPrompt: (options?.systemPrompt ? `${options.systemPrompt} ${JSON_ONLY_RULE}` : JSON_SYSTEM_PROMPT) + schemaHint,
     responseSchema: schema,
     responseMimeType: 'application/json',
     maxOutputTokens: options?.maxOutputTokens ?? maxTokensForItemCount(itemCount),
     timeoutMs: options?.timeoutMs ?? AI_PROVIDER_TIMEOUT_MS,
     ...(options?.signal ? { signal: options.signal } : {}),
     ...(options?.onTextChunk ? { onTextChunk: options.onTextChunk } : {}),
+    ...(options?.images?.length ? { images: options.images } : {}),
+    ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
   });
   return stripJsonFences(result.text);
 }

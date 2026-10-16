@@ -142,4 +142,6 @@ export const AI_EAGER_UI_JA: Catalog = {
   'deckExport.notes.distinction': '混同しやすい語',
   'deckExport.notes.examples': '例文',
   'deckExport.notes.accepted': '正解として受け入れる答え',
+  'aiProv.feature.ocrVision': '画像の文字を読み取る',
+  'aiProv.feature.ocrVision.desc': 'AI で読み取る画像はプロバイダーに送信されます。許可するまではオフです。',
 };

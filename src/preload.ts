@@ -2809,6 +2809,16 @@ const api = {
     ipcRenderer.on('aiSetup:changed', handler);
     return () => ipcRenderer.removeListener('aiSetup:changed', handler);
   },
+  // "Read text with AI" (main/aiOcrVisionStore.ts): mode, provider, and whether the local model reads pictures.
+  aiOcrVisionStatus: (): Promise<import('./shared/aiOcrVision').AiOcrVisionStatus> => ipcRenderer.invoke('aiOcrVision:status'),
+  aiOcrVisionUpdate: (
+    patch: import('./shared/aiOcrVision').AiOcrVisionPatch,
+  ): Promise<import('./shared/aiOcrVision').AiOcrVisionStatus> => ipcRenderer.invoke('aiOcrVision:update', patch),
+  onAiOcrVisionChanged: (cb: (status: import('./shared/aiOcrVision').AiOcrVisionStatus) => void): (() => void) => {
+    const handler = (_event: unknown, status: import('./shared/aiOcrVision').AiOcrVisionStatus): void => cb(status);
+    ipcRenderer.on('aiOcrVision:changed', handler);
+    return () => ipcRenderer.removeListener('aiOcrVision:changed', handler);
+  },
   localAgentPlan: (request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse> =>
     ipcRenderer.invoke('localAgent:plan', request),
   localAgentStatus: (): Promise<LocalAgentRuntimeStatus> => ipcRenderer.invoke('localAgent:status'),

@@ -19,12 +19,16 @@ import {
   AiProviderRuntimeError,
   clearAiProviderSessionCache,
   runCloudAiRequest,
+  estimateImageInputTokens,
   setAgentSpendGuard,
   setAiProviderOptionsReader,
+  setCompatibleVisionReader,
 } from '../providerRuntime';
 import { callAiProvider, callAiProviderJson, parseAiJson } from '../aiProviderClient';
 import { setAiCloudFeatureReader, setAiFeaturesReader } from '../aiFeatureGate';
 import { testAiConnection } from '../aiSetupIpc';
+import { readRegionsWithAiVision } from '../ocrAiVisionProvider';
+import type { RouterImage } from '../ocrRouter';
 
 const secrets = vi.hoisted(() => ({ values: {} as Record<string, string>, reads: [] as string[] }));
 
@@ -587,6 +591,116 @@ describe('callAiProvider / callAiProviderJson', () => {
 
     script = () => ({ json: { choices: [{ message: { content: 'not json' }, finish_reason: 'stop' }] } });
     await expect(callAiProviderJson('deepseek-v4-flash', '', 'x', {}, shape)).rejects.toBeInstanceOf(AiProviderRuntimeError);
+  });
+});
+
+describe('pictures for "Read text with AI" (images through callAiProviderJson)', () => {
+  /** A 1-pixel PNG as a RouterImage of any claimed size. */
+  const picture = (width = 400, height = 100): RouterImage => ({
+    width,
+    height,
+    dataUrl: () => 'data:image/png;base64,iVBORw0KGgo=',
+    crop: () => picture(),
+  });
+  const reply = { regions: [{ image: 1, lines: [{ text: '窓辺の猫', confidence: 0.97 }] }] };
+  const answerAll = (req: Seen) => (req.path.startsWith('/gemini')
+    ? { json: { candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] } }
+    : req.path.startsWith('/anthropic')
+      ? { json: { content: [{ type: 'tool_use', name: 'respond', input: reply }], stop_reason: 'tool_use' } }
+      : { json: { choices: [{ message: { content: JSON.stringify(reply) }, finish_reason: 'stop' }] } });
+  const opts = { langs: ['ja'], purpose: 'snip' as const };
+
+  beforeEach(() => {
+    setAiCloudFeatureReader((feature) => feature === 'ocrVision');
+    setCompatibleVisionReader(null);
+  });
+
+  it('carries the picture in each vendor\'s own format, ahead of the prompt, with the OCR role', async () => {
+    script = answerAll;
+    for (const id of ['claude-sonnet-5-5', 'openai', 'gemini-2.5-flash'] as const) {
+      const [lines] = await readRegionsWithAiVision([picture()], id, opts);
+      expect(lines.map((l) => l.text)).toEqual(['窓辺の猫']);
+    }
+    const anthropic = (seen[0].body.messages as Array<{ content: Array<Record<string, unknown>> }>)[0].content;
+    expect(anthropic[0]).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' } });
+    expect(anthropic[1].type).toBe('text');
+    expect(String((seen[0].body.system as Array<{ text: string }>)[0].text)).toMatch(/meticulous OCR engine/);
+    expect(seen[0].body.temperature).toBe(0);
+
+    const openai = (seen[1].body.messages as Array<{ role: string; content: unknown }>).find((m) => m.role === 'user')!.content as Array<Record<string, unknown>>;
+    // api.openai.com gets `detail: high`, so small print is not downscaled away.
+    expect(openai[0]).toEqual({ type: 'image_url', image_url: { url: 'data:image/png;base64,iVBORw0KGgo=', detail: 'high' } });
+    expect((seen[1].body.response_format as { type: string }).type).toBe('json_schema');
+
+    const gemini = (seen[2].body.contents as Array<{ parts: Array<Record<string, unknown>> }>)[0].parts;
+    expect(gemini[0]).toEqual({ inlineData: { mimeType: 'image/png', data: 'iVBORw0KGgo=' } });
+    expect((seen[2].body.generationConfig as Record<string, unknown>).responseSchema).toBeTruthy();
+  });
+
+  it('the local server is sent a picture only once the user said its model reads them, and never `detail`', async () => {
+    setAiProviderOptionsReader(() => ({ openaiModel: '', compatBaseUrl: `${base}/v1`, compatModel: 'qwen2.5-vl' }));
+    script = answerAll;
+    await expect(readRegionsWithAiVision([picture()], 'openai-compatible', opts)).rejects.toMatchObject({ code: 'vision-unsupported' });
+    expect(seen).toEqual([]);
+    setCompatibleVisionReader(() => true);
+    await readRegionsWithAiVision([picture()], 'openai-compatible', opts);
+    const content = (seen[0].body.messages as Array<{ role: string; content: unknown }>).find((m) => m.role === 'user')!.content as Array<Record<string, unknown>>;
+    expect(content[0]).toEqual({ type: 'image_url', image_url: { url: 'data:image/png;base64,iVBORw0KGgo=' } });
+  });
+
+  it('DeepSeek is refused before any request: it reads no pictures', async () => {
+    await expect(readRegionsWithAiVision([picture()], 'deepseek-v4-flash', opts)).rejects.toMatchObject({ code: 'vision-unsupported' });
+    expect(seen).toEqual([]);
+  });
+
+  it('nothing is sent without the "Read text in pictures" opt-in, or with AI off', async () => {
+    setAiCloudFeatureReader(null);
+    await expect(readRegionsWithAiVision([picture()], 'claude-haiku-5-5', opts)).rejects.toMatchObject({ code: 'cloud-disabled' });
+    setAiCloudFeatureReader(() => true);
+    setAiFeaturesReader(() => false);
+    await expect(readRegionsWithAiVision([picture()], 'claude-haiku-5-5', opts)).rejects.toMatchObject({ code: 'ai-off' });
+    expect(seen).toEqual([]);
+  });
+
+  it('several pictures go in ONE request, matched back by number', async () => {
+    script = () => ({
+      json: {
+        content: [{
+          type: 'tool_use',
+          name: 'respond',
+          input: { regions: [{ image: 2, lines: [{ text: '二' }] }, { image: 1, lines: [{ text: '一' }] }] },
+        }],
+        stop_reason: 'tool_use',
+      },
+    });
+    const out = await readRegionsWithAiVision([picture(), picture(), picture()], 'claude-haiku-5-5', { langs: ['ja'], purpose: 'manga' });
+    expect(seen).toHaveLength(1);
+    expect(((seen[0].body.messages as Array<{ content: unknown[] }>)[0].content).filter((p) => (p as { type: string }).type === 'image')).toHaveLength(3);
+    expect(out.map((lines) => lines.map((l) => l.text))).toEqual([['一'], ['二'], []]);
+  });
+
+  it('the caller\'s signal cancels the request', async () => {
+    script = () => ({ hang: true });
+    const controller = new AbortController();
+    const pending = readRegionsWithAiVision([picture()], 'gemini-2.5-flash', { ...opts, signal: controller.signal });
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+  });
+
+  it('the cost preflight counts the picture\'s tokens', async () => {
+    expect(estimateImageInputTokens({ width: 1568, height: 735 })).toBeGreaterThanOrEqual(1_536);
+    expect(estimateImageInputTokens({})).toBe(1_600);
+    const pricing = { inputPerMillionTokens: 3, outputPerMillionTokens: 15 };
+    // Text alone fits a budget the picture's tokens do not.
+    const prompt = { providerId: 'claude-sonnet-5-5' as const, prompt: 'x', maxOutputTokens: 1, pricing };
+    const budget = (estimateImageInputTokens({ width: 1568, height: 1568 }) * 3) / 1_000_000 / 2;
+    await expect(runCloudAiRequest({
+      ...prompt,
+      maxEstimatedCostUsd: budget,
+      images: [{ mimeType: 'image/png', base64: 'AAAA', width: 1568, height: 1568 }],
+    })).rejects.toMatchObject({ code: 'cost-budget' });
+    expect(seen).toEqual([]);
   });
 });
 

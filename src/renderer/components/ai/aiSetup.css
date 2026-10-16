@@ -102,3 +102,30 @@
   font-size: 11px;
   opacity: 0.75;
 }
+
+/* "Read text with AI" (AiOcrVisionSettings.tsx), in Settings > AI and the Snips settings. */
+.ai-ocr-vision {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-ocr-vision.is-compact {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+}
+
+.ai-ocr-vision-title {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ai-ocr-vision .os-set-hint,
+.ai-ocr-vision .ai-page-status {
+  margin: 0;
+}
+
+.ai-ocr-privacy {
+  font-size: 12px;
+}

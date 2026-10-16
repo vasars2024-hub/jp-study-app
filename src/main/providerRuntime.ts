@@ -120,6 +120,28 @@ export interface AiProviderUsage {
 export interface AiProviderImageInput {
   mimeType: string;
   base64: string;
+  /** Pixel size, when known: the cost preflight counts the picture's tokens from it. */
+  width?: number;
+  height?: number;
+  /**
+   * OpenAI's `image_url.detail`. Only sent to api.openai.com, and only when set:
+   * OCR asks for `high`, which reads small print the default may downscale away.
+   */
+  detail?: 'low' | 'high' | 'auto';
+}
+
+/**
+ * Input tokens one picture costs, at most. Anthropic bills about w×h/750 and
+ * downscales anything over ~1.15 MP (so ~1,600 tokens); OpenAI's high detail is
+ * 85 + 170 per 512-px tile; Gemini 258 per 768-px tile. One estimate that errs
+ * high for all three keeps the preflight a ceiling, as it is for text.
+ */
+export function estimateImageInputTokens(image: Pick<AiProviderImageInput, 'width' | 'height'>): number {
+  const w = Number(image.width);
+  const h = Number(image.height);
+  if (!(w > 0) || !(h > 0)) return 1_600;
+  const tiles = Math.ceil(Math.min(w, 2048) / 512) * Math.ceil(Math.min(h, 2048) / 512);
+  return Math.max(Math.min(1_600, Math.ceil((w * h) / 750)), 85 + 170 * tiles, 258);
 }
 
 export interface AiProviderRequest {
@@ -272,6 +294,29 @@ function providerOptions(): AiProviderOptions {
     return providerOptionsReader();
   } catch {
     return DEFAULT_AI_PROVIDER_OPTIONS;
+  }
+}
+
+/**
+ * Whether the model behind the OpenAI-compatible server reads pictures (llava,
+ * qwen2.5-vl, gemma3…). The entry cannot know — it is whatever model the user
+ * named — so the user says so in Settings > AI › Read text with AI. Registered
+ * by main; `null` reads as "text only", which refuses images as before.
+ */
+let compatibleVisionReader: (() => boolean) | null = null;
+
+export function setCompatibleVisionReader(next: (() => boolean) | null): void {
+  compatibleVisionReader = next;
+}
+
+/** `providerAcceptsImageInput`, plus the local server when the user said its model reads pictures. */
+export function aiProviderReadsImages(providerId: AiProviderId): boolean {
+  if (providerAcceptsImageInput(providerId)) return true;
+  if (providerId !== 'openai-compatible' || !compatibleVisionReader) return false;
+  try {
+    return compatibleVisionReader() === true;
+  } catch {
+    return false;
   }
 }
 
@@ -761,7 +806,11 @@ function chatRequest(
     ? [
         ...images.map((image) => ({
           type: 'image_url',
-          image_url: { url: `data:${image.mimeType};base64,${image.base64}` },
+          image_url: {
+            url: `data:${image.mimeType};base64,${image.base64}`,
+            // OpenAI's own field; a local server is not sent what it may not know.
+            ...(isOpenAi && image.detail ? { detail: image.detail } : {}),
+          },
         })),
         { type: 'text', text: request.prompt },
       ]
@@ -1195,7 +1244,7 @@ export async function runCloudAiRequest(input: AiProviderRequest): Promise<AiPro
   }
   // Refused, never silently dropped: sending a screenshot's worth of question to
   // a text-only model and returning its confident answer is the failure mode.
-  if ((request.images?.length ?? 0) > 0 && !providerAcceptsImageInput(request.providerId)) {
+  if ((request.images?.length ?? 0) > 0 && !aiProviderReadsImages(request.providerId)) {
     throw new AiProviderRuntimeError(
       `${target.def.label} does not accept image input.`,
       'vision-unsupported',
@@ -1211,7 +1260,11 @@ export async function runCloudAiRequest(input: AiProviderRequest): Promise<AiPro
   // A server on this computer bills nothing: no rates, no ledger, no ceiling.
   const preflightCost = target.local
     ? undefined
-    : estimateAiProviderCostUsd(estimatedTokens(inputChars), maxOutputTokens, request.pricing);
+    : estimateAiProviderCostUsd(
+      estimatedTokens(inputChars) + (request.images ?? []).reduce((sum, image) => sum + estimateImageInputTokens(image), 0),
+      maxOutputTokens,
+      request.pricing,
+    );
   if (
     request.maxEstimatedCostUsd !== undefined
     && preflightCost !== undefined

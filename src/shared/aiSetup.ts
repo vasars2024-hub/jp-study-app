@@ -86,7 +86,8 @@ export type AiCloudFeatureId =
   | 'shadowingFeedback'
   | 'conversationPartner'
   | 'writingCorrection'
-  | 'journalGrade';
+  | 'journalGrade'
+  | 'ocrVision';
 
 export interface AiCloudFeatureDefinition {
   id: AiCloudFeatureId;
@@ -97,125 +98,35 @@ export interface AiCloudFeatureDefinition {
 }
 
 export const AI_CLOUD_FEATURES: readonly AiCloudFeatureDefinition[] = [
-  {
-    id: 'cardGen',
-    labelKey: 'aiProv.feature.cardGen',
-    descKey: 'aiProv.feature.cardGen.desc',
-    defaultAllowed: true,
-  },
-  {
-    id: 'mirror',
-    labelKey: 'aiProv.feature.mirror',
-    descKey: 'aiProv.feature.mirror.desc',
-    defaultAllowed: true,
-  },
-  {
-    id: 'subtitleTranslate',
-    labelKey: 'aiProv.feature.subtitleTranslate',
-    descKey: 'aiProv.feature.subtitleTranslate.desc',
-    defaultAllowed: false,
-  },
+  { id: 'cardGen', labelKey: 'aiProv.feature.cardGen', descKey: 'aiProv.feature.cardGen.desc', defaultAllowed: true },
+  { id: 'mirror', labelKey: 'aiProv.feature.mirror', descKey: 'aiProv.feature.mirror.desc', defaultAllowed: true },
+  { id: 'subtitleTranslate', labelKey: 'aiProv.feature.subtitleTranslate', descKey: 'aiProv.feature.subtitleTranslate.desc', defaultAllowed: false },
   // The four below each run only after the user picks a cloud target or presses
   // a button (the Agent's send/plan, an assistant mode, "Fuse", "Generate"), so
   // they keep working by default; the toggle is how to stop them.
-  {
-    id: 'agentChat',
-    labelKey: 'aiAgent.feature.agentChat',
-    descKey: 'aiAgent.feature.agentChat.desc',
-    defaultAllowed: true,
-  },
-  {
-    id: 'mediaAssistant',
-    labelKey: 'aiAgent.feature.mediaAssistant',
-    descKey: 'aiAgent.feature.mediaAssistant.desc',
-    defaultAllowed: true,
-  },
-  {
-    id: 'subtitleFusion',
-    labelKey: 'aiAgent.feature.subtitleFusion',
-    descKey: 'aiAgent.feature.subtitleFusion.desc',
-    defaultAllowed: true,
-  },
-  {
-    id: 'ankiAdditions',
-    labelKey: 'aiAgent.feature.ankiAdditions',
-    descKey: 'aiAgent.feature.ankiAdditions.desc',
-    defaultAllowed: true,
-  },
+  { id: 'agentChat', labelKey: 'aiAgent.feature.agentChat', descKey: 'aiAgent.feature.agentChat.desc', defaultAllowed: true },
+  { id: 'mediaAssistant', labelKey: 'aiAgent.feature.mediaAssistant', descKey: 'aiAgent.feature.mediaAssistant.desc', defaultAllowed: true },
+  { id: 'subtitleFusion', labelKey: 'aiAgent.feature.subtitleFusion', descKey: 'aiAgent.feature.subtitleFusion.desc', defaultAllowed: true },
+  { id: 'ankiAdditions', labelKey: 'aiAgent.feature.ankiAdditions', descKey: 'aiAgent.feature.ankiAdditions.desc', defaultAllowed: true },
   // The optional study helpers (`shared/aiStudyCommon.ts`, enforced in
   // `main/aiStudyAssist.ts`). New, so they start OFF for the cloud: each has a
   // deterministic fallback and runs on the offline model without any opt-in, and
   // sending card text or known words to a provider waits for the user to allow it.
-  {
-    id: 'whyWrong',
-    labelKey: 'aiStudy.feature.whyWrong',
-    descKey: 'aiStudy.feature.whyWrong.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'exampleSentences',
-    labelKey: 'aiStudy.feature.exampleSentences',
-    descKey: 'aiStudy.feature.exampleSentences.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'leechRescue',
-    labelKey: 'aiStudy.feature.leechRescue',
-    descKey: 'aiStudy.feature.leechRescue.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'contextExplain',
-    labelKey: 'aiStudy.feature.contextExplain',
-    descKey: 'aiStudy.feature.contextExplain.desc',
-    defaultAllowed: false,
-  },
+  { id: 'whyWrong', labelKey: 'aiStudy.feature.whyWrong', descKey: 'aiStudy.feature.whyWrong.desc', defaultAllowed: false },
+  { id: 'exampleSentences', labelKey: 'aiStudy.feature.exampleSentences', descKey: 'aiStudy.feature.exampleSentences.desc', defaultAllowed: false },
+  { id: 'leechRescue', labelKey: 'aiStudy.feature.leechRescue', descKey: 'aiStudy.feature.leechRescue.desc', defaultAllowed: false },
+  { id: 'contextExplain', labelKey: 'aiStudy.feature.contextExplain', descKey: 'aiStudy.feature.contextExplain.desc', defaultAllowed: false },
   // The optional helpers for watching and reading (`shared/aiImmerseCommon.ts`,
   // enforced in `main/aiImmerseAssist.ts`). New, so they start OFF for the cloud
   // for the same reason as the study helpers above: each has a deterministic
   // fallback and runs on the offline model without any opt-in.
-  {
-    id: 'mediaBrief',
-    labelKey: 'aiImmerse.feature.mediaBrief',
-    descKey: 'aiImmerse.feature.mediaBrief.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'linePick',
-    labelKey: 'aiImmerse.feature.linePick',
-    descKey: 'aiImmerse.feature.linePick.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'readerExplain',
-    labelKey: 'aiImmerse.feature.readerExplain',
-    descKey: 'aiImmerse.feature.readerExplain.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'readerSimplify',
-    labelKey: 'aiImmerse.feature.readerSimplify',
-    descKey: 'aiImmerse.feature.readerSimplify.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'vnExplain',
-    labelKey: 'aiImmerse.feature.vnExplain',
-    descKey: 'aiImmerse.feature.vnExplain.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'vnTranslate',
-    labelKey: 'aiImmerse.feature.vnTranslate',
-    descKey: 'aiImmerse.feature.vnTranslate.desc',
-    defaultAllowed: false,
-  },
-  {
-    id: 'studyCommand',
-    labelKey: 'aiImmerse.feature.studyCommand',
-    descKey: 'aiImmerse.feature.studyCommand.desc',
-    defaultAllowed: false,
-  },
+  { id: 'mediaBrief', labelKey: 'aiImmerse.feature.mediaBrief', descKey: 'aiImmerse.feature.mediaBrief.desc', defaultAllowed: false },
+  { id: 'linePick', labelKey: 'aiImmerse.feature.linePick', descKey: 'aiImmerse.feature.linePick.desc', defaultAllowed: false },
+  { id: 'readerExplain', labelKey: 'aiImmerse.feature.readerExplain', descKey: 'aiImmerse.feature.readerExplain.desc', defaultAllowed: false },
+  { id: 'readerSimplify', labelKey: 'aiImmerse.feature.readerSimplify', descKey: 'aiImmerse.feature.readerSimplify.desc', defaultAllowed: false },
+  { id: 'vnExplain', labelKey: 'aiImmerse.feature.vnExplain', descKey: 'aiImmerse.feature.vnExplain.desc', defaultAllowed: false },
+  { id: 'vnTranslate', labelKey: 'aiImmerse.feature.vnTranslate', descKey: 'aiImmerse.feature.vnTranslate.desc', defaultAllowed: false },
+  { id: 'studyCommand', labelKey: 'aiImmerse.feature.studyCommand', descKey: 'aiImmerse.feature.studyCommand.desc', defaultAllowed: false },
   // Grammar, statistics, planning, onboarding and the Blanc study tools
   // (`shared/aiTutorCommon.ts`, enforced in `main/aiTutorAssist.ts`). New, so
   // every one starts OFF for the cloud: each has a deterministic fallback and
@@ -239,6 +150,7 @@ export const AI_CLOUD_FEATURES: readonly AiCloudFeatureDefinition[] = [
   { id: 'conversationPartner', labelKey: 'aiSpeak.feature.conversationPartner', descKey: 'aiSpeak.feature.conversationPartner.desc', defaultAllowed: false },
   { id: 'writingCorrection', labelKey: 'aiSpeak.feature.writingCorrection', descKey: 'aiSpeak.feature.writingCorrection.desc', defaultAllowed: false },
   { id: 'journalGrade', labelKey: 'aiSpeak.feature.journalGrade', descKey: 'aiSpeak.feature.journalGrade.desc', defaultAllowed: false },
+  { id: 'ocrVision', labelKey: 'aiProv.feature.ocrVision', descKey: 'aiProv.feature.ocrVision.desc', defaultAllowed: false },
 ];
 
 export type AiCloudFeatureConsent = Record<AiCloudFeatureId, boolean>;

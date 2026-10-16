@@ -1709,6 +1709,9 @@ declare global {
         providerId: AiProviderId,
       ): Promise<import('../shared/aiConnectionTest').AiConnectionTestResult>;
       onAiSetupChanged(cb: (status: AiSetupStatus) => void): () => void;
+      aiOcrVisionStatus(): Promise<import('../shared/aiOcrVision').AiOcrVisionStatus>;
+      aiOcrVisionUpdate(patch: import('../shared/aiOcrVision').AiOcrVisionPatch): Promise<import('../shared/aiOcrVision').AiOcrVisionStatus>;
+      onAiOcrVisionChanged(cb: (status: import('../shared/aiOcrVision').AiOcrVisionStatus) => void): () => void;
       localAgentPlan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse>;
       localAgentStatus(): Promise<LocalAgentRuntimeStatus>;
       localAgentModels(): Promise<LocalAgentModelInfo[]>;
